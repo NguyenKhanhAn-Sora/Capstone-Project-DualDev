@@ -1,0 +1,2 @@
+- Có tính năng privacy cho mỗi bài post (quyền riêng tư public/private/onlyfriend)
+- Có tính năng thả react cho message 
