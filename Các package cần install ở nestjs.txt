@@ -12,6 +12,10 @@ $ npm i --save @nestjs/websockets @nestjs/platform-socket.io
 $ npm i @nestjs/platform-ws
 $ npm i rxjs ws uuid
 
+$ npm i nodemailer
+$ npm i dotenv
+$ npm i cloudinary
+
 
 nest g resource users --no-spec
 
