@@ -16,7 +16,7 @@ export class ConfigService {
   }
 
   get port(): number {
-    return Number(process.env.PORT ?? 3000);
+    return Number(process.env.PORT ?? 8888);
   }
 
   get appUrl(): string {

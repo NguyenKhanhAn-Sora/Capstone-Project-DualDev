@@ -42,7 +42,7 @@ const avatarFileFilter = (
   cb: (error: Error | null, acceptFile: boolean) => void,
 ) => {
   if (!file.mimetype.startsWith('image/')) {
-    return cb(new BadRequestException('Chỉ chấp nhận file ảnh'), false);
+    return cb(new BadRequestException('Please choose an image file'), false);
   }
   cb(null, true);
 };
@@ -66,14 +66,12 @@ export class AuthController {
         existing.signupStage === 'completed' || existing.status === 'active';
 
       if (isCompleted) {
-        throw new BadRequestException('Email đã được đăng ký!');
+        throw new BadRequestException('Email already existed!');
       }
 
       if (existing.status === 'banned') {
-        throw new BadRequestException('Tài khoản đã bị khóa');
+        throw new BadRequestException('Account has been banned');
       }
-
-      // Cho phép gửi lại OTP cho tài khoản chưa hoàn tất đăng ký
     }
     const { code, expiresMs } = await this.otpService.requestOtp(email);
     await this.mailService.sendOtpEmail(
@@ -187,9 +185,7 @@ export class AuthController {
 
   @Get('google')
   @UseGuards(AuthGuard('google'))
-  async googleAuth() {
-    // Redirected to Google by passport
-  }
+  async googleAuth() {}
 
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))

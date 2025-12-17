@@ -26,8 +26,9 @@ export class MailService {
   ): Promise<void> {
     const subject = 'Mã đăng nhập Cordigram';
     const text = `Mã của bạn: ${code}\nHiệu lực: ${expiresMinutes} phút.`;
-    // Dùng URL công khai để tránh xuất hiện file đính kèm. Đặt FRONTEND_URL trỏ tới nơi có logo.png
-    const logoUrl = `${this.config.frontendUrl.replace(/\/$/, '')}/logo.png`;
+
+    const logoUrl =
+      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
     const html = `
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
         <tr>

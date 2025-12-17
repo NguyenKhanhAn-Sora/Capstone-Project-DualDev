@@ -297,7 +297,7 @@ export default function SignupPage() {
       });
       setCooldownLeft(null);
       setStep("otp");
-      showInfo("OTP sent to your email. Please check inbox and spam.");
+      showInfo("OTP sent to your email");
     } catch (err) {
       const apiErr = err as ApiError<{ retryAfterSec?: number }>;
       if (
@@ -388,9 +388,7 @@ export default function SignupPage() {
       setFieldError((prev) => ({ ...prev, birthdate: birthErr }));
       return;
     }
-
     setError("");
-    setInfo("Optional: pick an avatar or skip to finish.");
     setStep("avatar");
   };
 
@@ -608,6 +606,8 @@ export default function SignupPage() {
             value={username}
             onChange={(e) => {
               const cleaned = e.target.value
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
                 .toLowerCase()
                 .replace(/[^a-z0-9_]/g, "");
               setUsername(cleaned);
@@ -690,7 +690,7 @@ export default function SignupPage() {
       <div className={styles.avatarHeader}>
         <div>
           <h3 className="text-[18px] font-semibold text-slate-900">
-            Choose avatar (optional)
+            Choose avatar
           </h3>
         </div>
         {(avatarThumb || avatarPreview) && (
@@ -803,7 +803,6 @@ export default function SignupPage() {
                 </h1>
                 <p className="whitespace-nowrap text-[14px] text-slate-600">
                   Step {currentStepIndex + 1} / {steps.length}
-                  {step === "avatar" ? " · Choose avatar (optional)" : ""}
                 </p>
               </div>
 
