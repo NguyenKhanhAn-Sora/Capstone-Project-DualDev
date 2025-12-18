@@ -8,7 +8,8 @@ $ npm i @nestjs/core
 
 $ npm i class-validator class-transformer
 
-$ npm i --save @nestjs/websockets @nestjs/platform-socket.io
+$ npm i @nestjs/websockets @nestjs/platform-socket.io socket.io\
+
 $ npm i @nestjs/platform-ws
 $ npm i rxjs ws uuid
 
@@ -18,4 +19,9 @@ $ npm i cloudinary
 
 
 nest g resource users --no-spec
+
+-------------------------------------------
+
+$npm i socket.io-client
+
 

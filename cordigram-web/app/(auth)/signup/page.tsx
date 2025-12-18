@@ -50,6 +50,21 @@ function decodeJwtEmail(token: string): string | null {
   }
 }
 
+function validateDisplayName(name: string): string | null {
+  if (!name) return null;
+  const condensed = name.replace(/\s/g, "");
+  if (name.length < 3 || name.length > 30) {
+    return "Atleast 3 and maximum 30 character";
+  }
+  if (condensed.length < 3) {
+    return "Display name needs at least 3 letters after removing spaces";
+  }
+  if (!/^[\p{L}\s]+$/u.test(name)) {
+    return "Display name can only contain letters and spaces";
+  }
+  return null;
+}
+
 async function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -159,6 +174,7 @@ export default function SignupPage() {
     password?: string;
     birthdate?: string;
     username?: string;
+    displayName?: string;
   }>({});
   const [cooldownLeft, setCooldownLeft] = useState<number | null>(null);
 
@@ -251,6 +267,18 @@ export default function SignupPage() {
 
     return () => clearTimeout(handle);
   }, [username]);
+
+  useEffect(() => {
+    if (!displayName) {
+      setFieldError((prev) => ({ ...prev, displayName: undefined }));
+      return;
+    }
+    const handle = setTimeout(() => {
+      const err = validateDisplayName(displayName);
+      setFieldError((prev) => ({ ...prev, displayName: err || undefined }));
+    }, 1000);
+    return () => clearTimeout(handle);
+  }, [displayName]);
 
   const steps: Array<{ key: Step; label: string }> = useMemo(
     () => [
@@ -364,6 +392,12 @@ export default function SignupPage() {
         ...prev,
         username: usernameError || "Đang kiểm tra username",
       }));
+      return;
+    }
+
+    const displayErr = validateDisplayName(displayName);
+    if (displayErr) {
+      setFieldError((prev) => ({ ...prev, displayName: displayErr }));
       return;
     }
 
@@ -598,6 +632,9 @@ export default function SignupPage() {
             placeholder="E.g. Cordigrammer"
             required
           />
+          {fieldError.displayName && (
+            <p className={styles.fieldError}>{fieldError.displayName}</p>
+          )}
         </div>
         <div className="space-y-[6px]">
           <label className={styles.label}>Username</label>
