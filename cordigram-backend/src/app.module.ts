@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { AuthModule } from './auth/auth.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { PostsModule } from './posts/posts.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
     ProfilesModule,
     AuthModule,
     CloudinaryModule,
+    PostsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

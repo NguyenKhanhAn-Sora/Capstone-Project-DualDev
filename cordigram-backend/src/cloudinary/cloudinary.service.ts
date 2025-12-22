@@ -15,6 +15,7 @@ export interface UploadResult {
   format?: string;
   width?: number;
   height?: number;
+  duration?: number;
 }
 
 @Injectable()
@@ -74,6 +75,7 @@ export class CloudinaryService implements OnModuleInit {
       format: res.format,
       width: res.width,
       height: res.height,
+      duration: res.duration,
     };
   }
 }

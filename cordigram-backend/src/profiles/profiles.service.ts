@@ -88,4 +88,19 @@ export class ProfilesService {
       .exec();
     return !existing;
   }
+
+  async findByUserId(userId: string | Types.ObjectId): Promise<Profile | null> {
+    const objectId =
+      typeof userId === 'string'
+        ? Types.ObjectId.isValid(userId)
+          ? new Types.ObjectId(userId)
+          : null
+        : userId;
+
+    if (!objectId) {
+      return null;
+    }
+
+    return this.profileModel.findOne({ userId: objectId }).exec();
+  }
 }

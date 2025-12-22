@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Roboto } from "next/font/google";
-import "./globals.css";
+import "../globals.css";
+import Sidebar from "@/ui/Sidebar/sidebar";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -18,8 +19,9 @@ export default function MainLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${roboto.variable} antialiased`}>{children}</body>
-    </html>
+    <div className="app-shell flex">
+      <Sidebar />
+      <div className="page flex-1">{children}</div>
+    </div>
   );
 }

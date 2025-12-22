@@ -11,6 +11,8 @@ import { ConfigService } from '../config/config.service';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { PassportModule } from '@nestjs/passport';
 import { GoogleStrategy } from './google.strategy';
+import { JwtStrategy } from './jwt.strategy';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Module({
   imports: [
@@ -29,6 +31,7 @@ import { GoogleStrategy } from './google.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, GoogleStrategy],
+  providers: [AuthService, GoogleStrategy, JwtStrategy, JwtAuthGuard],
+  exports: [JwtAuthGuard, JwtStrategy],
 })
 export class AuthModule {}
