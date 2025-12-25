@@ -269,6 +269,34 @@ export async function uploadPostMedia(opts: {
   return (await res.json()) as UploadPostMediaResponse;
 }
 
+export type ProfileSearchItem = {
+  id: string;
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+  followersCount: number;
+};
+
+export async function searchProfiles(opts: {
+  token: string;
+  query: string;
+  limit?: number;
+}): Promise<{ items: ProfileSearchItem[]; count: number }> {
+  const { token, query, limit } = opts;
+  const params = new URLSearchParams();
+  params.set("q", query);
+  if (limit) params.set("limit", String(limit));
+
+  return apiFetch<{ items: ProfileSearchItem[]; count: number }>({
+    path: `/profiles/search?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function createReportProblem(opts: {
   token: string;
   description: string;

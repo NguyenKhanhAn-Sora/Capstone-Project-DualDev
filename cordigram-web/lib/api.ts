@@ -157,6 +157,10 @@ export type CurrentProfileResponse = {
   avatarUrl: string;
 };
 
+export type UserSettingsResponse = {
+  theme: "light" | "dark";
+};
+
 export async function fetchCurrentProfile(opts: {
   token: string;
 }): Promise<CurrentProfileResponse> {
@@ -167,6 +171,34 @@ export async function fetchCurrentProfile(opts: {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+  });
+}
+
+export async function fetchUserSettings(opts: {
+  token: string;
+}): Promise<UserSettingsResponse> {
+  const { token } = opts;
+  return apiFetch<UserSettingsResponse>({
+    path: "/users/settings",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function updateUserSettings(opts: {
+  token: string;
+  theme?: "light" | "dark";
+}): Promise<UserSettingsResponse> {
+  const { token, theme } = opts;
+  return apiFetch<UserSettingsResponse>({
+    path: "/users/settings",
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ theme }),
   });
 }
 
@@ -181,6 +213,29 @@ export type UploadPostMediaResponse = {
   width?: number;
   height?: number;
   duration?: number;
+};
+
+export type ReportProblemAttachment = {
+  url: string;
+  secureUrl: string;
+  publicId: string;
+  resourceType: string;
+  bytes: number;
+  format?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+};
+
+export type CreateReportProblemResponse = {
+  id: string;
+  reporterId: string;
+  userId?: string;
+  description: string;
+  attachments: ReportProblemAttachment[];
+  status: "open" | "in_progress" | "resolved";
+  createdAt: string;
+  updatedAt: string;
 };
 
 export async function uploadPostMedia(opts: {
@@ -212,6 +267,68 @@ export async function uploadPostMedia(opts: {
   }
 
   return (await res.json()) as UploadPostMediaResponse;
+}
+
+export type ProfileSearchItem = {
+  id: string;
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+  followersCount: number;
+};
+
+export async function searchProfiles(opts: {
+  token: string;
+  query: string;
+  limit?: number;
+}): Promise<{ items: ProfileSearchItem[]; count: number }> {
+  const { token, query, limit } = opts;
+  const params = new URLSearchParams();
+  params.set("q", query);
+  if (limit) params.set("limit", String(limit));
+
+  return apiFetch<{ items: ProfileSearchItem[]; count: number }>({
+    path: `/profiles/search?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function createReportProblem(opts: {
+  token: string;
+  description: string;
+  files?: File[];
+}): Promise<CreateReportProblemResponse> {
+  const { token, description, files } = opts;
+  const url = `${apiBaseUrl}/reportproblem`;
+  const form = new FormData();
+  form.append("description", description.trim());
+  (files ?? []).forEach((file) => form.append("files", file));
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => ({}))) as {
+      message?: string;
+      retryAfterMs?: number;
+    };
+    throw {
+      status: res.status,
+      message: payload.message || "Request failed",
+      data: payload,
+    } satisfies ApiError;
+  }
+
+  return (await res.json()) as CreateReportProblemResponse;
 }
 
 export function getApiBaseUrl(): string {

@@ -9,6 +9,10 @@ export type OAuthProvider = {
   refreshToken?: string | null;
 };
 
+export type UserSettings = {
+  theme: 'light' | 'dark';
+};
+
 @Schema({ timestamps: true })
 export class User extends Document {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
@@ -40,6 +44,14 @@ export class User extends Document {
 
   @Prop({ type: String, default: 'otp_pending' })
   signupStage: 'otp_pending' | 'info_pending' | 'completed';
+
+  @Prop({
+    type: {
+      theme: { type: String, enum: ['light', 'dark'], default: 'light' },
+    },
+    default: { theme: 'light' },
+  })
+  settings: UserSettings;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

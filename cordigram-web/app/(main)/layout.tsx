@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Roboto } from "next/font/google";
 import "../globals.css";
 import Sidebar from "@/ui/Sidebar/sidebar";
+import { AuthGuard } from "../../component/auth-guard";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -19,9 +20,11 @@ export default function MainLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="app-shell flex">
-      <Sidebar />
-      <div className="page flex-1">{children}</div>
-    </div>
+    <AuthGuard>
+      <div className="app-shell flex">
+        <Sidebar />
+        <div className="page flex-1">{children}</div>
+      </div>
+    </AuthGuard>
   );
 }

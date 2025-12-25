@@ -463,6 +463,10 @@
   align-items: center;
 }
 
+.locationCombo {
+  position: relative;
+}
+
 .ghostButton {
   margin-left: 10px;
   padding: 8px;
@@ -509,18 +513,129 @@
   resize: vertical;
 }
 
+.locationSuggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.22);
+  z-index: 12;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.locationSuggestion {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  transition: background 0.12s ease;
+}
+
+.locationSuggestion:hover,
+.locationSuggestionActive {
+  background: var(--color-surface-muted);
+}
+
+.locationSuggestionText {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.locationSuggestionMuted {
+  padding: 10px 12px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.mentionCombo {
+  position: relative;
+}
+
+.mentionSuggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.22);
+  z-index: 12;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.mentionSuggestion {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  transition: background 0.12s ease;
+}
+
+.mentionSuggestion:hover,
+.mentionSuggestionActive {
+  background: var(--color-surface-muted);
+}
+
+.mentionAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.mentionMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mentionName {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.mentionUsername {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.mentionStat {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.mentionSuggestionMuted {
+  padding: 10px 12px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
 .charCount {
   position: absolute;
   bottom: 8px;
   right: 24px;
   font-size: 12px;
   color: var(--color-text-muted);
-}
-
-.rowGroup {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
 }
 
 .switchGroup {
@@ -574,7 +689,8 @@
 
 .switchRow input {
   margin-top: 4px;
-  accent-color: var(--color-primary);
+  /* accent-color: var(--color-primary); */
+  background: (135deg, var(--color-primary), #22d3ee);
 }
 
 .switchTitle {
@@ -717,7 +833,7 @@
   gap: 6px;
   padding: 6px 10px;
   border-radius: 999px;
-  background: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary), #22d3ee);
   color: #fff;
   font-weight: 600;
   font-size: 13px;
@@ -872,11 +988,7 @@
 
 .dropdownCheckActive {
   border-color: transparent;
-  background: linear-gradient(
-    135deg,
-    var(--color-primary),
-    var(--color-primary-accent)
-  );
+  background: linear-gradient(135deg, var(--color-primary), #22d3ee);
   color: #ffffff;
   box-shadow: 0 8px 18px rgba(14, 165, 233, 0.18);
 }

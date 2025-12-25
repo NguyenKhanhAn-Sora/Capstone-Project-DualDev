@@ -64,4 +64,32 @@ export class ProfilesController {
       avatarUrl: profile.avatarUrl,
     };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('search')
+  async searchProfiles(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const user = req.user;
+    if (!user) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    if (!q || !q.trim()) {
+      throw new BadRequestException('q is required');
+    }
+
+    const results = await this.profilesService.searchProfiles({
+      query: q,
+      limit: limit ? Number(limit) : 8,
+      excludeUserId: user.userId,
+    });
+
+    return {
+      items: results,
+      count: results.length,
+    };
+  }
 }

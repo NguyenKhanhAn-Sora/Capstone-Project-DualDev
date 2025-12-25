@@ -13,6 +13,10 @@ export class UsersService {
     return this.userModel.findOne({ email }).exec();
   }
 
+  findById(userId: string): Promise<User | null> {
+    return this.userModel.findById(userId).exec();
+  }
+
   async createPending(email: string): Promise<User> {
     const existing = await this.findByEmail(email);
     if (existing) {
@@ -37,6 +41,38 @@ export class UsersService {
         { signupStage: 'completed', status: 'active', isVerified: true },
       )
       .exec();
+  }
+
+  async getSettings(userId: string): Promise<{ theme: 'light' | 'dark' }> {
+    const user = await this.userModel
+      .findById(userId)
+      .select('settings')
+      .lean()
+      .exec();
+
+    return { theme: user?.settings?.theme ?? 'light' };
+  }
+
+  async updateSettings(params: {
+    userId: string;
+    theme?: 'light' | 'dark';
+  }): Promise<{ theme: 'light' | 'dark' }> {
+    const update: Record<string, unknown> = {};
+    if (params.theme) {
+      update['settings.theme'] = params.theme;
+    }
+
+    if (!Object.keys(update).length) {
+      const current = await this.getSettings(params.userId);
+      return current;
+    }
+
+    await this.userModel
+      .updateOne({ _id: params.userId }, { $set: update })
+      .exec();
+
+    const next = await this.getSettings(params.userId);
+    return next;
   }
 
   async createWithGoogle(params: {

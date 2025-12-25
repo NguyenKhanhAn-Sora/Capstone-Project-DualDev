@@ -13,6 +13,7 @@
   --color-primary-accent: #22d3ee;
   --shadow-strong: 0 24px 80px rgba(10, 18, 40, 0.25);
   --gradient-surface: linear-gradient(135deg, #f8fafc, #eef2ff);
+  --color-title-primary: #0f1629;
 }
 
 [data-theme="dark"] {
@@ -28,6 +29,8 @@
   --color-primary-accent: #1b5f9d;
   --shadow-strong: 0 24px 80px rgba(0, 0, 0, 0.45);
   --gradient-surface: linear-gradient(135deg, #111b30, #0c1220);
+  --color-title-primary: #e5e7ef;
+
 }
 
 @theme inline {

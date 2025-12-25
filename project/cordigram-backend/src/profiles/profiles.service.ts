@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Types, PipelineStage } from 'mongoose';
 import { Profile } from './profile.schema';
 
 @Injectable()
@@ -8,6 +8,10 @@ export class ProfilesService {
   constructor(
     @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
   ) {}
+
+  private escapeRegex(input: string): string {
+    return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
 
   private readonly DEFAULT_AVATAR_URL =
     'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
@@ -102,5 +106,88 @@ export class ProfilesService {
     }
 
     return this.profileModel.findOne({ userId: objectId }).exec();
+  }
+
+  async searchProfiles(params: {
+    query: string;
+    limit?: number;
+    excludeUserId?: string;
+  }): Promise<
+    Array<{
+      id: string;
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      followersCount: number;
+    }>
+  > {
+    const term = params.query?.trim();
+    if (!term) return [];
+
+    const limit = Math.min(Math.max(Number(params.limit) || 8, 1), 25);
+    const escaped = this.escapeRegex(term.toLowerCase());
+    const prefixRegex = new RegExp(`^${escaped}`, 'i');
+    const anywhereRegex = new RegExp(escaped, 'i');
+
+    const excludeUserId = params.excludeUserId;
+    const exclude =
+      excludeUserId && Types.ObjectId.isValid(excludeUserId)
+        ? new Types.ObjectId(excludeUserId)
+        : null;
+
+    const pipeline: PipelineStage[] = [
+      {
+        $match: {
+          ...(exclude ? { userId: { $ne: exclude } } : {}),
+          $or: [
+            { username: { $regex: anywhereRegex } },
+            { displayName: { $regex: anywhereRegex } },
+          ],
+        },
+      },
+      {
+        $addFields: {
+          prefixUsername: {
+            $cond: [
+              { $regexMatch: { input: '$username', regex: prefixRegex } },
+              1,
+              0,
+            ],
+          },
+          prefixDisplay: {
+            $cond: [
+              { $regexMatch: { input: '$displayName', regex: prefixRegex } },
+              1,
+              0,
+            ],
+          },
+          usernameLength: { $strLenCP: '$username' },
+        },
+      },
+      {
+        $sort: {
+          prefixUsername: -1,
+          prefixDisplay: -1,
+          usernameLength: 1,
+          'stats.followersCount': -1,
+          createdAt: -1,
+        },
+      },
+      { $limit: limit },
+      {
+        $project: {
+          _id: 0,
+          id: { $toString: '$_id' },
+          userId: { $toString: '$userId' },
+          username: 1,
+          displayName: 1,
+          avatarUrl: 1,
+          followersCount: '$stats.followersCount',
+        },
+      },
+    ];
+
+    return this.profileModel.aggregate(pipeline).exec();
   }
 }

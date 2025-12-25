@@ -4,7 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import EmojiPicker from "emoji-picker-react";
 import styles from "./create.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { createPost, createReel, uploadPostMedia } from "@/lib/api";
+import {
+  createPost,
+  createReel,
+  searchProfiles,
+  uploadPostMedia,
+  type ProfileSearchItem,
+} from "@/lib/api";
 
 function LocationIcon() {
   return (
@@ -50,6 +56,24 @@ type FormState = {
   mentions: string[];
 };
 
+const normalizeHashtag = (value: string) =>
+  value
+    .replace(/^#/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "")
+    .replace(/[^a-zA-Z0-9_]/g, "")
+    .toLowerCase();
+
+const cleanLocationLabel = (label: string) =>
+  label
+    .replace(/\b\d{4,6}\b/g, "")
+    .replace(/,\s*,+/g, ", ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s*,\s*$/g, "")
+    .replace(/^\s*,\s*/g, "")
+    .trim();
+
 const initialForm: FormState = {
   caption: "",
   location: "",
@@ -76,7 +100,6 @@ export default function CreatePostPage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     null
   );
-  const [isResolvingLocation, setIsResolvingLocation] = useState(false);
   const [hashtagDraft, setHashtagDraft] = useState("");
   const [mentionDraft, setMentionDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -85,6 +108,22 @@ export default function CreatePostPage() {
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
+  const [locationInput, setLocationInput] = useState(initialForm.location);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState<
+    Array<{ label: string; lat: string; lon: string }>
+  >([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [locationHighlight, setLocationHighlight] = useState(-1);
+  const [mentionSuggestions, setMentionSuggestions] = useState<
+    ProfileSearchItem[]
+  >([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const [mentionError, setMentionError] = useState("");
+  const [mentionHighlight, setMentionHighlight] = useState(-1);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const captionRef = useRef<HTMLTextAreaElement | null>(null);
   const audienceRef = useRef<HTMLDivElement | null>(null);
@@ -249,6 +288,17 @@ export default function CreatePostPage() {
     setPreviewUrl(null);
     setVideoDuration(null);
     setForm(initialForm);
+    setLocationInput(initialForm.location);
+    setLocationQuery("");
+    setLocationSuggestions([]);
+    setLocationOpen(false);
+    setLocationHighlight(-1);
+    setLocationError("");
+    setMentionSuggestions([]);
+    setMentionOpen(false);
+    setMentionLoading(false);
+    setMentionError("");
+    setMentionHighlight(-1);
     setStep("select");
     setSubmitError("");
     setSubmitSuccess("");
@@ -264,8 +314,6 @@ export default function CreatePostPage() {
     const sizeInMb = selectedFile.size / 1024 / 1024;
     return `${sizeInMb.toFixed(1)} MB`;
   }, [selectedFile]);
-
-  if (!canRender) return null;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -316,11 +364,7 @@ export default function CreatePostPage() {
     let uploadedMeta: Record<string, unknown> | null = null;
 
     const normalizedHashtags = Array.from(
-      new Set(
-        (form.hashtags || []).map((t) =>
-          t.toString().trim().replace(/^#/, "").toLowerCase()
-        )
-      )
+      new Set((form.hashtags || []).map((t) => normalizeHashtag(t.toString())))
     ).filter(Boolean);
 
     const normalizedMentions = Array.from(
@@ -433,18 +477,11 @@ export default function CreatePostPage() {
       maximumAge: 5000,
     };
 
-    const lowOptions: PositionOptions = {
-      enableHighAccuracy: false,
-      timeout: 12000,
-      maximumAge: 60000,
-    };
-
     const resolveAddress = async (
       latitude: number,
       longitude: number,
       fallback: string
     ) => {
-      setIsResolvingLocation(true);
       try {
         const url = new URL("https://nominatim.openstreetmap.org/reverse");
         url.searchParams.set("format", "jsonv2");
@@ -460,7 +497,7 @@ export default function CreatePostPage() {
         });
         if (!res.ok) throw new Error("reverse geocode failed");
         const data = await res.json();
-        const addr = data?.display_name as string | undefined;
+        const addr = data.display_name;
         const city =
           data?.address?.city || data?.address?.town || data?.address?.village;
         const road = data?.address?.road;
@@ -469,8 +506,6 @@ export default function CreatePostPage() {
         setForm((prev) => ({ ...prev, location: chosen }));
       } catch (err) {
         setForm((prev) => ({ ...prev, location: fallback }));
-      } finally {
-        setIsResolvingLocation(false);
       }
     };
 
@@ -479,9 +514,7 @@ export default function CreatePostPage() {
       setCoords({ lat: latitude, lng: longitude });
       setGeoStatus("granted");
       const pretty = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-      resolveAddress(latitude, longitude, pretty).catch(() => {
-        setForm((prev) => ({ ...prev, location: pretty }));
-      });
+      resolveAddress(latitude, longitude, pretty);
     };
 
     const handleError = (
@@ -496,7 +529,8 @@ export default function CreatePostPage() {
         navigator.geolocation.getCurrentPosition(
           handleSuccess,
           (err2) => handleError(err2, true),
-          lowOptions
+          // --------------------------------
+          highOptions
         );
         return;
       }
@@ -526,12 +560,10 @@ export default function CreatePostPage() {
   };
 
   const addHashtag = () => {
-    const raw = hashtagDraft.trim().replace(/^#/, "");
-    if (!raw) return;
-    const tag = raw.toLowerCase();
+    const tag = normalizeHashtag(hashtagDraft);
+    if (!tag) return;
     setForm((prev) => {
-      if (prev.hashtags.includes(tag) || prev.hashtags.length >= 10)
-        return prev;
+      if (prev.hashtags.includes(tag)) return prev;
       return { ...prev, hashtags: [...prev.hashtags, tag] };
     });
     setHashtagDraft("");
@@ -540,10 +572,9 @@ export default function CreatePostPage() {
   const addMention = () => {
     const raw = mentionDraft.trim().replace(/^@/, "");
     if (!raw) return;
-    const handle = raw;
+    const handle = raw.toLowerCase();
     setForm((prev) => {
-      if (prev.mentions.includes(handle) || prev.mentions.length >= 10)
-        return prev;
+      if (prev.mentions.includes(handle)) return prev;
       return { ...prev, mentions: [...prev.mentions, handle] };
     });
     setMentionDraft("");
@@ -563,6 +594,47 @@ export default function CreatePostPage() {
     }));
   };
 
+  const onLocationKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      if (locationOpen && locationHighlight >= 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        const chosen = locationSuggestions[locationHighlight];
+        if (chosen) selectLocation(chosen);
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (e.key === "ArrowDown") {
+      if (!locationSuggestions.length) return;
+      e.preventDefault();
+      setLocationOpen(true);
+      setLocationHighlight((prev) =>
+        prev + 1 < locationSuggestions.length ? prev + 1 : 0
+      );
+    }
+    if (e.key === "ArrowUp") {
+      if (!locationSuggestions.length) return;
+      e.preventDefault();
+      setLocationOpen(true);
+      setLocationHighlight((prev) =>
+        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1
+      );
+    }
+    if (e.key === "Escape") {
+      setLocationOpen(false);
+      setLocationHighlight(-1);
+    }
+  };
+
+  const onScheduleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
   const onHashtagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
@@ -573,9 +645,208 @@ export default function CreatePostPage() {
   const onMentionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
+      if (mentionOpen && mentionHighlight >= 0) {
+        const opt = mentionSuggestions[mentionHighlight];
+        if (opt) {
+          selectMention(opt);
+          return;
+        }
+      }
       addMention();
     }
+    if (e.key === "ArrowDown") {
+      if (!mentionSuggestions.length) return;
+      e.preventDefault();
+      setMentionOpen(true);
+      setMentionHighlight((prev) =>
+        prev + 1 < mentionSuggestions.length ? prev + 1 : 0
+      );
+    }
+    if (e.key === "ArrowUp") {
+      if (!mentionSuggestions.length) return;
+      e.preventDefault();
+      setMentionOpen(true);
+      setMentionHighlight((prev) =>
+        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
+      );
+    }
+    if (e.key === "Escape") {
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+    }
   };
+
+  useEffect(() => {
+    const cleaned = mentionDraft.trim().replace(/^@/, "");
+    if (!cleaned) {
+      setMentionSuggestions([]);
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setMentionError("");
+      return;
+    }
+
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("accessToken")
+        : null;
+
+    if (!token) {
+      setMentionSuggestions([]);
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setMentionError("You need to be logged in to search users.");
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setMentionLoading(true);
+      setMentionError("");
+      try {
+        const res = await searchProfiles({
+          token,
+          query: cleaned,
+          limit: 8,
+        });
+        if (cancelled) return;
+        setMentionSuggestions(res.items);
+        setMentionOpen(res.items.length > 0);
+        setMentionHighlight(res.items.length ? 0 : -1);
+        if (!res.items.length) {
+          setMentionError("User not found");
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setMentionSuggestions([]);
+        setMentionOpen(false);
+        setMentionHighlight(-1);
+        setMentionError("User not found");
+      } finally {
+        if (!cancelled) setMentionLoading(false);
+      }
+    }, 320);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [mentionDraft]);
+
+  const selectMention = (opt: ProfileSearchItem) => {
+    const handle = opt.username.toLowerCase();
+    setForm((prev) => {
+      if (prev.mentions.includes(handle)) return prev;
+      return { ...prev, mentions: [...prev.mentions, handle] };
+    });
+    setMentionDraft("");
+    setMentionSuggestions([]);
+    setMentionOpen(false);
+    setMentionHighlight(-1);
+  };
+
+  const onMentionFocus = () => {
+    if (mentionSuggestions.length) {
+      setMentionOpen(true);
+    }
+  };
+
+  const onMentionBlur = () => {
+    setTimeout(() => {
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+    }, 120);
+  };
+
+  useEffect(() => {
+    if (!locationQuery.trim()) {
+      setLocationSuggestions([]);
+      setLocationOpen(false);
+      setLocationHighlight(-1);
+      setLocationError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setLocationLoading(true);
+      setLocationError("");
+      try {
+        const url = new URL("https://nominatim.openstreetmap.org/search");
+        url.searchParams.set("q", locationQuery);
+        url.searchParams.set("format", "jsonv2");
+        url.searchParams.set("addressdetails", "1");
+        url.searchParams.set("limit", "8");
+        url.searchParams.set("countrycodes", "vn");
+        const res = await fetch(url.toString(), {
+          headers: {
+            Accept: "application/json",
+            "Accept-Language": "vi",
+          },
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error("search failed");
+        const data = await res.json();
+        const mapped = Array.isArray(data)
+          ? data.map((item: any) => ({
+              label: cleanLocationLabel(item.display_name as string),
+              lat: item.lat as string,
+              lon: item.lon as string,
+            }))
+          : [];
+        setLocationSuggestions(mapped);
+        setLocationOpen(true);
+        setLocationHighlight(mapped.length ? 0 : -1);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setLocationSuggestions([]);
+        setLocationOpen(false);
+        setLocationHighlight(-1);
+        setLocationError("No suggestions found, try different keywords.");
+      } finally {
+        if (!controller.signal.aborted) setLocationLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [locationQuery]);
+
+  const selectLocation = (option: {
+    label: string;
+    lat: string;
+    lon: string;
+  }) => {
+    setForm((prev) => ({ ...prev, location: option.label }));
+    setLocationInput(option.label);
+    setLocationQuery(option.label);
+    setLocationSuggestions([]);
+    setLocationOpen(false);
+    setLocationHighlight(-1);
+  };
+
+  const onLocationChange = (value: string) => {
+    setLocationInput(value);
+    setForm((prev) => ({ ...prev, location: value }));
+    setLocationQuery(value);
+  };
+
+  const onLocationBlur = () => {
+    setTimeout(() => {
+      setLocationOpen(false);
+      setLocationHighlight(-1);
+    }, 120);
+  };
+
+  const onLocationFocus = () => {
+    if (locationSuggestions.length) {
+      setLocationOpen(true);
+    }
+  };
+
+  if (!canRender) return null;
 
   return (
     <div className={styles.screen}>
@@ -791,14 +1062,14 @@ export default function CreatePostPage() {
                     aria-label="Add emoji"
                   >
                     <svg
-                      aria-label="Biểu tượng cảm xúc"
+                      aria-label="Emoji icon"
                       fill="currentColor"
                       height="20"
                       role="img"
                       viewBox="0 0 24 24"
                       width="20"
                     >
-                      <title>Biểu tượng cảm xúc</title>
+                      <title>Emoji icon</title>
                       <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
                     </svg>
                   </button>
@@ -837,7 +1108,7 @@ export default function CreatePostPage() {
 
             <div className={styles.rowGroup}>
               <div className={styles.formGroup}>
-                <label>Hashtags</label>
+                <label>Hashtags #</label>
                 <div className={styles.chipShell}>
                   <div className={styles.chips}>
                     {form.hashtags.map((tag) => (
@@ -858,7 +1129,9 @@ export default function CreatePostPage() {
                         form.hashtags.length ? "Add hashtag" : "Example: travel"
                       }
                       value={hashtagDraft}
-                      onChange={(e) => setHashtagDraft(e.target.value)}
+                      onChange={(e) =>
+                        setHashtagDraft(normalizeHashtag(e.target.value))
+                      }
                       onKeyDown={onHashtagKeyDown}
                     />
                   </div>
@@ -867,7 +1140,7 @@ export default function CreatePostPage() {
 
               <div className={styles.formGroup}>
                 <label>Tag @</label>
-                <div className={styles.chipShell}>
+                <div className={`${styles.chipShell} ${styles.mentionCombo}`}>
                   <div className={styles.chips}>
                     {form.mentions.map((handle) => (
                       <span key={handle} className={styles.chip}>
@@ -891,8 +1164,62 @@ export default function CreatePostPage() {
                       value={mentionDraft}
                       onChange={(e) => setMentionDraft(e.target.value)}
                       onKeyDown={onMentionKeyDown}
+                      onFocus={onMentionFocus}
+                      onBlur={onMentionBlur}
                     />
                   </div>
+                  {mentionOpen && (
+                    <div className={styles.mentionSuggestions}>
+                      {mentionLoading && (
+                        <div className={styles.mentionSuggestionMuted}>
+                          Đang tìm người dùng...
+                        </div>
+                      )}
+                      {!mentionLoading &&
+                        mentionSuggestions.length === 0 &&
+                        mentionError && (
+                          <div className={styles.mentionSuggestionMuted}>
+                            {mentionError}
+                          </div>
+                        )}
+                      {!mentionLoading &&
+                        mentionSuggestions.map((opt, idx) => (
+                          <button
+                            type="button"
+                            key={opt.id}
+                            className={`${styles.mentionSuggestion} ${
+                              idx === mentionHighlight
+                                ? styles.mentionSuggestionActive
+                                : ""
+                            }`}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectMention(opt);
+                            }}
+                            onMouseEnter={() => setMentionHighlight(idx)}
+                          >
+                            <img
+                              src={opt.avatarUrl}
+                              alt=""
+                              className={styles.mentionAvatar}
+                            />
+                            <div className={styles.mentionMeta}>
+                              <span className={styles.mentionName}>
+                                {opt.displayName}
+                              </span>
+                              <span className={styles.mentionUsername}>
+                                @{opt.username}
+                              </span>
+                            </div>
+                            {typeof opt.followersCount === "number" && (
+                              <span className={styles.mentionStat}>
+                                {opt.followersCount.toLocaleString()} followers
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -900,24 +1227,62 @@ export default function CreatePostPage() {
             <div className={styles.rowGroup}>
               <div className={styles.formGroup}>
                 <label htmlFor="location">Location</label>
-                <div className={styles.inputShell}>
-                  <input
-                    id="location"
-                    name="location"
-                    placeholder="Add a location (optional)"
-                    value={form.location}
-                    onChange={(e) =>
-                      setForm({ ...form, location: e.target.value })
-                    }
-                  />
-                  <button
-                    type="button"
-                    className={styles.ghostButton}
-                    onClick={requestCurrentLocation}
-                    disabled={geoStatus === "requesting"}
-                  >
-                    <LocationIcon />
-                  </button>
+                <div className={styles.locationCombo}>
+                  <div className={styles.inputShell}>
+                    <input
+                      id="location"
+                      name="location"
+                      placeholder="Add a location (optional)"
+                      value={locationInput}
+                      onChange={(e) => onLocationChange(e.target.value)}
+                      onKeyDown={onLocationKeyDown}
+                      onBlur={onLocationBlur}
+                      onFocus={onLocationFocus}
+                    />
+                    <button
+                      type="button"
+                      className={styles.ghostButton}
+                      onClick={requestCurrentLocation}
+                      disabled={geoStatus === "requesting"}
+                    >
+                      <LocationIcon />
+                    </button>
+                  </div>
+                  {locationOpen && (
+                    <div className={styles.locationSuggestions}>
+                      {locationLoading && (
+                        <div className={styles.locationSuggestionMuted}>
+                          Đang tìm kiếm...
+                        </div>
+                      )}
+                      {!locationLoading && locationSuggestions.length === 0 && (
+                        <div className={styles.locationSuggestionMuted}>
+                          {locationError || "No suggestions found"}
+                        </div>
+                      )}
+                      {!locationLoading &&
+                        locationSuggestions.map((option, idx) => (
+                          <button
+                            type="button"
+                            key={`${option.lat}-${option.lon}-${idx}`}
+                            className={`${styles.locationSuggestion} ${
+                              idx === locationHighlight
+                                ? styles.locationSuggestionActive
+                                : ""
+                            }`}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectLocation(option);
+                            }}
+                            onMouseEnter={() => setLocationHighlight(idx)}
+                          >
+                            <span className={styles.locationSuggestionText}>
+                              {option.label}
+                            </span>
+                          </button>
+                        ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1059,6 +1424,7 @@ export default function CreatePostPage() {
                         scheduledAt: e.target.value,
                       }))
                     }
+                    onKeyDown={onScheduleKeyDown}
                     min={new Date().toISOString().slice(0, 16)}
                   />
                 </div>
