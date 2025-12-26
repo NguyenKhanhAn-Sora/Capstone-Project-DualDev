@@ -9,6 +9,14 @@ export type OAuthProvider = {
   refreshToken?: string | null;
 };
 
+export type RecentAccount = {
+  email: string;
+  displayName?: string;
+  username?: string;
+  avatarUrl?: string;
+  lastUsed?: Date;
+};
+
 export type UserSettings = {
   theme: 'light' | 'dark';
 };
@@ -52,6 +60,20 @@ export class User extends Document {
     default: { theme: 'light' },
   })
   settings: UserSettings;
+
+  @Prop({
+    type: [
+      {
+        email: { type: String, lowercase: true, trim: true },
+        displayName: { type: String },
+        username: { type: String },
+        avatarUrl: { type: String },
+        lastUsed: { type: Date },
+      },
+    ],
+    default: [],
+  })
+  recentAccounts: RecentAccount[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

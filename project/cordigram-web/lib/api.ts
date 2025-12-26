@@ -161,6 +161,18 @@ export type UserSettingsResponse = {
   theme: "light" | "dark";
 };
 
+export type RecentAccountResponse = {
+  email: string;
+  displayName?: string;
+  username?: string;
+  avatarUrl?: string;
+  lastUsed?: string;
+};
+
+export type RecentAccountsPayload = {
+  recentAccounts: RecentAccountResponse[];
+};
+
 export async function fetchCurrentProfile(opts: {
   token: string;
 }): Promise<CurrentProfileResponse> {
@@ -199,6 +211,70 @@ export async function updateUserSettings(opts: {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ theme }),
+  });
+}
+
+export async function fetchRecentAccounts(opts: {
+  token: string;
+}): Promise<RecentAccountsPayload> {
+  const { token } = opts;
+  return apiFetch<RecentAccountsPayload>({
+    path: "/auth/recent-accounts",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+  });
+}
+
+export async function upsertRecentAccount(opts: {
+  token: string;
+  payload: {
+    email: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+  };
+}): Promise<RecentAccountsPayload> {
+  const { token, payload } = opts;
+  return apiFetch<RecentAccountsPayload>({
+    path: "/auth/recent-accounts",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function removeRecentAccount(opts: {
+  token: string;
+  email: string;
+}): Promise<RecentAccountsPayload> {
+  const { token, email } = opts;
+  return apiFetch<RecentAccountsPayload>({
+    path: `/auth/recent-accounts/${encodeURIComponent(email)}`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+  });
+}
+
+export async function clearRecentAccounts(opts: {
+  token: string;
+}): Promise<RecentAccountsPayload> {
+  const { token } = opts;
+  return apiFetch<RecentAccountsPayload>({
+    path: "/auth/recent-accounts",
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
   });
 }
 

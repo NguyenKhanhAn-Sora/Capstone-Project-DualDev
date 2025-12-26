@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -13,6 +14,10 @@ import {
   CloudinaryService,
   UploadResult,
 } from '../cloudinary/cloudinary.service';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Session } from './session.schema';
+import * as crypto from 'crypto';
 
 interface TokenPayload {
   sub: string;
@@ -23,6 +28,7 @@ interface TokenPayload {
 @Injectable()
 export class AuthService {
   constructor(
+    @InjectModel(Session.name) private readonly sessionModel: Model<Session>,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly usersService: UsersService,
@@ -61,10 +67,46 @@ export class AuthService {
     }
   }
 
+  private generateRefreshToken(): {
+    token: string;
+    hash: string;
+    expiresAt: Date;
+  } {
+    const token = crypto.randomBytes(48).toString('base64url');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    const days = Number(process.env.REFRESH_TOKEN_DAYS || 30);
+    const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    return { token, hash, expiresAt };
+  }
+
+  private async persistRefreshToken(params: {
+    userId: string;
+    tokenHash: string;
+    expiresAt: Date;
+    userAgent?: string;
+    deviceInfo?: string;
+  }): Promise<void> {
+    await this.sessionModel.create({
+      userId: new Types.ObjectId(params.userId),
+      tokenHash: params.tokenHash,
+      expiresAt: params.expiresAt,
+      userAgent: params.userAgent ?? '',
+      deviceInfo: params.deviceInfo ?? '',
+    });
+  }
+
+  async revokeRefreshToken(token: string): Promise<void> {
+    if (!token) return;
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    await this.sessionModel.deleteOne({ tokenHash: hash }).exec();
+  }
+
   async login(params: {
     email: string;
     password: string;
-  }): Promise<{ accessToken: string }> {
+    userAgent?: string;
+    deviceInfo?: string;
+  }): Promise<{ accessToken: string; refreshToken: string }> {
     const user = await this.usersService.findByEmail(params.email);
     if (!user) {
       throw new BadRequestException('Email không tồn tại trong hệ thống');
@@ -84,15 +126,30 @@ export class AuthService {
     }
 
     const accessToken = this.createAccessToken(user.id, user.email);
-    return { accessToken };
+    const refresh = this.generateRefreshToken();
+    await this.persistRefreshToken({
+      userId: user.id,
+      tokenHash: refresh.hash,
+      expiresAt: refresh.expiresAt,
+      userAgent: params.userAgent,
+      deviceInfo: params.deviceInfo,
+    });
+    return { accessToken, refreshToken: refresh.token };
   }
 
   async loginWithGoogle(params: {
     email: string;
     providerId: string;
     refreshToken?: string | null;
+    userAgent?: string;
+    deviceInfo?: string;
   }): Promise<
-    | { mode: 'login'; accessToken: string; needsProfile: false }
+    | {
+        mode: 'login';
+        accessToken: string;
+        refreshToken: string;
+        needsProfile: false;
+      }
     | { mode: 'complete-profile'; signupToken: string; needsProfile: true }
     | { mode: 'signup'; signupToken: string; needsProfile: true }
   > {
@@ -130,7 +187,20 @@ export class AuthService {
     }
 
     const accessToken = this.createAccessToken(user.id, email);
-    return { mode: 'login', accessToken, needsProfile: false };
+    const refresh = this.generateRefreshToken();
+    await this.persistRefreshToken({
+      userId: user.id,
+      tokenHash: refresh.hash,
+      expiresAt: refresh.expiresAt,
+      userAgent: params.userAgent,
+      deviceInfo: params.deviceInfo,
+    });
+    return {
+      mode: 'login',
+      accessToken,
+      refreshToken: refresh.token,
+      needsProfile: false,
+    };
   }
 
   async completeProfile(params: {
@@ -148,7 +218,7 @@ export class AuthService {
     location?: string;
     links?: Record<string, string>;
     password?: string;
-  }): Promise<{ accessToken: string }> {
+  }): Promise<{ accessToken: string; refreshToken: string }> {
     const payload = this.verifySignupToken(params.token);
     if (payload.email !== params.email) {
       throw new UnauthorizedException('Email mismatch');
@@ -183,7 +253,52 @@ export class AuthService {
 
     await this.usersService.completeSignup(user.id);
     const accessToken = this.createAccessToken(user.id, user.email);
-    return { accessToken };
+    const refresh = this.generateRefreshToken();
+    await this.persistRefreshToken({
+      userId: user.id,
+      tokenHash: refresh.hash,
+      expiresAt: refresh.expiresAt,
+    });
+    return { accessToken, refreshToken: refresh.token };
+  }
+
+  async refreshAccessToken(params: {
+    refreshToken: string;
+    userAgent?: string;
+    deviceInfo?: string;
+  }): Promise<{ accessToken: string; refreshToken: string }> {
+    if (!params.refreshToken) {
+      throw new UnauthorizedException('Missing refresh token');
+    }
+    const hash = crypto
+      .createHash('sha256')
+      .update(params.refreshToken)
+      .digest('hex');
+    const session = await this.sessionModel
+      .findOne({ tokenHash: hash, expiresAt: { $gt: new Date() } })
+      .lean()
+      .exec();
+    if (!session) {
+      throw new ForbiddenException('Refresh token invalid or expired');
+    }
+    const user = await this.usersService.findById(session.userId.toString());
+    if (!user || user.status !== 'active') {
+      throw new ForbiddenException('User not allowed');
+    }
+
+    await this.sessionModel.deleteOne({ _id: session._id }).exec();
+
+    const accessToken = this.createAccessToken(user.id, user.email);
+    const next = this.generateRefreshToken();
+    await this.persistRefreshToken({
+      userId: user.id,
+      tokenHash: next.hash,
+      expiresAt: next.expiresAt,
+      userAgent: params.userAgent,
+      deviceInfo: params.deviceInfo,
+    });
+
+    return { accessToken, refreshToken: next.token };
   }
 
   async uploadAvatarImage(params: {

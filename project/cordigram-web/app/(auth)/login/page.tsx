@@ -2,10 +2,36 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import styles from "./login.module.css";
-import { apiFetch, ApiError, getApiBaseUrl } from "@/lib/api";
+import {
+  apiFetch,
+  ApiError,
+  clearRecentAccounts,
+  fetchCurrentProfile,
+  fetchUserSettings,
+  getApiBaseUrl,
+  removeRecentAccount,
+  RecentAccountResponse,
+} from "@/lib/api";
 import { useRedirectIfAuthed } from "@/hooks/use-require-auth";
+import {
+  clearStoredAccessToken,
+  getStoredAccessToken,
+  isAccessTokenValid,
+  refreshSession,
+  setStoredAccessToken,
+} from "@/lib/auth";
+
+const RECENT_ACCOUNTS_KEY = "recentAccounts";
+
+type RecentAccount = {
+  email: string;
+  username?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  lastUsed: number;
+};
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -15,17 +41,235 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [recentAccounts, setRecentAccounts] = useState<RecentAccount[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<RecentAccount | null>(
+    null
+  );
+  const [modalPassword, setModalPassword] = useState("");
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [modalSubmitting, setModalSubmitting] = useState(false);
+  const [removingEmail, setRemovingEmail] = useState<string | null>(null);
+  const [clearingAll, setClearingAll] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState<RecentAccount | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
 
   const canRender = useRedirectIfAuthed();
+
+  useEffect(() => {
+    let skipRestore = false;
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("loggedOut") === "1") {
+        clearStoredAccessToken();
+        setError(null);
+        skipRestore = true;
+      }
+    }
+
+    const loadRecent = () => {
+      if (typeof window === "undefined") return [] as RecentAccount[];
+      try {
+        const raw = window.localStorage.getItem(RECENT_ACCOUNTS_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw) as RecentAccount[];
+        return Array.isArray(parsed)
+          ? parsed
+              .filter((item) => item?.email && emailRegex.test(item.email))
+              .sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0))
+          : [];
+      } catch (_err) {
+        return [];
+      }
+    };
+
+    setRecentAccounts(loadRecent());
+
+    if (skipRestore) {
+      setCheckingSession(false);
+      return;
+    }
+
+    let active = true;
+    const tryRestore = async () => {
+      if (!active) return;
+      setCheckingSession(true);
+      setError(null);
+
+      const existing = getStoredAccessToken();
+      if (isAccessTokenValid(existing)) {
+        router.replace("/");
+        return;
+      }
+
+      try {
+        await refreshSession();
+        router.replace("/");
+      } catch (_err) {
+        clearStoredAccessToken();
+        if (!active) return;
+        setCheckingSession(false);
+      }
+    };
+
+    tryRestore();
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   const handleGoogleLogin = () => {
     window.location.href = `${getApiBaseUrl()}/auth/google`;
   };
 
   const isDisabled = useMemo(
-    () => !email.trim() || !password.trim() || loading,
-    [email, password, loading]
+    () => !email.trim() || !password.trim() || loading || checkingSession,
+    [email, password, loading, checkingSession]
   );
+
+  const saveRecentAccounts = (items: RecentAccount[]) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(RECENT_ACCOUNTS_KEY, JSON.stringify(items));
+  };
+
+  const applyThemeInstant = (mode: "light" | "dark") => {
+    if (typeof document !== "undefined") {
+      document.documentElement.dataset.theme = mode;
+      document.body.dataset.theme = mode;
+    }
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("ui-theme", mode);
+    }
+  };
+
+  const syncThemeFromServer = async (token: string) => {
+    try {
+      const res = await fetchUserSettings({ token });
+      if (res.theme === "light" || res.theme === "dark") {
+        applyThemeInstant(res.theme);
+      }
+    } catch (_err) {
+      // ignore theme load errors
+    }
+  };
+
+  const upsertRecentAccount = (account: RecentAccount) => {
+    const normalizedEmail = account.email.trim().toLowerCase();
+    if (!emailRegex.test(normalizedEmail)) return;
+    const normalized: RecentAccount = { ...account, email: normalizedEmail };
+
+    setRecentAccounts((prev) => {
+      const filtered = prev.filter((item) => item.email !== normalized.email);
+      const next = [normalized, ...filtered].slice(0, 5);
+      saveRecentAccounts(next);
+      return next;
+    });
+  };
+
+  const normalizeRecentAccountsFromServer = (
+    items: RecentAccountResponse[] | undefined
+  ): RecentAccount[] => {
+    const mapped = (items ?? []).map((item) => ({
+      email: item.email.trim().toLowerCase(),
+      username: item.username,
+      displayName: item.displayName,
+      avatarUrl: item.avatarUrl,
+      lastUsed: item.lastUsed ? Date.parse(item.lastUsed) : Date.now(),
+    }));
+
+    return mapped
+      .filter((item) => emailRegex.test(item.email))
+      .sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0))
+      .slice(0, 5);
+  };
+
+  const applyServerRecentAccounts = (payload?: {
+    recentAccounts?: RecentAccountResponse[];
+  }) => {
+    if (!payload?.recentAccounts) return;
+    const normalized = normalizeRecentAccountsFromServer(
+      payload.recentAccounts
+    );
+    setRecentAccounts(normalized);
+    saveRecentAccounts(normalized);
+  };
+
+  const getActiveToken = async (): Promise<string | null> => {
+    const stored = getStoredAccessToken();
+    if (isAccessTokenValid(stored)) return stored;
+    try {
+      return await refreshSession();
+    } catch (_err) {
+      return null;
+    }
+  };
+
+  const handleAccountSelect = async (account: RecentAccount) => {
+    if (clearingAll || removingEmail === account.email) return;
+    setPassword("");
+    setError(null);
+    setCheckingSession(true);
+    setSelectedAccount(account);
+    setModalPassword("");
+    setModalError(null);
+
+    try {
+      await refreshSession();
+      await syncThemeFromServer(getStoredAccessToken() || "");
+      router.replace("/");
+    } catch (_err) {
+      setCheckingSession(false);
+      setModalError(null);
+    }
+  };
+
+  const handleModalSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedAccount) return;
+    setModalError(null);
+    setModalSubmitting(true);
+
+    const trimmedEmail = selectedAccount.email.toLowerCase();
+
+    try {
+      const result = await apiFetch<{ accessToken: string }>({
+        path: "/auth/login",
+        method: "POST",
+        body: JSON.stringify({ email: trimmedEmail, password: modalPassword }),
+        credentials: "include",
+        headers:
+          typeof navigator !== "undefined"
+            ? { "x-device-info": navigator.userAgent }
+            : undefined,
+      });
+
+      setStoredAccessToken(result.accessToken);
+
+      await syncThemeFromServer(result.accessToken);
+
+      try {
+        const profile = await fetchCurrentProfile({
+          token: result.accessToken,
+        });
+        upsertRecentAccount({
+          email: trimmedEmail,
+          username: profile.username,
+          displayName: profile.displayName,
+          avatarUrl: profile.avatarUrl,
+          lastUsed: Date.now(),
+        });
+      } catch (_err) {
+        upsertRecentAccount({ email: trimmedEmail, lastUsed: Date.now() });
+      }
+
+      router.replace("/");
+    } catch (err) {
+      const apiErr = err as ApiError | undefined;
+      setModalError(apiErr?.message || "Login failed. Please try again.");
+    } finally {
+      setModalSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -43,10 +287,35 @@ export default function LoginPage() {
         path: "/auth/login",
         method: "POST",
         body: JSON.stringify({ email: trimmedEmail, password }),
+        credentials: "include",
+        headers:
+          typeof navigator !== "undefined"
+            ? { "x-device-info": navigator.userAgent }
+            : undefined,
       });
 
       if (typeof window !== "undefined") {
-        localStorage.setItem("accessToken", result.accessToken);
+        setStoredAccessToken(result.accessToken);
+
+        await syncThemeFromServer(result.accessToken);
+      }
+
+      try {
+        const profile = await fetchCurrentProfile({
+          token: result.accessToken,
+        });
+        upsertRecentAccount({
+          email: trimmedEmail,
+          username: profile.username,
+          displayName: profile.displayName,
+          avatarUrl: profile.avatarUrl,
+          lastUsed: Date.now(),
+        });
+      } catch (_err) {
+        upsertRecentAccount({
+          email: trimmedEmail,
+          lastUsed: Date.now(),
+        });
       }
 
       router.push("/");
@@ -58,62 +327,216 @@ export default function LoginPage() {
     }
   };
 
+  const removeRecentAccountConfirmed = async (email: string) => {
+    if (!email) return;
+
+    const previous = [...recentAccounts];
+    const next = previous.filter((item) => item.email !== email);
+    setRecentAccounts(next);
+    saveRecentAccounts(next);
+    setRemovingEmail(email);
+    setConfirmEmail(null);
+
+    const token = await getActiveToken();
+    if (!token) {
+      setRemovingEmail(null);
+      return;
+    }
+
+    try {
+      const payload = await removeRecentAccount({ token, email });
+      applyServerRecentAccounts(payload);
+    } catch (_err) {
+      setRecentAccounts(previous);
+      saveRecentAccounts(previous);
+    } finally {
+      setRemovingEmail(null);
+    }
+  };
+
+  const clearRecentAccountsConfirmed = async () => {
+    if (!recentAccounts.length) return;
+    const previous = [...recentAccounts];
+
+    setClearingAll(true);
+    setConfirmAll(false);
+    setRecentAccounts([]);
+    saveRecentAccounts([]);
+
+    const token = await getActiveToken();
+    if (!token) {
+      setClearingAll(false);
+      return;
+    }
+
+    try {
+      const payload = await clearRecentAccounts({ token });
+      applyServerRecentAccounts(payload);
+    } catch (_err) {
+      setRecentAccounts(previous);
+      saveRecentAccounts(previous);
+    } finally {
+      setClearingAll(false);
+    }
+  };
+
+  const handleCardKeyDown = (
+    event: KeyboardEvent<HTMLDivElement>,
+    account: RecentAccount
+  ) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleAccountSelect(account);
+    }
+  };
+
   if (!canRender) return null;
 
+  const hasRecentAccounts = recentAccounts.length > 0;
 
   return (
     <div className={`${styles.page} ${styles["page-transition"]}`}>
       <div className="min-h-screen">
         <div className="grid min-h-screen w-full grid-cols-1 lg:grid-cols-2">
-          <div className={styles["hero-panel"]}>
-            <div className={styles["hero-tilt"]}>
-              <div className={styles["hero-card"]}>
-                <h2 className="mt-4 text-[38px] font-semibold leading-tight text-white">
-                  Welcome Back!
-                </h2>
-                <p className="mt-3 text-[16px] leading-6 text-slate-100/90">
-                  Continue conversations, update channels, and collaborate with
-                  your team. Everything stays synced, secure, and ready.
-                </p>
-
-                <div className={styles["hero-chip-row"]}>
-                  <div className={styles["hero-chip"]}>
-                    <span className={styles["hero-chip-dot"]} /> Secure sessions
+          {hasRecentAccounts ? (
+            <div className={styles["hero-panel"]}>
+              <div className={styles["recent-panel"]}>
+                <div className={styles["recent-panel-card"]}>
+                  <div className={styles["recent-panel-header"]}>
+                    <div>
+                      <p className={styles["recent-title"]}>Recent accounts</p>
+                    </div>
+                    <div className={styles["recent-actions"]}>
+                      <button
+                        type="button"
+                        className={styles["recent-delete-all"]}
+                        onClick={() => setConfirmAll(true)}
+                        disabled={clearingAll || !!removingEmail}
+                      >
+                        {clearingAll ? "Deleting..." : "Delete all"}
+                      </button>
+                    </div>
                   </div>
-                  <div className={styles["hero-chip"]}>
-                    <span className={styles["hero-chip-dot"]} /> Instant
-                    notifications
-                  </div>
-                  <div className={styles["hero-chip"]}>
-                    <span className={styles["hero-chip-dot"]} /> Multi-platform
-                    ready
-                  </div>
-                </div>
-
-                <div className={styles["hero-badges"]}>
-                  <div className={styles["hero-badge"]}>
-                    <span className={styles["hero-badge-icon"]}>◆</span>
-                    <p>Clear access control for every channel.</p>
-                  </div>
-                  <div className={styles["hero-badge"]}>
-                    <span className={styles["hero-badge-icon"]}>⇆</span>
-                    Single sign-on, synced across web and mobile.
-                  </div>
-                  <div className={styles["hero-badge"]}>
-                    <span className={styles["hero-badge-icon"]}>★</span>
-                    UI optimized for work and content sharing.
+                  <div className={styles["recent-grid"]}>
+                    {recentAccounts.map((acct) => {
+                      const label =
+                        acct.displayName || acct.username || "Account";
+                      const initial = label?.charAt(0)?.toUpperCase() || "?";
+                      return (
+                        <div
+                          key={acct.email}
+                          className={styles["recent-card"]}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleAccountSelect(acct)}
+                          onKeyDown={(event) => handleCardKeyDown(event, acct)}
+                          aria-label={`Continue as ${label}`}
+                        >
+                          <div className={styles["recent-avatar-wrapper"]}>
+                            {acct.avatarUrl ? (
+                              <img
+                                src={acct.avatarUrl}
+                                alt={label}
+                                className={styles["recent-avatar"]}
+                              />
+                            ) : (
+                              <span
+                                className={styles["recent-avatar-fallback"]}
+                              >
+                                {initial}
+                              </span>
+                            )}
+                          </div>
+                          <div className={styles["recent-text"]}>
+                            <span className={styles["recent-name"]}>
+                              {label}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className={styles["recent-remove"]}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setConfirmEmail(acct);
+                            }}
+                            disabled={
+                              removingEmail === acct.email || clearingAll
+                            }
+                            aria-label={`Remove ${label}`}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className={styles["hero-panel"]}>
+              <div className={styles["hero-tilt"]}>
+                <div className={styles["hero-card"]}>
+                  <h2 className="mt-4 text-[38px] font-semibold leading-tight text-white">
+                    Welcome Back!
+                  </h2>
+                  <p className="mt-3 text-[16px] leading-6 text-slate-100/90">
+                    Continue conversations, update channels, and collaborate
+                    with your team. Everything stays synced, secure, and ready.
+                  </p>
+
+                  <div className={styles["hero-chip-row"]}>
+                    <div className={styles["hero-chip"]}>
+                      <span className={styles["hero-chip-dot"]} /> Secure
+                      sessions
+                    </div>
+                    <div className={styles["hero-chip"]}>
+                      <span className={styles["hero-chip-dot"]} /> Instant
+                      notifications
+                    </div>
+                    <div className={styles["hero-chip"]}>
+                      <span className={styles["hero-chip-dot"]} />{" "}
+                      Multi-platform ready
+                    </div>
+                  </div>
+
+                  <div className={styles["hero-badges"]}>
+                    <div className={styles["hero-badge"]}>
+                      <span className={styles["hero-badge-icon"]}>◆</span>
+                      <p>Clear access control for every channel.</p>
+                    </div>
+                    <div className={styles["hero-badge"]}>
+                      <span className={styles["hero-badge-icon"]}>⇆</span>
+                      Single sign-on, synced across web and mobile.
+                    </div>
+                    <div className={styles["hero-badge"]}>
+                      <span className={styles["hero-badge-icon"]}>★</span>
+                      UI optimized for work and content sharing.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className={styles["login-right"]}>
             <div className="w-full max-w-[420px] rounded-2xl border border-[#e5edf5] bg-white p-10 shadow-xl">
+              {checkingSession ? (
+                <div className={styles["session-banner"]}>
+                  <div className={styles["session-spinner"]} />
+                  <div>
+                    <p className={styles["session-title"]}>
+                      Restoring your session
+                    </p>
+                    <p className={styles["session-sub"]}>
+                      Checking secure cookies and refreshing access.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
               <h1 className="text-[32px] font-semibold leading-[1.2] text-slate-900 text-center">
                 Login
               </h1>
-
               <form
                 className="mt-[30px] space-y-[20px]"
                 onSubmit={handleSubmit}
@@ -221,6 +644,139 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      {selectedAccount ? (
+        <div className={styles["overlay"]}>
+          <div className={styles["overlay-card"]}>
+            <button
+              type="button"
+              className={styles["overlay-close"]}
+              onClick={() => {
+                setSelectedAccount(null);
+                setModalPassword("");
+                setModalError(null);
+              }}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <div className={styles["overlay-avatar-wrapper"]}>
+              {selectedAccount.avatarUrl ? (
+                <img
+                  src={selectedAccount.avatarUrl}
+                  alt={
+                    selectedAccount.displayName ||
+                    selectedAccount.username ||
+                    ""
+                  }
+                  className={styles["overlay-avatar"]}
+                />
+              ) : (
+                <span className={styles["overlay-avatar-fallback"]}>
+                  {(
+                    selectedAccount.displayName ||
+                    selectedAccount.username ||
+                    "?"
+                  )
+                    .charAt(0)
+                    .toUpperCase()}
+                </span>
+              )}
+            </div>
+            <p className={styles["overlay-name"]}>
+              {selectedAccount.displayName ||
+                selectedAccount.username ||
+                "Account"}
+            </p>
+
+            <form
+              className={styles["overlay-form"]}
+              onSubmit={handleModalSubmit}
+            >
+              <input
+                type="password"
+                autoFocus
+                placeholder="Enter your password"
+                value={modalPassword}
+                onChange={(e) => setModalPassword(e.target.value)}
+                className={styles["overlay-input"]}
+                autoComplete="current-password"
+              />
+              {modalError ? (
+                <p className={styles["overlay-error"]}>{modalError}</p>
+              ) : null}
+
+              <button
+                type="submit"
+                className={styles["overlay-button"]}
+                disabled={!modalPassword.trim() || modalSubmitting}
+              >
+                {modalSubmitting ? "Signing in..." : "Sign in"}
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmEmail ? (
+        <div className={styles["overlay"]}>
+          <div className={styles["confirm-card"]}>
+            <p className={styles["confirm-title"]}>Remove account?</p>
+            <p className={styles["confirm-text"]}>
+              {confirmEmail.displayName ||
+                confirmEmail.username ||
+                confirmEmail.email}
+            </p>
+            <div className={styles["confirm-actions"]}>
+              <button
+                type="button"
+                className={styles["confirm-cancel"]}
+                onClick={() => setConfirmEmail(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles["confirm-danger"]}
+                onClick={() => removeRecentAccountConfirmed(confirmEmail.email)}
+                disabled={removingEmail === confirmEmail.email || clearingAll}
+              >
+                {removingEmail === confirmEmail.email
+                  ? "Removing..."
+                  : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmAll ? (
+        <div className={styles["overlay"]}>
+          <div className={styles["confirm-card"]}>
+            <p className={styles["confirm-title"]}>Delete all recent?</p>
+            <p className={styles["confirm-text"]}>
+              This will clear all saved recent accounts.
+            </p>
+            <div className={styles["confirm-actions"]}>
+              <button
+                type="button"
+                className={styles["confirm-cancel"]}
+                onClick={() => setConfirmAll(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles["confirm-danger"]}
+                onClick={clearRecentAccountsConfirmed}
+                disabled={clearingAll || !!removingEmail}
+              >
+                {clearingAll ? "Deleting..." : "Delete all"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

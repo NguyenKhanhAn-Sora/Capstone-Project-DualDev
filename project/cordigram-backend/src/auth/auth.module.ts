@@ -13,6 +13,9 @@ import { PassportModule } from '@nestjs/passport';
 import { GoogleStrategy } from './google.strategy';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { MongooseModule } from '@nestjs/mongoose';
+import { Session, SessionSchema } from './session.schema';
+import { User, UserSchema } from '../users/user.schema';
 
 @Module({
   imports: [
@@ -22,6 +25,8 @@ import { JwtAuthGuard } from './jwt-auth.guard';
     forwardRef(() => UsersModule),
     ProfilesModule,
     CloudinaryModule,
+    MongooseModule.forFeature([{ name: Session.name, schema: SessionSchema }]),
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     PassportModule.register({ session: false }),
     JwtModule.registerAsync({
       inject: [ConfigService],
