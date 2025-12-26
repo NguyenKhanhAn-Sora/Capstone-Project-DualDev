@@ -49,9 +49,6 @@ export class Post extends Document {
   @Prop({ type: [MediaSchema], default: [] })
   media: Media[];
 
-  @Prop({ type: Number, default: null })
-  videoDurationSec?: number | null;
-
   @Prop({
     type: [String],
     default: [],

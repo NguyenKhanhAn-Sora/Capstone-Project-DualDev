@@ -7,10 +7,11 @@ import {
   UnauthorizedException,
   UseGuards,
   UploadedFile,
+  UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
@@ -64,5 +65,40 @@ export class PostsController {
       throw new BadRequestException('Only image or video files are allowed');
     }
     return this.postsService.uploadMedia(user.userId, file);
+  }
+
+  @Post('upload/batch')
+  @UseInterceptors(
+    FilesInterceptor('files', 10, {
+      limits: {
+        fileSize: Number(
+          process.env.CLOUDINARY_MAX_FILE_SIZE ?? 15 * 1024 * 1024,
+        ),
+      },
+    }),
+  )
+  async uploadMediaBatch(
+    @Req() req: Request,
+    @UploadedFiles() files: UploadedFile[] | undefined,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    if (!files || !files.length) {
+      throw new BadRequestException('Missing files');
+    }
+
+    const invalid = files.find(
+      (file) =>
+        !file.mimetype.startsWith('image/') &&
+        !file.mimetype.startsWith('video/'),
+    );
+
+    if (invalid) {
+      throw new BadRequestException('Only image or video files are allowed');
+    }
+
+    return this.postsService.uploadMediaBatch(user.userId, files);
   }
 }

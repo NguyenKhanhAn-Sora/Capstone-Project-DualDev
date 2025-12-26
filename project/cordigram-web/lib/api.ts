@@ -83,7 +83,6 @@ export type CreatePostResponse = {
     url: string;
     metadata?: Record<string, unknown> | null;
   }>;
-  videoDurationSec?: number | null;
   hashtags: string[];
   mentions: string[];
   location?: string | null;

@@ -9,6 +9,7 @@ import {
   createReel,
   searchProfiles,
   uploadPostMedia,
+  type CreatePostRequest,
   type ProfileSearchItem,
 } from "@/lib/api";
 
@@ -38,6 +39,7 @@ const audienceOptions = [
 ];
 
 const REEL_MAX_DURATION_SECONDS = 90;
+const MAX_MEDIA_ITEMS = 10;
 
 type Step = "select" | "details";
 
@@ -54,6 +56,13 @@ type FormState = {
   scheduledAt: string;
   hashtags: string[];
   mentions: string[];
+};
+
+type MediaItem = {
+  file: File;
+  previewUrl: string;
+  kind: "image" | "video";
+  duration: number | null;
 };
 
 const normalizeHashtag = (value: string) =>
@@ -91,8 +100,7 @@ export default function CreatePostPage() {
   const canRender = useRequireAuth();
   const [mode, setMode] = useState<"post" | "reel">("post");
   const [step, setStep] = useState<Step>("select");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [form, setForm] = useState<FormState>(initialForm);
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string>("");
@@ -105,7 +113,6 @@ export default function CreatePostPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>("");
   const [submitSuccess, setSubmitSuccess] = useState<string>("");
-  const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [audienceOpen, setAudienceOpen] = useState(false);
   const [locationInput, setLocationInput] = useState(initialForm.location);
@@ -129,9 +136,16 @@ export default function CreatePostPage() {
   const audienceRef = useRef<HTMLDivElement | null>(null);
   const emojiRef = useRef<HTMLDivElement | null>(null);
 
-  const isVideo = useMemo(
-    () => Boolean(selectedFile?.type.startsWith("video")),
-    [selectedFile]
+  const totalSizeLabel = useMemo(() => {
+    if (!mediaItems.length) return "-";
+    const mb =
+      mediaItems.reduce((acc, item) => acc + item.file.size, 0) / 1024 / 1024;
+    return `${mb.toFixed(1)} MB total`;
+  }, [mediaItems]);
+
+  const canAddMore = useMemo(
+    () => (mode === "post" ? mediaItems.length < MAX_MEDIA_ITEMS : true),
+    [mode, mediaItems.length]
   );
 
   const selectedAudience = useMemo(
@@ -183,12 +197,6 @@ export default function CreatePostPage() {
   };
 
   useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
-
-  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (!audienceRef.current) return;
       if (!audienceRef.current.contains(event.target as Node)) {
@@ -210,68 +218,113 @@ export default function CreatePostPage() {
     };
   }, []);
 
-  const handleFileSelect = (file: File | undefined) => {
-    if (!file) return;
-
-    const isImage = file.type.startsWith("image/");
-    const isVideoFile = file.type.startsWith("video/");
-
-    if (!isImage && !isVideoFile) {
-      setError("Please select an image or video.");
-      return;
+  useEffect(() => {
+    if (mediaItems.length === 0 && step !== "select") {
+      setStep("select");
     }
+  }, [mediaItems.length, step]);
 
-    if (mode === "reel" && !isVideoFile) {
-      setError("Reels require a video file.");
-      return;
-    }
-
-    const url = URL.createObjectURL(file);
-
-    if (isVideoFile) {
+  const readVideoDuration = (file: File): Promise<number | null> => {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
       const videoEl = document.createElement("video");
       videoEl.preload = "metadata";
       videoEl.onloadedmetadata = () => {
-        const durationSec = videoEl.duration;
-        if (mode === "reel" && durationSec > REEL_MAX_DURATION_SECONDS) {
-          setError(
-            `Reel video must be ${REEL_MAX_DURATION_SECONDS}s or shorter.`
-          );
-          URL.revokeObjectURL(url);
-          setVideoDuration(null);
-          return;
-        }
-        setVideoDuration(durationSec);
-        setError("");
-        setSelectedFile(file);
-        setPreviewUrl(url);
-        setStep("details");
+        const durationSec = Number.isFinite(videoEl.duration)
+          ? videoEl.duration
+          : null;
+        URL.revokeObjectURL(url);
+        resolve(durationSec);
       };
       videoEl.onerror = () => {
-        setError("Could not read video metadata. Please try another file.");
         URL.revokeObjectURL(url);
+        resolve(null);
       };
       videoEl.src = url;
+    });
+  };
+
+  const addFiles = async (fileList: FileList | File[] | null | undefined) => {
+    if (!fileList) return;
+    const incoming = Array.from(fileList);
+    if (!incoming.length) return;
+
+    const valid = incoming.filter((file) => {
+      const isImage = file.type.startsWith("image/");
+      const isVideo = file.type.startsWith("video/");
+      return isImage || isVideo;
+    });
+
+    if (!valid.length) {
+      setError("Please select image or video files only.");
       return;
     }
 
-    setVideoDuration(null);
-    setError("");
-    setSelectedFile(file);
-    setPreviewUrl(url);
+    if (mode === "reel") {
+      const videoFile = valid.find((file) => file.type.startsWith("video/"));
+      if (!videoFile) {
+        setError("Reels require a video file.");
+        return;
+      }
+      const duration = await readVideoDuration(videoFile);
+      if (duration !== null && duration > REEL_MAX_DURATION_SECONDS) {
+        setError(
+          `Reel video must be ${REEL_MAX_DURATION_SECONDS}s or shorter.`
+        );
+        return;
+      }
+
+      const nextItem: MediaItem = {
+        file: videoFile,
+        previewUrl: URL.createObjectURL(videoFile),
+        kind: "video",
+        duration,
+      };
+
+      setMediaItems((prev) => {
+        prev.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+        return [nextItem];
+      });
+      setStep("details");
+      setError("");
+      return;
+    }
+
+    const newItems: MediaItem[] = [];
+    for (const file of valid) {
+      const remaining = MAX_MEDIA_ITEMS - (mediaItems.length + newItems.length);
+      if (remaining <= 0) break;
+      const kind: MediaItem["kind"] = file.type.startsWith("video/")
+        ? "video"
+        : "image";
+      const duration = kind === "video" ? await readVideoDuration(file) : null;
+      newItems.push({
+        file,
+        previewUrl: URL.createObjectURL(file),
+        kind,
+        duration,
+      });
+    }
+
+    if (!newItems.length) {
+      setError(`You can attach up to ${MAX_MEDIA_ITEMS} files per post.`);
+      return;
+    }
+
+    setMediaItems((prev) => [...prev, ...newItems]);
     setStep("details");
+    setError("");
   };
 
-  const onInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    handleFileSelect(file);
+  const onInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    await addFiles(event.target.files);
+    event.target.value = "";
   };
 
-  const onDrop = (event: React.DragEvent<HTMLLabelElement>) => {
+  const onDrop = async (event: React.DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     setDragActive(false);
-    const file = event.dataTransfer.files?.[0];
-    handleFileSelect(file);
+    await addFiles(event.dataTransfer.files);
   };
 
   const onDragOver = (event: React.DragEvent<HTMLLabelElement>) => {
@@ -284,9 +337,10 @@ export default function CreatePostPage() {
   const openFileDialog = () => fileInputRef.current?.click();
 
   const resetSelection = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
-    setVideoDuration(null);
+    setMediaItems((prev) => {
+      prev.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+      return [];
+    });
     setForm(initialForm);
     setLocationInput(initialForm.location);
     setLocationQuery("");
@@ -304,48 +358,44 @@ export default function CreatePostPage() {
     setSubmitSuccess("");
   };
 
+  const removeMedia = (index: number) => {
+    setMediaItems((prev) => {
+      const next = [...prev];
+      const [removed] = next.splice(index, 1);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return next;
+    });
+  };
+
   const handleAudienceSelect = (value: string) => {
     setForm((prev) => ({ ...prev, audience: value }));
     setAudienceOpen(false);
   };
-
-  const readableSize = useMemo(() => {
-    if (!selectedFile) return "-";
-    const sizeInMb = selectedFile.size / 1024 / 1024;
-    return `${sizeInMb.toFixed(1)} MB`;
-  }, [selectedFile]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitError("");
     setSubmitSuccess("");
 
-    if (!selectedFile || !previewUrl) {
-      setSubmitError("Please choose a photo or video before publishing.");
-      return;
-    }
-
-    if (mode === "reel" && !isVideo) {
-      setSubmitError("Reels require a video file.");
-      return;
-    }
-
-    if (
-      mode === "reel" &&
-      videoDuration !== null &&
-      videoDuration > REEL_MAX_DURATION_SECONDS
-    ) {
+    if (!mediaItems.length) {
       setSubmitError(
-        `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`
+        "Please choose at least one photo or video before publishing."
       );
       return;
     }
 
-    if (mode === "reel" && videoDuration === null) {
-      setSubmitError(
-        "We couldn't read the video duration. Please reselect the file."
-      );
-      return;
+    if (mode === "reel") {
+      const reel = mediaItems[0];
+      if (mediaItems.length !== 1 || reel.kind !== "video") {
+        setSubmitError("Reels require exactly one video file.");
+        return;
+      }
+      if (reel.duration !== null && reel.duration > REEL_MAX_DURATION_SECONDS) {
+        setSubmitError(
+          `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`
+        );
+        return;
+      }
     }
 
     const token =
@@ -356,12 +406,6 @@ export default function CreatePostPage() {
       setSubmitError("Missing access token. Please log in again.");
       return;
     }
-
-    const mediaType: "image" | "video" =
-      mode === "reel" ? "video" : isVideo ? "video" : "image";
-
-    let uploadedUrl = "";
-    let uploadedMeta: Record<string, unknown> | null = null;
 
     const normalizedHashtags = Array.from(
       new Set((form.hashtags || []).map((t) => normalizeHashtag(t.toString())))
@@ -393,64 +437,82 @@ export default function CreatePostPage() {
 
     try {
       setSubmitting(true);
-      const upload = await uploadPostMedia({ token, file: selectedFile });
-      uploadedUrl = upload.secureUrl || upload.url;
-      const uploadDurationRaw =
-        typeof upload.duration === "number"
-          ? upload.duration
-          : typeof upload.duration === "string"
-          ? Number(upload.duration)
-          : videoDuration;
-      const uploadDuration =
-        typeof uploadDurationRaw === "number" &&
-        Number.isFinite(uploadDurationRaw)
-          ? Math.round(uploadDurationRaw * 100) / 100
-          : null;
-      uploadedMeta = {
-        publicId: upload.publicId,
-        folder: upload.folder,
-        bytes: upload.bytes,
-        resourceType: upload.resourceType,
-        format: upload.format,
-        width: upload.width,
-        height: upload.height,
-        duration: uploadDuration,
-      };
+      const uploadedPayload: NonNullable<CreatePostRequest["media"]> = [];
 
-      const mediaPayload = [
-        {
-          type: mediaType,
-          url: uploadedUrl,
-          metadata: uploadedMeta,
-        },
-      ];
+      for (const item of mediaItems) {
+        const upload = await uploadPostMedia({ token, file: item.file });
+        const uploadedUrl = upload.secureUrl || upload.url;
 
-      if (mode === "reel") {
-        if (uploadDuration === null || uploadDuration === undefined) {
-          setSubmitError("Missing video duration. Please re-upload your reel.");
+        const uploadDurationRaw =
+          typeof upload.duration === "number"
+            ? upload.duration
+            : typeof upload.duration === "string"
+            ? Number(upload.duration)
+            : null;
+
+        const finalDuration =
+          typeof uploadDurationRaw === "number" &&
+          Number.isFinite(uploadDurationRaw)
+            ? uploadDurationRaw
+            : item.duration;
+
+        if (
+          mode === "reel" &&
+          (finalDuration === null || finalDuration > REEL_MAX_DURATION_SECONDS)
+        ) {
+          setSubmitError(
+            finalDuration === null
+              ? "Missing video duration. Please re-upload your reel."
+              : `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`
+          );
+          setSubmitting(false);
           return;
         }
+
+        uploadedPayload.push({
+          type: item.kind,
+          url: uploadedUrl,
+          metadata: {
+            publicId: upload.publicId,
+            folder: upload.folder,
+            bytes: upload.bytes,
+            resourceType: upload.resourceType,
+            format: upload.format,
+            width: upload.width,
+            height: upload.height,
+            duration:
+              typeof finalDuration === "number"
+                ? Math.round(finalDuration * 100) / 100
+                : finalDuration,
+          },
+        });
+      }
+
+      if (mode === "reel") {
+        const durationVal = uploadedPayload[0]?.metadata?.duration;
         await createReel({
           token,
           payload: {
             ...basePayload,
-            media: mediaPayload as Array<{
+            media: uploadedPayload as Array<{
               type: "video";
               url: string;
               metadata?: Record<string, unknown> | null;
             }>,
-            durationSeconds: uploadDuration,
+            durationSeconds:
+              typeof durationVal === "number" ? durationVal : undefined,
           },
         });
+        resetSelection();
         setSubmitSuccess("Reel created successfully.");
       } else {
         await createPost({
           token,
-          payload: { ...basePayload, media: mediaPayload },
+          payload: { ...basePayload, media: uploadedPayload },
         });
+        resetSelection();
         setSubmitSuccess("Post created successfully.");
       }
-      resetSelection();
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
@@ -867,7 +929,6 @@ export default function CreatePostPage() {
               onClick={() => {
                 setMode("post");
                 setError("");
-                setVideoDuration(null);
                 resetSelection();
               }}
             >
@@ -881,7 +942,6 @@ export default function CreatePostPage() {
               onClick={() => {
                 setMode("reel");
                 setError("");
-                setVideoDuration(null);
                 resetSelection();
               }}
             >
@@ -913,6 +973,16 @@ export default function CreatePostPage() {
         </div>
       </div>
 
+      <input
+        ref={fileInputRef}
+        id="fileInput"
+        type="file"
+        accept={mode === "reel" ? "video/*" : "image/*,video/*"}
+        multiple={mode === "post"}
+        className={styles.hiddenInput}
+        onChange={onInputChange}
+      />
+
       {step === "select" ? (
         <div className={styles.selectGrid}>
           <label
@@ -932,7 +1002,7 @@ export default function CreatePostPage() {
               <p className={styles.dropText}>
                 {mode === "reel"
                   ? "MP4 / MOV, vertical preferred (9:16), max 90s."
-                  : "Supports .jpg, .png, .mp4, .mov. Max size 200 MB."}
+                  : "Supports .jpg, .png, .mp4, .mov. Up to 10 items."}
               </p>
               <div className={styles.actions}>
                 <button
@@ -945,14 +1015,6 @@ export default function CreatePostPage() {
               </div>
               {error && <p className={styles.error}>{error}</p>}
             </div>
-            <input
-              ref={fileInputRef}
-              id="fileInput"
-              type="file"
-              accept={mode === "reel" ? "video/*" : "image/*,video/*"}
-              className={styles.hiddenInput}
-              onChange={onInputChange}
-            />
           </label>
 
           <div className={styles.tipsCard}>
@@ -993,13 +1055,14 @@ export default function CreatePostPage() {
             <div className={styles.cardHeader}>
               <div>
                 <p className={styles.cardEyebrow}>Selected content</p>
-                <p className={styles.cardTitle}>{selectedFile?.name}</p>
-                <p className={styles.meta}>
-                  {selectedFile?.type} · {readableSize}
-                  {isVideo && videoDuration !== null
-                    ? ` · ${videoDuration.toFixed(1)}s`
-                    : ""}
+                <p className={styles.cardTitle}>
+                  {mediaItems.length
+                    ? `${mediaItems.length} item${
+                        mediaItems.length > 1 ? "s" : ""
+                      } selected`
+                    : "No content chosen"}
                 </p>
+                <p className={styles.meta}>{totalSizeLabel}</p>
               </div>
               <div className={styles.cardActions}>
                 <button
@@ -1014,34 +1077,69 @@ export default function CreatePostPage() {
                   className={styles.primaryGhost}
                   onClick={openFileDialog}
                 >
-                  Change file
+                  {mode === "reel" ? "Change file" : "Add more"}
                 </button>
               </div>
             </div>
 
             <div className={styles.mediaFrame}>
-              {previewUrl ? (
-                isVideo ? (
-                  <video src={previewUrl} controls className={styles.media} />
-                ) : (
-                  <img
-                    src={previewUrl}
-                    alt="Preview"
-                    className={styles.media}
-                  />
-                )
+              {mediaItems.length ? (
+                <div className={styles.previewGrid}>
+                  {mediaItems.map((item, index) => (
+                    <div
+                      key={`${item.file.name}-${index}`}
+                      className={styles.previewTile}
+                    >
+                      <div className={styles.previewBadges}>
+                        <span className={styles.previewBadge}>{item.kind}</span>
+                        {item.kind === "video" && item.duration !== null ? (
+                          <span className={styles.previewBadgeMuted}>
+                            {item.duration.toFixed(1)}s
+                          </span>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.previewRemove}
+                        onClick={() => removeMedia(index)}
+                        aria-label={`Remove ${item.file.name}`}
+                      >
+                        ×
+                      </button>
+                      {item.kind === "video" ? (
+                        <video
+                          src={item.previewUrl}
+                          controls
+                          className={styles.media}
+                        />
+                      ) : (
+                        <img
+                          src={item.previewUrl}
+                          alt="Preview"
+                          className={styles.media}
+                        />
+                      )}
+                      <p className={styles.previewMeta}>
+                        {item.file.name} ·{" "}
+                        {(item.file.size / 1024 / 1024).toFixed(1)} MB
+                      </p>
+                    </div>
+                  ))}
+                  {canAddMore ? (
+                    <button
+                      type="button"
+                      className={styles.addTile}
+                      onClick={openFileDialog}
+                    >
+                      <span className={styles.addTileIcon}>+</span>
+                      <span className={styles.addTileText}>Add more</span>
+                    </button>
+                  ) : null}
+                </div>
               ) : (
                 <div className={styles.mediaPlaceholder}>No content yet</div>
               )}
             </div>
-            <input
-              ref={fileInputRef}
-              id="fileInput"
-              type="file"
-              accept={mode === "reel" ? "video/*" : "image/*,video/*"}
-              className={styles.hiddenInput}
-              onChange={onInputChange}
-            />
           </div>
 
           <div className={styles.formCard}>
@@ -1443,7 +1541,7 @@ export default function CreatePostPage() {
               <button
                 type="submit"
                 className={styles.primaryButton}
-                disabled={!selectedFile || submitting}
+                disabled={!mediaItems.length || submitting}
               >
                 {submitting ? "Publishing..." : "Finish"}
               </button>
