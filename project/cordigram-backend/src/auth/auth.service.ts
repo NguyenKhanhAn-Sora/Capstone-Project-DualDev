@@ -18,6 +18,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Session } from './session.schema';
 import * as crypto from 'crypto';
+import { OtpService } from '../otp/otp.service';
+import { MailService } from '../mail/mail.service';
+import {
+  ForgotPasswordRequestDto,
+  ResetPasswordDto,
+  VerifyResetOtpDto,
+} from './dto/forgot-password.dto';
 
 interface TokenPayload {
   sub: string;
@@ -34,6 +41,8 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly profilesService: ProfilesService,
     private readonly cloudinary: CloudinaryService,
+    private readonly otpService: OtpService,
+    private readonly mailService: MailService,
   ) {}
 
   createSignupToken(userId: string, email: string): string {
@@ -313,5 +322,45 @@ export class AuthService {
       resourceType: 'image',
       overwrite: false,
     });
+  }
+
+  async requestPasswordReset(dto: ForgotPasswordRequestDto) {
+    const email = dto.email.toLowerCase();
+    const user = await this.usersService.findByEmail(email);
+    // Không tiết lộ sự tồn tại, nhưng có thể từ chối nếu banned
+    if (!user) return { ok: true };
+    if (user.status === 'banned') {
+      throw new ForbiddenException('Tài khoản đã bị khóa');
+    }
+
+    const { code, expiresMs } = await this.otpService.requestOtp(email);
+    await this.mailService.sendPasswordResetEmail(
+      email,
+      code,
+      Math.ceil(expiresMs / 60000),
+    );
+    return { ok: true };
+  }
+
+  async verifyResetOtp(dto: VerifyResetOtpDto) {
+    const email = dto.email.toLowerCase();
+    await this.otpService.verifyOtpCode(email, dto.otp, { consume: false });
+    return { ok: true };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const email = dto.email.toLowerCase();
+    const user = await this.usersService.findByEmail(email);
+    if (!user || user.status === 'banned') {
+      throw new BadRequestException('Yêu cầu không hợp lệ');
+    }
+
+    await this.otpService.verifyOtp(email, dto.otp);
+    const saltRounds = this.config.bcryptSaltRounds;
+    const hash = await bcrypt.hash(dto.newPassword, saltRounds);
+    await this.usersService.setPassword(user.id, hash);
+
+    // TODO: thu hồi refresh tokens nếu lưu (session table)
+    return { ok: true };
   }
 }

@@ -77,7 +77,11 @@ export class OtpService {
     return { code, expiresMs: this.expireMs };
   }
 
-  async verifyOtp(email: string, code: string): Promise<Otp> {
+  async verifyOtpCode(
+    email: string,
+    code: string,
+    opts?: { consume?: boolean },
+  ): Promise<Otp> {
     const otp = await this.otpModel
       .findOne({ email, consumed: false, expiresAt: { $gt: new Date() } })
       .sort({ createdAt: -1 })
@@ -100,8 +104,14 @@ export class OtpService {
       throw new BadRequestException('Invalid code.');
     }
 
-    otp.consumed = true;
+    if (opts?.consume !== false) {
+      otp.consumed = true;
+    }
     await otp.save();
     return otp;
+  }
+
+  async verifyOtp(email: string, code: string): Promise<Otp> {
+    return this.verifyOtpCode(email, code, { consume: true });
   }
 }

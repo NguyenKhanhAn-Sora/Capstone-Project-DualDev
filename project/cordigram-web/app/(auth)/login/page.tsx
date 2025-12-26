@@ -588,11 +588,19 @@ export default function LoginPage() {
                   {loading ? "Logging in..." : "Log in"}
                 </button>
 
-                <div className="mt-[20px] max-w-[360px] text-center text-[14px] font-medium leading-[1.5] text-slate-700">
+                <button
+                  type="button"
+                  className={styles["link-button"]}
+                  onClick={() => router.push("/forgot-password")}
+                >
+                  Forgot password?
+                </button>
+
+                <div className=" max-w-[360px] text-center text-[14px] font-medium leading-[1.5] text-slate-700">
                   Don't have an account?{" "}
                   <Link
                     href="/signup"
-                    className="font-semibold text-[#3470A2] underline decoration-[#559AC2]/60 underline-offset-4 transition hover:brightness-110"
+                    className="font-semibold text-[#3470A2] decoration-[#559AC2]/60 underline-offset-4 transition hover:brightness-110"
                   >
                     Sign up
                   </Link>
@@ -711,7 +719,14 @@ export default function LoginPage() {
                 className={styles["overlay-button"]}
                 disabled={!modalPassword.trim() || modalSubmitting}
               >
-                {modalSubmitting ? "Signing in..." : "Sign in"}
+                {modalSubmitting ? "Logging in..." : "Log in"}
+              </button>
+              <button
+                type="button"
+                className={`${styles["link-button"]} flex `}
+                onClick={() => router.push("/forgot-password")}
+              >
+                Forgot password?
               </button>
             </form>
           </div>

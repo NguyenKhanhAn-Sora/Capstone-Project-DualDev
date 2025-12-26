@@ -278,6 +278,44 @@ export async function clearRecentAccounts(opts: {
   });
 }
 
+export async function requestPasswordReset(
+  email: string
+): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>({
+    path: "/auth/password/forgot",
+    method: "POST",
+    body: JSON.stringify({ email }),
+    credentials: "include",
+  });
+}
+
+export async function verifyResetOtp(opts: {
+  email: string;
+  otp: string;
+}): Promise<{ ok: true }> {
+  const { email, otp } = opts;
+  return apiFetch<{ ok: true }>({
+    path: "/auth/password/verify",
+    method: "POST",
+    body: JSON.stringify({ email, otp }),
+    credentials: "include",
+  });
+}
+
+export async function resetPassword(opts: {
+  email: string;
+  otp: string;
+  newPassword: string;
+}): Promise<{ ok: true }> {
+  const { email, otp, newPassword } = opts;
+  return apiFetch<{ ok: true }>({
+    path: "/auth/password/reset",
+    method: "POST",
+    body: JSON.stringify({ email, otp, newPassword }),
+    credentials: "include",
+  });
+}
+
 export type UploadPostMediaResponse = {
   folder: string;
   url: string;

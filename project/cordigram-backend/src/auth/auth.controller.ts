@@ -21,6 +21,11 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { LoginDto } from './dto/login.dto';
 import { UpsertRecentAccountDto } from './dto/upsert-recent-account.dto';
+import {
+  ForgotPasswordRequestDto,
+  ResetPasswordDto,
+  VerifyResetOtpDto,
+} from './dto/forgot-password.dto';
 import { OtpService } from '../otp/otp.service';
 import { MailService } from '../mail/mail.service';
 import { ConfigService } from '../config/config.service';
@@ -325,6 +330,21 @@ export class AuthController {
     }
     const recent = await this.usersService.clearRecentAccounts(userId);
     return { recentAccounts: recent };
+  }
+
+  @Post('password/forgot')
+  async forgotPassword(@Body() dto: ForgotPasswordRequestDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @Post('password/verify')
+  async verifyResetOtp(@Body() dto: VerifyResetOtpDto) {
+    return this.authService.verifyResetOtp(dto);
+  }
+
+  @Post('password/reset')
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 
   private setRefreshCookie(res: Response, token: string) {
