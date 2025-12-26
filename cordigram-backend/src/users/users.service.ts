@@ -9,6 +9,24 @@ export class UsersService {
     @InjectModel(User.name) private readonly userModel: Model<User>,
   ) {}
 
+  private sanitizeRecentAccounts(list: User['recentAccounts'] = []) {
+    return (list ?? [])
+      .filter((item) => item?.email)
+      .map((item) => ({
+        email: item.email.toLowerCase(),
+        displayName: item.displayName ?? undefined,
+        username: item.username ?? undefined,
+        avatarUrl: item.avatarUrl ?? undefined,
+        lastUsed: item.lastUsed ?? undefined,
+      }))
+      .sort((a, b) => {
+        const aTime = a.lastUsed ? new Date(a.lastUsed).getTime() : 0;
+        const bTime = b.lastUsed ? new Date(b.lastUsed).getTime() : 0;
+        return bTime - aTime;
+      })
+      .slice(0, 5);
+  }
+
   findByEmail(email: string): Promise<User | null> {
     return this.userModel.findOne({ email }).exec();
   }
@@ -140,5 +158,72 @@ export class UsersService {
         )
         .exec();
     }
+  }
+
+  async getRecentAccounts(userId: string) {
+    const user = await this.userModel
+      .findById(userId)
+      .select('recentAccounts')
+      .lean()
+      .exec();
+    return this.sanitizeRecentAccounts(user?.recentAccounts);
+  }
+
+  async upsertRecentAccount(params: {
+    userId: string;
+    email: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+    lastUsed?: Date | string | number;
+  }) {
+    const nextItem = {
+      email: params.email.toLowerCase(),
+      displayName: params.displayName,
+      username: params.username,
+      avatarUrl: params.avatarUrl,
+      lastUsed: params.lastUsed ? new Date(params.lastUsed) : new Date(),
+    };
+
+    const user = await this.userModel
+      .findById(params.userId)
+      .select('recentAccounts')
+      .lean()
+      .exec();
+
+    const current = this.sanitizeRecentAccounts(user?.recentAccounts);
+    const filtered = current.filter((item) => item.email !== nextItem.email);
+    const nextList = [nextItem, ...filtered].slice(0, 5);
+
+    await this.userModel
+      .updateOne({ _id: params.userId }, { $set: { recentAccounts: nextList } })
+      .exec();
+
+    return nextList;
+  }
+
+  async removeRecentAccount(params: { userId: string; email: string }) {
+    const user = await this.userModel
+      .findById(params.userId)
+      .select('recentAccounts')
+      .lean()
+      .exec();
+    const current = this.sanitizeRecentAccounts(user?.recentAccounts);
+    const nextList = current.filter(
+      (item) => item.email !== params.email.toLowerCase(),
+    );
+
+    await this.userModel
+      .updateOne({ _id: params.userId }, { $set: { recentAccounts: nextList } })
+      .exec();
+
+    return nextList;
+  }
+
+  async clearRecentAccounts(userId: string) {
+    await this.userModel
+      .updateOne({ _id: userId }, { $set: { recentAccounts: [] } })
+      .exec();
+    return [] as User['recentAccounts'];
   }
 }

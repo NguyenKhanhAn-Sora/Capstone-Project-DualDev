@@ -6,9 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./signup.module.css";
 import Cropper, { Area } from "react-easy-crop";
 import { apiFetch, ApiError, getApiBaseUrl } from "@/lib/api";
+import { setStoredAccessToken } from "@/lib/auth";
 import { useRedirectIfAuthed } from "@/hooks/use-require-auth";
 
 type Step = "email" | "otp" | "profile" | "avatar";
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type AvatarUploadResponse = {
   avatarUrl: string;
@@ -177,6 +180,38 @@ export default function SignupPage() {
     displayName?: string;
   }>({});
   const [cooldownLeft, setCooldownLeft] = useState<number | null>(null);
+
+  const saveRecentAccount = (account: {
+    email: string;
+    username?: string;
+    displayName?: string;
+    avatarUrl?: string | null;
+  }) => {
+    if (typeof window === "undefined") return;
+    const normalizedEmail = account.email.trim().toLowerCase();
+    if (!emailRegex.test(normalizedEmail)) return;
+
+    try {
+      const raw = window.localStorage.getItem("recentAccounts");
+      const parsed = raw ? (JSON.parse(raw) as any[]) : [];
+      const filtered = Array.isArray(parsed)
+        ? parsed.filter((item) => item?.email !== normalizedEmail)
+        : [];
+      const next = [
+        {
+          email: normalizedEmail,
+          username: account.username,
+          displayName: account.displayName,
+          avatarUrl: account.avatarUrl || undefined,
+          lastUsed: Date.now(),
+        },
+        ...filtered,
+      ].slice(0, 5);
+      window.localStorage.setItem("recentAccounts", JSON.stringify(next));
+    } catch (_err) {
+      // ignore localStorage errors
+    }
+  };
 
   const handleGoogleAuth = () => {
     window.location.href = `${getApiBaseUrl()}/auth/google`;
@@ -462,7 +497,21 @@ export default function SignupPage() {
       }),
     });
 
-    localStorage.setItem("accessToken", res.accessToken);
+    setStoredAccessToken(res.accessToken);
+    saveRecentAccount({
+      email,
+      username,
+      displayName,
+      avatarUrl: avatarData?.avatarUrl ?? null,
+    });
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ui-theme", "light");
+    }
+    if (typeof document !== "undefined") {
+      document.documentElement.dataset.theme = "light";
+      document.body.dataset.theme = "light";
+    }
     showInfo("Sign-up successful. Redirecting...");
     router.push("/");
   };

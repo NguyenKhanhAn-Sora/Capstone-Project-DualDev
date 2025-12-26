@@ -2,8 +2,10 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
+  Param,
   Post,
   Req,
   Res,
@@ -18,6 +20,12 @@ import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpsertRecentAccountDto } from './dto/upsert-recent-account.dto';
+import {
+  ForgotPasswordRequestDto,
+  ResetPasswordDto,
+  VerifyResetOtpDto,
+} from './dto/forgot-password.dto';
 import { OtpService } from '../otp/otp.service';
 import { MailService } from '../mail/mail.service';
 import { ConfigService } from '../config/config.service';
@@ -25,6 +33,8 @@ import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 import { v4 as uuid } from 'uuid';
 import type { Response, Request } from 'express';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import type { AuthenticatedUser } from './jwt.strategy';
 type MulterFile = {
   buffer: Buffer;
   mimetype: string;
@@ -156,6 +166,7 @@ export class AuthController {
   async completeProfile(
     @Body() dto: CompleteProfileDto,
     @Headers('authorization') authHeader: string | undefined,
+    @Res() res: Response,
   ) {
     const token = this.extractToken(authHeader);
     const result = await this.authService.completeProfile({
@@ -174,13 +185,27 @@ export class AuthController {
       links: dto.links,
       password: dto.password,
     });
-    return result;
+
+    this.setRefreshCookie(res, result.refreshToken);
+    return res.json({ accessToken: result.accessToken });
   }
 
   @Post('login')
-  async login(@Body() dto: LoginDto) {
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
     const email = dto.email.toLowerCase();
-    return this.authService.login({ email, password: dto.password });
+    const result = await this.authService.login({
+      email,
+      password: dto.password,
+      userAgent: req.headers['user-agent'],
+      deviceInfo: req.headers['x-device-info'] as string,
+    });
+
+    this.setRefreshCookie(res, result.refreshToken);
+    return res.json({ accessToken: result.accessToken });
   }
 
   @Get('google')
@@ -206,12 +231,15 @@ export class AuthController {
       email: user.email,
       providerId: user.sub,
       refreshToken: user.refreshToken ?? null,
+      userAgent: req.headers['user-agent'] as string,
+      deviceInfo: req.headers['x-device-info'] as string,
     });
 
     const params = new URLSearchParams();
     params.append('needsProfile', result.needsProfile ? '1' : '0');
     if ('accessToken' in result) {
       params.append('accessToken', result.accessToken);
+      this.setRefreshCookie(res, result.refreshToken);
     }
     if ('signupToken' in result) {
       params.append('signupToken', result.signupToken);
@@ -219,6 +247,114 @@ export class AuthController {
 
     const redirectUrl = `${this.config.frontendUrl}/auth/google/callback?${params.toString()}`;
     return res.redirect(redirectUrl);
+  }
+
+  @Post('refresh')
+  async refresh(@Req() req: Request, @Res() res: Response) {
+    const token = (req as Request & { cookies?: Record<string, string> })
+      .cookies?.['refresh_token'];
+    const result = await this.authService.refreshAccessToken({
+      refreshToken: token,
+      userAgent: req.headers['user-agent'] as string,
+      deviceInfo: req.headers['x-device-info'] as string,
+    });
+    this.setRefreshCookie(res, result.refreshToken);
+    return res.json({ accessToken: result.accessToken });
+  }
+
+  @Post('logout')
+  async logout(@Req() req: Request, @Res() res: Response) {
+    const token = (req as Request & { cookies?: Record<string, string> })
+      .cookies?.['refresh_token'];
+    await this.authService.revokeRefreshToken(token ?? '');
+    res.clearCookie('refresh_token', { path: '/auth' });
+    return res.json({ success: true });
+  }
+
+  @Get('recent-accounts')
+  @UseGuards(JwtAuthGuard)
+  async getRecentAccounts(@Req() req: Request & { user?: AuthenticatedUser }) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const recent = await this.usersService.getRecentAccounts(userId);
+    return { recentAccounts: recent };
+  }
+
+  @Post('recent-accounts')
+  @UseGuards(JwtAuthGuard)
+  async upsertRecentAccount(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Body() dto: UpsertRecentAccountDto,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const recent = await this.usersService.upsertRecentAccount({
+      userId,
+      email: dto.email,
+      displayName: dto.displayName,
+      username: dto.username,
+      avatarUrl: dto.avatarUrl,
+    });
+    return { recentAccounts: recent };
+  }
+
+  @Delete('recent-accounts/:email')
+  @UseGuards(JwtAuthGuard)
+  async removeRecentAccount(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('email') email: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const recent = await this.usersService.removeRecentAccount({
+      userId,
+      email,
+    });
+    return { recentAccounts: recent };
+  }
+
+  @Delete('recent-accounts')
+  @UseGuards(JwtAuthGuard)
+  async clearRecentAccounts(
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const recent = await this.usersService.clearRecentAccounts(userId);
+    return { recentAccounts: recent };
+  }
+
+  @Post('password/forgot')
+  async forgotPassword(@Body() dto: ForgotPasswordRequestDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @Post('password/verify')
+  async verifyResetOtp(@Body() dto: VerifyResetOtpDto) {
+    return this.authService.verifyResetOtp(dto);
+  }
+
+  @Post('password/reset')
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
+
+  private setRefreshCookie(res: Response, token: string) {
+    res.cookie('refresh_token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/auth',
+      maxAge: 1000 * 60 * 60 * 24 * 30,
+    });
   }
 
   private extractToken(authHeader?: string): string {

@@ -102,13 +102,26 @@ export default function Sidebar() {
   const displayName = profile?.displayName;
   const username = profile?.username ? `@${profile.username}` : null;
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
+    setMenuOpen(false);
+
+    try {
+      await apiFetch<{ success: boolean }>({
+        path: "/auth/logout",
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (_err) {
+      // ignore
+    }
+
     if (typeof window !== "undefined") {
       localStorage.removeItem("accessToken");
+      localStorage.removeItem("ui-theme");
     }
+
     setProfile(null);
-    setMenuOpen(false);
-    router.replace("/login");
+    router.replace("/login?loggedOut=1");
   }, [router]);
 
   const handleSwitchAccountSuccess = useCallback(

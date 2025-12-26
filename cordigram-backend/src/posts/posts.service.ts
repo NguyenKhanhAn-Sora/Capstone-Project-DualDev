@@ -81,10 +81,6 @@ export class PostsService {
       reposts: 0,
     };
 
-    const inferredDuration = this.extractVideoDuration(
-      media.find((m) => m.type === 'video')?.metadata,
-    );
-
     const doc = await this.postModel.create({
       kind: 'post',
       authorId: new Types.ObjectId(authorId),
@@ -93,7 +89,6 @@ export class PostsService {
       repostOf,
       content: typeof dto.content === 'string' ? dto.content : '',
       media,
-      videoDurationSec: inferredDuration,
       hashtags: normalizedHashtags,
       mentions: normalizedMentions,
       location: dto.location?.trim() || null,
@@ -172,7 +167,6 @@ export class PostsService {
       repostOf: null,
       content: typeof dto.content === 'string' ? dto.content : '',
       media,
-      videoDurationSec: duration,
       hashtags: normalizedHashtags,
       mentions: normalizedMentions,
       location: dto.location?.trim() || null,
@@ -215,7 +209,6 @@ export class PostsService {
       id: doc.id,
       content: doc.content,
       media: doc.media,
-      videoDurationSec: doc.videoDurationSec ?? null,
       hashtags: doc.hashtags,
       mentions: doc.mentions,
       location: doc.location,
@@ -256,16 +249,52 @@ export class PostsService {
       throw new BadRequestException('Missing file');
     }
 
-    const resourceType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+    return this.uploadSingle(authorId, file);
+  }
+
+  async uploadMediaBatch(authorId: string, files: UploadedFile[]) {
+    if (!files || !files.length) {
+      throw new BadRequestException('Missing files');
+    }
+
+    const uploads = [] as Array<{
+      folder: string;
+      url: string;
+      secureUrl: string;
+      publicId: string;
+      resourceType: string;
+      bytes: number;
+      format?: string;
+      width?: number;
+      height?: number;
+      duration?: number;
+      originalName?: string;
+    }>;
+
+    for (const file of files) {
+      const result = await this.uploadSingle(authorId, file);
+      uploads.push({ ...result, originalName: file.originalname });
+    }
+
+    return uploads;
+  }
+
+  private buildUploadFolder(authorId: string): string {
     const now = new Date();
-    const folderParts = [
+    const parts = [
       this.config.cloudinaryFolder,
       'posts',
       authorId,
       now.getFullYear().toString(),
       `${now.getMonth() + 1}`.padStart(2, '0'),
     ].filter(Boolean);
-    const folder = folderParts.join('/');
+
+    return parts.join('/');
+  }
+
+  private async uploadSingle(authorId: string, file: UploadedFile) {
+    const resourceType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+    const folder = this.buildUploadFolder(authorId);
 
     const upload = await this.cloudinary.uploadBuffer({
       buffer: file.buffer,

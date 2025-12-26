@@ -83,7 +83,6 @@ export type CreatePostResponse = {
     url: string;
     metadata?: Record<string, unknown> | null;
   }>;
-  videoDurationSec?: number | null;
   hashtags: string[];
   mentions: string[];
   location?: string | null;
@@ -161,6 +160,18 @@ export type UserSettingsResponse = {
   theme: "light" | "dark";
 };
 
+export type RecentAccountResponse = {
+  email: string;
+  displayName?: string;
+  username?: string;
+  avatarUrl?: string;
+  lastUsed?: string;
+};
+
+export type RecentAccountsPayload = {
+  recentAccounts: RecentAccountResponse[];
+};
+
 export async function fetchCurrentProfile(opts: {
   token: string;
 }): Promise<CurrentProfileResponse> {
@@ -199,6 +210,108 @@ export async function updateUserSettings(opts: {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ theme }),
+  });
+}
+
+export async function fetchRecentAccounts(opts: {
+  token: string;
+}): Promise<RecentAccountsPayload> {
+  const { token } = opts;
+  return apiFetch<RecentAccountsPayload>({
+    path: "/auth/recent-accounts",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+  });
+}
+
+export async function upsertRecentAccount(opts: {
+  token: string;
+  payload: {
+    email: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+  };
+}): Promise<RecentAccountsPayload> {
+  const { token, payload } = opts;
+  return apiFetch<RecentAccountsPayload>({
+    path: "/auth/recent-accounts",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function removeRecentAccount(opts: {
+  token: string;
+  email: string;
+}): Promise<RecentAccountsPayload> {
+  const { token, email } = opts;
+  return apiFetch<RecentAccountsPayload>({
+    path: `/auth/recent-accounts/${encodeURIComponent(email)}`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+  });
+}
+
+export async function clearRecentAccounts(opts: {
+  token: string;
+}): Promise<RecentAccountsPayload> {
+  const { token } = opts;
+  return apiFetch<RecentAccountsPayload>({
+    path: "/auth/recent-accounts",
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+  });
+}
+
+export async function requestPasswordReset(
+  email: string
+): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>({
+    path: "/auth/password/forgot",
+    method: "POST",
+    body: JSON.stringify({ email }),
+    credentials: "include",
+  });
+}
+
+export async function verifyResetOtp(opts: {
+  email: string;
+  otp: string;
+}): Promise<{ ok: true }> {
+  const { email, otp } = opts;
+  return apiFetch<{ ok: true }>({
+    path: "/auth/password/verify",
+    method: "POST",
+    body: JSON.stringify({ email, otp }),
+    credentials: "include",
+  });
+}
+
+export async function resetPassword(opts: {
+  email: string;
+  otp: string;
+  newPassword: string;
+}): Promise<{ ok: true }> {
+  const { email, otp, newPassword } = opts;
+  return apiFetch<{ ok: true }>({
+    path: "/auth/password/reset",
+    method: "POST",
+    body: JSON.stringify({ email, otp, newPassword }),
+    credentials: "include",
   });
 }
 
