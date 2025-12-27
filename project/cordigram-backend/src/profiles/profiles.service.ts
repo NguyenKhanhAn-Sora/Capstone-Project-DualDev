@@ -1,0 +1,193 @@
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types, PipelineStage } from 'mongoose';
+import { Profile } from './profile.schema';
+
+@Injectable()
+export class ProfilesService {
+  constructor(
+    @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
+  ) {}
+
+  private escapeRegex(input: string): string {
+    return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private readonly DEFAULT_AVATAR_URL =
+    'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
+
+  async createOrUpdate(data: {
+    userId: Types.ObjectId;
+    displayName: string;
+    username: string;
+    avatarUrl?: string;
+    avatarOriginalUrl?: string;
+    avatarPublicId?: string;
+    avatarOriginalPublicId?: string;
+    coverUrl?: string;
+    bio?: string;
+    location?: string;
+    links?: Record<string, string>;
+    birthdate?: Date | null;
+  }): Promise<Profile> {
+    const existingUsername = await this.profileModel
+      .findOne({ username: data.username })
+      .exec();
+    if (
+      existingUsername &&
+      existingUsername.userId.toString() !== data.userId.toString()
+    ) {
+      throw new BadRequestException('Username already taken');
+    }
+
+    const profile = await this.profileModel
+      .findOne({ userId: data.userId })
+      .exec();
+    if (profile) {
+      profile.displayName = data.displayName;
+      profile.username = data.username;
+      profile.avatarUrl = data.avatarUrl ?? profile.avatarUrl;
+      profile.avatarOriginalUrl =
+        data.avatarOriginalUrl ?? profile.avatarOriginalUrl;
+      profile.avatarPublicId = data.avatarPublicId ?? profile.avatarPublicId;
+      profile.avatarOriginalPublicId =
+        data.avatarOriginalPublicId ?? profile.avatarOriginalPublicId;
+      profile.coverUrl = data.coverUrl ?? profile.coverUrl;
+      profile.bio = data.bio ?? profile.bio;
+      profile.location = data.location ?? profile.location;
+      profile.links = data.links ?? profile.links;
+      profile.birthdate = data.birthdate ?? profile.birthdate;
+      await profile.save();
+      return profile;
+    }
+
+    return this.profileModel.create({
+      userId: data.userId,
+      displayName: data.displayName,
+      username: data.username,
+      avatarUrl: data.avatarUrl ?? this.DEFAULT_AVATAR_URL,
+      avatarOriginalUrl: data.avatarOriginalUrl ?? this.DEFAULT_AVATAR_URL,
+      avatarPublicId: data.avatarPublicId ?? '',
+      avatarOriginalPublicId: data.avatarOriginalPublicId ?? '',
+      coverUrl: data.coverUrl ?? '',
+      bio: data.bio ?? '',
+      location: data.location ?? '',
+      links: data.links ?? {},
+      birthdate: data.birthdate ?? null,
+    });
+  }
+
+  async isUsernameAvailable(
+    username: string,
+    excludeUserId?: string,
+  ): Promise<boolean> {
+    const query: Record<string, unknown> = { username };
+    if (excludeUserId) {
+      query.userId = { $ne: new Types.ObjectId(excludeUserId) };
+    }
+    const existing = await this.profileModel
+      .findOne(query)
+      .select('_id')
+      .lean()
+      .exec();
+    return !existing;
+  }
+
+  async findByUserId(userId: string | Types.ObjectId): Promise<Profile | null> {
+    const objectId =
+      typeof userId === 'string'
+        ? Types.ObjectId.isValid(userId)
+          ? new Types.ObjectId(userId)
+          : null
+        : userId;
+
+    if (!objectId) {
+      return null;
+    }
+
+    return this.profileModel.findOne({ userId: objectId }).exec();
+  }
+
+  async searchProfiles(params: {
+    query: string;
+    limit?: number;
+    excludeUserId?: string;
+  }): Promise<
+    Array<{
+      id: string;
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      followersCount: number;
+    }>
+  > {
+    const term = params.query?.trim();
+    if (!term) return [];
+
+    const limit = Math.min(Math.max(Number(params.limit) || 8, 1), 25);
+    const escaped = this.escapeRegex(term.toLowerCase());
+    const prefixRegex = new RegExp(`^${escaped}`, 'i');
+    const anywhereRegex = new RegExp(escaped, 'i');
+
+    const excludeUserId = params.excludeUserId;
+    const exclude =
+      excludeUserId && Types.ObjectId.isValid(excludeUserId)
+        ? new Types.ObjectId(excludeUserId)
+        : null;
+
+    const pipeline: PipelineStage[] = [
+      {
+        $match: {
+          ...(exclude ? { userId: { $ne: exclude } } : {}),
+          $or: [
+            { username: { $regex: anywhereRegex } },
+            { displayName: { $regex: anywhereRegex } },
+          ],
+        },
+      },
+      {
+        $addFields: {
+          prefixUsername: {
+            $cond: [
+              { $regexMatch: { input: '$username', regex: prefixRegex } },
+              1,
+              0,
+            ],
+          },
+          prefixDisplay: {
+            $cond: [
+              { $regexMatch: { input: '$displayName', regex: prefixRegex } },
+              1,
+              0,
+            ],
+          },
+          usernameLength: { $strLenCP: '$username' },
+        },
+      },
+      {
+        $sort: {
+          prefixUsername: -1,
+          prefixDisplay: -1,
+          usernameLength: 1,
+          'stats.followersCount': -1,
+          createdAt: -1,
+        },
+      },
+      { $limit: limit },
+      {
+        $project: {
+          _id: 0,
+          id: { $toString: '$_id' },
+          userId: { $toString: '$userId' },
+          username: 1,
+          displayName: 1,
+          avatarUrl: 1,
+          followersCount: '$stats.followersCount',
+        },
+      },
+    ];
+
+    return this.profileModel.aggregate(pipeline).exec();
+  }
+}
