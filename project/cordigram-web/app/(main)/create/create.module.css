@@ -1,17 +1,7 @@
 .screen {
   min-height: 100vh;
   padding: 32px 40px 48px;
-  background: radial-gradient(
-      circle at 18% 18%,
-      rgba(255, 255, 255, 0.06) 0,
-      transparent 36%
-    ),
-    radial-gradient(
-      circle at 78% 0%,
-      rgba(255, 255, 255, 0.04) 0,
-      transparent 26%
-    ),
-    var(--color-bg);
+  background: var(--color-bg);
   color: var(--color-text);
   display: flex;
   flex-direction: column;
@@ -370,12 +360,7 @@
 }
 
 .mediaFrame {
-  background: radial-gradient(
-    circle at 40% 30%,
-    rgba(11, 18, 36, 0.85),
-    rgba(12, 18, 34, 0.96) 65%,
-    rgba(10, 16, 30, 0.98) 100%
-  );
+  background: var(--color-bg);
   margin: 16px;
   border-radius: 14px;
   padding: 14px;
@@ -476,14 +461,15 @@
   top: 8px;
   right: 8px;
   border: none;
-  background: rgba(15, 23, 42, 0.7);
-  color: #fff;
-  width: 28px;
-  height: 28px;
+  color: var(--color-button-x);
+  border: 1px solid var(--color-border-button-x);
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   cursor: pointer;
   font-weight: 700;
   display: grid;
+  font-size: 13px;
   place-items: center;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
@@ -503,25 +489,27 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 2px 6px;
   border-radius: 999px;
   background: linear-gradient(135deg, var(--color-primary), #22d3ee);
   color: #fff;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: capitalize;
+  line-height: normal;
 }
 
 .previewBadgeMuted {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 2px 6px;
   border-radius: 999px;
   background: var(--color-surface);
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
+  line-height: normal;
 }
 
 .previewMeta {

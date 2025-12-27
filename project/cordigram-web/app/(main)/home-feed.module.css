@@ -4,17 +4,7 @@
   gap: 24px;
   padding: 24px;
   min-height: 100vh;
-  background: radial-gradient(
-      circle at 20% 20%,
-      rgba(108, 99, 255, 0.08),
-      transparent 40%
-    ),
-    radial-gradient(
-      circle at 80% 30%,
-      rgba(255, 131, 67, 0.08),
-      transparent 42%
-    ),
-    linear-gradient(135deg, #0f172a 0%, #0b1224 50%, #0f172a 100%);
+  background: var(--color-bg-home);
   color: #e8ecf8;
 }
 
@@ -26,11 +16,11 @@
 }
 
 .feedCard {
-  background: rgba(15, 23, 42, 0.8);
+  background: var(--color-surface);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 16px;
   padding: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0px 3px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(8px);
 }
 
@@ -76,7 +66,7 @@
 
 .authorName {
   font-weight: 700;
-  color: #f8fafc;
+  color: var(--color-text);
 }
 
 .authorSub {
@@ -86,9 +76,77 @@
 
 .content {
   margin: 8px 0 12px;
-  color: #e2e8f0;
+  color: var(--color-text);
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+.contentRich {
+  word-break: break-word;
+}
+
+.contentSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.contentCollapsible {
+  position: relative;
+}
+
+.contentCollapsed {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.seeMore {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+}
+
+.seeMore:hover {
+  text-decoration: underline;
+}
+
+.mentionLink {
+  color: var(--color-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.mentionLink:hover {
+  text-decoration: underline;
+}
+
+.contentBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+.metaLabel {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 8px;
+  border-radius: 12px;
 }
 
 .mediaGrid {

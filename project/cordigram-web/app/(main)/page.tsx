@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { JSX, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./home-feed.module.css";
 import {
   fetchFeed,
@@ -322,17 +322,18 @@ function FeedCard({
     authorAvatarUrl,
     author,
     content,
+    createdAt,
     media,
     stats,
+    mentions,
     hashtags,
     topics,
-    createdAt,
+    location,
   } = data;
 
   const displayName = authorDisplayName || author?.displayName;
   const username = authorUsername || author?.username;
   const avatarUrl = authorAvatarUrl || author?.avatarUrl;
-  data;
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -358,6 +359,74 @@ function FeedCard({
     const base = displayName?.trim() || username?.trim() || authorId || "?";
     return base.slice(0, 2).toUpperCase();
   }, [displayName, username, authorId]);
+
+  const [collapsed, setCollapsed] = useState(true);
+  const [canExpand, setCanExpand] = useState(false);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  const captionNodes = useMemo(() => {
+    if (!content) return null;
+    const parts: Array<string | JSX.Element> = [];
+    const normalizedMentions = new Set(
+      (mentions || []).map((m) => m.toLowerCase())
+    );
+    const pushText = (text: string, keyBase: string) => {
+      const chunks = text.split("\n");
+      chunks.forEach((chunk, idx) => {
+        if (idx > 0) {
+          parts.push(<br key={`${keyBase}-br-${idx}`} />);
+        }
+        if (chunk) parts.push(chunk);
+      });
+    };
+
+    const regex = /@([a-zA-Z0-9_.]+)/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(content))) {
+      const start = match.index;
+      if (start > lastIndex) {
+        pushText(content.slice(lastIndex, start), `text-${start}`);
+      }
+      const handle = match[1];
+      const display = `@${handle}`;
+      const canLink =
+        normalizedMentions.size === 0 ||
+        normalizedMentions.has(handle.toLowerCase());
+      if (canLink) {
+        parts.push(
+          <a
+            key={`${handle}-${start}`}
+            href={`/profiles/${handle}`}
+            className={styles.mentionLink}
+          >
+            {display}
+          </a>
+        );
+      } else {
+        pushText(display, `text-${start}-plain`);
+      }
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < content.length) {
+      pushText(content.slice(lastIndex), `text-tail-${lastIndex}`);
+    }
+    return parts;
+  }, [content, mentions]);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const measure = () => {
+      const lineHeight = parseFloat(getComputedStyle(el).lineHeight || "0");
+      if (!lineHeight) return;
+      const lines = el.scrollHeight / lineHeight;
+      const shouldCollapse = lines > 3.2;
+      setCanExpand(shouldCollapse);
+      setCollapsed((prev) => (shouldCollapse ? true : false));
+    };
+    measure();
+  }, [content, captionNodes]);
 
   const authorLine = useMemo(() => {
     if (displayName) return displayName;
@@ -394,20 +463,50 @@ function FeedCard({
         </button>
       </header>
 
-      {content && <div className={styles.content}>{content}</div>}
+      {content && (
+        <div className={styles.contentSection}>
+          <div
+            ref={contentRef}
+            className={`${styles.content} ${styles.contentRich} ${
+              styles.contentCollapsible
+            } ${collapsed && canExpand ? styles.contentCollapsed : ""}`}
+          >
+            {captionNodes}
+          </div>
+          {canExpand && (
+            <button
+              type="button"
+              className={styles.seeMore}
+              onClick={() => setCollapsed((prev) => !prev)}
+            >
+              {collapsed ? "See more" : "Collapse"}
+            </button>
+          )}
+        </div>
+      )}
 
-      {Boolean((hashtags?.length || 0) + (topics?.length || 0)) && (
-        <div className={styles.tags}>
-          {hashtags?.map((tag) => (
-            <span key={tag} className={styles.tag}>
-              #{tag}
-            </span>
-          ))}
-          {topics?.map((tag) => (
-            <span key={tag} className={styles.tag}>
-              {tag}
-            </span>
-          ))}
+      {(location ||
+        Boolean((hashtags?.length || 0) + (topics?.length || 0))) && (
+        <div className={styles.contentBlock}>
+          {location && (
+            <div className={styles.metaRow}>
+              <span className={styles.metaLabel}>{location}</span>
+            </div>
+          )}
+          {Boolean((hashtags?.length || 0) + (topics?.length || 0)) && (
+            <div className={styles.tags}>
+              {hashtags?.map((tag) => (
+                <span key={tag} className={styles.tag}>
+                  #{tag}
+                </span>
+              ))}
+              {topics?.map((tag) => (
+                <span key={tag} className={styles.tag}>
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

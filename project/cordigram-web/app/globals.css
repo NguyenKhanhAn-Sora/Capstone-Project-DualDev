@@ -11,9 +11,18 @@
   --color-primary: #4aa3e4;
   --color-primary-strong: #3470a2;
   --color-primary-accent: #22d3ee;
+  --color-button-x: #1f2a3d;
+  --color-border-button-x: #828b9a;
   --shadow-strong: 0 24px 80px rgba(10, 18, 40, 0.25);
   --gradient-surface: linear-gradient(135deg, #f8fafc, #eef2ff);
   --color-title-primary: #0f1629;
+  --color-bg-home: radial-gradient(
+      circle at 20% 20%,
+      #ffffff1f,
+      transparent 40%
+    ),
+    radial-gradient(circle at 80% 0%, #ffffff14, transparent 32%),
+    var(--color-bg);
 }
 
 [data-theme="dark"] {
@@ -24,13 +33,21 @@
   --color-text: #e5e7ef;
   --color-text-muted: #98a3c7;
   --color-overlay: rgba(5, 8, 16, 0.65);
+  --color-button-x: #ffffff;
+  --color-border-button-x: #434f65;
   --color-primary: #559ac2;
   --color-primary-strong: #2b6fb0;
   --color-primary-accent: #1b5f9d;
   --shadow-strong: 0 24px 80px rgba(0, 0, 0, 0.45);
   --gradient-surface: linear-gradient(135deg, #111b30, #0c1220);
   --color-title-primary: #e5e7ef;
-
+  --color-bg-home: radial-gradient(
+      circle at 20% 20%,
+      #ffffff1f,
+      transparent 40%
+    ),
+    radial-gradient(circle at 80% 0%, #ffffff14, transparent 32%),
+    var(--color-bg);
 }
 
 @theme inline {
