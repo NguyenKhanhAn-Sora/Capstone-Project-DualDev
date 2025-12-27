@@ -36,18 +36,12 @@
   --color-button-x: #ffffff;
   --color-border-button-x: #434f65;
   --color-primary: #559ac2;
-  --color-primary-strong: #2b6fb0;
+  --color-primary-strong: #2b74b0;
   --color-primary-accent: #1b5f9d;
   --shadow-strong: 0 24px 80px rgba(0, 0, 0, 0.45);
   --gradient-surface: linear-gradient(135deg, #111b30, #0c1220);
   --color-title-primary: #e5e7ef;
-  --color-bg-home: radial-gradient(
-      circle at 20% 20%,
-      #ffffff1f,
-      transparent 40%
-    ),
-    radial-gradient(circle at 80% 0%, #ffffff14, transparent 32%),
-    var(--color-bg);
+  --color-bg-home: #0c1220;
 }
 
 @theme inline {

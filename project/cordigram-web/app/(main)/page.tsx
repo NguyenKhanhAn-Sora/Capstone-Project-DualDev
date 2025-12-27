@@ -30,6 +30,120 @@ type PostViewState = {
 const PAGE_SIZE = 12;
 const VIEW_DEBOUNCE_MS = 800;
 
+type IconProps = { size?: number; filled?: boolean };
+
+const IconLike = ({ size = 20, filled }: IconProps) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill={filled ? "currentColor" : "none"}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M6 10h3.2V6.6a2.1 2.1 0 0 1 2.1-2.1c.46 0 .91.16 1.27.45l.22.18c.32.26.51.66.51 1.07V10h3.6a2 2 0 0 1 1.97 2.35l-1 5.3A2.2 2.2 0 0 1 15.43 20H8.2A2.2 2.2 0 0 1 6 17.8Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M4 10h2v10H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill={filled ? "currentColor" : "none"}
+    />
+  </svg>
+);
+
+const IconComment = ({ size = 20 }: IconProps) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M5.5 5.5h13a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H10l-3.6 2.8a.6.6 0 0 1-.96-.48V7.5a2 2 0 0 1 2-2Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const IconShare = ({ size = 20 }: IconProps) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M12 5.5V3l8 5-8 5v-2.6c-4.5 0-7.5 1.6-9.5 5.1.5-4.9 3.3-9 9.5-10Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const IconSave = ({ size = 20, filled }: IconProps) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill={filled ? "currentColor" : "none"}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M7 4.8A1.8 1.8 0 0 1 8.8 3h8.4A1.8 1.8 0 0 1 19 4.8v15.1l-6-3.6-6 3.6Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill={filled ? "currentColor" : "none"}
+    />
+  </svg>
+);
+
+const IconEye = ({ size = 20 }: IconProps) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M2.8 12.4C4.5 8.7 7.7 6.2 12 6.2s7.5 2.5 9.2 6.2c-1.7 3.7-4.9 6.2-9.2 6.2s-7.5-2.5-9.2-6.2Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M12 15.4a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+  </svg>
+);
+
 export default function HomePage() {
   const canRender = useRequireAuth();
   const [items, setItems] = useState<PostViewState[]>([]);
@@ -529,27 +643,56 @@ function FeedCard({
         </div>
       ) : null}
 
-      <div className={styles.actions}>
-        <button
-          className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
-          onClick={() => onLike(id, !liked)}
-        >
-          {liked ? "♥" : "♡"} {stats.hearts ?? 0}
-        </button>
-        <button className={styles.actionBtn} onClick={() => onSave(id, !saved)}>
-          {saved ? "Đã lưu" : "Lưu"} {stats.saves ?? 0}
-        </button>
-        <button className={styles.actionBtn} onClick={() => onShare(id)}>
-          Chia sẻ {stats.shares ?? 0}
-        </button>
-        <button className={styles.actionBtnGhost} onClick={() => onReport(id)}>
-          Báo cáo
-        </button>
+      <div className={styles.statRow}>
+        <div className={styles.statItem}>
+          <span className={styles.statIcon}>
+            <IconLike size={18} />
+          </span>
+          <span>{stats.hearts ?? 0}</span>
+        </div>
+        <div className={styles.statItem}>
+          <span className={styles.statIcon}>
+            <IconComment size={18} />
+          </span>
+          <span>{stats.comments ?? 0}</span>
+        </div>
+        <div className={styles.statItem}>
+          <span className={styles.statIcon}>
+            <IconEye size={18} />
+          </span>
+          <span>{stats.views ?? stats.impressions ?? 0}</span>
+        </div>
+        <div className={styles.statItem}>
+          <span className={styles.statIcon}>
+            <IconShare size={18} />
+          </span>
+          <span>{stats.shares ?? 0}</span>
+        </div>
       </div>
 
-      <div className={styles.counters}>
-        <span>💬 {stats.comments ?? 0}</span>
-        <span>👁 {stats.views ?? stats.impressions ?? 0}</span>
+      <div className={styles.actionRow}>
+        <button
+          className={`${styles.actionBtn} ${
+            liked ? styles.actionBtnActive : ""
+          }`}
+          onClick={() => onLike(id, !liked)}
+        >
+          <IconLike size={20} filled={liked} />
+          <span>{liked ? "Đã thích" : "Thích"}</span>
+        </button>
+        <button
+          className={`${styles.actionBtn} ${
+            saved ? styles.actionBtnActive : ""
+          }`}
+          onClick={() => onSave(id, !saved)}
+        >
+          <IconSave size={20} filled={saved} />
+          <span>{saved ? "Đã lưu" : "Lưu"}</span>
+        </button>
+        <button className={styles.actionBtn} onClick={() => onShare(id)}>
+          <IconShare size={20} />
+          <span>Chia sẻ</span>
+        </button>
       </div>
     </article>
   );
