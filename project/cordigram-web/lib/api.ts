@@ -134,6 +134,8 @@ export type CreateReelRequest = {
 export type FeedItem = CreatePostResponse & {
   spamScore?: number;
   qualityScore?: number;
+  liked?: boolean;
+  saved?: boolean;
   authorId?: string;
   authorUsername?: string;
   authorDisplayName?: string;

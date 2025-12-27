@@ -1,6 +1,6 @@
 "use client";
 
-import { JSX, useEffect, useMemo, useRef, useState } from "react";
+import { JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./home-feed.module.css";
 import {
   fetchFeed,
@@ -29,6 +29,8 @@ type PostViewState = {
 
 const PAGE_SIZE = 12;
 const VIEW_DEBOUNCE_MS = 800;
+const VIEW_DWELL_MS = 2000;
+const VIEW_COOLDOWN_MS = 60000;
 
 type IconProps = { size?: number; filled?: boolean };
 
@@ -78,22 +80,22 @@ const IconComment = ({ size = 20 }: IconProps) => (
   </svg>
 );
 
-const IconShare = ({ size = 20 }: IconProps) => (
+const IconReup = ({ size = 20 }: IconProps) => (
   <svg
     aria-hidden
     width={size}
     height={size}
     viewBox="0 0 24 24"
-    fill="none"
+    fill="var(--color-text-muted)"
     xmlns="http://www.w3.org/2000/svg"
   >
     <path
-      d="M12 5.5V3l8 5-8 5v-2.6c-4.5 0-7.5 1.6-9.5 5.1.5-4.9 3.3-9 9.5-10Z"
-      stroke="currentColor"
-      strokeWidth={1.6}
+      stroke="none"
+      strokeWidth={1}
       strokeLinecap="round"
       strokeLinejoin="round"
-    />
+      d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"
+    ></path>
   </svg>
 );
 
@@ -144,6 +146,24 @@ const IconEye = ({ size = 20 }: IconProps) => (
   </svg>
 );
 
+const IconClose = ({ size = 18 }: IconProps) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 20 20"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M6 6l12 12M18 6 6 18"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 export default function HomePage() {
   const canRender = useRequireAuth();
   const [items, setItems] = useState<PostViewState[]>([]);
@@ -160,6 +180,30 @@ export default function HomePage() {
     return localStorage.getItem("accessToken");
   }, []);
 
+  const syncStats = useCallback(async () => {
+    if (!token) return;
+    try {
+      const limit = page * PAGE_SIZE;
+      const data = await fetchFeed({ token, limit });
+      const map = new Map(data.map((item) => [item.id, item]));
+      setItems((prev) =>
+        prev.map((p) => {
+          const updated = map.get(p.item.id);
+          if (!updated) return p;
+          return {
+            ...p,
+            item: { ...p.item, stats: updated.stats },
+            flags: {
+              ...p.flags,
+              liked: updated.liked ?? p.flags.liked,
+              saved: updated.saved ?? p.flags.saved,
+            },
+          };
+        })
+      );
+    } catch {}
+  }, [page, token]);
+
   const load = async (nextPage: number) => {
     if (!token) {
       setError("Bạn cần đăng nhập để xem feed");
@@ -174,7 +218,7 @@ export default function HomePage() {
       setItems(
         data.map((item) => ({
           item,
-          flags: {},
+          flags: { liked: item.liked, saved: item.saved },
         }))
       );
       setPage(nextPage);
@@ -223,6 +267,7 @@ export default function HomePage() {
       } else {
         await unlikePost({ token, postId });
       }
+      void syncStats();
     } catch {
       setItems((prev) =>
         prev.map((p) =>
@@ -369,6 +414,17 @@ export default function HomePage() {
     load(page + 1);
   };
 
+  useEffect(() => {
+    if (!canRender || !token) return;
+    const tick = () => {
+      if (document.visibilityState !== "visible") return;
+      void syncStats();
+    };
+    const intervalId = setInterval(tick, 5000);
+    tick();
+    return () => clearInterval(intervalId);
+  }, [canRender, token, syncStats]);
+
   if (!canRender) return null;
 
   return (
@@ -449,6 +505,8 @@ function FeedCard({
   const username = authorUsername || author?.username;
   const avatarUrl = authorAvatarUrl || author?.avatarUrl;
   const cardRef = useRef<HTMLDivElement | null>(null);
+  const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastViewAt = useRef<number>(0);
 
   useEffect(() => {
     const el = cardRef.current;
@@ -457,7 +515,14 @@ function FeedCard({
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            onView(id);
+            if (Date.now() - lastViewAt.current < VIEW_COOLDOWN_MS) return;
+            dwellTimer.current = setTimeout(() => {
+              lastViewAt.current = Date.now();
+              onView(id);
+            }, VIEW_DWELL_MS);
+          } else if (dwellTimer.current) {
+            clearTimeout(dwellTimer.current);
+            dwellTimer.current = null;
           }
         });
       },
@@ -465,6 +530,9 @@ function FeedCard({
     );
     observer.observe(el);
     return () => {
+      if (dwellTimer.current) {
+        clearTimeout(dwellTimer.current);
+      }
       observer.disconnect();
     };
   }, [id, onView]);
@@ -573,7 +641,7 @@ function FeedCard({
           className={`${styles.actionBtn} ${styles.actionBtnGhost}`}
           onClick={() => onHide(id)}
         >
-          Ẩn
+          <IconClose size={22} />
         </button>
       </header>
 
@@ -664,7 +732,7 @@ function FeedCard({
         </div>
         <div className={styles.statItem}>
           <span className={styles.statIcon}>
-            <IconShare size={18} />
+            <IconReup size={18} />
           </span>
           <span>{stats.shares ?? 0}</span>
         </div>
@@ -678,7 +746,7 @@ function FeedCard({
           onClick={() => onLike(id, !liked)}
         >
           <IconLike size={20} filled={liked} />
-          <span>{liked ? "Đã thích" : "Thích"}</span>
+          <span>{liked ? "Liked" : "Like"}</span>
         </button>
         <button
           className={`${styles.actionBtn} ${
@@ -687,11 +755,11 @@ function FeedCard({
           onClick={() => onSave(id, !saved)}
         >
           <IconSave size={20} filled={saved} />
-          <span>{saved ? "Đã lưu" : "Lưu"}</span>
+          <span>{saved ? "Saved" : "Save"}</span>
         </button>
         <button className={styles.actionBtn} onClick={() => onShare(id)}>
-          <IconShare size={20} />
-          <span>Chia sẻ</span>
+          <IconReup size={20} />
+          <span>Reup</span>
         </button>
       </div>
     </article>

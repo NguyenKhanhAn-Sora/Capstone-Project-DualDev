@@ -243,6 +243,7 @@ export class PostsService {
       username?: string;
       avatarUrl?: string;
     } | null,
+    userFlags?: { liked?: boolean; saved?: boolean } | null,
   ) {
     return {
       kind: doc.kind,
@@ -277,6 +278,8 @@ export class PostsService {
       repostOf: doc.repostOf,
       serverId: doc.serverId,
       channelId: doc.channelId,
+      liked: userFlags?.liked ?? false,
+      saved: userFlags?.saved ?? false,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     };
@@ -380,6 +383,14 @@ export class PostsService {
     const safeLimit = Math.min(Math.max(limit, 1), 50);
     const userObjectId = this.asObjectId(userId, 'userId');
 
+    const hidden = await this.postInteractionModel
+      .find({ userId: userObjectId, type: 'hide' })
+      .select('postId')
+      .lean();
+    const hiddenIds = new Set(
+      hidden.map((h) => h.postId?.toString?.()).filter(Boolean),
+    );
+
     const followees = await this.followModel
       .find({ followerId: userObjectId })
       .select('followeeId')
@@ -399,6 +410,7 @@ export class PostsService {
         visibility: { $ne: 'private' },
         deletedAt: null,
         publishedAt: { $ne: null },
+        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
       })
       .sort({ createdAt: -1 })
       .limit(safeLimit * 2)
@@ -412,6 +424,7 @@ export class PostsService {
         deletedAt: null,
         publishedAt: { $ne: null },
         createdAt: { $gte: freshnessWindow },
+        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
       })
       .sort({ 'stats.hearts': -1, 'stats.comments': -1, createdAt: -1 })
       .limit(safeLimit * 2)
@@ -422,7 +435,7 @@ export class PostsService {
 
     for (const raw of [...followCandidates, ...exploreCandidates]) {
       const id = raw._id?.toString?.();
-      if (!id || seen.has(id)) {
+      if (!id || seen.has(id) || hiddenIds.has(id)) {
         continue;
       }
       merged.push(this.postModel.hydrate(raw) as Post);
@@ -450,9 +463,30 @@ export class PostsService {
 
     const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
 
+    const postIds = topPosts.map((p) => p._id);
+    const interactions = await this.postInteractionModel
+      .find({ userId: userObjectId, postId: { $in: postIds } })
+      .select('postId type')
+      .lean();
+
+    const interactionMap = new Map<
+      string,
+      { liked?: boolean; saved?: boolean }
+    >();
+
+    interactions.forEach((item) => {
+      const key = item.postId?.toString?.();
+      if (!key) return;
+      const current = interactionMap.get(key) || {};
+      if (item.type === 'like') current.liked = true;
+      if (item.type === 'save') current.saved = true;
+      interactionMap.set(key, current);
+    });
+
     return topPosts.map((post) => {
       const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
-      return this.toResponse(post, profile);
+      const flags = interactionMap.get(post._id?.toString?.() ?? '') || null;
+      return this.toResponse(post, profile, flags);
     });
   }
 
