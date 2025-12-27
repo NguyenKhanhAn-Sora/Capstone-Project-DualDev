@@ -174,6 +174,7 @@ export default function HomePage() {
   const viewTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map()
   );
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const token = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -409,10 +410,27 @@ export default function HomePage() {
     viewTimers.current.set(postId, timer);
   };
 
-  const loadMore = () => {
+  const handleLoadMore = useCallback(() => {
     if (!hasMore || loading) return;
     load(page + 1);
-  };
+  }, [hasMore, loading, page]);
+
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            handleLoadMore();
+          }
+        });
+      },
+      { root: null, rootMargin: "200px 0px", threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [handleLoadMore]);
 
   useEffect(() => {
     if (!canRender || !token) return;
@@ -452,9 +470,9 @@ export default function HomePage() {
         ))}
 
         {loading && <SkeletonList count={3} />}
-
+        <div ref={loadMoreRef} style={{ height: 1 }} aria-hidden />
         {hasMore && !loading && (
-          <button className={styles.loadMore} onClick={loadMore}>
+          <button className={styles.loadMore} onClick={handleLoadMore}>
             Tải thêm
           </button>
         )}
