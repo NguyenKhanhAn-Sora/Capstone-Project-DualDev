@@ -136,6 +136,7 @@ export type FeedItem = CreatePostResponse & {
   qualityScore?: number;
   liked?: boolean;
   saved?: boolean;
+  following?: boolean;
   authorId?: string;
   authorUsername?: string;
   authorDisplayName?: string;
@@ -145,6 +146,11 @@ export type FeedItem = CreatePostResponse & {
     username?: string;
     displayName?: string;
     avatarUrl?: string;
+  };
+  flags?: {
+    liked?: boolean;
+    saved?: boolean;
+    following?: boolean;
   };
 };
 

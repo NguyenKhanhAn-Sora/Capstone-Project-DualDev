@@ -59,7 +59,6 @@
   color: var(--color-text);
   font-size: 14px;
   align-self: flex-start;
-  line-height: 1.7;
 }
 
 .followBtnMuted:hover {

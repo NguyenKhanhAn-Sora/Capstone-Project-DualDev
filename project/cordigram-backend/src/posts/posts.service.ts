@@ -246,7 +246,11 @@ export class PostsService {
       username?: string;
       avatarUrl?: string;
     } | null,
-    userFlags?: { liked?: boolean; saved?: boolean } | null,
+    userFlags?: {
+      liked?: boolean;
+      saved?: boolean;
+      following?: boolean;
+    } | null,
   ) {
     return {
       kind: doc.kind,
@@ -283,6 +287,12 @@ export class PostsService {
       channelId: doc.channelId,
       liked: userFlags?.liked ?? false,
       saved: userFlags?.saved ?? false,
+      following: userFlags?.following ?? false,
+      flags: {
+        liked: userFlags?.liked ?? false,
+        saved: userFlags?.saved ?? false,
+        following: userFlags?.following ?? false,
+      },
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     };
@@ -495,8 +505,11 @@ export class PostsService {
 
     return topPosts.map((post) => {
       const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
-      const flags = interactionMap.get(post._id?.toString?.() ?? '') || null;
-      return this.toResponse(post, profile, flags);
+      const baseFlags = interactionMap.get(post._id?.toString?.() ?? '') || {};
+      const following = post.authorId
+        ? followeeSet.has(post.authorId.toString())
+        : false;
+      return this.toResponse(post, profile, { ...baseFlags, following });
     });
   }
 
@@ -540,14 +553,23 @@ export class PostsService {
       .select('type')
       .lean();
 
-    const flags = interactions.reduce<{ liked?: boolean; saved?: boolean }>(
-      (acc, item) => {
-        if (item.type === 'like') acc.liked = true;
-        if (item.type === 'save') acc.saved = true;
-        return acc;
-      },
-      {},
-    );
+    const flags = interactions.reduce<{
+      liked?: boolean;
+      saved?: boolean;
+      following?: boolean;
+    }>((acc, item) => {
+      if (item.type === 'like') acc.liked = true;
+      if (item.type === 'save') acc.saved = true;
+      return acc;
+    }, {});
+
+    if (!isAuthor) {
+      const isFollowing = await this.followModel
+        .findOne({ followerId: userObjectId, followeeId: post.authorId })
+        .select('_id')
+        .lean();
+      flags.following = Boolean(isFollowing);
+    }
 
     return this.toResponse(
       this.postModel.hydrate(post) as Post,

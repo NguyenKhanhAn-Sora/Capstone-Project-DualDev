@@ -855,7 +855,7 @@ function FeedCard({
                     }`}
                     onClick={() => onFollow(authorOwnerId, !isFollowing)}
                   >
-                    {isFollowing ? "Followed" : "Follow"}
+                    {isFollowing ? "Following" : "Follow"}
                   </button>
                 </>
               ) : null}

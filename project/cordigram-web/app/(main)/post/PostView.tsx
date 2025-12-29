@@ -10,10 +10,12 @@ import {
   fetchComments,
   fetchCurrentProfile,
   fetchPostDetail,
+  followUser,
   likeComment,
   likePost,
   unlikeComment,
   unlikePost,
+  unfollowUser,
   type CommentItem,
   type CommentListResponse,
   type CurrentProfileResponse,
@@ -79,6 +81,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
   const [post, setPost] = useState<FeedItem | null>(null);
+  const [followingAuthor, setFollowingAuthor] = useState(false);
   const [postError, setPostError] = useState<string>("");
   const [loadingPost, setLoadingPost] = useState(true);
 
@@ -120,6 +123,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const [mediaIndex, setMediaIndex] = useState(0);
+  const [mediaDirection, setMediaDirection] = useState<"next" | "prev">("next");
   const bodyLockRef = useRef<string | null>(null);
   const captionRef = useRef<HTMLDivElement | null>(null);
   const [captionCollapsed, setCaptionCollapsed] = useState(true);
@@ -146,6 +150,10 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     fetchPostDetail({ token, postId })
       .then((data) => {
         setPost(data);
+        const flagsFollowing = Boolean(
+          (data as any)?.flags?.following ?? (data as any)?.following
+        );
+        setFollowingAuthor(flagsFollowing);
         setMediaIndex(0);
         setLiked(Boolean((data as any).liked));
       })
@@ -487,16 +495,29 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const currentMedia = media[mediaIndex];
 
   const renderMedia = () => {
+    const transitionClass = `${styles.mediaEnter} ${
+      mediaDirection === "next" ? styles.mediaEnterNext : styles.mediaEnterPrev
+    }`;
     if (!currentMedia)
-      return <div className={styles.mediaPlaceholder}>No media</div>;
+      return (
+        <div className={`${styles.mediaPlaceholder} ${transitionClass}`}>
+          No media
+        </div>
+      );
     if (currentMedia.type === "video") {
       return (
-        <video className={styles.mediaVisual} controls src={currentMedia.url} />
+        <video
+          key={currentMedia.url}
+          className={`${styles.mediaVisual} ${transitionClass}`}
+          controls
+          src={currentMedia.url}
+        />
       );
     }
     return (
       <img
-        className={styles.mediaVisual}
+        key={currentMedia.url}
+        className={`${styles.mediaVisual} ${transitionClass}`}
         src={currentMedia.url}
         alt="Post media"
       />
@@ -761,6 +782,26 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     }
   };
 
+  const toggleFollowAuthor = async () => {
+    if (!token || !post?.authorId) return;
+    const next = !followingAuthor;
+    setFollowingAuthor(next);
+    try {
+      if (next) {
+        await followUser({ token, userId: post.authorId });
+      } else {
+        await unfollowUser({ token, userId: post.authorId });
+      }
+    } catch (err) {
+      setFollowingAuthor(!next);
+      setPost((prev) =>
+        prev
+          ? { ...prev, flags: { ...(prev as any).flags, following: !next } }
+          : prev
+      );
+    }
+  };
+
   const header = (
     <div className={styles.headerRow}>
       <div className={styles.authorBlock}>
@@ -779,10 +820,29 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             </span>
           )}
         </div>
-        <div className={styles.authorMeta}>
-          {post?.authorUsername ? (
-            <div className={styles.authorHandle}>@{post.authorUsername}</div>
-          ) : null}
+        <div className={`${styles.authorMeta} flex flex-row`}>
+          <span>
+            {post?.authorUsername ? (
+              <div className={styles.authorHandle}>@{post.authorUsername}</div>
+            ) : null}
+          </span>
+          <span aria-hidden="true" className="mr-2 ml-2">
+            {" "}
+            ·{" "}
+          </span>
+          <span>
+            {post?.authorId && viewer?.id !== post.authorId ? (
+              <button
+                type="button"
+                className={`${styles.followBtn} ${
+                  followingAuthor ? styles.following : ""
+                }`}
+                onClick={toggleFollowAuthor}
+              >
+                {followingAuthor ? "Following" : "Follow"}
+              </button>
+            ) : null}
+          </span>
         </div>
       </div>
     </div>
@@ -810,11 +870,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                   <>
                     <button
                       className={`${styles.mediaNavBtn} ${styles.mediaNavLeft}`}
-                      onClick={() =>
+                      onClick={() => {
+                        setMediaDirection("prev");
                         setMediaIndex(
                           (prev) => (prev - 1 + media.length) % media.length
-                        )
-                      }
+                        );
+                      }}
                       aria-label="Previous media"
                     >
                       <svg
@@ -829,9 +890,10 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     </button>
                     <button
                       className={`${styles.mediaNavBtn} ${styles.mediaNavRight}`}
-                      onClick={() =>
-                        setMediaIndex((prev) => (prev + 1) % media.length)
-                      }
+                      onClick={() => {
+                        setMediaDirection("next");
+                        setMediaIndex((prev) => (prev + 1) % media.length);
+                      }}
                       aria-label="Next media"
                     >
                       <svg
@@ -928,9 +990,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     <path
                       d="M5.5 5.5h13a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H10l-3.6 2.8a.6.6 0 0 1-.96-.48V7.5a2 2 0 0 1 2-2Z"
                       stroke="currentColor"
-                      stroke-width="1.6"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     ></path>
                   </svg>
                   <span>{post.stats?.comments ?? 0}</span>
@@ -947,16 +1009,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     <path
                       d="M2.8 12.4C4.5 8.7 7.7 6.2 12 6.2s7.5 2.5 9.2 6.2c-1.7 3.7-4.9 6.2-9.2 6.2s-7.5-2.5-9.2-6.2Z"
                       stroke="currentColor"
-                      stroke-width="1.6"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     ></path>
                     <path
                       d="M12 15.4a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8Z"
                       stroke="currentColor"
-                      stroke-width="1.6"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     ></path>
                     <circle
                       cx="12"
