@@ -1,12 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { User } from './user.schema';
+import { Follow } from './follow.schema';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
   ) {}
 
   private sanitizeRecentAccounts(list: User['recentAccounts'] = []) {
@@ -225,5 +227,71 @@ export class UsersService {
       .updateOne({ _id: userId }, { $set: { recentAccounts: [] } })
       .exec();
     return [] as User['recentAccounts'];
+  }
+
+  async follow(userId: string, targetUserId: string) {
+    if (userId === targetUserId) {
+      throw new BadRequestException('Cannot follow yourself');
+    }
+
+    const followerId = this.asObjectId(userId, 'userId');
+    const followeeId = this.asObjectId(targetUserId, 'targetUserId');
+
+    const result = await this.followModel
+      .updateOne(
+        { followerId, followeeId },
+        { $setOnInsert: { followerId, followeeId } },
+        { upsert: true },
+      )
+      .exec();
+
+    const inserted = Boolean(
+      (result as { upsertedCount?: number }).upsertedCount,
+    );
+    if (inserted) {
+      await Promise.all([
+        this.userModel
+          .updateOne({ _id: followeeId }, { $inc: { followerCount: 1 } })
+          .exec(),
+        this.userModel
+          .updateOne({ _id: followerId }, { $inc: { followingCount: 1 } })
+          .exec(),
+      ]);
+    }
+
+    return { following: true };
+  }
+
+  async unfollow(userId: string, targetUserId: string) {
+    if (userId === targetUserId) {
+      throw new BadRequestException('Cannot unfollow yourself');
+    }
+
+    const followerId = this.asObjectId(userId, 'userId');
+    const followeeId = this.asObjectId(targetUserId, 'targetUserId');
+
+    const result = await this.followModel
+      .deleteOne({ followerId, followeeId })
+      .exec();
+
+    if (result.deletedCount) {
+      await Promise.all([
+        this.userModel
+          .updateOne({ _id: followeeId }, { $inc: { followerCount: -1 } })
+          .exec(),
+        this.userModel
+          .updateOne({ _id: followerId }, { $inc: { followingCount: -1 } })
+          .exec(),
+      ]);
+    }
+
+    return { following: false };
+  }
+
+  private asObjectId(id: string, field: string): Types.ObjectId {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(`Invalid ${field}`);
+    }
+    return new Types.ObjectId(id);
   }
 }

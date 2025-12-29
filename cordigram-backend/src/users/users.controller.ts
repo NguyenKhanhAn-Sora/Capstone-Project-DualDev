@@ -1,7 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Param,
+  Post,
   Patch,
   Req,
   UseGuards,
@@ -44,5 +47,29 @@ export class UsersController {
       theme: dto.theme,
     });
     return result;
+  }
+
+  @Post(':id/follow')
+  async follow(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('id') targetUserId: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.usersService.follow(userId, targetUserId);
+  }
+
+  @Delete(':id/follow')
+  async unfollow(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('id') targetUserId: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.usersService.unfollow(userId, targetUserId);
   }
 }

@@ -52,6 +52,12 @@ export class CreatePostDto {
   mentions?: string[];
 
   @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  topics?: string[];
+
+  @IsOptional()
   @IsString()
   @MaxLength(160)
   location?: string;

@@ -127,8 +127,8 @@ export default function GoogleCallbackPage() {
   return (
     <div className="min-h-screen flex items-center justify-center text-slate-700">
       <div className="text-center space-y-3">
-        <p className="text-lg font-semibold">Đang xử lý đăng nhập Google...</p>
-        <p className="text-sm text-slate-500">Vui lòng đợi trong giây lát.</p>
+        <p className="text-lg font-semibold">Processing Login With Google...</p>
+        <p className="text-sm text-slate-500">Please wait a moment.</p>
       </div>
     </div>
   );

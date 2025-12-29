@@ -83,6 +83,25 @@ const cleanLocationLabel = (label: string) =>
     .replace(/^\s*,\s*/g, "")
     .trim();
 
+const extractMentionsFromCaption = (value: string) => {
+  const handles = new Set<string>();
+  const regex = /@([a-zA-Z0-9_.]{1,30})/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(value))) {
+    handles.add(match[1].toLowerCase());
+  }
+  return Array.from(handles);
+};
+
+const findActiveMention = (value: string, caret: number) => {
+  const beforeCaret = value.slice(0, caret);
+  const match = /(^|[\s([{.,!?])@([a-zA-Z0-9_.]{0,30})$/i.exec(beforeCaret);
+  if (!match) return null;
+  const handle = match[2];
+  const start = caret - handle.length - 1;
+  return { handle, start, end: caret };
+};
+
 const initialForm: FormState = {
   caption: "",
   location: "",
@@ -131,6 +150,10 @@ export default function CreatePostPage() {
   const [mentionLoading, setMentionLoading] = useState(false);
   const [mentionError, setMentionError] = useState("");
   const [mentionHighlight, setMentionHighlight] = useState(-1);
+  const [activeMentionRange, setActiveMentionRange] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const captionRef = useRef<HTMLTextAreaElement | null>(null);
   const audienceRef = useRef<HTMLDivElement | null>(null);
@@ -338,6 +361,62 @@ export default function CreatePostPage() {
 
   const openFileDialog = () => fileInputRef.current?.click();
 
+  const handleCaptionChange = (
+    event: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    const value = event.target.value;
+    const caret = event.target.selectionStart ?? value.length;
+    setForm((prev) => ({ ...prev, caption: value }));
+
+    const active = findActiveMention(value, caret);
+    if (active) {
+      setActiveMentionRange({ start: active.start, end: active.end });
+      setMentionDraft(active.handle);
+      setMentionOpen(true);
+      setMentionError("");
+      setMentionHighlight(0);
+    } else {
+      setActiveMentionRange(null);
+      setMentionDraft("");
+      setMentionSuggestions([]);
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setMentionError("");
+    }
+  };
+
+  const onCaptionKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!mentionOpen) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!mentionSuggestions.length) return;
+      setMentionHighlight((prev) =>
+        prev + 1 < mentionSuggestions.length ? prev + 1 : 0
+      );
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!mentionSuggestions.length) return;
+      setMentionHighlight((prev) =>
+        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
+      );
+      return;
+    }
+    if (e.key === "Enter") {
+      if (mentionSuggestions.length && mentionHighlight >= 0) {
+        e.preventDefault();
+        const opt = mentionSuggestions[mentionHighlight];
+        if (opt) selectMention(opt);
+      }
+    }
+    if (e.key === "Escape") {
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setActiveMentionRange(null);
+    }
+  };
+
   const resetSelection = () => {
     setMediaItems((prev) => {
       prev.forEach((item) => URL.revokeObjectURL(item.previewUrl));
@@ -355,6 +434,7 @@ export default function CreatePostPage() {
     setMentionLoading(false);
     setMentionError("");
     setMentionHighlight(-1);
+    setActiveMentionRange(null);
     setStep("select");
     setSubmitError("");
     setSubmitSuccess("");
@@ -415,11 +495,14 @@ export default function CreatePostPage() {
 
     const normalizedMentions = Array.from(
       new Set(
-        (form.mentions || []).map((t) =>
-          t.toString().trim().replace(/^@/, "").toLowerCase()
-        )
+        [
+          ...extractMentionsFromCaption(form.caption || ""),
+          ...(form.mentions || []).map((t) =>
+            t.toString().trim().replace(/^@/, "").toLowerCase()
+          ),
+        ].filter(Boolean)
       )
-    ).filter(Boolean);
+    );
 
     const scheduledAtIso =
       form.publishMode === "schedule" && form.scheduledAt
@@ -633,17 +716,6 @@ export default function CreatePostPage() {
     setHashtagDraft("");
   };
 
-  const addMention = () => {
-    const raw = mentionDraft.trim().replace(/^@/, "");
-    if (!raw) return;
-    const handle = raw.toLowerCase();
-    setForm((prev) => {
-      if (prev.mentions.includes(handle)) return prev;
-      return { ...prev, mentions: [...prev.mentions, handle] };
-    });
-    setMentionDraft("");
-  };
-
   const removeHashtag = (tag: string) => {
     setForm((prev) => ({
       ...prev,
@@ -652,9 +724,14 @@ export default function CreatePostPage() {
   };
 
   const removeMention = (handle: string) => {
+    const escaped = handle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     setForm((prev) => ({
       ...prev,
       mentions: prev.mentions.filter((t) => t !== handle),
+      caption: prev.caption.replace(
+        new RegExp(`@${escaped}(?![a-zA-Z0-9_.])`, "gi"),
+        ""
+      ),
     }));
   };
 
@@ -703,40 +780,6 @@ export default function CreatePostPage() {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
       addHashtag();
-    }
-  };
-
-  const onMentionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      if (mentionOpen && mentionHighlight >= 0) {
-        const opt = mentionSuggestions[mentionHighlight];
-        if (opt) {
-          selectMention(opt);
-          return;
-        }
-      }
-      addMention();
-    }
-    if (e.key === "ArrowDown") {
-      if (!mentionSuggestions.length) return;
-      e.preventDefault();
-      setMentionOpen(true);
-      setMentionHighlight((prev) =>
-        prev + 1 < mentionSuggestions.length ? prev + 1 : 0
-      );
-    }
-    if (e.key === "ArrowUp") {
-      if (!mentionSuggestions.length) return;
-      e.preventDefault();
-      setMentionOpen(true);
-      setMentionHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
-      );
-    }
-    if (e.key === "Escape") {
-      setMentionOpen(false);
-      setMentionHighlight(-1);
     }
   };
 
@@ -799,27 +842,39 @@ export default function CreatePostPage() {
 
   const selectMention = (opt: ProfileSearchItem) => {
     const handle = opt.username.toLowerCase();
-    setForm((prev) => {
-      if (prev.mentions.includes(handle)) return prev;
-      return { ...prev, mentions: [...prev.mentions, handle] };
-    });
+    const caption = form.caption || "";
+    const range = activeMentionRange ?? {
+      start: caption.length,
+      end: caption.length,
+    };
+    const before = caption.slice(0, range.start);
+    const after = caption.slice(range.end);
+    const insertion = `@${handle}`;
+    const needsSpaceAfter = after.startsWith(" ") || after === "" ? "" : " ";
+    const nextCaption = `${before}${insertion}${needsSpaceAfter}${after}`;
+    const nextMentions = form.mentions.includes(handle)
+      ? form.mentions
+      : [...form.mentions, handle];
+
+    setForm((prev) => ({
+      ...prev,
+      caption: nextCaption,
+      mentions: nextMentions,
+    }));
+
     setMentionDraft("");
     setMentionSuggestions([]);
     setMentionOpen(false);
     setMentionHighlight(-1);
-  };
+    setActiveMentionRange(null);
 
-  const onMentionFocus = () => {
-    if (mentionSuggestions.length) {
-      setMentionOpen(true);
-    }
-  };
-
-  const onMentionBlur = () => {
     setTimeout(() => {
-      setMentionOpen(false);
-      setMentionHighlight(-1);
-    }, 120);
+      const el = captionRef.current;
+      if (!el) return;
+      const caret = range.start + insertion.length + (needsSpaceAfter ? 1 : 0);
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    }, 0);
   };
 
   useEffect(() => {
@@ -1188,22 +1243,103 @@ export default function CreatePostPage() {
                   )}
                 </div>
               </div>
-              <div className={`${styles.inputShell} ${styles.textareaShell}`}>
+              <div
+                className={`${styles.inputShell} ${styles.textareaShell} ${styles.mentionCombo}`}
+              >
                 <textarea
                   id="caption"
                   name="caption"
                   ref={captionRef}
-                  placeholder="Tell your story..."
+                  placeholder="Type @ to tag friends..."
                   value={form.caption}
-                  onChange={(e) =>
-                    setForm({ ...form, caption: e.target.value })
-                  }
+                  onChange={handleCaptionChange}
+                  onKeyDown={onCaptionKeyDown}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      setMentionOpen(false);
+                      setMentionHighlight(-1);
+                      setActiveMentionRange(null);
+                    }, 120);
+                  }}
                   maxLength={2200}
                 />
                 <span className={styles.charCount}>
                   {form.caption.length}/2200
                 </span>
+                {mentionOpen && (
+                  <div className={styles.mentionSuggestions}>
+                    {mentionLoading && (
+                      <div className={styles.mentionSuggestionMuted}>
+                        Đang tìm người dùng...
+                      </div>
+                    )}
+                    {!mentionLoading &&
+                      mentionSuggestions.length === 0 &&
+                      mentionError && (
+                        <div className={styles.mentionSuggestionMuted}>
+                          {mentionError}
+                        </div>
+                      )}
+                    {!mentionLoading &&
+                      mentionSuggestions.map((opt, idx) => (
+                        <button
+                          type="button"
+                          key={opt.id}
+                          className={`${styles.mentionSuggestion} ${
+                            idx === mentionHighlight
+                              ? styles.mentionSuggestionActive
+                              : ""
+                          }`}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            selectMention(opt);
+                          }}
+                          onMouseEnter={() => setMentionHighlight(idx)}
+                        >
+                          <img
+                            src={opt.avatarUrl}
+                            alt=""
+                            className={styles.mentionAvatar}
+                          />
+                          <div className={styles.mentionMeta}>
+                            <span className={styles.mentionName}>
+                              {opt.displayName}
+                            </span>
+                            <span className={styles.mentionUsername}>
+                              @{opt.username}
+                            </span>
+                          </div>
+                          {typeof opt.followersCount === "number" && (
+                            <span className={styles.mentionStat}>
+                              {opt.followersCount.toLocaleString()} followers
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                  </div>
+                )}
               </div>
+              <p className={styles.helper}>
+                Gõ @ để tag bạn bè trực tiếp trong caption.
+              </p>
+              {form.mentions.length > 0 && (
+                <div className={styles.chipShell}>
+                  <div className={styles.chips}>
+                    {form.mentions.map((handle) => (
+                      <span key={handle} className={styles.chip}>
+                        @{handle}
+                        <button
+                          type="button"
+                          onClick={() => removeMention(handle)}
+                          aria-label={`Remove tag ${handle}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className={styles.rowGroup}>
@@ -1235,91 +1371,6 @@ export default function CreatePostPage() {
                       onKeyDown={onHashtagKeyDown}
                     />
                   </div>
-                </div>
-              </div>
-
-              <div className={styles.formGroup}>
-                <label>Tag @</label>
-                <div className={`${styles.chipShell} ${styles.mentionCombo}`}>
-                  <div className={styles.chips}>
-                    {form.mentions.map((handle) => (
-                      <span key={handle} className={styles.chip}>
-                        @{handle}
-                        <button
-                          type="button"
-                          onClick={() => removeMention(handle)}
-                          aria-label={`Remove tag ${handle}`}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                    <input
-                      className={styles.chipInput}
-                      placeholder={
-                        form.mentions.length
-                          ? "Add @username"
-                          : "Example: cordiuser"
-                      }
-                      value={mentionDraft}
-                      onChange={(e) => setMentionDraft(e.target.value)}
-                      onKeyDown={onMentionKeyDown}
-                      onFocus={onMentionFocus}
-                      onBlur={onMentionBlur}
-                    />
-                  </div>
-                  {mentionOpen && (
-                    <div className={styles.mentionSuggestions}>
-                      {mentionLoading && (
-                        <div className={styles.mentionSuggestionMuted}>
-                          Đang tìm người dùng...
-                        </div>
-                      )}
-                      {!mentionLoading &&
-                        mentionSuggestions.length === 0 &&
-                        mentionError && (
-                          <div className={styles.mentionSuggestionMuted}>
-                            {mentionError}
-                          </div>
-                        )}
-                      {!mentionLoading &&
-                        mentionSuggestions.map((opt, idx) => (
-                          <button
-                            type="button"
-                            key={opt.id}
-                            className={`${styles.mentionSuggestion} ${
-                              idx === mentionHighlight
-                                ? styles.mentionSuggestionActive
-                                : ""
-                            }`}
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              selectMention(opt);
-                            }}
-                            onMouseEnter={() => setMentionHighlight(idx)}
-                          >
-                            <img
-                              src={opt.avatarUrl}
-                              alt=""
-                              className={styles.mentionAvatar}
-                            />
-                            <div className={styles.mentionMeta}>
-                              <span className={styles.mentionName}>
-                                {opt.displayName}
-                              </span>
-                              <span className={styles.mentionUsername}>
-                                @{opt.username}
-                              </span>
-                            </div>
-                            {typeof opt.followersCount === "number" && (
-                              <span className={styles.mentionStat}>
-                                {opt.followersCount.toLocaleString()} followers
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

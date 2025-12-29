@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
+import { UsersModule } from '../users/users.module';
 import { Post, PostSchema } from './post.schema';
 import { PostsService } from './posts.service';
 import { PostsController } from './posts.controller';
@@ -17,6 +18,7 @@ import { Profile, ProfileSchema } from '../profiles/profile.schema';
   imports: [
     AuthModule,
     CloudinaryModule,
+    UsersModule,
     MongooseModule.forFeature([
       { name: Post.name, schema: PostSchema },
       { name: PostInteraction.name, schema: PostInteractionSchema },

@@ -6,12 +6,23 @@ import { Post, PostSchema } from './post.schema';
 import { PostsService } from './posts.service';
 import { PostsController } from './posts.controller';
 import { ReelsController } from './reels.controller';
+import {
+  PostInteraction,
+  PostInteractionSchema,
+} from './post-interaction.schema';
+import { Follow, FollowSchema } from '../users/follow.schema';
+import { Profile, ProfileSchema } from '../profiles/profile.schema';
 
 @Module({
   imports: [
     AuthModule,
     CloudinaryModule,
-    MongooseModule.forFeature([{ name: Post.name, schema: PostSchema }]),
+    MongooseModule.forFeature([
+      { name: Post.name, schema: PostSchema },
+      { name: PostInteraction.name, schema: PostInteractionSchema },
+      { name: Follow.name, schema: FollowSchema },
+      { name: Profile.name, schema: ProfileSchema },
+    ]),
   ],
   controllers: [PostsController, ReelsController],
   providers: [PostsService],

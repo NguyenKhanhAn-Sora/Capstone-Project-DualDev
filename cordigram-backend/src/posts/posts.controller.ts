@@ -3,6 +3,10 @@ import {
   Body,
   Controller,
   Post,
+  Delete,
+  Get,
+  Param,
+  Query,
   Req,
   UnauthorizedException,
   UseGuards,
@@ -35,6 +39,16 @@ export class PostsController {
       throw new UnauthorizedException();
     }
     return this.postsService.create(user.userId, dto);
+  }
+
+  @Get('feed')
+  async feed(@Req() req: Request, @Query('limit') limit?: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.postsService.getFeed(user.userId, parsedLimit ?? 20);
   }
 
   @Post('upload')
@@ -100,5 +114,83 @@ export class PostsController {
     }
 
     return this.postsService.uploadMediaBatch(user.userId, files);
+  }
+
+  @Post(':id/like')
+  async like(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.like(user.userId, postId);
+  }
+
+  @Delete(':id/like')
+  async unlike(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.unlike(user.userId, postId);
+  }
+
+  @Post(':id/save')
+  async save(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.save(user.userId, postId);
+  }
+
+  @Delete(':id/save')
+  async unsave(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.unsave(user.userId, postId);
+  }
+
+  @Post(':id/share')
+  async share(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.share(user.userId, postId);
+  }
+
+  @Post(':id/hide')
+  async hide(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.hide(user.userId, postId);
+  }
+
+  @Post(':id/report')
+  async report(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.report(user.userId, postId);
+  }
+
+  @Post(':id/view')
+  async view(
+    @Req() req: Request,
+    @Param('id') postId: string,
+    @Body('durationMs') durationMs?: number,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const parsed =
+      typeof durationMs === 'string' ? Number(durationMs) : durationMs;
+    return this.postsService.view(user.userId, postId, parsed);
   }
 }

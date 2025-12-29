@@ -74,6 +74,21 @@ export class User extends Document {
     default: [],
   })
   recentAccounts: RecentAccount[];
+
+  @Prop({ type: [String], default: [] })
+  interests: string[];
+
+  @Prop({ type: String, default: null })
+  region?: string | null;
+
+  @Prop({ type: String, default: null })
+  language?: string | null;
+
+  @Prop({ type: Number, default: 0 })
+  followerCount: number;
+
+  @Prop({ type: Number, default: 0 })
+  followingCount: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

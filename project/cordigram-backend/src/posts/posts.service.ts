@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -14,6 +15,7 @@ import { ConfigService } from '../config/config.service';
 import { PostInteraction, InteractionType } from './post-interaction.schema';
 import { Follow } from '../users/follow.schema';
 import { Profile } from '../profiles/profile.schema';
+import { BlocksService } from '../users/blocks.service';
 type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
@@ -31,6 +33,7 @@ export class PostsService {
     private readonly postInteractionModel: Model<PostInteraction>,
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
     @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
+    private readonly blocksService: BlocksService,
     private readonly cloudinary: CloudinaryService,
     private readonly config: ConfigService,
   ) {}
@@ -403,9 +406,16 @@ export class PostsService {
     const now = new Date();
     const freshnessWindow = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
 
+    const { blockedIds, blockedByIds } =
+      await this.blocksService.getBlockLists(userObjectId);
+    const excludedAuthorIds = Array.from(
+      new Set([...blockedIds, ...blockedByIds]),
+      (id) => new Types.ObjectId(id),
+    );
+
     const followCandidates = await this.postModel
       .find({
-        authorId: { $in: followeeObjectIds },
+        authorId: { $in: followeeObjectIds, $nin: excludedAuthorIds },
         status: 'published',
         visibility: { $ne: 'private' },
         deletedAt: null,
@@ -418,7 +428,7 @@ export class PostsService {
 
     const exploreCandidates = await this.postModel
       .find({
-        authorId: { $nin: followeeObjectIds },
+        authorId: { $nin: [...followeeObjectIds, ...excludedAuthorIds] },
         status: 'published',
         visibility: 'public',
         deletedAt: null,
@@ -495,10 +505,13 @@ export class PostsService {
       userId,
       postId,
     );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
     const inserted = await this.upsertUniqueInteraction(
       userObjectId,
       postObjectId,
       'like',
+      true,
     );
     if (inserted) {
       await this.bumpCounters(postObjectId, { 'stats.hearts': 1 });
@@ -511,10 +524,13 @@ export class PostsService {
       userId,
       postId,
     );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
     const removed = await this.removeUniqueInteraction(
       userObjectId,
       postObjectId,
       'like',
+      true,
     );
     if (removed) {
       await this.bumpCounters(postObjectId, { 'stats.hearts': -1 });
@@ -527,10 +543,13 @@ export class PostsService {
       userId,
       postId,
     );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
     const inserted = await this.upsertUniqueInteraction(
       userObjectId,
       postObjectId,
       'save',
+      true,
     );
     if (inserted) {
       await this.bumpCounters(postObjectId, { 'stats.saves': 1 });
@@ -543,10 +562,13 @@ export class PostsService {
       userId,
       postId,
     );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
     const removed = await this.removeUniqueInteraction(
       userObjectId,
       postObjectId,
       'save',
+      true,
     );
     if (removed) {
       await this.bumpCounters(postObjectId, { 'stats.saves': -1 });
@@ -559,10 +581,13 @@ export class PostsService {
       userId,
       postId,
     );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
     const inserted = await this.upsertUniqueInteraction(
       userObjectId,
       postObjectId,
       'share',
+      true,
     );
     if (inserted) {
       await this.bumpCounters(postObjectId, { 'stats.shares': 1 });
@@ -575,10 +600,13 @@ export class PostsService {
       userId,
       postId,
     );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
     const inserted = await this.upsertUniqueInteraction(
       userObjectId,
       postObjectId,
       'hide',
+      true,
     );
     if (inserted) {
       await this.bumpCounters(postObjectId, { 'stats.hides': 1 });
@@ -591,10 +619,13 @@ export class PostsService {
       userId,
       postId,
     );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
     const inserted = await this.upsertUniqueInteraction(
       userObjectId,
       postObjectId,
       'report',
+      true,
     );
     if (inserted) {
       await this.bumpCounters(postObjectId, { 'stats.reports': 1 });
@@ -607,7 +638,7 @@ export class PostsService {
       userId,
       postId,
     );
-    await this.ensurePostExists(postObjectId);
+    await this.assertPostAccessible(userObjectId, postObjectId);
 
     await this.postInteractionModel.create({
       userId: userObjectId,
@@ -622,6 +653,27 @@ export class PostsService {
     });
 
     return { viewed: true };
+  }
+
+  private async assertPostAccessible(
+    viewerId: Types.ObjectId,
+    postId: Types.ObjectId,
+  ) {
+    const post = await this.postModel
+      .findOne({ _id: postId, deletedAt: null })
+      .select('authorId')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (!post.authorId) {
+      throw new ForbiddenException('Post author missing');
+    }
+
+    await this.blocksService.assertNotBlocked(viewerId, post.authorId);
+    return post;
   }
 
   private scorePost(post: Post, followeeSet: Set<string>, now: Date) {
@@ -654,8 +706,11 @@ export class PostsService {
     userId: Types.ObjectId,
     postId: Types.ObjectId,
     type: InteractionType,
+    skipEnsureExists = false,
   ) {
-    await this.ensurePostExists(postId);
+    if (!skipEnsureExists) {
+      await this.ensurePostExists(postId);
+    }
     const result = await this.postInteractionModel
       .updateOne(
         { userId, postId, type },
@@ -671,8 +726,11 @@ export class PostsService {
     userId: Types.ObjectId,
     postId: Types.ObjectId,
     type: InteractionType,
+    skipEnsureExists = false,
   ) {
-    await this.ensurePostExists(postId);
+    if (!skipEnsureExists) {
+      await this.ensurePostExists(postId);
+    }
     const result = await this.postInteractionModel
       .deleteOne({ userId, postId, type })
       .exec();

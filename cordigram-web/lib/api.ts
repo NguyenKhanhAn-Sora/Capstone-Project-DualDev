@@ -85,6 +85,7 @@ export type CreatePostResponse = {
   }>;
   hashtags: string[];
   mentions: string[];
+  topics?: string[];
   location?: string | null;
   visibility: "public" | "followers" | "private";
   allowComments: boolean;
@@ -92,7 +93,17 @@ export type CreatePostResponse = {
   status: "published" | "scheduled";
   scheduledAt?: string | null;
   publishedAt?: string | null;
-  stats: { hearts: number; comments: number; saves: number; reposts: number };
+  stats: {
+    hearts: number;
+    comments: number;
+    saves: number;
+    reposts: number;
+    shares?: number;
+    impressions?: number;
+    views?: number;
+    hides?: number;
+    reports?: number;
+  };
   repostOf?: string | null;
   serverId?: string | null;
   channelId?: string | null;
@@ -109,6 +120,7 @@ export type CreateReelRequest = {
   }>;
   hashtags?: string[];
   mentions?: string[];
+  topics?: string[];
   location?: string;
   visibility?: "public" | "followers" | "private";
   allowComments?: boolean;
@@ -117,6 +129,23 @@ export type CreateReelRequest = {
   channelId?: string;
   scheduledAt?: string;
   durationSeconds?: number;
+};
+
+export type FeedItem = CreatePostResponse & {
+  spamScore?: number;
+  qualityScore?: number;
+  liked?: boolean;
+  saved?: boolean;
+  authorId?: string;
+  authorUsername?: string;
+  authorDisplayName?: string;
+  authorAvatarUrl?: string;
+  author?: {
+    id?: string;
+    username?: string;
+    displayName?: string;
+    avatarUrl?: string;
+  };
 };
 
 export async function createPost(opts: {
@@ -146,6 +175,167 @@ export async function createReel(opts: {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchFeed(opts: {
+  token: string;
+  limit?: number;
+}): Promise<FeedItem[]> {
+  const { token, limit = 20 } = opts;
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+
+  return apiFetch<FeedItem[]>({
+    path: `/posts/feed?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function likePost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ liked: boolean; created?: boolean }> {
+  const { token, postId } = opts;
+  return apiFetch<{ liked: boolean; created?: boolean }>({
+    path: `/posts/${postId}/like`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function unlikePost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ liked: boolean }> {
+  const { token, postId } = opts;
+  return apiFetch<{ liked: boolean }>({
+    path: `/posts/${postId}/like`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function savePost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ saved: boolean; created?: boolean }> {
+  const { token, postId } = opts;
+  return apiFetch<{ saved: boolean; created?: boolean }>({
+    path: `/posts/${postId}/save`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function unsavePost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ saved: boolean }> {
+  const { token, postId } = opts;
+  return apiFetch<{ saved: boolean }>({
+    path: `/posts/${postId}/save`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function sharePost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ shared: boolean }> {
+  const { token, postId } = opts;
+  return apiFetch<{ shared: boolean }>({
+    path: `/posts/${postId}/share`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function hidePost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ hidden: boolean }> {
+  const { token, postId } = opts;
+  return apiFetch<{ hidden: boolean }>({
+    path: `/posts/${postId}/hide`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function reportPost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ reported: boolean }> {
+  const { token, postId } = opts;
+  return apiFetch<{ reported: boolean }>({
+    path: `/posts/${postId}/report`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function viewPost(opts: {
+  token: string;
+  postId: string;
+  durationMs?: number;
+}): Promise<{ viewed: boolean }> {
+  const { token, postId, durationMs } = opts;
+  return apiFetch<{ viewed: boolean }>({
+    path: `/posts/${postId}/view`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(
+      typeof durationMs === "number" ? { durationMs } : { durationMs: null }
+    ),
+  });
+}
+
+export async function followUser(opts: {
+  token: string;
+  userId: string;
+}): Promise<{ following: boolean }> {
+  const { token, userId } = opts;
+  return apiFetch<{ following: boolean }>({
+    path: `/users/${userId}/follow`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function unfollowUser(opts: {
+  token: string;
+  userId: string;
+}): Promise<{ following: boolean }> {
+  const { token, userId } = opts;
+  return apiFetch<{ following: boolean }>({
+    path: `/users/${userId}/follow`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 }
 

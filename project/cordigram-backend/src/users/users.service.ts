@@ -1,14 +1,20 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User } from './user.schema';
 import { Follow } from './follow.schema';
+import { BlocksService } from './blocks.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
+    private readonly blocksService: BlocksService,
   ) {}
 
   private sanitizeRecentAccounts(list: User['recentAccounts'] = []) {
@@ -236,6 +242,14 @@ export class UsersService {
 
     const followerId = this.asObjectId(userId, 'userId');
     const followeeId = this.asObjectId(targetUserId, 'targetUserId');
+
+    const blocked = await this.blocksService.isBlockedEither(
+      followerId,
+      followeeId,
+    );
+    if (blocked) {
+      throw new ForbiddenException('Cannot follow a blocked user');
+    }
 
     const result = await this.followModel
       .updateOne(

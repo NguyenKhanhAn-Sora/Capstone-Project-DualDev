@@ -325,6 +325,34 @@ export async function followUser(opts: {
   });
 }
 
+export async function blockUser(opts: {
+  token: string;
+  userId: string;
+}): Promise<{ blocked: boolean }> {
+  const { token, userId } = opts;
+  return apiFetch<{ blocked: boolean }>({
+    path: `/users/${userId}/block`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function unblockUser(opts: {
+  token: string;
+  userId: string;
+}): Promise<{ blocked: boolean }> {
+  const { token, userId } = opts;
+  return apiFetch<{ blocked: boolean }>({
+    path: `/users/${userId}/block`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function unfollowUser(opts: {
   token: string;
   userId: string;
