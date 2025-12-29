@@ -51,6 +51,15 @@ export class PostsController {
     return this.postsService.getFeed(user.userId, parsedLimit ?? 20);
   }
 
+  @Get(':id')
+  async getOne(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.getById(user.userId, postId);
+  }
+
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {

@@ -23,6 +23,7 @@
     ),
     radial-gradient(circle at 80% 0%, #ffffff14, transparent 32%),
     var(--color-bg);
+  --color-scrollbar-thumb: #c5c5c5;
 }
 
 [data-theme="dark"] {
@@ -42,6 +43,8 @@
   --gradient-surface: linear-gradient(135deg, #111b30, #0c1220);
   --color-title-primary: #e5e7ef;
   --color-bg-home: #0c1220;
+  --color-scrollbar-thumb: #293653;
+
 }
 
 @theme inline {
@@ -73,4 +76,18 @@ body {
   flex: 1;
   height: 100vh;
   overflow-y: auto;
+}
+
+::-webkit-scrollbar {
+  width: 10px; /* chiều rộng */
+  height: 10px; /* cho scrollbar ngang */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border-radius: 8px;
 }

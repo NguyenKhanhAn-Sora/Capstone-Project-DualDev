@@ -1,6 +1,7 @@
 "use client";
 
 import { JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import styles from "./home-feed.module.css";
 import {
   fetchFeed,
@@ -673,6 +674,7 @@ function FeedCard({
   const cardRef = useRef<HTMLDivElement | null>(null);
   const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastViewAt = useRef<number>(0);
+  const router = useRouter();
 
   useEffect(() => {
     const el = cardRef.current;
@@ -1094,6 +1096,13 @@ function FeedCard({
         >
           <IconLike size={20} filled={liked} />
           <span>{liked ? "Liked" : "Like"}</span>
+        </button>
+        <button
+          className={styles.actionBtn}
+          onClick={() => router.push(`/post/${id}`)}
+        >
+          <IconComment size={20} />
+          <span>Comment</span>
         </button>
         <button
           className={`${styles.actionBtn} ${

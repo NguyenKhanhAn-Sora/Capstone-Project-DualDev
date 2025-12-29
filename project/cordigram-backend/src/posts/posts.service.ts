@@ -500,6 +500,62 @@ export class PostsService {
     });
   }
 
+  async getById(userId: string, postId: string) {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    const isAuthor = post.authorId?.toString?.() === userId;
+
+    if (!isAuthor && post.status !== 'published') {
+      throw new ForbiddenException('Post is not published');
+    }
+
+    if (!isAuthor && post.visibility === 'private') {
+      throw new ForbiddenException('Post is private');
+    }
+
+    await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
+
+    const profile = await this.profileModel
+      .findOne({ userId: post.authorId })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const interactions = await this.postInteractionModel
+      .find({
+        userId: userObjectId,
+        postId: postObjectId,
+        type: { $in: ['like', 'save'] },
+      })
+      .select('type')
+      .lean();
+
+    const flags = interactions.reduce<{ liked?: boolean; saved?: boolean }>(
+      (acc, item) => {
+        if (item.type === 'like') acc.liked = true;
+        if (item.type === 'save') acc.saved = true;
+        return acc;
+      },
+      {},
+    );
+
+    return this.toResponse(
+      this.postModel.hydrate(post) as Post,
+      profile || null,
+      flags,
+    );
+  }
+
   async like(userId: string, postId: string) {
     const { postObjectId, userObjectId } = await this.resolveIds(
       userId,

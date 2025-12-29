@@ -148,6 +148,33 @@ export type FeedItem = CreatePostResponse & {
   };
 };
 
+export type CommentItem = {
+  id: string;
+  postId: string;
+  authorId?: string;
+  author?: {
+    id?: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+  };
+  content: string;
+  parentId: string | null;
+  rootCommentId: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  repliesCount?: number;
+  likesCount?: number;
+  liked?: boolean;
+};
+
+export type CommentListResponse = {
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  items: CommentItem[];
+};
+
 export async function createPost(opts: {
   token: string;
   payload: CreatePostRequest;
@@ -189,6 +216,91 @@ export async function fetchFeed(opts: {
   return apiFetch<FeedItem[]>({
     path: `/posts/feed?${params.toString()}`,
     method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchPostDetail(opts: {
+  token: string;
+  postId: string;
+}): Promise<FeedItem> {
+  const { token, postId } = opts;
+  return apiFetch<FeedItem>({
+    path: `/posts/${postId}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchComments(opts: {
+  token: string;
+  postId: string;
+  page?: number;
+  limit?: number;
+  parentId?: string;
+}): Promise<CommentListResponse> {
+  const { token, postId, page, limit, parentId } = opts;
+  const params = new URLSearchParams();
+  if (page) params.set("page", String(page));
+  if (limit) params.set("limit", String(limit));
+  if (parentId) params.set("parentId", parentId);
+
+  const query = params.toString();
+
+  return apiFetch<CommentListResponse>({
+    path: `/posts/${postId}/comments${query ? `?${query}` : ""}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function createComment(opts: {
+  token: string;
+  postId: string;
+  content: string;
+  parentId?: string;
+}): Promise<CommentItem> {
+  const { token, postId, content, parentId } = opts;
+  return apiFetch<CommentItem>({
+    path: `/posts/${postId}/comments`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(parentId ? { content, parentId } : { content }),
+  });
+}
+
+export async function likeComment(opts: {
+  token: string;
+  postId: string;
+  commentId: string;
+}): Promise<{ liked: boolean; likesCount: number; created?: boolean }> {
+  const { token, postId, commentId } = opts;
+  return apiFetch<{ liked: boolean; likesCount: number; created?: boolean }>({
+    path: `/posts/${postId}/comments/${commentId}/like`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function unlikeComment(opts: {
+  token: string;
+  postId: string;
+  commentId: string;
+}): Promise<{ liked: boolean; likesCount: number }> {
+  const { token, postId, commentId } = opts;
+  return apiFetch<{ liked: boolean; likesCount: number }>({
+    path: `/posts/${postId}/comments/${commentId}/like`,
+    method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`,
     },

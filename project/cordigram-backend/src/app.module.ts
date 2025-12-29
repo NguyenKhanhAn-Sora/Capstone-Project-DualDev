@@ -11,6 +11,7 @@ import { AuthModule } from './auth/auth.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { PostsModule } from './posts/posts.module';
 import { ReportProblemModule } from './reportproblem/reportproblem.module';
+import { CommentsModule } from './comment/comments.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ReportProblemModule } from './reportproblem/reportproblem.module';
     AuthModule,
     CloudinaryModule,
     PostsModule,
+    CommentsModule,
     ReportProblemModule,
   ],
   controllers: [AppController],
