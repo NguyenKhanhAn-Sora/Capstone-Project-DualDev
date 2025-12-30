@@ -120,7 +120,11 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [submitting, setSubmitting] = useState(false);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
   const emojiRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [mediaIndex, setMediaIndex] = useState(0);
   const [mediaDirection, setMediaDirection] = useState<"next" | "prev">("next");
@@ -129,6 +133,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [captionCollapsed, setCaptionCollapsed] = useState(true);
   const [captionCanExpand, setCaptionCanExpand] = useState(false);
   const [liked, setLiked] = useState(false);
+
+  const showToast = useCallback((message: string, duration = 1600) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastMessage(message);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), duration);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -192,13 +202,21 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
-      if (!emojiRef.current) return;
-      if (!emojiRef.current.contains(event.target as Node)) {
+      if (
+        emojiRef.current &&
+        !emojiRef.current.contains(event.target as Node)
+      ) {
         setShowEmojiPicker(false);
+      }
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMoreMenu(false);
       }
     };
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowEmojiPicker(false);
+      if (event.key === "Escape") {
+        setShowEmojiPicker(false);
+        setShowMoreMenu(false);
+      }
     };
     document.addEventListener("mousedown", handleClick);
     document.addEventListener("keydown", handleEscape);
@@ -221,6 +239,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     };
     measure();
   }, [post?.content]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   const applyCommentPage = (res: CommentListResponse, append: boolean) => {
     setComments((prev) => (append ? [...prev, ...res.items] : res.items));
@@ -488,6 +512,76 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       router.back();
     } else {
       router.push("/");
+    }
+  };
+
+  const copyPermalink = async () => {
+    try {
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
+      const permalink = `${origin}/post/${postId}`;
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(permalink);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = permalink;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setShowMoreMenu(false);
+      showToast("Link copied to clipboard");
+    } catch (err) {
+      setShowMoreMenu(false);
+      showToast("Failed to copy link");
+    }
+  };
+
+  const allowDownloads = Boolean(
+    (post as any)?.allowDownloads ??
+      (post as any)?.allowDownload ??
+      (post as any)?.flags?.allowDownloads ??
+      (post as any)?.flags?.allowDownload ??
+      (post as any)?.permissions?.allowDownloads ??
+      (post as any)?.permissions?.allowDownload
+  );
+
+  const handleDownloadCurrentMedia = async () => {
+    const media = post?.media ?? [];
+    const current = media[mediaIndex];
+    if (!current) return;
+    try {
+      const sameOrigin =
+        typeof window !== "undefined" &&
+        current.url?.startsWith(window.location.origin);
+
+      const res = await fetch(current.url, {
+        credentials: sameOrigin ? "include" : "omit",
+        mode: "cors",
+      });
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      const fallbackName = `media-${mediaIndex + 1}`;
+      const nameFromUrl = current.url?.split("/").pop()?.split("?")[0];
+      link.href = objectUrl;
+      link.download = (current as any)?.filename || nameFromUrl || fallbackName;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+
+      setShowMoreMenu(false);
+      showToast("Download started");
+    } catch (err) {
+      setShowMoreMenu(false);
+      showToast("Failed to download");
     }
   };
 
@@ -845,6 +939,85 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           </span>
         </div>
       </div>
+      <div className={styles.headerActions}>
+        <div className={styles.moreMenuWrap} ref={menuRef}>
+          <button
+            type="button"
+            className={styles.moreBtn}
+            onClick={() => setShowMoreMenu((prev) => !prev)}
+            aria-haspopup="true"
+            aria-expanded={showMoreMenu}
+            aria-label="More options"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <circle cx="5" cy="12" r="1.6" />
+              <circle cx="12" cy="12" r="1.6" />
+              <circle cx="19" cy="12" r="1.6" />
+            </svg>
+          </button>
+          {showMoreMenu ? (
+            <div className={styles.moreMenu} role="menu">
+              <button
+                type="button"
+                className={styles.moreMenuItem}
+                role="menuitem"
+                onClick={() => setShowMoreMenu(false)}
+              >
+                Save post
+              </button>
+              {allowDownloads && currentMedia ? (
+                <button
+                  type="button"
+                  className={styles.moreMenuItem}
+                  role="menuitem"
+                  onClick={handleDownloadCurrentMedia}
+                >
+                  Download this media
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className={styles.moreMenuItem}
+                role="menuitem"
+                onClick={() => setShowMoreMenu(false)}
+              >
+                Report
+              </button>
+              <div className={styles.moreMenuDivider} />
+              <button
+                type="button"
+                className={styles.moreMenuItem}
+                role="menuitem"
+                onClick={() => setShowMoreMenu(false)}
+              >
+                Go to post
+              </button>
+              <button
+                type="button"
+                className={styles.moreMenuItem}
+                role="menuitem"
+                onClick={copyPermalink}
+              >
+                Copy link
+              </button>
+              <button
+                type="button"
+                className={styles.moreMenuItem}
+                role="menuitem"
+                onClick={() => setShowMoreMenu(false)}
+              >
+                Go to this account
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 
@@ -1099,6 +1272,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           <div className={styles.stateBox}>Post not found</div>
         )}
       </div>
+      {toastMessage ? (
+        <div
+          className={styles.toast}
+          role="status"
+          aria-live="polite"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {toastMessage}
+        </div>
+      ) : null}
     </div>
   );
 }

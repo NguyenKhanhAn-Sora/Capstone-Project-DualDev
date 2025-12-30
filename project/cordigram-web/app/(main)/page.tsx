@@ -921,9 +921,6 @@ function FeedCard({
                     >
                       Block this account
                     </button>
-                    <div className={styles.menuHint} aria-hidden>
-                      Other actions coming soon.
-                    </div>
                   </div>
                 )}
               </div>

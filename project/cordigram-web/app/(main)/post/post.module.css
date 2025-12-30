@@ -1,6 +1,6 @@
 ::-webkit-scrollbar {
-  width: 10px; /* chiều rộng */
-  height: 10px; /* cho scrollbar ngang */
+  width: 10px;
+  height: 10px;
 }
 
 .modalOverlay {
@@ -50,6 +50,88 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text, #e5e7eb);
+}
+
+.dotSeparator {
+  color: var(--color-text-muted, #94a3b8);
+  font-weight: 700;
+}
+
+.moreMenuWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.moreBtn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--color-text, #e5e7eb);
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease,
+    background 120ms ease;
+}
+
+.moreBtn:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-border-strong, rgba(255, 255, 255, 0.25));
+}
+
+.moreMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  background: var(--color-surface, #0f172a);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  box-shadow: -1px 1px 5px rgba(0, 0, 0, 0.35);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 12;
+}
+
+.moreMenuItem {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--color-text, #e5e7eb);
+  font-weight: 600;
+  padding: 10px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 140ms ease, transform 120ms ease;
+}
+
+.moreMenuItem:hover {
+  background: var(--color-surface-muted, rgba(255, 255, 255, 0.06));
+  transform: translateY(-1px);
+}
+
+.moreMenuItem:disabled,
+.moreMenuItem[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  background: transparent;
+}
+
+.moreMenuDivider {
+  height: 1px;
+  width: 100%;
+  background: var(--color-border, rgba(255, 255, 255, 0.1));
+  margin: 4px 0;
 }
 
 .followBtn {
@@ -125,7 +207,7 @@
 .contentGrid {
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(360px, 460px);
-  align-items: stretch; /* kéo giãn để infoPane cao bằng mediaPane */
+  align-items: stretch;
 }
 
 .mediaPane {
@@ -539,6 +621,21 @@
   background: rgba(239, 68, 68, 0.08);
   border: 1px solid rgba(239, 68, 68, 0.4);
   color: #fecdd3;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  background: var(--color-surface, #0f172a);
+  color: var(--color-text, #e5e7eb);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 600;
+  z-index: 80;
 }
 
 @keyframes mediaFade {
