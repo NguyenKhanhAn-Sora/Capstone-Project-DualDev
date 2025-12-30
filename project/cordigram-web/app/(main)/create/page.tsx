@@ -1167,6 +1167,8 @@ export default function CreatePostPage() {
                         <video
                           src={item.previewUrl}
                           controls
+                          controlsList="nodownload noremoteplayback"
+                          onContextMenu={(e) => e.preventDefault()}
                           className={styles.media}
                         />
                       ) : (

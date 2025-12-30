@@ -143,7 +143,10 @@ const REPORT_GROUPS: ReportCategory[] = [
     accent: "#06b6d4",
     reasons: [
       { key: "doxxing", label: "Doxxing private information" },
-      { key: "nonconsensual_intimate", label: "Non-consensual intimate content" },
+      {
+        key: "nonconsensual_intimate",
+        label: "Non-consensual intimate content",
+      },
     ],
   },
   {
@@ -203,9 +206,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportClosing, setReportClosing] = useState(false);
   const reportHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [reportCategory, setReportCategory] = useState<ReportCategory["key"] | null>(
-    null
-  );
+  const [reportCategory, setReportCategory] = useState<
+    ReportCategory["key"] | null
+  >(null);
   const [reportReason, setReportReason] = useState<string | null>(null);
   const [reportNote, setReportNote] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
@@ -784,6 +787,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           key={currentMedia.url}
           className={`${styles.mediaVisual} ${transitionClass}`}
           controls
+          controlsList="nodownload noremoteplayback"
+          onContextMenu={(e) => e.preventDefault()}
           src={currentMedia.url}
         />
       );
@@ -1471,7 +1476,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       {reportOpen ? (
         <div
           className={`${styles.reportOverlay} ${
-            reportClosing ? styles.reportOverlayClosing : styles.reportOverlayOpen
+            reportClosing
+              ? styles.reportOverlayClosing
+              : styles.reportOverlayOpen
           }`}
           role="dialog"
           aria-modal="true"
@@ -1518,7 +1525,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       onClick={() => {
                         setReportCategory(group.key);
                         setReportReason(
-                          group.reasons.length === 1 ? group.reasons[0].key : null
+                          group.reasons.length === 1
+                            ? group.reasons[0].key
+                            : null
                         );
                       }}
                     >
@@ -1526,14 +1535,18 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         className={styles.reportCategoryDot}
                         style={{ background: group.accent }}
                       />
-                      <span className={styles.reportCategoryLabel}>{group.label}</span>
+                      <span className={styles.reportCategoryLabel}>
+                        {group.label}
+                      </span>
                     </button>
                   );
                 })}
               </div>
 
               <div className={styles.reportReasonPanel}>
-                <div className={styles.reportReasonHeader}>Select a specific reason</div>
+                <div className={styles.reportReasonHeader}>
+                  Select a specific reason
+                </div>
                 {selectedReportGroup ? (
                   <div className={styles.reportReasonList}>
                     {selectedReportGroup.reasons.map((reason) => {
@@ -1550,7 +1563,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                             className={styles.reportReasonRadio}
                             aria-checked={checked}
                           >
-                            {checked ? <span className={styles.reportReasonRadioDot} /> : null}
+                            {checked ? (
+                              <span className={styles.reportReasonRadioDot} />
+                            ) : null}
                           </span>
                           <span>{reason.label}</span>
                         </button>

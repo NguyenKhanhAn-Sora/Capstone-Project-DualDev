@@ -435,8 +435,6 @@
 
 .closeBtn {
   background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
   color: var(--color-text-muted);
   padding: 6px;
   cursor: pointer;

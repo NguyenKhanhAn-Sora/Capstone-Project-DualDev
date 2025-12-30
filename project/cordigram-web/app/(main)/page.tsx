@@ -585,6 +585,32 @@ export default function HomePage() {
     } catch {}
   };
 
+  const onCopyLink = useCallback(
+    async (postId: string) => {
+      if (typeof window === "undefined") return;
+      const origin = window.location.origin;
+      const permalink = `${origin}/post/${postId}`;
+      try {
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(permalink);
+        } else {
+          const textarea = document.createElement("textarea");
+          textarea.value = permalink;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+        }
+        showToast("Link copied to clipboard");
+      } catch {
+        showToast("Failed to copy link");
+      }
+    },
+    [showToast]
+  );
+
   const onReportIntent = (postId: string, label: string) => {
     if (!token) return;
     if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
@@ -759,6 +785,7 @@ export default function HomePage() {
             onSave={onSave}
             onShare={onShare}
             onHide={onHide}
+            onCopyLink={onCopyLink}
             onReportIntent={onReportIntent}
             onView={onView}
             onBlockUser={onBlockIntent}
@@ -828,7 +855,7 @@ export default function HomePage() {
                 aria-label="Close"
                 onClick={closeReportModal}
               >
-                <IconClose size={18} />
+                <IconClose size={24} />
               </button>
             </div>
 
@@ -954,6 +981,7 @@ function FeedCard({
   onSave,
   onShare,
   onHide,
+  onCopyLink,
   onReportIntent,
   onView,
   onBlockUser,
@@ -968,6 +996,7 @@ function FeedCard({
   onSave: (postId: string, saved: boolean) => void;
   onShare: (postId: string) => void;
   onHide: (postId: string) => void;
+  onCopyLink: (postId: string) => void | Promise<void>;
   onReportIntent: (postId: string, label: string) => void;
   onView: (postId: string, durationMs?: number) => void;
   onBlockUser: (userId?: string, label?: string) => void | Promise<void>;
@@ -1222,7 +1251,10 @@ function FeedCard({
                     </button>
                     <button
                       className={styles.menuItem}
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onCopyLink(id);
+                      }}
                     >
                       Copy link
                     </button>
@@ -1235,6 +1267,33 @@ function FeedCard({
                   </div>
                 ) : (
                   <div className={styles.menuContent}>
+                    <button
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onCopyLink(id);
+                      }}
+                    >
+                      Copy link
+                    </button>
+                    <button
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onSave(id, !saved);
+                      }}
+                    >
+                      {saved ? "Unsave this post" : "Save this post"}
+                    </button>
+                    <button
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onHide(id);
+                      }}
+                    >
+                      Hide this post
+                    </button>
                     <button
                       className={styles.menuItem}
                       onClick={() => {
@@ -1326,6 +1385,8 @@ function FeedCard({
                   key={`${id}-${mediaIndex}`}
                   src={current.url}
                   controls
+                  controlsList="nodownload noremoteplayback"
+                  onContextMenu={(e) => e.preventDefault()}
                   onPlay={() => onView(id, 1000)}
                   className={styles.mediaVisual}
                 />
