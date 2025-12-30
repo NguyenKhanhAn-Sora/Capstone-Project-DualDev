@@ -11,6 +11,7 @@ import {
   fetchCurrentProfile,
   fetchPostDetail,
   followUser,
+  reportPost,
   likeComment,
   likePost,
   unlikeComment,
@@ -49,6 +50,109 @@ type PostViewProps = {
 };
 
 type IconProps = { size?: number; filled?: boolean };
+
+type ReportCategory = {
+  key:
+    | "abuse"
+    | "violence"
+    | "sensitive"
+    | "misinfo"
+    | "spam"
+    | "ip"
+    | "illegal"
+    | "privacy"
+    | "other";
+  label: string;
+  accent: string;
+  reasons: Array<{ key: string; label: string }>;
+};
+
+const REPORT_GROUPS: ReportCategory[] = [
+  {
+    key: "abuse",
+    label: "Harassment / Hate speech",
+    accent: "#f59e0b",
+    reasons: [
+      { key: "harassment", label: "Targets an individual to harass" },
+      { key: "hate_speech", label: "Hate speech or discrimination" },
+      { key: "offensive_discrimination", label: "Attacks vulnerable groups" },
+    ],
+  },
+  {
+    key: "violence",
+    label: "Violence / Threats",
+    accent: "#ef4444",
+    reasons: [
+      { key: "violence_threats", label: "Threatens or promotes violence" },
+      { key: "graphic_violence", label: "Graphic violent imagery" },
+      { key: "extremism", label: "Extremism or terrorism" },
+      { key: "self_harm", label: "Self-harm or suicide" },
+    ],
+  },
+  {
+    key: "sensitive",
+    label: "Sensitive content",
+    accent: "#a855f7",
+    reasons: [
+      { key: "nudity", label: "Nudity or adult content" },
+      { key: "minor_nudity", label: "Minor safety risk" },
+      { key: "sexual_solicitation", label: "Sexual solicitation" },
+    ],
+  },
+  {
+    key: "misinfo",
+    label: "Impersonation / Misinformation",
+    accent: "#22c55e",
+    reasons: [
+      { key: "fake_news", label: "False or misleading information" },
+      { key: "impersonation", label: "Impersonation of a person or org" },
+    ],
+  },
+  {
+    key: "spam",
+    label: "Spam / Scam",
+    accent: "#14b8a6",
+    reasons: [
+      { key: "spam", label: "Spam or irrelevant content" },
+      { key: "financial_scam", label: "Financial scam" },
+      { key: "unsolicited_ads", label: "Unwanted advertising" },
+    ],
+  },
+  {
+    key: "ip",
+    label: "Intellectual property",
+    accent: "#3b82f6",
+    reasons: [
+      { key: "copyright", label: "Copyright infringement" },
+      { key: "trademark", label: "Trademark violation" },
+      { key: "brand_impersonation", label: "Brand impersonation" },
+    ],
+  },
+  {
+    key: "illegal",
+    label: "Illegal activity",
+    accent: "#f97316",
+    reasons: [
+      { key: "contraband", label: "Contraband" },
+      { key: "illegal_transaction", label: "Illegal transaction" },
+    ],
+  },
+  {
+    key: "privacy",
+    label: "Privacy violation",
+    accent: "#06b6d4",
+    reasons: [
+      { key: "doxxing", label: "Doxxing private information" },
+      { key: "nonconsensual_intimate", label: "Non-consensual intimate content" },
+    ],
+  },
+  {
+    key: "other",
+    label: "Other",
+    accent: "#94a3b8",
+    reasons: [{ key: "other", label: "Other reason" }],
+  },
+];
 
 const IconLike = ({ size = 20, filled }: IconProps) => (
   <svg
@@ -96,6 +200,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     username?: string;
   } | null>(null);
   const [replyState, setReplyState] = useState<Record<string, ReplyState>>({});
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportClosing, setReportClosing] = useState(false);
+  const reportHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [reportCategory, setReportCategory] = useState<ReportCategory["key"] | null>(
+    null
+  );
+  const [reportReason, setReportReason] = useState<string | null>(null);
+  const [reportNote, setReportNote] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportError, setReportError] = useState("");
 
   const updateCommentEverywhere = useCallback(
     (id: string, updater: (comment: CommentItem) => CommentItem) => {
@@ -133,6 +247,20 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [captionCollapsed, setCaptionCollapsed] = useState(true);
   const [captionCanExpand, setCaptionCanExpand] = useState(false);
   const [liked, setLiked] = useState(false);
+  const selectedReportGroup = useMemo(
+    () => REPORT_GROUPS.find((g) => g.key === reportCategory),
+    [reportCategory]
+  );
+
+  const isAuthor = useMemo(() => {
+    if (!post || !viewer) return false;
+    const sameId = viewer.id && post.authorId && viewer.id === post.authorId;
+    const sameUsername =
+      viewer.username &&
+      post.authorUsername &&
+      viewer.username.toLowerCase() === post.authorUsername.toLowerCase();
+    return Boolean(sameId || sameUsername);
+  }, [post, viewer]);
 
   const showToast = useCallback((message: string, duration = 1600) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -242,6 +370,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   useEffect(() => {
     return () => {
+      if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, []);
@@ -537,6 +666,57 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     } catch (err) {
       setShowMoreMenu(false);
       showToast("Failed to copy link");
+    }
+  };
+
+  const openReportModal = () => {
+    if (!token) return;
+    if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
+    setReportClosing(false);
+    setReportOpen(true);
+    setReportCategory(null);
+    setReportReason(null);
+    setReportNote("");
+    setReportError("");
+    setReportSubmitting(false);
+  };
+
+  const closeReportModal = () => {
+    if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
+    setReportClosing(true);
+    reportHideTimerRef.current = setTimeout(() => {
+      setReportOpen(false);
+      setReportCategory(null);
+      setReportReason(null);
+      setReportNote("");
+      setReportError("");
+      setReportSubmitting(false);
+      setReportClosing(false);
+    }, 200);
+  };
+
+  const submitReport = async () => {
+    if (!token || !post || !reportCategory || !reportReason) return;
+    setReportSubmitting(true);
+    setReportError("");
+    try {
+      await reportPost({
+        token,
+        postId: post.id,
+        category: reportCategory,
+        reason: reportReason,
+        note: reportNote.trim() || undefined,
+      });
+      closeReportModal();
+      showToast("Report submitted");
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? (err as { message?: string }).message || "Could not submit report"
+          : "Could not submit report";
+      setReportError(message);
+    } finally {
+      setReportSubmitting(false);
     }
   };
 
@@ -920,21 +1100,23 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               <div className={styles.authorHandle}>@{post.authorUsername}</div>
             ) : null}
           </span>
-          <span aria-hidden="true" className="mr-2 ml-2">
-            {" "}
-            ·{" "}
-          </span>
           <span>
-            {post?.authorId && viewer?.id !== post.authorId ? (
-              <button
-                type="button"
-                className={`${styles.followBtn} ${
-                  followingAuthor ? styles.following : ""
-                }`}
-                onClick={toggleFollowAuthor}
-              >
-                {followingAuthor ? "Following" : "Follow"}
-              </button>
+            {post?.authorId && viewer?.id && !isAuthor ? (
+              <>
+                <span aria-hidden="true" className="mr-2 ml-2">
+                  {" "}
+                  ·{" "}
+                </span>
+                <button
+                  type="button"
+                  className={`${styles.followBtn} ${
+                    followingAuthor ? styles.following : ""
+                  }`}
+                  onClick={toggleFollowAuthor}
+                >
+                  {followingAuthor ? "Following" : "Follow"}
+                </button>
+              </>
             ) : null}
           </span>
         </div>
@@ -985,7 +1167,10 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 type="button"
                 className={styles.moreMenuItem}
                 role="menuitem"
-                onClick={() => setShowMoreMenu(false)}
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  openReportModal();
+                }}
               >
                 Report
               </button>
@@ -1280,6 +1465,137 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           onClick={(e) => e.stopPropagation()}
         >
           {toastMessage}
+        </div>
+      ) : null}
+
+      {reportOpen ? (
+        <div
+          className={`${styles.reportOverlay} ${
+            reportClosing ? styles.reportOverlayClosing : styles.reportOverlayOpen
+          }`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeReportModal}
+        >
+          <div
+            className={`${styles.reportCard} ${
+              reportClosing ? styles.reportCardClosing : styles.reportCardOpen
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.reportHeader}>
+              <div>
+                <h3 className={styles.reportTitle}>Report this post</h3>
+                <p className={styles.reportBody}>
+                  Help us understand what is wrong with this content.
+                </p>
+              </div>
+              <button
+                className={styles.reportClose}
+                aria-label="Close"
+                onClick={closeReportModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.reportGrid}>
+              <div className={styles.reportCategoryGrid}>
+                {REPORT_GROUPS.map((group) => {
+                  const isActive = reportCategory === group.key;
+                  return (
+                    <button
+                      key={group.key}
+                      className={`${styles.reportCategoryCard} ${
+                        isActive ? styles.reportCategoryCardActive : ""
+                      }`}
+                      style={{
+                        borderColor: isActive ? group.accent : undefined,
+                        boxShadow: isActive
+                          ? `0 0 0 1px ${group.accent}`
+                          : undefined,
+                      }}
+                      onClick={() => {
+                        setReportCategory(group.key);
+                        setReportReason(
+                          group.reasons.length === 1 ? group.reasons[0].key : null
+                        );
+                      }}
+                    >
+                      <span
+                        className={styles.reportCategoryDot}
+                        style={{ background: group.accent }}
+                      />
+                      <span className={styles.reportCategoryLabel}>{group.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className={styles.reportReasonPanel}>
+                <div className={styles.reportReasonHeader}>Select a specific reason</div>
+                {selectedReportGroup ? (
+                  <div className={styles.reportReasonList}>
+                    {selectedReportGroup.reasons.map((reason) => {
+                      const checked = reportReason === reason.key;
+                      return (
+                        <button
+                          key={reason.key}
+                          className={`${styles.reportReasonRow} ${
+                            checked ? styles.reportReasonRowActive : ""
+                          }`}
+                          onClick={() => setReportReason(reason.key)}
+                        >
+                          <span
+                            className={styles.reportReasonRadio}
+                            aria-checked={checked}
+                          >
+                            {checked ? <span className={styles.reportReasonRadioDot} /> : null}
+                          </span>
+                          <span>{reason.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className={styles.reportReasonPlaceholder}>
+                    Pick a category first.
+                  </div>
+                )}
+
+                <label className={styles.reportNoteLabel}>
+                  Additional notes (optional)
+                  <textarea
+                    className={styles.reportNoteInput}
+                    placeholder="Add brief context if needed..."
+                    value={reportNote}
+                    onChange={(e) => setReportNote(e.target.value)}
+                    maxLength={500}
+                  />
+                </label>
+                {reportError ? (
+                  <div className={styles.reportInlineError}>{reportError}</div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className={styles.reportActions}>
+              <button
+                className={styles.reportSecondary}
+                onClick={closeReportModal}
+                disabled={reportSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.reportPrimary}
+                onClick={submitReport}
+                disabled={!reportReason || reportSubmitting}
+              >
+                {reportSubmitting ? "Submitting..." : "Submit report"}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </div>

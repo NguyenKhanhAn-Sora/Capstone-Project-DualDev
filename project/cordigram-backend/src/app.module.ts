@@ -12,6 +12,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { PostsModule } from './posts/posts.module';
 import { ReportProblemModule } from './reportproblem/reportproblem.module';
 import { CommentsModule } from './comment/comments.module';
+import { ReportPostModule } from './reportpost/reportpost.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { CommentsModule } from './comment/comments.module';
     PostsModule,
     CommentsModule,
     ReportProblemModule,
+    ReportPostModule,
   ],
   controllers: [AppController],
   providers: [AppService],

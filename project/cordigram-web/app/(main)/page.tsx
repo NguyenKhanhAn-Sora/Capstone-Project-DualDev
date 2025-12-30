@@ -48,6 +48,7 @@ const PAGE_SIZE = 12;
 const VIEW_DEBOUNCE_MS = 800;
 const VIEW_DWELL_MS = 2000;
 const VIEW_COOLDOWN_MS = 60000;
+const REPORT_ANIMATION_MS = 200;
 
 type IconProps = { size?: number; filled?: boolean };
 
@@ -196,6 +197,112 @@ const IconDots = ({ size = 18 }: IconProps) => (
   </svg>
 );
 
+type ReportCategory = {
+  key:
+    | "abuse"
+    | "violence"
+    | "sensitive"
+    | "misinfo"
+    | "spam"
+    | "ip"
+    | "illegal"
+    | "privacy"
+    | "other";
+  label: string;
+  accent: string;
+  reasons: Array<{ key: string; label: string }>;
+};
+
+const REPORT_GROUPS: ReportCategory[] = [
+  {
+    key: "abuse",
+    label: "Harassment / Hate speech",
+    accent: "#f59e0b",
+    reasons: [
+      { key: "harassment", label: "Targets an individual to harass" },
+      { key: "hate_speech", label: "Hate speech or discrimination" },
+      { key: "offensive_discrimination", label: "Attacks vulnerable groups" },
+    ],
+  },
+  {
+    key: "violence",
+    label: "Violence / Threats",
+    accent: "#ef4444",
+    reasons: [
+      { key: "violence_threats", label: "Threatens or promotes violence" },
+      { key: "graphic_violence", label: "Graphic violent imagery" },
+      { key: "extremism", label: "Extremism or terrorism" },
+      { key: "self_harm", label: "Self-harm or suicide" },
+    ],
+  },
+  {
+    key: "sensitive",
+    label: "Sensitive content",
+    accent: "#a855f7",
+    reasons: [
+      { key: "nudity", label: "Nudity or adult content" },
+      { key: "minor_nudity", label: "Minor safety risk" },
+      { key: "sexual_solicitation", label: "Sexual solicitation" },
+    ],
+  },
+  {
+    key: "misinfo",
+    label: "Impersonation / Misinformation",
+    accent: "#22c55e",
+    reasons: [
+      { key: "fake_news", label: "False or misleading information" },
+      { key: "impersonation", label: "Impersonation of a person or org" },
+    ],
+  },
+  {
+    key: "spam",
+    label: "Spam / Scam",
+    accent: "#14b8a6",
+    reasons: [
+      { key: "spam", label: "Spam or irrelevant content" },
+      { key: "financial_scam", label: "Financial scam" },
+      { key: "unsolicited_ads", label: "Unwanted advertising" },
+    ],
+  },
+  {
+    key: "ip",
+    label: "Intellectual property",
+    accent: "#3b82f6",
+    reasons: [
+      { key: "copyright", label: "Copyright infringement" },
+      { key: "trademark", label: "Trademark violation" },
+      { key: "brand_impersonation", label: "Brand impersonation" },
+    ],
+  },
+  {
+    key: "illegal",
+    label: "Illegal activity",
+    accent: "#f97316",
+    reasons: [
+      { key: "contraband", label: "Contraband" },
+      { key: "illegal_transaction", label: "Illegal transaction" },
+    ],
+  },
+  {
+    key: "privacy",
+    label: "Privacy violation",
+    accent: "#06b6d4",
+    reasons: [
+      { key: "doxxing", label: "Doxxing private information" },
+      {
+        key: "nonconsensual_intimate",
+        label: "Non-consensual intimate content",
+      },
+    ],
+  },
+  {
+    key: "other",
+    label: "Other",
+    accent: "#94a3b8",
+    reasons: [{ key: "other", label: "Other reason" }],
+  },
+];
+
 export default function HomePage() {
   const canRender = useRequireAuth();
   const [items, setItems] = useState<PostViewState[]>([]);
@@ -208,6 +315,21 @@ export default function HomePage() {
     label: string;
   }>();
   const [blocking, setBlocking] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    postId: string;
+    label: string;
+  }>();
+  const [reportCategory, setReportCategory] = useState<
+    ReportCategory["key"] | null
+  >(null);
+  const [reportReason, setReportReason] = useState<string | null>(null);
+  const [reportNote, setReportNote] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportError, setReportError] = useState("");
+  const [reportClosing, setReportClosing] = useState(false);
+  const reportHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [viewerId, setViewerId] = useState<string | undefined>(() =>
     typeof window === "undefined"
       ? undefined
@@ -223,10 +345,28 @@ export default function HomePage() {
     return localStorage.getItem("accessToken");
   }, []);
 
+  const selectedReportGroup = useMemo(
+    () => REPORT_GROUPS.find((g) => g.key === reportCategory),
+    [reportCategory]
+  );
+
+  const showToast = useCallback((message: string, duration = 1600) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastMessage(message);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), duration);
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     setViewerId(getUserIdFromToken(localStorage.getItem("accessToken")));
   }, [token]);
+
+  useEffect(() => {
+    return () => {
+      if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   const syncStats = useCallback(async () => {
     if (!token) return;
@@ -254,7 +394,7 @@ export default function HomePage() {
 
   const load = async (nextPage: number) => {
     if (!token) {
-      setError("Bạn cần đăng nhập để xem feed");
+      setError("Sign in to view the feed");
       return;
     }
     setLoading(true);
@@ -278,8 +418,8 @@ export default function HomePage() {
     } catch (err) {
       const msg =
         typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Không tải được feed"
-          : "Không tải được feed";
+          ? (err as { message?: string }).message || "Unable to load feed"
+          : "Unable to load feed";
       setError(msg);
     } finally {
       setLoading(false);
@@ -445,11 +585,55 @@ export default function HomePage() {
     } catch {}
   };
 
-  const onReport = async (postId: string) => {
+  const onReportIntent = (postId: string, label: string) => {
     if (!token) return;
+    if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
+    setReportClosing(false);
+    setReportTarget({ postId, label });
+    setReportCategory(null);
+    setReportReason(null);
+    setReportNote("");
+    setReportError("");
+    setReportSubmitting(false);
+  };
+
+  const closeReportModal = () => {
+    if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
+    setReportClosing(true);
+    reportHideTimerRef.current = setTimeout(() => {
+      setReportTarget(undefined);
+      setReportCategory(null);
+      setReportReason(null);
+      setReportNote("");
+      setReportError("");
+      setReportSubmitting(false);
+      setReportClosing(false);
+    }, REPORT_ANIMATION_MS);
+  };
+
+  const submitReport = async () => {
+    if (!token || !reportTarget || !reportCategory || !reportReason) return;
+    setReportSubmitting(true);
+    setReportError("");
     try {
-      await reportPost({ token, postId });
-    } catch {}
+      await reportPost({
+        token,
+        postId: reportTarget.postId,
+        category: reportCategory,
+        reason: reportReason,
+        note: reportNote.trim() || undefined,
+      });
+      closeReportModal();
+      showToast("Report submitted");
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? (err as { message?: string }).message || "Could not submit report"
+          : "Could not submit report";
+      setReportError(message);
+    } finally {
+      setReportSubmitting(false);
+    }
   };
 
   const onFollow = async (authorId: string, nextFollow: boolean) => {
@@ -561,7 +745,7 @@ export default function HomePage() {
         {error && <div className={styles.errorBox}>{error}</div>}
 
         {!items.length && !loading && (
-          <div className={styles.empty}>Chưa có bài viết nào.</div>
+          <div className={styles.empty}>No posts yet.</div>
         )}
 
         {items.map(({ item, flags }) => (
@@ -575,7 +759,7 @@ export default function HomePage() {
             onSave={onSave}
             onShare={onShare}
             onHide={onHide}
-            onReport={onReport}
+            onReportIntent={onReportIntent}
             onView={onView}
             onBlockUser={onBlockIntent}
             viewerId={viewerId}
@@ -587,7 +771,7 @@ export default function HomePage() {
         <div ref={loadMoreRef} style={{ height: 1 }} aria-hidden />
         {hasMore && !loading && (
           <button className={styles.loadMore} onClick={handleLoadMore}>
-            Tải thêm
+            Load more
           </button>
         )}
       </div>
@@ -618,6 +802,145 @@ export default function HomePage() {
           </div>
         </div>
       ) : null}
+
+      {reportTarget ? (
+        <div
+          className={`${styles.modalOverlay} ${
+            reportClosing ? styles.modalOverlayClosing : styles.modalOverlayOpen
+          }`}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className={`${styles.modalCard} ${styles.reportCard} ${
+              reportClosing ? styles.modalCardClosing : styles.modalCardOpen
+            }`}
+          >
+            <div className={styles.modalHeader}>
+              <div>
+                <h3 className={styles.modalTitle}>Report this post</h3>
+                <p className={styles.modalBody}>
+                  {`Reporting ${reportTarget.label}'s post. Please pick the most accurate reason.`}
+                </p>
+              </div>
+              <button
+                className={styles.closeBtn}
+                aria-label="Close"
+                onClick={closeReportModal}
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <div className={styles.reportGrid}>
+              <div className={styles.categoryGrid}>
+                {REPORT_GROUPS.map((group) => {
+                  const isActive = reportCategory === group.key;
+                  return (
+                    <button
+                      key={group.key}
+                      className={`${styles.categoryCard} ${
+                        isActive ? styles.categoryCardActive : ""
+                      }`}
+                      style={{
+                        borderColor: isActive ? group.accent : undefined,
+                        boxShadow: isActive
+                          ? `0 0 0 1px ${group.accent}`
+                          : undefined,
+                      }}
+                      onClick={() => {
+                        setReportCategory(group.key);
+                        setReportReason(
+                          group.reasons.length === 1
+                            ? group.reasons[0].key
+                            : null
+                        );
+                      }}
+                    >
+                      <span
+                        className={styles.categoryDot}
+                        style={{ background: group.accent }}
+                      />
+                      <span className={styles.categoryLabel}>
+                        {group.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className={styles.reasonPanel}>
+                <div className={styles.reasonHeader}>
+                  Select a specific reason
+                </div>
+                {selectedReportGroup ? (
+                  <div className={styles.reasonList}>
+                    {selectedReportGroup.reasons.map((r) => {
+                      const checked = reportReason === r.key;
+                      return (
+                        <button
+                          key={r.key}
+                          className={`${styles.reasonRow} ${
+                            checked ? styles.reasonRowActive : ""
+                          }`}
+                          onClick={() => setReportReason(r.key)}
+                        >
+                          <span
+                            className={styles.reasonRadio}
+                            aria-checked={checked}
+                          >
+                            {checked ? (
+                              <span className={styles.reasonRadioDot} />
+                            ) : null}
+                          </span>
+                          <span>{r.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className={styles.reasonPlaceholder}>
+                    Pick a category first.
+                  </div>
+                )}
+
+                <label className={styles.noteLabel}>
+                  Additional notes (optional)
+                  <textarea
+                    className={styles.noteInput}
+                    placeholder="Add brief context if needed..."
+                    value={reportNote}
+                    onChange={(e) => setReportNote(e.target.value)}
+                    maxLength={500}
+                  />
+                </label>
+                {reportError ? (
+                  <div className={styles.inlineError}>{reportError}</div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className={styles.modalActions}>
+              <button
+                className={styles.modalSecondary}
+                onClick={closeReportModal}
+                disabled={reportSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.modalPrimary}
+                disabled={!reportReason || reportSubmitting}
+                onClick={submitReport}
+              >
+                {reportSubmitting ? "Submitting..." : "Submit report"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {toastMessage ? <div className={styles.toast}>{toastMessage}</div> : null}
     </div>
   );
 }
@@ -631,7 +954,7 @@ function FeedCard({
   onSave,
   onShare,
   onHide,
-  onReport,
+  onReportIntent,
   onView,
   onBlockUser,
   viewerId,
@@ -645,7 +968,7 @@ function FeedCard({
   onSave: (postId: string, saved: boolean) => void;
   onShare: (postId: string) => void;
   onHide: (postId: string) => void;
-  onReport: (postId: string) => void;
+  onReportIntent: (postId: string, label: string) => void;
   onView: (postId: string, durationMs?: number) => void;
   onBlockUser: (userId?: string, label?: string) => void | Promise<void>;
   viewerId?: string;
@@ -912,6 +1235,15 @@ function FeedCard({
                   </div>
                 ) : (
                   <div className={styles.menuContent}>
+                    <button
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onReportIntent(id, authorLine);
+                      }}
+                    >
+                      Report this post
+                    </button>
                     <button
                       className={`${styles.menuItem} ${styles.menuItemDanger}`}
                       onClick={() => {

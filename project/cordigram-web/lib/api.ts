@@ -400,14 +400,27 @@ export async function hidePost(opts: {
 export async function reportPost(opts: {
   token: string;
   postId: string;
+  category:
+    | "abuse"
+    | "violence"
+    | "sensitive"
+    | "misinfo"
+    | "spam"
+    | "ip"
+    | "illegal"
+    | "privacy"
+    | "other";
+  reason: string;
+  note?: string;
 }): Promise<{ reported: boolean }> {
-  const { token, postId } = opts;
+  const { token, postId, category, reason, note } = opts;
   return apiFetch<{ reported: boolean }>({
-    path: `/posts/${postId}/report`,
+    path: `/report-posts/${postId}`,
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    body: JSON.stringify({ category, reason, note }),
   });
 }
 
