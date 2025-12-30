@@ -68,6 +68,7 @@ export type CreatePostRequest = {
   visibility?: "public" | "followers" | "private";
   allowComments?: boolean;
   allowDownload?: boolean;
+  hideLikeCount?: boolean;
   serverId?: string;
   channelId?: string;
   repostOf?: string;
@@ -90,6 +91,7 @@ export type CreatePostResponse = {
   visibility: "public" | "followers" | "private";
   allowComments: boolean;
   allowDownload: boolean;
+  hideLikeCount?: boolean;
   status: "published" | "scheduled";
   scheduledAt?: string | null;
   publishedAt?: string | null;
@@ -118,6 +120,7 @@ export type CreateReelRequest = {
     url: string;
     metadata?: Record<string, unknown> | null;
   }>;
+  hideLikeCount?: boolean;
   hashtags?: string[];
   mentions?: string[];
   topics?: string[];
@@ -439,6 +442,38 @@ export async function viewPost(opts: {
     body: JSON.stringify(
       typeof durationMs === "number" ? { durationMs } : { durationMs: null }
     ),
+  });
+}
+
+export async function setPostAllowComments(opts: {
+  token: string;
+  postId: string;
+  allowComments: boolean;
+}): Promise<{ allowComments: boolean }> {
+  const { token, postId, allowComments } = opts;
+  return apiFetch<{ allowComments: boolean }>({
+    path: `/posts/${postId}/allow-comments`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ allowComments }),
+  });
+}
+
+export async function setPostHideLikeCount(opts: {
+  token: string;
+  postId: string;
+  hideLikeCount: boolean;
+}): Promise<{ hideLikeCount: boolean }> {
+  const { token, postId, hideLikeCount } = opts;
+  return apiFetch<{ hideLikeCount: boolean }>({
+    path: `/posts/${postId}/hide-like-count`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ hideLikeCount }),
   });
 }
 

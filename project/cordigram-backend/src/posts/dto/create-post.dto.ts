@@ -75,6 +75,10 @@ export class CreatePostDto {
   allowDownload?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  hideLikeCount?: boolean;
+
+  @IsOptional()
   @IsMongoId()
   serverId?: string;
 

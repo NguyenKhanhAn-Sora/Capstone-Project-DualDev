@@ -12,11 +12,15 @@ import {
   fetchPostDetail,
   followUser,
   reportPost,
+  setPostAllowComments,
+  setPostHideLikeCount,
+  savePost,
   likeComment,
   likePost,
   unlikeComment,
   unlikePost,
   unfollowUser,
+  unsavePost,
   type CommentItem,
   type CommentListResponse,
   type CurrentProfileResponse,
@@ -239,21 +243,46 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const emojiRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commentRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [mediaIndex, setMediaIndex] = useState(0);
   const [mediaDirection, setMediaDirection] = useState<"next" | "prev">("next");
+  const mediaVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [soundOn, setSoundOn] = useState(false);
+  const mediaTimeRef = useRef<Map<string, number>>(new Map());
+  const lastMediaKeyRef = useRef<string | null>(null);
   const bodyLockRef = useRef<string | null>(null);
   const captionRef = useRef<HTMLDivElement | null>(null);
   const [captionCollapsed, setCaptionCollapsed] = useState(true);
   const [captionCanExpand, setCaptionCanExpand] = useState(false);
   const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const scrollToComment = useCallback((commentId: string) => {
+    if (!commentId) return;
+    requestAnimationFrame(() => {
+      const el = commentRefs.current[commentId];
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+  }, []);
   const selectedReportGroup = useMemo(
     () => REPORT_GROUPS.find((g) => g.key === reportCategory),
     [reportCategory]
   );
+
+  const goToPostPage = useCallback(() => {
+    setShowMoreMenu(false);
+    // Force full-page navigation to avoid the intercepted modal route
+    if (typeof window !== "undefined") {
+      window.location.href = `/post/${postId}`;
+    } else {
+      router.push(`/post/${postId}`);
+    }
+  }, [postId, router]);
 
   const isAuthor = useMemo(() => {
     if (!post || !viewer) return false;
@@ -297,11 +326,55 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         setFollowingAuthor(flagsFollowing);
         setMediaIndex(0);
         setLiked(Boolean((data as any).liked));
+        const initialSaved = Boolean(
+          (data as any)?.flags?.saved ?? (data as any)?.saved
+        );
+        setSaved(initialSaved);
       })
       .catch((err: { message?: string }) => {
         setPostError(err?.message || "Failed to load post");
       })
       .finally(() => setLoadingPost(false));
+  }, [postId, token]);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState !== "visible"
+      ) {
+        return;
+      }
+      try {
+        const latest = await fetchPostDetail({ token, postId });
+        if (cancelled || !latest) return;
+        setPost((prev) =>
+          prev
+            ? {
+                ...prev,
+                allowComments:
+                  (latest as any).allowComments ?? (prev as any).allowComments,
+                hideLikeCount:
+                  (latest as any).hideLikeCount ?? (prev as any).hideLikeCount,
+                stats: latest.stats ?? prev.stats,
+                flags: (latest as any).flags ?? (prev as any).flags,
+              }
+            : latest
+        );
+      } catch {
+        // ignore polling errors
+      }
+    };
+
+    const intervalId = setInterval(tick, 5000);
+    void tick();
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
   }, [postId, token]);
 
   const loadComments = useCallback(
@@ -452,6 +525,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const handleSubmit = async () => {
     if (!token) return;
+    if (commentsLocked) return;
     const content = commentText.trim();
     if (!content) return;
 
@@ -481,7 +555,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         const state = prev[parentId] ?? {
           items: [],
           page: 1,
-          hasMore: true,
+          hasMore: false,
           loading: false,
           expanded: true,
         };
@@ -493,8 +567,10 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           },
         };
       });
+      scrollToComment(parentId);
     } else {
       setComments((prev) => [...prev, optimistic]);
+      scrollToComment(optimisticId);
     }
 
     setCommentText("");
@@ -550,7 +626,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           const state = prev[parentId] ?? {
             items: [],
             page: 1,
-            hasMore: true,
+            hasMore: false,
             loading: false,
             expanded: true,
           };
@@ -565,20 +641,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
         const targetRootId = saved.rootCommentId || parentId;
         incrementRepliesCount(parentId);
-        if (targetRootId) {
-          setComments((prev) =>
-            prev.map((comment) =>
-              comment.id === targetRootId
-                ? {
-                    ...comment,
-                    repliesCount:
-                      typeof comment.repliesCount === "number"
-                        ? comment.repliesCount + 1
-                        : 1,
-                  }
-                : comment
-            )
-          );
+        if (targetRootId && targetRootId !== parentId) {
+          incrementRepliesCount(targetRootId);
         }
       } else {
         setComments((prev) => {
@@ -607,7 +671,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           const state = prev[parentId] ?? {
             items: [],
             page: 1,
-            hasMore: true,
+            hasMore: false,
             loading: false,
             expanded: true,
           };
@@ -771,6 +835,69 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const media = post?.media ?? [];
   const currentMedia = media[mediaIndex];
 
+  useEffect(() => {
+    const videoEl = mediaVideoRef.current;
+    if (!videoEl) return;
+    if (!currentMedia || currentMedia.type !== "video") return;
+
+    const key = currentMedia.url || `media-${mediaIndex}`;
+    lastMediaKeyRef.current = key;
+
+    const applySavedTime = () => {
+      const saved = mediaTimeRef.current.get(key);
+      if (saved == null) return;
+      const duration = videoEl.duration;
+      const safeTime = Number.isFinite(duration)
+        ? Math.min(Math.max(saved, 0), Math.max(0, duration - 0.2))
+        : Math.max(saved, 0);
+      try {
+        videoEl.currentTime = safeTime;
+      } catch {
+        // ignore seek errors
+      }
+    };
+
+    const handleLoaded = () => applySavedTime();
+    const handleTimeUpdate = () => {
+      mediaTimeRef.current.set(key, videoEl.currentTime || 0);
+    };
+    const handlePause = () => {
+      mediaTimeRef.current.set(key, videoEl.currentTime || 0);
+    };
+
+    videoEl.addEventListener("loadedmetadata", handleLoaded);
+    videoEl.addEventListener("timeupdate", handleTimeUpdate);
+    videoEl.addEventListener("pause", handlePause);
+
+    if (videoEl.readyState >= 1) {
+      applySavedTime();
+    }
+
+    const playCurrent = () => {
+      try {
+        videoEl.muted = !soundOn;
+        const p = videoEl.play();
+        if (p?.catch) p.catch(() => undefined);
+      } catch {
+        // ignore autoplay failures
+      }
+    };
+
+    playCurrent();
+
+    return () => {
+      try {
+        mediaTimeRef.current.set(key, videoEl.currentTime || 0);
+        videoEl.pause();
+      } catch {
+        // ignore pause errors
+      }
+      videoEl.removeEventListener("loadedmetadata", handleLoaded);
+      videoEl.removeEventListener("timeupdate", handleTimeUpdate);
+      videoEl.removeEventListener("pause", handlePause);
+    };
+  }, [currentMedia, mediaIndex, soundOn]);
+
   const renderMedia = () => {
     const transitionClass = `${styles.mediaEnter} ${
       mediaDirection === "next" ? styles.mediaEnterNext : styles.mediaEnterPrev
@@ -790,6 +917,17 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           controlsList="nodownload noremoteplayback"
           onContextMenu={(e) => e.preventDefault()}
           src={currentMedia.url}
+          ref={mediaVideoRef}
+          playsInline
+          preload="metadata"
+          muted={!soundOn}
+          onVolumeChange={(e) => {
+            const target = e.currentTarget;
+            const userUnmuted = !target.muted && target.volume > 0;
+            if (userUnmuted) {
+              setSoundOn(true);
+            }
+          }}
         />
       );
     }
@@ -893,7 +1031,17 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       };
 
       return (
-        <div key={comment.id} className={styles.commentRow}>
+        <div
+          key={comment.id}
+          className={styles.commentRow}
+          ref={(el) => {
+            if (el) {
+              commentRefs.current[comment.id] = el;
+            } else {
+              delete commentRefs.current[comment.id];
+            }
+          }}
+        >
           <div className={avatarClass}>
             {comment.author?.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -928,17 +1076,19 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             </div>
             <div className={styles.commentText}>{comment.content}</div>
             <div className={styles.commentActions}>
-              <button
-                className={styles.linkBtn}
-                onClick={() =>
-                  setReplyTarget({
-                    id: comment.id,
-                    username: comment.author?.username,
-                  })
-                }
-              >
-                Reply
-              </button>
+              {!commentsLocked ? (
+                <button
+                  className={styles.linkBtn}
+                  onClick={() =>
+                    setReplyTarget({
+                      id: comment.id,
+                      username: comment.author?.username,
+                    })
+                  }
+                >
+                  Reply
+                </button>
+              ) : null}
               <button
                 className={styles.linkBtn}
                 onClick={() => toggleCommentLike(comment)}
@@ -1016,6 +1166,33 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     return "";
   };
 
+  const hideLikeCount = Boolean((post as any)?.hideLikeCount);
+  const commentsLocked = Boolean(post && post.allowComments === false);
+  const commentsToggleLabel =
+    post?.allowComments === false ? "Turn on comments" : "Turn off comments";
+  const hideLikeToggleLabel = hideLikeCount
+    ? "Show like count"
+    : "Hide like count";
+
+  useEffect(() => {
+    if (commentsLocked) {
+      setCommentsError("");
+      setReplyTarget(null);
+      setShowEmojiPicker(false);
+    }
+  }, [commentsLocked]);
+
+  useEffect(() => {
+    if (!replyTarget || commentsLocked) return;
+    requestAnimationFrame(() => {
+      const el = commentInputRef.current;
+      if (!el) return;
+      el.focus();
+      const caret = el.value.length;
+      el.setSelectionRange(caret, caret);
+    });
+  }, [replyTarget, commentsLocked]);
+
   const toggleLike = async () => {
     if (!token || !post) return;
     const nextLiked = !liked;
@@ -1061,9 +1238,103 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     }
   };
 
+  const toggleSave = async () => {
+    if (!token || !post) return;
+    const nextSaved = !saved;
+    setSaved(nextSaved);
+    setPost((prev) =>
+      prev
+        ? {
+            ...prev,
+            flags: { ...(prev as any).flags, saved: nextSaved },
+            stats: {
+              ...prev.stats,
+              saves: Math.max(
+                0,
+                (prev.stats?.saves ?? 0) + (nextSaved ? 1 : -1)
+              ),
+            },
+          }
+        : prev
+    );
+    try {
+      if (nextSaved) {
+        await savePost({ token, postId });
+        showToast("Saved");
+      } else {
+        await unsavePost({ token, postId });
+        showToast("Removed from saved");
+      }
+    } catch (err) {
+      setSaved(!nextSaved);
+      setPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              flags: { ...(prev as any).flags, saved: !nextSaved },
+              stats: {
+                ...prev.stats,
+                saves: Math.max(
+                  0,
+                  (prev.stats?.saves ?? 0) + (nextSaved ? -1 : 1)
+                ),
+              },
+            }
+          : prev
+      );
+      showToast("Failed to update save");
+    }
+  };
+
+  const toggleAllowComments = async () => {
+    if (!token || !post) return;
+    const currentAllowed = post.allowComments !== false;
+    const nextAllowed = !currentAllowed;
+    setPost((prev) => (prev ? { ...prev, allowComments: nextAllowed } : prev));
+    setShowMoreMenu(false);
+    try {
+      await setPostAllowComments({
+        token,
+        postId,
+        allowComments: nextAllowed,
+      });
+      showToast(nextAllowed ? "Comments turned on" : "Comments turned off");
+    } catch (err) {
+      setPost((prev) =>
+        prev ? { ...prev, allowComments: currentAllowed } : prev
+      );
+      showToast("Failed to update comments");
+    }
+  };
+
+  const toggleHideLikeCount = async () => {
+    if (!token || !post) return;
+    const currentHidden = Boolean(post.hideLikeCount);
+    const nextHidden = !currentHidden;
+    setPost((prev) => (prev ? { ...prev, hideLikeCount: nextHidden } : prev));
+    setShowMoreMenu(false);
+    try {
+      await setPostHideLikeCount({
+        token,
+        postId,
+        hideLikeCount: nextHidden,
+      });
+      showToast(nextHidden ? "Like count hidden" : "Like count visible");
+    } catch (err) {
+      setPost((prev) =>
+        prev ? { ...prev, hideLikeCount: currentHidden } : prev
+      );
+      showToast("Failed to update like count visibility");
+    }
+  };
+
+  const initialFollowingRef = useRef(Boolean(post?.flags?.following));
+  const followToggledRef = useRef(false);
+
   const toggleFollowAuthor = async () => {
     if (!token || !post?.authorId) return;
     const next = !followingAuthor;
+    followToggledRef.current = true;
     setFollowingAuthor(next);
     try {
       if (next) {
@@ -1106,7 +1377,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             ) : null}
           </span>
           <span>
-            {post?.authorId && viewer?.id && !isAuthor ? (
+            {post?.authorId &&
+            viewer?.id &&
+            !isAuthor &&
+            (!initialFollowingRef.current ||
+              followToggledRef.current ||
+              !followingAuthor) ? (
               <>
                 <span aria-hidden="true" className="mr-2 ml-2">
                   {" "}
@@ -1114,9 +1390,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 </span>
                 <button
                   type="button"
-                  className={`${styles.followBtn} ${
-                    followingAuthor ? styles.following : ""
-                  }`}
+                  className={styles.followBtn}
                   onClick={toggleFollowAuthor}
                 >
                   {followingAuthor ? "Following" : "Follow"}
@@ -1131,79 +1405,141 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           <button
             type="button"
             className={styles.moreBtn}
-            onClick={() => setShowMoreMenu((prev) => !prev)}
             aria-haspopup="true"
             aria-expanded={showMoreMenu}
-            aria-label="More options"
+            onClick={() => setShowMoreMenu((prev) => !prev)}
           >
             <svg
-              viewBox="0 0 24 24"
-              width="22"
-              height="22"
-              fill="currentColor"
               aria-hidden="true"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="currentColor"
             >
-              <circle cx="5" cy="12" r="1.6" />
-              <circle cx="12" cy="12" r="1.6" />
-              <circle cx="19" cy="12" r="1.6" />
+              <circle cx="5" cy="12" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="19" cy="12" r="1.5" />
             </svg>
           </button>
           {showMoreMenu ? (
             <div className={styles.moreMenu} role="menu">
-              <button
-                type="button"
-                className={styles.moreMenuItem}
-                role="menuitem"
-                onClick={() => setShowMoreMenu(false)}
-              >
-                Save post
-              </button>
-              {allowDownloads && currentMedia ? (
-                <button
-                  type="button"
-                  className={styles.moreMenuItem}
-                  role="menuitem"
-                  onClick={handleDownloadCurrentMedia}
-                >
-                  Download this media
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className={styles.moreMenuItem}
-                role="menuitem"
-                onClick={() => {
-                  setShowMoreMenu(false);
-                  openReportModal();
-                }}
-              >
-                Report
-              </button>
-              <div className={styles.moreMenuDivider} />
-              <button
-                type="button"
-                className={styles.moreMenuItem}
-                role="menuitem"
-                onClick={() => setShowMoreMenu(false)}
-              >
-                Go to post
-              </button>
-              <button
-                type="button"
-                className={styles.moreMenuItem}
-                role="menuitem"
-                onClick={copyPermalink}
-              >
-                Copy link
-              </button>
-              <button
-                type="button"
-                className={styles.moreMenuItem}
-                role="menuitem"
-                onClick={() => setShowMoreMenu(false)}
-              >
-                Go to this account
-              </button>
+              {isAuthor ? (
+                <>
+                  <button
+                    type="button"
+                    className={styles.moreMenuItem}
+                    role="menuitem"
+                    onClick={toggleAllowComments}
+                  >
+                    {commentsToggleLabel}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.moreMenuItem}
+                    role="menuitem"
+                    onClick={toggleHideLikeCount}
+                  >
+                    {hideLikeToggleLabel}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.moreMenuItem}
+                    role="menuitem"
+                    onClick={goToPostPage}
+                  >
+                    Go to post
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.moreMenuItem}
+                    role="menuitem"
+                    onClick={copyPermalink}
+                  >
+                    Copy link
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.moreMenuItem}
+                    role="menuitem"
+                    onClick={() => setShowMoreMenu(false)}
+                  >
+                    Delete post
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={styles.moreMenuItem}
+                    role="menuitem"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      toggleSave();
+                    }}
+                  >
+                    {saved ? "Unsave this post" : "Save this post"}
+                  </button>
+                  {post?.authorId ? (
+                    <button
+                      type="button"
+                      className={styles.moreMenuItem}
+                      role="menuitem"
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        toggleFollowAuthor();
+                      }}
+                    >
+                      {followingAuthor ? "Unfollow" : "Follow"}
+                    </button>
+                  ) : null}
+                  {allowDownloads && currentMedia ? (
+                    <button
+                      type="button"
+                      className={styles.moreMenuItem}
+                      role="menuitem"
+                      onClick={handleDownloadCurrentMedia}
+                    >
+                      Download this media
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={styles.moreMenuItem}
+                    role="menuitem"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      openReportModal();
+                    }}
+                  >
+                    Report
+                  </button>
+                  <div className={styles.moreMenuDivider} />
+                  <button
+                    type="button"
+                    className={styles.moreMenuItem}
+                    role="menuitem"
+                    onClick={goToPostPage}
+                  >
+                    Go to post
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.moreMenuItem}
+                    role="menuitem"
+                    onClick={copyPermalink}
+                  >
+                    Copy link
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.moreMenuItem}
+                    role="menuitem"
+                    onClick={() => setShowMoreMenu(false)}
+                  >
+                    Go to this account
+                  </button>
+                </>
+              )}
             </div>
           ) : null}
         </div>
@@ -1339,7 +1675,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                   aria-label={liked ? "Unlike" : "Like"}
                 >
                   <IconLike size={18} filled={liked} />
-                  <span>{post.stats?.hearts ?? 0}</span>
+                  {!(hideLikeCount && !isAuthor) ? (
+                    <span>{post.stats?.hearts ?? 0}</span>
+                  ) : null}
                 </button>
                 <span className={styles.statItem}>
                   <svg
@@ -1395,67 +1733,97 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                   </span>
                 </span>
               </div>
-              {replyTarget ? (
-                <div className={styles.replyBadge}>
-                  Replying to @{replyTarget.username || "comment"}
-                  <button
-                    onClick={() => setReplyTarget(null)}
-                    aria-label="Cancel reply"
-                  >
-                    ×
-                  </button>
+              {commentsLocked ? (
+                <div className={styles.commentsLockedNotice}>
+                  The post owner has turned off comments.
                 </div>
-              ) : null}
-              <div className={styles.formRow}>
-                <div className={styles.emojiWrap} ref={emojiRef}>
-                  <button
-                    type="button"
-                    className={styles.emojiButton}
-                    onClick={() => setShowEmojiPicker((prev) => !prev)}
-                    aria-label="Add emoji"
-                  >
-                    <svg
-                      aria-label="Emoji icon"
-                      fill="currentColor"
-                      height="20"
-                      role="img"
-                      viewBox="0 0 24 24"
-                      width="20"
-                    >
-                      <title>Emoji icon</title>
-                      <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
-                    </svg>
-                  </button>
-                  {showEmojiPicker ? (
-                    <div className={styles.emojiPopover}>
-                      <EmojiPicker
-                        onEmojiClick={(emojiData) => {
-                          insertEmoji(toEmojiChar(emojiData));
-                          setShowEmojiPicker(false);
-                        }}
-                        searchDisabled={false}
-                        skinTonesDisabled={false}
-                        lazyLoadEmojis
-                      />
+              ) : (
+                <>
+                  {replyTarget ? (
+                    <div className={styles.replyBadge}>
+                      Replying to @{replyTarget.username || "comment"}
+                      <button
+                        onClick={() => setReplyTarget(null)}
+                        aria-label="Cancel reply"
+                      >
+                        ×
+                      </button>
                     </div>
                   ) : null}
-                </div>
-                <textarea
-                  ref={commentInputRef}
-                  className={styles.input}
-                  placeholder="Add a comment..."
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  rows={3}
-                />
-                <button
-                  className={styles.submitBtn}
-                  onClick={handleSubmit}
-                  disabled={submitting || !commentText.trim()}
-                >
-                  {submitting ? "Posting..." : "Post"}
-                </button>
-              </div>
+                  <div className={styles.formRow}>
+                    <div className={styles.emojiWrap} ref={emojiRef}>
+                      <button
+                        type="button"
+                        className={styles.emojiButton}
+                        onClick={() =>
+                          !commentsLocked && setShowEmojiPicker((prev) => !prev)
+                        }
+                        aria-label="Add emoji"
+                        disabled={commentsLocked}
+                      >
+                        <svg
+                          aria-label="Emoji icon"
+                          fill="currentColor"
+                          height="20"
+                          role="img"
+                          viewBox="0 0 24 24"
+                          width="20"
+                        >
+                          <title>Emoji icon</title>
+                          <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
+                        </svg>
+                      </button>
+                      {showEmojiPicker ? (
+                        <div className={styles.emojiPopover}>
+                          <EmojiPicker
+                            onEmojiClick={(emojiData) => {
+                              insertEmoji(toEmojiChar(emojiData));
+                              setShowEmojiPicker(false);
+                            }}
+                            searchDisabled={false}
+                            skinTonesDisabled={false}
+                            lazyLoadEmojis
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                    <textarea
+                      ref={commentInputRef}
+                      className={styles.input}
+                      placeholder={
+                        commentsLocked
+                          ? "Comments are turned off"
+                          : "Add a comment..."
+                      }
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          if (
+                            !submitting &&
+                            !commentsLocked &&
+                            commentText.trim()
+                          ) {
+                            handleSubmit();
+                          }
+                        }
+                      }}
+                      rows={3}
+                      disabled={commentsLocked}
+                    />
+                    <button
+                      className={styles.submitBtn}
+                      onClick={handleSubmit}
+                      disabled={
+                        commentsLocked || submitting || !commentText.trim()
+                      }
+                    >
+                      {submitting ? "Posting..." : "Post"}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ) : (

@@ -51,6 +51,7 @@ type FormState = {
   audience: string;
   allowComments: boolean;
   allowDownload: boolean;
+  hideLikeCount: boolean;
   altText: string;
   publishMode: "now" | "schedule";
   scheduledAt: string;
@@ -108,6 +109,7 @@ const initialForm: FormState = {
   audience: "public",
   allowComments: true,
   allowDownload: false,
+  hideLikeCount: false,
   altText: "",
   publishMode: "now",
   scheduledAt: "",
@@ -517,6 +519,7 @@ export default function CreatePostPage() {
       visibility: form.audience as "public" | "followers" | "private",
       allowComments: form.allowComments,
       allowDownload: form.allowDownload,
+      hideLikeCount: form.hideLikeCount,
       scheduledAt: scheduledAtIso,
     };
 
@@ -701,7 +704,10 @@ export default function CreatePostPage() {
   };
 
   const toggle = (
-    key: keyof Pick<FormState, "allowComments" | "allowDownload">
+    key: keyof Pick<
+      FormState,
+      "allowComments" | "allowDownload" | "hideLikeCount"
+    >
   ) => {
     setForm((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -1529,6 +1535,20 @@ export default function CreatePostPage() {
                   <p className={styles.switchTitle}>Allow downloads</p>
                   <p className={styles.switchHint}>
                     Share the original file with people you trust
+                  </p>
+                </div>
+              </label>
+
+              <label className={styles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={form.hideLikeCount}
+                  onChange={() => toggle("hideLikeCount")}
+                />
+                <div>
+                  <p className={styles.switchTitle}>Hide like count</p>
+                  <p className={styles.switchHint}>
+                    Viewers won’t see the number of likes on this post
                   </p>
                 </div>
               </label>

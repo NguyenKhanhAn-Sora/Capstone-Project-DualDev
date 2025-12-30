@@ -44,7 +44,7 @@ export class CommentsService {
     await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
 
     if (post.allowComments === false) {
-      throw new ForbiddenException('Comments are disabled for this post');
+      throw new ForbiddenException();
     }
 
     const content = dto.content?.trim?.();

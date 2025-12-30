@@ -2,7 +2,9 @@ import {
   BadRequestException,
   Body,
   Controller,
+  HttpCode,
   Post,
+  ParseBoolPipe,
   Delete,
   Get,
   Param,
@@ -152,9 +154,49 @@ export class PostsController {
     return this.postsService.save(user.userId, postId);
   }
 
+  @Post(':id/allow-comments')
+  @HttpCode(200)
+  async setAllowComments(
+    @Req() req: Request,
+    @Param('id') postId: string,
+    @Body('allowComments') allowComments?: boolean,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    if (typeof allowComments !== 'boolean') {
+      throw new BadRequestException('allowComments must be a boolean');
+    }
+    return this.postsService.setAllowComments(
+      user.userId,
+      postId,
+      allowComments,
+    );
+  }
+
+  @Post(':id/hide-like-count')
+  @HttpCode(200)
+  async setHideLikeCount(
+    @Req() req: Request,
+    @Param('id') postId: string,
+    @Body('hideLikeCount', new ParseBoolPipe()) hideLikeCount: boolean,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return await this.postsService.setHideLikeCount(
+      user.userId,
+      postId,
+      hideLikeCount,
+    );
+  }
+
   @Delete(':id/save')
   async unsave(@Req() req: Request, @Param('id') postId: string) {
     const user = req.user as AuthenticatedUser | undefined;
+
     if (!user) {
       throw new UnauthorizedException();
     }

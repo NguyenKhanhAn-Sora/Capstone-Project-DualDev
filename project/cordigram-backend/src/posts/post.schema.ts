@@ -103,6 +103,9 @@ export class Post extends Document {
   @Prop({ type: Boolean, default: false })
   allowDownload: boolean;
 
+  @Prop({ type: Boolean, default: false })
+  hideLikeCount: boolean;
+
   @Prop({
     type: String,
     enum: ['published', 'scheduled'],

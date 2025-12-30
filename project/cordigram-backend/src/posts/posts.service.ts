@@ -113,6 +113,7 @@ export class PostsService {
       visibility: dto.visibility ?? 'public',
       allowComments: dto.allowComments ?? true,
       allowDownload: dto.allowDownload ?? false,
+      hideLikeCount: dto.hideLikeCount ?? false,
       status,
       scheduledAt: scheduledAt ?? null,
       publishedAt,
@@ -198,6 +199,7 @@ export class PostsService {
       visibility: dto.visibility ?? 'public',
       allowComments: dto.allowComments ?? true,
       allowDownload: dto.allowDownload ?? false,
+      hideLikeCount: dto.hideLikeCount ?? false,
       status,
       scheduledAt: scheduledAt ?? null,
       publishedAt,
@@ -276,6 +278,7 @@ export class PostsService {
       visibility: doc.visibility,
       allowComments: doc.allowComments,
       allowDownload: doc.allowDownload,
+      hideLikeCount: doc.hideLikeCount,
       status: doc.status,
       scheduledAt: doc.scheduledAt,
       publishedAt: doc.publishedAt,
@@ -731,6 +734,68 @@ export class PostsService {
     });
 
     return { viewed: true };
+  }
+
+  async setAllowComments(userId: string, postId: string, allow: boolean) {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId allowComments')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (
+      !post.authorId ||
+      post.authorId.toString() !== userObjectId.toString()
+    ) {
+      throw new ForbiddenException(
+        'Only the author can change comment settings',
+      );
+    }
+
+    await this.postModel
+      .updateOne({ _id: postObjectId }, { $set: { allowComments: allow } })
+      .exec();
+
+    return { allowComments: allow };
+  }
+
+  async setHideLikeCount(userId: string, postId: string, hide: boolean) {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId hideLikeCount')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (
+      !post.authorId ||
+      post.authorId.toString() !== userObjectId.toString()
+    ) {
+      throw new ForbiddenException(
+        'Only the author can change like visibility',
+      );
+    }
+
+    await this.postModel
+      .updateOne({ _id: postObjectId }, { $set: { hideLikeCount: hide } })
+      .exec();
+
+    return { hideLikeCount: hide };
   }
 
   private async assertPostAccessible(

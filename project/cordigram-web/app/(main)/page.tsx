@@ -11,6 +11,9 @@ import {
   savePost,
   unsavePost,
   sharePost,
+  setPostAllowComments,
+  setPostHideLikeCount,
+  fetchPostDetail,
   reportPost,
   viewPost,
   blockUser,
@@ -28,6 +31,11 @@ type LocalFlags = {
 type PostViewState = {
   item: FeedItem;
   flags: LocalFlags;
+};
+
+type FeedRemotePatch = Partial<FeedItem> & {
+  liked?: boolean;
+  saved?: boolean;
 };
 
 const getUserIdFromToken = (token: string | null): string | undefined => {
@@ -49,6 +57,7 @@ const VIEW_DEBOUNCE_MS = 800;
 const VIEW_DWELL_MS = 2000;
 const VIEW_COOLDOWN_MS = 60000;
 const REPORT_ANIMATION_MS = 200;
+const FEED_POLL_MS = 7000; // 5–8s range for feed refresh
 
 type IconProps = { size?: number; filled?: boolean };
 
@@ -585,6 +594,88 @@ export default function HomePage() {
     } catch {}
   };
 
+  const onToggleComments = async (
+    postId: string,
+    allowComments: boolean,
+  ) => {
+    if (!token) return;
+    setItems((prev) =>
+      prev.map((p) =>
+        p.item.id === postId
+          ? { ...p, item: { ...p.item, allowComments } }
+          : p,
+      ),
+    );
+    try {
+      await setPostAllowComments({ token, postId, allowComments });
+      showToast(allowComments ? "Comments turned on" : "Comments turned off");
+    } catch {
+      setItems((prev) =>
+        prev.map((p) =>
+          p.item.id === postId
+            ? { ...p, item: { ...p.item, allowComments: !allowComments } }
+            : p,
+        ),
+      );
+      showToast("Failed to update comments");
+    }
+  };
+
+  const onToggleHideLikeCount = async (
+    postId: string,
+    hideLikeCount: boolean,
+  ) => {
+    if (!token) return;
+    setItems((prev) =>
+      prev.map((p) =>
+        p.item.id === postId
+          ? { ...p, item: { ...p.item, hideLikeCount } }
+          : p,
+      ),
+    );
+    try {
+      await setPostHideLikeCount({ token, postId, hideLikeCount });
+      showToast(hideLikeCount ? "Like count hidden" : "Like count visible");
+    } catch {
+      setItems((prev) =>
+        prev.map((p) =>
+          p.item.id === postId
+            ? { ...p, item: { ...p.item, hideLikeCount: !hideLikeCount } }
+            : p,
+        ),
+      );
+      showToast("Failed to update like count visibility");
+    }
+  };
+
+  const onRemoteUpdate = useCallback(
+    (postId: string, patch: FeedRemotePatch) => {
+      setItems((prev) =>
+        prev.map((p) =>
+          p.item.id === postId
+            ? {
+                ...p,
+                item: {
+                  ...p.item,
+                  allowComments:
+                    patch.allowComments ?? p.item.allowComments,
+                  hideLikeCount:
+                    patch.hideLikeCount ?? p.item.hideLikeCount,
+                  stats: patch.stats ?? p.item.stats,
+                },
+                flags: {
+                  ...p.flags,
+                  liked: patch.liked ?? p.flags.liked,
+                  saved: patch.saved ?? p.flags.saved,
+                },
+              }
+            : p
+        )
+      );
+    },
+    []
+  );
+
   const onCopyLink = useCallback(
     async (postId: string) => {
       if (typeof window === "undefined") return;
@@ -752,17 +843,6 @@ export default function HomePage() {
     return () => observer.disconnect();
   }, [handleLoadMore]);
 
-  useEffect(() => {
-    if (!canRender || !token) return;
-    const tick = () => {
-      if (document.visibilityState !== "visible") return;
-      void syncStats();
-    };
-    const intervalId = setInterval(tick, 5000);
-    tick();
-    return () => clearInterval(intervalId);
-  }, [canRender, token, syncStats]);
-
   if (!canRender) return null;
 
   return (
@@ -785,12 +865,16 @@ export default function HomePage() {
             onSave={onSave}
             onShare={onShare}
             onHide={onHide}
+            onToggleComments={onToggleComments}
+            onToggleHideLikeCount={onToggleHideLikeCount}
             onCopyLink={onCopyLink}
             onReportIntent={onReportIntent}
             onView={onView}
             onBlockUser={onBlockIntent}
             viewerId={viewerId}
             onFollow={onFollow}
+            token={token}
+            onRemoteUpdate={onRemoteUpdate}
           />
         ))}
 
@@ -981,12 +1065,16 @@ function FeedCard({
   onSave,
   onShare,
   onHide,
+  onToggleComments,
+  onToggleHideLikeCount,
   onCopyLink,
   onReportIntent,
   onView,
   onBlockUser,
   viewerId,
   onFollow,
+  token,
+  onRemoteUpdate,
 }: {
   data: FeedItem;
   liked: boolean;
@@ -996,12 +1084,16 @@ function FeedCard({
   onSave: (postId: string, saved: boolean) => void;
   onShare: (postId: string) => void;
   onHide: (postId: string) => void;
+  onToggleComments: (postId: string, allowComments: boolean) => void;
+  onToggleHideLikeCount: (postId: string, hideLikeCount: boolean) => void;
   onCopyLink: (postId: string) => void | Promise<void>;
   onReportIntent: (postId: string, label: string) => void;
   onView: (postId: string, durationMs?: number) => void;
   onBlockUser: (userId?: string, label?: string) => void | Promise<void>;
   viewerId?: string;
   onFollow: (authorId: string, nextFollow: boolean) => void;
+  token: string | null;
+  onRemoteUpdate: (postId: string, patch: FeedRemotePatch) => void;
 }) {
   const {
     id,
@@ -1018,6 +1110,8 @@ function FeedCard({
     hashtags,
     topics,
     location,
+    allowComments,
+    hideLikeCount,
   } = data;
 
   const displayName = authorDisplayName || author?.displayName;
@@ -1027,6 +1121,31 @@ function FeedCard({
   const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastViewAt = useRef<number>(0);
   const router = useRouter();
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  const pollOnce = useCallback(async () => {
+    if (!token) return;
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    try {
+      const latest = await fetchPostDetail({ token, postId: id });
+      onRemoteUpdate(id, {
+        allowComments: latest.allowComments,
+        hideLikeCount: (latest as any).hideLikeCount,
+        stats: latest.stats,
+        liked: (latest as any).liked,
+        saved: (latest as any).saved,
+      });
+    } catch {
+      // ignore polling errors
+    }
+  }, [id, onRemoteUpdate, token]);
 
   useEffect(() => {
     const el = cardRef.current;
@@ -1057,6 +1176,35 @@ function FeedCard({
     };
   }, [id, onView]);
 
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || !token) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.target !== el) return;
+          if (entry.isIntersecting) {
+            void pollOnce();
+            stopPolling();
+            pollTimerRef.current = setInterval(() => {
+              void pollOnce();
+            }, FEED_POLL_MS);
+          } else {
+            stopPolling();
+          }
+        });
+      },
+      { threshold: 0.25 }
+    );
+
+    observer.observe(el);
+    return () => {
+      stopPolling();
+      observer.disconnect();
+    };
+  }, [pollOnce, stopPolling, token]);
+
   const initials = useMemo(() => {
     const base = displayName?.trim() || username?.trim() || authorId || "?";
     return base.slice(0, 2).toUpperCase();
@@ -1068,6 +1216,18 @@ function FeedCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [soundOn, setSoundOn] = useState(false);
+
+  const goToPost = useCallback(() => {
+    setMenuOpen(false);
+    // Use a hard navigation to bypass the modal intercept route and land on the full post page
+    if (typeof window !== "undefined") {
+      window.location.href = `/post/${id}`;
+    } else {
+      router.push(`/post/${id}`);
+    }
+  }, [id, router]);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -1090,16 +1250,61 @@ function FeedCard({
 
   useEffect(() => {
     setMediaIndex(0);
+    setSoundOn(false);
   }, [id]);
 
   useEffect(() => {
     const mediaCount = media?.length ?? 0;
     if (mediaCount === 0) {
       setMediaIndex(0);
+      setSoundOn(false);
       return;
     }
     setMediaIndex((prev) => (prev >= mediaCount ? 0 : prev));
+    setSoundOn(false);
   }, [media]);
+
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+    videoEl.muted = !soundOn;
+  }, [soundOn, mediaIndex]);
+
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+
+    const handleEntries = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const playPromise = videoEl.play();
+          if (playPromise?.catch) playPromise.catch(() => undefined);
+        } else {
+          videoEl.pause();
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(handleEntries, {
+      threshold: 0.6,
+    });
+
+    observer.observe(videoEl);
+
+    return () => {
+      observer.disconnect();
+      videoEl.pause();
+    };
+  }, [mediaIndex, media]);
+
+  const enableSound = useCallback(() => {
+    setSoundOn(true);
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+    videoEl.muted = false;
+    const playPromise = videoEl.play();
+    if (playPromise?.catch) playPromise.catch(() => undefined);
+  }, []);
 
   const captionNodes = useMemo(() => {
     if (!content) return null;
@@ -1174,7 +1379,20 @@ function FeedCard({
 
   const authorOwnerId = authorId || author?.id;
   const isSelf = Boolean(viewerId && authorOwnerId === viewerId);
+  const shouldHideLikeStat = Boolean(hideLikeCount) && !isSelf;
   const isFollowing = Boolean(flags?.following);
+  const initialFollowingRef = useRef(isFollowing);
+  const followToggledRef = useRef(false);
+  const commentsToggleLabel = allowComments
+    ? "Turn off comments"
+    : "Turn on comments";
+  const hideLikeToggleLabel = hideLikeCount
+    ? "Show like count"
+    : "Hide like count";
+  const showInlineFollow =
+    !isSelf &&
+    Boolean(authorOwnerId) &&
+    (!initialFollowingRef.current || followToggledRef.current || !isFollowing);
 
   return (
     <article className={styles.feedCard} ref={cardRef}>
@@ -1193,7 +1411,7 @@ function FeedCard({
             <div>
               <span className={styles.authorName}>{authorLine}</span>
 
-              {!isSelf && authorOwnerId ? (
+              {showInlineFollow ? (
                 <>
                   <span aria-hidden="true" className={`${styles.followBtn}`}>
                     {" "}
@@ -1205,7 +1423,10 @@ function FeedCard({
                         ? styles.followBtnMuted
                         : styles.followBtnPrimary
                     }`}
-                    onClick={() => onFollow(authorOwnerId, !isFollowing)}
+                    onClick={() => {
+                      followToggledRef.current = true;
+                      onFollow(authorOwnerId as string, !isFollowing);
+                    }}
                   >
                     {isFollowing ? "Following" : "Follow"}
                   </button>
@@ -1253,6 +1474,27 @@ function FeedCard({
                       className={styles.menuItem}
                       onClick={() => {
                         setMenuOpen(false);
+                        onToggleComments(id, !allowComments);
+                      }}
+                    >
+                      {commentsToggleLabel}
+                    </button>
+                    <button
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onToggleHideLikeCount(id, !hideLikeCount);
+                      }}
+                    >
+                      {hideLikeToggleLabel}
+                    </button>
+                    <button className={styles.menuItem} onClick={goToPost}>
+                      Go to post
+                    </button>
+                    <button
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setMenuOpen(false);
                         onCopyLink(id);
                       }}
                     >
@@ -1267,6 +1509,9 @@ function FeedCard({
                   </div>
                 ) : (
                   <div className={styles.menuContent}>
+                    <button className={styles.menuItem} onClick={goToPost}>
+                      Go to post
+                    </button>
                     <button
                       className={styles.menuItem}
                       onClick={() => {
@@ -1276,6 +1521,18 @@ function FeedCard({
                     >
                       Copy link
                     </button>
+                    {authorOwnerId ? (
+                      <button
+                        className={styles.menuItem}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          followToggledRef.current = true;
+                          onFollow(authorOwnerId, !isFollowing);
+                        }}
+                      >
+                        {isFollowing ? "Unfollow" : "Follow"}
+                      </button>
+                    ) : null}
                     <button
                       className={styles.menuItem}
                       onClick={() => {
@@ -1381,15 +1638,31 @@ function FeedCard({
             if (!current) return null;
             if (current.type === "video") {
               return (
-                <video
-                  key={`${id}-${mediaIndex}`}
-                  src={current.url}
-                  controls
-                  controlsList="nodownload noremoteplayback"
-                  onContextMenu={(e) => e.preventDefault()}
-                  onPlay={() => onView(id, 1000)}
-                  className={styles.mediaVisual}
-                />
+                <>
+                  <video
+                    key={`${id}-${mediaIndex}`}
+                    ref={videoRef}
+                    src={current.url}
+                    controls
+                    controlsList="nodownload noremoteplayback"
+                    muted={!soundOn}
+                    playsInline
+                    preload="metadata"
+                    onContextMenu={(e) => e.preventDefault()}
+                    onPlay={() => onView(id, 1000)}
+                    className={styles.mediaVisual}
+                  />
+                  {!soundOn ? (
+                    <button
+                      type="button"
+                      className={styles.soundToggle}
+                      onClick={enableSound}
+                      aria-pressed={false}
+                    >
+                      Tap for sound
+                    </button>
+                  ) : null}
+                </>
               );
             }
             return (
@@ -1451,12 +1724,14 @@ function FeedCard({
       ) : null}
 
       <div className={styles.statRow}>
-        <div className={styles.statItem}>
-          <span className={styles.statIcon}>
-            <IconLike size={18} />
-          </span>
-          <span>{stats.hearts ?? 0}</span>
-        </div>
+        {!shouldHideLikeStat ? (
+          <div className={styles.statItem}>
+            <span className={styles.statIcon}>
+              <IconLike size={18} />
+            </span>
+            <span>{stats.hearts ?? 0}</span>
+          </div>
+        ) : null}
         <div className={styles.statItem}>
           <span className={styles.statIcon}>
             <IconComment size={18} />

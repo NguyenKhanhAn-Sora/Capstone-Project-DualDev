@@ -43,6 +43,9 @@
 
 .pageCard {
   margin: 0 auto;
+  padding: unset;
+  border: unset;
+  border-radius: unset;
 }
 
 .headerRow {
@@ -294,7 +297,7 @@
   gap: 12px;
   height: 100%;
   min-height: 0;
-  max-height: 620px;
+  max-height: 640px;
 }
 
 .infoScrollArea {
@@ -535,6 +538,15 @@
   gap: 8px;
   align-items: center;
   margin-top: auto;
+}
+
+.commentsLockedNotice {
+  border: 1px dashed var(--color-border, rgba(255, 255, 255, 0.15));
+  background: var(--color-surface-muted, rgba(255, 255, 255, 0.04));
+  color: var(--color-text-muted, #94a3b8);
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 14px;
 }
 
 .input {

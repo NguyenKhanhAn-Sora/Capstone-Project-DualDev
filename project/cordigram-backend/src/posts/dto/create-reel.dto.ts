@@ -77,6 +77,10 @@ export class CreateReelDto {
   allowDownload?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  hideLikeCount?: boolean;
+
+  @IsOptional()
   @IsMongoId()
   serverId?: string;
 
