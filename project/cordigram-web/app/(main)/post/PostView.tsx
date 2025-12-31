@@ -254,6 +254,13 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [soundOn, setSoundOn] = useState(false);
   const mediaTimeRef = useRef<Map<string, number>>(new Map());
   const lastMediaKeyRef = useRef<string | null>(null);
+  const resumeAppliedRef = useRef(false);
+  const [resumeReady, setResumeReady] = useState(false);
+  const resumePendingRef = useRef<{
+    mediaIndex?: number;
+    time?: number;
+    soundOn?: boolean;
+  } | null>(null);
   const bodyLockRef = useRef<string | null>(null);
   const captionRef = useRef<HTMLDivElement | null>(null);
   const [captionCollapsed, setCaptionCollapsed] = useState(true);
@@ -274,15 +281,37 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     [reportCategory]
   );
 
+  const persistResume = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (!post) return;
+    const mediaList = post.media ?? [];
+    const current = mediaList[mediaIndex];
+    if (!current || current.type !== "video") return;
+    const keyMedia = current.url || `media-${mediaIndex}`;
+    const videoEl = mediaVideoRef.current;
+    const time =
+      videoEl?.currentTime ?? mediaTimeRef.current.get(keyMedia) ?? 0;
+    const sound = videoEl ? !videoEl.muted || soundOn : soundOn;
+    if (time <= 0.05) return;
+    try {
+      const payload = { mediaIndex, time, soundOn: sound };
+      sessionStorage.setItem(
+        `postVideoResume:${post.id}`,
+        JSON.stringify(payload)
+      );
+    } catch {}
+  }, [mediaIndex, post, soundOn]);
+
   const goToPostPage = useCallback(() => {
     setShowMoreMenu(false);
-    // Force full-page navigation to avoid the intercepted modal route
+    persistResume();
+
     if (typeof window !== "undefined") {
       window.location.href = `/post/${postId}`;
     } else {
       router.push(`/post/${postId}`);
     }
-  }, [postId, router]);
+  }, [persistResume, postId, router]);
 
   const isAuthor = useMemo(() => {
     if (!post || !viewer) return false;
@@ -364,9 +393,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               }
             : latest
         );
-      } catch {
-        // ignore polling errors
-      }
+      } catch {}
     };
 
     const intervalId = setInterval(tick, 5000);
@@ -704,6 +731,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   }, [asModal]);
 
   const goClose = () => {
+    persistResume();
     if (asModal) {
       router.back();
     } else {
@@ -852,9 +880,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         : Math.max(saved, 0);
       try {
         videoEl.currentTime = safeTime;
-      } catch {
-        // ignore seek errors
-      }
+      } catch {}
     };
 
     const handleLoaded = () => applySavedTime();
@@ -878,9 +904,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         videoEl.muted = !soundOn;
         const p = videoEl.play();
         if (p?.catch) p.catch(() => undefined);
-      } catch {
-        // ignore autoplay failures
-      }
+      } catch {}
     };
 
     playCurrent();
@@ -889,14 +913,122 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       try {
         mediaTimeRef.current.set(key, videoEl.currentTime || 0);
         videoEl.pause();
-      } catch {
-        // ignore pause errors
-      }
+      } catch {}
       videoEl.removeEventListener("loadedmetadata", handleLoaded);
       videoEl.removeEventListener("timeupdate", handleTimeUpdate);
       videoEl.removeEventListener("pause", handlePause);
     };
   }, [currentMedia, mediaIndex, soundOn]);
+
+  useEffect(() => {
+    if (!post) return;
+    if (resumeAppliedRef.current) return;
+    if (typeof window === "undefined") return;
+
+    const key = `postVideoResume:${post.id}`;
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return;
+
+    try {
+      const data = JSON.parse(raw) as {
+        mediaIndex?: number;
+        time?: number;
+        soundOn?: boolean;
+      };
+
+      const mediaList = post.media ?? [];
+      const targetIndex =
+        typeof data.mediaIndex === "number" &&
+        data.mediaIndex >= 0 &&
+        data.mediaIndex < mediaList.length
+          ? data.mediaIndex
+          : 0;
+
+      resumePendingRef.current = {
+        mediaIndex: targetIndex,
+        time:
+          typeof data.time === "number" ? Math.max(0, data.time) : undefined,
+        soundOn: data.soundOn,
+      };
+
+      if (targetIndex !== mediaIndex) {
+        setMediaIndex(targetIndex);
+      }
+
+      resumeAppliedRef.current = true;
+      sessionStorage.removeItem(key);
+    } catch {}
+  }, [post, mediaIndex]);
+  useEffect(() => {
+    if (!post) return;
+    if (resumeAppliedRef.current) {
+      setResumeReady(true);
+      return;
+    }
+    if (typeof window === "undefined") return;
+
+    const key = `postVideoResume:${post.id}`;
+    const raw = sessionStorage.getItem(key);
+
+    if (raw) {
+      try {
+        const data = JSON.parse(raw) as {
+          mediaIndex?: number;
+          time?: number;
+          soundOn?: boolean;
+        };
+
+        const mediaList = post.media ?? [];
+        const targetIndex =
+          typeof data.mediaIndex === "number" &&
+          data.mediaIndex >= 0 &&
+          data.mediaIndex < mediaList.length
+            ? data.mediaIndex
+            : 0;
+
+        resumePendingRef.current = {
+          mediaIndex: targetIndex,
+          time:
+            typeof data.time === "number" ? Math.max(0, data.time) : undefined,
+          soundOn: data.soundOn,
+        };
+
+        if (targetIndex !== mediaIndex) {
+          setMediaIndex(targetIndex);
+        }
+      } catch {}
+    }
+
+    resumeAppliedRef.current = true;
+    setResumeReady(true);
+    sessionStorage.removeItem(key);
+  }, [post, mediaIndex]);
+
+  useEffect(() => {
+    if (!resumePendingRef.current) return;
+    if (!post) return;
+
+    const mediaList = post.media ?? [];
+    const pendingIndex = resumePendingRef.current.mediaIndex ?? 0;
+    const target = mediaList[pendingIndex];
+    const time = resumePendingRef.current.time;
+    const sound = resumePendingRef.current.soundOn;
+
+    if (target?.type === "video" && typeof time === "number") {
+      const keyMedia = target.url || `media-${pendingIndex}`;
+      mediaTimeRef.current.set(keyMedia, Math.max(0, time));
+    }
+
+    if (sound) setSoundOn(true);
+
+    resumePendingRef.current = null;
+  }, [post, mediaIndex]);
+
+  useEffect(() => {
+    return () => {
+      persistResume();
+    };
+  }, [persistResume]);
 
   const renderMedia = () => {
     const transitionClass = `${styles.mediaEnter} ${
@@ -909,6 +1041,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         </div>
       );
     if (currentMedia.type === "video") {
+      if (!resumeReady) return null;
       return (
         <video
           key={currentMedia.url}
@@ -1044,7 +1177,6 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         >
           <div className={avatarClass}>
             {comment.author?.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={comment.author.avatarUrl}
                 alt={comment.author.username || "avatar"}
@@ -1171,8 +1303,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const commentsToggleLabel =
     post?.allowComments === false ? "Turn on comments" : "Turn off comments";
   const hideLikeToggleLabel = hideLikeCount
-    ? "Show like count"
-    : "Hide like count";
+    ? "Show like"
+    : "Hide like";
 
   useEffect(() => {
     if (commentsLocked) {
@@ -1357,7 +1489,6 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       <div className={styles.authorBlock}>
         <div className={styles.avatarLarge}>
           {post?.authorAvatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={post.authorAvatarUrl}
               alt={post.authorUsername || "avatar"}
@@ -1459,7 +1590,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                   </button>
                   <button
                     type="button"
-                    className={styles.moreMenuItem}
+                    className={`${styles.moreMenuItem} ${styles.moreMenuDanger}`}
                     role="menuitem"
                     onClick={() => setShowMoreMenu(false)}
                   >

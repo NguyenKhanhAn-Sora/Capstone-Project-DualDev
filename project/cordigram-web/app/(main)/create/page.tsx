@@ -1546,7 +1546,7 @@ export default function CreatePostPage() {
                   onChange={() => toggle("hideLikeCount")}
                 />
                 <div>
-                  <p className={styles.switchTitle}>Hide like count</p>
+                  <p className={styles.switchTitle}>Hide like</p>
                   <p className={styles.switchHint}>
                     Viewers won’t see the number of likes on this post
                   </p>

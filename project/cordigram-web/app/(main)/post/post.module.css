@@ -39,6 +39,7 @@
   border: unset;
   box-shadow: unset;
   width: min(1200px, 96vw);
+  height: clamp(520px, 93vh, 820px);
 }
 
 .pageCard {
@@ -137,6 +138,10 @@
   margin: 4px 0;
 }
 
+.moreMenuDanger {
+  color: #f87171;
+}
+
 .followBtn {
   color: var(--color-text, #e5e7eb);
   font-weight: 700;
@@ -231,7 +236,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: clamp(520px, 90vh, 820px);
+  height: clamp(520px, 93vh, 820px);
   max-width: 100%;
   overflow: hidden;
 }

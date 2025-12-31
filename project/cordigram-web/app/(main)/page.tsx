@@ -1,7 +1,7 @@
 "use client";
 
 import { JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import styles from "./home-feed.module.css";
 import {
   fetchFeed,
@@ -23,6 +23,7 @@ import {
 } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { useScrollRestoration } from "@/hooks/use-scroll-restoration";
 type LocalFlags = {
   liked?: boolean;
   saved?: boolean;
@@ -55,9 +56,9 @@ const getUserIdFromToken = (token: string | null): string | undefined => {
 const PAGE_SIZE = 12;
 const VIEW_DEBOUNCE_MS = 800;
 const VIEW_DWELL_MS = 2000;
-const VIEW_COOLDOWN_MS = 60000;
+const VIEW_COOLDOWN_MS = 300000;
 const REPORT_ANIMATION_MS = 200;
-const FEED_POLL_MS = 7000; // 5–8s range for feed refresh
+const FEED_POLL_MS = 7000;
 
 type IconProps = { size?: number; filled?: boolean };
 
@@ -314,8 +315,10 @@ const REPORT_GROUPS: ReportCategory[] = [
 
 export default function HomePage() {
   const canRender = useRequireAuth();
+  const pathname = usePathname();
   const [items, setItems] = useState<PostViewState[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string>("");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -348,11 +351,24 @@ export default function HomePage() {
     new Map()
   );
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const getScrollTarget = useCallback(() => {
+    if (typeof document === "undefined") return null;
+    const el = document.querySelector<HTMLElement>("[data-scroll-root]");
+    if (el) return el;
+    return (document.scrollingElement as HTMLElement | null) ?? null;
+  }, []);
 
   const token = useMemo(() => {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("accessToken");
   }, []);
+
+  useScrollRestoration(
+    "feed-scroll",
+    initialized && !loading,
+    getScrollTarget,
+    pathname === "/"
+  );
 
   const selectedReportGroup = useMemo(
     () => REPORT_GROUPS.find((g) => g.key === reportCategory),
@@ -431,6 +447,7 @@ export default function HomePage() {
           : "Unable to load feed";
       setError(msg);
     } finally {
+      setInitialized(true);
       setLoading(false);
     }
   };
@@ -594,17 +611,12 @@ export default function HomePage() {
     } catch {}
   };
 
-  const onToggleComments = async (
-    postId: string,
-    allowComments: boolean,
-  ) => {
+  const onToggleComments = async (postId: string, allowComments: boolean) => {
     if (!token) return;
     setItems((prev) =>
       prev.map((p) =>
-        p.item.id === postId
-          ? { ...p, item: { ...p.item, allowComments } }
-          : p,
-      ),
+        p.item.id === postId ? { ...p, item: { ...p.item, allowComments } } : p
+      )
     );
     try {
       await setPostAllowComments({ token, postId, allowComments });
@@ -614,8 +626,8 @@ export default function HomePage() {
         prev.map((p) =>
           p.item.id === postId
             ? { ...p, item: { ...p.item, allowComments: !allowComments } }
-            : p,
-        ),
+            : p
+        )
       );
       showToast("Failed to update comments");
     }
@@ -623,15 +635,13 @@ export default function HomePage() {
 
   const onToggleHideLikeCount = async (
     postId: string,
-    hideLikeCount: boolean,
+    hideLikeCount: boolean
   ) => {
     if (!token) return;
     setItems((prev) =>
       prev.map((p) =>
-        p.item.id === postId
-          ? { ...p, item: { ...p.item, hideLikeCount } }
-          : p,
-      ),
+        p.item.id === postId ? { ...p, item: { ...p.item, hideLikeCount } } : p
+      )
     );
     try {
       await setPostHideLikeCount({ token, postId, hideLikeCount });
@@ -641,8 +651,8 @@ export default function HomePage() {
         prev.map((p) =>
           p.item.id === postId
             ? { ...p, item: { ...p.item, hideLikeCount: !hideLikeCount } }
-            : p,
-        ),
+            : p
+        )
       );
       showToast("Failed to update like count visibility");
     }
@@ -657,10 +667,8 @@ export default function HomePage() {
                 ...p,
                 item: {
                   ...p.item,
-                  allowComments:
-                    patch.allowComments ?? p.item.allowComments,
-                  hideLikeCount:
-                    patch.hideLikeCount ?? p.item.hideLikeCount,
+                  allowComments: patch.allowComments ?? p.item.allowComments,
+                  hideLikeCount: patch.hideLikeCount ?? p.item.hideLikeCount,
                   stats: patch.stats ?? p.item.stats,
                 },
                 flags: {
@@ -931,7 +939,7 @@ export default function HomePage() {
               <div>
                 <h3 className={styles.modalTitle}>Report this post</h3>
                 <p className={styles.modalBody}>
-                  {`Reporting ${reportTarget.label}'s post. Please pick the most accurate reason.`}
+                  {`Reporting @${reportTarget.label} post. Please pick the most accurate reason.`}
                 </p>
               </div>
               <button
@@ -1132,7 +1140,11 @@ function FeedCard({
 
   const pollOnce = useCallback(async () => {
     if (!token) return;
-    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    if (
+      typeof document !== "undefined" &&
+      document.visibilityState !== "visible"
+    )
+      return;
     try {
       const latest = await fetchPostDetail({ token, postId: id });
       onRemoteUpdate(id, {
@@ -1142,9 +1154,7 @@ function FeedCard({
         liked: (latest as any).liked,
         saved: (latest as any).saved,
       });
-    } catch {
-      // ignore polling errors
-    }
+    } catch {}
   }, [id, onRemoteUpdate, token]);
 
   useEffect(() => {
@@ -1218,16 +1228,45 @@ function FeedCard({
   const [mediaIndex, setMediaIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [soundOn, setSoundOn] = useState(false);
+  const lastTimeRef = useRef(0);
+  const lastSoundRef = useRef(false);
+  const resumeTimeRef = useRef<number | null>(null);
+  const resumeAppliedRef = useRef(false);
+  const persistResume = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const videoEl = videoRef.current;
+    const time = videoEl
+      ? videoEl.currentTime || lastTimeRef.current || 0
+      : lastTimeRef.current || 0;
+    const sound = videoEl
+      ? !videoEl.muted || soundOn || lastSoundRef.current
+      : soundOn || lastSoundRef.current;
+    if (time <= 0.05) return;
+    try {
+      const payload = {
+        mediaIndex,
+        time,
+        soundOn: sound,
+      };
+      sessionStorage.setItem(`postVideoResume:${id}`, JSON.stringify(payload));
+    } catch {}
+  }, [id, mediaIndex, soundOn]);
 
   const goToPost = useCallback(() => {
     setMenuOpen(false);
-    // Use a hard navigation to bypass the modal intercept route and land on the full post page
+    persistResume();
+
     if (typeof window !== "undefined") {
       window.location.href = `/post/${id}`;
     } else {
       router.push(`/post/${id}`);
     }
-  }, [id, router]);
+  }, [id, router, persistResume]);
+
+  const quickOpenPost = useCallback(() => {
+    persistResume();
+    router.push(`/post/${id}`);
+  }, [id, router, persistResume]);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -1265,10 +1304,62 @@ function FeedCard({
   }, [media]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = `postVideoResume:${id}`;
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return;
+    try {
+      const data = JSON.parse(raw) as {
+        mediaIndex?: number;
+        time?: number;
+        soundOn?: boolean;
+      };
+      const mediaCount = media?.length ?? 0;
+      if (
+        typeof data.mediaIndex === "number" &&
+        data.mediaIndex >= 0 &&
+        data.mediaIndex < mediaCount
+      ) {
+        setMediaIndex(data.mediaIndex);
+      }
+      if (typeof data.time === "number") {
+        resumeTimeRef.current = Math.max(0, data.time);
+      }
+      if (data.soundOn) setSoundOn(true);
+      resumeAppliedRef.current = true;
+    } catch {}
+    sessionStorage.removeItem(key);
+  }, [id, media]);
+
+  useEffect(() => {
     const videoEl = videoRef.current;
     if (!videoEl) return;
     videoEl.muted = !soundOn;
   }, [soundOn, mediaIndex]);
+
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+    const applyResume = () => {
+      if (resumeTimeRef.current == null) return;
+      const duration = videoEl.duration;
+      const safe = Number.isFinite(duration)
+        ? Math.min(
+            Math.max(resumeTimeRef.current, 0),
+            Math.max(duration - 0.2, 0)
+          )
+        : Math.max(resumeTimeRef.current, 0);
+      try {
+        videoEl.currentTime = safe;
+      } catch {}
+      resumeTimeRef.current = null;
+    };
+    videoEl.addEventListener("loadedmetadata", applyResume);
+    if (videoEl.readyState >= 1) applyResume();
+    return () => {
+      videoEl.removeEventListener("loadedmetadata", applyResume);
+    };
+  }, [mediaIndex]);
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -1296,6 +1387,36 @@ function FeedCard({
       videoEl.pause();
     };
   }, [mediaIndex, media]);
+
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+    const handler = () => persistResume();
+    videoEl.addEventListener("timeupdate", handler);
+    videoEl.addEventListener("pause", handler);
+    videoEl.addEventListener("ended", handler);
+    const updateRefs = () => {
+      lastTimeRef.current = videoEl.currentTime || 0;
+      lastSoundRef.current = !videoEl.muted;
+    };
+    videoEl.addEventListener("timeupdate", updateRefs);
+    videoEl.addEventListener("volumechange", updateRefs);
+    videoEl.addEventListener("pause", updateRefs);
+    return () => {
+      videoEl.removeEventListener("timeupdate", handler);
+      videoEl.removeEventListener("pause", handler);
+      videoEl.removeEventListener("ended", handler);
+      videoEl.removeEventListener("timeupdate", updateRefs);
+      videoEl.removeEventListener("volumechange", updateRefs);
+      videoEl.removeEventListener("pause", updateRefs);
+    };
+  }, [persistResume]);
+
+  useEffect(() => {
+    return () => {
+      persistResume();
+    };
+  }, [persistResume]);
 
   const enableSound = useCallback(() => {
     setSoundOn(true);
@@ -1386,9 +1507,7 @@ function FeedCard({
   const commentsToggleLabel = allowComments
     ? "Turn off comments"
     : "Turn on comments";
-  const hideLikeToggleLabel = hideLikeCount
-    ? "Show like count"
-    : "Hide like count";
+  const hideLikeToggleLabel = hideLikeCount ? "Show like" : "Hide like";
   const showInlineFollow =
     !isSelf &&
     Boolean(authorOwnerId) &&
@@ -1558,7 +1677,7 @@ function FeedCard({
                         onReportIntent(id, authorLine);
                       }}
                     >
-                      Report this post
+                      Report
                     </button>
                     <button
                       className={`${styles.menuItem} ${styles.menuItemDanger}`}
@@ -1762,10 +1881,7 @@ function FeedCard({
           <IconLike size={20} filled={liked} />
           <span>{liked ? "Liked" : "Like"}</span>
         </button>
-        <button
-          className={styles.actionBtn}
-          onClick={() => router.push(`/post/${id}`)}
-        >
+        <button className={styles.actionBtn} onClick={quickOpenPost}>
           <IconComment size={20} />
           <span>Comment</span>
         </button>

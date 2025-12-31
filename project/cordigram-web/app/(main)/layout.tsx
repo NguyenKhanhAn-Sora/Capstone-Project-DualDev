@@ -23,7 +23,9 @@ export default function MainLayout({
     <AuthGuard>
       <div className="app-shell flex">
         <Sidebar />
-        <div className="page flex-1">{children}</div>
+        <div className="page flex-1" data-scroll-root>
+          {children}
+        </div>
       </div>
     </AuthGuard>
   );
