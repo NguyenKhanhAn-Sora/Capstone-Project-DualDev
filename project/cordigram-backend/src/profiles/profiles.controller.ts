@@ -59,6 +59,7 @@ export class ProfilesController {
 
     return {
       id: profile._id?.toString?.() ?? (profile as { id?: string }).id,
+      userId: profile.userId?.toString?.() ?? user.userId,
       displayName: profile.displayName,
       username: profile.username,
       avatarUrl: profile.avatarUrl,

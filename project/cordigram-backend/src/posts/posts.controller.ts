@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Patch,
   HttpCode,
   Post,
   ParseBoolPipe,
@@ -27,6 +28,8 @@ type UploadedFile = {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/jwt.strategy';
 import { CreatePostDto } from './dto/create-post.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
+import { UpdateVisibilityDto } from './dto/update-visibility.dto';
 import { PostsService } from './posts.service';
 
 @Controller('posts')
@@ -41,6 +44,19 @@ export class PostsController {
       throw new UnauthorizedException();
     }
     return this.postsService.create(user.userId, dto);
+  }
+
+  @Patch(':id')
+  async update(
+    @Req() req: Request,
+    @Param('id') postId: string,
+    @Body() dto: UpdatePostDto,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.update(user.userId, postId, dto);
   }
 
   @Get('feed')
@@ -191,6 +207,21 @@ export class PostsController {
       postId,
       hideLikeCount,
     );
+  }
+
+  @Patch(':id/visibility')
+  @HttpCode(200)
+  async updateVisibility(
+    @Req() req: Request,
+    @Param('id') postId: string,
+    @Body() dto: UpdateVisibilityDto,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    return this.postsService.setVisibility(user.userId, postId, dto.visibility);
   }
 
   @Delete(':id/save')

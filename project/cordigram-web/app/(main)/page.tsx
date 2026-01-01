@@ -1,6 +1,8 @@
 "use client";
 
 import { JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import EmojiPicker from "emoji-picker-react";
 import { usePathname, useRouter } from "next/navigation";
 import styles from "./home-feed.module.css";
 import {
@@ -19,6 +21,10 @@ import {
   blockUser,
   followUser,
   unfollowUser,
+  updatePostVisibility,
+  updatePost,
+  searchProfiles,
+  type ProfileSearchItem,
   type FeedItem,
 } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
@@ -59,6 +65,45 @@ const VIEW_DWELL_MS = 2000;
 const VIEW_COOLDOWN_MS = 300000;
 const REPORT_ANIMATION_MS = 200;
 const FEED_POLL_MS = 7000;
+const FEED_CACHE_KEY = "feedCache:v1";
+const FEED_CACHE_INTENT_KEY = "feedCache:intent";
+
+const normalizeHashtag = (value: string) =>
+  value
+    .replace(/^#/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "")
+    .replace(/[^a-zA-Z0-9_]/g, "")
+    .toLowerCase();
+
+const cleanLocationLabel = (label: string) =>
+  label
+    .replace(/\b\d{4,6}\b/g, "")
+    .replace(/,\s*,+/g, ", ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s*,\s*$/g, "")
+    .replace(/^\s*,\s*/g, "")
+    .trim();
+
+const extractMentionsFromCaption = (value: string) => {
+  const handles = new Set<string>();
+  const regex = /@([a-zA-Z0-9_.]{1,30})/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(value))) {
+    handles.add(match[1].toLowerCase());
+  }
+  return Array.from(handles);
+};
+
+const findActiveMention = (value: string, caret: number) => {
+  const beforeCaret = value.slice(0, caret);
+  const match = /(^|[\s([{.,!?])@([a-zA-Z0-9_.]{0,30})$/i.exec(beforeCaret);
+  if (!match) return null;
+  const handle = match[2];
+  const start = caret - handle.length - 1;
+  return { handle, start, end: caret };
+};
 
 type IconProps = { size?: number; filled?: boolean };
 
@@ -375,6 +420,61 @@ export default function HomePage() {
     [reportCategory]
   );
 
+  const persistFeedCache = useCallback(
+    (payload?: {
+      items?: PostViewState[];
+      page?: number;
+      hasMore?: boolean;
+    }) => {
+      if (typeof window === "undefined") return;
+      const data = payload ?? {
+        items,
+        page,
+        hasMore,
+      };
+      try {
+        sessionStorage.setItem(
+          FEED_CACHE_KEY,
+          JSON.stringify({
+            items: data.items,
+            page: data.page,
+            hasMore: data.hasMore,
+            viewerId,
+            ts: Date.now(),
+          })
+        );
+      } catch {}
+    },
+    [hasMore, items, page, viewerId]
+  );
+
+  const tryHydrateFromCache = useCallback(() => {
+    if (typeof window === "undefined") return false;
+    const raw = sessionStorage.getItem(FEED_CACHE_KEY);
+    if (!raw) return false;
+    try {
+      const cached = JSON.parse(raw) as {
+        items?: PostViewState[];
+        page?: number;
+        hasMore?: boolean;
+        viewerId?: string;
+      };
+      if (cached.viewerId && viewerId && cached.viewerId !== viewerId) {
+        return false;
+      }
+      if (!Array.isArray(cached.items) || !cached.items.length) return false;
+      setItems(cached.items);
+      setPage(cached.page ?? 1);
+      setHasMore(cached.hasMore ?? true);
+      setInitialized(true);
+      setLoading(false);
+      sessionStorage.removeItem(FEED_CACHE_INTENT_KEY);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [viewerId]);
+
   const showToast = useCallback((message: string, duration = 1600) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage(message);
@@ -392,6 +492,11 @@ export default function HomePage() {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!initialized) return;
+    persistFeedCache();
+  }, [initialized, items, page, hasMore, persistFeedCache]);
 
   const syncStats = useCallback(async () => {
     if (!token) return;
@@ -428,17 +533,21 @@ export default function HomePage() {
       const limit = nextPage * PAGE_SIZE;
       const data = await fetchFeed({ token, limit });
       setHasMore(data.length >= limit);
-      setItems(
-        data.map((item) => ({
-          item,
-          flags: {
-            liked: item.liked,
-            saved: item.saved,
-            following:
-              (item as unknown as { following?: boolean }).following ?? false,
-          },
-        }))
-      );
+      const mapped = data.map((item) => ({
+        item,
+        flags: {
+          liked: item.liked,
+          saved: item.saved,
+          following:
+            (item as unknown as { following?: boolean }).following ?? false,
+        },
+      }));
+      setItems(mapped);
+      persistFeedCache({
+        items: mapped,
+        page: nextPage,
+        hasMore: data.length >= limit,
+      });
       setPage(nextPage);
     } catch (err) {
       const msg =
@@ -453,10 +562,12 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    if (canRender) {
-      load(1);
-    }
-  }, [canRender]);
+    if (!canRender) return;
+    const shouldHydrate = sessionStorage.getItem(FEED_CACHE_INTENT_KEY);
+    if (shouldHydrate && tryHydrateFromCache()) return;
+    if (tryHydrateFromCache()) return;
+    load(1);
+  }, [canRender, tryHydrateFromCache]);
 
   const onLike = async (postId: string, liked: boolean) => {
     if (!token) return;
@@ -667,6 +778,13 @@ export default function HomePage() {
                 ...p,
                 item: {
                   ...p.item,
+                  content: patch.content ?? p.item.content,
+                  hashtags: patch.hashtags ?? p.item.hashtags,
+                  mentions: patch.mentions ?? p.item.mentions,
+                  topics: patch.topics ?? p.item.topics,
+                  location: patch.location ?? p.item.location,
+                  allowDownload: patch.allowDownload ?? p.item.allowDownload,
+                  visibility: patch.visibility ?? p.item.visibility,
                   allowComments: patch.allowComments ?? p.item.allowComments,
                   hideLikeCount: patch.hideLikeCount ?? p.item.hideLikeCount,
                   stats: patch.stats ?? p.item.stats,
@@ -883,6 +1001,7 @@ export default function HomePage() {
             onFollow={onFollow}
             token={token}
             onRemoteUpdate={onRemoteUpdate}
+            onPersistFeedCache={persistFeedCache}
           />
         ))}
 
@@ -1083,6 +1202,7 @@ function FeedCard({
   onFollow,
   token,
   onRemoteUpdate,
+  onPersistFeedCache,
 }: {
   data: FeedItem;
   liked: boolean;
@@ -1102,6 +1222,7 @@ function FeedCard({
   onFollow: (authorId: string, nextFollow: boolean) => void;
   token: string | null;
   onRemoteUpdate: (postId: string, patch: FeedRemotePatch) => void;
+  onPersistFeedCache?: () => void;
 }) {
   const {
     id,
@@ -1118,7 +1239,9 @@ function FeedCard({
     hashtags,
     topics,
     location,
+    visibility,
     allowComments,
+    allowDownload,
     hideLikeCount,
   } = data;
 
@@ -1224,7 +1347,477 @@ function FeedCard({
   const [canExpand, setCanExpand] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editCaption, setEditCaption] = useState(content || "");
+  const editCaptionRef = useRef<HTMLTextAreaElement | null>(null);
+  const editEmojiRef = useRef<HTMLDivElement | null>(null);
+  const [editEmojiOpen, setEditEmojiOpen] = useState(false);
+  const [editHashtags, setEditHashtags] = useState<string[]>(hashtags || []);
+  const [hashtagDraft, setHashtagDraft] = useState("");
+  const [editMentions, setEditMentions] = useState<string[]>(mentions || []);
+  const [mentionDraft, setMentionDraft] = useState("");
+  const [mentionSuggestions, setMentionSuggestions] = useState<
+    ProfileSearchItem[]
+  >([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const [mentionError, setMentionError] = useState("");
+  const [mentionHighlight, setMentionHighlight] = useState(-1);
+  const [activeMentionRange, setActiveMentionRange] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
+  const [editLocation, setEditLocation] = useState(location || "");
+  const [locationQuery, setLocationQuery] = useState(location || "");
+  const [locationSuggestions, setLocationSuggestions] = useState<
+    Array<{ label: string; lat: string; lon: string }>
+  >([]);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [locationHighlight, setLocationHighlight] = useState(-1);
+  const [editAllowComments, setEditAllowComments] = useState(allowComments);
+  const [editAllowDownload, setEditAllowDownload] = useState(
+    allowDownload ?? false
+  );
+  const [editHideLikeCount, setEditHideLikeCount] = useState(hideLikeCount);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editSuccess, setEditSuccess] = useState("");
+  const [visibilityModalOpen, setVisibilityModalOpen] = useState(false);
+  const [visibilitySelected, setVisibilitySelected] = useState<
+    "public" | "followers" | "private"
+  >(visibility ?? "public");
+  const [visibilitySaving, setVisibilitySaving] = useState(false);
+  const [visibilityError, setVisibilityError] = useState<string>("");
+  const visibilityOptions: Array<{
+    value: "public" | "followers" | "private";
+    title: string;
+    description: string;
+  }> = [
+    {
+      value: "public",
+      title: "Public",
+      description: "Anyone can view this post",
+    },
+    {
+      value: "followers",
+      title: "Friends / Following",
+      description: "Only followers can view this post",
+    },
+    {
+      value: "private",
+      title: "Private",
+      description: "Only you can view this post",
+    },
+  ];
+
+  useEffect(() => {
+    setVisibilitySelected(visibility ?? "public");
+  }, [visibility]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const resetEditState = useCallback(() => {
+    setEditCaption(content || "");
+    setEditHashtags(hashtags || []);
+    setHashtagDraft("");
+    setEditMentions(mentions || []);
+    setMentionDraft("");
+    setMentionSuggestions([]);
+    setMentionOpen(false);
+    setMentionLoading(false);
+    setMentionError("");
+    setMentionHighlight(-1);
+    setActiveMentionRange(null);
+    setEditLocation(location || "");
+    setLocationQuery(location || "");
+    setLocationSuggestions([]);
+    setLocationOpen(false);
+    setLocationLoading(false);
+    setLocationError("");
+    setLocationHighlight(-1);
+    setEditAllowComments(allowComments);
+    setEditAllowDownload(allowDownload ?? false);
+    setEditHideLikeCount(hideLikeCount);
+    setEditError("");
+    setEditSuccess("");
+  }, [
+    allowComments,
+    allowDownload,
+    content,
+    hashtags,
+    hideLikeCount,
+    location,
+    mentions,
+  ]);
+
+  useEffect(() => {
+    resetEditState();
+  }, [resetEditState, id]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!editEmojiRef.current) return;
+      if (!editEmojiRef.current.contains(event.target as Node)) {
+        setEditEmojiOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setEditEmojiOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!editOpen) setEditEmojiOpen(false);
+  }, [editOpen]);
+
+  const openEditModal = () => {
+    resetEditState();
+    setEditOpen(true);
+  };
+
+  const closeEditModal = () => {
+    if (editSaving) return;
+    setEditOpen(false);
+  };
+
+  const handleCaptionChange = (
+    event: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    const value = event.target.value;
+    const caret = event.target.selectionStart ?? value.length;
+    setEditCaption(value);
+
+    const active = findActiveMention(value, caret);
+    if (active) {
+      setActiveMentionRange({ start: active.start, end: active.end });
+      setMentionDraft(active.handle);
+      setMentionOpen(true);
+      setMentionError("");
+      setMentionHighlight(0);
+    } else {
+      setActiveMentionRange(null);
+      setMentionDraft("");
+      setMentionSuggestions([]);
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setMentionError("");
+    }
+  };
+
+  const insertEditEmoji = (emoji: string) => {
+    const el = editCaptionRef.current;
+    const caret = el?.selectionStart ?? editCaption.length;
+    setEditCaption((prev) => {
+      const value = prev || "";
+      if (!el || typeof el.selectionStart !== "number") {
+        return value + emoji;
+      }
+      const start = el.selectionStart;
+      const end = el.selectionEnd ?? start;
+      return value.slice(0, start) + emoji + value.slice(end);
+    });
+
+    setTimeout(() => {
+      if (!el) return;
+      const nextPos = caret + emoji.length;
+      el.focus();
+      el.setSelectionRange(nextPos, nextPos);
+    }, 0);
+  };
+
+  const onCaptionKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!mentionOpen) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!mentionSuggestions.length) return;
+      setMentionHighlight((prev) =>
+        prev + 1 < mentionSuggestions.length ? prev + 1 : 0
+      );
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!mentionSuggestions.length) return;
+      setMentionHighlight((prev) =>
+        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
+      );
+      return;
+    }
+    if (e.key === "Enter") {
+      if (mentionSuggestions.length && mentionHighlight >= 0) {
+        e.preventDefault();
+        const opt = mentionSuggestions[mentionHighlight];
+        if (opt) selectMention(opt);
+      }
+    }
+    if (e.key === "Escape") {
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setActiveMentionRange(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!editOpen) return;
+    const cleaned = mentionDraft.trim().replace(/^@/, "");
+    if (!cleaned) {
+      setMentionSuggestions([]);
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setMentionError("");
+      return;
+    }
+
+    if (!token) {
+      setMentionSuggestions([]);
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setMentionError("Sign in to mention users");
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setMentionLoading(true);
+      setMentionError("");
+      try {
+        const res = await searchProfiles({
+          token,
+          query: cleaned,
+          limit: 8,
+        });
+        if (cancelled) return;
+        setMentionSuggestions(res.items);
+        setMentionOpen(res.items.length > 0);
+        setMentionHighlight(res.items.length ? 0 : -1);
+        if (!res.items.length) {
+          setMentionError("User not found");
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setMentionSuggestions([]);
+        setMentionOpen(false);
+        setMentionHighlight(-1);
+        setMentionError("User not found");
+      } finally {
+        if (!cancelled) setMentionLoading(false);
+      }
+    }, 320);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [editOpen, mentionDraft, token]);
+
+  const selectMention = (opt: ProfileSearchItem) => {
+    const handle = opt.username.toLowerCase();
+    const caption = editCaption || "";
+    const range = activeMentionRange ?? {
+      start: caption.length,
+      end: caption.length,
+    };
+    const before = caption.slice(0, range.start);
+    const after = caption.slice(range.end);
+    const insertion = `@${handle}`;
+    const needsSpaceAfter = after.startsWith(" ") || after === "" ? "" : " ";
+    const nextCaption = `${before}${insertion}${needsSpaceAfter}${after}`;
+    const nextMentions = editMentions.includes(handle)
+      ? editMentions
+      : [...editMentions, handle];
+
+    setEditCaption(nextCaption);
+    setEditMentions(nextMentions);
+
+    setMentionDraft("");
+    setMentionSuggestions([]);
+    setMentionOpen(false);
+    setMentionHighlight(-1);
+    setActiveMentionRange(null);
+
+    setTimeout(() => {
+      const el = editCaptionRef.current;
+      if (!el) return;
+      const caret = range.start + insertion.length + (needsSpaceAfter ? 1 : 0);
+      el.focus?.();
+      el.setSelectionRange?.(caret, caret);
+    }, 0);
+  };
+
+  const addHashtag = () => {
+    const cleaned = normalizeHashtag(hashtagDraft);
+    if (!cleaned) return;
+    if (editHashtags.includes(cleaned)) {
+      setHashtagDraft("");
+      return;
+    }
+    if (editHashtags.length >= 30) return;
+    setEditHashtags((prev) => [...prev, cleaned]);
+    setHashtagDraft("");
+  };
+
+  const removeHashtag = (tag: string) => {
+    setEditHashtags((prev) => prev.filter((t) => t !== tag));
+  };
+
+  useEffect(() => {
+    if (!editOpen) return;
+    if (!locationQuery.trim()) {
+      setLocationSuggestions([]);
+      setLocationOpen(false);
+      setLocationHighlight(-1);
+      setLocationError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setLocationLoading(true);
+      setLocationError("");
+      try {
+        const url = new URL("https://nominatim.openstreetmap.org/search");
+        url.searchParams.set("q", locationQuery);
+        url.searchParams.set("format", "jsonv2");
+        url.searchParams.set("addressdetails", "1");
+        url.searchParams.set("limit", "8");
+        url.searchParams.set("countrycodes", "vn");
+        const res = await fetch(url.toString(), {
+          headers: {
+            Accept: "application/json",
+            "Accept-Language": "vi",
+          },
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error("search failed");
+        const data = await res.json();
+        const mapped = Array.isArray(data)
+          ? data.map((item: any) => ({
+              label: cleanLocationLabel(item.display_name as string),
+              lat: item.lat as string,
+              lon: item.lon as string,
+            }))
+          : [];
+        setLocationSuggestions(mapped);
+        setLocationOpen(true);
+        setLocationHighlight(mapped.length ? 0 : -1);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setLocationSuggestions([]);
+        setLocationOpen(false);
+        setLocationHighlight(-1);
+        setLocationError("No suggestions found, try different keywords.");
+      } finally {
+        if (!controller.signal.aborted) setLocationLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [editOpen, locationQuery]);
+
+  const pickLocation = (label: string) => {
+    setEditLocation(label);
+    setLocationQuery(label);
+    setLocationSuggestions([]);
+    setLocationOpen(false);
+    setLocationHighlight(-1);
+    setLocationError("");
+  };
+
+  const onLocationKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!locationSuggestions.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setLocationHighlight((prev) =>
+        prev + 1 < locationSuggestions.length ? prev + 1 : 0
+      );
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setLocationHighlight((prev) =>
+        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1
+      );
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const chosen = locationSuggestions[locationHighlight];
+      if (chosen) pickLocation(chosen.label);
+    }
+  };
+
+  const handleEditSubmit = async (event?: React.FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    setEditError("");
+    setEditSuccess("");
+
+    if (!token) {
+      setEditError("Please sign in to edit posts");
+      return;
+    }
+
+    const normalizedHashtags = Array.from(
+      new Set(editHashtags.map((t) => normalizeHashtag(t.toString())))
+    ).filter(Boolean);
+
+    const normalizedMentions = Array.from(
+      new Set(
+        [
+          ...extractMentionsFromCaption(editCaption || ""),
+          ...editMentions.map((t) =>
+            t.toString().trim().replace(/^@/, "").toLowerCase()
+          ),
+        ].filter(Boolean)
+      )
+    );
+
+    const trimmedLocation = editLocation.trim();
+
+    const payload = {
+      content: editCaption || "",
+      hashtags: normalizedHashtags,
+      mentions: normalizedMentions,
+      location: trimmedLocation || undefined,
+      allowComments: editAllowComments,
+      allowDownload: editAllowDownload,
+      hideLikeCount: editHideLikeCount,
+    } as const;
+
+    try {
+      setEditSaving(true);
+      const updated = await updatePost({ token, postId: id, payload });
+      onRemoteUpdate(id, updated);
+      setEditSuccess("Post updated");
+      setEditOpen(false);
+    } catch (err: any) {
+      const message =
+        (err && typeof err === "object" && "message" in err
+          ? (err as { message?: string }).message
+          : null) || "Failed to update post";
+      setEditError(message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
   const [mediaIndex, setMediaIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [soundOn, setSoundOn] = useState(false);
@@ -1253,6 +1846,10 @@ function FeedCard({
   }, [id, mediaIndex, soundOn]);
 
   const goToPost = useCallback(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(FEED_CACHE_INTENT_KEY, "1");
+      onPersistFeedCache?.();
+    }
     setMenuOpen(false);
     persistResume();
 
@@ -1261,12 +1858,16 @@ function FeedCard({
     } else {
       router.push(`/post/${id}`);
     }
-  }, [id, router, persistResume]);
+  }, [id, router, persistResume, onPersistFeedCache]);
 
   const quickOpenPost = useCallback(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(FEED_CACHE_INTENT_KEY, "1");
+      onPersistFeedCache?.();
+    }
     persistResume();
     router.push(`/post/${id}`);
-  }, [id, router, persistResume]);
+  }, [id, router, persistResume, onPersistFeedCache]);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -1513,6 +2114,407 @@ function FeedCard({
     Boolean(authorOwnerId) &&
     (!initialFollowingRef.current || followToggledRef.current || !isFollowing);
 
+  const disableVisibilityUpdate =
+    visibilitySaving || visibilitySelected === (visibility ?? "public");
+
+  const submitVisibilityUpdate = async () => {
+    if (!token) {
+      setVisibilityError("Please sign in");
+      return;
+    }
+    if (disableVisibilityUpdate) return;
+
+    setVisibilitySaving(true);
+    setVisibilityError("");
+    try {
+      await updatePostVisibility({
+        token,
+        postId: id,
+        visibility: visibilitySelected,
+      });
+
+      onRemoteUpdate(id, { visibility: visibilitySelected });
+      setVisibilityModalOpen(false);
+    } catch (err: any) {
+      setVisibilityError(err?.message || "Failed to update visibility");
+    } finally {
+      setVisibilitySaving(false);
+    }
+  };
+
+  const closeVisibilityModal = () => {
+    if (visibilitySaving) return;
+    setVisibilityModalOpen(false);
+  };
+
+  const editModal = (
+    <div
+      className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+      role="dialog"
+      aria-modal="true"
+      onClick={closeEditModal}
+    >
+      <div
+        className={`${styles.modalCard} ${styles.editCard}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={styles.modalHeader}>
+          <div>
+            <h3 className={styles.modalTitle}>Edit post</h3>
+          </div>
+          <button
+            className={styles.closeBtn}
+            aria-label="Close"
+            onClick={closeEditModal}
+            type="button"
+          >
+            <IconClose size={18} />
+          </button>
+        </div>
+
+        <form className={styles.editForm} onSubmit={handleEditSubmit}>
+          <label className={styles.editLabel}>
+            <div className={styles.editLabelRow}>
+              <span className={styles.editLabelText}>Caption</span>
+              <div className={styles.emojiWrap} ref={editEmojiRef}>
+                <button
+                  type="button"
+                  className={styles.emojiButton}
+                  onClick={() => setEditEmojiOpen((prev) => !prev)}
+                  aria-label="Add emoji"
+                >
+                  <svg
+                    aria-label="Emoji icon"
+                    fill="currentColor"
+                    height="20"
+                    role="img"
+                    viewBox="0 0 24 24"
+                    width="20"
+                  >
+                    <title>Emoji icon</title>
+                    <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
+                  </svg>
+                </button>
+                {editEmojiOpen ? (
+                  <div className={styles.emojiPopover}>
+                    <EmojiPicker
+                      onEmojiClick={(emojiData) => {
+                        insertEditEmoji(emojiData.emoji || "");
+                        setEditEmojiOpen(false);
+                      }}
+                      searchDisabled={false}
+                      skinTonesDisabled={false}
+                      lazyLoadEmojis
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <div
+              className={`${styles.editTextareaShell} ${styles.mentionCombo}`}
+            >
+              <textarea
+                ref={editCaptionRef}
+                className={styles.editTextarea}
+                value={editCaption}
+                onChange={handleCaptionChange}
+                onKeyDown={onCaptionKeyDown}
+                onBlur={() => {
+                  setTimeout(() => {
+                    setMentionOpen(false);
+                    setMentionHighlight(-1);
+                    setActiveMentionRange(null);
+                  }, 120);
+                }}
+                rows={4}
+                maxLength={2200}
+                placeholder="Write something..."
+              />
+              <span className={styles.charCount}>
+                {editCaption.length}/2200
+              </span>
+            </div>
+          </label>
+
+          {mentionOpen ? (
+            <div className={styles.mentionDropdown}>
+              {mentionLoading ? (
+                <div className={styles.mentionItem}>Searching...</div>
+              ) : null}
+              {!mentionLoading && mentionSuggestions.length === 0 ? (
+                <div className={styles.mentionItem}>
+                  {mentionError || "No matches"}
+                </div>
+              ) : null}
+              {mentionSuggestions.map((opt, idx) => {
+                const active = idx === mentionHighlight;
+                const avatarInitials = (opt.displayName || opt.username || "?")
+                  .slice(0, 2)
+                  .toUpperCase();
+                return (
+                  <button
+                    type="button"
+                    key={opt.id || opt.username}
+                    className={`${styles.mentionItem} ${
+                      active ? styles.mentionItemActive : ""
+                    }`}
+                    onClick={() => selectMention(opt)}
+                  >
+                    <span className={styles.mentionAvatar} aria-hidden>
+                      {opt.avatarUrl ? (
+                        <img
+                          src={opt.avatarUrl}
+                          alt={opt.displayName || opt.username}
+                          className={styles.mentionAvatarImg}
+                        />
+                      ) : (
+                        <span className={styles.mentionAvatarFallback}>
+                          {avatarInitials}
+                        </span>
+                      )}
+                    </span>
+                    <span className={styles.mentionCopy}>
+                      <span className={styles.mentionHandle}>
+                        @{opt.username}
+                      </span>
+                      {opt.displayName ? (
+                        <span className={styles.mentionName}>
+                          {opt.displayName}
+                        </span>
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          <div className={styles.editField}>
+            <div className={styles.editLabelRow}>
+              <span className={styles.editLabelText}>Hashtags</span>
+            </div>
+            <div className={styles.chipRow}>
+              {editHashtags.map((tag) => (
+                <span key={tag} className={styles.chip}>
+                  #{tag}
+                  <button
+                    type="button"
+                    className={styles.chipRemove}
+                    onClick={() => removeHashtag(tag)}
+                    aria-label={`Remove ${tag}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              <input
+                className={styles.editInput}
+                placeholder="Add hashtag"
+                value={hashtagDraft}
+                onChange={(e) => setHashtagDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault();
+                    addHashtag();
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <div className={styles.editField}>
+            <div className={styles.editLabelRow}>
+              <span className={styles.editLabelText}>Location</span>
+            </div>
+            <input
+              className={styles.editInput}
+              placeholder="Add a place"
+              value={locationQuery}
+              onChange={(e) => {
+                setEditLocation(e.target.value);
+                setLocationQuery(e.target.value);
+              }}
+              onFocus={() =>
+                setLocationOpen(Boolean(locationSuggestions.length))
+              }
+              onKeyDown={onLocationKeyDown}
+            />
+            {locationOpen ? (
+              <div className={styles.locationDropdown}>
+                {locationLoading ? (
+                  <div className={styles.locationItem}>Searching...</div>
+                ) : null}
+                {!locationLoading && locationSuggestions.length === 0 ? (
+                  <div className={styles.locationItem}>
+                    {locationError || "No suggestions"}
+                  </div>
+                ) : null}
+                {locationSuggestions.map((opt, idx) => {
+                  const active = idx === locationHighlight;
+                  return (
+                    <button
+                      type="button"
+                      key={`${opt.label}-${opt.lat}-${opt.lon}`}
+                      className={`${styles.locationItem} ${
+                        active ? styles.locationItemActive : ""
+                      }`}
+                      onClick={() => pickLocation(opt.label)}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+
+          <div className={styles.switchGroup}>
+            <label className={styles.switchRow}>
+              <input
+                type="checkbox"
+                checked={editAllowComments}
+                onChange={() => setEditAllowComments((prev) => !prev)}
+              />
+              <div>
+                <p className={styles.switchTitle}>Allow comments</p>
+                <p className={styles.switchHint}>
+                  Enable to receive feedback from everyone
+                </p>
+              </div>
+            </label>
+
+            <label className={styles.switchRow}>
+              <input
+                type="checkbox"
+                checked={editAllowDownload}
+                onChange={() => setEditAllowDownload((prev) => !prev)}
+              />
+              <div>
+                <p className={styles.switchTitle}>Allow downloads</p>
+                <p className={styles.switchHint}>
+                  Share the original file with people you trust
+                </p>
+              </div>
+            </label>
+
+            <label className={styles.switchRow}>
+              <input
+                type="checkbox"
+                checked={editHideLikeCount}
+                onChange={() => setEditHideLikeCount((prev) => !prev)}
+              />
+              <div>
+                <p className={styles.switchTitle}>Hide like</p>
+                <p className={styles.switchHint}>
+                  Viewers won’t see the number of likes on this post
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {editError ? (
+            <div className={styles.inlineError}>{editError}</div>
+          ) : null}
+          {editSuccess ? (
+            <div className={styles.editSuccess}>{editSuccess}</div>
+          ) : null}
+
+          <div className={styles.modalActions}>
+            <button
+              type="button"
+              className={styles.modalSecondary}
+              onClick={closeEditModal}
+              disabled={editSaving}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className={styles.modalPrimary}
+              disabled={editSaving}
+            >
+              {editSaving ? "Saving..." : "Save changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  const visibilityModal = (
+    <div
+      className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+      role="dialog"
+      aria-modal="true"
+      onClick={closeVisibilityModal}
+    >
+      <div
+        className={`${styles.modalCard} ${styles.modalCardOpen}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={styles.modalHeader}>
+          <div>
+            <h3 className={styles.modalTitle}>Edit visibility</h3>
+            <p className={styles.modalBody}>Choose who can see this post.</p>
+          </div>
+          <button
+            className={styles.closeBtn}
+            aria-label="Close"
+            onClick={closeVisibilityModal}
+          >
+            <IconClose size={18} />
+          </button>
+        </div>
+
+        <div className={styles.visibilityList}>
+          {visibilityOptions.map((opt) => {
+            const active = visibilitySelected === opt.value;
+            return (
+              <button
+                key={opt.value}
+                className={`${styles.visibilityOption} ${
+                  active ? styles.visibilityOptionActive : ""
+                }`}
+                onClick={() => setVisibilitySelected(opt.value)}
+              >
+                <span className={styles.visibilityRadio}>
+                  {active ? "✓" : ""}
+                </span>
+                <span className={styles.visibilityCopy}>
+                  <span className={styles.visibilityTitle}>{opt.title}</span>
+                  <span className={styles.visibilityDesc}>
+                    {opt.description}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {visibilityError ? (
+          <div className={styles.inlineError}>{visibilityError}</div>
+        ) : null}
+
+        <div className={styles.modalActions}>
+          <button
+            className={styles.modalSecondary}
+            onClick={closeVisibilityModal}
+            disabled={visibilitySaving}
+          >
+            Cancel
+          </button>
+          <button
+            className={styles.modalPrimary}
+            onClick={submitVisibilityUpdate}
+            disabled={disableVisibilityUpdate}
+          >
+            {visibilitySaving ? "Updating..." : "Update visibility"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <article className={styles.feedCard} ref={cardRef}>
       <header className={styles.feedHeader}>
@@ -1573,13 +2575,21 @@ function FeedCard({
                   <div className={styles.menuContent}>
                     <button
                       className={styles.menuItem}
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        openEditModal();
+                      }}
                     >
                       Edit post
                     </button>
                     <button
                       className={styles.menuItem}
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setVisibilityError("");
+                        setVisibilitySelected(visibility ?? "public");
+                        setVisibilityModalOpen(true);
+                      }}
                     >
                       Edit visibility
                     </button>
@@ -1843,31 +2853,35 @@ function FeedCard({
       ) : null}
 
       <div className={styles.statRow}>
-        {!shouldHideLikeStat ? (
+        <div>
+          {!shouldHideLikeStat ? (
+            <div className={styles.statItem}>
+              <span className={styles.statIcon}>
+                <IconLike size={18} />
+              </span>
+              <span>{stats.hearts ?? 0}</span>
+            </div>
+          ) : null}
           <div className={styles.statItem}>
             <span className={styles.statIcon}>
-              <IconLike size={18} />
+              <IconComment size={18} />
             </span>
-            <span>{stats.hearts ?? 0}</span>
+            <span>{stats.comments ?? 0}</span>
           </div>
-        ) : null}
-        <div className={styles.statItem}>
-          <span className={styles.statIcon}>
-            <IconComment size={18} />
-          </span>
-          <span>{stats.comments ?? 0}</span>
         </div>
-        <div className={styles.statItem}>
-          <span className={styles.statIcon}>
-            <IconEye size={18} />
-          </span>
-          <span>{stats.views ?? stats.impressions ?? 0}</span>
-        </div>
-        <div className={styles.statItem}>
-          <span className={styles.statIcon}>
-            <IconReup size={18} />
-          </span>
-          <span>{stats.shares ?? 0}</span>
+        <div>
+          <div className={styles.statItem}>
+            <span className={styles.statIcon}>
+              <IconEye size={18} />
+            </span>
+            <span>{stats.views ?? stats.impressions ?? 0}</span>
+          </div>
+          <div className={styles.statItem}>
+            <span className={styles.statIcon}>
+              <IconReup size={18} />
+            </span>
+            <span>{stats.shares ?? 0}</span>
+          </div>
         </div>
       </div>
 
@@ -1899,6 +2913,18 @@ function FeedCard({
           <span>Reup</span>
         </button>
       </div>
+
+      {editOpen
+        ? mounted && typeof document !== "undefined"
+          ? createPortal(editModal, document.body)
+          : editModal
+        : null}
+
+      {visibilityModalOpen
+        ? mounted && typeof document !== "undefined"
+          ? createPortal(visibilityModal, document.body)
+          : visibilityModal
+        : null}
     </article>
   );
 }

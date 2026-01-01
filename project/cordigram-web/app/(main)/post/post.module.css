@@ -78,15 +78,7 @@
   place-items: center;
   width: 36px;
   height: 36px;
-  color: var(--color-text, #e5e7eb);
   cursor: pointer;
-  transition: transform 120ms ease, border-color 120ms ease,
-    background 120ms ease;
-}
-
-.moreBtn:hover {
-  transform: translateY(-1px);
-  border-color: var(--color-border-strong, rgba(255, 255, 255, 0.25));
 }
 
 .moreMenu {
@@ -140,6 +132,42 @@
 
 .moreMenuDanger {
   color: #f87171;
+}
+
+.commentMenuOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 95;
+  padding: 12px;
+}
+
+.commentMenuCard {
+  width: min(320px, 92vw);
+  background: var(--color-surface, #0f172a);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.14));
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.commentMenuHeader {
+  font-weight: 700;
+  color: var(--color-text, #e5e7eb);
+  font-size: 15px;
+}
+
+.commentMenuList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .followBtn {
@@ -468,6 +496,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  /* flex-wrap: wrap; */
 }
 
 .commentAuthor {
@@ -493,6 +522,95 @@
   font-size: 12px;
   color: var(--color-text-muted, #94a3b8);
   align-items: center;
+}
+
+.commentMoreWrap {
+  position: relative;
+  display: inline-flex;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.commentRow:hover .commentMoreWrap,
+.commentMoreWrap:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.commentMoreBtn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted, #94a3b8);
+  cursor: pointer;
+  transition: transform 120ms ease, background 140ms ease,
+    border-color 140ms ease, color 140ms ease;
+}
+
+.commentMoreBtn:hover {
+  transform: translateY(-1px);
+  background: var(--color-surface-muted, rgba(255, 255, 255, 0.06));
+  border-color: var(--color-border, rgba(255, 255, 255, 0.25));
+  color: var(--color-text, #e5e7eb);
+}
+
+.commentMenuOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 95;
+  padding: 12px;
+}
+
+.commentMenuCard {
+  width: min(320px, 92vw);
+  background: var(--color-surface, #0f172a);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.14));
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.commentMenuHeader {
+  font-weight: 700;
+  color: var(--color-text, #e5e7eb);
+  font-size: 15px;
+}
+
+.commentMenuList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.commentMoreItem {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--color-text, #e5e7eb);
+  font-weight: 700;
+  padding: 10px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, transform 120ms ease;
+}
+
+.commentMoreItem:hover {
+  background: var(--color-surface-muted, rgba(255, 255, 255, 0.06));
+}
+
+.commentDanger {
+  color: #f87171;
 }
 
 .linkBtn {
@@ -675,7 +793,7 @@
 }
 
 .reportCard {
-  width: min(920px, 96vw);
+  width: 420px;
   background: var(--color-surface, #0f172a);
   border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
   border-radius: 16px;
@@ -689,6 +807,7 @@
 
 .reportCardOpen {
   animation: modalSlideIn 200ms ease forwards;
+  width: min(960px, 96vw);
 }
 
 .reportCardClosing {
@@ -717,18 +836,15 @@
 
 .reportClose {
   background: transparent;
-  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.18));
   color: var(--color-text-muted, #94a3b8);
-  border-radius: 10px;
-  padding: 6px 10px;
-  font-size: 16px;
+  font-size: 28px;
   cursor: pointer;
   transition: color 120ms ease, transform 120ms ease, border 120ms ease;
+  transform: translateY(-10px);
 }
 
 .reportClose:hover {
   color: var(--color-text, #e5e7eb);
-  transform: translateY(-1px);
 }
 
 .reportGrid {
@@ -738,8 +854,8 @@
 }
 
 .reportCategoryGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
@@ -886,7 +1002,7 @@
 
 .reportSecondary,
 .reportPrimary {
-  min-width: 110px;
+  min-width: 96px;
   padding: 10px 14px;
   border-radius: 10px;
   font-weight: 700;
@@ -922,6 +1038,17 @@
   opacity: 0.7;
   cursor: not-allowed;
   transform: none;
+}
+
+.blockDanger {
+  background: transparent;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.blockDanger:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
 }
 
 @keyframes overlayFadeIn {

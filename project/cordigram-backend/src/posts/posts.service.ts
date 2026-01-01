@@ -9,6 +9,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateReelDto } from './dto/create-reel.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
 import { Post, PostStatus, PostStats } from './post.schema';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { ConfigService } from '../config/config.service';
@@ -128,6 +129,78 @@ export class PostsService {
     }
 
     return this.toResponse(doc);
+  }
+
+  async update(authorId: string, postId: string, dto: UpdatePostDto) {
+    if (!dto || Object.keys(dto).length === 0) {
+      throw new BadRequestException('No fields to update');
+    }
+
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      authorId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (!post.authorId || !post.authorId.equals(userObjectId)) {
+      throw new ForbiddenException('Only the author can edit this post');
+    }
+
+    const update: Record<string, unknown> = {};
+
+    if (dto.content !== undefined) {
+      update.content = dto.content ?? '';
+    }
+    if (dto.hashtags !== undefined) {
+      update.hashtags = this.normalizeHashtags(dto.hashtags ?? []);
+    }
+    if (dto.mentions !== undefined) {
+      update.mentions = this.normalizeMentions(dto.mentions ?? []);
+    }
+    if (dto.topics !== undefined) {
+      update.topics = this.normalizeTopics(dto.topics ?? []);
+    }
+    if (dto.location !== undefined) {
+      update.location = dto.location?.trim() || null;
+    }
+    if (dto.visibility !== undefined) {
+      update.visibility = dto.visibility;
+    }
+    if (typeof dto.allowComments === 'boolean') {
+      update.allowComments = dto.allowComments;
+    }
+    if (typeof dto.allowDownload === 'boolean') {
+      update.allowDownload = dto.allowDownload;
+    }
+    if (typeof dto.hideLikeCount === 'boolean') {
+      update.hideLikeCount = dto.hideLikeCount;
+    }
+
+    if (!Object.keys(update).length) {
+      throw new BadRequestException('No changes provided');
+    }
+
+    await this.postModel
+      .updateOne({ _id: postObjectId }, { $set: update })
+      .exec();
+
+    const fresh = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .lean();
+
+    if (!fresh) {
+      throw new NotFoundException('Post not found after update');
+    }
+
+    return this.toResponse(this.postModel.hydrate(fresh) as Post);
   }
 
   async createReel(authorId: string, dto: CreateReelDto) {
@@ -465,11 +538,37 @@ export class PostsService {
       seen.add(id);
     }
 
-    const topPosts = merged
+    const mergedIds = merged
+      .map((p) => p._id?.toString?.())
+      .filter((id): id is string => Boolean(id));
+
+    const viewed = await this.postInteractionModel
+      .find({
+        userId: userObjectId,
+        postId: { $in: mergedIds.map((id) => new Types.ObjectId(id)) },
+        type: 'view',
+      })
+      .select('postId')
+      .lean();
+
+    const viewedIds = new Set(
+      viewed.map((v) => v.postId?.toString?.()).filter(Boolean),
+    );
+
+    const scored = merged
       .map((post) => ({ post, score: this.scorePost(post, followeeSet, now) }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, safeLimit)
-      .map((item) => item.post);
+      .sort((a, b) => b.score - a.score);
+
+    const prioritized = [
+      ...scored.filter((item) =>
+        item.post._id ? !viewedIds.has(item.post._id.toString()) : true,
+      ),
+      ...scored.filter((item) =>
+        item.post._id ? viewedIds.has(item.post._id.toString()) : false,
+      ),
+    ];
+
+    const topPosts = prioritized.slice(0, safeLimit).map((item) => item.post);
 
     const authorIds = Array.from(
       new Set(
@@ -796,6 +895,40 @@ export class PostsService {
       .exec();
 
     return { hideLikeCount: hide };
+  }
+
+  async setVisibility(
+    userId: string,
+    postId: string,
+    visibility: 'public' | 'followers' | 'private',
+  ) {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId visibility')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (!post.authorId || !post.authorId.equals(userObjectId)) {
+      throw new ForbiddenException('Only the author can change visibility');
+    }
+
+    if (post.visibility === visibility) {
+      return { visibility, unchanged: true };
+    }
+
+    await this.postModel
+      .updateOne({ _id: postObjectId }, { $set: { visibility } })
+      .exec();
+
+    return { visibility, updated: true };
   }
 
   private async assertPostAccessible(

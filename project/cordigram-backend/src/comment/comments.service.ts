@@ -13,6 +13,8 @@ import { Post } from 'src/posts/post.schema';
 import { CreateCommentDto } from '../comment/dto/create-comment.dto';
 import { BlocksService } from '../users/blocks.service';
 import { Profile } from '../profiles/profile.schema';
+import { DeleteCommentDto } from './dto/delete-comment.dto';
+import { UpdateCommentDto } from './dto/update-comment.dto';
 
 @Injectable()
 export class CommentsService {
@@ -119,6 +121,14 @@ export class CommentsService {
 
     await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
 
+    const { blockedIds, blockedByIds } =
+      await this.blocksService.getBlockLists(userObjectId);
+    const excludedAuthorIds = Array.from(
+      new Set<string>([...blockedIds, ...blockedByIds]),
+    )
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
     const rawPage = Number(options?.page);
     const page =
       Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
@@ -133,6 +143,10 @@ export class CommentsService {
       postId: postObjectId,
       deletedAt: null,
     };
+
+    if (excludedAuthorIds.length) {
+      query.authorId = { $nin: excludedAuthorIds };
+    }
 
     if (options?.parentId) {
       const parentObjectId = this.asObjectId(options.parentId, 'parentId');
@@ -166,7 +180,15 @@ export class CommentsService {
             _id: Types.ObjectId;
             count: number;
           }>([
-            { $match: { parentId: { $in: parentIds }, deletedAt: null } },
+            {
+              $match: {
+                parentId: { $in: parentIds },
+                deletedAt: null,
+                ...(excludedAuthorIds.length
+                  ? { authorId: { $nin: excludedAuthorIds } }
+                  : {}),
+              },
+            },
             { $group: { _id: '$parentId', count: { $sum: 1 } } },
           ])
           .exec();
@@ -237,6 +259,103 @@ export class CommentsService {
     };
   }
 
+  async deleteComment(
+    userId: string,
+    postId: string,
+    commentId: string,
+    _dto?: DeleteCommentDto,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    const userObjectId = this.asObjectId(userId, 'userId');
+    const postObjectId = this.asObjectId(postId, 'postId');
+    const commentObjectId = this.asObjectId(commentId, 'commentId');
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    const comment = await this.commentModel
+      .findOne({ _id: commentObjectId, postId: postObjectId, deletedAt: null })
+      .select('_id authorId')
+      .lean();
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    const isPostOwner = Boolean(
+      post.authorId && post.authorId.equals(userObjectId),
+    );
+    const isCommentOwner = Boolean(
+      comment.authorId && comment.authorId.equals(userObjectId),
+    );
+
+    if (!isPostOwner && !isCommentOwner) {
+      throw new ForbiddenException('Not allowed to delete this comment');
+    }
+
+    // Gather the subtree rooted at the target comment (target + all descendants).
+    const idsToDelete: Types.ObjectId[] = [commentObjectId];
+    const visited = new Set<string>([commentObjectId.toString()]);
+
+    // BFS to collect all descendants by parentId.
+    let frontier = [commentObjectId];
+    while (frontier.length) {
+      const children = await this.commentModel
+        .find({
+          postId: postObjectId,
+          deletedAt: null,
+          parentId: { $in: frontier },
+        })
+        .select('_id')
+        .lean();
+
+      const nextFrontier: Types.ObjectId[] = [];
+      for (const child of children) {
+        const cid = (child as { _id?: Types.ObjectId })._id;
+        if (!cid) continue;
+        const key = cid.toString();
+        if (visited.has(key)) continue;
+        visited.add(key);
+        idsToDelete.push(cid);
+        nextFrontier.push(cid);
+      }
+      frontier = nextFrontier;
+    }
+
+    const now = new Date();
+    const deleteResult = await this.commentModel
+      .updateMany(
+        { _id: { $in: idsToDelete }, deletedAt: null },
+        { $set: { deletedAt: now } },
+      )
+      .exec();
+
+    const deletedCount = deleteResult.modifiedCount ?? 0;
+
+    if (deletedCount > 0) {
+      await this.postModel
+        .updateOne(
+          { _id: postObjectId },
+          { $inc: { 'stats.comments': -deletedCount } },
+        )
+        .exec();
+      await this.commentLikeModel
+        .deleteMany({ commentId: { $in: idsToDelete } })
+        .exec();
+    }
+
+    return { deleted: true, count: deletedCount };
+  }
+
   async likeComment(userId: string, postId: string, commentId: string) {
     const userObjectId = this.asObjectId(userId, 'userId');
     const postObjectId = this.asObjectId(postId, 'postId');
@@ -301,6 +420,65 @@ export class CommentsService {
       commentId: commentObjectId,
     });
     return { liked: false, likesCount };
+  }
+
+  async updateComment(
+    userId: string,
+    postId: string,
+    commentId: string,
+    dto: UpdateCommentDto,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    const userObjectId = this.asObjectId(userId, 'userId');
+    const postObjectId = this.asObjectId(postId, 'postId');
+    const commentObjectId = this.asObjectId(commentId, 'commentId');
+
+    const comment = await this.commentModel
+      .findOne({ _id: commentObjectId, postId: postObjectId, deletedAt: null })
+      .select('_id authorId content createdAt updatedAt parentId rootCommentId')
+      .lean();
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    if (!comment.authorId || !comment.authorId.equals(userObjectId)) {
+      throw new ForbiddenException('Not allowed to edit this comment');
+    }
+
+    const content = dto.content?.trim?.();
+    if (!content) {
+      throw new BadRequestException('Comment content is required');
+    }
+
+    await this.commentModel
+      .updateOne(
+        { _id: commentObjectId },
+        { $set: { content, updatedAt: new Date() } },
+      )
+      .exec();
+
+    const profile = await this.profileModel
+      .findOne({ userId: userObjectId })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    return this.toResponse(
+      {
+        ...comment,
+        content,
+        updatedAt: new Date(),
+      },
+      profile || null,
+      {
+        repliesCount: 0,
+        likesCount: 0,
+        liked: false,
+      },
+    );
   }
 
   private toResponse(

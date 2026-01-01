@@ -13,6 +13,7 @@ import { PostsModule } from './posts/posts.module';
 import { ReportProblemModule } from './reportproblem/reportproblem.module';
 import { CommentsModule } from './comment/comments.module';
 import { ReportPostModule } from './reportpost/reportpost.module';
+import { ReportCommentModule } from './reportcomment/reportcomment.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ReportPostModule } from './reportpost/reportpost.module';
     CommentsModule,
     ReportProblemModule,
     ReportPostModule,
+    ReportCommentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

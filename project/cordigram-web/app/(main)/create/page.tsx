@@ -169,7 +169,7 @@ export default function CreatePostPage() {
   }, [mediaItems]);
 
   const canAddMore = useMemo(
-    () => (mode === "post" ? mediaItems.length < MAX_MEDIA_ITEMS : true),
+    () => (mode === "post" ? mediaItems.length < MAX_MEDIA_ITEMS : false),
     [mode, mediaItems.length]
   );
 
@@ -1147,20 +1147,32 @@ export default function CreatePostPage() {
 
             <div className={styles.mediaFrame}>
               {mediaItems.length ? (
-                <div className={styles.previewGrid}>
+                <div
+                  className={
+                    mode === "reel"
+                      ? styles.reelPreviewGrid
+                      : styles.previewGrid
+                  }
+                >
                   {mediaItems.map((item, index) => (
                     <div
                       key={`${item.file.name}-${index}`}
-                      className={styles.previewTile}
+                      className={`${styles.previewTile} ${
+                        mode === "reel" ? styles.reelTile : ""
+                      }`}
                     >
-                      <div className={styles.previewBadges}>
-                        <span className={styles.previewBadge}>{item.kind}</span>
-                        {item.kind === "video" && item.duration !== null ? (
-                          <span className={styles.previewBadgeMuted}>
-                            {item.duration.toFixed(1)}s
+                      {mode === "post" ? (
+                        <div className={styles.previewBadges}>
+                          <span className={styles.previewBadge}>
+                            {item.kind}
                           </span>
-                        ) : null}
-                      </div>
+                          {item.kind === "video" && item.duration !== null ? (
+                            <span className={styles.previewBadgeMuted}>
+                              {item.duration.toFixed(1)}s
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
                       <button
                         type="button"
                         className={styles.previewRemove}
@@ -1175,19 +1187,25 @@ export default function CreatePostPage() {
                           controls
                           controlsList="nodownload noremoteplayback"
                           onContextMenu={(e) => e.preventDefault()}
-                          className={styles.media}
+                          className={`${styles.media} ${
+                            mode === "reel" ? styles.reelMedia : ""
+                          }`}
                         />
                       ) : (
                         <img
                           src={item.previewUrl}
                           alt="Preview"
-                          className={styles.media}
+                          className={`${styles.media} ${
+                            mode === "reel" ? styles.reelMedia : ""
+                          }`}
                         />
                       )}
-                      <p className={styles.previewMeta}>
-                        {item.file.name} ·{" "}
-                        {(item.file.size / 1024 / 1024).toFixed(1)} MB
-                      </p>
+                      {mode === "post" ? (
+                        <p className={styles.previewMeta}>
+                          {item.file.name} ·{" "}
+                          {(item.file.size / 1024 / 1024).toFixed(1)} MB
+                        </p>
+                      ) : null}
                     </div>
                   ))}
                   {canAddMore ? (

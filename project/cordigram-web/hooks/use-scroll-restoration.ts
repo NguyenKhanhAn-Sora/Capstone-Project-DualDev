@@ -14,7 +14,6 @@ export function useScrollRestoration(
   const [target, setTarget] = useState<ScrollTarget | null>(null);
   const lastSavedRef = useRef<number | null>(null);
 
-  // Resolve target after mount; retry via rAF until found to avoid null on first render
   useEffect(() => {
     if (typeof window === "undefined") return;
     let raf = 0;
@@ -79,9 +78,7 @@ export function useScrollRestoration(
           }
           lastSavedRef.current = current;
           sessionStorage.setItem(key, String(current));
-        } catch {
-          // ignore persistence failures
-        }
+        } catch {}
       });
     };
 

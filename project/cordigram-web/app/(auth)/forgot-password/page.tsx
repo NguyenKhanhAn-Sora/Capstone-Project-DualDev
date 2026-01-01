@@ -15,6 +15,24 @@ import { setStoredAccessToken } from "@/lib/auth";
 const RECENT_ACCOUNTS_KEY = "recentAccounts";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const EyeIcon = ({ open }: { open: boolean }) => (
+  <svg
+    aria-hidden
+    width={20}
+    height={20}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.8}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M2 12s4.5-7 10-7 10 7 10 7-4.5 7-10 7S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3.5" />
+    {!open && <line x1="4" y1="4" x2="20" y2="20" />}
+  </svg>
+);
+
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [step, setStep] = useState<"email" | "otp" | "reset">("email");
@@ -22,6 +40,8 @@ export default function ForgotPasswordPage() {
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -225,22 +245,46 @@ export default function ForgotPasswordPage() {
               onSubmit={handleResetPassword}
               className={styles["overlay-form"]}
             >
-              <input
-                className={styles["overlay-input"]}
-                type="password"
-                placeholder="New password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                autoComplete="new-password"
-              />
-              <input
-                className={styles["overlay-input"]}
-                type="password"
-                placeholder="Confirm new password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                autoComplete="new-password"
-              />
+              <div className={styles.passwordField}>
+                <input
+                  className={`${styles["overlay-input"]} ${styles.passwordInput}`}
+                  type={showNewPassword ? "text" : "password"}
+                  placeholder="New password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  className={styles.passwordToggle}
+                  onClick={() => setShowNewPassword((prev) => !prev)}
+                  aria-label={
+                    showNewPassword ? "Hide password" : "Show password"
+                  }
+                >
+                  <EyeIcon open={showNewPassword} />
+                </button>
+              </div>
+              <div className={styles.passwordField}>
+                <input
+                  className={`${styles["overlay-input"]} ${styles.passwordInput}`}
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirm new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  className={styles.passwordToggle}
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  aria-label={
+                    showConfirmPassword ? "Hide password" : "Show password"
+                  }
+                >
+                  <EyeIcon open={showConfirmPassword} />
+                </button>
+              </div>
               {error && <p className={styles["overlay-error"]}>{error}</p>}
               {message && <p className={styles["overlay-sub"]}>{message}</p>}
               <button

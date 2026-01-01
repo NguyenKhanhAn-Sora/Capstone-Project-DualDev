@@ -75,6 +75,18 @@ export type CreatePostRequest = {
   scheduledAt?: string;
 };
 
+export type UpdatePostRequest = {
+  content?: string;
+  hashtags?: string[];
+  mentions?: string[];
+  topics?: string[];
+  location?: string;
+  visibility?: "public" | "followers" | "private";
+  allowComments?: boolean;
+  allowDownload?: boolean;
+  hideLikeCount?: boolean;
+};
+
 export type CreatePostResponse = {
   kind: "post" | "reel";
   id: string;
@@ -157,6 +169,28 @@ export type FeedItem = CreatePostResponse & {
   };
 };
 
+export type UpdateVisibilityResponse = {
+  visibility: "public" | "followers" | "private";
+  updated?: boolean;
+  unchanged?: boolean;
+};
+
+export async function updatePostVisibility(opts: {
+  token: string;
+  postId: string;
+  visibility: "public" | "followers" | "private";
+}): Promise<UpdateVisibilityResponse> {
+  const { token, postId, visibility } = opts;
+  return apiFetch<UpdateVisibilityResponse>({
+    path: `/posts/${postId}/visibility`,
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ visibility }),
+  });
+}
+
 export type CommentItem = {
   id: string;
   postId: string;
@@ -184,6 +218,13 @@ export type CommentListResponse = {
   items: CommentItem[];
 };
 
+export type DeleteCommentResponse = {
+  deleted: boolean;
+  count?: number;
+};
+
+export type UpdateCommentResponse = CommentItem;
+
 export async function createPost(opts: {
   token: string;
   payload: CreatePostRequest;
@@ -192,6 +233,22 @@ export async function createPost(opts: {
   return apiFetch<CreatePostResponse>({
     path: "/posts",
     method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updatePost(opts: {
+  token: string;
+  postId: string;
+  payload: UpdatePostRequest;
+}): Promise<FeedItem> {
+  const { token, postId, payload } = opts;
+  return apiFetch<FeedItem>({
+    path: `/posts/${postId}`,
+    method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -283,6 +340,38 @@ export async function createComment(opts: {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(parentId ? { content, parentId } : { content }),
+  });
+}
+
+export async function deleteComment(opts: {
+  token: string;
+  postId: string;
+  commentId: string;
+}): Promise<DeleteCommentResponse> {
+  const { token, postId, commentId } = opts;
+  return apiFetch<DeleteCommentResponse>({
+    path: `/posts/${postId}/comments/${commentId}`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function updateComment(opts: {
+  token: string;
+  postId: string;
+  commentId: string;
+  content: string;
+}): Promise<UpdateCommentResponse> {
+  const { token, postId, commentId, content } = opts;
+  return apiFetch<UpdateCommentResponse>({
+    path: `/posts/${postId}/comments/${commentId}`,
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ content }),
   });
 }
 
@@ -427,6 +516,33 @@ export async function reportPost(opts: {
   });
 }
 
+export async function reportComment(opts: {
+  token: string;
+  commentId: string;
+  category:
+    | "abuse"
+    | "violence"
+    | "sensitive"
+    | "misinfo"
+    | "spam"
+    | "ip"
+    | "illegal"
+    | "privacy"
+    | "other";
+  reason: string;
+  note?: string;
+}): Promise<{ reported: boolean }> {
+  const { token, commentId, category, reason, note } = opts;
+  return apiFetch<{ reported: boolean }>({
+    path: `/report-comments/${commentId}`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ category, reason, note }),
+  });
+}
+
 export async function viewPost(opts: {
   token: string;
   postId: string;
@@ -534,6 +650,7 @@ export async function unfollowUser(opts: {
 }
 
 export type CurrentProfileResponse = {
+  userId?: string;
   id: string;
   displayName: string;
   username: string;

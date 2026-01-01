@@ -13,6 +13,24 @@ type Step = "email" | "otp" | "profile" | "avatar";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const EyeIcon = ({ open }: { open: boolean }) => (
+  <svg
+    aria-hidden
+    width={20}
+    height={20}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.8}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M2 12s4.5-7 10-7 10 7 10 7-4.5 7-10 7S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3.5" />
+    {!open && <line x1="4" y1="4" x2="20" y2="20" />}
+  </svg>
+);
+
 type AvatarUploadResponse = {
   avatarUrl: string;
   avatarOriginalUrl: string;
@@ -158,7 +176,9 @@ export default function SignupPage() {
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [birthdate, setBirthdate] = useState("");
   const [bio, setBio] = useState("");
 
@@ -716,26 +736,48 @@ export default function SignupPage() {
       <div className={styles.gridTwoCols}>
         <div className="space-y-[6px]">
           <label className={styles.label}>Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={styles.input}
-            placeholder="At least 8 characters"
-          />
+          <div className={styles.passwordField}>
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={`${styles.input} ${styles.passwordInput}`}
+              placeholder="At least 8 characters"
+            />
+            <button
+              type="button"
+              className={styles.passwordToggle}
+              onClick={() => setShowPassword((prev) => !prev)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              <EyeIcon open={showPassword} />
+            </button>
+          </div>
           {fieldError.password && (
             <p className={styles.fieldError}>{fieldError.password}</p>
           )}
         </div>
         <div className="space-y-[6px]">
           <label className={styles.label}>Confirm password</label>
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className={styles.input}
-            placeholder="Re-enter to confirm"
-          />
+          <div className={styles.passwordField}>
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className={`${styles.input} ${styles.passwordInput}`}
+              placeholder="Re-enter to confirm"
+            />
+            <button
+              type="button"
+              className={styles.passwordToggle}
+              onClick={() => setShowConfirmPassword((prev) => !prev)}
+              aria-label={
+                showConfirmPassword ? "Hide password" : "Show password"
+              }
+            >
+              <EyeIcon open={showConfirmPassword} />
+            </button>
+          </div>
         </div>
       </div>
 

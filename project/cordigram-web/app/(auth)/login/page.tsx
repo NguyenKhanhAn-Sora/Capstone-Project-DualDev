@@ -35,10 +35,29 @@ type RecentAccount = {
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const EyeIcon = ({ open }: { open: boolean }) => (
+  <svg
+    aria-hidden
+    width={20}
+    height={20}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.8}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M2 12s4.5-7 10-7 10 7 10 7-4.5 7-10 7S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3.5" />
+    {!open && <line x1="4" y1="4" x2="20" y2="20" />}
+  </svg>
+);
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -47,6 +66,7 @@ export default function LoginPage() {
     null
   );
   const [modalPassword, setModalPassword] = useState("");
+  const [showModalPassword, setShowModalPassword] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalSubmitting, setModalSubmitting] = useState(false);
   const [removingEmail, setRemovingEmail] = useState<string | null>(null);
@@ -561,15 +581,29 @@ export default function LoginPage() {
                   <label className="block text-[13px] font-semibold leading-[1.5] text-slate-700">
                     Password
                   </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                    className="h-11 w-full max-w-[360px] rounded-[10px] border border-[#d7e5f2] bg-white px-3 text-[14px] font-medium text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:outline-none focus-visible:border-[#559AC2] focus-visible:ring-4 focus-visible:ring-[#9AACEF]/45"
-                  />
+                  <div
+                    className={`${styles.passwordField} w-full max-w-[360px]`}
+                  >
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      autoComplete="current-password"
+                      className={`h-11 w-full max-w-[360px] rounded-[10px] border border-[#d7e5f2] bg-white pl-3 pr-11 text-[14px] font-medium text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:outline-none focus-visible:border-[#559AC2] focus-visible:ring-4 focus-visible:ring-[#9AACEF]/45 ${styles.passwordInput}`}
+                    />
+                    <button
+                      type="button"
+                      className={styles.passwordToggle}
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                    >
+                      <EyeIcon open={showPassword} />
+                    </button>
+                  </div>
                   {error ? (
                     <p
                       className="text-[12px] font-medium text-red-600"
@@ -701,15 +735,27 @@ export default function LoginPage() {
               className={styles["overlay-form"]}
               onSubmit={handleModalSubmit}
             >
-              <input
-                type="password"
-                autoFocus
-                placeholder="Enter your password"
-                value={modalPassword}
-                onChange={(e) => setModalPassword(e.target.value)}
-                className={styles["overlay-input"]}
-                autoComplete="current-password"
-              />
+              <div className={styles.passwordField}>
+                <input
+                  type={showModalPassword ? "text" : "password"}
+                  autoFocus
+                  placeholder="Enter your password"
+                  value={modalPassword}
+                  onChange={(e) => setModalPassword(e.target.value)}
+                  className={`${styles["overlay-input"]} ${styles.passwordInput}`}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  className={styles.passwordToggle}
+                  onClick={() => setShowModalPassword((prev) => !prev)}
+                  aria-label={
+                    showModalPassword ? "Hide password" : "Show password"
+                  }
+                >
+                  <EyeIcon open={showModalPassword} />
+                </button>
+              </div>
               {modalError ? (
                 <p className={styles["overlay-error"]}>{modalError}</p>
               ) : null}

@@ -216,25 +216,21 @@
 
 .closeButton {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: 10px;
+  right: 10px;
   width: 36px;
   height: 36px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-surface);
   color: var(--color-text);
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 400;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.2s ease;
+  font-size: 28px !important;
 }
 
 .closeButton:hover {
-  background: #f1f5f9;
   transform: translateY(-1px);
 }
-
 
 .switchHeader {
   padding: 28px 28px 12px;
@@ -294,6 +290,35 @@
   background: var(--color-surface);
   box-shadow: 0 6px 14px rgba(15, 22, 41, 0.04);
   transition: border 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+}
+
+.passwordField {
+  position: relative;
+  width: 100%;
+}
+
+.passwordInput {
+  padding-right: 44px;
+}
+
+.passwordToggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+}
+
+.passwordToggle:hover {
+  color: var(--color-text);
 }
 
 .switchInput:focus {
