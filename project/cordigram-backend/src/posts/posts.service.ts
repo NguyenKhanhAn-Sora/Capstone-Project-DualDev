@@ -10,7 +10,7 @@ import { Model, Types } from 'mongoose';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateReelDto } from './dto/create-reel.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
-import { Post, PostStatus, PostStats } from './post.schema';
+import { Post, PostKind, PostStatus, PostStats } from './post.schema';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { ConfigService } from '../config/config.service';
 import { PostInteraction, InteractionType } from './post-interaction.schema';
@@ -325,6 +325,7 @@ export class PostsService {
       liked?: boolean;
       saved?: boolean;
       following?: boolean;
+      reposted?: boolean;
     } | null,
   ) {
     return {
@@ -364,10 +365,12 @@ export class PostsService {
       liked: userFlags?.liked ?? false,
       saved: userFlags?.saved ?? false,
       following: userFlags?.following ?? false,
+      reposted: userFlags?.reposted ?? false,
       flags: {
         liked: userFlags?.liked ?? false,
         saved: userFlags?.saved ?? false,
         following: userFlags?.following ?? false,
+        reposted: userFlags?.reposted ?? false,
       },
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
@@ -464,10 +467,16 @@ export class PostsService {
     };
   }
 
-  async getFeed(userId: string, limit = 20) {
+  async getFeed(
+    userId: string,
+    limit = 20,
+    kinds: PostKind[] = ['post', 'reel'],
+  ) {
     if (!userId) {
       throw new UnauthorizedException('Unauthorized');
     }
+
+    const allowedKinds = kinds.length ? kinds : ['post', 'reel'];
 
     const safeLimit = Math.min(Math.max(limit, 1), 50);
     const userObjectId = this.asObjectId(userId, 'userId');
@@ -502,6 +511,7 @@ export class PostsService {
     const followCandidates = await this.postModel
       .find({
         authorId: { $in: followeeObjectIds, $nin: excludedAuthorIds },
+        kind: { $in: allowedKinds },
         status: 'published',
         visibility: { $ne: 'private' },
         deletedAt: null,
@@ -515,6 +525,7 @@ export class PostsService {
     const exploreCandidates = await this.postModel
       .find({
         authorId: { $nin: [...followeeObjectIds, ...excludedAuthorIds] },
+        kind: { $in: allowedKinds },
         status: 'published',
         visibility: 'public',
         deletedAt: null,
@@ -587,13 +598,17 @@ export class PostsService {
 
     const postIds = topPosts.map((p) => p._id);
     const interactions = await this.postInteractionModel
-      .find({ userId: userObjectId, postId: { $in: postIds } })
+      .find({
+        userId: userObjectId,
+        postId: { $in: postIds },
+        type: { $in: ['like', 'save', 'repost'] },
+      })
       .select('postId type')
       .lean();
 
     const interactionMap = new Map<
       string,
-      { liked?: boolean; saved?: boolean }
+      { liked?: boolean; saved?: boolean; reposted?: boolean }
     >();
 
     interactions.forEach((item) => {
@@ -602,6 +617,7 @@ export class PostsService {
       const current = interactionMap.get(key) || {};
       if (item.type === 'like') current.liked = true;
       if (item.type === 'save') current.saved = true;
+      if (item.type === 'repost') current.reposted = true;
       interactionMap.set(key, current);
     });
 
@@ -615,7 +631,15 @@ export class PostsService {
     });
   }
 
-  async getById(userId: string, postId: string) {
+  async getReelsFeed(userId: string, limit = 20) {
+    return this.getFeed(userId, limit, ['reel']);
+  }
+
+  async getById(
+    userId: string,
+    postId: string,
+    opts?: { allowedKinds?: PostKind[] },
+  ) {
     const { userObjectId, postObjectId } = await this.resolveIds(
       userId,
       postId,
@@ -626,6 +650,14 @@ export class PostsService {
       .lean();
 
     if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (
+      opts?.allowedKinds &&
+      opts.allowedKinds.length &&
+      !opts.allowedKinds.includes(post.kind)
+    ) {
       throw new NotFoundException('Post not found');
     }
 
@@ -650,7 +682,7 @@ export class PostsService {
       .find({
         userId: userObjectId,
         postId: postObjectId,
-        type: { $in: ['like', 'save'] },
+        type: { $in: ['like', 'save', 'repost'] },
       })
       .select('type')
       .lean();
@@ -659,9 +691,11 @@ export class PostsService {
       liked?: boolean;
       saved?: boolean;
       following?: boolean;
+      reposted?: boolean;
     }>((acc, item) => {
       if (item.type === 'like') acc.liked = true;
       if (item.type === 'save') acc.saved = true;
+      if (item.type === 'repost') acc.reposted = true;
       return acc;
     }, {});
 
@@ -678,6 +712,10 @@ export class PostsService {
       profile || null,
       flags,
     );
+  }
+
+  async getReelById(userId: string, postId: string) {
+    return this.getById(userId, postId, { allowedKinds: ['reel'] });
   }
 
   async like(userId: string, postId: string) {
@@ -773,6 +811,48 @@ export class PostsService {
       await this.bumpCounters(postObjectId, { 'stats.shares': 1 });
     }
     return { shared: true };
+  }
+
+  async repost(userId: string, postId: string) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
+    const inserted = await this.upsertUniqueInteraction(
+      userObjectId,
+      postObjectId,
+      'repost',
+      true,
+    );
+
+    if (inserted) {
+      await this.bumpCounters(postObjectId, { 'stats.reposts': 1 });
+    }
+
+    return { reposted: true, created: inserted };
+  }
+
+  async unrepost(userId: string, postId: string) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
+    const removed = await this.removeUniqueInteraction(
+      userObjectId,
+      postObjectId,
+      'repost',
+      true,
+    );
+
+    if (removed) {
+      await this.bumpCounters(postObjectId, { 'stats.reposts': -1 });
+    }
+
+    return { reposted: !removed };
   }
 
   async hide(userId: string, postId: string) {

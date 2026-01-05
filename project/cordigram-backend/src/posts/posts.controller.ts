@@ -243,6 +243,24 @@ export class PostsController {
     return this.postsService.share(user.userId, postId);
   }
 
+  @Post(':id/repost')
+  async repost(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.repost(user.userId, postId);
+  }
+
+  @Delete(':id/repost')
+  async unrepost(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.unrepost(user.userId, postId);
+  }
+
   @Post(':id/hide')
   async hide(@Req() req: Request, @Param('id') postId: string) {
     const user = req.user as AuthenticatedUser | undefined;

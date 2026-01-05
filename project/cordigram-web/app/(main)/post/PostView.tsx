@@ -171,6 +171,9 @@ const REPORT_GROUPS: ReportCategory[] = [
   },
 ];
 
+const COMMENT_POLL_INTERVAL = 4000;
+const COMMENT_PAGE_SIZE = 20;
+
 const normalizeHashtag = (value: string) =>
   value
     .replace(/^#/, "")
@@ -1250,7 +1253,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           token,
           postId,
           page: nextPage,
-          limit: 20,
+          limit: COMMENT_PAGE_SIZE,
         });
         applyCommentPage(res, nextPage > 1);
       } catch (err: any) {
@@ -1266,6 +1269,170 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     if (!token) return;
     loadComments(1);
   }, [token, loadComments]);
+
+  const mergeLatestComments = useCallback((latest: CommentItem[]) => {
+    setComments((prev) => {
+      const normalize = (items: CommentItem[]) =>
+        items.map((c) => ({ ...c, id: ensureId(c) }));
+
+      const latestNormalized = normalize(latest);
+      const latestIds = new Set(latestNormalized.map((c) => c.id));
+      const prevNormalized = normalize(prev);
+      // Remove top-level comments that disappeared from latest (deleted/hidden)
+      const withoutMissingTopLevel = prevNormalized.filter(
+        (c) => c.parentId || latestIds.has(c.id)
+      );
+      const withoutLatest = withoutMissingTopLevel.filter(
+        (c) => !latestIds.has(c.id)
+      );
+      const next = [...latestNormalized, ...withoutLatest];
+
+      const unchanged =
+        next.length === prevNormalized.length &&
+        next.every((item, idx) => item.id === prevNormalized[idx]?.id);
+
+      return unchanged ? prev : next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    let inFlight = false;
+
+    const refreshRepliesIfNeeded = async (latestRoots: CommentItem[]) => {
+      // Index all known comments (roots + loaded replies) so we can read reply counts for any level
+      const index = new Map<string, CommentItem>();
+      const addToIndex = (item: CommentItem) => {
+        const id = ensureId(item);
+        index.set(id, { ...item, id });
+      };
+      latestRoots.forEach(addToIndex);
+      Object.values(replyState).forEach((state) => {
+        state.items.forEach(addToIndex);
+      });
+
+      // Build candidate parents: all roots, all existing reply threads, and any comment with repliesCount > 0
+      const candidateMap = new Map<string, ReplyState>();
+
+      const ensureCandidate = (id: string, state?: ReplyState) => {
+        if (candidateMap.has(id)) return;
+        candidateMap.set(
+          id,
+          state ?? {
+            items: [],
+            page: 0,
+            hasMore: true,
+            loading: false,
+            expanded: true,
+          }
+        );
+      };
+
+      latestRoots.forEach((root) => {
+        const id = ensureId(root);
+        ensureCandidate(id, replyState[id]);
+      });
+
+      Object.entries(replyState).forEach(([parentId, state]) => {
+        ensureCandidate(parentId, state);
+      });
+
+      // Any known comment (from roots or loaded replies) that advertises repliesCount > 0 becomes a candidate
+      index.forEach((comment) => {
+        const id = ensureId(comment);
+        if (
+          typeof comment.repliesCount === "number" &&
+          comment.repliesCount > 0
+        ) {
+          ensureCandidate(id, replyState[id]);
+        }
+      });
+
+      const targets = Array.from(candidateMap.entries())
+        .map(([parentId, state]) => ({ parentId, state }))
+        .filter(({ parentId, state }) => {
+          if (!state.expanded) return false;
+          const parent = index.get(parentId);
+          const replyCount = parent?.repliesCount;
+          const loaded = state.items.length;
+          const hasCount = typeof replyCount === "number";
+          return (
+            (hasCount ? replyCount !== loaded : true) ||
+            state.hasMore ||
+            (hasCount ? replyCount > 0 && !loaded : loaded === 0)
+          );
+        });
+
+      if (!targets.length) return;
+
+      await Promise.all(
+        targets.map(async ({ parentId, state }) => {
+          try {
+            const res = await fetchComments({
+              token,
+              postId,
+              page: 1,
+              limit: 10,
+              parentId,
+            });
+
+            setReplyState((prev) => ({
+              ...prev,
+              [parentId]: {
+                ...(prev[parentId] ?? state),
+                items: res.items,
+                page: res.page,
+                hasMore: res.hasMore,
+                loading: false,
+                expanded: true,
+              },
+            }));
+          } catch {
+            /* ignore per-thread errors */
+          }
+        })
+      );
+    };
+
+    const tick = async () => {
+      if (cancelled || inFlight) return;
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState !== "visible"
+      ) {
+        return;
+      }
+
+      inFlight = true;
+      try {
+        const res = await fetchComments({
+          token,
+          postId,
+          page: 1,
+          limit: COMMENT_PAGE_SIZE,
+        });
+
+        if (!cancelled && res?.items) {
+          mergeLatestComments(res.items);
+          void refreshRepliesIfNeeded(res.items);
+          setHasMoreComments(res.hasMore);
+        }
+      } catch {
+        /* silent: keep existing comments */
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const intervalId = setInterval(tick, COMMENT_POLL_INTERVAL);
+    void tick();
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [postId, token, mergeLatestComments, replyState]);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -1560,7 +1727,22 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           : prev
       );
     } catch (err: any) {
-      setCommentsError(err?.message || "Failed to comment");
+      const rawMsg = err?.message || "Failed to comment";
+      const friendlyMissingParent =
+        parentId &&
+        typeof rawMsg === "string" &&
+        rawMsg.toLowerCase().includes("parent") &&
+        rawMsg.toLowerCase().includes("not found");
+
+      const parentLabel = replyTarget?.username
+        ? `@${replyTarget.username}`
+        : "this user";
+
+      setCommentsError(
+        friendlyMissingParent
+          ? `Comment of ${parentLabel} not available`
+          : rawMsg
+      );
       if (parentId) {
         setReplyState((prev) => {
           const state = prev[parentId] ?? {

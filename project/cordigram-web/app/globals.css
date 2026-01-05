@@ -24,6 +24,7 @@
     radial-gradient(circle at 80% 0%, #ffffff14, transparent 32%),
     var(--color-bg);
   --color-scrollbar-thumb: #c5c5c5;
+  --color-background-stat-reel: #5757570f;
 }
 
 [data-theme="dark"] {
@@ -44,6 +45,7 @@
   --color-title-primary: #e5e7ef;
   --color-bg-home: #0c1220;
   --color-scrollbar-thumb: #293653;
+  --color-background-stat-reel: #ffffff0f;
 
 }
 

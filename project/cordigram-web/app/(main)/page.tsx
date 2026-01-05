@@ -40,6 +40,12 @@ type PostViewState = {
   flags: LocalFlags;
 };
 
+const onlyPostItems = (items: FeedItem[]): FeedItem[] =>
+  items.filter((item) => item.kind === "post");
+
+const onlyPostViews = (items: PostViewState[]): PostViewState[] =>
+  items.filter((item) => item.item?.kind === "post");
+
 type FeedRemotePatch = Partial<FeedItem> & {
   liked?: boolean;
   saved?: boolean;
@@ -463,7 +469,9 @@ export default function HomePage() {
         return false;
       }
       if (!Array.isArray(cached.items) || !cached.items.length) return false;
-      setItems(cached.items);
+      const filteredItems = onlyPostViews(cached.items || []);
+      if (!filteredItems.length) return false;
+      setItems(filteredItems);
       setPage(cached.page ?? 1);
       setHasMore(cached.hasMore ?? true);
       setInitialized(true);
@@ -503,7 +511,8 @@ export default function HomePage() {
     try {
       const limit = page * PAGE_SIZE;
       const data = await fetchFeed({ token, limit });
-      const map = new Map(data.map((item) => [item.id, item]));
+      const posts = onlyPostItems(data);
+      const map = new Map(posts.map((item) => [item.id, item]));
       setItems((prev) =>
         prev.map((p) => {
           const updated = map.get(p.item.id);
@@ -532,8 +541,9 @@ export default function HomePage() {
     try {
       const limit = nextPage * PAGE_SIZE;
       const data = await fetchFeed({ token, limit });
+      const posts = onlyPostItems(data);
       setHasMore(data.length >= limit);
-      const mapped = data.map((item) => ({
+      const mapped = posts.map((item) => ({
         item,
         flags: {
           liked: item.liked,

@@ -152,6 +152,7 @@ export type FeedItem = CreatePostResponse & {
   liked?: boolean;
   saved?: boolean;
   following?: boolean;
+  reposted?: boolean;
   authorId?: string;
   authorUsername?: string;
   authorDisplayName?: string;
@@ -166,6 +167,7 @@ export type FeedItem = CreatePostResponse & {
     liked?: boolean;
     saved?: boolean;
     following?: boolean;
+    reposted?: boolean;
   };
 };
 
@@ -288,6 +290,23 @@ export async function fetchFeed(opts: {
   });
 }
 
+export async function fetchReelsFeed(opts: {
+  token: string;
+  limit?: number;
+}): Promise<FeedItem[]> {
+  const { token, limit = 20 } = opts;
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+
+  return apiFetch<FeedItem[]>({
+    path: `/reels/feed?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function fetchPostDetail(opts: {
   token: string;
   postId: string;
@@ -295,6 +314,20 @@ export async function fetchPostDetail(opts: {
   const { token, postId } = opts;
   return apiFetch<FeedItem>({
     path: `/posts/${postId}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchReelDetail(opts: {
+  token: string;
+  reelId: string;
+}): Promise<FeedItem> {
+  const { token, reelId } = opts;
+  return apiFetch<FeedItem>({
+    path: `/reels/${reelId}`,
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -469,6 +502,34 @@ export async function sharePost(opts: {
   return apiFetch<{ shared: boolean }>({
     path: `/posts/${postId}/share`,
     method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function repostPost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ reposted: boolean; created?: boolean }> {
+  const { token, postId } = opts;
+  return apiFetch<{ reposted: boolean; created?: boolean }>({
+    path: `/posts/${postId}/repost`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function unrepostPost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ reposted: boolean }> {
+  const { token, postId } = opts;
+  return apiFetch<{ reposted: boolean }>({
+    path: `/posts/${postId}/repost`,
+    method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`,
     },
