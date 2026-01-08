@@ -1276,22 +1276,22 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         items.map((c) => ({ ...c, id: ensureId(c) }));
 
       const latestNormalized = normalize(latest);
-      const latestIds = new Set(latestNormalized.map((c) => c.id));
+      const latestMap = new Map(latestNormalized.map((c) => [c.id, c]));
       const prevNormalized = normalize(prev);
-      // Remove top-level comments that disappeared from latest (deleted/hidden)
-      const withoutMissingTopLevel = prevNormalized.filter(
-        (c) => c.parentId || latestIds.has(c.id)
-      );
-      const withoutLatest = withoutMissingTopLevel.filter(
-        (c) => !latestIds.has(c.id)
-      );
-      const next = [...latestNormalized, ...withoutLatest];
 
-      const unchanged =
-        next.length === prevNormalized.length &&
-        next.every((item, idx) => item.id === prevNormalized[idx]?.id);
+      const mergedLatest = latestNormalized.map((c) => {
+        const prevMatch = prevNormalized.find((p) => p.id === c.id);
+        return prevMatch ? { ...prevMatch, ...c } : c;
+      });
 
-      return unchanged ? prev : next;
+      const trailing = prevNormalized
+        .filter((c) => c.parentId || !latestMap.has(c.id))
+        .map((c) => {
+          const refreshed = latestMap.get(c.id);
+          return refreshed ? { ...c, ...refreshed } : c;
+        });
+
+      return [...mergedLatest, ...trailing];
     });
   }, []);
 
@@ -2241,8 +2241,14 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           },
         }));
 
-        if (nextExpanded && replies.length === 0 && !loading) {
-          loadReplies(comment.id, (replyState[comment.id]?.page ?? 0) + 1);
+        const needsRefresh =
+          replies.length === 0 ||
+          (!loading &&
+            ((typeof replyCount === "number" && replyCount > replies.length) ||
+              hasMore));
+
+        if (nextExpanded && !loading && needsRefresh) {
+          loadReplies(comment.id, 1);
         }
       };
 
@@ -2281,16 +2287,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               <div className={styles.commentAuthor}>
                 @{comment.author?.username || "User"}
               </div>
-              <div className={styles.commentMeta}>
-                {comment.createdAt
-                  ? formatDistanceToNow(new Date(comment.createdAt), {
-                      addSuffix: true,
-                    })
-                  : "just now"}
-              </div>
             </div>
             <div className={styles.commentText}>{comment.content}</div>
             <div className={styles.commentActions}>
+              <div className={styles.commentMeta}>
+                {comment.createdAt
+                  ? formatDistanceToNow(new Date(comment.createdAt), {
+                      addSuffix: false,
+                    })
+                  : "just now"}
+              </div>
               {!commentsLocked ? (
                 <button
                   className={styles.linkBtn}
@@ -2339,9 +2345,6 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     data-comment-menu="true"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className={styles.commentMenuHeader}>
-                      Comment options
-                    </div>
                     <div className={styles.commentMenuList}>
                       {isCommentOwner ? (
                         <>

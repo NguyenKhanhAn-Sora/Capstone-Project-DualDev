@@ -1,10 +1,11 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import {
   fetchReelsFeed,
+  fetchReelDetail,
   likePost,
   unlikePost,
   savePost,
@@ -27,6 +28,8 @@ const formatCount = (value?: number) => {
   if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
   return `${n}`;
 };
+
+const REEL_STATS_POLL_INTERVAL = 5000;
 
 type ReelItem = FeedItem & { durationSeconds?: number };
 
@@ -542,7 +545,12 @@ export default function ReelPage() {
   const [transition, setTransition] = useState<"next" | "prev" | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentReelId, setCommentReelId] = useState<string | null>(null);
+  const [commentsRender, setCommentsRender] = useState(false);
   const wheelLockRef = useRef(false);
+  const commentPanelRef = useRef<HTMLElement | null>(null);
+  const commentCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   useEffect(() => {
     if (!canRender) return;
@@ -593,6 +601,25 @@ export default function ReelPage() {
       )
     );
   };
+
+  const syncStats = useCallback(
+    (id: string, patch: Partial<NonNullable<FeedItem["stats"]>>) => {
+      setItems((prev) =>
+        prev.map((it) =>
+          it.id === id
+            ? {
+                ...it,
+                stats: {
+                  ...it.stats,
+                  ...patch,
+                },
+              }
+            : it
+        )
+      );
+    },
+    []
+  );
 
   const handleLike = async (id: string, liked: boolean) => {
     if (!token) return;
@@ -708,6 +735,36 @@ export default function ReelPage() {
   }, [commentReelId, items]);
 
   useEffect(() => {
+    if (commentsOpen) {
+      if (commentCloseTimerRef.current) {
+        clearTimeout(commentCloseTimerRef.current);
+        commentCloseTimerRef.current = null;
+      }
+      setCommentsRender(true);
+      return;
+    }
+
+    commentCloseTimerRef.current = setTimeout(() => {
+      setCommentsRender(false);
+      setCommentReelId(null);
+      commentCloseTimerRef.current = null;
+    }, 260);
+
+    return () => {
+      if (commentCloseTimerRef.current) {
+        clearTimeout(commentCloseTimerRef.current);
+        commentCloseTimerRef.current = null;
+      }
+    };
+  }, [commentsOpen]);
+
+  useEffect(() => {
+    const current = items[activeIndex];
+    if (!commentsOpen || !current) return;
+    setCommentReelId((prev) => (prev === current.id ? prev : current.id));
+  }, [commentsOpen, items, activeIndex]);
+
+  useEffect(() => {
     const current = items[activeIndex];
     if (!current) return;
     const target = `/reels/${current.id}`;
@@ -716,10 +773,60 @@ export default function ReelPage() {
     }
   }, [activeIndex, items, pathname, router]);
 
+  useEffect(() => {
+    if (!token) return;
+    const reelId = active?.id;
+    if (!reelId) return;
+    let cancelled = false;
+    let inFlight = false;
+
+    const tick = async () => {
+      if (cancelled || inFlight) return;
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState !== "visible"
+      ) {
+        return;
+      }
+
+      inFlight = true;
+      try {
+        const detail = await fetchReelDetail({ token, reelId });
+        if (cancelled || !detail) return;
+        setItems((prev) =>
+          prev.map((it) =>
+            it.id === detail.id
+              ? {
+                  ...it,
+                  ...detail,
+                  stats: detail.stats ?? it.stats,
+                  flags: detail.flags ?? it.flags,
+                  liked: detail.liked ?? it.liked,
+                  saved: detail.saved ?? it.saved,
+                  reposted: detail.reposted ?? it.reposted,
+                }
+              : it
+          )
+        );
+      } catch {
+        /* silent */
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const intervalId = setInterval(tick, REEL_STATS_POLL_INTERVAL);
+    void tick();
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [active?.id, token]);
+
   const toggleComments = (id: string) => {
     if (commentsOpen && commentReelId === id) {
       setCommentsOpen(false);
-      setCommentReelId(null);
       return;
     }
     setCommentsOpen(true);
@@ -752,8 +859,24 @@ export default function ReelPage() {
     }
   };
 
+  const handleCommentTotal = useCallback(
+    (reelId: string, total: number) => {
+      syncStats(reelId, { comments: total });
+    },
+    [syncStats]
+  );
+
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
+      if (
+        commentsOpen &&
+        commentPanelRef.current &&
+        (commentPanelRef.current.contains(e.target as Node) ||
+          (typeof e.composedPath === "function" &&
+            e.composedPath().includes(commentPanelRef.current)))
+      ) {
+        return;
+      }
       if (wheelLockRef.current) return;
       if (Math.abs(e.deltaY) < 24) return;
       wheelLockRef.current = true;
@@ -768,7 +891,7 @@ export default function ReelPage() {
     };
     window.addEventListener("wheel", onWheel, { passive: true });
     return () => window.removeEventListener("wheel", onWheel);
-  }, [activeIndex, items.length]);
+  }, [activeIndex, items.length, commentsOpen]);
 
   if (!canRender) return null;
 
@@ -785,8 +908,8 @@ export default function ReelPage() {
           <div className={styles.stageShell}>
             <div
               className={`${styles.stage} ${
-                commentsOpen ? styles.stageWithComments : ""
-              }`}
+                commentsRender ? styles.stageWithComments : ""
+              } ${commentsOpen ? styles.stageShifted : ""}`}
             >
               <div className={styles.videoColumn}>
                 <div
@@ -804,17 +927,17 @@ export default function ReelPage() {
                     autoplay
                     onViewed={(ms) => handleViewed(active.id, ms)}
                   />
+                  <ReelActions
+                    item={active}
+                    onLike={handleLike}
+                    onSave={handleSave}
+                    onRepost={handleRepost}
+                    onComment={toggleComments}
+                    onFollow={onFollow}
+                    viewerId={viewerId}
+                  />
                 </div>
               </div>
-              <ReelActions
-                item={active}
-                onLike={handleLike}
-                onSave={handleSave}
-                onRepost={handleRepost}
-                onComment={toggleComments}
-                onFollow={onFollow}
-                viewerId={viewerId}
-              />
               <div className={styles.navColumn}>
                 <button
                   className={styles.navBtn}
@@ -839,14 +962,18 @@ export default function ReelPage() {
                   <IconArrow />
                 </button>
               </div>
-              {commentsOpen && commentReelId ? (
+              {commentsRender && commentReelId ? (
                 <ReelComments
                   open={commentsOpen}
                   postId={commentReelId}
                   token={token}
+                  panelRef={commentPanelRef}
+                  viewerId={viewerId}
+                  postAuthorId={active.authorId}
+                  initialCount={active.stats?.comments}
+                  onTotalChange={handleCommentTotal}
                   onClose={() => {
                     setCommentsOpen(false);
-                    setCommentReelId(null);
                   }}
                 />
               ) : null}

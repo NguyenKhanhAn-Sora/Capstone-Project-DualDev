@@ -218,6 +218,7 @@ export type CommentListResponse = {
   limit: number;
   hasMore: boolean;
   items: CommentItem[];
+  total?: number;
 };
 
 export type DeleteCommentResponse = {
