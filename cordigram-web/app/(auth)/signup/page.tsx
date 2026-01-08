@@ -1,0 +1,972 @@
+"use client";
+
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import styles from "./signup.module.css";
+import Cropper, { Area } from "react-easy-crop";
+import { apiFetch, ApiError, getApiBaseUrl } from "@/lib/api";
+import { useRedirectIfAuthed } from "@/hooks/use-require-auth";
+
+type Step = "email" | "otp" | "profile" | "avatar";
+
+type AvatarUploadResponse = {
+  avatarUrl: string;
+  avatarOriginalUrl: string;
+  avatarPublicId: string;
+  avatarOriginalPublicId: string;
+};
+
+function validateBirthdate(dateStr: string): string | null {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) {
+    return "Birthdate is invalid";
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const birth = new Date(date);
+  birth.setHours(0, 0, 0, 0);
+  if (birth > today) {
+    return "Birthdate cannot be in the future";
+  }
+  const ageMs = today.getTime() - birth.getTime();
+  const ageYears = ageMs / (1000 * 60 * 60 * 24 * 365.25);
+  if (ageYears < 12) {
+    return "You must be at least 12 years old";
+  }
+  return null;
+}
+
+function decodeJwtEmail(token: string): string | null {
+  try {
+    const payload = token.split(".")[1];
+    const json = JSON.parse(
+      atob(payload.replace(/-/g, "+").replace(/_/g, "/"))
+    );
+    return typeof json?.email === "string" ? json.email : null;
+  } catch (_err) {
+    return null;
+  }
+}
+
+function validateDisplayName(name: string): string | null {
+  if (!name) return null;
+  const condensed = name.replace(/\s/g, "");
+  if (name.length < 3 || name.length > 30) {
+    return "Atleast 3 and maximum 30 character";
+  }
+  if (condensed.length < 3) {
+    return "Display name needs at least 3 letters after removing spaces";
+  }
+  if (!/^[\p{L}\s]+$/u.test(name)) {
+    return "Display name can only contain letters and spaces";
+  }
+  return null;
+}
+
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = (err) => reject(err);
+    img.src = src;
+  });
+}
+
+async function getCroppedBlob(
+  imageSrc: string,
+  croppedAreaPixels: Area
+): Promise<Blob> {
+  const image = await loadImage(imageSrc);
+  const canvas = document.createElement("canvas");
+  canvas.width = croppedAreaPixels.width;
+  canvas.height = croppedAreaPixels.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas not supported");
+  }
+
+  ctx.drawImage(
+    image,
+    croppedAreaPixels.x,
+    croppedAreaPixels.y,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+    0,
+    0,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height
+  );
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return reject(new Error("Could not create blob"));
+        resolve(blob);
+      },
+      "image/jpeg",
+      0.9
+    );
+  });
+}
+
+async function getCroppedDataUrl(
+  imageSrc: string,
+  croppedAreaPixels: Area
+): Promise<string> {
+  const image = await loadImage(imageSrc);
+  const canvas = document.createElement("canvas");
+  canvas.width = croppedAreaPixels.width;
+  canvas.height = croppedAreaPixels.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas not supported");
+  }
+
+  ctx.drawImage(
+    image,
+    croppedAreaPixels.x,
+    croppedAreaPixels.y,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+    0,
+    0,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height
+  );
+
+  return canvas.toDataURL("image/jpeg", 0.9);
+}
+
+export default function SignupPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const canRender = useRedirectIfAuthed();
+
+  const [step, setStep] = useState<Step>("email");
+  const [email, setEmail] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [signupToken, setSignupToken] = useState("");
+  const [isGoogleFlow, setIsGoogleFlow] = useState(false);
+
+  const [displayName, setDisplayName] = useState("");
+  const [username, setUsername] = useState("");
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameChecking, setUsernameChecking] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [birthdate, setBirthdate] = useState("");
+  const [bio, setBio] = useState("");
+
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarThumb, setAvatarThumb] = useState<string | null>(null);
+  const [crop, setCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [fieldError, setFieldError] = useState<{
+    email?: string;
+    password?: string;
+    birthdate?: string;
+    username?: string;
+    displayName?: string;
+  }>({});
+  const [cooldownLeft, setCooldownLeft] = useState<number | null>(null);
+
+  const handleGoogleAuth = () => {
+    window.location.href = `${getApiBaseUrl()}/auth/google`;
+  };
+
+  useEffect(() => {
+    if (cooldownLeft === null) return;
+    if (cooldownLeft <= 0) {
+      setCooldownLeft(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCooldownLeft((val) => (val !== null ? val - 1 : null));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [cooldownLeft]);
+
+  useEffect(() => {
+    if (!avatarPreview || !croppedAreaPixels) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = await getCroppedDataUrl(avatarPreview, croppedAreaPixels);
+        if (!cancelled) {
+          setAvatarThumb(url);
+        }
+      } catch (err) {
+        // ignore preview errors
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [avatarPreview, croppedAreaPixels]);
+
+  useEffect(() => {
+    const googleParam = searchParams.get("google");
+    const storedToken =
+      typeof window !== "undefined"
+        ? sessionStorage.getItem("googleSignupToken")
+        : null;
+    const storedEmail =
+      typeof window !== "undefined"
+        ? sessionStorage.getItem("googleSignupEmail")
+        : null;
+
+    if (googleParam === "1" && storedToken) {
+      setIsGoogleFlow(true);
+      setSignupToken(storedToken);
+      if (storedEmail) setEmail(storedEmail);
+      setStep("profile");
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!username) {
+      setUsernameError(null);
+      setFieldError((prev) => ({ ...prev, username: undefined }));
+      return;
+    }
+
+    const handle = setTimeout(async () => {
+      setUsernameChecking(true);
+      setUsernameError(null);
+      try {
+        const res = await apiFetch<{ available: boolean }>({
+          path: `/profiles/check-username?username=${encodeURIComponent(
+            username
+          )}`,
+          method: "GET",
+        });
+        if (!res.available) {
+          setUsernameError("Username already taken");
+          setFieldError((prev) => ({
+            ...prev,
+            username: "Username already taken",
+          }));
+        } else {
+          setUsernameError(null);
+          setFieldError((prev) => ({ ...prev, username: undefined }));
+        }
+      } catch (_err) {
+        // Nếu API lỗi, không chặn nhưng cũng không đặt available
+      } finally {
+        setUsernameChecking(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(handle);
+  }, [username]);
+
+  useEffect(() => {
+    if (!displayName) {
+      setFieldError((prev) => ({ ...prev, displayName: undefined }));
+      return;
+    }
+    const handle = setTimeout(() => {
+      const err = validateDisplayName(displayName);
+      setFieldError((prev) => ({ ...prev, displayName: err || undefined }));
+    }, 1000);
+    return () => clearTimeout(handle);
+  }, [displayName]);
+
+  const steps: Array<{ key: Step; label: string }> = useMemo(
+    () => [
+      { key: "email", label: "Enter email" },
+      { key: "otp", label: "Verify OTP" },
+      { key: "profile", label: "Profile info" },
+    ],
+    []
+  );
+
+  const visualStep = step === "avatar" ? "profile" : step;
+  const currentStepIndex = Math.max(
+    steps.findIndex((s) => s.key === visualStep),
+    0
+  );
+
+  const showError = (message: string) => {
+    setError(message);
+    setInfo("");
+    setFieldError((prev) => ({ ...prev, email: undefined }));
+  };
+
+  const showInfo = (message: string) => {
+    setInfo(message);
+    setError("");
+    setFieldError((prev) => ({ ...prev, email: undefined }));
+  };
+
+  const handleRequestOtp = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      showError("Please enter your email");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setFieldError({});
+    try {
+      await apiFetch({
+        path: "/auth/request-otp",
+        method: "POST",
+        body: JSON.stringify({ email }),
+      });
+      setCooldownLeft(null);
+      setStep("otp");
+      showInfo("OTP sent to your email");
+    } catch (err) {
+      const apiErr = err as ApiError<{ retryAfterSec?: number }>;
+      if (
+        apiErr.message?.toLowerCase().includes("email") &&
+        apiErr.message?.toLowerCase().includes("đã")
+      ) {
+        setFieldError({ email: apiErr.message });
+        setError("");
+      } else if (apiErr.data?.retryAfterSec) {
+        setCooldownLeft(apiErr.data.retryAfterSec);
+        setError("");
+        setInfo("");
+      } else {
+        showError(apiErr.message || "Could not send OTP");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!otpCode || otpCode.length < 4) {
+      showError("OTP code is invalid");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setFieldError((prev) => ({
+      ...prev,
+      password: undefined,
+      birthdate: undefined,
+      username: undefined,
+    }));
+    try {
+      const res = await apiFetch<{ signupToken: string }>({
+        path: "/auth/verify-otp",
+        method: "POST",
+        body: JSON.stringify({ email, code: otpCode }),
+      });
+      setSignupToken(res.signupToken);
+      setStep("profile");
+      showInfo("Verification successful. Complete your account info.");
+    } catch (err) {
+      const apiErr = err as ApiError;
+      showError(apiErr.message || "Could not verify OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProfileNext = (e: FormEvent) => {
+    e.preventDefault();
+    setFieldError((prev) => ({
+      ...prev,
+      password: undefined,
+      birthdate: undefined,
+      username: undefined,
+    }));
+
+    if (usernameError || usernameChecking) {
+      setFieldError((prev) => ({
+        ...prev,
+        username: usernameError || "Đang kiểm tra username",
+      }));
+      return;
+    }
+
+    const displayErr = validateDisplayName(displayName);
+    if (displayErr) {
+      setFieldError((prev) => ({ ...prev, displayName: displayErr }));
+      return;
+    }
+
+    if (password && password.length < 8) {
+      setFieldError((prev) => ({
+        ...prev,
+        password: "Password must be at least 8 characters",
+      }));
+      return;
+    }
+    if (password && password !== confirmPassword) {
+      showError("Passwords do not match");
+      return;
+    }
+    if (!displayName || !username) {
+      showError("Display name and username are required");
+      return;
+    }
+
+    const birthErr = validateBirthdate(birthdate);
+    if (birthErr) {
+      setFieldError((prev) => ({ ...prev, birthdate: birthErr }));
+      return;
+    }
+    setError("");
+    setStep("avatar");
+  };
+
+  const handleAvatarFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatarPreview(reader.result as string);
+      setZoom(1);
+      setCrop({ x: 0, y: 0 });
+      setCroppedAreaPixels(null);
+      setAvatarThumb(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const completeSignup = async (avatarData?: AvatarUploadResponse) => {
+    const res = await apiFetch<{ accessToken: string }>({
+      path: "/auth/complete-profile",
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${signupToken}`,
+      },
+      body: JSON.stringify({
+        email,
+        displayName,
+        username,
+        birthdate: birthdate || undefined,
+        bio: bio || undefined,
+        password: password || undefined,
+        avatarUrl: avatarData?.avatarUrl,
+        avatarOriginalUrl: avatarData?.avatarOriginalUrl,
+        avatarPublicId: avatarData?.avatarPublicId,
+        avatarOriginalPublicId: avatarData?.avatarOriginalPublicId,
+      }),
+    });
+
+    localStorage.setItem("accessToken", res.accessToken);
+    showInfo("Sign-up successful. Redirecting...");
+    router.push("/");
+  };
+
+  const handleSubmitAvatar = async () => {
+    if (!signupToken) {
+      showError("Missing signup token, please verify OTP again");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      let avatarPayload: AvatarUploadResponse | undefined;
+      if (avatarFile && avatarPreview && croppedAreaPixels) {
+        const croppedBlob = await getCroppedBlob(
+          avatarPreview,
+          croppedAreaPixels
+        );
+        const form = new FormData();
+        form.append("original", avatarFile, avatarFile.name);
+        form.append(
+          "cropped",
+          new File([croppedBlob], `avatar-cropped-${Date.now()}.jpg`, {
+            type: "image/jpeg",
+          })
+        );
+
+        const uploadRes = await fetch(`${getApiBaseUrl()}/auth/upload-avatar`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${signupToken}`,
+          },
+          body: form,
+        });
+
+        if (!uploadRes.ok) {
+          const errText = await uploadRes.text();
+          throw new Error(errText || "Avatar upload failed");
+        }
+
+        avatarPayload = (await uploadRes.json()) as AvatarUploadResponse;
+      }
+
+      await completeSignup(avatarPayload);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not complete profile";
+      showError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSkipAvatar = async () => {
+    if (!signupToken) {
+      showError("Missing signup token, please verify OTP again");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await completeSignup();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not complete profile";
+      showError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderEmailStep = () => {
+    if (isGoogleFlow) return null;
+    return (
+      <form className="space-y-[16px]" onSubmit={handleRequestOtp}>
+        <div className="space-y-[6px]">
+          <label className={styles.label}>Email address</label>
+          <input
+            type="email"
+            name="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value.toLowerCase())}
+            placeholder="email@example.com"
+            className={styles.input}
+            required
+          />
+          {fieldError.email && (
+            <p className={styles.fieldError}>{fieldError.email}</p>
+          )}
+        </div>
+        <button
+          type="submit"
+          className={styles.primaryButton}
+          disabled={loading}
+        >
+          {loading ? "Sending..." : "Send OTP"}
+        </button>
+      </form>
+    );
+  };
+
+  const renderOtpStep = () => {
+    if (isGoogleFlow) return null;
+    return (
+      <form className="space-y-[16px]" onSubmit={handleVerifyOtp}>
+        <div className="space-y-[6px]">
+          <div className={styles.labelRow}>
+            <label className={styles.label}>Enter OTP code</label>
+            <span className={styles.muted}>Sent to {email}</span>
+          </div>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={6}
+            value={otpCode}
+            onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
+            className={styles.input}
+            placeholder="Example: 123456"
+          />
+        </div>
+        <div className={styles.inlineActions}>
+          <button
+            type="button"
+            className={styles.linkButton}
+            onClick={() => {
+              setStep("email");
+              setOtpCode("");
+              setCooldownLeft(null);
+              showInfo("You can change the email and request a new OTP.");
+            }}
+          >
+            Change email
+          </button>
+          <button
+            type="button"
+            className={styles.linkButton}
+            disabled={loading || cooldownLeft !== null}
+            onClick={handleRequestOtp}
+          >
+            {cooldownLeft !== null
+              ? `Resend in ${cooldownLeft}s`
+              : "Resend code"}
+          </button>
+        </div>
+        <button
+          type="submit"
+          className={styles.primaryButton}
+          disabled={loading}
+        >
+          {loading ? "Verifying..." : "Verify"}
+        </button>
+      </form>
+    );
+  };
+
+  const renderProfileStep = () => (
+    <form className="space-y-[14px]" onSubmit={handleProfileNext}>
+      <div className={styles.gridTwoCols}>
+        <div className="space-y-[6px]">
+          <label className={styles.label}>Display name</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            className={styles.input}
+            placeholder="E.g. Cordigrammer"
+            required
+          />
+          {fieldError.displayName && (
+            <p className={styles.fieldError}>{fieldError.displayName}</p>
+          )}
+        </div>
+        <div className="space-y-[6px]">
+          <label className={styles.label}>Username</label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => {
+              const cleaned = e.target.value
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase()
+                .replace(/[^a-z0-9_]/g, "");
+              setUsername(cleaned);
+            }}
+            className={styles.input}
+            placeholder="username"
+            pattern="^[a-z0-9_]{3,30}$"
+            required
+          />
+          {fieldError.username ? (
+            <p className={styles.fieldError}>{fieldError.username}</p>
+          ) : (
+            <p className="text-[12px]">
+              (Make it easier for people to find you)
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className={styles.gridTwoCols}>
+        <div className="space-y-[6px]">
+          <label className={styles.label}>Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={styles.input}
+            placeholder="At least 8 characters"
+          />
+          {fieldError.password && (
+            <p className={styles.fieldError}>{fieldError.password}</p>
+          )}
+        </div>
+        <div className="space-y-[6px]">
+          <label className={styles.label}>Confirm password</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className={styles.input}
+            placeholder="Re-enter to confirm"
+          />
+        </div>
+      </div>
+
+      <div className={styles.gridTwoCols}>
+        <div className="space-y-[6px]">
+          <label className={styles.label}>Birthdate</label>
+          <input
+            type="date"
+            value={birthdate}
+            onChange={(e) => setBirthdate(e.target.value)}
+            className={styles.input}
+          />
+          {fieldError.birthdate && (
+            <p className={styles.fieldError}>{fieldError.birthdate}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-[6px]">
+        <label className={styles.label}>Short bio (optional)</label>
+        <textarea
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
+          className={styles.textarea}
+          rows={3}
+          placeholder="Share a little about yourself"
+        />
+      </div>
+
+      <button type="submit" className={styles.primaryButton} disabled={loading}>
+        {loading ? "Processing..." : "Next"}
+      </button>
+    </form>
+  );
+
+  const renderAvatarStep = () => (
+    <div className={styles.avatarStep}>
+      <div className={styles.avatarHeader}>
+        <div>
+          <h3 className="text-[18px] font-semibold text-slate-900">
+            Choose avatar
+          </h3>
+        </div>
+        {(avatarThumb || avatarPreview) && (
+          <div className={styles.avatarThumb}>
+            <img
+              src={avatarThumb || avatarPreview || ""}
+              alt="Avatar preview"
+            />
+          </div>
+        )}
+      </div>
+
+      <div className={styles.avatarGrid}>
+        <div className={styles.cropperCard}>
+          {avatarPreview ? (
+            <div className={styles.cropperWrapper}>
+              <Cropper
+                image={avatarPreview}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                cropShape="round"
+                showGrid={false}
+                restrictPosition
+                minZoom={1}
+                maxZoom={3}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={(_, areaPixels) =>
+                  setCroppedAreaPixels(areaPixels)
+                }
+                zoomWithScroll
+              />
+            </div>
+          ) : (
+            <div className={styles.avatarPlaceholder}>
+              <p className="text-[14px] text-slate-600">
+                Pick an image to preview and crop.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className={styles.avatarControls}>
+          <label className={styles.fileButton}>
+            Choose image from device
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarFileChange}
+              hidden
+            />
+          </label>
+
+          <div className={styles.sliderRow}>
+            <span className={styles.sliderLabel}>Zoom</span>
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.01}
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              disabled={!avatarPreview}
+            />
+            <span className={styles.sliderValue}>x{zoom.toFixed(2)}</span>
+          </div>
+
+          <div className={styles.avatarActions}>
+            <button
+              type="button"
+              className={styles.ghostButton}
+              onClick={handleSkipAvatar}
+              disabled={loading}
+            >
+              Skip
+            </button>
+            <button
+              type="button"
+              className={styles.primaryButton}
+              onClick={handleSubmitAvatar}
+              disabled={loading || !signupToken}
+            >
+              {loading ? "Finishing..." : "Finish"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderStepForm = () => {
+    if (step === "email") return renderEmailStep();
+    if (step === "otp") return renderOtpStep();
+    if (step === "avatar") return renderAvatarStep();
+    return renderProfileStep();
+  };
+
+  if (!canRender) return null;
+
+  return (
+    <div className={`${styles.page} ${styles["page-transition"]}`}>
+      <div className="min-h-screen">
+        <div className="grid min-h-screen w-full grid-cols-1 lg:grid-cols-2">
+          <div className={styles["signup-left"]}>
+            <div className="w-full max-w-[520px] rounded-2xl border border-[#e5edf5] bg-white p-10 shadow-xl">
+              <div className={styles.cardHeader}>
+                <h1 className="text-[32px] font-semibold leading-[1.2] text-slate-900">
+                  Create a Cordigram account
+                </h1>
+                <p className="whitespace-nowrap text-[14px] text-slate-600">
+                  Step {currentStepIndex + 1} / {steps.length}
+                </p>
+              </div>
+
+              <div className={styles.stepper}>
+                {steps.map(({ key, label }) => {
+                  const index = steps.findIndex((s) => s.key === key);
+                  const active = visualStep === key;
+                  const done = currentStepIndex > index;
+                  return (
+                    <div key={key} className={styles.stepItem}>
+                      <div
+                        className={`${styles.stepBullet} ${
+                          active ? styles.stepBulletActive : ""
+                        } ${done ? styles.stepBulletDone : ""}`}
+                      >
+                        {done ? "✓" : index + 1}
+                      </div>
+                      <span className={styles.stepLabel}>{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {error && <div className={styles.errorBox}>{error}</div>}
+              {info && <div className={styles.infoBox}>{info}</div>}
+
+              <div className="mt-[18px]">{renderStepForm()}</div>
+
+              <div className="mt-[22px] text-center text-[14px] font-medium leading-[1.5] text-slate-700">
+                Already have an account?{" "}
+                <Link
+                  href="/login"
+                  className="font-semibold text-[#3470A2] underline decoration-[#559AC2]/60 underline-offset-4 transition hover:brightness-110"
+                >
+                  Log in
+                </Link>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                <div className={styles.divider}>
+                  <span className={styles.dividerLine} />
+                  <span className={styles.dividerText}>or</span>
+                  <span className={styles.dividerLine} />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGoogleAuth}
+                  className={styles.oauthButton}
+                >
+                  <span className="">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      x="0px"
+                      y="0px"
+                      width="30"
+                      height="30"
+                      viewBox="0 0 48 48"
+                    >
+                      <path
+                        fill="#FFC107"
+                        d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"
+                      ></path>
+                      <path
+                        fill="#FF3D00"
+                        d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"
+                      ></path>
+                      <path
+                        fill="#4CAF50"
+                        d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"
+                      ></path>
+                      <path
+                        fill="#1976D2"
+                        d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"
+                      ></path>
+                    </svg>
+                  </span>
+                  Sign up with Google
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles["hero-panel"]}>
+            <div className={styles["hero-tilt"]}>
+              <div className={styles["hero-card"]}>
+                <h2 className="mt-4 text-[38px] font-semibold leading-tight text-white">
+                  Welcome to Cordigram!
+                </h2>
+                <p className="mt-3 text-[16px] leading-6 text-slate-100/90">
+                  A social platform with real-time chat channels. Create
+                  Discord-style channels, share photos/videos like Instagram,
+                  and connect communities the modern way.
+                </p>
+
+                <div className={styles["hero-chip-row"]}>
+                  <div className={styles["hero-chip"]}>
+                    <span className={styles["hero-chip-dot"]} /> Realtime
+                    channels
+                  </div>
+                  <div className={styles["hero-chip"]}>
+                    <span className={styles["hero-chip-dot"]} /> Media feed &
+                    stories
+                  </div>
+                  <div className={styles["hero-chip"]}>
+                    <span className={styles["hero-chip-dot"]} /> Voice-ready
+                  </div>
+                </div>
+
+                <div className={styles["hero-badges"]}>
+                  <div className={styles["hero-badge"]}>
+                    <span className={styles["hero-badge-icon"]}>◆</span>
+                    <p>Permissions and roles to manage communities safely.</p>
+                  </div>
+                  <div className={styles["hero-badge"]}>
+                    <span className={styles["hero-badge-icon"]}>⇆</span>
+                    Multi-device sync with instant notifications.
+                  </div>
+                  <div className={styles["hero-badge"]}>
+                    <span className={styles["hero-badge-icon"]}>★</span>
+                    Modern UI optimized for sharing content.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
