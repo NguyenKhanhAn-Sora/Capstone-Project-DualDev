@@ -13,10 +13,13 @@ export class UsersService {
     return this.userModel.findOne({ email }).exec();
   }
 
+<<<<<<< HEAD
   findById(userId: string): Promise<User | null> {
     return this.userModel.findById(userId).exec();
   }
 
+=======
+>>>>>>> origin/Cordigram-social-chat
   async createPending(email: string): Promise<User> {
     const existing = await this.findByEmail(email);
     if (existing) {
@@ -43,6 +46,7 @@ export class UsersService {
       .exec();
   }
 
+<<<<<<< HEAD
   async getSettings(userId: string): Promise<{ theme: 'light' | 'dark' }> {
     const user = await this.userModel
       .findById(userId)
@@ -75,6 +79,8 @@ export class UsersService {
     return next;
   }
 
+=======
+>>>>>>> origin/Cordigram-social-chat
   async createWithGoogle(params: {
     email: string;
     providerId: string;

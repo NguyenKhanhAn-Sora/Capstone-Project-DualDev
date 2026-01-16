@@ -2,8 +2,13 @@
   width: 260px;
   min-height: 100vh;
   padding: 24px 18px;
+<<<<<<< HEAD
   border-right: 1px solid var(--color-border);
   background: var(--color-surface);
+=======
+  border-right: 1px solid #f1f1f1;
+  background: #fff;
+>>>>>>> origin/Cordigram-social-chat
   display: flex;
   flex-direction: column;
   gap: 28px;
@@ -27,7 +32,11 @@
   font-weight: 600;
   font-style: italic;
   letter-spacing: 0.3px;
+<<<<<<< HEAD
   color: var(--color-text);
+=======
+  color: #0f1629;
+>>>>>>> origin/Cordigram-social-chat
 }
 
 .nav {
@@ -43,7 +52,11 @@
   gap: 14px;
   padding: 8px 10px;
   border-radius: 12px;
+<<<<<<< HEAD
   color: var(--color-text);
+=======
+  color: #0f1629;
+>>>>>>> origin/Cordigram-social-chat
   text-decoration: none;
   font-size: 18px;
   font-weight: 500;
@@ -51,7 +64,11 @@
 }
 
 .item:hover {
+<<<<<<< HEAD
   background: var(--color-surface-muted);
+=======
+  background: #f6f7f8;
+>>>>>>> origin/Cordigram-social-chat
   transform: translateX(2px);
 }
 
@@ -60,7 +77,11 @@
   height: 28px;
   display: grid;
   place-items: center;
+<<<<<<< HEAD
   color: var(--color-text);
+=======
+  color: #111;
+>>>>>>> origin/Cordigram-social-chat
 }
 
 .label {
@@ -85,9 +106,15 @@
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
+<<<<<<< HEAD
   border: 1px solid var(--color-border);
   border-radius: 14px;
   background: var(--gradient-surface);
+=======
+  border: 1px solid #f1f1f1;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f8fafc, #eef2ff);
+>>>>>>> origin/Cordigram-social-chat
   cursor: pointer;
   user-select: none;
   position: relative;
@@ -124,7 +151,11 @@
 
 .userDisplay {
   font-weight: 700;
+<<<<<<< HEAD
   color: var(--color-text);
+=======
+  color: #0f1629;
+>>>>>>> origin/Cordigram-social-chat
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -132,7 +163,11 @@
 
 .userUsername {
   font-size: 13px;
+<<<<<<< HEAD
   color: var(--color-text-muted);
+=======
+  color: #6b7280;
+>>>>>>> origin/Cordigram-social-chat
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -143,15 +178,24 @@
   left: 0;
   right: 0;
   bottom: calc(100% + 10px);
+<<<<<<< HEAD
   background: var(--gradient-surface);
   color: var(--color-text);
+=======
+  background: linear-gradient(135deg, #f8fafc, #eef2ff);
+  color: #0f1629;
+>>>>>>> origin/Cordigram-social-chat
   border-radius: 16px;
   padding: 10px 8px;
   box-shadow: 0 18px 45px rgba(15, 22, 41, 0.14);
   display: grid;
   gap: 6px;
   z-index: 10;
+<<<<<<< HEAD
   border: 1px solid var(--color-border);
+=======
+  border: 1px solid #e8eef5;
+>>>>>>> origin/Cordigram-social-chat
 }
 
 .menuItem {
@@ -174,17 +218,24 @@
   transform: translateX(2px);
 }
 
+<<<<<<< HEAD
 :global([data-theme="dark"]) .menuItem:hover {
   background: rgba(255, 255, 255, 0.08);
   transform: translateX(2px);
 }
 
+=======
+>>>>>>> origin/Cordigram-social-chat
 .menuIcon {
   width: 24px;
   height: 24px;
   display: grid;
   place-items: center;
+<<<<<<< HEAD
   color: var(--color-text);
+=======
+  color: #000;
+>>>>>>> origin/Cordigram-social-chat
 }
 
 .menuLabel {
@@ -192,6 +243,7 @@
   font-weight: 600;
   letter-spacing: 0.1px;
 }
+<<<<<<< HEAD
 
 .switchOverlay {
   position: fixed;
@@ -421,3 +473,5 @@
     min-height: 200px;
   }
 }
+=======
+>>>>>>> origin/Cordigram-social-chat

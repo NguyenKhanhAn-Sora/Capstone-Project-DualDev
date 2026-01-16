@@ -9,10 +9,13 @@ export type OAuthProvider = {
   refreshToken?: string | null;
 };
 
+<<<<<<< HEAD
 export type UserSettings = {
   theme: 'light' | 'dark';
 };
 
+=======
+>>>>>>> origin/Cordigram-social-chat
 @Schema({ timestamps: true })
 export class User extends Document {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
@@ -44,6 +47,7 @@ export class User extends Document {
 
   @Prop({ type: String, default: 'otp_pending' })
   signupStage: 'otp_pending' | 'info_pending' | 'completed';
+<<<<<<< HEAD
 
   @Prop({
     type: {
@@ -52,6 +56,8 @@ export class User extends Document {
     default: { theme: 'light' },
   })
   settings: UserSettings;
+=======
+>>>>>>> origin/Cordigram-social-chat
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -1,0 +1,12 @@
+- Có tính năng privacy cho mỗi bài post (quyền riêng tư public/private/onlyfriend)
+- Có tính năng thả react cho message 
+
+
+- 1 số note về NextJS:
+ + Suspense để thay thế loading
+ + (name) để nhóm các route lại cho dễ dàng nhận biết và tường minh
+ + Dynamic Rendering (no-cache) và Client Rendering (fetch chay) hoặc lai cả 2 và cho 1 thời gian mặc định để server tự động fetch dữ liệu mới
+ + Page.tsx tượng trung cho 1 route, không cần layout
+ + Layout có tác dụng chia bố cục cho tất cả route children
+ + có thể import các font của google trực tiếp 
+ + dùng use client khi có 1 component sử dụng các hook của react hoặc tương tác như click. Còn submit form hoặc dùng <Link> thì không cần giúp dữ liệu load nhanh hơn và SEO tốt hơn 
