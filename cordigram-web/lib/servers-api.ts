@@ -357,3 +357,65 @@ export async function getMyFollowers(): Promise<Friend[]> {
     return [];
   }
 }
+
+// Get following list
+export async function getFollowing(): Promise<Friend[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/follows/following`, {
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    return response.json();
+  } catch (err) {
+    console.error('Failed to fetch following', err);
+    return [];
+  }
+}
+
+// Follow a user
+export async function followUser(userId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/follows/${userId}`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to follow user');
+  }
+}
+
+// Unfollow a user
+export async function unfollowUser(userId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/follows/${userId}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to unfollow user');
+  }
+}
+
+// Check if following a user
+export async function isFollowing(userId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/follows/check/${userId}`, {
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const data = await response.json();
+    return data.isFollowing;
+  } catch (err) {
+    console.error('Failed to check following status', err);
+    return false;
+  }
+}
+

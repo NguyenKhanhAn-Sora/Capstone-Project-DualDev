@@ -44,7 +44,7 @@ export default function MessagesPage() {
         setCurrentUserId(payload.userId || payload.sub);
         setError(null); // Clear error when token found
         loadServers();
-        loadFriends();
+        loadFollowing();
       } catch (e) {
         console.error("Failed to parse token", e);
         setError("Invalid token");
@@ -113,6 +113,16 @@ export default function MessagesPage() {
     } catch (err) {
       console.error("Failed to load friends", err);
       // Set empty array if friends API is not available
+      setFriends([]);
+    }
+  };
+
+  const loadFollowing = async () => {
+    try {
+      const followingList = await serversApi.getFollowing();
+      setFriends(followingList);
+    } catch (err) {
+      console.error("Failed to load following", err);
       setFriends([]);
     }
   };
@@ -434,7 +444,6 @@ export default function MessagesPage() {
                     </button>
                   </div>
                 </div>
-
                 {/* Messages Container */}
                 <div className={styles.messagesContainer}>
                   {messages.map((message) => (
