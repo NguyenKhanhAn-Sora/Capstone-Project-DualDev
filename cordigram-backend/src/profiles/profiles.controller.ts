@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   NotFoundException,
+  Param,
   Query,
   Req,
   UnauthorizedException,
@@ -92,5 +93,22 @@ export class ProfilesController {
       items: results,
       count: results.length,
     };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':usernameOrId')
+  async getProfileById(
+    @Param('usernameOrId') usernameOrId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const user = req.user;
+    if (!user) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    return this.profilesService.getProfileDetails({
+      usernameOrId,
+      viewerId: user.userId,
+    });
   }
 }

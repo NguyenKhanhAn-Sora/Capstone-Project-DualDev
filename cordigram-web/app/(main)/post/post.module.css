@@ -283,6 +283,15 @@
   font-weight: 700;
 }
 
+.authorHandleLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.authorHandleLink:hover {
+  text-decoration: underline;
+}
+
 .closeArea {
   display: flex;
   justify-content: flex-end;
@@ -561,6 +570,15 @@
 .commentAuthor {
   font-weight: 700;
   font-size: 14px;
+}
+
+.commentAuthorLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.commentAuthorLink:hover {
+  text-decoration: underline;
 }
 
 .commentMeta {

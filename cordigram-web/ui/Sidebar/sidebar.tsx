@@ -160,6 +160,22 @@ export default function Sidebar() {
     router.replace("/login?loggedOut=1");
   }, [router]);
 
+  const handleProfileClick = useCallback(() => {
+    const profileId = profile?.id || profile?.userId;
+    if (!profileId) return;
+
+    setMenuOpen(false);
+    router.push(`/profile/${profileId}`);
+  }, [profile, router]);
+
+  const handleSavedClick = useCallback(() => {
+    const profileId = profile?.id || profile?.userId;
+    if (!profileId) return;
+
+    setMenuOpen(false);
+    router.push(`/profile/${profileId}/saved`);
+  }, [profile, router]);
+
   const handleSwitchAccountSuccess = useCallback(
     async (token: string) => {
       if (typeof window !== "undefined") {
@@ -246,9 +262,17 @@ export default function Sidebar() {
 
             {menuOpen ? (
               <div className={styles.userMenu}>
-                <MenuItem label="Profile" icon={<IconProfile />} />
+                <MenuItem
+                  label="Profile"
+                  icon={<IconProfile />}
+                  onClick={handleProfileClick}
+                />
                 <MenuItem label="Settings" icon={<IconSettings />} />
-                <MenuItem label="Saved" icon={<IconSaved />} />
+                <MenuItem
+                  label="Saved"
+                  icon={<IconSaved />}
+                  onClick={handleSavedClick}
+                />
                 <MenuItem
                   label={
                     theme === "dark" ? "Switch to light" : "Switch to dark"

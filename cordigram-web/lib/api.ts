@@ -90,6 +90,7 @@ export type UpdatePostRequest = {
 export type CreatePostResponse = {
   kind: "post" | "reel";
   id: string;
+  repostOf?: string | null;
   content: string;
   media: Array<{
     type: "image" | "video";
@@ -259,6 +260,20 @@ export async function updatePost(opts: {
   });
 }
 
+export async function deletePost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ deleted: boolean }> {
+  const { token, postId } = opts;
+  return apiFetch<{ deleted: boolean }>({
+    path: `/posts/${postId}`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function createReel(opts: {
   token: string;
   payload: CreateReelRequest;
@@ -291,13 +306,87 @@ export async function fetchFeed(opts: {
   });
 }
 
-export async function fetchReelsFeed(opts: {
+export async function fetchUserPosts(opts: {
+  token: string;
+  userId: string;
+  limit?: number;
+}): Promise<FeedItem[]> {
+  const { token, userId, limit = 30 } = opts;
+  const params = new URLSearchParams();
+  if (limit) params.set("limit", String(limit));
+
+  return apiFetch<FeedItem[]>({
+    path: `/posts/user/${userId}?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchUserReels(opts: {
+  token: string;
+  userId: string;
+  limit?: number;
+}): Promise<FeedItem[]> {
+  const { token, userId, limit = 30 } = opts;
+  const params = new URLSearchParams();
+  if (limit) params.set("limit", String(limit));
+
+  return apiFetch<FeedItem[]>({
+    path: `/reels/user/${userId}?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchSavedItems(opts: {
   token: string;
   limit?: number;
 }): Promise<FeedItem[]> {
-  const { token, limit = 20 } = opts;
+  const { token, limit = 30 } = opts;
+  const params = new URLSearchParams();
+  if (limit) params.set("limit", String(limit));
+
+  return apiFetch<FeedItem[]>({
+    path: `/posts/saved?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchSavedReels(opts: {
+  token: string;
+  limit?: number;
+}): Promise<FeedItem[]> {
+  const { token, limit = 30 } = opts;
+  const params = new URLSearchParams();
+  if (limit) params.set("limit", String(limit));
+
+  return apiFetch<FeedItem[]>({
+    path: `/reels/saved?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchReelsFeed(opts: {
+  token: string;
+  limit?: number;
+  authorId?: string;
+  includeOwned?: boolean;
+}): Promise<FeedItem[]> {
+  const { token, limit = 20, authorId, includeOwned } = opts;
   const params = new URLSearchParams();
   params.set("limit", String(limit));
+  if (authorId) params.set("authorId", authorId);
+  if (includeOwned) params.set("includeOwned", "1");
 
   return apiFetch<FeedItem[]>({
     path: `/reels/feed?${params.toString()}`,
@@ -551,19 +640,21 @@ export async function hidePost(opts: {
   });
 }
 
+type ReportCategoryKey =
+  | "abuse"
+  | "violence"
+  | "sensitive"
+  | "misinfo"
+  | "spam"
+  | "ip"
+  | "illegal"
+  | "privacy"
+  | "other";
+
 export async function reportPost(opts: {
   token: string;
   postId: string;
-  category:
-    | "abuse"
-    | "violence"
-    | "sensitive"
-    | "misinfo"
-    | "spam"
-    | "ip"
-    | "illegal"
-    | "privacy"
-    | "other";
+  category: ReportCategoryKey;
   reason: string;
   note?: string;
 }): Promise<{ reported: boolean }> {
@@ -581,16 +672,7 @@ export async function reportPost(opts: {
 export async function reportComment(opts: {
   token: string;
   commentId: string;
-  category:
-    | "abuse"
-    | "violence"
-    | "sensitive"
-    | "misinfo"
-    | "spam"
-    | "ip"
-    | "illegal"
-    | "privacy"
-    | "other";
+  category: ReportCategoryKey;
   reason: string;
   note?: string;
 }): Promise<{ reported: boolean }> {
@@ -620,6 +702,24 @@ export async function viewPost(opts: {
     body: JSON.stringify(
       typeof durationMs === "number" ? { durationMs } : { durationMs: null }
     ),
+  });
+}
+
+export async function reportUser(opts: {
+  token: string;
+  userId: string;
+  category: ReportCategoryKey;
+  reason: string;
+  note?: string;
+}): Promise<{ reported: boolean }> {
+  const { token, userId, category, reason, note } = opts;
+  return apiFetch<{ reported: boolean }>({
+    path: `/report-users/${userId}`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ category, reason, note }),
   });
 }
 
@@ -954,6 +1054,25 @@ export type ProfileSearchItem = {
   followersCount: number;
 };
 
+export type ProfileDetailResponse = {
+  id: string;
+  userId: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string;
+  coverUrl?: string;
+  bio?: string;
+  location?: string;
+  stats: {
+    posts: number;
+    reels: number;
+    totalPosts: number;
+    followers: number;
+    following: number;
+  };
+  isFollowing?: boolean;
+};
+
 export async function searchProfiles(opts: {
   token: string;
   query: string;
@@ -966,6 +1085,20 @@ export async function searchProfiles(opts: {
 
   return apiFetch<{ items: ProfileSearchItem[]; count: number }>({
     path: `/profiles/search?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchProfileDetail(opts: {
+  token: string;
+  id: string;
+}): Promise<ProfileDetailResponse> {
+  const { token, id } = opts;
+  return apiFetch<ProfileDetailResponse>({
+    path: `/profiles/${encodeURIComponent(id)}`,
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,

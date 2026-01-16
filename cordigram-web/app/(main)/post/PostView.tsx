@@ -4,6 +4,7 @@ import { JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import styles from "./post.module.css";
 import feedStyles from "../home-feed.module.css";
@@ -22,6 +23,7 @@ import {
   likeComment,
   likePost,
   deleteComment,
+  deletePost,
   updateComment,
   unlikeComment,
   unlikePost,
@@ -48,7 +50,6 @@ function upsertById(list: CommentItem[], incoming: CommentItem): CommentItem[] {
 function ensureId(item: CommentItem): string {
   return item.id || `${item.postId}-${item.createdAt ?? Date.now()}`;
 }
-
 type ReplyState = {
   items: CommentItem[];
   page: number;
@@ -326,6 +327,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [deleteTarget, setDeleteTarget] = useState<CommentItem | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [deletePostOpen, setDeletePostOpen] = useState(false);
+  const [deletePostSubmitting, setDeletePostSubmitting] = useState(false);
+  const [deletePostError, setDeletePostError] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editCaption, setEditCaption] = useState("");
@@ -1202,6 +1206,45 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       setDeleteError(err?.message || "Failed to delete comment");
     } finally {
       setDeleteSubmitting(false);
+    }
+  };
+
+  const openDeletePostConfirm = () => {
+    if (!token) {
+      showToast("Please sign in to delete posts");
+      return;
+    }
+    setShowMoreMenu(false);
+    setDeletePostOpen(true);
+    setDeletePostError("");
+  };
+
+  const closeDeletePostConfirm = () => {
+    if (deletePostSubmitting) return;
+    setDeletePostOpen(false);
+    setDeletePostError("");
+  };
+
+  const confirmDeletePost = async () => {
+    if (!token || !post?.id) {
+      setDeletePostError("Please sign in to delete posts");
+      return;
+    }
+    setDeletePostSubmitting(true);
+    setDeletePostError("");
+    try {
+      await deletePost({ token, postId: post.id });
+      setDeletePostOpen(false);
+      if (typeof window !== "undefined") {
+        sessionStorage.clear();
+        window.location.replace("/");
+        return;
+      }
+      router.push("/");
+    } catch (err: any) {
+      setDeletePostError(err?.message || "Failed to delete post");
+    } finally {
+      setDeletePostSubmitting(false);
     }
   };
 
@@ -2224,6 +2267,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         viewerId &&
           (comment.author?.id === viewerId || comment.authorId === viewerId)
       );
+      const commentProfileId = comment.author?.id || comment.authorId;
 
       const toggleRepliesVisibility = () => {
         const nextExpanded = !expanded;
@@ -2285,7 +2329,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           <div className={styles.commentBody}>
             <div className={styles.commentHeader}>
               <div className={styles.commentAuthor}>
-                @{comment.author?.username || "User"}
+                {commentProfileId ? (
+                  <Link
+                    href={`/profile/${commentProfileId}`}
+                    className={`${styles.commentAuthorLink}`}
+                  >
+                    @{comment.author?.username || "User"}
+                  </Link>
+                ) : (
+                  <>@{comment.author?.username || "User"}</>
+                )}
               </div>
             </div>
             <div className={styles.commentText}>{comment.content}</div>
@@ -3043,6 +3096,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     </div>
   );
 
+  const authorProfileId = post?.authorId || post?.author?.id;
+
   const header = (
     <div className={styles.headerRow}>
       <div className={styles.authorBlock}>
@@ -3063,7 +3118,18 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         <div className={`${styles.authorMeta} flex flex-row`}>
           <span>
             {post?.authorUsername ? (
-              <div className={styles.authorHandle}>@{post.authorUsername}</div>
+              authorProfileId ? (
+                <Link
+                  href={`/profile/${authorProfileId}`}
+                  className={`${styles.authorHandle} ${styles.authorHandleLink}`}
+                >
+                  @{post.authorUsername}
+                </Link>
+              ) : (
+                <div className={styles.authorHandle}>
+                  @{post.authorUsername}
+                </div>
+              )
             ) : null}
           </span>
           <span>
@@ -3180,7 +3246,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     type="button"
                     className={`${styles.moreMenuItem} ${styles.moreMenuDanger}`}
                     role="menuitem"
-                    onClick={() => setShowMoreMenu(false)}
+                    onClick={openDeletePostConfirm}
                   >
                     Delete post
                   </button>
@@ -3867,6 +3933,59 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 }
               >
                 {reportCommentSubmitting ? "Submitting..." : "Submit report"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deletePostOpen ? (
+        <div
+          className={`${styles.reportOverlay} ${styles.reportOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeDeletePostConfirm}
+        >
+          <div
+            className={styles.reportCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.reportHeader}>
+              <div>
+                <h3 className={styles.reportTitle}>Delete this post?</h3>
+                <p className={styles.reportBody}>
+                  Removing this post will delete it for everyone. This action
+                  cannot be undone.
+                </p>
+              </div>
+              <button
+                className={styles.reportClose}
+                aria-label="Close"
+                onClick={closeDeletePostConfirm}
+                disabled={deletePostSubmitting}
+              >
+                ×
+              </button>
+            </div>
+
+            {deletePostError ? (
+              <div className={styles.reportInlineError}>{deletePostError}</div>
+            ) : null}
+
+            <div className={styles.reportActions}>
+              <button
+                className={styles.reportSecondary}
+                onClick={closeDeletePostConfirm}
+                disabled={deletePostSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className={`${styles.reportPrimary} ${styles.blockDanger}`}
+                onClick={confirmDeletePost}
+                disabled={deletePostSubmitting}
+              >
+                {deletePostSubmitting ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>

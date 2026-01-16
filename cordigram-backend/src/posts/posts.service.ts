@@ -10,7 +10,13 @@ import { Model, Types } from 'mongoose';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateReelDto } from './dto/create-reel.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
-import { Post, PostKind, PostStatus, PostStats } from './post.schema';
+import {
+  Post,
+  PostKind,
+  PostStatus,
+  PostStats,
+  Visibility,
+} from './post.schema';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { ConfigService } from '../config/config.service';
 import { PostInteraction, InteractionType } from './post-interaction.schema';
@@ -283,6 +289,41 @@ export class PostsService {
     return this.toResponse(doc);
   }
 
+  async delete(userId: string, postId: string) {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId kind')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (!post.authorId || !post.authorId.equals(userObjectId)) {
+      throw new ForbiddenException('Only the author can delete this post');
+    }
+
+    const result = await this.postModel
+      .updateOne(
+        { _id: postObjectId, deletedAt: null },
+        { $set: { deletedAt: new Date() } },
+      )
+      .exec();
+
+    if (!result.modifiedCount) {
+      throw new BadRequestException('Unable to delete post');
+    }
+
+    await this.postInteractionModel.deleteMany({ postId: postObjectId }).exec();
+
+    return { deleted: true };
+  }
+
   private normalizeHashtags(tags: string[]): string[] {
     return Array.from(
       new Set(
@@ -508,6 +549,19 @@ export class PostsService {
       (id) => new Types.ObjectId(id),
     );
 
+    const ownedCandidates = await this.postModel
+      .find({
+        authorId: userObjectId,
+        kind: { $in: allowedKinds },
+        status: 'published',
+        deletedAt: null,
+        publishedAt: { $ne: null },
+        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
+      })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit * 2)
+      .lean();
+
     const followCandidates = await this.postModel
       .find({
         authorId: { $in: followeeObjectIds, $nin: excludedAuthorIds },
@@ -540,14 +594,22 @@ export class PostsService {
     const merged: Post[] = [];
     const seen = new Set<string>();
 
-    for (const raw of [...followCandidates, ...exploreCandidates]) {
-      const id = raw._id?.toString?.();
+    const pushCandidate = (raw: unknown) => {
+      const candidate = raw as Post;
+      // Handle lean documents safely and avoid duplicates/hidden posts
+      const id = (
+        candidate as { _id?: Types.ObjectId | string }
+      )?._id?.toString?.();
       if (!id || seen.has(id) || hiddenIds.has(id)) {
-        continue;
+        return;
       }
-      merged.push(this.postModel.hydrate(raw) as Post);
+      merged.push(this.postModel.hydrate(candidate) as Post);
       seen.add(id);
-    }
+    };
+
+    [...ownedCandidates, ...followCandidates, ...exploreCandidates].forEach(
+      (raw) => pushCandidate(raw),
+    );
 
     const mergedIds = merged
       .map((p) => p._id?.toString?.())
@@ -633,6 +695,275 @@ export class PostsService {
 
   async getReelsFeed(userId: string, limit = 20) {
     return this.getFeed(userId, limit, ['reel']);
+  }
+
+  async getUserPosts(params: {
+    viewerId: string;
+    targetUserId: string;
+    limit?: number;
+  }) {
+    const { viewerId, targetUserId } = params;
+    const limit = Math.min(Math.max(params.limit ?? 24, 1), 60);
+
+    const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
+    const targetObjectId = this.asObjectId(targetUserId, 'targetUserId');
+
+    if (viewerObjectId.toString() !== targetObjectId.toString()) {
+      await this.blocksService.assertNotBlocked(viewerObjectId, targetObjectId);
+    }
+
+    const isOwner = viewerObjectId.equals(targetObjectId);
+    let allowedVisibilities: Visibility[] = ['public'];
+
+    if (isOwner) {
+      allowedVisibilities = ['public', 'followers', 'private'];
+    } else {
+      const follows = await this.followModel
+        .findOne({ followerId: viewerObjectId, followeeId: targetObjectId })
+        .select('_id')
+        .lean();
+      if (follows?._id) {
+        allowedVisibilities = ['public', 'followers'];
+      }
+    }
+
+    const docs = await this.postModel
+      .find({
+        authorId: targetObjectId,
+        kind: 'post',
+        status: 'published',
+        visibility: { $in: allowedVisibilities },
+        deletedAt: null,
+        publishedAt: { $ne: null },
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    return docs.map((doc) =>
+      this.toResponse(this.postModel.hydrate(doc) as Post),
+    );
+  }
+
+  async getUserReels(params: {
+    viewerId: string;
+    targetUserId: string;
+    limit?: number;
+  }) {
+    const { viewerId, targetUserId } = params;
+    const limit = Math.min(Math.max(params.limit ?? 24, 1), 60);
+
+    const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
+    const targetObjectId = this.asObjectId(targetUserId, 'targetUserId');
+
+    if (viewerObjectId.toString() !== targetObjectId.toString()) {
+      await this.blocksService.assertNotBlocked(viewerObjectId, targetObjectId);
+    }
+
+    const isOwner = viewerObjectId.equals(targetObjectId);
+    let allowedVisibilities: Visibility[] = ['public'];
+
+    if (isOwner) {
+      allowedVisibilities = ['public', 'followers', 'private'];
+    } else {
+      const follows = await this.followModel
+        .findOne({ followerId: viewerObjectId, followeeId: targetObjectId })
+        .select('_id')
+        .lean();
+      if (follows?._id) {
+        allowedVisibilities = ['public', 'followers'];
+      }
+    }
+
+    const docs = await this.postModel
+      .find({
+        authorId: targetObjectId,
+        kind: 'reel',
+        status: 'published',
+        visibility: { $in: allowedVisibilities },
+        deletedAt: null,
+        publishedAt: { $ne: null },
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    return docs.map((doc) =>
+      this.toResponse(this.postModel.hydrate(doc) as Post),
+    );
+  }
+
+  async getSavedPosts(userId: string, limit = 24) {
+    const viewerObjectId = this.asObjectId(userId, 'userId');
+    const safeLimit = Math.min(Math.max(limit, 1), 60);
+
+    const saves = await this.postInteractionModel
+      .find({ userId: viewerObjectId, type: 'save' })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit * 3)
+      .lean();
+
+    const postIds = Array.from(
+      new Set(
+        saves
+          .map((s) => s.postId)
+          .filter((id): id is Types.ObjectId => Boolean(id)),
+      ),
+    );
+
+    if (!postIds.length) return [] as ReturnType<typeof this.toResponse>[];
+
+    const posts = await this.postModel
+      .find({
+        _id: { $in: postIds },
+        status: 'published',
+        deletedAt: null,
+        publishedAt: { $ne: null },
+      })
+      .lean();
+
+    const filtered: Post[] = [];
+
+    for (const raw of posts) {
+      const doc = this.postModel.hydrate(raw) as Post;
+
+      try {
+        await this.blocksService.assertNotBlocked(
+          viewerObjectId,
+          doc.authorId,
+        );
+      } catch {
+        continue;
+      }
+
+      const isOwner = doc.authorId?.equals(viewerObjectId) ?? false;
+
+      if (!isOwner) {
+        if (doc.visibility === 'private') continue;
+        if (doc.visibility === 'followers') {
+          const follows = await this.followModel
+            .findOne({ followerId: viewerObjectId, followeeId: doc.authorId })
+            .select('_id')
+            .lean();
+
+          if (!follows?._id) continue;
+        }
+      }
+
+      filtered.push(doc);
+    }
+
+    if (!filtered.length) return [] as ReturnType<typeof this.toResponse>[];
+
+    filtered.sort(
+      (a, b) =>
+        (b.createdAt?.getTime?.() ?? 0) - (a.createdAt?.getTime?.() ?? 0),
+    );
+
+    const limited = filtered.slice(0, safeLimit);
+
+    const authorIds = Array.from(
+      new Set(
+        limited
+          .map((p) => p.authorId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+
+    const profiles = await this.profileModel
+      .find({ userId: { $in: authorIds } })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+
+    return limited.map((post) => {
+      const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
+      return this.toResponse(post, profile, { saved: true });
+    });
+  }
+
+  async getSavedReels(userId: string, limit = 24) {
+    const viewerObjectId = this.asObjectId(userId, 'userId');
+    const safeLimit = Math.min(Math.max(limit, 1), 60);
+
+    const saves = await this.postInteractionModel
+      .find({ userId: viewerObjectId, type: 'save' })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit * 2)
+      .lean();
+
+    const postIds = saves
+      .map((s) => s.postId)
+      .filter((id): id is Types.ObjectId => Boolean(id));
+
+    if (!postIds.length) return [] as ReturnType<typeof this.toResponse>[];
+
+    const posts = await this.postModel
+      .find({
+        _id: { $in: postIds },
+        kind: 'reel',
+        status: 'published',
+        deletedAt: null,
+        publishedAt: { $ne: null },
+      })
+      .lean();
+
+    const postMap = new Map(
+      posts.map((p) => [p._id?.toString?.() ?? '', this.postModel.hydrate(p)]),
+    );
+
+    const results: Post[] = [];
+
+    for (const interaction of saves) {
+      if (results.length >= safeLimit) break;
+      const postId = interaction.postId?.toString?.();
+      if (!postId) continue;
+      const doc = postMap.get(postId);
+      if (!doc) continue;
+
+      try {
+        await this.blocksService.assertNotBlocked(viewerObjectId, doc.authorId);
+      } catch {
+        continue;
+      }
+
+      const isOwner = doc.authorId?.equals(viewerObjectId) ?? false;
+      if (!isOwner) {
+        if (doc.visibility === 'private') continue;
+        if (doc.visibility === 'followers') {
+          const follows = await this.followModel
+            .findOne({ followerId: viewerObjectId, followeeId: doc.authorId })
+            .select('_id')
+            .lean();
+          if (!follows?._id) continue;
+        }
+      }
+
+      results.push(doc as Post);
+    }
+
+    if (!results.length) return [] as ReturnType<typeof this.toResponse>[];
+
+    const authorIds = Array.from(
+      new Set(
+        results
+          .map((p) => p.authorId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+
+    const profiles = await this.profileModel
+      .find({ userId: { $in: authorIds } })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+
+    return results.map((post) => {
+      const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
+      return this.toResponse(post, profile, { saved: true });
+    });
   }
 
   async getById(

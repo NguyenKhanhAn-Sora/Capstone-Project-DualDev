@@ -59,6 +59,15 @@ export class PostsController {
     return this.postsService.update(user.userId, postId, dto);
   }
 
+  @Delete(':id')
+  async remove(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.delete(user.userId, postId);
+  }
+
   @Get('feed')
   async feed(@Req() req: Request, @Query('limit') limit?: string) {
     const user = req.user as AuthenticatedUser | undefined;
@@ -67,6 +76,34 @@ export class PostsController {
     }
     const parsedLimit = limit ? Number(limit) : undefined;
     return this.postsService.getFeed(user.userId, parsedLimit ?? 20);
+  }
+
+  @Get('saved')
+  async saved(@Req() req: Request, @Query('limit') limit?: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.postsService.getSavedPosts(user.userId, parsedLimit ?? 24);
+  }
+
+  @Get('user/:id')
+  async listByUser(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.postsService.getUserPosts({
+      viewerId: user.userId,
+      targetUserId: id,
+      limit: parsedLimit,
+    });
   }
 
   @Get(':id')

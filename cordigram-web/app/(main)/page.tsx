@@ -4,6 +4,7 @@ import { JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import styles from "./home-feed.module.css";
 import {
   fetchFeed,
@@ -12,9 +13,12 @@ import {
   unlikePost,
   savePost,
   unsavePost,
-  sharePost,
+  repostPost,
+  createPost,
+  createReel,
   setPostAllowComments,
   setPostHideLikeCount,
+  deletePost,
   fetchPostDetail,
   reportPost,
   viewPost,
@@ -390,7 +394,24 @@ export default function HomePage() {
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportError, setReportError] = useState("");
   const [reportClosing, setReportClosing] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    postId: string;
+    label: string;
+  } | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [repostTarget, setRepostTarget] = useState<{
+    postId: string;
+    label: string;
+    kind: "post" | "reel";
+  } | null>(null);
+  const [repostMode, setRepostMode] = useState<"quote" | "repost" | null>(null);
+  const [repostNote, setRepostNote] = useState("");
+  const [repostSubmitting, setRepostSubmitting] = useState(false);
+  const [repostError, setRepostError] = useState("");
+  const [repostClosing, setRepostClosing] = useState(false);
   const reportHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const repostHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [viewerId, setViewerId] = useState<string | undefined>(() =>
@@ -497,6 +518,7 @@ export default function HomePage() {
   useEffect(() => {
     return () => {
       if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
+      if (repostHideTimerRef.current) clearTimeout(repostHideTimerRef.current);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, []);
@@ -581,6 +603,8 @@ export default function HomePage() {
 
   const onLike = async (postId: string, liked: boolean) => {
     if (!token) return;
+    const targetItem = items.find((p) => p.item.id === postId)?.item;
+    const targetId = targetItem?.repostOf || postId;
     setItems((prev) =>
       prev.map((p) =>
         p.item.id === postId
@@ -603,9 +627,9 @@ export default function HomePage() {
     );
     try {
       if (liked) {
-        await likePost({ token, postId });
+        await likePost({ token, postId: targetId });
       } else {
-        await unlikePost({ token, postId });
+        await unlikePost({ token, postId: targetId });
       }
       void syncStats();
     } catch {
@@ -684,43 +708,89 @@ export default function HomePage() {
     }
   };
 
-  const onShare = async (postId: string) => {
-    if (!token) return;
-    setItems((prev) =>
-      prev.map((p) =>
-        p.item.id === postId
-          ? {
-              ...p,
-              item: {
-                ...p.item,
-                stats: {
-                  ...p.item.stats,
-                  shares: (p.item.stats.shares ?? 0) + 1,
-                },
-              },
-            }
-          : p
-      )
-    );
+  const onRepostIntent = (
+    postId: string,
+    label: string,
+    kind: "post" | "reel"
+  ) => {
+    if (!token) {
+      showToast("Sign in to repost");
+      return;
+    }
+    if (repostHideTimerRef.current) clearTimeout(repostHideTimerRef.current);
+    setRepostClosing(false);
+    setRepostTarget({ postId, label, kind });
+    setRepostMode(null);
+    setRepostNote("");
+    setRepostError("");
+    setRepostSubmitting(false);
+  };
+
+  const closeRepostModal = () => {
+    if (repostHideTimerRef.current) clearTimeout(repostHideTimerRef.current);
+    setRepostClosing(true);
+    repostHideTimerRef.current = setTimeout(() => {
+      setRepostTarget(null);
+      setRepostMode(null);
+      setRepostNote("");
+      setRepostError("");
+      setRepostSubmitting(false);
+      setRepostClosing(false);
+    }, REPORT_ANIMATION_MS);
+  };
+
+  const submitRepost = async () => {
+    if (!token || !repostTarget || !repostMode) {
+      setRepostError("Choose an option to continue");
+      return;
+    }
+    setRepostSubmitting(true);
+    setRepostError("");
     try {
-      await sharePost({ token, postId });
-    } catch {
-      setItems((prev) =>
-        prev.map((p) =>
-          p.item.id === postId
-            ? {
-                ...p,
-                item: {
-                  ...p.item,
-                  stats: {
-                    ...p.item.stats,
-                    shares: Math.max(0, (p.item.stats.shares ?? 0) - 1),
+      if (repostMode === "repost") {
+        await repostPost({ token, postId: repostTarget.postId });
+        setItems((prev) =>
+          prev.map((p) =>
+            p.item.id === repostTarget.postId
+              ? {
+                  ...p,
+                  item: {
+                    ...p.item,
+                    stats: {
+                      ...p.item.stats,
+                      shares: (p.item.stats.shares ?? 0) + 1,
+                    },
                   },
-                },
-              }
-            : p
-        )
-      );
+                  flags: { ...p.flags, reposted: true },
+                }
+              : p
+          )
+        );
+        showToast("Reposted");
+        closeRepostModal();
+        return;
+      }
+
+      const note = repostNote.trim();
+      const payload = {
+        repostOf: repostTarget.postId,
+        content: note || undefined,
+      };
+      const created =
+        repostTarget.kind === "reel"
+          ? await createReel({ token, payload: payload as any })
+          : await createPost({ token, payload });
+      setItems((prev) => [{ item: created, flags: {} }, ...prev]);
+      showToast("Reposted with quote");
+      closeRepostModal();
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Could not repost";
+      setRepostError(message || "Could not repost");
+    } finally {
+      setRepostSubmitting(false);
     }
   };
 
@@ -838,6 +908,48 @@ export default function HomePage() {
     [showToast]
   );
 
+  const onDeleteIntent = (postId: string, label: string) => {
+    if (!token) {
+      showToast("Please sign in to delete posts");
+      return;
+    }
+    setDeleteTarget({ postId, label });
+    setDeleteError("");
+  };
+
+  const closeDeleteModal = () => {
+    if (deleteSubmitting) return;
+    setDeleteTarget(null);
+    setDeleteError("");
+  };
+
+  const confirmDelete = async () => {
+    if (!token || !deleteTarget) {
+      setDeleteError("Please sign in to delete posts");
+      return;
+    }
+    setDeleteSubmitting(true);
+    setDeleteError("");
+    try {
+      await deletePost({ token, postId: deleteTarget.postId });
+      setItems((prev) => {
+        const next = prev.filter((p) => p.item.id !== deleteTarget.postId);
+        persistFeedCache({ items: next, page, hasMore });
+        return next;
+      });
+      setDeleteTarget(null);
+      showToast("Deleted post");
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? (err as { message?: string }).message || "Failed to delete post"
+          : "Failed to delete post";
+      setDeleteError(message);
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
   const onReportIntent = (postId: string, label: string) => {
     if (!token) return;
     if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
@@ -949,10 +1061,12 @@ export default function HomePage() {
 
   const onView = (postId: string, durationMs?: number) => {
     if (!token) return;
+    const targetItem = items.find((p) => p.item.id === postId)?.item;
+    const targetId = targetItem?.repostOf || postId;
     const existing = viewTimers.current.get(postId);
     if (existing) clearTimeout(existing);
     const timer = setTimeout(() => {
-      viewPost({ token, postId, durationMs }).catch(() => undefined);
+      viewPost({ token, postId: targetId, durationMs }).catch(() => undefined);
     }, VIEW_DEBOUNCE_MS);
     viewTimers.current.set(postId, timer);
   };
@@ -999,12 +1113,19 @@ export default function HomePage() {
             flags={flags}
             onLike={onLike}
             onSave={onSave}
-            onShare={onShare}
+            onShare={(id) =>
+              onRepostIntent(
+                id,
+                item.authorUsername || item.author?.username || "this user",
+                item.kind
+              )
+            }
             onHide={onHide}
             onToggleComments={onToggleComments}
             onToggleHideLikeCount={onToggleHideLikeCount}
             onCopyLink={onCopyLink}
             onReportIntent={onReportIntent}
+            onDeleteIntent={onDeleteIntent}
             onView={onView}
             onBlockUser={onBlockIntent}
             viewerId={viewerId}
@@ -1023,6 +1144,44 @@ export default function HomePage() {
           </button>
         )}
       </div>
+
+      {deleteTarget ? (
+        <div
+          className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeDeleteModal}
+        >
+          <div
+            className={styles.modalCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className={styles.modalTitle}>Delete this post?</h3>
+            <p className={styles.modalBody}>
+              {`${deleteTarget.label}'s post will be removed for everyone. This action cannot be undone.`}
+            </p>
+            {deleteError ? (
+              <div className={styles.inlineError}>{deleteError}</div>
+            ) : null}
+            <div className={styles.modalActions}>
+              <button
+                className={styles.modalSecondary}
+                onClick={closeDeleteModal}
+                disabled={deleteSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.modalDanger}
+                onClick={confirmDelete}
+                disabled={deleteSubmitting}
+              >
+                {deleteSubmitting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {blockTarget ? (
         <div className={styles.modalOverlay} role="dialog" aria-modal="true">
@@ -1188,6 +1347,125 @@ export default function HomePage() {
         </div>
       ) : null}
 
+      {repostTarget ? (
+        <div
+          className={`${styles.modalOverlay} ${
+            repostClosing ? styles.modalOverlayClosing : styles.modalOverlayOpen
+          }`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeRepostModal}
+        >
+          <div
+            className={`${styles.modalCard} ${styles.repostCard} ${
+              repostClosing ? styles.modalCardClosing : styles.modalCardOpen
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <div>
+                <h3 className={styles.modalTitle}>Repost</h3>
+                <p className={styles.modalBody}>
+                  {`Choose how to share @${repostTarget.label}'s ${repostTarget.kind}.`}
+                </p>
+              </div>
+              <button
+                className={styles.closeBtn}
+                onClick={closeRepostModal}
+                aria-label="Close"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <div className={styles.repostGrid}>
+              <button
+                type="button"
+                className={`${styles.repostOption} ${
+                  repostMode === "repost" ? styles.repostOptionActive : ""
+                }`}
+                onClick={() => setRepostMode("repost")}
+              >
+                <span className={styles.repostTitle}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="20"
+                    height="20"
+                    fill="currentColor"
+                  >
+                    <path d="M23.615 15.485a.75.75 0 0 1-.75.75h-2.25a.75.75 0 0 1-.75-.75 2.25 2.25 0 0 0-2.25-2.25h-5.46l3.47 3.47a.75.75 0 0 1-1.06 1.06l-4.75-4.75a.75.75 0 0 1 0-1.06l4.75-4.75a.75.75 0 0 1 1.06 1.06l-3.47 3.47h5.46a3.75 3.75 0 0 1 3.75 3.750 0 1 3.75 3.75ZM6.135 15.485h5.46a.75.75 0 0 1 0 1.5h-5.46a3.75 3.75 0 0 1-3.75-3.75 3.75 3.75 0 0 1 3.75-3.75h2.25a.75.75 0 0 1 .75.75v5.25a.75.75 0 0 1-1.28.53l-2.25-2.25a.75.75 0 0 1 1.06-1.06l.97.97v-3.44h-1.5a2.25 2.25 0 0 0-2.25 2.25 2.25 2.25 0 0 0 2.25 2.25Z"></path>
+                  </svg>
+                  Repost only
+                </span>
+                <span className={styles.repostDesc}>
+                  Share the original post without a caption. Likes/Views will be
+                  credited to the original post.
+                </span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.repostOption} ${
+                  repostMode === "quote" ? styles.repostOptionActive : ""
+                }`}
+                onClick={() => setRepostMode("quote")}
+              >
+                <span className={styles.repostTitle}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="20"
+                    height="20"
+                    fill="currentColor"
+                  >
+                    <path d="M4.5 7.5a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-9a3 3 0 0 1-3-3v-9Z" opacity="0.1"></path>
+                    <path d="M15.75 2.25H8.25a5.25 5.25 0 0 0-5.25 5.25v8.25a5.25 5.25 0 0 0 5.25 5.25h7.5a5.25 5.25 0 0 0 5.25-5.25V7.5a5.25 5.25 0 0 0-5.25-5.25Zm3.75 13.5a3.75 3.75 0 0 1-3.75 3.75H8.25a3.75 3.75 0 0 1-3.75-3.75V7.5a3.75 3.75 0 0 1 3.75-3.75h7.5a3.75 3.75 0 0 1 3.75 3.75v8.25Z"></path>
+                    <path d="M10.28 11.47a.75.75 0 0 0-1.06-1.06l-1.5 1.5a.75.75 0 0 0 0 1.06l1.5 1.5a.75.75 0 0 0 1.06-1.06l-.97-.97h4.09l-.97.97a.75.75 0 0 0 1.06 1.06l1.5-1.5a.75.75 0 0 0 0-1.06l-1.5-1.5a.75.75 0 0 0-1.06 1.06l.97.97H9.31l.97-.97Z"></path>
+                  </svg>
+                  Quote
+                </span>
+                <span className={styles.repostDesc}>
+                  Add your own caption; comments belong to the quote, but
+                  likes/views still count for the original post.
+                </span>
+              </button>
+            </div>
+
+            {repostMode === "quote" ? (
+              <label className={styles.repostNoteLabel}>
+                Caption (optional)
+                <textarea
+                  className={styles.repostTextarea}
+                  value={repostNote}
+                  onChange={(e) => setRepostNote(e.target.value)}
+                  maxLength={500}
+                  placeholder="Add a few thoughts..."
+                />
+              </label>
+            ) : null}
+
+            {repostError ? (
+              <div className={styles.inlineError}>{repostError}</div>
+            ) : null}
+
+            <div className={styles.modalActions}>
+              <button
+                className={styles.modalSecondary}
+                onClick={closeRepostModal}
+                disabled={repostSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.modalPrimary}
+                onClick={submitRepost}
+                disabled={!repostMode || repostSubmitting}
+              >
+                {repostSubmitting ? "Sharing..." : "Share"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {toastMessage ? <div className={styles.toast}>{toastMessage}</div> : null}
     </div>
   );
@@ -1206,6 +1484,7 @@ function FeedCard({
   onToggleHideLikeCount,
   onCopyLink,
   onReportIntent,
+  onDeleteIntent,
   onView,
   onBlockUser,
   viewerId,
@@ -1226,6 +1505,7 @@ function FeedCard({
   onToggleHideLikeCount: (postId: string, hideLikeCount: boolean) => void;
   onCopyLink: (postId: string) => void | Promise<void>;
   onReportIntent: (postId: string, label: string) => void;
+  onDeleteIntent: (postId: string, label: string) => void;
   onView: (postId: string, durationMs?: number) => void;
   onBlockUser: (userId?: string, label?: string) => void | Promise<void>;
   viewerId?: string;
@@ -2540,7 +2820,16 @@ function FeedCard({
           )}
           <div className={styles.authorMeta}>
             <div>
-              <span className={styles.authorName}>{authorLine}</span>
+              {authorOwnerId ? (
+                <Link
+                  href={`/profile/${authorOwnerId}`}
+                  className={`${styles.authorName} ${styles.authorNameLink}`}
+                >
+                  {authorLine}
+                </Link>
+              ) : (
+                <span className={styles.authorName}>{authorLine}</span>
+              )}
 
               {showInlineFollow ? (
                 <>
@@ -2641,7 +2930,10 @@ function FeedCard({
                     </button>
                     <button
                       className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onDeleteIntent(id, authorLine);
+                      }}
                     >
                       Delete post
                     </button>
@@ -2920,7 +3212,7 @@ function FeedCard({
         </button>
         <button className={styles.actionBtn} onClick={() => onShare(id)}>
           <IconReup size={20} />
-          <span>Reup</span>
+          <span>Repost</span>
         </button>
       </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import Link from "next/link";
 import type { JSX, MutableRefObject } from "react";
 import { createPortal } from "react-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -36,6 +37,7 @@ type ReelCommentsProps = {
   panelRef?: MutableRefObject<HTMLElement | null>;
   viewerId?: string;
   postAuthorId?: string;
+  allowComments?: boolean;
   initialCount?: number;
   onTotalChange?: (postId: string, total: number) => void;
 };
@@ -208,6 +210,7 @@ export default function ReelComments({
   panelRef,
   viewerId,
   postAuthorId,
+  allowComments,
   initialCount,
   onTotalChange,
 }: ReelCommentsProps) {
@@ -276,9 +279,14 @@ export default function ReelComments({
     onTotalChange(postId, totalCount);
   }, [onTotalChange, postId, totalCount]);
 
+  const commentsLocked = useMemo(
+    () => allowComments === false,
+    [allowComments]
+  );
+
   const canInteract = useMemo(
-    () => Boolean(open && token && postId),
-    [open, postId, token]
+    () => Boolean(open && token && postId && !commentsLocked),
+    [commentsLocked, open, postId, token]
   );
 
   const topLevelComments = useMemo(
@@ -337,6 +345,14 @@ export default function ReelComments({
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (!commentsLocked) return;
+    setText("");
+    setReplyTarget(null);
+    setEditingCommentId(null);
+    setEmojiOpen(false);
+  }, [commentsLocked]);
 
   const closeCommentMenu = useCallback(() => {
     if (commentMenuCloseTimerRef.current)
@@ -568,25 +584,58 @@ export default function ReelComments({
           }
         }}
       >
-        <div
-          className={
-            depth > 0 ? postStyles.commentAvatarSmall : postStyles.commentAvatar
-          }
-        >
-          {comment.author?.avatarUrl ? (
-            <img
-              src={comment.author.avatarUrl}
-              alt={fallbackLabel}
-              loading="lazy"
-            />
-          ) : (
-            <span>{initials}</span>
-          )}
-        </div>
+        {authorId ? (
+          <Link
+            href={`/profile/${authorId}`}
+            className={
+              depth > 0
+                ? postStyles.commentAvatarSmall
+                : postStyles.commentAvatar
+            }
+            aria-label="View profile"
+          >
+            {comment.author?.avatarUrl ? (
+              <img
+                src={comment.author.avatarUrl}
+                alt={fallbackLabel}
+                loading="lazy"
+              />
+            ) : (
+              <span>{initials}</span>
+            )}
+          </Link>
+        ) : (
+          <div
+            className={
+              depth > 0
+                ? postStyles.commentAvatarSmall
+                : postStyles.commentAvatar
+            }
+          >
+            {comment.author?.avatarUrl ? (
+              <img
+                src={comment.author.avatarUrl}
+                alt={fallbackLabel}
+                loading="lazy"
+              />
+            ) : (
+              <span>{initials}</span>
+            )}
+          </div>
+        )}
         <div className={postStyles.commentBody}>
           <div className={postStyles.commentHeader}>
             <span className={postStyles.commentAuthor}>
-              @{fallbackLabel || "user"}
+              {authorId ? (
+                <Link
+                  href={`/profile/${authorId}`}
+                  className={postStyles.commentAuthorLink}
+                >
+                  @{fallbackLabel || "user"}
+                </Link>
+              ) : (
+                <>@{fallbackLabel || "user"}</>
+              )}
             </span>
           </div>
           <div className={postStyles.commentText}>{comment.content}</div>
@@ -1139,7 +1188,7 @@ export default function ReelComments({
   };
 
   const handleSubmit = async () => {
-    if (!token || !postId || submitting) return;
+    if (!token || !postId || submitting || commentsLocked) return;
     const content = text.trim();
     if (!content) return;
 
@@ -1313,137 +1362,146 @@ export default function ReelComments({
     : styles.commentSidebarExit;
 
   return (
-    <aside
-      className={`${styles.commentSidebar} ${sidebarAnimClass}`}
-      role="complementary"
-      aria-label="Comments"
-      ref={(node) => {
-        if (panelRef) panelRef.current = node;
-      }}
-    >
-      <div className={styles.commentSidebarHeader}>
-        <div>
-          <div className={styles.commentSidebarTitle}>
-            Comments ({Math.max(0, totalCount)})
-          </div>
-        </div>
-        <button
-          className={styles.commentCloseBtn}
-          onClick={onClose}
-          aria-label="Close comments"
-        >
-          ×
-        </button>
-      </div>
-
-      <div className={`${postStyles.infoScrollArea} ${styles.commentScroll}`}>
-        {error ? <div className={postStyles.errorBox}>{error}</div> : null}
-        <div className={postStyles.commentList}>
-          {topLevelComments.map((comment) => renderCommentThread(comment))}
-          {loading ? (
-            <div className={postStyles.stateBox}>Loading comments...</div>
-          ) : null}
-          {!loading && !comments.length && !error ? (
-            <div className={postStyles.stateBox}>No comments yet.</div>
-          ) : null}
-        </div>
-        {hasMore ? (
-          <button
-            className={postStyles.loadMoreBtn}
-            onClick={loadMore}
-            disabled={loading || loadingMore}
-          >
-            {loadingMore ? "Loading..." : "Load more"}
-          </button>
-        ) : null}
-      </div>
-
-      {replyTarget ? (
-        <div className={postStyles.replyBadge}>
-          Replying to @{replyTarget.username || "comment"}
-          <button
-            onClick={() => setReplyTarget(null)}
-            aria-label="Cancel reply"
-          >
-            ×
-          </button>
-        </div>
-      ) : null}
-
-      {editingCommentId ? (
-        <div className={postStyles.replyBadge}>
-          Editing your comment
-          <button
-            onClick={cancelEditComment}
-            aria-label="Cancel edit"
-            disabled={submitting}
-          >
-            ×
-          </button>
-        </div>
-      ) : null}
-
-      <div
-        className={postStyles.formRow}
-        style={{ paddingBottom: 12, paddingRight: 12 }}
+    <>
+      <aside
+        className={`${styles.commentSidebar} ${sidebarAnimClass}`}
+        role="complementary"
+        aria-label="Comments"
+        ref={(node) => {
+          if (panelRef) panelRef.current = node;
+        }}
       >
-        <div className={postStyles.emojiWrap} ref={emojiRef}>
-          <button
-            type="button"
-            className={postStyles.emojiButton}
-            onClick={() => setEmojiOpen((prev) => !prev)}
-            aria-label="Add emoji"
-            disabled={!canInteract}
-          >
-            <svg
-              aria-label="Emoji icon"
-              fill="currentColor"
-              height="22"
-              role="img"
-              viewBox="0 0 24 24"
-              width="22"
-            >
-              <title>Emoji icon</title>
-              <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
-            </svg>
-          </button>
-          {emojiOpen ? (
-            <div className={postStyles.emojiPopover}>
-              <EmojiPicker
-                onEmojiClick={(emojiData) => {
-                  insertEmoji(emojiData.emoji || "");
-                }}
-                searchDisabled={false}
-                skinTonesDisabled={false}
-                lazyLoadEmojis
-              />
+        <div className={styles.commentSidebarHeader}>
+          <div>
+            <div className={styles.commentSidebarTitle}>
+              Comments ({Math.max(0, totalCount)})
             </div>
+          </div>
+          <button
+            className={styles.commentCloseBtn}
+            onClick={onClose}
+            aria-label="Close comments"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className={`${postStyles.infoScrollArea} ${styles.commentScroll}`}>
+          {error ? <div className={postStyles.errorBox}>{error}</div> : null}
+          <div className={postStyles.commentList}>
+            {topLevelComments.map((comment) => renderCommentThread(comment))}
+            {loading ? (
+              <div className={postStyles.stateBox}>Loading comments...</div>
+            ) : null}
+            {!loading && !comments.length && !error ? (
+              <div className={postStyles.stateBox}>No comments yet.</div>
+            ) : null}
+          </div>
+          {hasMore ? (
+            <button
+              className={postStyles.loadMoreBtn}
+              onClick={loadMore}
+              disabled={loading || loadingMore}
+            >
+              {loadingMore ? "Loading..." : "Load more"}
+            </button>
           ) : null}
         </div>
-        <textarea
-          className={postStyles.input}
-          placeholder="Add a comment..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows={3}
-          ref={textareaRef}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSubmit();
-            }
-          }}
-          disabled={!canInteract || submitting}
-        />
-        <button
-          className={postStyles.submitBtn}
-          onClick={handleSubmit}
-          disabled={!canInteract || submitting || !text.trim()}
-        >
-          {submitting ? "Sending..." : "Post"}
-        </button>
-      </div>
 
+        {commentsLocked ? (
+          <div className={postStyles.commentsLockedNotice}>
+            The post owner has turned off comments.
+          </div>
+        ) : (
+          <>
+            {replyTarget ? (
+              <div className={postStyles.replyBadge}>
+                Replying to @{replyTarget.username || "comment"}
+                <button
+                  onClick={() => setReplyTarget(null)}
+                  aria-label="Cancel reply"
+                >
+                  ×
+                </button>
+              </div>
+            ) : null}
+
+            {editingCommentId ? (
+              <div className={postStyles.replyBadge}>
+                Editing your comment
+                <button
+                  onClick={cancelEditComment}
+                  aria-label="Cancel edit"
+                  disabled={submitting}
+                >
+                  ×
+                </button>
+              </div>
+            ) : null}
+
+            <div
+              className={postStyles.formRow}
+              style={{ paddingBottom: 12, paddingRight: 12 }}
+            >
+              <div className={postStyles.emojiWrap} ref={emojiRef}>
+                <button
+                  type="button"
+                  className={postStyles.emojiButton}
+                  onClick={() => setEmojiOpen((prev) => !prev)}
+                  aria-label="Add emoji"
+                  disabled={!canInteract}
+                >
+                  <svg
+                    aria-label="Emoji icon"
+                    fill="currentColor"
+                    height="22"
+                    role="img"
+                    viewBox="0 0 24 24"
+                    width="22"
+                  >
+                    <title>Emoji icon</title>
+                    <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
+                  </svg>
+                </button>
+                {emojiOpen ? (
+                  <div className={postStyles.emojiPopover}>
+                    <EmojiPicker
+                      onEmojiClick={(emojiData) => {
+                        insertEmoji(emojiData.emoji || "");
+                      }}
+                      searchDisabled={false}
+                      skinTonesDisabled={false}
+                      lazyLoadEmojis
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <textarea
+                className={postStyles.input}
+                placeholder="Add a comment..."
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                rows={3}
+                ref={textareaRef}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+                disabled={!canInteract || submitting}
+              />
+              <button
+                className={postStyles.submitBtn}
+                onClick={handleSubmit}
+                disabled={!canInteract || submitting || !text.trim()}
+              >
+                {submitting ? "Sending..." : "Post"}
+              </button>
+            </div>
+          </>
+        )}
+      </aside>
       {reportingCommentId ? (
         <div
           className={`${postStyles.reportOverlay} ${
@@ -1685,6 +1743,6 @@ export default function ReelComments({
           </div>
         </div>
       ) : null}
-    </aside>
+    </>
   );
 }

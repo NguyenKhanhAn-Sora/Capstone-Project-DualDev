@@ -2,7 +2,9 @@
 
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
+import EmojiPicker from "emoji-picker-react";
+import { useParams, useRouter } from "next/navigation";
 import {
   fetchReelsFeed,
   fetchReelDetail,
@@ -16,10 +18,20 @@ import {
   unfollowUser,
   viewPost,
   type FeedItem,
+  reportPost,
+  setPostAllowComments,
+  setPostHideLikeCount,
+  updatePostVisibility,
+  updatePost,
+  deletePost,
+  searchProfiles,
+  type ProfileSearchItem,
 } from "@/lib/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import ReelComments from "./ReelComments";
 import styles from "./reel.module.css";
+import postStyles from "../post/post.module.css";
+import feedStyles from "../home-feed.module.css";
 
 const formatCount = (value?: number) => {
   const n = value ?? 0;
@@ -30,8 +42,117 @@ const formatCount = (value?: number) => {
 };
 
 const REEL_STATS_POLL_INTERVAL = 5000;
+const VIEW_THRESHOLD = 0.5;
+const VIEW_DWELL_MS = 2000;
+const VIEW_COOLDOWN_MS = 5 * 60 * 1000;
 
 type ReelItem = FeedItem & { durationSeconds?: number };
+
+type ReportCategory = {
+  key:
+    | "abuse"
+    | "violence"
+    | "sensitive"
+    | "misinfo"
+    | "spam"
+    | "ip"
+    | "illegal"
+    | "privacy"
+    | "other";
+  label: string;
+  accent: string;
+  reasons: Array<{ key: string; label: string }>;
+};
+
+const REPORT_GROUPS: ReportCategory[] = [
+  {
+    key: "abuse",
+    label: "Harassment / Hate speech",
+    accent: "#f59e0b",
+    reasons: [
+      { key: "harassment", label: "Targets an individual to harass" },
+      { key: "hate_speech", label: "Hate speech or discrimination" },
+      { key: "offensive_discrimination", label: "Attacks vulnerable groups" },
+    ],
+  },
+  {
+    key: "violence",
+    label: "Violence / Threats",
+    accent: "#ef4444",
+    reasons: [
+      { key: "violence_threats", label: "Threatens or promotes violence" },
+      { key: "graphic_violence", label: "Graphic violent imagery" },
+      { key: "extremism", label: "Extremism or terrorism" },
+      { key: "self_harm", label: "Self-harm or suicide" },
+    ],
+  },
+  {
+    key: "sensitive",
+    label: "Sensitive content",
+    accent: "#a855f7",
+    reasons: [
+      { key: "nudity", label: "Nudity or adult content" },
+      { key: "minor_nudity", label: "Minor safety risk" },
+      { key: "sexual_solicitation", label: "Sexual solicitation" },
+    ],
+  },
+  {
+    key: "misinfo",
+    label: "Impersonation / Misinformation",
+    accent: "#22c55e",
+    reasons: [
+      { key: "fake_news", label: "False or misleading information" },
+      { key: "impersonation", label: "Impersonation of a person or org" },
+    ],
+  },
+  {
+    key: "spam",
+    label: "Spam / Scam",
+    accent: "#14b8a6",
+    reasons: [
+      { key: "spam", label: "Spam or irrelevant content" },
+      { key: "financial_scam", label: "Financial scam" },
+      { key: "unsolicited_ads", label: "Unwanted advertising" },
+    ],
+  },
+  {
+    key: "ip",
+    label: "Intellectual property",
+    accent: "#3b82f6",
+    reasons: [
+      { key: "copyright", label: "Copyright infringement" },
+      { key: "trademark", label: "Trademark violation" },
+      { key: "brand_impersonation", label: "Brand impersonation" },
+    ],
+  },
+  {
+    key: "illegal",
+    label: "Illegal activity",
+    accent: "#f97316",
+    reasons: [
+      { key: "contraband", label: "Contraband" },
+      { key: "illegal_transaction", label: "Illegal transaction" },
+    ],
+  },
+  {
+    key: "privacy",
+    label: "Privacy violation",
+    accent: "#06b6d4",
+    reasons: [
+      { key: "doxxing", label: "Doxxing private information" },
+      {
+        key: "nonconsensual_intimate",
+        label: "Non-consensual intimate content",
+      },
+    ],
+  },
+  {
+    key: "other",
+    label: "Other",
+    accent: "#94a3b8",
+    reasons: [{ key: "other", label: "Other reason" }],
+  },
+];
 
 const getUserIdFromToken = (token: string | null): string | undefined => {
   if (!token) return undefined;
@@ -47,10 +168,48 @@ const getUserIdFromToken = (token: string | null): string | undefined => {
   }
 };
 
+const normalizeHashtag = (value: string) =>
+  value
+    .replace(/^#/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "")
+    .replace(/[^a-zA-Z0-9_]/g, "")
+    .toLowerCase();
+
+const cleanLocationLabel = (label: string) =>
+  label
+    .replace(/\b\d{4,6}\b/g, "")
+    .replace(/,\s*,+/g, ", ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s*,\s*$/g, "")
+    .replace(/^\s*,\s*/g, "")
+    .trim();
+
+const extractMentionsFromCaption = (value: string) => {
+  const handles = new Set<string>();
+  const regex = /@([a-zA-Z0-9_.]{1,30})/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(value))) {
+    handles.add(match[1].toLowerCase());
+  }
+  return Array.from(handles);
+};
+
+const findActiveMention = (value: string, caret: number) => {
+  const beforeCaret = value.slice(0, caret);
+  const match = /(^|[\s([{.,!?])@([a-zA-Z0-9_.]{0,30})$/i.exec(beforeCaret);
+  if (!match) return null;
+  const handle = match[2];
+  const start = caret - handle.length - 1;
+  return { handle, start, end: caret };
+};
+
 type ReelVideoProps = {
   item: ReelItem;
   autoplay: boolean;
   onViewed?: (msWatched?: number) => void;
+  children?: React.ReactNode;
 };
 
 const IconPlay = ({ size = 56 }: { size?: number }) => (
@@ -190,7 +349,7 @@ const IconArrow = ({ up }: { up?: boolean }) => (
   </svg>
 );
 
-function ReelVideo({ item, autoplay, onViewed }: ReelVideoProps) {
+function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -265,7 +424,7 @@ function ReelVideo({ item, autoplay, onViewed }: ReelVideoProps) {
     const handleTime = () => {
       const t = video.currentTime;
       setCurrent(t);
-      if (!viewSentRef.current && t >= 2) {
+      if (!viewSentRef.current && t * 1000 >= VIEW_DWELL_MS) {
         viewSentRef.current = true;
         onViewed?.(Math.round(t * 1000));
       }
@@ -350,6 +509,7 @@ function ReelVideo({ item, autoplay, onViewed }: ReelVideoProps) {
 
   return (
     <div className={shellClass} onClick={togglePlay}>
+      {children}
       <video
         ref={videoRef}
         className={styles.video}
@@ -390,7 +550,16 @@ function ReelVideo({ item, autoplay, onViewed }: ReelVideoProps) {
       <div className={styles.captionCard}>
         <div className={styles.captionHeader}>
           {item.authorUsername ? (
-            <div className={styles.captionHandle}>@{item.authorUsername}</div>
+            item.authorId ? (
+              <Link
+                href={`/profile/${item.authorId}`}
+                className={`${styles.captionHandle} ${styles.captionHandleLink}`}
+              >
+                @{item.authorUsername}
+              </Link>
+            ) : (
+              <div className={styles.captionHandle}>@{item.authorUsername}</div>
+            )
           ) : null}
         </div>
         <div
@@ -440,23 +609,50 @@ function ReelActions({
       (item as unknown as { following?: boolean }).following
   );
   const isSelf = Boolean(viewerId && item.authorId === viewerId);
+  const hideLikeCount =
+    (item as any)?.hideLikeCount ??
+    (item.flags as any)?.hideLikeCount ??
+    (item as any)?.permissions?.hideLikeCount;
+  const likeCountHidden = Boolean(hideLikeCount) && !isSelf;
+  const likeCountLabel = likeCountHidden ? "" : formatCount(item.stats?.hearts);
   return (
     <div className={styles.actionBar}>
       <div className={styles.avatarShell}>
-        <div className={styles.avatarWrap}>
-          {item.authorAvatarUrl ? (
-            <img
-              src={item.authorAvatarUrl}
-              alt={item.authorDisplayName || item.authorUsername || "avatar"}
-            />
-          ) : (
-            <span>
-              {(item.authorDisplayName || item.authorUsername || "?")
-                .slice(0, 2)
-                .toUpperCase()}
-            </span>
-          )}
-        </div>
+        {item.authorId ? (
+          <Link
+            href={`/profile/${item.authorId}`}
+            className={styles.avatarWrap}
+            aria-label="View author profile"
+          >
+            {item.authorAvatarUrl ? (
+              <img
+                src={item.authorAvatarUrl}
+                alt={item.authorDisplayName || item.authorUsername || "avatar"}
+              />
+            ) : (
+              <span>
+                {(item.authorDisplayName || item.authorUsername || "?")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </span>
+            )}
+          </Link>
+        ) : (
+          <div className={styles.avatarWrap}>
+            {item.authorAvatarUrl ? (
+              <img
+                src={item.authorAvatarUrl}
+                alt={item.authorDisplayName || item.authorUsername || "avatar"}
+              />
+            ) : (
+              <span>
+                {(item.authorDisplayName || item.authorUsername || "?")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </span>
+            )}
+          </div>
+        )}
         {item.authorId && !isSelf ? (
           <button
             className={`${styles.followBadge} ${
@@ -478,12 +674,12 @@ function ReelActions({
           item.liked ? styles.actionActive : ""
         }`}
         onClick={() => onLike(item.id, Boolean(item.liked))}
-        aria-label="Like reel"
+        aria-label={likeCountHidden ? "Like reel (count hidden)" : "Like reel"}
       >
         <span className={`${styles.actionBtnWrap}`}>
           <IconHeart filled={item.liked} />
         </span>
-        <span>{formatCount(item.stats?.hearts)}</span>
+        <span>{likeCountLabel}</span>
       </button>
       <button
         className={styles.actionBtn}
@@ -527,30 +723,264 @@ export default function ReelPage() {
   const canRender = useRequireAuth();
   const router = useRouter();
   const params = useParams<{ id?: string | string[] }>();
-  const pathname = usePathname();
-  const requestedReelId = useMemo(() => {
-    if (!params?.id) return undefined;
-    return Array.isArray(params.id) ? params.id[0] : params.id;
-  }, [params]);
-  const [token, setToken] = useState<string | null>(null);
   const [viewerId, setViewerId] = useState<string | undefined>(() =>
     typeof window === "undefined"
       ? undefined
       : getUserIdFromToken(localStorage.getItem("accessToken"))
   );
+  const requestedReelId = useMemo(() => {
+    const fromPath = params?.id
+      ? Array.isArray(params.id)
+        ? params.id[0]
+        : params.id
+      : undefined;
+
+    if (fromPath) return fromPath;
+
+    if (typeof window !== "undefined" && viewerId) {
+      try {
+        const raw = localStorage.getItem("lastOwnedReelId");
+        if (raw) {
+          const parsed = JSON.parse(raw) as { id?: string; ownerId?: string };
+          if (parsed?.id && parsed.ownerId === viewerId) return parsed.id;
+        }
+      } catch {
+        /* ignore stored parse errors */
+      }
+    }
+
+    return undefined;
+  }, [params, viewerId]);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [items, setItems] = useState<ReelItem[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const activeIndexRef = useRef(0);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const visibleReelsRef = useRef<Set<string>>(new Set());
+  const viewCooldownRef = useRef<Map<string, number>>(new Map());
   const [transition, setTransition] = useState<"next" | "prev" | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentReelId, setCommentReelId] = useState<string | null>(null);
   const [commentsRender, setCommentsRender] = useState(false);
-  const wheelLockRef = useRef(false);
   const commentPanelRef = useRef<HTMLElement | null>(null);
   const commentCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const missingDetailRef = useRef<Set<string>>(new Set());
+  const [openMoreMenuId, setOpenMoreMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportClosing, setReportClosing] = useState(false);
+  const reportHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [reportCategory, setReportCategory] = useState<
+    ReportCategory["key"] | null
+  >(null);
+  const [reportReason, setReportReason] = useState<string | null>(null);
+  const [reportNote, setReportNote] = useState("");
+  const [reportError, setReportError] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [visibilityModalOpen, setVisibilityModalOpen] = useState(false);
+  const [visibilitySaving, setVisibilitySaving] = useState(false);
+  const [visibilitySelected, setVisibilitySelected] = useState<
+    "public" | "followers" | "private"
+  >("public");
+  const [visibilityError, setVisibilityError] = useState("");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editCaption, setEditCaption] = useState("");
+  const editCaptionRef = useRef<HTMLTextAreaElement | null>(null);
+  const editEmojiRef = useRef<HTMLDivElement | null>(null);
+  const [editEmojiOpen, setEditEmojiOpen] = useState(false);
+  const [editHashtags, setEditHashtags] = useState<string[]>([]);
+  const [hashtagDraft, setHashtagDraft] = useState("");
+  const [editMentions, setEditMentions] = useState<string[]>([]);
+  const [mentionDraft, setMentionDraft] = useState("");
+  const [mentionSuggestions, setMentionSuggestions] = useState<
+    ProfileSearchItem[]
+  >([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const [mentionError, setMentionError] = useState("");
+  const [mentionHighlight, setMentionHighlight] = useState(-1);
+  const [activeMentionRange, setActiveMentionRange] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
+  const [editLocation, setEditLocation] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState<
+    Array<{ label: string; lat: string; lon: string }>
+  >([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [locationHighlight, setLocationHighlight] = useState(-1);
+  const [editAllowComments, setEditAllowComments] = useState(true);
+  const [editAllowDownload, setEditAllowDownload] = useState(false);
+  const [editHideLikeCount, setEditHideLikeCount] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editSuccess, setEditSuccess] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  useEffect(() => {
+    if (!openMoreMenuId) return;
+    const handleClick = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMoreMenuId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [openMoreMenuId]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!editEmojiRef.current) return;
+      if (!editEmojiRef.current.contains(event.target as Node)) {
+        setEditEmojiOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setEditEmojiOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
+      if (commentCloseTimerRef.current)
+        clearTimeout(commentCloseTimerRef.current);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!editOpen) return;
+    const cleaned = mentionDraft.trim().replace(/^@/, "");
+    if (!cleaned) {
+      setMentionSuggestions([]);
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setMentionError("");
+      return;
+    }
+
+    if (!token) {
+      setMentionSuggestions([]);
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setMentionError("Sign in to mention users");
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setMentionLoading(true);
+      setMentionError("");
+      try {
+        const res = await searchProfiles({
+          token,
+          query: cleaned,
+          limit: 8,
+        });
+        if (cancelled) return;
+        setMentionSuggestions(res.items);
+        setMentionOpen(res.items.length > 0);
+        setMentionHighlight(res.items.length ? 0 : -1);
+        if (!res.items.length) {
+          setMentionError("User not found");
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setMentionSuggestions([]);
+        setMentionOpen(false);
+        setMentionHighlight(-1);
+        setMentionError("User not found");
+      } finally {
+        if (!cancelled) setMentionLoading(false);
+      }
+    }, 320);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [editOpen, mentionDraft, token]);
+
+  useEffect(() => {
+    if (!editOpen) return;
+    if (!locationQuery.trim()) {
+      setLocationSuggestions([]);
+      setLocationOpen(false);
+      setLocationHighlight(-1);
+      setLocationError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setLocationLoading(true);
+      setLocationError("");
+      try {
+        const url = new URL("https://nominatim.openstreetmap.org/search");
+        url.searchParams.set("q", locationQuery);
+        url.searchParams.set("format", "jsonv2");
+        url.searchParams.set("addressdetails", "1");
+        url.searchParams.set("limit", "8");
+        url.searchParams.set("countrycodes", "vn");
+        const res = await fetch(url.toString(), {
+          headers: {
+            Accept: "application/json",
+            "Accept-Language": "vi",
+          },
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error("search failed");
+        const data = await res.json();
+        const mapped = Array.isArray(data)
+          ? data.map((item: any) => ({
+              label: cleanLocationLabel(item.display_name as string),
+              lat: item.lat as string,
+              lon: item.lon as string,
+            }))
+          : [];
+        setLocationSuggestions(mapped);
+        setLocationOpen(true);
+        setLocationHighlight(mapped.length ? 0 : -1);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setLocationSuggestions([]);
+        setLocationOpen(false);
+        setLocationHighlight(-1);
+        setLocationError("No suggestions found, try different keywords.");
+      } finally {
+        if (!controller.signal.aborted) setLocationLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [editOpen, locationQuery]);
 
   useEffect(() => {
     if (!canRender) return;
@@ -561,20 +991,113 @@ export default function ReelPage() {
 
   useEffect(() => {
     if (!token) return;
-    setLoading(true);
-    fetchReelsFeed({ token })
-      .then((data) => {
-        const nextItems = data || [];
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      try {
+        let nextItems = (await fetchReelsFeed({ token })) || [];
+
+        if (!nextItems.length && viewerId) {
+          const owned =
+            (await fetchReelsFeed({
+              token,
+              authorId: viewerId,
+              includeOwned: true,
+            })) || [];
+          if (owned.length) nextItems = owned;
+        }
+
+        if (cancelled) return;
+
         setItems(nextItems);
         const initialIndex = requestedReelId
           ? nextItems.findIndex((it) => it.id === requestedReelId)
           : 0;
         setActiveIndex(initialIndex >= 0 ? initialIndex : 0);
         setError("");
+      } catch (err) {
+        if (cancelled) return;
+        setError(
+          (err as { message?: string })?.message ||
+            "Không tải được danh sách reel"
+        );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, viewerId, requestedReelId]);
+
+  useEffect(() => {
+    if (!token || !viewerId) return;
+    const ownedPresent = items.some((it) => it.authorId === viewerId);
+    if (ownedPresent) return;
+
+    try {
+      const raw = localStorage.getItem("lastOwnedReelId");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { id?: string; ownerId?: string };
+      if (!parsed?.id || parsed.ownerId !== viewerId) return;
+      const reelId = parsed.id;
+      if (items.some((it) => it.id === reelId)) return;
+      if (missingDetailRef.current.has(reelId)) return;
+
+      missingDetailRef.current.add(reelId);
+      let cancelled = false;
+
+      fetchReelDetail({ token, reelId })
+        .then((detail) => {
+          if (cancelled || !detail) return;
+          setItems((prev) => {
+            if (prev.some((it) => it.id === detail.id)) return prev;
+            const next = [detail, ...prev];
+            return next;
+          });
+          setActiveIndex((prev) => 0);
+        })
+        .catch(() => undefined);
+
+      return () => {
+        cancelled = true;
+      };
+    } catch {
+      /* ignore storage parse errors */
+    }
+  }, [items, token, viewerId]);
+
+  useEffect(() => {
+    if (!token || !requestedReelId) return;
+    if (items.some((it) => it.id === requestedReelId)) return;
+    if (missingDetailRef.current.has(requestedReelId)) return;
+
+    missingDetailRef.current.add(requestedReelId);
+    let cancelled = false;
+
+    fetchReelDetail({ token, reelId: requestedReelId })
+      .then((detail) => {
+        if (cancelled || !detail) return;
+        setItems((prev) => {
+          if (prev.some((it) => it.id === detail.id)) return prev;
+          return [detail, ...prev];
+        });
+        setActiveIndex(0);
       })
-      .catch((err) => setError(err?.message || "Không tải được danh sách reel"))
-      .finally(() => setLoading(false));
-  }, [token]);
+      .catch((err) => {
+        if (cancelled) return;
+        setError(
+          (err as { message?: string })?.message || "Không tải được reel"
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items, requestedReelId, token]);
 
   const updateItem = (id: string, patch: Partial<ReelItem>) => {
     setItems((prev) =>
@@ -620,6 +1143,322 @@ export default function ReelPage() {
     },
     []
   );
+
+  const showToast = useCallback((message: string, duration = 1600) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastMessage(message);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), duration);
+  }, []);
+
+  const applyEditSeed = useCallback((seed?: ReelItem | null) => {
+    const current = seed;
+    const content = current?.content || "";
+
+    setEditCaption(content);
+    setEditHashtags(current?.hashtags || []);
+    setHashtagDraft("");
+    setEditMentions(current?.mentions || []);
+    setMentionDraft("");
+    setMentionSuggestions([]);
+    setMentionOpen(false);
+    setMentionLoading(false);
+    setMentionError("");
+    setMentionHighlight(-1);
+    setActiveMentionRange(null);
+    setEditLocation(current?.location || "");
+    setLocationQuery(current?.location || "");
+    setLocationSuggestions([]);
+    setLocationOpen(false);
+    setLocationLoading(false);
+    setLocationError("");
+    setLocationHighlight(-1);
+    setEditAllowComments(current?.allowComments !== false);
+    setEditAllowDownload(
+      Boolean(
+        (current as any)?.allowDownload ??
+          (current as any)?.allowDownloads ??
+          (current as any)?.flags?.allowDownload ??
+          (current as any)?.permissions?.allowDownload
+      )
+    );
+    setEditHideLikeCount(Boolean(current?.hideLikeCount));
+    setEditError("");
+    setEditSuccess("");
+  }, []);
+
+  const openEditModal = () => {
+    if (!active) return;
+    applyEditSeed(active);
+    setEditOpen(true);
+    setOpenMoreMenuId(null);
+  };
+
+  const closeEditModal = () => {
+    if (editSaving) return;
+    setEditOpen(false);
+  };
+
+  const handleCaptionChange = (
+    event: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    const value = event.target.value;
+    const caret = event.target.selectionStart ?? value.length;
+    setEditCaption(value);
+
+    const activeMention = findActiveMention(value, caret);
+    if (activeMention) {
+      setActiveMentionRange({
+        start: activeMention.start,
+        end: activeMention.end,
+      });
+      setMentionDraft(activeMention.handle);
+      setMentionOpen(true);
+      setMentionError("");
+      setMentionHighlight(0);
+    } else {
+      setActiveMentionRange(null);
+      setMentionDraft("");
+      setMentionSuggestions([]);
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setMentionError("");
+    }
+  };
+
+  const insertEditEmoji = (emoji: string) => {
+    const el = editCaptionRef.current;
+    const caret = el?.selectionStart ?? editCaption.length;
+    setEditCaption((prev) => {
+      const value = prev || "";
+      if (!el || typeof el.selectionStart !== "number") {
+        return value + emoji;
+      }
+      const start = el.selectionStart;
+      const end = el.selectionEnd ?? start;
+      return value.slice(0, start) + emoji + value.slice(end);
+    });
+
+    setTimeout(() => {
+      if (!el) return;
+      const nextPos = caret + emoji.length;
+      el.focus();
+      el.setSelectionRange(nextPos, nextPos);
+    }, 0);
+  };
+
+  const selectMention = (opt: ProfileSearchItem) => {
+    const handle = opt.username.toLowerCase();
+    const caption = editCaption || "";
+    const range = activeMentionRange ?? {
+      start: caption.length,
+      end: caption.length,
+    };
+    const before = caption.slice(0, range.start);
+    const after = caption.slice(range.end);
+    const insertion = `@${handle}`;
+    const needsSpaceAfter = after.startsWith(" ") || after === "" ? "" : " ";
+    const nextCaption = `${before}${insertion}${needsSpaceAfter}${after}`;
+    const nextMentions = editMentions.includes(handle)
+      ? editMentions
+      : [...editMentions, handle];
+    setEditCaption(nextCaption);
+    setEditMentions(nextMentions);
+    setMentionOpen(false);
+    setMentionHighlight(-1);
+    setActiveMentionRange(null);
+  };
+
+  const onCaptionKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!mentionOpen) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!mentionSuggestions.length) return;
+      setMentionHighlight((prev) =>
+        prev + 1 < mentionSuggestions.length ? prev + 1 : 0
+      );
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!mentionSuggestions.length) return;
+      setMentionHighlight((prev) =>
+        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
+      );
+      return;
+    }
+    if (e.key === "Enter") {
+      if (mentionSuggestions.length && mentionHighlight >= 0) {
+        e.preventDefault();
+        const opt = mentionSuggestions[mentionHighlight];
+        if (opt) selectMention(opt);
+      }
+    }
+    if (e.key === "Escape") {
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setActiveMentionRange(null);
+    }
+  };
+
+  const addHashtag = () => {
+    const cleaned = normalizeHashtag(hashtagDraft);
+    if (!cleaned) {
+      setHashtagDraft("");
+      return;
+    }
+    if (editHashtags.includes(cleaned)) {
+      setHashtagDraft("");
+      return;
+    }
+    setEditHashtags((prev) => [...prev, cleaned]);
+    setHashtagDraft("");
+  };
+
+  const removeHashtag = (tag: string) => {
+    setEditHashtags((prev) => prev.filter((t) => t !== tag));
+  };
+
+  const pickLocation = (label: string) => {
+    setEditLocation(label);
+    setLocationQuery(label);
+    setLocationOpen(false);
+    setLocationSuggestions([]);
+    setLocationHighlight(-1);
+  };
+
+  const onLocationKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!locationOpen) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setLocationHighlight((prev) =>
+        prev + 1 < locationSuggestions.length ? prev + 1 : 0
+      );
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setLocationHighlight((prev) =>
+        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1
+      );
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const chosen = locationSuggestions[locationHighlight];
+      if (chosen) pickLocation(chosen.label);
+    }
+  };
+
+  const handleEditSubmit = async (event?: React.FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    setEditError("");
+    setEditSuccess("");
+
+    if (!token || !active) {
+      setEditError("Please sign in to edit reels");
+      return;
+    }
+
+    const normalizedHashtags = Array.from(
+      new Set(editHashtags.map((t) => normalizeHashtag(t.toString())))
+    ).filter(Boolean);
+
+    const normalizedMentions = Array.from(
+      new Set(
+        [
+          ...extractMentionsFromCaption(editCaption || ""),
+          ...editMentions.map((t) =>
+            t.toString().trim().replace(/^@/, "").toLowerCase()
+          ),
+        ].filter(Boolean)
+      )
+    );
+
+    const trimmedLocation = editLocation.trim();
+
+    const payload = {
+      content: editCaption || "",
+      hashtags: normalizedHashtags,
+      mentions: normalizedMentions,
+      location: trimmedLocation || undefined,
+      allowComments: editAllowComments,
+      allowDownload: editAllowDownload,
+      hideLikeCount: editHideLikeCount,
+    } as const;
+
+    try {
+      setEditSaving(true);
+      const updated = await updatePost({
+        token,
+        postId: active.id,
+        payload,
+      });
+      setItems((prev) =>
+        prev.map((it) => (it.id === active.id ? { ...it, ...updated } : it))
+      );
+      setEditSuccess("Reel updated");
+      setEditOpen(false);
+      showToast("Reel updated");
+    } catch (err: any) {
+      const message =
+        (err && typeof err === "object" && "message" in err
+          ? (err as { message?: string }).message
+          : null) || "Failed to update reel";
+      setEditError(message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const closeDeleteConfirm = () => {
+    if (deleteSubmitting) return;
+    setDeleteConfirmOpen(false);
+  };
+
+  const confirmDelete = async () => {
+    if (!token || !active) {
+      setDeleteError("Please sign in to delete reels");
+      return;
+    }
+    setDeleteSubmitting(true);
+    setDeleteError("");
+    const targetId = active.id;
+    try {
+      await deletePost({ token, postId: targetId });
+      missingDetailRef.current.add(targetId);
+      let nextTargetId: string | null = null;
+      setItems((prev) => {
+        const idx = prev.findIndex((it) => it.id === targetId);
+        const next = prev.filter((it) => it.id !== targetId);
+        const plannedIndex =
+          next.length === 0
+            ? 0
+            : Math.max(
+                0,
+                Math.min(idx === -1 ? activeIndex : idx, next.length - 1)
+              );
+        nextTargetId = next[plannedIndex]?.id ?? null;
+        setActiveIndex(plannedIndex);
+        return next;
+      });
+      setCommentsOpen(false);
+      setDeleteConfirmOpen(false);
+      if (nextTargetId) {
+        router.push(`/reels/${nextTargetId}`);
+      } else {
+        router.push(`/reels`);
+      }
+      showToast("Deleted reel");
+    } catch (err: any) {
+      const message =
+        (err && typeof err === "object" && "message" in err
+          ? (err as { message?: string }).message
+          : null) || "Failed to delete reel";
+      setDeleteError(message);
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
 
   const handleLike = async (id: string, liked: boolean) => {
     if (!token) return;
@@ -694,10 +1533,73 @@ export default function ReelPage() {
 
   const handleViewed = (id: string, ms?: number) => {
     if (!token) return;
-    viewPost({ token, postId: id, durationMs: ms }).catch(() => undefined);
+    if (!visibleReelsRef.current.has(id)) return;
+
+    const now = Date.now();
+    const last = viewCooldownRef.current.get(id) ?? 0;
+    if (now - last < VIEW_COOLDOWN_MS) return;
+
+    viewPost({ token, postId: id, durationMs: ms })
+      .then(() => {
+        viewCooldownRef.current.set(id, Date.now());
+      })
+      .catch(() => undefined);
   };
 
   const active = items[activeIndex];
+  const isAuthor = useMemo(
+    () => Boolean(active?.authorId && viewerId && active.authorId === viewerId),
+    [active?.authorId, viewerId]
+  );
+
+  const selectedReportGroup = useMemo(
+    () => REPORT_GROUPS.find((g) => g.key === reportCategory),
+    [reportCategory]
+  );
+
+  const commentsToggleLabel =
+    active?.allowComments === false ? "Turn on comments" : "Turn off comments";
+
+  const hideLikeToggleLabel = active?.hideLikeCount
+    ? "Show like count"
+    : "Hide like count";
+
+  const allowDownloads = useMemo(
+    () =>
+      Boolean(
+        active &&
+          ((active as any)?.allowDownloads ??
+            (active as any)?.allowDownload ??
+            (active as any)?.flags?.allowDownloads ??
+            (active as any)?.flags?.allowDownload ??
+            (active as any)?.permissions?.allowDownloads ??
+            (active as any)?.permissions?.allowDownload)
+      ),
+    [active]
+  );
+
+  const activeFollowing = Boolean(
+    active?.flags?.following ?? (active as any)?.following
+  );
+
+  const activeSaved = Boolean(active?.flags?.saved ?? active?.saved);
+
+  useEffect(() => {
+    if (!editOpen) return;
+    applyEditSeed(active);
+  }, [active, applyEditSeed, editOpen]);
+
+  useEffect(() => {
+    if (!active) return;
+    const nextVisibility =
+      ((active as any)?.visibility as "public" | "followers" | "private") ||
+      "public";
+    setVisibilitySelected(nextVisibility);
+  }, [active]);
+
+  useEffect(() => {
+    setOpenMoreMenuId(null);
+  }, [active?.id]);
 
   useEffect(() => {
     if (!transition) return;
@@ -705,27 +1607,150 @@ export default function ReelPage() {
     return () => clearTimeout(id);
   }, [transition]);
 
+  useEffect(() => {
+    activeIndexRef.current = activeIndex;
+  }, [activeIndex]);
+
   const goNext = () => {
-    if (activeIndex + 1 < items.length) {
-      setTransition("next");
-      setActiveIndex(activeIndex + 1);
+    const nextIndex = Math.min(items.length - 1, activeIndex + 1);
+    if (nextIndex <= activeIndex) return;
+    const target = items[nextIndex];
+    const el = target ? itemRefs.current[target.id] : null;
+    setTransition("next");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      setActiveIndex(nextIndex);
     }
   };
 
   const goPrev = () => {
-    if (activeIndex - 1 >= 0) {
-      setTransition("prev");
-      setActiveIndex(activeIndex - 1);
+    const nextIndex = Math.max(0, activeIndex - 1);
+    if (nextIndex >= activeIndex) return;
+    const target = items[nextIndex];
+    const el = target ? itemRefs.current[target.id] : null;
+    setTransition("prev");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      setActiveIndex(nextIndex);
     }
   };
 
+  const initialSyncRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!requestedReelId || !items.length) return;
-    const idx = items.findIndex((it) => it.id === requestedReelId);
-    if (idx >= 0 && idx !== activeIndex) {
+    if (!items.length) return;
+
+    const currentRequested = requestedReelId ?? null;
+    const hasSyncedForCurrentRequest =
+      initialSyncRef.current === currentRequested;
+
+    if (hasSyncedForCurrentRequest) return;
+
+    const idx = currentRequested
+      ? items.findIndex((it) => it.id === currentRequested)
+      : 0;
+
+    if (idx >= 0) {
       setActiveIndex(idx);
+      activeIndexRef.current = idx;
+      initialSyncRef.current = currentRequested;
     }
-  }, [requestedReelId, items, activeIndex]);
+  }, [requestedReelId, items]);
+
+  const scrollRafRef = useRef<number | null>(null);
+  const scrollTickingRef = useRef(false);
+  const urlSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSyncedIdRef = useRef<string | null>(null);
+  const lastSyncedPathRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const container = listRef.current;
+    if (!container || !items.length) return;
+
+    const computeNearest = () => {
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+      scrollRafRef.current = requestAnimationFrame(() => {
+        const rect = container.getBoundingClientRect();
+        const centerY = rect.top + rect.height / 2;
+
+        let bestIdx = activeIndexRef.current;
+        let bestDist = Number.POSITIVE_INFINITY;
+
+        items.forEach((it, idx) => {
+          const el = itemRefs.current[it.id];
+          if (!el) return;
+          const b = el.getBoundingClientRect();
+          const itemCenter = (b.top + b.bottom) / 2;
+          const dist = Math.abs(itemCenter - centerY);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestIdx = idx;
+          }
+        });
+
+        if (bestIdx !== activeIndexRef.current) {
+          activeIndexRef.current = bestIdx;
+          setActiveIndex(bestIdx);
+        }
+      });
+    };
+
+    const handleScroll = () => {
+      if (scrollTickingRef.current) return;
+      scrollTickingRef.current = true;
+      scrollRafRef.current = requestAnimationFrame(() => {
+        scrollTickingRef.current = false;
+        computeNearest();
+      });
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    computeNearest();
+
+    return () => {
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+      container.removeEventListener("scroll", handleScroll);
+      scrollTickingRef.current = false;
+    };
+  }, [items]);
+
+  useEffect(() => {
+    const container = listRef.current;
+    if (!container || !items.length) return;
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const target = entry.target as HTMLElement;
+          const id = target?.dataset?.reelId;
+          if (!id) return;
+
+          if (
+            entry.isIntersecting &&
+            entry.intersectionRatio >= VIEW_THRESHOLD
+          ) {
+            visibleReelsRef.current.add(id);
+          } else {
+            visibleReelsRef.current.delete(id);
+          }
+        });
+      },
+      { root: container, threshold: [VIEW_THRESHOLD] }
+    );
+
+    items.forEach((it) => {
+      const el = itemRefs.current[it.id];
+      if (el) observer.observe(el);
+    });
+
+    return () => {
+      visibleReelsRef.current.clear();
+      observer.disconnect();
+    };
+  }, [items]);
 
   useEffect(() => {
     if (commentReelId && !items.some((it) => it.id === commentReelId)) {
@@ -764,14 +1789,32 @@ export default function ReelPage() {
     setCommentReelId((prev) => (prev === current.id ? prev : current.id));
   }, [commentsOpen, items, activeIndex]);
 
+  const currentReelId = items[activeIndex]?.id;
+
   useEffect(() => {
-    const current = items[activeIndex];
-    if (!current) return;
-    const target = `/reels/${current.id}`;
-    if (pathname !== target) {
-      router.replace(target);
-    }
-  }, [activeIndex, items, pathname, router]);
+    if (!currentReelId) return;
+
+    if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
+    urlSyncTimerRef.current = setTimeout(() => {
+      const target = `/reels/${currentReelId}`;
+      if (lastSyncedIdRef.current === currentReelId) return;
+      lastSyncedIdRef.current = currentReelId;
+
+      if (typeof window === "undefined") return;
+      if (lastSyncedPathRef.current === target) return;
+      if (window.location.pathname === target) {
+        lastSyncedPathRef.current = target;
+        return;
+      }
+
+      window.history.replaceState({}, "", target);
+      lastSyncedPathRef.current = target;
+    }, 200);
+
+    return () => {
+      if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
+    };
+  }, [currentReelId]);
 
   useEffect(() => {
     if (!token) return;
@@ -824,6 +1867,290 @@ export default function ReelPage() {
     };
   }, [active?.id, token]);
 
+  const copyLink = async () => {
+    if (!active) return;
+    try {
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
+      const permalink = `${origin}/reels/${active.id}`;
+
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(permalink);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = permalink;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+
+      setOpenMoreMenuId(null);
+      showToast("Link copied to clipboard");
+    } catch (err) {
+      setOpenMoreMenuId(null);
+      showToast("Failed to copy link");
+    }
+  };
+
+  const toggleAllowComments = async () => {
+    if (!token || !active) return;
+    const currentAllowed = active.allowComments !== false;
+    const nextAllowed = !currentAllowed;
+    updateItem(active.id, { allowComments: nextAllowed });
+    setOpenMoreMenuId(null);
+    try {
+      await setPostAllowComments({
+        token,
+        postId: active.id,
+        allowComments: nextAllowed,
+      });
+      showToast(nextAllowed ? "Comments turned on" : "Comments turned off");
+    } catch (err) {
+      updateItem(active.id, { allowComments: currentAllowed });
+      showToast("Failed to update comments");
+    }
+  };
+
+  const toggleHideLikeCount = async () => {
+    if (!token || !active) return;
+    const currentHidden = Boolean(active.hideLikeCount);
+    const nextHidden = !currentHidden;
+    updateItem(active.id, { hideLikeCount: nextHidden });
+    setOpenMoreMenuId(null);
+    try {
+      await setPostHideLikeCount({
+        token,
+        postId: active.id,
+        hideLikeCount: nextHidden,
+      });
+      showToast(nextHidden ? "Like count hidden" : "Like count visible");
+    } catch (err) {
+      updateItem(active.id, { hideLikeCount: currentHidden });
+      showToast("Failed to update like count");
+    }
+  };
+
+  const visibilityOptions: Array<{
+    value: "public" | "followers" | "private";
+    title: string;
+    description: string;
+  }> = [
+    {
+      value: "public",
+      title: "Public",
+      description: "Anyone can view this reel",
+    },
+    {
+      value: "followers",
+      title: "Friends / Following",
+      description: "Only followers can view this reel",
+    },
+    {
+      value: "private",
+      title: "Private",
+      description: "Only you can view this reel",
+    },
+  ];
+
+  const openVisibilityModal = () => {
+    if (!active) return;
+    const currentVisibility =
+      ((active as any)?.visibility as "public" | "followers" | "private") ||
+      "public";
+    setVisibilitySelected(currentVisibility);
+    setVisibilityError("");
+    setOpenMoreMenuId(null);
+    setVisibilityModalOpen(true);
+  };
+
+  const closeVisibilityModal = () => {
+    if (visibilitySaving) return;
+    setVisibilityModalOpen(false);
+  };
+
+  const submitVisibilityUpdate = async () => {
+    if (!token || !active) {
+      setVisibilityError("Please sign in to update visibility");
+      return;
+    }
+
+    const currentVisibility =
+      ((active as any)?.visibility as "public" | "followers" | "private") ||
+      "public";
+
+    if (visibilitySelected === currentVisibility) {
+      setVisibilityModalOpen(false);
+      return;
+    }
+
+    setVisibilitySaving(true);
+    setVisibilityError("");
+    try {
+      const res = await updatePostVisibility({
+        token,
+        postId: active.id,
+        visibility: visibilitySelected,
+      });
+      updateItem(active.id, { visibility: res.visibility as any });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(
+            "lastOwnedReelId",
+            JSON.stringify({ id: active.id, ownerId: active.authorId })
+          );
+        } catch {
+          /* ignore storage errors */
+        }
+      }
+      setVisibilityModalOpen(false);
+      showToast("Visibility updated");
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? (err as { message?: string }).message || "Failed to update"
+          : "Failed to update";
+      setVisibilityError(message);
+    } finally {
+      setVisibilitySaving(false);
+    }
+  };
+
+  const openReportModal = () => {
+    if (!token) return;
+    if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
+    setReportClosing(false);
+    setReportOpen(true);
+    setReportCategory(null);
+    setReportReason(null);
+    setReportNote("");
+    setReportError("");
+    setReportSubmitting(false);
+  };
+
+  const closeReportModal = () => {
+    if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
+    setReportClosing(true);
+    reportHideTimerRef.current = setTimeout(() => {
+      setReportOpen(false);
+      setReportCategory(null);
+      setReportReason(null);
+      setReportNote("");
+      setReportError("");
+      setReportSubmitting(false);
+      setReportClosing(false);
+    }, 200);
+  };
+
+  const submitReport = async () => {
+    if (!token || !active || !reportCategory || !reportReason) return;
+    setReportSubmitting(true);
+    setReportError("");
+    try {
+      await reportPost({
+        token,
+        postId: active.id,
+        category: reportCategory,
+        reason: reportReason,
+        note: reportNote.trim() || undefined,
+      });
+      closeReportModal();
+      showToast("Report submitted");
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? (err as { message?: string }).message || "Could not submit report"
+          : "Could not submit report";
+      setReportError(message);
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  const handleDownloadCurrentMedia = async () => {
+    const media = active?.media ?? [];
+    const current = media[0];
+    if (!current?.url) return;
+    try {
+      const sameOrigin =
+        typeof window !== "undefined" &&
+        current.url?.startsWith(window.location.origin);
+
+      const res = await fetch(current.url, {
+        credentials: sameOrigin ? "include" : "omit",
+        mode: "cors",
+      });
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      const fallbackName =
+        (current.metadata as { filename?: string } | undefined)?.filename ||
+        "reel";
+      const nameFromUrl = current.url?.split("/").pop()?.split("?")[0];
+      link.href = objectUrl;
+      link.download = fallbackName || nameFromUrl || "reel";
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+
+      setOpenMoreMenuId(null);
+      showToast("Download started");
+    } catch (err) {
+      setOpenMoreMenuId(null);
+      showToast("Failed to download");
+    }
+  };
+
+  const handleEditPost = () => {
+    if (!active) return;
+    openEditModal();
+  };
+
+  const handleMuteNotifications = () => {
+    setOpenMoreMenuId(null);
+    showToast("Notifications muted for this reel");
+  };
+
+  const handleDeletePost = () => {
+    if (!active) return;
+    setDeleteError("");
+    setOpenMoreMenuId(null);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleSaveFromMenu = () => {
+    if (!active) return;
+    handleSave(active.id, Boolean(activeSaved));
+    setOpenMoreMenuId(null);
+  };
+
+  const handleFollowFromMenu = () => {
+    if (!active?.authorId) return;
+    const currentFollowing = Boolean(
+      active.flags?.following ?? (active as any)?.following
+    );
+    onFollow(active.authorId, !currentFollowing);
+    setOpenMoreMenuId(null);
+  };
+
+  const handleReportFromMenu = () => {
+    setOpenMoreMenuId(null);
+    openReportModal();
+  };
+
+  const handleGoProfile = () => {
+    if (!active?.authorId) return;
+    const target = `/profile/${active.authorId}`;
+    setOpenMoreMenuId(null);
+    router.push(target);
+  };
+
   const toggleComments = (id: string) => {
     if (commentsOpen && commentReelId === id) {
       setCommentsOpen(false);
@@ -866,121 +2193,913 @@ export default function ReelPage() {
     [syncStats]
   );
 
-  useEffect(() => {
-    const onWheel = (e: WheelEvent) => {
-      if (
-        commentsOpen &&
-        commentPanelRef.current &&
-        (commentPanelRef.current.contains(e.target as Node) ||
-          (typeof e.composedPath === "function" &&
-            e.composedPath().includes(commentPanelRef.current)))
-      ) {
-        return;
-      }
-      if (wheelLockRef.current) return;
-      if (Math.abs(e.deltaY) < 24) return;
-      wheelLockRef.current = true;
-      if (e.deltaY > 0) {
-        goNext();
-      } else {
-        goPrev();
-      }
-      setTimeout(() => {
-        wheelLockRef.current = false;
-      }, 480);
-    };
-    window.addEventListener("wheel", onWheel, { passive: true });
-    return () => window.removeEventListener("wheel", onWheel);
-  }, [activeIndex, items.length, commentsOpen]);
-
   if (!canRender) return null;
 
   return (
-    <div className={styles.page}>
-      <div className={styles.rail}>
-        {loading ? (
-          <div className={styles.stateCard}>Loading reels...</div>
-        ) : error ? (
-          <div className={styles.stateCard}>{error}</div>
-        ) : !active ? (
-          <div className={styles.stateCard}>No reels yet.</div>
-        ) : (
-          <div className={styles.stageShell}>
-            <div
-              className={`${styles.stage} ${
-                commentsRender ? styles.stageWithComments : ""
-              } ${commentsOpen ? styles.stageShifted : ""}`}
-            >
-              <div className={styles.videoColumn}>
+    <>
+      <div className={styles.page}>
+        <div className={styles.rail}>
+          {loading ? (
+            <div className={styles.stateCard}>Loading reels...</div>
+          ) : error ? (
+            <div className={styles.stateCard}>{error}</div>
+          ) : !items.length ? (
+            <div className={styles.stateCard}>No reels yet.</div>
+          ) : (
+            <div className={styles.stageShell}>
+              <div className={styles.feedScroll} ref={listRef}>
+                {items.map((item) => {
+                  const isActive = active?.id === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      ref={(el) => {
+                        itemRefs.current[item.id] = el;
+                      }}
+                      data-reel-id={item.id}
+                      className={styles.feedItem}
+                    >
+                      {isActive ? (
+                        <div
+                          className={`${styles.stage} ${
+                            commentsRender ? styles.stageWithComments : ""
+                          } ${commentsOpen ? styles.stageShifted : ""}`}
+                        >
+                          <div className={styles.videoColumn}>
+                            <div
+                              className={`${styles.reelWrapper} ${
+                                transition === "next"
+                                  ? styles.slideNext
+                                  : transition === "prev"
+                                  ? styles.slidePrev
+                                  : ""
+                              }`}
+                            >
+                              <ReelVideo
+                                item={item}
+                                autoplay
+                                onViewed={(ms) => handleViewed(item.id, ms)}
+                              >
+                                <div
+                                  className={`${styles.moreMenuWrap} ${
+                                    openMoreMenuId === item.id
+                                      ? styles.moreMenuWrapVisible
+                                      : ""
+                                  }`}
+                                  ref={menuRef}
+                                >
+                                  <button
+                                    type="button"
+                                    className={styles.moreBtn}
+                                    aria-haspopup="true"
+                                    aria-expanded={openMoreMenuId === item.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenMoreMenuId((prev) =>
+                                        prev === item.id ? null : item.id
+                                      );
+                                    }}
+                                  >
+                                    <svg
+                                      aria-hidden="true"
+                                      width="22"
+                                      height="22"
+                                      viewBox="0 0 24 24"
+                                      fill="currentColor"
+                                    >
+                                      <circle cx="5" cy="12" r="1.5" />
+                                      <circle cx="12" cy="12" r="1.5" />
+                                      <circle cx="19" cy="12" r="1.5" />
+                                    </svg>
+                                  </button>
+                                  {openMoreMenuId === item.id ? (
+                                    <div
+                                      className={styles.moreMenu}
+                                      role="menu"
+                                    >
+                                      {isAuthor ? (
+                                        <>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleEditPost();
+                                            }}
+                                          >
+                                            Edit Reel
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              openVisibilityModal();
+                                            }}
+                                          >
+                                            Edit visibility
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleMuteNotifications();
+                                            }}
+                                          >
+                                            Mute notifications
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              toggleAllowComments();
+                                            }}
+                                          >
+                                            {commentsToggleLabel}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              toggleHideLikeCount();
+                                            }}
+                                          >
+                                            {hideLikeToggleLabel}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              copyLink();
+                                            }}
+                                          >
+                                            Copy link
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className={`${styles.moreMenuItem} ${styles.moreMenuDanger}`}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeletePost();
+                                            }}
+                                          >
+                                            Delete reel
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleSaveFromMenu();
+                                            }}
+                                          >
+                                            {activeSaved
+                                              ? "Unsave this reel"
+                                              : "Save this reel"}
+                                          </button>
+                                          {item.authorId ? (
+                                            <button
+                                              type="button"
+                                              className={styles.moreMenuItem}
+                                              role="menuitem"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleFollowFromMenu();
+                                              }}
+                                            >
+                                              {activeFollowing
+                                                ? "Unfollow"
+                                                : "Follow"}
+                                            </button>
+                                          ) : null}
+                                          {allowDownloads ? (
+                                            <button
+                                              type="button"
+                                              className={styles.moreMenuItem}
+                                              role="menuitem"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDownloadCurrentMedia();
+                                              }}
+                                            >
+                                              Download
+                                            </button>
+                                          ) : null}
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleReportFromMenu();
+                                            }}
+                                          >
+                                            Report
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              copyLink();
+                                            }}
+                                          >
+                                            Copy link
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleGoProfile();
+                                            }}
+                                          >
+                                            Go to this profile
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </ReelVideo>
+                              <ReelActions
+                                item={item}
+                                onLike={handleLike}
+                                onSave={handleSave}
+                                onRepost={handleRepost}
+                                onComment={toggleComments}
+                                onFollow={onFollow}
+                                viewerId={viewerId}
+                              />
+                            </div>
+                          </div>
+                          <div className={styles.navColumn}>
+                            <button
+                              className={styles.navBtn}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                goPrev();
+                              }}
+                              disabled={activeIndex <= 0}
+                              aria-label="Previous reel"
+                            >
+                              <IconArrow up />
+                            </button>
+                            <button
+                              className={styles.navBtn}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                goNext();
+                              }}
+                              disabled={activeIndex >= items.length - 1}
+                              aria-label="Next reel"
+                            >
+                              <IconArrow />
+                            </button>
+                          </div>
+                          {commentsRender && commentReelId ? (
+                            <ReelComments
+                              open={commentsOpen}
+                              postId={commentReelId}
+                              token={token}
+                              panelRef={commentPanelRef}
+                              viewerId={viewerId}
+                              postAuthorId={item.authorId}
+                              allowComments={item.allowComments}
+                              initialCount={item.stats?.comments}
+                              onTotalChange={handleCommentTotal}
+                              onClose={() => {
+                                setCommentsOpen(false);
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className={styles.stageGhost}>
+                          <div className={styles.videoColumn}>
+                            <div className={styles.reelWrapper}>
+                              <ReelVideo
+                                item={item}
+                                autoplay={false}
+                                onViewed={(ms) => handleViewed(item.id, ms)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {toastMessage ? (
+        <div className={postStyles.toast} role="status" aria-live="polite">
+          {toastMessage}
+        </div>
+      ) : null}
+
+      {editOpen ? (
+        <div
+          className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeEditModal}
+        >
+          <div
+            className={`${feedStyles.modalCard} ${feedStyles.editCard}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={feedStyles.modalHeader}>
+              <div>
+                <h3 className={feedStyles.modalTitle}>Edit reel</h3>
+                <p className={feedStyles.modalBody}>
+                  Update caption, hashtags, mentions, location, and reel
+                  controls.
+                </p>
+              </div>
+              <button
+                className={feedStyles.closeBtn}
+                aria-label="Close"
+                onClick={closeEditModal}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+
+            <form className={feedStyles.editForm} onSubmit={handleEditSubmit}>
+              <label className={feedStyles.editLabel}>
+                <div className={feedStyles.editLabelRow}>
+                  <span className={feedStyles.editLabelText}>Caption</span>
+                  <div className={feedStyles.emojiWrap} ref={editEmojiRef}>
+                    <button
+                      type="button"
+                      className={feedStyles.emojiButton}
+                      onClick={() => setEditEmojiOpen((prev) => !prev)}
+                      aria-label="Add emoji"
+                    >
+                      <svg
+                        aria-label="Emoji icon"
+                        fill="currentColor"
+                        height="20"
+                        role="img"
+                        viewBox="0 0 24 24"
+                        width="20"
+                      >
+                        <title>Emoji icon</title>
+                        <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
+                      </svg>
+                    </button>
+                    {editEmojiOpen ? (
+                      <div className={feedStyles.emojiPopover}>
+                        <EmojiPicker
+                          onEmojiClick={(emojiData) => {
+                            insertEditEmoji(emojiData.emoji || "");
+                            setEditEmojiOpen(false);
+                          }}
+                          searchDisabled={false}
+                          skinTonesDisabled={false}
+                          lazyLoadEmojis
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
                 <div
-                  key={active.id}
-                  className={`${styles.reelWrapper} ${
-                    transition === "next"
-                      ? styles.slideNext
-                      : transition === "prev"
-                      ? styles.slidePrev
-                      : ""
-                  }`}
+                  className={`${feedStyles.editTextareaShell} ${feedStyles.mentionCombo}`}
                 >
-                  <ReelVideo
-                    item={active}
-                    autoplay
-                    onViewed={(ms) => handleViewed(active.id, ms)}
+                  <textarea
+                    ref={editCaptionRef}
+                    className={feedStyles.editTextarea}
+                    value={editCaption}
+                    onChange={handleCaptionChange}
+                    onKeyDown={onCaptionKeyDown}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        setMentionOpen(false);
+                        setMentionHighlight(-1);
+                        setActiveMentionRange(null);
+                      }, 120);
+                    }}
+                    rows={4}
+                    maxLength={2200}
+                    placeholder="Write something..."
                   />
-                  <ReelActions
-                    item={active}
-                    onLike={handleLike}
-                    onSave={handleSave}
-                    onRepost={handleRepost}
-                    onComment={toggleComments}
-                    onFollow={onFollow}
-                    viewerId={viewerId}
+                  <span className={feedStyles.charCount}>
+                    {editCaption.length}/2200
+                  </span>
+                </div>
+              </label>
+
+              {mentionOpen ? (
+                <div className={feedStyles.mentionDropdown}>
+                  {mentionLoading ? (
+                    <div className={feedStyles.mentionItem}>Searching...</div>
+                  ) : null}
+                  {!mentionLoading && mentionSuggestions.length === 0 ? (
+                    <div className={feedStyles.mentionItem}>
+                      {mentionError || "No matches"}
+                    </div>
+                  ) : null}
+                  {mentionSuggestions.map((opt, idx) => {
+                    const activeOpt = idx === mentionHighlight;
+                    const avatarInitials = (
+                      opt.displayName ||
+                      opt.username ||
+                      "?"
+                    )
+                      .slice(0, 2)
+                      .toUpperCase();
+                    return (
+                      <button
+                        type="button"
+                        key={opt.id || opt.username}
+                        className={`${feedStyles.mentionItem} ${
+                          activeOpt ? feedStyles.mentionItemActive : ""
+                        }`}
+                        onClick={() => selectMention(opt)}
+                      >
+                        <span className={feedStyles.mentionAvatar} aria-hidden>
+                          {opt.avatarUrl ? (
+                            <img
+                              src={opt.avatarUrl}
+                              alt={opt.displayName || opt.username}
+                              className={feedStyles.mentionAvatarImg}
+                            />
+                          ) : (
+                            <span className={feedStyles.mentionAvatarFallback}>
+                              {avatarInitials}
+                            </span>
+                          )}
+                        </span>
+                        <span className={feedStyles.mentionCopy}>
+                          <span className={feedStyles.mentionHandle}>
+                            @{opt.username}
+                          </span>
+                          {opt.displayName ? (
+                            <span className={feedStyles.mentionName}>
+                              {opt.displayName}
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              <div className={feedStyles.editField}>
+                <div className={feedStyles.editLabelRow}>
+                  <span className={feedStyles.editLabelText}>Hashtags</span>
+                </div>
+                <div className={feedStyles.chipRow}>
+                  {editHashtags.map((tag) => (
+                    <span key={tag} className={feedStyles.chip}>
+                      #{tag}
+                      <button
+                        type="button"
+                        className={feedStyles.chipRemove}
+                        onClick={() => removeHashtag(tag)}
+                        aria-label={`Remove ${tag}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    className={feedStyles.editInput}
+                    placeholder="Add hashtag"
+                    value={hashtagDraft}
+                    onChange={(e) => setHashtagDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === ",") {
+                        e.preventDefault();
+                        addHashtag();
+                      }
+                    }}
                   />
                 </div>
               </div>
-              <div className={styles.navColumn}>
-                <button
-                  className={styles.navBtn}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    goPrev();
+
+              <div className={feedStyles.editField}>
+                <div className={feedStyles.editLabelRow}>
+                  <span className={feedStyles.editLabelText}>Location</span>
+                </div>
+                <input
+                  className={feedStyles.editInput}
+                  placeholder="Add a place"
+                  value={locationQuery}
+                  onChange={(e) => {
+                    setEditLocation(e.target.value);
+                    setLocationQuery(e.target.value);
                   }}
-                  disabled={activeIndex <= 0}
-                  aria-label="Previous reel"
+                  onFocus={() =>
+                    setLocationOpen(Boolean(locationSuggestions.length))
+                  }
+                  onKeyDown={onLocationKeyDown}
+                />
+                {locationOpen ? (
+                  <div className={feedStyles.locationDropdown}>
+                    {locationLoading ? (
+                      <div className={feedStyles.locationItem}>
+                        Searching...
+                      </div>
+                    ) : null}
+                    {!locationLoading && locationSuggestions.length === 0 ? (
+                      <div className={feedStyles.locationItem}>
+                        {locationError || "No suggestions"}
+                      </div>
+                    ) : null}
+                    {locationSuggestions.map((opt, idx) => {
+                      const activeOpt = idx === locationHighlight;
+                      return (
+                        <button
+                          type="button"
+                          key={`${opt.label}-${opt.lat}-${opt.lon}`}
+                          className={`${feedStyles.locationItem} ${
+                            activeOpt ? feedStyles.locationItemActive : ""
+                          }`}
+                          onClick={() => pickLocation(opt.label)}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className={feedStyles.switchGroup}>
+                <label className={feedStyles.switchRow}>
+                  <input
+                    type="checkbox"
+                    checked={editAllowComments}
+                    onChange={() => setEditAllowComments((prev) => !prev)}
+                  />
+                  <div>
+                    <p className={feedStyles.switchTitle}>Allow comments</p>
+                    <p className={feedStyles.switchHint}>
+                      Enable to receive feedback from everyone
+                    </p>
+                  </div>
+                </label>
+
+                <label className={feedStyles.switchRow}>
+                  <input
+                    type="checkbox"
+                    checked={editAllowDownload}
+                    onChange={() => setEditAllowDownload((prev) => !prev)}
+                  />
+                  <div>
+                    <p className={feedStyles.switchTitle}>Allow downloads</p>
+                    <p className={feedStyles.switchHint}>
+                      Share the original file with people you trust
+                    </p>
+                  </div>
+                </label>
+
+                <label className={feedStyles.switchRow}>
+                  <input
+                    type="checkbox"
+                    checked={editHideLikeCount}
+                    onChange={() => setEditHideLikeCount((prev) => !prev)}
+                  />
+                  <div>
+                    <p className={feedStyles.switchTitle}>Hide like</p>
+                    <p className={feedStyles.switchHint}>
+                      Viewers won’t see the number of likes on this reel
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {editError ? (
+                <div className={feedStyles.inlineError}>{editError}</div>
+              ) : null}
+              {editSuccess ? (
+                <div className={feedStyles.editSuccess}>{editSuccess}</div>
+              ) : null}
+
+              <div className={feedStyles.modalActions}>
+                <button
+                  type="button"
+                  className={feedStyles.modalSecondary}
+                  onClick={closeEditModal}
+                  disabled={editSaving}
                 >
-                  <IconArrow up />
+                  Cancel
                 </button>
                 <button
-                  className={styles.navBtn}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    goNext();
-                  }}
-                  disabled={activeIndex >= items.length - 1}
-                  aria-label="Next reel"
+                  type="submit"
+                  className={feedStyles.modalPrimary}
+                  disabled={editSaving}
                 >
-                  <IconArrow />
+                  {editSaving ? "Saving..." : "Save changes"}
                 </button>
               </div>
-              {commentsRender && commentReelId ? (
-                <ReelComments
-                  open={commentsOpen}
-                  postId={commentReelId}
-                  token={token}
-                  panelRef={commentPanelRef}
-                  viewerId={viewerId}
-                  postAuthorId={active.authorId}
-                  initialCount={active.stats?.comments}
-                  onTotalChange={handleCommentTotal}
-                  onClose={() => {
-                    setCommentsOpen(false);
-                  }}
-                />
-              ) : null}
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteConfirmOpen ? (
+        <div
+          className={`${postStyles.reportOverlay} ${postStyles.reportOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeDeleteConfirm}
+        >
+          <div
+            className={postStyles.reportCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={postStyles.reportHeader}>
+              <div>
+                <h3 className={postStyles.reportTitle}>Delete this reel?</h3>
+                <p className={postStyles.reportBody}>
+                  Removing this reel cannot be undone. It will disappear
+                  immediately.
+                </p>
+              </div>
+              <button
+                className={postStyles.reportClose}
+                aria-label="Close"
+                onClick={closeDeleteConfirm}
+                disabled={deleteSubmitting}
+              >
+                ×
+              </button>
+            </div>
+
+            {deleteError ? (
+              <div className={postStyles.reportInlineError}>{deleteError}</div>
+            ) : null}
+
+            <div className={postStyles.reportActions}>
+              <button
+                className={postStyles.reportSecondary}
+                onClick={closeDeleteConfirm}
+                disabled={deleteSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className={`${postStyles.reportPrimary} ${postStyles.blockDanger}`}
+                onClick={confirmDelete}
+                disabled={deleteSubmitting}
+              >
+                {deleteSubmitting ? "Deleting..." : "Delete"}
+              </button>
             </div>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      ) : null}
+
+      {visibilityModalOpen ? (
+        <div
+          className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeVisibilityModal}
+        >
+          <div
+            className={feedStyles.modalCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={feedStyles.modalHeader}>
+              <div>
+                <h3 className={feedStyles.modalTitle}>Edit visibility</h3>
+                <p className={feedStyles.modalBody}>
+                  Choose who can view this reel.
+                </p>
+              </div>
+              <button
+                className={feedStyles.closeBtn}
+                aria-label="Close"
+                onClick={closeVisibilityModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={feedStyles.visibilityGrid}>
+              {visibilityOptions.map((opt) => {
+                const activeOpt = visibilitySelected === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    className={`${feedStyles.visibilityOption} ${
+                      activeOpt ? feedStyles.visibilityOptionActive : ""
+                    }`}
+                    onClick={() => setVisibilitySelected(opt.value)}
+                  >
+                    <span className={feedStyles.visibilityRadio}>
+                      {activeOpt ? "✓" : ""}
+                    </span>
+                    <span className={feedStyles.visibilityCopy}>
+                      <span className={feedStyles.visibilityTitle}>
+                        {opt.title}
+                      </span>
+                      <span className={feedStyles.visibilityDesc}>
+                        {opt.description}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {visibilityError ? (
+              <div className={feedStyles.inlineError}>{visibilityError}</div>
+            ) : null}
+
+            <div className={feedStyles.modalActions}>
+              <button
+                className={feedStyles.modalSecondary}
+                onClick={closeVisibilityModal}
+                disabled={visibilitySaving}
+              >
+                Cancel
+              </button>
+              <button
+                className={feedStyles.modalPrimary}
+                onClick={submitVisibilityUpdate}
+                disabled={visibilitySaving}
+              >
+                {visibilitySaving ? "Updating..." : "Update visibility"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {reportOpen ? (
+        <div
+          className={`${postStyles.reportOverlay} ${
+            reportClosing
+              ? postStyles.reportOverlayClosing
+              : postStyles.reportOverlayOpen
+          }`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeReportModal}
+        >
+          <div
+            className={`${postStyles.reportCard} ${
+              reportClosing
+                ? postStyles.reportCardClosing
+                : postStyles.reportCardOpen
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={postStyles.reportHeader}>
+              <div>
+                <h3 className={postStyles.reportTitle}>Report this reel</h3>
+                <p className={postStyles.reportBody}>
+                  Help us understand what is wrong with this content.
+                </p>
+              </div>
+              <button
+                className={postStyles.reportClose}
+                aria-label="Close"
+                onClick={closeReportModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={postStyles.reportGrid}>
+              <div className={postStyles.reportCategoryGrid}>
+                {REPORT_GROUPS.map((group) => {
+                  const isActive = reportCategory === group.key;
+                  return (
+                    <button
+                      key={group.key}
+                      className={`${postStyles.reportCategoryCard} ${
+                        isActive ? postStyles.reportCategoryCardActive : ""
+                      }`}
+                      style={{
+                        borderColor: isActive ? group.accent : undefined,
+                        boxShadow: isActive
+                          ? `0 0 0 1px ${group.accent}`
+                          : undefined,
+                      }}
+                      onClick={() => {
+                        setReportCategory(group.key);
+                        setReportReason(
+                          group.reasons.length === 1
+                            ? group.reasons[0].key
+                            : null
+                        );
+                      }}
+                    >
+                      <span
+                        className={postStyles.reportCategoryDot}
+                        style={{ background: group.accent }}
+                      />
+                      <span className={postStyles.reportCategoryLabel}>
+                        {group.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className={postStyles.reportReasonPanel}>
+                <div className={postStyles.reportReasonHeader}>
+                  Select a specific reason
+                </div>
+                {selectedReportGroup ? (
+                  <div className={postStyles.reportReasonList}>
+                    {selectedReportGroup.reasons.map((reason) => {
+                      const checked = reportReason === reason.key;
+                      return (
+                        <button
+                          key={reason.key}
+                          className={`${postStyles.reportReasonRow} ${
+                            checked ? postStyles.reportReasonRowActive : ""
+                          }`}
+                          onClick={() => setReportReason(reason.key)}
+                        >
+                          <span
+                            className={postStyles.reportReasonRadio}
+                            aria-checked={checked}
+                          >
+                            {checked ? (
+                              <span
+                                className={postStyles.reportReasonRadioDot}
+                              />
+                            ) : null}
+                          </span>
+                          <span>{reason.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className={postStyles.reportReasonPlaceholder}>
+                    Pick a category first.
+                  </div>
+                )}
+
+                <label className={postStyles.reportNoteLabel}>
+                  Additional notes (optional)
+                  <textarea
+                    className={postStyles.reportNoteInput}
+                    placeholder="Add brief context if needed..."
+                    value={reportNote}
+                    onChange={(e) => setReportNote(e.target.value)}
+                    maxLength={500}
+                  />
+                </label>
+                {reportError ? (
+                  <div className={postStyles.reportInlineError}>
+                    {reportError}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className={postStyles.reportActions}>
+              <button
+                className={postStyles.reportSecondary}
+                onClick={closeReportModal}
+                disabled={reportSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className={postStyles.reportPrimary}
+                onClick={submitReport}
+                disabled={!reportReason || reportSubmitting}
+              >
+                {reportSubmitting ? "Submitting..." : "Submit report"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
