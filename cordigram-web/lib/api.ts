@@ -119,7 +119,6 @@ export type CreatePostResponse = {
     hides?: number;
     reports?: number;
   };
-  repostOf?: string | null;
   serverId?: string | null;
   channelId?: string | null;
   createdAt: string;
@@ -1045,9 +1044,6 @@ export async function uploadPostMedia(opts: {
   return (await res.json()) as UploadPostMediaResponse;
 }
 
-<<<<<<< HEAD
-=======
-export type ProfileSearchItem = {
 export type ProfileSearchItem = {
   id: string;
   userId: string;
@@ -1108,7 +1104,10 @@ export async function fetchProfileDetail(opts: {
     },
   });
 }
-on: string;
+
+export async function createReportProblem(opts: {
+  token: string;
+  description: string;
   files?: File[];
 }): Promise<CreateReportProblemResponse> {
   const { token, description, files } = opts;
