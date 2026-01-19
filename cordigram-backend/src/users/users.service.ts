@@ -1,13 +1,39 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { User } from './user.schema';
+import { Follow } from './follow.schema';
+import { BlocksService } from './blocks.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
+    private readonly blocksService: BlocksService,
   ) {}
+
+  private sanitizeRecentAccounts(list: User['recentAccounts'] = []) {
+    return (list ?? [])
+      .filter((item) => item?.email)
+      .map((item) => ({
+        email: item.email.toLowerCase(),
+        displayName: item.displayName ?? undefined,
+        username: item.username ?? undefined,
+        avatarUrl: item.avatarUrl ?? undefined,
+        lastUsed: item.lastUsed ?? undefined,
+      }))
+      .sort((a, b) => {
+        const aTime = a.lastUsed ? new Date(a.lastUsed).getTime() : 0;
+        const bTime = b.lastUsed ? new Date(b.lastUsed).getTime() : 0;
+        return bTime - aTime;
+      })
+      .slice(0, 5);
+  }
 
   findByEmail(email: string): Promise<User | null> {
     return this.userModel.findOne({ email }).exec();
@@ -140,5 +166,146 @@ export class UsersService {
         )
         .exec();
     }
+  }
+
+  async getRecentAccounts(userId: string) {
+    const user = await this.userModel
+      .findById(userId)
+      .select('recentAccounts')
+      .lean()
+      .exec();
+    return this.sanitizeRecentAccounts(user?.recentAccounts);
+  }
+
+  async upsertRecentAccount(params: {
+    userId: string;
+    email: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+    lastUsed?: Date | string | number;
+  }) {
+    const nextItem = {
+      email: params.email.toLowerCase(),
+      displayName: params.displayName,
+      username: params.username,
+      avatarUrl: params.avatarUrl,
+      lastUsed: params.lastUsed ? new Date(params.lastUsed) : new Date(),
+    };
+
+    const user = await this.userModel
+      .findById(params.userId)
+      .select('recentAccounts')
+      .lean()
+      .exec();
+
+    const current = this.sanitizeRecentAccounts(user?.recentAccounts);
+    const filtered = current.filter((item) => item.email !== nextItem.email);
+    const nextList = [nextItem, ...filtered].slice(0, 5);
+
+    await this.userModel
+      .updateOne({ _id: params.userId }, { $set: { recentAccounts: nextList } })
+      .exec();
+
+    return nextList;
+  }
+
+  async removeRecentAccount(params: { userId: string; email: string }) {
+    const user = await this.userModel
+      .findById(params.userId)
+      .select('recentAccounts')
+      .lean()
+      .exec();
+    const current = this.sanitizeRecentAccounts(user?.recentAccounts);
+    const nextList = current.filter(
+      (item) => item.email !== params.email.toLowerCase(),
+    );
+
+    await this.userModel
+      .updateOne({ _id: params.userId }, { $set: { recentAccounts: nextList } })
+      .exec();
+
+    return nextList;
+  }
+
+  async clearRecentAccounts(userId: string) {
+    await this.userModel
+      .updateOne({ _id: userId }, { $set: { recentAccounts: [] } })
+      .exec();
+    return [] as User['recentAccounts'];
+  }
+
+  async follow(userId: string, targetUserId: string) {
+    if (userId === targetUserId) {
+      throw new BadRequestException('Cannot follow yourself');
+    }
+
+    const followerId = this.asObjectId(userId, 'userId');
+    const followeeId = this.asObjectId(targetUserId, 'targetUserId');
+
+    const blocked = await this.blocksService.isBlockedEither(
+      followerId,
+      followeeId,
+    );
+    if (blocked) {
+      throw new ForbiddenException('Cannot follow a blocked user');
+    }
+
+    const result = await this.followModel
+      .updateOne(
+        { followerId, followeeId },
+        { $setOnInsert: { followerId, followeeId } },
+        { upsert: true },
+      )
+      .exec();
+
+    const inserted = Boolean(
+      (result as { upsertedCount?: number }).upsertedCount,
+    );
+    if (inserted) {
+      await Promise.all([
+        this.userModel
+          .updateOne({ _id: followeeId }, { $inc: { followerCount: 1 } })
+          .exec(),
+        this.userModel
+          .updateOne({ _id: followerId }, { $inc: { followingCount: 1 } })
+          .exec(),
+      ]);
+    }
+
+    return { following: true };
+  }
+
+  async unfollow(userId: string, targetUserId: string) {
+    if (userId === targetUserId) {
+      throw new BadRequestException('Cannot unfollow yourself');
+    }
+
+    const followerId = this.asObjectId(userId, 'userId');
+    const followeeId = this.asObjectId(targetUserId, 'targetUserId');
+
+    const result = await this.followModel
+      .deleteOne({ followerId, followeeId })
+      .exec();
+
+    if (result.deletedCount) {
+      await Promise.all([
+        this.userModel
+          .updateOne({ _id: followeeId }, { $inc: { followerCount: -1 } })
+          .exec(),
+        this.userModel
+          .updateOne({ _id: followerId }, { $inc: { followingCount: -1 } })
+          .exec(),
+      ]);
+    }
+
+    return { following: false };
+  }
+
+  private asObjectId(id: string, field: string): Types.ObjectId {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(`Invalid ${field}`);
+    }
+    return new Types.ObjectId(id);
   }
 }

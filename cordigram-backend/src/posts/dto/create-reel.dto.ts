@@ -54,6 +54,12 @@ export class CreateReelDto {
   mentions?: string[];
 
   @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  topics?: string[];
+
+  @IsOptional()
   @IsString()
   @MaxLength(160)
   location?: string;
@@ -69,6 +75,10 @@ export class CreateReelDto {
   @IsOptional()
   @IsBoolean()
   allowDownload?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  hideLikeCount?: boolean;
 
   @IsOptional()
   @IsMongoId()

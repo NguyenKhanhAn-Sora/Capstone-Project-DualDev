@@ -1,15 +1,28 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateReelDto } from './dto/create-reel.dto';
-import { Post, PostStatus, PostStats } from './post.schema';
+import { UpdatePostDto } from './dto/update-post.dto';
+import {
+  Post,
+  PostKind,
+  PostStatus,
+  PostStats,
+  Visibility,
+} from './post.schema';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { ConfigService } from '../config/config.service';
+import { PostInteraction, InteractionType } from './post-interaction.schema';
+import { Follow } from '../users/follow.schema';
+import { Profile } from '../profiles/profile.schema';
+import { BlocksService } from '../users/blocks.service';
 type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
@@ -23,6 +36,11 @@ const REEL_MAX_DURATION_SECONDS = 90;
 export class PostsService {
   constructor(
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
+    @InjectModel(PostInteraction.name)
+    private readonly postInteractionModel: Model<PostInteraction>,
+    @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
+    @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
+    private readonly blocksService: BlocksService,
     private readonly cloudinary: CloudinaryService,
     private readonly config: ConfigService,
   ) {}
@@ -30,6 +48,7 @@ export class PostsService {
   async create(authorId: string, dto: CreatePostDto) {
     const normalizedHashtags = this.normalizeHashtags(dto.hashtags ?? []);
     const normalizedMentions = this.normalizeMentions(dto.mentions ?? []);
+    const normalizedTopics = this.normalizeTopics(dto.topics ?? []);
 
     let media = (dto.media ?? []).map((item) => ({
       type: item.type,
@@ -79,11 +98,12 @@ export class PostsService {
       comments: 0,
       saves: 0,
       reposts: 0,
+      shares: 0,
+      impressions: 0,
+      views: 0,
+      hides: 0,
+      reports: 0,
     };
-
-    const inferredDuration = this.extractVideoDuration(
-      media.find((m) => m.type === 'video')?.metadata,
-    );
 
     const doc = await this.postModel.create({
       kind: 'post',
@@ -93,13 +113,14 @@ export class PostsService {
       repostOf,
       content: typeof dto.content === 'string' ? dto.content : '',
       media,
-      videoDurationSec: inferredDuration,
       hashtags: normalizedHashtags,
       mentions: normalizedMentions,
+      topics: normalizedTopics,
       location: dto.location?.trim() || null,
       visibility: dto.visibility ?? 'public',
       allowComments: dto.allowComments ?? true,
       allowDownload: dto.allowDownload ?? false,
+      hideLikeCount: dto.hideLikeCount ?? false,
       status,
       scheduledAt: scheduledAt ?? null,
       publishedAt,
@@ -116,9 +137,82 @@ export class PostsService {
     return this.toResponse(doc);
   }
 
+  async update(authorId: string, postId: string, dto: UpdatePostDto) {
+    if (!dto || Object.keys(dto).length === 0) {
+      throw new BadRequestException('No fields to update');
+    }
+
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      authorId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (!post.authorId || !post.authorId.equals(userObjectId)) {
+      throw new ForbiddenException('Only the author can edit this post');
+    }
+
+    const update: Record<string, unknown> = {};
+
+    if (dto.content !== undefined) {
+      update.content = dto.content ?? '';
+    }
+    if (dto.hashtags !== undefined) {
+      update.hashtags = this.normalizeHashtags(dto.hashtags ?? []);
+    }
+    if (dto.mentions !== undefined) {
+      update.mentions = this.normalizeMentions(dto.mentions ?? []);
+    }
+    if (dto.topics !== undefined) {
+      update.topics = this.normalizeTopics(dto.topics ?? []);
+    }
+    if (dto.location !== undefined) {
+      update.location = dto.location?.trim() || null;
+    }
+    if (dto.visibility !== undefined) {
+      update.visibility = dto.visibility;
+    }
+    if (typeof dto.allowComments === 'boolean') {
+      update.allowComments = dto.allowComments;
+    }
+    if (typeof dto.allowDownload === 'boolean') {
+      update.allowDownload = dto.allowDownload;
+    }
+    if (typeof dto.hideLikeCount === 'boolean') {
+      update.hideLikeCount = dto.hideLikeCount;
+    }
+
+    if (!Object.keys(update).length) {
+      throw new BadRequestException('No changes provided');
+    }
+
+    await this.postModel
+      .updateOne({ _id: postObjectId }, { $set: update })
+      .exec();
+
+    const fresh = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .lean();
+
+    if (!fresh) {
+      throw new NotFoundException('Post not found after update');
+    }
+
+    return this.toResponse(this.postModel.hydrate(fresh) as Post);
+  }
+
   async createReel(authorId: string, dto: CreateReelDto) {
     const normalizedHashtags = this.normalizeHashtags(dto.hashtags ?? []);
     const normalizedMentions = this.normalizeMentions(dto.mentions ?? []);
+    const normalizedTopics = this.normalizeTopics(dto.topics ?? []);
 
     const media = (dto.media ?? []).map((item) => ({
       type: item.type,
@@ -162,6 +256,11 @@ export class PostsService {
       comments: 0,
       saves: 0,
       reposts: 0,
+      shares: 0,
+      impressions: 0,
+      views: 0,
+      hides: 0,
+      reports: 0,
     };
 
     const doc = await this.postModel.create({
@@ -172,13 +271,14 @@ export class PostsService {
       repostOf: null,
       content: typeof dto.content === 'string' ? dto.content : '',
       media,
-      videoDurationSec: duration,
       hashtags: normalizedHashtags,
       mentions: normalizedMentions,
+      topics: normalizedTopics,
       location: dto.location?.trim() || null,
       visibility: dto.visibility ?? 'public',
       allowComments: dto.allowComments ?? true,
       allowDownload: dto.allowDownload ?? false,
+      hideLikeCount: dto.hideLikeCount ?? false,
       status,
       scheduledAt: scheduledAt ?? null,
       publishedAt,
@@ -187,6 +287,41 @@ export class PostsService {
     });
 
     return this.toResponse(doc);
+  }
+
+  async delete(userId: string, postId: string) {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId kind')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (!post.authorId || !post.authorId.equals(userObjectId)) {
+      throw new ForbiddenException('Only the author can delete this post');
+    }
+
+    const result = await this.postModel
+      .updateOne(
+        { _id: postObjectId, deletedAt: null },
+        { $set: { deletedAt: new Date() } },
+      )
+      .exec();
+
+    if (!result.modifiedCount) {
+      throw new BadRequestException('Unable to delete post');
+    }
+
+    await this.postInteractionModel.deleteMany({ postId: postObjectId }).exec();
+
+    return { deleted: true };
   }
 
   private normalizeHashtags(tags: string[]): string[] {
@@ -209,26 +344,75 @@ export class PostsService {
     ).slice(0, 30);
   }
 
-  private toResponse(doc: Post) {
+  private normalizeTopics(topics: string[]): string[] {
+    return Array.from(
+      new Set(
+        (topics ?? [])
+          .map((t) => t?.toString().trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    ).slice(0, 20);
+  }
+
+  private toResponse(
+    doc: Post,
+    profile?: {
+      userId?: Types.ObjectId;
+      displayName?: string;
+      username?: string;
+      avatarUrl?: string;
+    } | null,
+    userFlags?: {
+      liked?: boolean;
+      saved?: boolean;
+      following?: boolean;
+      reposted?: boolean;
+    } | null,
+  ) {
     return {
       kind: doc.kind,
       id: doc.id,
+      authorId: doc.authorId?.toString?.(),
+      authorDisplayName: profile?.displayName,
+      authorUsername: profile?.username,
+      authorAvatarUrl: profile?.avatarUrl,
+      author: profile
+        ? {
+            id: profile.userId?.toString?.(),
+            displayName: profile.displayName,
+            username: profile.username,
+            avatarUrl: profile.avatarUrl,
+          }
+        : undefined,
       content: doc.content,
       media: doc.media,
-      videoDurationSec: doc.videoDurationSec ?? null,
       hashtags: doc.hashtags,
       mentions: doc.mentions,
+      topics: doc.topics,
       location: doc.location,
       visibility: doc.visibility,
       allowComments: doc.allowComments,
       allowDownload: doc.allowDownload,
+      hideLikeCount: doc.hideLikeCount,
       status: doc.status,
       scheduledAt: doc.scheduledAt,
       publishedAt: doc.publishedAt,
       stats: doc.stats,
+      spamScore: doc.spamScore,
+      qualityScore: doc.qualityScore,
       repostOf: doc.repostOf,
       serverId: doc.serverId,
       channelId: doc.channelId,
+      liked: userFlags?.liked ?? false,
+      saved: userFlags?.saved ?? false,
+      following: userFlags?.following ?? false,
+      reposted: userFlags?.reposted ?? false,
+      flags: {
+        liked: userFlags?.liked ?? false,
+        saved: userFlags?.saved ?? false,
+        following: userFlags?.following ?? false,
+        reposted: userFlags?.reposted ?? false,
+      },
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     };
@@ -256,16 +440,52 @@ export class PostsService {
       throw new BadRequestException('Missing file');
     }
 
-    const resourceType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+    return this.uploadSingle(authorId, file);
+  }
+
+  async uploadMediaBatch(authorId: string, files: UploadedFile[]) {
+    if (!files || !files.length) {
+      throw new BadRequestException('Missing files');
+    }
+
+    const uploads = [] as Array<{
+      folder: string;
+      url: string;
+      secureUrl: string;
+      publicId: string;
+      resourceType: string;
+      bytes: number;
+      format?: string;
+      width?: number;
+      height?: number;
+      duration?: number;
+      originalName?: string;
+    }>;
+
+    for (const file of files) {
+      const result = await this.uploadSingle(authorId, file);
+      uploads.push({ ...result, originalName: file.originalname });
+    }
+
+    return uploads;
+  }
+
+  private buildUploadFolder(authorId: string): string {
     const now = new Date();
-    const folderParts = [
+    const parts = [
       this.config.cloudinaryFolder,
       'posts',
       authorId,
       now.getFullYear().toString(),
       `${now.getMonth() + 1}`.padStart(2, '0'),
     ].filter(Boolean);
-    const folder = folderParts.join('/');
+
+    return parts.join('/');
+  }
+
+  private async uploadSingle(authorId: string, file: UploadedFile) {
+    const resourceType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+    const folder = this.buildUploadFolder(authorId);
 
     const upload = await this.cloudinary.uploadBuffer({
       buffer: file.buffer,
@@ -286,5 +506,954 @@ export class PostsService {
       height: upload.height,
       duration: upload.duration,
     };
+  }
+
+  async getFeed(
+    userId: string,
+    limit = 20,
+    kinds: PostKind[] = ['post', 'reel'],
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    const allowedKinds = kinds.length ? kinds : ['post', 'reel'];
+
+    const safeLimit = Math.min(Math.max(limit, 1), 50);
+    const userObjectId = this.asObjectId(userId, 'userId');
+
+    const hidden = await this.postInteractionModel
+      .find({ userId: userObjectId, type: 'hide' })
+      .select('postId')
+      .lean();
+    const hiddenIds = new Set(
+      hidden.map((h) => h.postId?.toString?.()).filter(Boolean),
+    );
+
+    const followees = await this.followModel
+      .find({ followerId: userObjectId })
+      .select('followeeId')
+      .lean();
+
+    const followeeIds = followees.map((f) => f.followeeId.toString());
+    const followeeSet = new Set(followeeIds);
+    const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
+
+    const now = new Date();
+    const freshnessWindow = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+
+    const { blockedIds, blockedByIds } =
+      await this.blocksService.getBlockLists(userObjectId);
+    const excludedAuthorIds = Array.from(
+      new Set([...blockedIds, ...blockedByIds]),
+      (id) => new Types.ObjectId(id),
+    );
+
+    const ownedCandidates = await this.postModel
+      .find({
+        authorId: userObjectId,
+        kind: { $in: allowedKinds },
+        status: 'published',
+        deletedAt: null,
+        publishedAt: { $ne: null },
+        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
+      })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit * 2)
+      .lean();
+
+    const followCandidates = await this.postModel
+      .find({
+        authorId: { $in: followeeObjectIds, $nin: excludedAuthorIds },
+        kind: { $in: allowedKinds },
+        status: 'published',
+        visibility: { $ne: 'private' },
+        deletedAt: null,
+        publishedAt: { $ne: null },
+        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
+      })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit * 2)
+      .lean();
+
+    const exploreCandidates = await this.postModel
+      .find({
+        authorId: { $nin: [...followeeObjectIds, ...excludedAuthorIds] },
+        kind: { $in: allowedKinds },
+        status: 'published',
+        visibility: 'public',
+        deletedAt: null,
+        publishedAt: { $ne: null },
+        createdAt: { $gte: freshnessWindow },
+        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
+      })
+      .sort({ 'stats.hearts': -1, 'stats.comments': -1, createdAt: -1 })
+      .limit(safeLimit * 2)
+      .lean();
+
+    const merged: Post[] = [];
+    const seen = new Set<string>();
+
+    const pushCandidate = (raw: unknown) => {
+      const candidate = raw as Post;
+      // Handle lean documents safely and avoid duplicates/hidden posts
+      const id = (
+        candidate as { _id?: Types.ObjectId | string }
+      )?._id?.toString?.();
+      if (!id || seen.has(id) || hiddenIds.has(id)) {
+        return;
+      }
+      merged.push(this.postModel.hydrate(candidate) as Post);
+      seen.add(id);
+    };
+
+    [...ownedCandidates, ...followCandidates, ...exploreCandidates].forEach(
+      (raw) => pushCandidate(raw),
+    );
+
+    const mergedIds = merged
+      .map((p) => p._id?.toString?.())
+      .filter((id): id is string => Boolean(id));
+
+    const viewed = await this.postInteractionModel
+      .find({
+        userId: userObjectId,
+        postId: { $in: mergedIds.map((id) => new Types.ObjectId(id)) },
+        type: 'view',
+      })
+      .select('postId')
+      .lean();
+
+    const viewedIds = new Set(
+      viewed.map((v) => v.postId?.toString?.()).filter(Boolean),
+    );
+
+    const scored = merged
+      .map((post) => ({ post, score: this.scorePost(post, followeeSet, now) }))
+      .sort((a, b) => b.score - a.score);
+
+    const prioritized = [
+      ...scored.filter((item) =>
+        item.post._id ? !viewedIds.has(item.post._id.toString()) : true,
+      ),
+      ...scored.filter((item) =>
+        item.post._id ? viewedIds.has(item.post._id.toString()) : false,
+      ),
+    ];
+
+    const topPosts = prioritized.slice(0, safeLimit).map((item) => item.post);
+
+    const authorIds = Array.from(
+      new Set(
+        topPosts
+          .map((p) => p.authorId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+
+    const profiles = await this.profileModel
+      .find({ userId: { $in: authorIds } })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+
+    const postIds = topPosts.map((p) => p._id);
+    const interactions = await this.postInteractionModel
+      .find({
+        userId: userObjectId,
+        postId: { $in: postIds },
+        type: { $in: ['like', 'save', 'repost'] },
+      })
+      .select('postId type')
+      .lean();
+
+    const interactionMap = new Map<
+      string,
+      { liked?: boolean; saved?: boolean; reposted?: boolean }
+    >();
+
+    interactions.forEach((item) => {
+      const key = item.postId?.toString?.();
+      if (!key) return;
+      const current = interactionMap.get(key) || {};
+      if (item.type === 'like') current.liked = true;
+      if (item.type === 'save') current.saved = true;
+      if (item.type === 'repost') current.reposted = true;
+      interactionMap.set(key, current);
+    });
+
+    return topPosts.map((post) => {
+      const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
+      const baseFlags = interactionMap.get(post._id?.toString?.() ?? '') || {};
+      const following = post.authorId
+        ? followeeSet.has(post.authorId.toString())
+        : false;
+      return this.toResponse(post, profile, { ...baseFlags, following });
+    });
+  }
+
+  async getReelsFeed(userId: string, limit = 20) {
+    return this.getFeed(userId, limit, ['reel']);
+  }
+
+  async getUserPosts(params: {
+    viewerId: string;
+    targetUserId: string;
+    limit?: number;
+  }) {
+    const { viewerId, targetUserId } = params;
+    const limit = Math.min(Math.max(params.limit ?? 24, 1), 60);
+
+    const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
+    const targetObjectId = this.asObjectId(targetUserId, 'targetUserId');
+
+    if (viewerObjectId.toString() !== targetObjectId.toString()) {
+      await this.blocksService.assertNotBlocked(viewerObjectId, targetObjectId);
+    }
+
+    const isOwner = viewerObjectId.equals(targetObjectId);
+    let allowedVisibilities: Visibility[] = ['public'];
+
+    if (isOwner) {
+      allowedVisibilities = ['public', 'followers', 'private'];
+    } else {
+      const follows = await this.followModel
+        .findOne({ followerId: viewerObjectId, followeeId: targetObjectId })
+        .select('_id')
+        .lean();
+      if (follows?._id) {
+        allowedVisibilities = ['public', 'followers'];
+      }
+    }
+
+    const docs = await this.postModel
+      .find({
+        authorId: targetObjectId,
+        kind: 'post',
+        status: 'published',
+        visibility: { $in: allowedVisibilities },
+        deletedAt: null,
+        publishedAt: { $ne: null },
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    return docs.map((doc) =>
+      this.toResponse(this.postModel.hydrate(doc) as Post),
+    );
+  }
+
+  async getUserReels(params: {
+    viewerId: string;
+    targetUserId: string;
+    limit?: number;
+  }) {
+    const { viewerId, targetUserId } = params;
+    const limit = Math.min(Math.max(params.limit ?? 24, 1), 60);
+
+    const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
+    const targetObjectId = this.asObjectId(targetUserId, 'targetUserId');
+
+    if (viewerObjectId.toString() !== targetObjectId.toString()) {
+      await this.blocksService.assertNotBlocked(viewerObjectId, targetObjectId);
+    }
+
+    const isOwner = viewerObjectId.equals(targetObjectId);
+    let allowedVisibilities: Visibility[] = ['public'];
+
+    if (isOwner) {
+      allowedVisibilities = ['public', 'followers', 'private'];
+    } else {
+      const follows = await this.followModel
+        .findOne({ followerId: viewerObjectId, followeeId: targetObjectId })
+        .select('_id')
+        .lean();
+      if (follows?._id) {
+        allowedVisibilities = ['public', 'followers'];
+      }
+    }
+
+    const docs = await this.postModel
+      .find({
+        authorId: targetObjectId,
+        kind: 'reel',
+        status: 'published',
+        visibility: { $in: allowedVisibilities },
+        deletedAt: null,
+        publishedAt: { $ne: null },
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    return docs.map((doc) =>
+      this.toResponse(this.postModel.hydrate(doc) as Post),
+    );
+  }
+
+  async getSavedPosts(userId: string, limit = 24) {
+    const viewerObjectId = this.asObjectId(userId, 'userId');
+    const safeLimit = Math.min(Math.max(limit, 1), 60);
+
+    const saves = await this.postInteractionModel
+      .find({ userId: viewerObjectId, type: 'save' })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit * 3)
+      .lean();
+
+    const postIds = Array.from(
+      new Set(
+        saves
+          .map((s) => s.postId)
+          .filter((id): id is Types.ObjectId => Boolean(id)),
+      ),
+    );
+
+    if (!postIds.length) return [] as ReturnType<typeof this.toResponse>[];
+
+    const posts = await this.postModel
+      .find({
+        _id: { $in: postIds },
+        status: 'published',
+        deletedAt: null,
+        publishedAt: { $ne: null },
+      })
+      .lean();
+
+    const filtered: Post[] = [];
+
+    for (const raw of posts) {
+      const doc = this.postModel.hydrate(raw) as Post;
+
+      try {
+        await this.blocksService.assertNotBlocked(
+          viewerObjectId,
+          doc.authorId,
+        );
+      } catch {
+        continue;
+      }
+
+      const isOwner = doc.authorId?.equals(viewerObjectId) ?? false;
+
+      if (!isOwner) {
+        if (doc.visibility === 'private') continue;
+        if (doc.visibility === 'followers') {
+          const follows = await this.followModel
+            .findOne({ followerId: viewerObjectId, followeeId: doc.authorId })
+            .select('_id')
+            .lean();
+
+          if (!follows?._id) continue;
+        }
+      }
+
+      filtered.push(doc);
+    }
+
+    if (!filtered.length) return [] as ReturnType<typeof this.toResponse>[];
+
+    filtered.sort(
+      (a, b) =>
+        (b.createdAt?.getTime?.() ?? 0) - (a.createdAt?.getTime?.() ?? 0),
+    );
+
+    const limited = filtered.slice(0, safeLimit);
+
+    const authorIds = Array.from(
+      new Set(
+        limited
+          .map((p) => p.authorId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+
+    const profiles = await this.profileModel
+      .find({ userId: { $in: authorIds } })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+
+    return limited.map((post) => {
+      const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
+      return this.toResponse(post, profile, { saved: true });
+    });
+  }
+
+  async getSavedReels(userId: string, limit = 24) {
+    const viewerObjectId = this.asObjectId(userId, 'userId');
+    const safeLimit = Math.min(Math.max(limit, 1), 60);
+
+    const saves = await this.postInteractionModel
+      .find({ userId: viewerObjectId, type: 'save' })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit * 2)
+      .lean();
+
+    const postIds = saves
+      .map((s) => s.postId)
+      .filter((id): id is Types.ObjectId => Boolean(id));
+
+    if (!postIds.length) return [] as ReturnType<typeof this.toResponse>[];
+
+    const posts = await this.postModel
+      .find({
+        _id: { $in: postIds },
+        kind: 'reel',
+        status: 'published',
+        deletedAt: null,
+        publishedAt: { $ne: null },
+      })
+      .lean();
+
+    const postMap = new Map(
+      posts.map((p) => [p._id?.toString?.() ?? '', this.postModel.hydrate(p)]),
+    );
+
+    const results: Post[] = [];
+
+    for (const interaction of saves) {
+      if (results.length >= safeLimit) break;
+      const postId = interaction.postId?.toString?.();
+      if (!postId) continue;
+      const doc = postMap.get(postId);
+      if (!doc) continue;
+
+      try {
+        await this.blocksService.assertNotBlocked(viewerObjectId, doc.authorId);
+      } catch {
+        continue;
+      }
+
+      const isOwner = doc.authorId?.equals(viewerObjectId) ?? false;
+      if (!isOwner) {
+        if (doc.visibility === 'private') continue;
+        if (doc.visibility === 'followers') {
+          const follows = await this.followModel
+            .findOne({ followerId: viewerObjectId, followeeId: doc.authorId })
+            .select('_id')
+            .lean();
+          if (!follows?._id) continue;
+        }
+      }
+
+      results.push(doc as Post);
+    }
+
+    if (!results.length) return [] as ReturnType<typeof this.toResponse>[];
+
+    const authorIds = Array.from(
+      new Set(
+        results
+          .map((p) => p.authorId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+
+    const profiles = await this.profileModel
+      .find({ userId: { $in: authorIds } })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+
+    return results.map((post) => {
+      const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
+      return this.toResponse(post, profile, { saved: true });
+    });
+  }
+
+  async getById(
+    userId: string,
+    postId: string,
+    opts?: { allowedKinds?: PostKind[] },
+  ) {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (
+      opts?.allowedKinds &&
+      opts.allowedKinds.length &&
+      !opts.allowedKinds.includes(post.kind)
+    ) {
+      throw new NotFoundException('Post not found');
+    }
+
+    const isAuthor = post.authorId?.toString?.() === userId;
+
+    if (!isAuthor && post.status !== 'published') {
+      throw new ForbiddenException('Post is not published');
+    }
+
+    if (!isAuthor && post.visibility === 'private') {
+      throw new ForbiddenException('Post is private');
+    }
+
+    await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
+
+    const profile = await this.profileModel
+      .findOne({ userId: post.authorId })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const interactions = await this.postInteractionModel
+      .find({
+        userId: userObjectId,
+        postId: postObjectId,
+        type: { $in: ['like', 'save', 'repost'] },
+      })
+      .select('type')
+      .lean();
+
+    const flags = interactions.reduce<{
+      liked?: boolean;
+      saved?: boolean;
+      following?: boolean;
+      reposted?: boolean;
+    }>((acc, item) => {
+      if (item.type === 'like') acc.liked = true;
+      if (item.type === 'save') acc.saved = true;
+      if (item.type === 'repost') acc.reposted = true;
+      return acc;
+    }, {});
+
+    if (!isAuthor) {
+      const isFollowing = await this.followModel
+        .findOne({ followerId: userObjectId, followeeId: post.authorId })
+        .select('_id')
+        .lean();
+      flags.following = Boolean(isFollowing);
+    }
+
+    return this.toResponse(
+      this.postModel.hydrate(post) as Post,
+      profile || null,
+      flags,
+    );
+  }
+
+  async getReelById(userId: string, postId: string) {
+    return this.getById(userId, postId, { allowedKinds: ['reel'] });
+  }
+
+  async like(userId: string, postId: string) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
+    const inserted = await this.upsertUniqueInteraction(
+      userObjectId,
+      postObjectId,
+      'like',
+      true,
+    );
+    if (inserted) {
+      await this.bumpCounters(postObjectId, { 'stats.hearts': 1 });
+    }
+    return { liked: true, created: inserted };
+  }
+
+  async unlike(userId: string, postId: string) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
+    const removed = await this.removeUniqueInteraction(
+      userObjectId,
+      postObjectId,
+      'like',
+      true,
+    );
+    if (removed) {
+      await this.bumpCounters(postObjectId, { 'stats.hearts': -1 });
+    }
+    return { liked: !removed };
+  }
+
+  async save(userId: string, postId: string) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
+    const inserted = await this.upsertUniqueInteraction(
+      userObjectId,
+      postObjectId,
+      'save',
+      true,
+    );
+    if (inserted) {
+      await this.bumpCounters(postObjectId, { 'stats.saves': 1 });
+    }
+    return { saved: true, created: inserted };
+  }
+
+  async unsave(userId: string, postId: string) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
+    const removed = await this.removeUniqueInteraction(
+      userObjectId,
+      postObjectId,
+      'save',
+      true,
+    );
+    if (removed) {
+      await this.bumpCounters(postObjectId, { 'stats.saves': -1 });
+    }
+    return { saved: !removed };
+  }
+
+  async share(userId: string, postId: string) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
+    const inserted = await this.upsertUniqueInteraction(
+      userObjectId,
+      postObjectId,
+      'share',
+      true,
+    );
+    if (inserted) {
+      await this.bumpCounters(postObjectId, { 'stats.shares': 1 });
+    }
+    return { shared: true };
+  }
+
+  async repost(userId: string, postId: string) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
+    const inserted = await this.upsertUniqueInteraction(
+      userObjectId,
+      postObjectId,
+      'repost',
+      true,
+    );
+
+    if (inserted) {
+      await this.bumpCounters(postObjectId, { 'stats.reposts': 1 });
+    }
+
+    return { reposted: true, created: inserted };
+  }
+
+  async unrepost(userId: string, postId: string) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
+    const removed = await this.removeUniqueInteraction(
+      userObjectId,
+      postObjectId,
+      'repost',
+      true,
+    );
+
+    if (removed) {
+      await this.bumpCounters(postObjectId, { 'stats.reposts': -1 });
+    }
+
+    return { reposted: !removed };
+  }
+
+  async hide(userId: string, postId: string) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
+    const inserted = await this.upsertUniqueInteraction(
+      userObjectId,
+      postObjectId,
+      'hide',
+      true,
+    );
+    if (inserted) {
+      await this.bumpCounters(postObjectId, { 'stats.hides': 1 });
+    }
+    return { hidden: true };
+  }
+
+  async report(userId: string, postId: string) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
+    const inserted = await this.upsertUniqueInteraction(
+      userObjectId,
+      postObjectId,
+      'report',
+      true,
+    );
+    if (inserted) {
+      await this.bumpCounters(postObjectId, { 'stats.reports': 1 });
+    }
+    return { reported: true };
+  }
+
+  async view(userId: string, postId: string, durationMs?: number) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+    await this.assertPostAccessible(userObjectId, postObjectId);
+
+    await this.postInteractionModel.create({
+      userId: userObjectId,
+      postId: postObjectId,
+      type: 'view',
+      durationMs: durationMs ?? null,
+    });
+
+    await this.bumpCounters(postObjectId, {
+      'stats.views': 1,
+      'stats.impressions': 1,
+    });
+
+    return { viewed: true };
+  }
+
+  async setAllowComments(userId: string, postId: string, allow: boolean) {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId allowComments')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (
+      !post.authorId ||
+      post.authorId.toString() !== userObjectId.toString()
+    ) {
+      throw new ForbiddenException(
+        'Only the author can change comment settings',
+      );
+    }
+
+    await this.postModel
+      .updateOne({ _id: postObjectId }, { $set: { allowComments: allow } })
+      .exec();
+
+    return { allowComments: allow };
+  }
+
+  async setHideLikeCount(userId: string, postId: string, hide: boolean) {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId hideLikeCount')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (
+      !post.authorId ||
+      post.authorId.toString() !== userObjectId.toString()
+    ) {
+      throw new ForbiddenException(
+        'Only the author can change like visibility',
+      );
+    }
+
+    await this.postModel
+      .updateOne({ _id: postObjectId }, { $set: { hideLikeCount: hide } })
+      .exec();
+
+    return { hideLikeCount: hide };
+  }
+
+  async setVisibility(
+    userId: string,
+    postId: string,
+    visibility: 'public' | 'followers' | 'private',
+  ) {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId visibility')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (!post.authorId || !post.authorId.equals(userObjectId)) {
+      throw new ForbiddenException('Only the author can change visibility');
+    }
+
+    if (post.visibility === visibility) {
+      return { visibility, unchanged: true };
+    }
+
+    await this.postModel
+      .updateOne({ _id: postObjectId }, { $set: { visibility } })
+      .exec();
+
+    return { visibility, updated: true };
+  }
+
+  private async assertPostAccessible(
+    viewerId: Types.ObjectId,
+    postId: Types.ObjectId,
+  ) {
+    const post = await this.postModel
+      .findOne({ _id: postId, deletedAt: null })
+      .select('authorId')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (!post.authorId) {
+      throw new ForbiddenException('Post author missing');
+    }
+
+    await this.blocksService.assertNotBlocked(viewerId, post.authorId);
+    return post;
+  }
+
+  private scorePost(post: Post, followeeSet: Set<string>, now: Date) {
+    const createdAt = post.createdAt ? new Date(post.createdAt) : now;
+    const ageHours = Math.max(
+      0.1,
+      (now.getTime() - createdAt.getTime()) / 3_600_000,
+    );
+    const freshness = 1 / (1 + ageHours / 12);
+    const stats = post.stats ?? ({} as PostStats);
+    const engagement =
+      (stats.hearts ?? 0) * 2 +
+      (stats.comments ?? 0) * 3 +
+      (stats.saves ?? 0) * 4 +
+      (stats.shares ?? 0) * 3 +
+      (stats.reposts ?? 0) * 3 +
+      (stats.views ?? 0) * 0.3 +
+      (stats.impressions ?? 0) * 0.1;
+
+    const qualityBoost =
+      1 + ((post.qualityScore ?? 0) - (post.spamScore ?? 0)) * 0.01;
+    const relationshipBoost = followeeSet.has(post.authorId?.toString?.() ?? '')
+      ? 1.3
+      : 1;
+
+    return (engagement + 1) * freshness * qualityBoost * relationshipBoost;
+  }
+
+  private async upsertUniqueInteraction(
+    userId: Types.ObjectId,
+    postId: Types.ObjectId,
+    type: InteractionType,
+    skipEnsureExists = false,
+  ) {
+    if (!skipEnsureExists) {
+      await this.ensurePostExists(postId);
+    }
+    const result = await this.postInteractionModel
+      .updateOne(
+        { userId, postId, type },
+        { $setOnInsert: { userId, postId, type } },
+        { upsert: true },
+      )
+      .exec();
+
+    return Boolean((result as { upsertedCount?: number }).upsertedCount);
+  }
+
+  private async removeUniqueInteraction(
+    userId: Types.ObjectId,
+    postId: Types.ObjectId,
+    type: InteractionType,
+    skipEnsureExists = false,
+  ) {
+    if (!skipEnsureExists) {
+      await this.ensurePostExists(postId);
+    }
+    const result = await this.postInteractionModel
+      .deleteOne({ userId, postId, type })
+      .exec();
+    return result.deletedCount === 1;
+  }
+
+  private async bumpCounters(
+    postId: Types.ObjectId,
+    inc: Record<string, number>,
+  ) {
+    await this.postModel.updateOne({ _id: postId }, { $inc: inc }).exec();
+  }
+
+  private async ensurePostExists(postId: Types.ObjectId) {
+    const exists = await this.postModel
+      .findOne({ _id: postId, deletedAt: null })
+      .select('_id')
+      .lean();
+    if (!exists) {
+      throw new NotFoundException('Post not found');
+    }
+  }
+
+  private asObjectId(id: string, field: string): Types.ObjectId {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(`Invalid ${field}`);
+    }
+    return new Types.ObjectId(id);
+  }
+
+  private async resolveIds(userId: string, postId: string) {
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const userObjectId = this.asObjectId(userId, 'userId');
+    const postObjectId = this.asObjectId(postId, 'postId');
+    return { userObjectId, postObjectId };
   }
 }

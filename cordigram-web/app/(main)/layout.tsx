@@ -2,6 +2,7 @@
 
 import Sidebar from "@/ui/Sidebar/sidebar";
 import { usePathname } from "next/navigation";
+import { AuthGuard } from "../../component/auth-guard";
 
 export default function MainLayout({
   children,
@@ -16,9 +17,13 @@ export default function MainLayout({
   }
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <div className="page">{children}</div>
-    </div>
+    <AuthGuard>
+      <div className="app-shell flex">
+        <Sidebar />
+        <div className="page flex-1" data-scroll-root>
+          {children}
+        </div>
+      </div>
+    </AuthGuard>
   );
 }

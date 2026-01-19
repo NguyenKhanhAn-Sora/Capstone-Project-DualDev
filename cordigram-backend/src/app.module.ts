@@ -15,6 +15,9 @@ import { ServersModule } from './servers/servers.module';
 import { ChannelsModule } from './channels/channels.module';
 import { MessagesModule } from './messages/messages.module';
 import { FollowsModule } from './follows/follows.module';
+import { CommentsModule } from './comment/comments.module';
+import { ReportPostModule } from './reportpost/reportpost.module';
+import { ReportCommentModule } from './reportcomment/reportcomment.module';
 
 @Module({
   imports: [
@@ -32,6 +35,9 @@ import { FollowsModule } from './follows/follows.module';
     ChannelsModule,
     MessagesModule,
     FollowsModule,
+    CommentsModule,
+    ReportPostModule,
+    ReportCommentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

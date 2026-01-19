@@ -17,6 +17,24 @@ import { useTheme } from "@/component/theme-provider";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const EyeIcon = ({ open }: { open: boolean }) => (
+  <svg
+    aria-hidden
+    width={18}
+    height={18}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.8}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M2 12s4.5-7 10-7 10 7 10 7-4.5 7-10 7S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3.5" />
+    {!open && <line x1="4" y1="4" x2="20" y2="20" />}
+  </svg>
+);
+
 const navItems = [
   { label: "Home", href: "/", icon: IconHome },
   { label: "Search", href: "/search", icon: IconSearch },
@@ -40,6 +58,26 @@ export default function Sidebar() {
   const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const { theme, toggleTheme } = useTheme();
+  const clearSessionAndGoHome = useCallback(
+    (event?: React.MouseEvent<HTMLAnchorElement>) => {
+      event?.preventDefault();
+
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.clear();
+        } catch (_err) {}
+      }
+
+      setMenuOpen(false);
+      if (typeof window !== "undefined") {
+        window.location.href = "/";
+        return;
+      }
+
+      router.push("/");
+    },
+    [router]
+  );
 
   useEffect(() => {
     let active = true;
@@ -102,14 +140,41 @@ export default function Sidebar() {
   const displayName = profile?.displayName;
   const username = profile?.username ? `@${profile.username}` : null;
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
+    setMenuOpen(false);
+
+    try {
+      await apiFetch<{ success: boolean }>({
+        path: "/auth/logout",
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (_err) {}
+
     if (typeof window !== "undefined") {
       localStorage.removeItem("accessToken");
+      localStorage.removeItem("ui-theme");
     }
+
     setProfile(null);
-    setMenuOpen(false);
-    router.replace("/login");
+    router.replace("/login?loggedOut=1");
   }, [router]);
+
+  const handleProfileClick = useCallback(() => {
+    const profileId = profile?.id || profile?.userId;
+    if (!profileId) return;
+
+    setMenuOpen(false);
+    router.push(`/profile/${profileId}`);
+  }, [profile, router]);
+
+  const handleSavedClick = useCallback(() => {
+    const profileId = profile?.id || profile?.userId;
+    if (!profileId) return;
+
+    setMenuOpen(false);
+    router.push(`/profile/${profileId}/saved`);
+  }, [profile, router]);
 
   const handleSwitchAccountSuccess = useCallback(
     async (token: string) => {
@@ -135,7 +200,7 @@ export default function Sidebar() {
   return (
     <>
       <aside className={styles.sidebar}>
-        <Link href="/" className={styles.brand}>
+        <Link href="/" className={styles.brand} onClick={clearSessionAndGoHome}>
           <Image
             src="/logo.png"
             alt="Cordigram logo"
@@ -149,7 +214,12 @@ export default function Sidebar() {
 
         <nav className={styles.nav}>
           {navItems.map(({ label, href, icon: Icon, hasAvatar }) => (
-            <Link key={label} href={href} className={styles.item}>
+            <Link
+              key={label}
+              href={href}
+              className={styles.item}
+              onClick={label === "Home" ? clearSessionAndGoHome : undefined}
+            >
               <span className={styles.icon}>
                 {hasAvatar ? (
                   <div className={styles.avatarFallback}>S</div>
@@ -192,9 +262,17 @@ export default function Sidebar() {
 
             {menuOpen ? (
               <div className={styles.userMenu}>
-                <MenuItem label="Profile" icon={<IconProfile />} />
+                <MenuItem
+                  label="Profile"
+                  icon={<IconProfile />}
+                  onClick={handleProfileClick}
+                />
                 <MenuItem label="Settings" icon={<IconSettings />} />
-                <MenuItem label="Saved" icon={<IconSaved />} />
+                <MenuItem
+                  label="Saved"
+                  icon={<IconSaved />}
+                  onClick={handleSavedClick}
+                />
                 <MenuItem
                   label={
                     theme === "dark" ? "Switch to light" : "Switch to dark"
@@ -276,6 +354,7 @@ function SwitchAccountOverlay({
 }: SwitchAccountOverlayProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -376,15 +455,27 @@ function SwitchAccountOverlay({
 
               <label className={styles.switchLabel}>
                 Password
-                <input
-                  type="password"
-                  name="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password"
-                  autoComplete="current-password"
-                  className={styles.switchInput}
-                />
+                <div className={styles.passwordField}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter password"
+                    autoComplete="current-password"
+                    className={`${styles.switchInput} ${styles.passwordInput}`}
+                  />
+                  <button
+                    type="button"
+                    className={styles.passwordToggle}
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                  >
+                    <EyeIcon open={showPassword} />
+                  </button>
+                </div>
               </label>
 
               {error ? (
