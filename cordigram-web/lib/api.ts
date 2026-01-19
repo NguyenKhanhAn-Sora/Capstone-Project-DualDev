@@ -157,13 +157,10 @@ export type CurrentProfileResponse = {
   avatarUrl: string;
 };
 
-<<<<<<< HEAD
 export type UserSettingsResponse = {
   theme: "light" | "dark";
 };
 
-=======
->>>>>>> origin/Cordigram-social-chat
 export async function fetchCurrentProfile(opts: {
   token: string;
 }): Promise<CurrentProfileResponse> {
@@ -177,7 +174,6 @@ export async function fetchCurrentProfile(opts: {
   });
 }
 
-<<<<<<< HEAD
 export async function fetchUserSettings(opts: {
   token: string;
 }): Promise<UserSettingsResponse> {
@@ -206,8 +202,6 @@ export async function updateUserSettings(opts: {
   });
 }
 
-=======
->>>>>>> origin/Cordigram-social-chat
 export type UploadPostMediaResponse = {
   folder: string;
   url: string;
@@ -221,7 +215,6 @@ export type UploadPostMediaResponse = {
   duration?: number;
 };
 
-<<<<<<< HEAD
 export type ReportProblemAttachment = {
   url: string;
   secureUrl: string;
@@ -245,8 +238,6 @@ export type CreateReportProblemResponse = {
   updatedAt: string;
 };
 
-=======
->>>>>>> origin/Cordigram-social-chat
 export async function uploadPostMedia(opts: {
   token: string;
   file: File;
@@ -278,7 +269,6 @@ export async function uploadPostMedia(opts: {
   return (await res.json()) as UploadPostMediaResponse;
 }
 
-<<<<<<< HEAD
 export async function createReportProblem(opts: {
   token: string;
   description: string;
@@ -313,8 +303,6 @@ export async function createReportProblem(opts: {
   return (await res.json()) as CreateReportProblemResponse;
 }
 
-=======
->>>>>>> origin/Cordigram-social-chat
 export function getApiBaseUrl(): string {
   return apiBaseUrl;
 }

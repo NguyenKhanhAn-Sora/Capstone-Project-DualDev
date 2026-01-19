@@ -3,7 +3,6 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-<<<<<<< HEAD
   --color-bg: #f6f8fb;
   --color-surface: #ffffff;
   --color-surface-muted: #f4f7fb;
@@ -35,21 +34,6 @@
   --shadow-strong: 0 24px 80px rgba(0, 0, 0, 0.45);
   --gradient-surface: linear-gradient(135deg, #111b30, #0c1220);
   --color-title-primary: #e5e7ef;
-=======
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-roboto: "Roboto", sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
->>>>>>> origin/Cordigram-social-chat
 }
 
 html,
@@ -59,13 +43,8 @@ body {
 
 body {
   margin: 0;
-<<<<<<< HEAD
   background: var(--color-bg);
   color: var(--color-text);
-=======
-  background: var(--background);
-  color: var(--foreground);
->>>>>>> origin/Cordigram-social-chat
   font-family: var(--font-roboto);
 }
 

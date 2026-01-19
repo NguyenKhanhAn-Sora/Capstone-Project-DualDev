@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import Image from "next/image";
-<<<<<<< HEAD
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -17,12 +16,6 @@ import {
 import { useTheme } from "@/component/theme-provider";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-=======
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import styles from "./sidebar.module.css";
-import { fetchCurrentProfile, type CurrentProfileResponse } from "@/lib/api";
->>>>>>> origin/Cordigram-social-chat
 
 const navItems = [
   { label: "Home", href: "/", icon: IconHome },
@@ -44,13 +37,9 @@ export default function Sidebar() {
   const router = useRouter();
   const [profile, setProfile] = useState<CurrentProfileResponse | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-<<<<<<< HEAD
   const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const { theme, toggleTheme } = useTheme();
-=======
-  const menuRef = useRef<HTMLDivElement | null>(null);
->>>>>>> origin/Cordigram-social-chat
 
   useEffect(() => {
     let active = true;
@@ -122,7 +111,6 @@ export default function Sidebar() {
     router.replace("/login");
   }, [router]);
 
-<<<<<<< HEAD
   const handleSwitchAccountSuccess = useCallback(
     async (token: string) => {
       if (typeof window !== "undefined") {
@@ -250,83 +238,6 @@ export default function Sidebar() {
         onSuccess={handleSwitchAccountSuccess}
       />
     </>
-=======
-  return (
-    <aside className={styles.sidebar}>
-      <Link href="/" className={styles.brand}>
-        <Image
-          src="/logo.png" // đã có trong public
-          alt="Cordigram logo"
-          width={52}
-          height={52}
-          className={styles.logo}
-          priority
-        />
-        <span className={styles.brandName}>CORDIGRAM</span>
-      </Link>
-
-      <nav className={styles.nav}>
-        {navItems.map(({ label, href, icon: Icon, hasAvatar }) => (
-          <Link key={label} href={href} className={styles.item}>
-            <span className={styles.icon}>
-              {hasAvatar ? (
-                <div className={styles.avatarFallback}>S</div>
-              ) : (
-                <Icon />
-              )}
-            </span>
-            <span className={styles.label}>{label}</span>
-          </Link>
-        ))}
-      </nav>
-
-      {profile ? (
-        <div
-          className={styles.userCard}
-          onClick={() => setMenuOpen((prev) => !prev)}
-          ref={menuRef}
-        >
-          <div className={styles.userAvatar}>
-            {profile.avatarUrl ? (
-              <Image
-                src={profile.avatarUrl}
-                alt={`${displayName ?? ""} avatar`}
-                width={44}
-                height={44}
-                className={styles.userAvatarImg}
-              />
-            ) : (
-              <span>{avatarLetter}</span>
-            )}
-          </div>
-          <div className={styles.userMeta}>
-            {displayName ? (
-              <span className={styles.userDisplay}>{displayName}</span>
-            ) : null}
-            {username ? (
-              <span className={styles.userUsername}>{username}</span>
-            ) : null}
-          </div>
-
-          {menuOpen ? (
-            <div className={styles.userMenu}>
-              <MenuItem label="Trang cá nhân" icon={<IconProfile />} />
-              <MenuItem label="Cài đặt" icon={<IconSettings />} />
-              <MenuItem label="Đã lưu" icon={<IconSaved />} />
-              <MenuItem label="Chuyển chế độ" icon={<IconTheme />} />
-              <MenuItem label="Báo cáo sự cố" icon={<IconReport />} />
-              <MenuItem label="Chuyển tài khoản" icon={<IconSwitchAccount />} />
-              <MenuItem
-                label="Đăng xuất"
-                icon={<IconLogout />}
-                onClick={handleLogout}
-              />
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </aside>
->>>>>>> origin/Cordigram-social-chat
   );
 }
 
@@ -352,7 +263,6 @@ function MenuItem({
   );
 }
 
-<<<<<<< HEAD
 type SwitchAccountOverlayProps = {
   open: boolean;
   onClose: () => void;
@@ -531,8 +441,7 @@ function SwitchAccountOverlay({
     </div>
   );
 }
-=======
->>>>>>> origin/Cordigram-social-chat
+
 function IconHome() {
   return (
     <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
@@ -709,11 +618,7 @@ function IconSaved() {
 function IconTheme() {
   return (
     <svg
-<<<<<<< HEAD
       aria-label="Theme icon"
-=======
-      aria-label="Biểu tượng chủ đề"
->>>>>>> origin/Cordigram-social-chat
       fill="currentColor"
       height="18"
       role="img"

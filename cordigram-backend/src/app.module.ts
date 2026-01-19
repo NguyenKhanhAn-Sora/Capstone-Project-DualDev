@@ -10,14 +10,11 @@ import { ProfilesModule } from './profiles/profiles.module';
 import { AuthModule } from './auth/auth.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { PostsModule } from './posts/posts.module';
-<<<<<<< HEAD
 import { ReportProblemModule } from './reportproblem/reportproblem.module';
 import { ServersModule } from './servers/servers.module';
 import { ChannelsModule } from './channels/channels.module';
 import { MessagesModule } from './messages/messages.module';
 import { FollowsModule } from './follows/follows.module';
-=======
->>>>>>> origin/Cordigram-social-chat
 
 @Module({
   imports: [
@@ -30,14 +27,11 @@ import { FollowsModule } from './follows/follows.module';
     AuthModule,
     CloudinaryModule,
     PostsModule,
-<<<<<<< HEAD
     ReportProblemModule,
     ServersModule,
     ChannelsModule,
     MessagesModule,
     FollowsModule,
-=======
->>>>>>> origin/Cordigram-social-chat
   ],
   controllers: [AppController],
   providers: [AppService],
