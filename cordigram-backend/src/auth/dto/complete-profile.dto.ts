@@ -51,6 +51,11 @@ export class CompleteProfileDto {
   location?: string;
 
   @IsOptional()
+  @IsString()
+  @Matches(/^(male|female|other)$/)
+  gender?: 'male' | 'female' | 'other';
+
+  @IsOptional()
   links?: Record<string, string>;
 
   @IsOptional()

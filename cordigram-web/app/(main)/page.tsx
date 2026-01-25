@@ -6,6 +6,7 @@ import EmojiPicker from "emoji-picker-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./home-feed.module.css";
+import ImageViewerOverlay from "@/ui/image-viewer-overlay";
 import {
   fetchFeed,
   hidePost,
@@ -34,6 +35,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useScrollRestoration } from "@/hooks/use-scroll-restoration";
+
 type LocalFlags = {
   liked?: boolean;
   saved?: boolean;
@@ -44,8 +46,17 @@ type PostViewState = {
   flags: LocalFlags;
 };
 
+const isRepostOfReel = (item: FeedItem): boolean => {
+  const duration = (item as any)?.durationSeconds as number | undefined;
+  const mediaIsVideo = item.media?.some((m) => m?.type === "video");
+  return Boolean(
+    item.repostOf &&
+    (item.kind === "reel" || typeof duration === "number" || mediaIsVideo),
+  );
+};
+
 const onlyPostItems = (items: FeedItem[]): FeedItem[] =>
-  items.filter((item) => item.kind === "post");
+  items.filter((item) => item.kind === "post" && !isRepostOfReel(item));
 
 const onlyPostViews = (items: PostViewState[]): PostViewState[] =>
   items.filter((item) => item.item?.kind === "post");
@@ -74,9 +85,10 @@ const VIEW_DEBOUNCE_MS = 800;
 const VIEW_DWELL_MS = 2000;
 const VIEW_COOLDOWN_MS = 300000;
 const REPORT_ANIMATION_MS = 200;
-const FEED_POLL_MS = 7000;
+const FEED_POLL_MS = 4000;
 const FEED_CACHE_KEY = "feedCache:v1";
 const FEED_CACHE_INTENT_KEY = "feedCache:intent";
+const QUOTE_CHAR_LIMIT = 500;
 
 const normalizeHashtag = (value: string) =>
   value
@@ -114,6 +126,9 @@ const findActiveMention = (value: string, caret: number) => {
   const start = caret - handle.length - 1;
   return { handle, start, end: caret };
 };
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
 
 type IconProps = { size?: number; filled?: boolean };
 
@@ -405,8 +420,24 @@ export default function HomePage() {
     label: string;
     kind: "post" | "reel";
   } | null>(null);
+  const [repostMenuAnchor, setRepostMenuAnchor] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [quoteOpen, setQuoteOpen] = useState(false);
   const [repostMode, setRepostMode] = useState<"quote" | "repost" | null>(null);
   const [repostNote, setRepostNote] = useState("");
+  const [quoteVisibility, setQuoteVisibility] = useState<
+    "public" | "followers" | "private"
+  >("public");
+  const [quoteAllowComments, setQuoteAllowComments] = useState(true);
+  const [quoteAllowDownload, setQuoteAllowDownload] = useState(true);
+  const [quoteHideLikeCount, setQuoteHideLikeCount] = useState(false);
+  const [quoteLocation, setQuoteLocation] = useState("");
+  const [quoteHashtags, setQuoteHashtags] = useState<string[]>([]);
+  const [quoteHashtagDraft, setQuoteHashtagDraft] = useState("");
+  const [quoteEmojiOpen, setQuoteEmojiOpen] = useState(false);
+  const quoteEmojiRef = useRef<HTMLDivElement | null>(null);
   const [repostSubmitting, setRepostSubmitting] = useState(false);
   const [repostError, setRepostError] = useState("");
   const [repostClosing, setRepostClosing] = useState(false);
@@ -417,12 +448,26 @@ export default function HomePage() {
   const [viewerId, setViewerId] = useState<string | undefined>(() =>
     typeof window === "undefined"
       ? undefined
-      : getUserIdFromToken(localStorage.getItem("accessToken"))
+      : getUserIdFromToken(localStorage.getItem("accessToken")),
   );
   const viewTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
-    new Map()
+    new Map(),
   );
+  const viewCooldownRef = useRef<Map<string, number>>(new Map());
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const autoLoadLockRef = useRef(false);
+
+  const repostHeartsByOriginalId = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const entry of items) {
+      const repostOf = entry.item?.repostOf;
+      if (!repostOf) continue;
+      const hearts = entry.item?.stats?.hearts ?? 0;
+      totals.set(repostOf, (totals.get(repostOf) ?? 0) + hearts);
+    }
+    return totals;
+  }, [items]);
+
   const getScrollTarget = useCallback(() => {
     if (typeof document === "undefined") return null;
     const el = document.querySelector<HTMLElement>("[data-scroll-root]");
@@ -439,13 +484,93 @@ export default function HomePage() {
     "feed-scroll",
     initialized && !loading,
     getScrollTarget,
-    pathname === "/"
+    pathname === "/",
   );
 
   const selectedReportGroup = useMemo(
     () => REPORT_GROUPS.find((g) => g.key === reportCategory),
-    [reportCategory]
+    [reportCategory],
   );
+
+  const repostMenuStyle = useMemo(() => {
+    if (!repostMenuAnchor || typeof window === "undefined") return null;
+    const width = 240;
+    const height = 132;
+    const margin = 12;
+    const left = clamp(
+      repostMenuAnchor.x - width / 2,
+      margin,
+      window.innerWidth - width - margin,
+    );
+    const top = clamp(
+      repostMenuAnchor.y + 10,
+      margin,
+      window.innerHeight - height - margin,
+    );
+    return { left, top, width };
+  }, [repostMenuAnchor]);
+
+  const quoteVisibilityOptions = useMemo(
+    () => [
+      {
+        value: "public" as const,
+        title: "Public",
+        description: "Anyone can view this repost",
+      },
+      {
+        value: "followers" as const,
+        title: "Followers",
+        description: "Only followers can view this repost",
+      },
+      {
+        value: "private" as const,
+        title: "Private",
+        description: "Only you can view this repost",
+      },
+    ],
+    [],
+  );
+
+  const resolveOriginalPostId = useCallback(
+    (postId: string) => {
+      const target = items.find((p) => p.item.id === postId)?.item;
+      return target?.repostOf || postId;
+    },
+    [items],
+  );
+
+  const resetQuoteState = useCallback(() => {
+    setRepostMode(null);
+    setRepostNote("");
+    setQuoteVisibility("public");
+    setQuoteAllowComments(true);
+    setQuoteAllowDownload(true);
+    setQuoteHideLikeCount(false);
+    setQuoteLocation("");
+    setQuoteHashtags([]);
+    setQuoteHashtagDraft("");
+    setRepostError("");
+    setRepostSubmitting(false);
+    setQuoteOpen(false);
+    setRepostMenuAnchor(null);
+  }, []);
+
+  const addQuoteHashtag = useCallback(() => {
+    const clean = normalizeHashtag(quoteHashtagDraft);
+    if (!clean) return;
+    setQuoteHashtags((prev) =>
+      prev.includes(clean) ? prev : [...prev, clean].slice(0, 12),
+    );
+    setQuoteHashtagDraft("");
+  }, [quoteHashtagDraft]);
+
+  const removeQuoteHashtag = useCallback((tag: string) => {
+    setQuoteHashtags((prev) => prev.filter((item) => item !== tag));
+  }, []);
+
+  const insertQuoteEmoji = useCallback((emoji: string) => {
+    setRepostNote((prev) => `${prev}${emoji}`);
+  }, []);
 
   const persistFeedCache = useCallback(
     (payload?: {
@@ -468,11 +593,11 @@ export default function HomePage() {
             hasMore: data.hasMore,
             viewerId,
             ts: Date.now(),
-          })
+          }),
         );
       } catch {}
     },
-    [hasMore, items, page, viewerId]
+    [hasMore, items, page, viewerId],
   );
 
   const tryHydrateFromCache = useCallback(() => {
@@ -524,6 +649,28 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!quoteEmojiRef.current) return;
+      if (!quoteEmojiRef.current.contains(event.target as Node)) {
+        setQuoteEmojiOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setQuoteEmojiOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!initialized) return;
     persistFeedCache();
   }, [initialized, items, page, hasMore, persistFeedCache]);
@@ -548,63 +695,112 @@ export default function HomePage() {
               saved: updated.saved ?? p.flags.saved,
             },
           };
-        })
+        }),
       );
     } catch {}
   }, [page, token]);
 
-  const load = async (nextPage: number) => {
-    if (!token) {
-      setError("Sign in to view the feed");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const limit = nextPage * PAGE_SIZE;
-      const data = await fetchFeed({ token, limit });
-      const posts = onlyPostItems(data);
-      setHasMore(data.length >= limit);
-      const mapped = posts.map((item) => ({
-        item,
-        flags: {
-          liked: item.liked,
-          saved: item.saved,
-          following:
-            (item as unknown as { following?: boolean }).following ?? false,
-        },
-      }));
-      setItems(mapped);
-      persistFeedCache({
-        items: mapped,
-        page: nextPage,
-        hasMore: data.length >= limit,
-      });
-      setPage(nextPage);
-    } catch (err) {
-      const msg =
-        typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Unable to load feed"
-          : "Unable to load feed";
-      setError(msg);
-    } finally {
-      setInitialized(true);
-      setLoading(false);
-    }
-  };
+  const load = useCallback(
+    async (nextPage: number) => {
+      if (!token) {
+        setError("Sign in to view the feed");
+        return;
+      }
+      setLoading(true);
+      setError("");
+      try {
+        const limit = nextPage * PAGE_SIZE;
+        const data = await fetchFeed({ token, limit });
+        const posts = onlyPostItems(data);
+        setHasMore(data.length >= limit);
+        const mapped = posts.map((item) => ({
+          item,
+          flags: {
+            liked: item.liked,
+            saved: item.saved,
+            following:
+              (item as unknown as { following?: boolean }).following ?? false,
+          },
+        }));
+        setItems(mapped);
+        persistFeedCache({
+          items: mapped,
+          page: nextPage,
+          hasMore: data.length >= limit,
+        });
+        setPage(nextPage);
+      } catch (err) {
+        const msg =
+          typeof err === "object" && err && "message" in err
+            ? (err as { message?: string }).message || "Unable to load feed"
+            : "Unable to load feed";
+        setError(msg);
+      } finally {
+        setInitialized(true);
+        setLoading(false);
+      }
+    },
+    [persistFeedCache, token],
+  );
+
+  const handleLoadMore = useCallback(() => {
+    if (loading || !hasMore) return;
+    void load(page + 1);
+  }, [hasMore, load, loading, page]);
+
+  useEffect(() => {
+    if (!loading) autoLoadLockRef.current = false;
+  }, [loading]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const anchor = loadMoreRef.current;
+    if (!anchor) return;
+    if (!hasMore) return;
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const rootEl = getScrollTarget();
+    const isScrollableRoot = (el: HTMLElement) =>
+      el.scrollHeight > el.clientHeight + 2;
+
+    const root =
+      rootEl &&
+      typeof document !== "undefined" &&
+      rootEl !== (document.scrollingElement as HTMLElement | null) &&
+      isScrollableRoot(rootEl)
+        ? rootEl
+        : null;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isVisible = entries.some((entry) => entry.isIntersecting);
+        if (!isVisible) return;
+        if (autoLoadLockRef.current) return;
+        if (loading || !hasMore) return;
+        autoLoadLockRef.current = true;
+        handleLoadMore();
+      },
+      {
+        root,
+        rootMargin: "800px 0px",
+        threshold: 0,
+      },
+    );
+
+    observer.observe(anchor);
+    return () => observer.disconnect();
+  }, [getScrollTarget, handleLoadMore, hasMore, loading, items.length]);
 
   useEffect(() => {
     if (!canRender) return;
     const shouldHydrate = sessionStorage.getItem(FEED_CACHE_INTENT_KEY);
     if (shouldHydrate && tryHydrateFromCache()) return;
     if (tryHydrateFromCache()) return;
-    load(1);
+    void load(1);
   }, [canRender, tryHydrateFromCache]);
 
   const onLike = async (postId: string, liked: boolean) => {
     if (!token) return;
-    const targetItem = items.find((p) => p.item.id === postId)?.item;
-    const targetId = targetItem?.repostOf || postId;
     setItems((prev) =>
       prev.map((p) =>
         p.item.id === postId
@@ -616,20 +812,20 @@ export default function HomePage() {
                   ...p.item.stats,
                   hearts: Math.max(
                     0,
-                    (p.item.stats.hearts ?? 0) + (liked ? 1 : -1)
+                    (p.item.stats.hearts ?? 0) + (liked ? 1 : -1),
                   ),
                 },
               },
               flags: { ...p.flags, liked },
             }
-          : p
-      )
+          : p,
+      ),
     );
     try {
       if (liked) {
-        await likePost({ token, postId: targetId });
+        await likePost({ token, postId });
       } else {
-        await unlikePost({ token, postId: targetId });
+        await unlikePost({ token, postId });
       }
       void syncStats();
     } catch {
@@ -644,14 +840,14 @@ export default function HomePage() {
                     ...p.item.stats,
                     hearts: Math.max(
                       0,
-                      (p.item.stats.hearts ?? 0) + (liked ? -1 : 1)
+                      (p.item.stats.hearts ?? 0) + (liked ? -1 : 1),
                     ),
                   },
                 },
                 flags: { ...p.flags, liked: !liked },
               }
-            : p
-        )
+            : p,
+        ),
       );
     }
   };
@@ -670,13 +866,13 @@ export default function HomePage() {
                   ...p.item.stats,
                   saves: Math.max(
                     0,
-                    (p.item.stats.saves ?? 0) + (saved ? 1 : -1)
+                    (p.item.stats.saves ?? 0) + (saved ? 1 : -1),
                   ),
                 },
               },
             }
-          : p
-      )
+          : p,
+      ),
     );
     try {
       if (saved) {
@@ -697,13 +893,13 @@ export default function HomePage() {
                     ...p.item.stats,
                     saves: Math.max(
                       0,
-                      (p.item.stats.saves ?? 0) + (saved ? -1 : 1)
+                      (p.item.stats.saves ?? 0) + (saved ? -1 : 1),
                     ),
                   },
                 },
               }
-            : p
-        )
+            : p,
+        ),
       );
     }
   };
@@ -711,7 +907,8 @@ export default function HomePage() {
   const onRepostIntent = (
     postId: string,
     label: string,
-    kind: "post" | "reel"
+    kind: "post" | "reel",
+    anchor?: DOMRect | null,
   ) => {
     if (!token) {
       showToast("Sign in to repost");
@@ -722,8 +919,28 @@ export default function HomePage() {
     setRepostTarget({ postId, label, kind });
     setRepostMode(null);
     setRepostNote("");
+    setQuoteOpen(false);
+    setQuoteVisibility("public");
+    setQuoteAllowComments(true);
+    setQuoteAllowDownload(true);
+    setQuoteHideLikeCount(false);
+    setQuoteLocation("");
+    setQuoteHashtags([]);
+    setQuoteHashtagDraft("");
     setRepostError("");
     setRepostSubmitting(false);
+    if (anchor) {
+      setRepostMenuAnchor({
+        x: anchor.left + anchor.width / 2,
+        y: anchor.bottom,
+      });
+    } else {
+      setRepostMenuAnchor(
+        typeof window !== "undefined"
+          ? { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+          : null,
+      );
+    }
   };
 
   const closeRepostModal = () => {
@@ -731,56 +948,83 @@ export default function HomePage() {
     setRepostClosing(true);
     repostHideTimerRef.current = setTimeout(() => {
       setRepostTarget(null);
-      setRepostMode(null);
-      setRepostNote("");
-      setRepostError("");
-      setRepostSubmitting(false);
+      resetQuoteState();
       setRepostClosing(false);
     }, REPORT_ANIMATION_MS);
   };
 
-  const submitRepost = async () => {
-    if (!token || !repostTarget || !repostMode) {
+  const incrementRepostStat = useCallback((postId: string) => {
+    setItems((prev) =>
+      prev.map((p) => {
+        if (p.item.id !== postId) return p;
+        const currentShares = p.item.stats.reposts ?? p.item.stats.shares ?? 0;
+        const nextShares = currentShares + 1;
+        return {
+          ...p,
+          item: {
+            ...p.item,
+            stats: {
+              ...p.item.stats,
+              shares: nextShares,
+              reposts: nextShares,
+            },
+          },
+          flags: { ...p.flags, reposted: true },
+        };
+      }),
+    );
+  }, []);
+
+  const submitRepost = async (modeOverride?: "quote" | "repost") => {
+    const mode = modeOverride ?? repostMode;
+    if (!token || !repostTarget || !mode) {
       setRepostError("Choose an option to continue");
       return;
     }
+    const originalId = resolveOriginalPostId(repostTarget.postId);
+    const targetId = repostTarget.postId;
     setRepostSubmitting(true);
     setRepostError("");
     try {
-      if (repostMode === "repost") {
-        await repostPost({ token, postId: repostTarget.postId });
-        setItems((prev) =>
-          prev.map((p) =>
-            p.item.id === repostTarget.postId
-              ? {
-                  ...p,
-                  item: {
-                    ...p.item,
-                    stats: {
-                      ...p.item.stats,
-                      shares: (p.item.stats.shares ?? 0) + 1,
-                    },
-                  },
-                  flags: { ...p.flags, reposted: true },
-                }
-              : p
-          )
-        );
+      if (mode === "repost") {
+        await createPost({ token, payload: { repostOf: originalId } });
+        incrementRepostStat(originalId);
+        if (originalId !== targetId) {
+          incrementRepostStat(targetId);
+          try {
+            await repostPost({ token, postId: targetId });
+          } catch {}
+        }
         showToast("Reposted");
         closeRepostModal();
         return;
       }
 
       const note = repostNote.trim();
+      const mentions = extractMentionsFromCaption(note);
       const payload = {
-        repostOf: repostTarget.postId,
+        repostOf: originalId,
         content: note || undefined,
+        hashtags: quoteHashtags.length ? quoteHashtags : undefined,
+        location: quoteLocation.trim() || undefined,
+        allowComments: quoteAllowComments,
+        allowDownload: quoteAllowDownload,
+        hideLikeCount: quoteHideLikeCount,
+        visibility: quoteVisibility,
+        mentions: mentions.length ? mentions : undefined,
       };
-      const created =
-        repostTarget.kind === "reel"
-          ? await createReel({ token, payload: payload as any })
-          : await createPost({ token, payload });
-      setItems((prev) => [{ item: created, flags: {} }, ...prev]);
+      if (repostTarget.kind === "reel") {
+        await createReel({ token, payload: payload as any });
+      } else {
+        await createPost({ token, payload });
+      }
+      incrementRepostStat(originalId);
+      if (originalId !== targetId) {
+        incrementRepostStat(targetId);
+        try {
+          await repostPost({ token, postId: targetId });
+        } catch {}
+      }
       showToast("Reposted with quote");
       closeRepostModal();
     } catch (err) {
@@ -792,6 +1036,25 @@ export default function HomePage() {
     } finally {
       setRepostSubmitting(false);
     }
+  };
+
+  const closeRepostMenu = () => {
+    setRepostMenuAnchor(null);
+  };
+
+  const handleQuickRepost = () => {
+    if (!repostTarget) return;
+    setRepostMode("repost");
+    closeRepostMenu();
+    void submitRepost("repost");
+  };
+
+  const openQuoteComposer = () => {
+    if (!repostTarget) return;
+    setRepostMode("quote");
+    setQuoteOpen(true);
+    setRepostError("");
+    closeRepostMenu();
   };
 
   const onHide = async (postId: string) => {
@@ -806,8 +1069,8 @@ export default function HomePage() {
     if (!token) return;
     setItems((prev) =>
       prev.map((p) =>
-        p.item.id === postId ? { ...p, item: { ...p.item, allowComments } } : p
-      )
+        p.item.id === postId ? { ...p, item: { ...p.item, allowComments } } : p,
+      ),
     );
     try {
       await setPostAllowComments({ token, postId, allowComments });
@@ -817,8 +1080,8 @@ export default function HomePage() {
         prev.map((p) =>
           p.item.id === postId
             ? { ...p, item: { ...p.item, allowComments: !allowComments } }
-            : p
-        )
+            : p,
+        ),
       );
       showToast("Failed to update comments");
     }
@@ -826,13 +1089,13 @@ export default function HomePage() {
 
   const onToggleHideLikeCount = async (
     postId: string,
-    hideLikeCount: boolean
+    hideLikeCount: boolean,
   ) => {
     if (!token) return;
     setItems((prev) =>
       prev.map((p) =>
-        p.item.id === postId ? { ...p, item: { ...p.item, hideLikeCount } } : p
-      )
+        p.item.id === postId ? { ...p, item: { ...p.item, hideLikeCount } } : p,
+      ),
     );
     try {
       await setPostHideLikeCount({ token, postId, hideLikeCount });
@@ -842,8 +1105,8 @@ export default function HomePage() {
         prev.map((p) =>
           p.item.id === postId
             ? { ...p, item: { ...p.item, hideLikeCount: !hideLikeCount } }
-            : p
-        )
+            : p,
+        ),
       );
       showToast("Failed to update like count visibility");
     }
@@ -875,11 +1138,11 @@ export default function HomePage() {
                   saved: patch.saved ?? p.flags.saved,
                 },
               }
-            : p
-        )
+            : p,
+        ),
       );
     },
-    []
+    [],
   );
 
   const onCopyLink = useCallback(
@@ -905,7 +1168,7 @@ export default function HomePage() {
         showToast("Failed to copy link");
       }
     },
-    [showToast]
+    [showToast],
   );
 
   const onDeleteIntent = (postId: string, label: string) => {
@@ -1007,8 +1270,8 @@ export default function HomePage() {
       prev.map((p) =>
         p.item.authorId === authorId
           ? { ...p, flags: { ...p.flags, following: nextFollow } }
-          : p
-      )
+          : p,
+      ),
     );
     try {
       if (nextFollow) {
@@ -1021,8 +1284,8 @@ export default function HomePage() {
         prev.map((p) =>
           p.item.authorId === authorId
             ? { ...p, flags: { ...p.flags, following: !nextFollow } }
-            : p
-        )
+            : p,
+        ),
       );
       const message =
         typeof err === "object" && err && "message" in err
@@ -1044,8 +1307,8 @@ export default function HomePage() {
       await blockUser({ token, userId: blockTarget.userId });
       setItems((prev) =>
         prev.filter(
-          (p) => p.item.authorId && p.item.authorId !== blockTarget.userId
-        )
+          (p) => p.item.authorId && p.item.authorId !== blockTarget.userId,
+        ),
       );
       setBlockTarget(undefined);
     } catch (err) {
@@ -1063,47 +1326,24 @@ export default function HomePage() {
     if (!token) return;
     const targetItem = items.find((p) => p.item.id === postId)?.item;
     const targetId = targetItem?.repostOf || postId;
-    const existing = viewTimers.current.get(postId);
-    if (existing) clearTimeout(existing);
-    const timer = setTimeout(() => {
-      viewPost({ token, postId: targetId, durationMs }).catch(() => undefined);
-    }, VIEW_DEBOUNCE_MS);
-    viewTimers.current.set(postId, timer);
+    const now = Date.now();
+    const last = viewCooldownRef.current.get(targetId) ?? 0;
+    if (now - last < VIEW_COOLDOWN_MS) return;
+    const handler = () => {
+      viewPost({ token, postId: targetId, durationMs })
+        .then(() => {
+          viewCooldownRef.current.set(targetId, Date.now());
+        })
+        .catch(() => undefined);
+    };
+    const timeout = setTimeout(handler, 0);
+    viewTimers.current.set(targetId, timeout);
   };
-
-  const handleLoadMore = useCallback(() => {
-    if (!hasMore || loading) return;
-    load(page + 1);
-  }, [hasMore, loading, page]);
-
-  useEffect(() => {
-    const el = loadMoreRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            handleLoadMore();
-          }
-        });
-      },
-      { root: null, rootMargin: "200px 0px", threshold: 0 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [handleLoadMore]);
-
   if (!canRender) return null;
 
   return (
     <div className={styles.page}>
       <div className={styles.centerColumn}>
-        {error && <div className={styles.errorBox}>{error}</div>}
-
-        {!items.length && !loading && (
-          <div className={styles.empty}>No posts yet.</div>
-        )}
-
         {items.map(({ item, flags }) => (
           <FeedCard
             key={item.id}
@@ -1111,13 +1351,15 @@ export default function HomePage() {
             liked={Boolean(flags.liked)}
             saved={Boolean(flags.saved)}
             flags={flags}
+            repostHeartsBoost={repostHeartsByOriginalId.get(item.id) ?? 0}
             onLike={onLike}
             onSave={onSave}
-            onShare={(id) =>
+            onShare={(id, anchor) =>
               onRepostIntent(
                 id,
                 item.authorUsername || item.author?.username || "this user",
-                item.kind
+                item.kind,
+                anchor,
               )
             }
             onHide={onHide}
@@ -1260,7 +1502,7 @@ export default function HomePage() {
                         setReportReason(
                           group.reasons.length === 1
                             ? group.reasons[0].key
-                            : null
+                            : null,
                         );
                       }}
                     >
@@ -1347,7 +1589,7 @@ export default function HomePage() {
         </div>
       ) : null}
 
-      {repostTarget ? (
+      {quoteOpen && repostTarget ? (
         <div
           className={`${styles.modalOverlay} ${
             repostClosing ? styles.modalOverlayClosing : styles.modalOverlayOpen
@@ -1362,11 +1604,11 @@ export default function HomePage() {
             }`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className={styles.modalHeader}>
+            <div className={`${styles.modalHeader} ${styles.repostHeader}`}>
               <div>
-                <h3 className={styles.modalTitle}>Repost</h3>
-                <p className={styles.modalBody}>
-                  {`Choose how to share @${repostTarget.label}'s ${repostTarget.kind}.`}
+                <h3 className={styles.modalTitle}>Quote</h3>
+                <p className={styles.repostSub}>
+                  {`Quoting @${repostTarget.label}'s ${repostTarget.kind}`}
                 </p>
               </div>
               <button
@@ -1378,69 +1620,142 @@ export default function HomePage() {
               </button>
             </div>
 
-            <div className={styles.repostGrid}>
-              <button
-                type="button"
-                className={`${styles.repostOption} ${
-                  repostMode === "repost" ? styles.repostOptionActive : ""
-                }`}
-                onClick={() => setRepostMode("repost")}
-              >
-                <span className={styles.repostTitle}>
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="20"
-                    height="20"
-                    fill="currentColor"
-                  >
-                    <path d="M23.615 15.485a.75.75 0 0 1-.75.75h-2.25a.75.75 0 0 1-.75-.75 2.25 2.25 0 0 0-2.25-2.25h-5.46l3.47 3.47a.75.75 0 0 1-1.06 1.06l-4.75-4.75a.75.75 0 0 1 0-1.06l4.75-4.75a.75.75 0 0 1 1.06 1.06l-3.47 3.47h5.46a3.75 3.75 0 0 1 3.75 3.750 0 1 3.75 3.75ZM6.135 15.485h5.46a.75.75 0 0 1 0 1.5h-5.46a3.75 3.75 0 0 1-3.75-3.75 3.75 3.75 0 0 1 3.75-3.75h2.25a.75.75 0 0 1 .75.75v5.25a.75.75 0 0 1-1.28.53l-2.25-2.25a.75.75 0 0 1 1.06-1.06l.97.97v-3.44h-1.5a2.25 2.25 0 0 0-2.25 2.25 2.25 2.25 0 0 0 2.25 2.25Z"></path>
-                  </svg>
-                  Repost only
-                </span>
-                <span className={styles.repostDesc}>
-                  Share the original post without a caption. Likes/Views will be
-                  credited to the original post.
-                </span>
-              </button>
-              <button
-                type="button"
-                className={`${styles.repostOption} ${
-                  repostMode === "quote" ? styles.repostOptionActive : ""
-                }`}
-                onClick={() => setRepostMode("quote")}
-              >
-                <span className={styles.repostTitle}>
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="20"
-                    height="20"
-                    fill="currentColor"
-                  >
-                    <path d="M4.5 7.5a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-9a3 3 0 0 1-3-3v-9Z" opacity="0.1"></path>
-                    <path d="M15.75 2.25H8.25a5.25 5.25 0 0 0-5.25 5.25v8.25a5.25 5.25 0 0 0 5.25 5.25h7.5a5.25 5.25 0 0 0 5.25-5.25V7.5a5.25 5.25 0 0 0-5.25-5.25Zm3.75 13.5a3.75 3.75 0 0 1-3.75 3.75H8.25a3.75 3.75 0 0 1-3.75-3.75V7.5a3.75 3.75 0 0 1 3.75-3.75h7.5a3.75 3.75 0 0 1 3.75 3.75v8.25Z"></path>
-                    <path d="M10.28 11.47a.75.75 0 0 0-1.06-1.06l-1.5 1.5a.75.75 0 0 0 0 1.06l1.5 1.5a.75.75 0 0 0 1.06-1.06l-.97-.97h4.09l-.97.97a.75.75 0 0 0 1.06 1.06l1.5-1.5a.75.75 0 0 0 0-1.06l-1.5-1.5a.75.75 0 0 0-1.06 1.06l.97.97H9.31l.97-.97Z"></path>
-                  </svg>
-                  Quote
-                </span>
-                <span className={styles.repostDesc}>
-                  Add your own caption; comments belong to the quote, but
-                  likes/views still count for the original post.
-                </span>
-              </button>
-            </div>
-
-            {repostMode === "quote" ? (
-              <label className={styles.repostNoteLabel}>
-                Caption (optional)
+            <label className={styles.repostNoteLabel}>
+              Caption
+              <div className={styles.editTextareaShell}>
                 <textarea
                   className={styles.repostTextarea}
                   value={repostNote}
                   onChange={(e) => setRepostNote(e.target.value)}
-                  maxLength={500}
-                  placeholder="Add a few thoughts..."
+                  maxLength={QUOTE_CHAR_LIMIT}
+                  placeholder="Add your thoughts..."
                 />
+                <span className={styles.charCount}>
+                  {repostNote.length}/{QUOTE_CHAR_LIMIT}
+                </span>
+              </div>
+            </label>
+
+            <div className={styles.editField}>
+              <div className={styles.editLabelRow}>
+                <span className={styles.editLabelText}>Visibility</span>
+              </div>
+              <div className={styles.visibilityList}>
+                {quoteVisibilityOptions.map((opt) => {
+                  const active = quoteVisibility === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      className={`${styles.visibilityOption} ${
+                        active ? styles.visibilityOptionActive : ""
+                      }`}
+                      onClick={() => setQuoteVisibility(opt.value)}
+                    >
+                      <span className={styles.visibilityRadio}>
+                        {active ? "✓" : ""}
+                      </span>
+                      <span className={styles.visibilityCopy}>
+                        <span className={styles.visibilityTitle}>
+                          {opt.title}
+                        </span>
+                        <span className={styles.visibilityDesc}>
+                          {opt.description}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className={styles.switchGroup}>
+              <label className={styles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={quoteAllowComments}
+                  onChange={() => setQuoteAllowComments((prev) => !prev)}
+                />
+                <div>
+                  <p className={styles.switchTitle}>Allow comments</p>
+                  <p className={styles.switchHint}>
+                    People can reply to your quote
+                  </p>
+                </div>
               </label>
-            ) : null}
+
+              <label className={styles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={quoteAllowDownload}
+                  onChange={() => setQuoteAllowDownload((prev) => !prev)}
+                />
+                <div>
+                  <p className={styles.switchTitle}>Allow downloads</p>
+                  <p className={styles.switchHint}>
+                    Let followers save the media from the original post
+                  </p>
+                </div>
+              </label>
+
+              <label className={styles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={quoteHideLikeCount}
+                  onChange={() => setQuoteHideLikeCount((prev) => !prev)}
+                />
+                <div>
+                  <p className={styles.switchTitle}>Hide like</p>
+                  <p className={styles.switchHint}>
+                    Only you will see like counts on this quote
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div className={styles.editField}>
+              <div className={styles.editLabelRow}>
+                <span className={styles.editLabelText}>Location</span>
+              </div>
+              <input
+                className={styles.editInput}
+                placeholder="Add a place"
+                value={quoteLocation}
+                onChange={(e) => setQuoteLocation(e.target.value)}
+              />
+            </div>
+
+            <div className={styles.editField}>
+              <div className={styles.editLabelRow}>
+                <span className={styles.editLabelText}>Hashtags</span>
+              </div>
+              <div className={styles.chipRow}>
+                {quoteHashtags.map((tag) => (
+                  <span key={tag} className={styles.chip}>
+                    #{tag}
+                    <button
+                      type="button"
+                      className={styles.chipRemove}
+                      onClick={() => removeQuoteHashtag(tag)}
+                      aria-label={`Remove ${tag}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  className={styles.editInput}
+                  placeholder="Add hashtag"
+                  value={quoteHashtagDraft}
+                  onChange={(e) => setQuoteHashtagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === ",") {
+                      e.preventDefault();
+                      addQuoteHashtag();
+                    }
+                  }}
+                />
+              </div>
+            </div>
 
             {repostError ? (
               <div className={styles.inlineError}>{repostError}</div>
@@ -1456,10 +1771,54 @@ export default function HomePage() {
               </button>
               <button
                 className={styles.modalPrimary}
-                onClick={submitRepost}
-                disabled={!repostMode || repostSubmitting}
+                onClick={() => submitRepost("quote")}
+                disabled={repostSubmitting}
               >
-                {repostSubmitting ? "Sharing..." : "Share"}
+                {repostSubmitting ? "Sharing..." : "Share quote"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {repostTarget && !quoteOpen ? (
+        <div
+          className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeRepostModal}
+        >
+          <div
+            className={styles.repostSheet}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.repostSheetHeader}>
+              <p className={styles.repostSheetTitle}>Repost</p>
+              <p className={styles.repostSheetSubtitle}>
+                {`@${repostTarget.label} · ${repostTarget.kind}`}
+              </p>
+            </div>
+            <div className={styles.repostSheetList} role="menu">
+              <button
+                className={`${styles.repostSheetItem} ${styles.repostSheetPrimary}`}
+                onClick={handleQuickRepost}
+                disabled={repostSubmitting}
+              >
+                Repost
+              </button>
+              <button
+                className={styles.repostSheetItem}
+                onClick={openQuoteComposer}
+                disabled={repostSubmitting}
+              >
+                Quote
+              </button>
+              <button
+                className={styles.repostSheetItem}
+                onClick={closeRepostModal}
+                disabled={repostSubmitting}
+              >
+                Hủy
               </button>
             </div>
           </div>
@@ -1476,6 +1835,7 @@ function FeedCard({
   liked,
   saved,
   flags,
+  repostHeartsBoost,
   onLike,
   onSave,
   onShare,
@@ -1497,9 +1857,10 @@ function FeedCard({
   liked: boolean;
   saved: boolean;
   flags: LocalFlags;
+  repostHeartsBoost?: number;
   onLike: (postId: string, liked: boolean) => void;
   onSave: (postId: string, saved: boolean) => void;
-  onShare: (postId: string) => void;
+  onShare: (postId: string, anchor?: DOMRect | null) => void;
   onHide: (postId: string) => void;
   onToggleComments: (postId: string, allowComments: boolean) => void;
   onToggleHideLikeCount: (postId: string, hideLikeCount: boolean) => void;
@@ -1533,6 +1894,11 @@ function FeedCard({
     allowComments,
     allowDownload,
     hideLikeCount,
+    repostOf,
+    repostOfAuthorId,
+    repostOfAuthorUsername,
+    repostOfAuthorDisplayName,
+    repostOfAuthorAvatarUrl,
   } = data;
 
   const displayName = authorDisplayName || author?.displayName;
@@ -1588,7 +1954,7 @@ function FeedCard({
           }
         });
       },
-      { threshold: 0.5 }
+      { threshold: 0.5 },
     );
     observer.observe(el);
     return () => {
@@ -1618,7 +1984,7 @@ function FeedCard({
           }
         });
       },
-      { threshold: 0.25 }
+      { threshold: 0.25 },
     );
 
     observer.observe(el);
@@ -1670,7 +2036,7 @@ function FeedCard({
   const [locationHighlight, setLocationHighlight] = useState(-1);
   const [editAllowComments, setEditAllowComments] = useState(allowComments);
   const [editAllowDownload, setEditAllowDownload] = useState(
-    allowDownload ?? false
+    allowDownload ?? false,
   );
   const [editHideLikeCount, setEditHideLikeCount] = useState(hideLikeCount);
   const [editSaving, setEditSaving] = useState(false);
@@ -1787,7 +2153,7 @@ function FeedCard({
   };
 
   const handleCaptionChange = (
-    event: React.ChangeEvent<HTMLTextAreaElement>
+    event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
     const value = event.target.value;
     const caret = event.target.selectionStart ?? value.length;
@@ -1837,7 +2203,7 @@ function FeedCard({
       e.preventDefault();
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
-        prev + 1 < mentionSuggestions.length ? prev + 1 : 0
+        prev + 1 < mentionSuggestions.length ? prev + 1 : 0,
       );
       return;
     }
@@ -1845,7 +2211,7 @@ function FeedCard({
       e.preventDefault();
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1,
       );
       return;
     }
@@ -2037,14 +2403,14 @@ function FeedCard({
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setLocationHighlight((prev) =>
-        prev + 1 < locationSuggestions.length ? prev + 1 : 0
+        prev + 1 < locationSuggestions.length ? prev + 1 : 0,
       );
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
       setLocationHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1,
       );
       return;
     }
@@ -2066,7 +2432,7 @@ function FeedCard({
     }
 
     const normalizedHashtags = Array.from(
-      new Set(editHashtags.map((t) => normalizeHashtag(t.toString())))
+      new Set(editHashtags.map((t) => normalizeHashtag(t.toString()))),
     ).filter(Boolean);
 
     const normalizedMentions = Array.from(
@@ -2074,10 +2440,10 @@ function FeedCard({
         [
           ...extractMentionsFromCaption(editCaption || ""),
           ...editMentions.map((t) =>
-            t.toString().trim().replace(/^@/, "").toLowerCase()
+            t.toString().trim().replace(/^@/, "").toLowerCase(),
           ),
-        ].filter(Boolean)
-      )
+        ].filter(Boolean),
+      ),
     );
 
     const trimmedLocation = editLocation.trim();
@@ -2109,6 +2475,7 @@ function FeedCard({
     }
   };
   const [mediaIndex, setMediaIndex] = useState(0);
+  const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [soundOn, setSoundOn] = useState(false);
   const lastTimeRef = useRef(0);
@@ -2135,6 +2502,8 @@ function FeedCard({
     } catch {}
   }, [id, mediaIndex, soundOn]);
 
+  const targetPostId = repostOf || id;
+
   const goToPost = useCallback(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem(FEED_CACHE_INTENT_KEY, "1");
@@ -2144,11 +2513,11 @@ function FeedCard({
     persistResume();
 
     if (typeof window !== "undefined") {
-      window.location.href = `/post/${id}`;
+      window.location.href = `/post/${targetPostId}`;
     } else {
-      router.push(`/post/${id}`);
+      router.push(`/post/${targetPostId}`);
     }
-  }, [id, router, persistResume, onPersistFeedCache]);
+  }, [targetPostId, router, persistResume, onPersistFeedCache]);
 
   const quickOpenPost = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -2237,7 +2606,7 @@ function FeedCard({
       const safe = Number.isFinite(duration)
         ? Math.min(
             Math.max(resumeTimeRef.current, 0),
-            Math.max(duration - 0.2, 0)
+            Math.max(duration - 0.2, 0),
           )
         : Math.max(resumeTimeRef.current, 0);
       try {
@@ -2322,7 +2691,10 @@ function FeedCard({
     if (!content) return null;
     const parts: Array<string | JSX.Element> = [];
     const normalizedMentions = new Set(
-      (mentions || []).map((m) => m.toLowerCase())
+      (mentions || []).map((m) => m.toLowerCase()),
+    );
+    const normalizedHashtags = new Set(
+      (hashtags || []).map((tag) => tag.toLowerCase()),
     );
     const pushText = (text: string, keyBase: string) => {
       const chunks = text.split("\n");
@@ -2334,7 +2706,7 @@ function FeedCard({
       });
     };
 
-    const regex = /@([a-zA-Z0-9_.]+)/g;
+    const regex = /(@[a-zA-Z0-9_.]+|#[a-zA-Z0-9_]+)/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = regex.exec(content))) {
@@ -2342,23 +2714,45 @@ function FeedCard({
       if (start > lastIndex) {
         pushText(content.slice(lastIndex, start), `text-${start}`);
       }
-      const handle = match[1];
-      const display = `@${handle}`;
-      const canLink =
-        normalizedMentions.size === 0 ||
-        normalizedMentions.has(handle.toLowerCase());
-      if (canLink) {
-        parts.push(
-          <a
-            key={`${handle}-${start}`}
-            href={`/profiles/${handle}`}
-            className={styles.mentionLink}
-          >
-            {display}
-          </a>
-        );
-      } else {
-        pushText(display, `text-${start}-plain`);
+      const token = match[0];
+      if (token.startsWith("@")) {
+        const handle = token.slice(1);
+        const display = `@${handle}`;
+        const canLink =
+          normalizedMentions.size === 0 ||
+          normalizedMentions.has(handle.toLowerCase());
+        if (canLink) {
+          parts.push(
+            <a
+              key={`${handle}-${start}`}
+              href={`/profiles/${handle}`}
+              className={styles.mentionLink}
+            >
+              {display}
+            </a>,
+          );
+        } else {
+          pushText(display, `text-${start}-plain`);
+        }
+      } else if (token.startsWith("#")) {
+        const tag = token.slice(1);
+        const display = `#${tag}`;
+        const canLink =
+          normalizedHashtags.size === 0 ||
+          normalizedHashtags.has(tag.toLowerCase());
+        if (canLink) {
+          parts.push(
+            <a
+              key={`${tag}-${start}`}
+              href={`/hashtag/${encodeURIComponent(tag)}`}
+              className={styles.hashtagLink}
+            >
+              {display}
+            </a>,
+          );
+        } else {
+          pushText(display, `text-${start}-plain`);
+        }
       }
       lastIndex = regex.lastIndex;
     }
@@ -2366,7 +2760,7 @@ function FeedCard({
       pushText(content.slice(lastIndex), `text-tail-${lastIndex}`);
     }
     return parts;
-  }, [content, mentions]);
+  }, [content, mentions, hashtags]);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -2392,9 +2786,14 @@ function FeedCard({
   const authorOwnerId = authorId || author?.id;
   const isSelf = Boolean(viewerId && authorOwnerId === viewerId);
   const shouldHideLikeStat = Boolean(hideLikeCount) && !isSelf;
+  const displayHearts =
+    (stats.hearts ?? 0) + (repostOf ? 0 : (repostHeartsBoost ?? 0));
   const isFollowing = Boolean(flags?.following);
   const initialFollowingRef = useRef(isFollowing);
   const followToggledRef = useRef(false);
+  const repostSourceLabel =
+    repostOfAuthorDisplayName ||
+    (repostOfAuthorUsername ? `@${repostOfAuthorUsername}` : null);
   const commentsToggleLabel = allowComments
     ? "Turn off comments"
     : "Turn on comments";
@@ -2403,6 +2802,8 @@ function FeedCard({
     !isSelf &&
     Boolean(authorOwnerId) &&
     (!initialFollowingRef.current || followToggledRef.current || !isFollowing);
+
+  const shareCount = stats.reposts ?? stats.shares ?? 0;
 
   const disableVisibilityUpdate =
     visibilitySaving || visibilitySelected === (visibility ?? "public");
@@ -2807,6 +3208,26 @@ function FeedCard({
 
   return (
     <article className={styles.feedCard} ref={cardRef}>
+      {repostOf ? (
+        <div className={styles.repostBanner}>
+          <span className={styles.repostIcon}>
+            <IconReup size={16} />
+          </span>
+          <span className={styles.repostText}>
+            Reposted from{" "}
+            {repostOfAuthorId ? (
+              <Link
+                href={`/profile/${repostOfAuthorId}`}
+                className={styles.repostLink}
+              >
+                {repostSourceLabel || "original post"}
+              </Link>
+            ) : (
+              <>{repostSourceLabel || "original post"}</>
+            )}
+          </span>
+        </div>
+      ) : null}
       <header className={styles.feedHeader}>
         <div className={styles.author}>
           {avatarUrl ? (
@@ -2916,9 +3337,11 @@ function FeedCard({
                     >
                       {hideLikeToggleLabel}
                     </button>
-                    <button className={styles.menuItem} onClick={goToPost}>
-                      Go to post
-                    </button>
+                    {repostOf ? (
+                      <button className={styles.menuItem} onClick={goToPost}>
+                        Go to post
+                      </button>
+                    ) : null}
                     <button
                       className={styles.menuItem}
                       onClick={() => {
@@ -2940,9 +3363,11 @@ function FeedCard({
                   </div>
                 ) : (
                   <div className={styles.menuContent}>
-                    <button className={styles.menuItem} onClick={goToPost}>
-                      Go to post
-                    </button>
+                    {repostOf ? (
+                      <button className={styles.menuItem} onClick={goToPost}>
+                        Go to post
+                      </button>
+                    ) : null}
                     <button
                       className={styles.menuItem}
                       onClick={() => {
@@ -3042,15 +3467,28 @@ function FeedCard({
         <div className={styles.contentBlock}>
           {location && (
             <div className={styles.metaRow}>
-              <span className={styles.metaLabel}>{location}</span>
+              <a
+                className={`${styles.metaLabel} ${styles.metaLink}`}
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  location,
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {location}
+              </a>
             </div>
           )}
           {Boolean((hashtags?.length || 0) + (topics?.length || 0)) && (
             <div className={styles.tags}>
               {hashtags?.map((tag) => (
-                <span key={tag} className={styles.tag}>
+                <a
+                  key={tag}
+                  href={`/hashtag/${encodeURIComponent(tag)}`}
+                  className={`${styles.tag} ${styles.tagLink}`}
+                >
                   #{tag}
-                </span>
+                </a>
               ))}
               {topics?.map((tag) => (
                 <span key={tag} className={styles.tag}>
@@ -3102,6 +3540,8 @@ function FeedCard({
                 src={current.url}
                 alt="media"
                 className={styles.mediaVisual}
+                onContextMenu={(e) => e.preventDefault()}
+                onClick={() => setImageViewerUrl(current.url)}
               />
             );
           })()}
@@ -3113,7 +3553,7 @@ function FeedCard({
                 aria-label="Previous media"
                 onClick={() =>
                   setMediaIndex((prev) =>
-                    media.length ? (prev - 1 + media.length) % media.length : 0
+                    media.length ? (prev - 1 + media.length) % media.length : 0,
                   )
                 }
               >
@@ -3132,7 +3572,7 @@ function FeedCard({
                 aria-label="Next media"
                 onClick={() =>
                   setMediaIndex((prev) =>
-                    media.length ? (prev + 1) % media.length : 0
+                    media.length ? (prev + 1) % media.length : 0,
                   )
                 }
               >
@@ -3154,6 +3594,14 @@ function FeedCard({
         </div>
       ) : null}
 
+      {imageViewerUrl ? (
+        <ImageViewerOverlay
+          url={imageViewerUrl}
+          alt="Post media"
+          onClose={() => setImageViewerUrl(null)}
+        />
+      ) : null}
+
       <div className={styles.statRow}>
         <div>
           {!shouldHideLikeStat ? (
@@ -3161,7 +3609,7 @@ function FeedCard({
               <span className={styles.statIcon}>
                 <IconLike size={18} />
               </span>
-              <span>{stats.hearts ?? 0}</span>
+              <span>{displayHearts}</span>
             </div>
           ) : null}
           <div className={styles.statItem}>
@@ -3182,7 +3630,7 @@ function FeedCard({
             <span className={styles.statIcon}>
               <IconReup size={18} />
             </span>
-            <span>{stats.shares ?? 0}</span>
+            <span>{shareCount}</span>
           </div>
         </div>
       </div>
@@ -3210,7 +3658,10 @@ function FeedCard({
           <IconSave size={20} filled={saved} />
           <span>{saved ? "Saved" : "Save"}</span>
         </button>
-        <button className={styles.actionBtn} onClick={() => onShare(id)}>
+        <button
+          className={styles.actionBtn}
+          onClick={(e) => onShare(id, e.currentTarget.getBoundingClientRect())}
+        >
           <IconReup size={20} />
           <span>Repost</span>
         </button>

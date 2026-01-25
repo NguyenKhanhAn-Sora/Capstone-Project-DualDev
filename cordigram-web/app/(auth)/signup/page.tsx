@@ -1,6 +1,13 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  ChangeEvent,
+  FormEvent,
+  KeyboardEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./signup.module.css";
@@ -10,6 +17,8 @@ import { setStoredAccessToken } from "@/lib/auth";
 import { useRedirectIfAuthed } from "@/hooks/use-require-auth";
 
 type Step = "email" | "otp" | "profile" | "avatar";
+
+type GeoStatus = "idle" | "requesting" | "granted" | "denied" | "error";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -31,12 +40,56 @@ const EyeIcon = ({ open }: { open: boolean }) => (
   </svg>
 );
 
+function LocationIcon() {
+  return (
+    <svg
+      aria-hidden
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 21s-6-5.5-6-10a6 6 0 1 1 12 0c0 4.5-6 10-6 10Z" />
+      <circle cx="12" cy="11" r="2.5" />
+    </svg>
+  );
+}
+
+const ArrowLeftIcon = () => (
+  <svg
+    aria-hidden
+    width={25}
+    height={25}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
+
 type AvatarUploadResponse = {
   avatarUrl: string;
   avatarOriginalUrl: string;
   avatarPublicId: string;
   avatarOriginalPublicId: string;
 };
+
+const cleanLocationLabel = (label: string) =>
+  label
+    .replace(/\b\d{4,6}\b/g, "")
+    .replace(/,\s*,+/g, ", ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s*,\s*$/g, "")
+    .replace(/^\s*,\s*/g, "")
+    .trim();
 
 function validateBirthdate(dateStr: string): string | null {
   if (!dateStr) return null;
@@ -63,7 +116,7 @@ function decodeJwtEmail(token: string): string | null {
   try {
     const payload = token.split(".")[1];
     const json = JSON.parse(
-      atob(payload.replace(/-/g, "+").replace(/_/g, "/"))
+      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
     );
     return typeof json?.email === "string" ? json.email : null;
   } catch (_err) {
@@ -97,7 +150,7 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
 
 async function getCroppedBlob(
   imageSrc: string,
-  croppedAreaPixels: Area
+  croppedAreaPixels: Area,
 ): Promise<Blob> {
   const image = await loadImage(imageSrc);
   const canvas = document.createElement("canvas");
@@ -117,7 +170,7 @@ async function getCroppedBlob(
     0,
     0,
     croppedAreaPixels.width,
-    croppedAreaPixels.height
+    croppedAreaPixels.height,
   );
 
   return new Promise((resolve, reject) => {
@@ -127,14 +180,14 @@ async function getCroppedBlob(
         resolve(blob);
       },
       "image/jpeg",
-      0.9
+      0.9,
     );
   });
 }
 
 async function getCroppedDataUrl(
   imageSrc: string,
-  croppedAreaPixels: Area
+  croppedAreaPixels: Area,
 ): Promise<string> {
   const image = await loadImage(imageSrc);
   const canvas = document.createElement("canvas");
@@ -154,7 +207,7 @@ async function getCroppedDataUrl(
     0,
     0,
     croppedAreaPixels.width,
-    croppedAreaPixels.height
+    croppedAreaPixels.height,
   );
 
   return canvas.toDataURL("image/jpeg", 0.9);
@@ -180,6 +233,17 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [birthdate, setBirthdate] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "other" | "">("");
+  const [locationInput, setLocationInput] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState<
+    Array<{ label: string; lat: string; lon: string }>
+  >([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [locationHighlight, setLocationHighlight] = useState(-1);
+  const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [bio, setBio] = useState("");
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -195,11 +259,19 @@ export default function SignupPage() {
   const [fieldError, setFieldError] = useState<{
     email?: string;
     password?: string;
+    confirmPassword?: string;
     birthdate?: string;
     username?: string;
     displayName?: string;
+    gender?: string;
   }>({});
   const [cooldownLeft, setCooldownLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (step === "avatar" && typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [step]);
 
   const saveRecentAccount = (account: {
     email: string;
@@ -268,6 +340,29 @@ export default function SignupPage() {
   }, [avatarPreview, croppedAreaPixels]);
 
   useEffect(() => {
+    if (isGoogleFlow) {
+      setFieldError((prev) => ({ ...prev, confirmPassword: undefined }));
+      return;
+    }
+    if (!confirmPassword) {
+      setFieldError((prev) => ({ ...prev, confirmPassword: undefined }));
+      return;
+    }
+    const handle = setTimeout(() => {
+      if (confirmPassword !== password) {
+        setFieldError((prev) => ({
+          ...prev,
+          confirmPassword: "Passwords do not match",
+        }));
+      } else {
+        setFieldError((prev) => ({ ...prev, confirmPassword: undefined }));
+      }
+    }, 1000);
+
+    return () => clearTimeout(handle);
+  }, [confirmPassword, password, isGoogleFlow]);
+
+  useEffect(() => {
     const googleParam = searchParams.get("google");
     const storedToken =
       typeof window !== "undefined"
@@ -287,6 +382,13 @@ export default function SignupPage() {
   }, [searchParams]);
 
   useEffect(() => {
+    if (!isGoogleFlow) return;
+    setPassword("");
+    setConfirmPassword("");
+    setFieldError((prev) => ({ ...prev, password: undefined }));
+  }, [isGoogleFlow]);
+
+  useEffect(() => {
     if (!username) {
       setUsernameError(null);
       setFieldError((prev) => ({ ...prev, username: undefined }));
@@ -299,7 +401,7 @@ export default function SignupPage() {
       try {
         const res = await apiFetch<{ available: boolean }>({
           path: `/profiles/check-username?username=${encodeURIComponent(
-            username
+            username,
           )}`,
           method: "GET",
         });
@@ -335,19 +437,75 @@ export default function SignupPage() {
     return () => clearTimeout(handle);
   }, [displayName]);
 
+  useEffect(() => {
+    if (!locationQuery.trim()) {
+      setLocationSuggestions([]);
+      setLocationOpen(false);
+      setLocationHighlight(-1);
+      setLocationError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setLocationLoading(true);
+      setLocationError("");
+      try {
+        const url = new URL("https://nominatim.openstreetmap.org/search");
+        url.searchParams.set("q", locationQuery);
+        url.searchParams.set("format", "jsonv2");
+        url.searchParams.set("addressdetails", "1");
+        url.searchParams.set("limit", "8");
+        url.searchParams.set("countrycodes", "vn");
+        const res = await fetch(url.toString(), {
+          headers: {
+            Accept: "application/json",
+            "Accept-Language": "vi",
+          },
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error("search failed");
+        const data = await res.json();
+        const mapped = Array.isArray(data)
+          ? data.map((item: any) => ({
+              label: cleanLocationLabel(item.display_name as string),
+              lat: item.lat as string,
+              lon: item.lon as string,
+            }))
+          : [];
+        setLocationSuggestions(mapped);
+        setLocationOpen(true);
+        setLocationHighlight(mapped.length ? 0 : -1);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setLocationSuggestions([]);
+        setLocationOpen(false);
+        setLocationHighlight(-1);
+        setLocationError("No suggestions found, try different keywords.");
+      } finally {
+        if (!controller.signal.aborted) setLocationLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [locationQuery]);
+
   const steps: Array<{ key: Step; label: string }> = useMemo(
     () => [
       { key: "email", label: "Enter email" },
       { key: "otp", label: "Verify OTP" },
       { key: "profile", label: "Profile info" },
     ],
-    []
+    [],
   );
 
   const visualStep = step === "avatar" ? "profile" : step;
   const currentStepIndex = Math.max(
     steps.findIndex((s) => s.key === visualStep),
-    0
+    0,
   );
 
   const showError = (message: string) => {
@@ -360,6 +518,160 @@ export default function SignupPage() {
     setInfo(message);
     setError("");
     setFieldError((prev) => ({ ...prev, email: undefined }));
+  };
+
+  const selectLocation = (option: {
+    label: string;
+    lat: string;
+    lon: string;
+  }) => {
+    setLocationInput(option.label);
+    setLocationQuery(option.label);
+    setLocationSuggestions([]);
+    setLocationOpen(false);
+    setLocationHighlight(-1);
+  };
+
+  const onLocationChange = (value: string) => {
+    setLocationInput(value);
+    setLocationQuery(value);
+    setLocationOpen(Boolean(value.trim()));
+  };
+
+  const onLocationBlur = () => {
+    setTimeout(() => {
+      setLocationOpen(false);
+      setLocationHighlight(-1);
+    }, 120);
+  };
+
+  const onLocationFocus = () => {
+    if (locationSuggestions.length) {
+      setLocationOpen(true);
+    }
+  };
+
+  const onLocationKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      if (locationOpen && locationHighlight >= 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        const chosen = locationSuggestions[locationHighlight];
+        if (chosen) selectLocation(chosen);
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (e.key === "ArrowDown") {
+      if (!locationSuggestions.length) return;
+      e.preventDefault();
+      setLocationOpen(true);
+      setLocationHighlight((prev) =>
+        prev + 1 < locationSuggestions.length ? prev + 1 : 0,
+      );
+    }
+    if (e.key === "ArrowUp") {
+      if (!locationSuggestions.length) return;
+      e.preventDefault();
+      setLocationOpen(true);
+      setLocationHighlight((prev) =>
+        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1,
+      );
+    }
+    if (e.key === "Escape") {
+      setLocationOpen(false);
+      setLocationHighlight(-1);
+    }
+  };
+
+  const requestCurrentLocation = () => {
+    if (typeof window === "undefined") return;
+    if (!("geolocation" in navigator)) {
+      setGeoStatus("error");
+      return;
+    }
+
+    setGeoStatus("requesting");
+
+    const highOptions: PositionOptions = {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 5000,
+    };
+
+    const resolveAddress = async (
+      latitude: number,
+      longitude: number,
+      fallback: string,
+    ) => {
+      try {
+        const url = new URL("https://nominatim.openstreetmap.org/reverse");
+        url.searchParams.set("format", "jsonv2");
+        url.searchParams.set("lat", latitude.toString());
+        url.searchParams.set("lon", longitude.toString());
+        url.searchParams.set("addressdetails", "1");
+        url.searchParams.set("accept-language", "en");
+
+        const res = await fetch(url.toString(), {
+          headers: {
+            Accept: "application/json",
+          },
+        });
+        if (!res.ok) throw new Error("reverse geocode failed");
+        const data = await res.json();
+        const addr = data.display_name as string;
+        const city =
+          data?.address?.city || data?.address?.town || data?.address?.village;
+        const road = data?.address?.road as string | undefined;
+        const compact = [road, city].filter(Boolean).join(", ") || addr;
+        const chosen = compact || fallback;
+        selectLocation({
+          label: chosen,
+          lat: latitude.toString(),
+          lon: longitude.toString(),
+        });
+      } catch (_err) {
+        selectLocation({
+          label: fallback,
+          lat: latitude.toString(),
+          lon: longitude.toString(),
+        });
+      }
+    };
+
+    const handleSuccess = (pos: GeolocationPosition) => {
+      const { latitude, longitude } = pos.coords;
+      setGeoStatus("granted");
+      const pretty = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+      resolveAddress(latitude, longitude, pretty);
+    };
+
+    const handleError = (
+      err: GeolocationPositionError,
+      isFallback: boolean,
+    ) => {
+      const shouldRetry =
+        !isFallback &&
+        (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE);
+
+      if (shouldRetry) {
+        navigator.geolocation.getCurrentPosition(
+          handleSuccess,
+          (err2) => handleError(err2, true),
+          highOptions,
+        );
+        return;
+      }
+
+      setGeoStatus(err.code === err.PERMISSION_DENIED ? "denied" : "error");
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      handleSuccess,
+      (err) => handleError(err, false),
+      highOptions,
+    );
   };
 
   const handleRequestOtp = async (e: FormEvent) => {
@@ -413,8 +725,10 @@ export default function SignupPage() {
     setFieldError((prev) => ({
       ...prev,
       password: undefined,
+      confirmPassword: undefined,
       birthdate: undefined,
       username: undefined,
+      gender: undefined,
     }));
     try {
       const res = await apiFetch<{ signupToken: string }>({
@@ -438,6 +752,7 @@ export default function SignupPage() {
     setFieldError((prev) => ({
       ...prev,
       password: undefined,
+      confirmPassword: undefined,
       birthdate: undefined,
       username: undefined,
     }));
@@ -456,16 +771,32 @@ export default function SignupPage() {
       return;
     }
 
-    if (password && password.length < 8) {
-      setFieldError((prev) => ({
-        ...prev,
-        password: "Password must be at least 8 characters",
-      }));
-      return;
-    }
-    if (password && password !== confirmPassword) {
-      showError("Passwords do not match");
-      return;
+    if (!isGoogleFlow) {
+      const trimmedPassword = password.trim();
+      if (!trimmedPassword) {
+        setFieldError((prev) => ({
+          ...prev,
+          password: "Password is reqiure",
+        }));
+        return;
+      }
+      if (trimmedPassword.length < 8) {
+        setFieldError((prev) => ({
+          ...prev,
+          password: "Password must be at least 8 characters",
+        }));
+        return;
+      }
+      if (trimmedPassword !== confirmPassword) {
+        setFieldError((prev) => ({
+          ...prev,
+          confirmPassword: "Passwords do not match",
+        }));
+        return;
+      }
+    } else {
+      if (password) setPassword("");
+      if (confirmPassword) setConfirmPassword("");
     }
     if (!displayName || !username) {
       showError("Display name and username are required");
@@ -475,6 +806,13 @@ export default function SignupPage() {
     const birthErr = validateBirthdate(birthdate);
     if (birthErr) {
       setFieldError((prev) => ({ ...prev, birthdate: birthErr }));
+      return;
+    }
+    if (!gender) {
+      setFieldError((prev) => ({
+        ...prev,
+        gender: "Please select your gender",
+      }));
       return;
     }
     setError("");
@@ -509,7 +847,9 @@ export default function SignupPage() {
         username,
         birthdate: birthdate || undefined,
         bio: bio || undefined,
-        password: password || undefined,
+        gender: gender || undefined,
+        location: locationInput.trim() || undefined,
+        password: isGoogleFlow ? undefined : password || undefined,
         avatarUrl: avatarData?.avatarUrl,
         avatarOriginalUrl: avatarData?.avatarOriginalUrl,
         avatarPublicId: avatarData?.avatarPublicId,
@@ -548,7 +888,7 @@ export default function SignupPage() {
       if (avatarFile && avatarPreview && croppedAreaPixels) {
         const croppedBlob = await getCroppedBlob(
           avatarPreview,
-          croppedAreaPixels
+          croppedAreaPixels,
         );
         const form = new FormData();
         form.append("original", avatarFile, avatarFile.name);
@@ -556,7 +896,7 @@ export default function SignupPage() {
           "cropped",
           new File([croppedBlob], `avatar-cropped-${Date.now()}.jpg`, {
             type: "image/jpeg",
-          })
+          }),
         );
 
         const uploadRes = await fetch(`${getApiBaseUrl()}/auth/upload-avatar`, {
@@ -733,53 +1073,67 @@ export default function SignupPage() {
         </div>
       </div>
 
-      <div className={styles.gridTwoCols}>
-        <div className="space-y-[6px]">
-          <label className={styles.label}>Password</label>
-          <div className={styles.passwordField}>
-            <input
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={`${styles.input} ${styles.passwordInput}`}
-              placeholder="At least 8 characters"
-            />
-            <button
-              type="button"
-              className={styles.passwordToggle}
-              onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              <EyeIcon open={showPassword} />
-            </button>
+      {!isGoogleFlow && (
+        <div className={styles.gridTwoCols}>
+          <div className="space-y-[6px]">
+            <label className={styles.label}>Password</label>
+            <div className={styles.passwordField}>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setFieldError((prev) => ({ ...prev, password: undefined }));
+                }}
+                className={`${styles.input} ${styles.passwordInput}`}
+                placeholder="At least 8 characters"
+              />
+              <button
+                type="button"
+                className={styles.passwordToggle}
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                <EyeIcon open={showPassword} />
+              </button>
+            </div>
+            {fieldError.password && (
+              <p className={styles.fieldError}>{fieldError.password}</p>
+            )}
           </div>
-          {fieldError.password && (
-            <p className={styles.fieldError}>{fieldError.password}</p>
-          )}
-        </div>
-        <div className="space-y-[6px]">
-          <label className={styles.label}>Confirm password</label>
-          <div className={styles.passwordField}>
-            <input
-              type={showConfirmPassword ? "text" : "password"}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className={`${styles.input} ${styles.passwordInput}`}
-              placeholder="Re-enter to confirm"
-            />
-            <button
-              type="button"
-              className={styles.passwordToggle}
-              onClick={() => setShowConfirmPassword((prev) => !prev)}
-              aria-label={
-                showConfirmPassword ? "Hide password" : "Show password"
-              }
-            >
-              <EyeIcon open={showConfirmPassword} />
-            </button>
+          <div className="space-y-[6px]">
+            <label className={styles.label}>Confirm password</label>
+            <div className={styles.passwordField}>
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  setFieldError((prev) => ({
+                    ...prev,
+                    confirmPassword: undefined,
+                  }));
+                }}
+                className={`${styles.input} ${styles.passwordInput}`}
+                placeholder="Re-enter to confirm"
+              />
+              <button
+                type="button"
+                className={styles.passwordToggle}
+                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                aria-label={
+                  showConfirmPassword ? "Hide password" : "Show password"
+                }
+              >
+                <EyeIcon open={showConfirmPassword} />
+              </button>
+            </div>
+            {fieldError.confirmPassword && (
+              <p className={styles.fieldError}>{fieldError.confirmPassword}</p>
+            )}
           </div>
         </div>
-      </div>
+      )}
 
       <div className={styles.gridTwoCols}>
         <div className="space-y-[6px]">
@@ -792,6 +1146,112 @@ export default function SignupPage() {
           />
           {fieldError.birthdate && (
             <p className={styles.fieldError}>{fieldError.birthdate}</p>
+          )}
+        </div>
+        <div className="space-y-[6px]">
+          <label className={styles.label}>Gender</label>
+          <div
+            className={styles.radioGroup}
+            role="radiogroup"
+            aria-label="Gender"
+          >
+            {["male", "female", "other"].map((value) => {
+              const label =
+                value === "other"
+                  ? "Other"
+                  : value.charAt(0).toUpperCase() + value.slice(1);
+              return (
+                <label
+                  key={value}
+                  className={`${styles.radioPill} ${gender === value ? styles.radioPillActive : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="gender"
+                    value={value}
+                    checked={gender === value}
+                    onChange={() => {
+                      setGender(value as "male" | "female" | "other");
+                      setFieldError((prev) => ({ ...prev, gender: undefined }));
+                    }}
+                  />
+                  <span>{label}</span>
+                </label>
+              );
+            })}
+          </div>
+          {fieldError.gender && (
+            <p className={styles.fieldError}>{fieldError.gender}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-[6px]">
+        <div className={styles.labelRow}>
+          <label className={styles.label}>Location (optional)</label>
+        </div>
+        <div className={styles.locationCombo}>
+          <div className={styles.locationInputShell}>
+            <input
+              type="text"
+              name="location"
+              value={locationInput}
+              onChange={(e) => onLocationChange(e.target.value)}
+              onKeyDown={onLocationKeyDown}
+              onBlur={onLocationBlur}
+              onFocus={onLocationFocus}
+              placeholder="Add a city, landmark, or place"
+              aria-autocomplete="list"
+              aria-expanded={locationOpen}
+              aria-haspopup="listbox"
+            />
+            <button
+              type="button"
+              className={styles.locationButton}
+              onClick={requestCurrentLocation}
+              disabled={geoStatus === "requesting"}
+              aria-label="Use current location"
+            >
+              <LocationIcon />
+            </button>
+          </div>
+
+          {locationOpen && (
+            <div className={styles.locationSuggestions} role="listbox">
+              {locationLoading && (
+                <div className={styles.locationSuggestionMuted}>
+                  Searching...
+                </div>
+              )}
+              {!locationLoading && locationSuggestions.length === 0 && (
+                <div className={styles.locationSuggestionMuted}>
+                  {locationError || "No suggestions found"}
+                </div>
+              )}
+              {!locationLoading &&
+                locationSuggestions.map((option, idx) => (
+                  <button
+                    type="button"
+                    key={`${option.lat}-${option.lon}-${idx}`}
+                    className={`${styles.locationSuggestion} ${
+                      idx === locationHighlight
+                        ? styles.locationSuggestionActive
+                        : ""
+                    }`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      selectLocation(option);
+                    }}
+                    onMouseEnter={() => setLocationHighlight(idx)}
+                    role="option"
+                    aria-selected={idx === locationHighlight}
+                  >
+                    <span className={styles.locationSuggestionText}>
+                      {option.label}
+                    </span>
+                  </button>
+                ))}
+            </div>
           )}
         </div>
       </div>
@@ -926,6 +1386,20 @@ export default function SignupPage() {
           <div className={styles["signup-left"]}>
             <div className="w-full max-w-[520px] rounded-2xl border border-[#e5edf5] bg-white p-10 shadow-xl">
               <div className={styles.cardHeader}>
+                {step === "avatar" && (
+                  <button
+                    type="button"
+                    className={styles.backButton}
+                    onClick={() => {
+                      setStep("profile");
+                      setError("");
+                      setInfo("");
+                    }}
+                    aria-label="Back to profile info"
+                  >
+                    <ArrowLeftIcon />
+                  </button>
+                )}
                 <h1 className="text-[32px] font-semibold leading-[1.2] text-slate-900">
                   Create a Cordigram account
                 </h1>

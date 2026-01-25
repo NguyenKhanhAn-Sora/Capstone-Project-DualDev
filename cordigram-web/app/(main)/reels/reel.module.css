@@ -61,15 +61,20 @@
   height: 100vh;
   width: 100%;
   overflow-y: auto;
+  position: relative;
   scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 }
 
+.noSnap {
+  scroll-snap-type: none !important;
+}
+
 .feedItem {
   scroll-snap-align: start;
   scroll-snap-stop: always;
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -81,13 +86,16 @@
   grid-template-columns: minmax(0, 1fr) 104px 72px var(--sidebar-width);
   gap: 18px;
   align-items: center;
-  height: calc(100vh - 16px);
+  height: 100%;
   margin: 0 auto;
   width: 100%;
   max-width: 100vw;
   position: relative;
-  transition: grid-template-columns 260ms ease, gap 260ms ease,
-    --sidebar-width 260ms ease, transform 260ms ease;
+  transition:
+    grid-template-columns 260ms ease,
+    gap 260ms ease,
+    --sidebar-width 260ms ease,
+    transform 260ms ease;
 }
 
 .stageWithComments {
@@ -104,6 +112,10 @@
   align-items: center;
   padding: 24px 0;
   min-height: calc(100vh - 16px);
+}
+
+.stageInactive {
+  pointer-events: none;
 }
 
 .videoColumn {
@@ -132,7 +144,9 @@
   z-index: 12;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
 }
 
 .videoShell:hover .moreMenuWrap,
@@ -150,7 +164,9 @@
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: background 140ms ease, transform 120ms ease,
+  transition:
+    background 140ms ease,
+    transform 120ms ease,
     border-color 140ms ease;
 }
 
@@ -180,7 +196,10 @@
   padding: 10px 12px;
   border-radius: 10px;
   cursor: pointer;
-  transition: background 140ms ease, transform 120ms ease, color 140ms ease;
+  transition:
+    background 140ms ease,
+    transform 120ms ease,
+    color 140ms ease;
 }
 
 .moreMenuItem:hover {
@@ -224,6 +243,10 @@
   pointer-events: auto;
 }
 
+.navColumnGhost {
+  visibility: hidden;
+}
+
 .navBtn {
   width: 48px;
   height: 48px;
@@ -235,8 +258,11 @@
   display: grid;
   place-items: center;
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
-  transition: transform 120ms ease, background 140ms ease,
-    border-color 140ms ease, box-shadow 140ms ease;
+  transition:
+    transform 120ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .navBtn:hover:not(:disabled) {
@@ -267,6 +293,17 @@
   right: 0;
   bottom: 0;
   top: 0;
+}
+
+.commentSidebarDocked {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  height: calc(100vh - 24px);
+  z-index: 32;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
+  border-radius: 16px;
 }
 
 .commentSidebarEnter {
@@ -312,6 +349,12 @@
   background: rgba(0, 0, 0, 0.05);
 }
 
+.reelStickerPopover {
+  right: 0;
+  left: auto;
+  width: min(320px, 86vw);
+}
+
 .commentScroll {
   max-height: calc(100vh - 200px);
 }
@@ -355,6 +398,15 @@
     height: auto;
     z-index: 40;
     max-width: unset;
+  }
+
+  .commentSidebarDocked {
+    inset: 0;
+    width: 100%;
+    min-width: 0;
+    max-width: unset;
+    height: auto;
+    border-radius: 0;
   }
 }
 
@@ -444,8 +496,12 @@
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 160ms ease, transform 160ms ease, background 140ms ease,
-    border-color 140ms ease, box-shadow 140ms ease;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .videoShell:hover .volumeBtn {
@@ -465,7 +521,9 @@
   max-width: 0;
   opacity: 0;
   pointer-events: none;
-  transition: max-width 360ms ease, opacity 120ms ease;
+  transition:
+    max-width 360ms ease,
+    opacity 120ms ease;
   height: 4px;
   cursor: pointer;
   background: transparent;
@@ -480,7 +538,8 @@
 
 .volumeBtn input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
-  background: linear-gradient(90deg, #0b1a2c, #0b1a2c),
+  background:
+    linear-gradient(90deg, #0b1a2c, #0b1a2c),
     linear-gradient(90deg, #0ea5e9, #38bdf8);
   background-blend-mode: overlay;
   border-radius: 999px;
@@ -501,7 +560,8 @@
 
 .volumeBtn input[type="range"]::-moz-range-track {
   height: 8px;
-  background: linear-gradient(90deg, #0b1a2c, #0b1a2c),
+  background:
+    linear-gradient(90deg, #0b1a2c, #0b1a2c),
     linear-gradient(90deg, #0ea5e9, #38bdf8);
   background-blend-mode: overlay;
   border-radius: 999px;
@@ -526,7 +586,8 @@
 
 .volumeBtn input[type="range"]::-ms-fill-lower,
 .volumeBtn input[type="range"]::-ms-fill-upper {
-  background: linear-gradient(90deg, #0b1a2c, #0b1a2c),
+  background:
+    linear-gradient(90deg, #0b1a2c, #0b1a2c),
     linear-gradient(90deg, #0ea5e9, #38bdf8);
   background-blend-mode: overlay;
   border-radius: 999px;
@@ -641,7 +702,10 @@
   cursor: pointer;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
   font-weight: 500;
-  transition: transform 120ms ease, box-shadow 140ms ease, filter 140ms ease;
+  transition:
+    transform 120ms ease,
+    box-shadow 140ms ease,
+    filter 140ms ease;
 }
 
 .followBadge:hover {
@@ -680,7 +744,9 @@
   justify-content: center;
   gap: 6px;
   cursor: pointer;
-  transition: transform 120ms ease, border-color 140ms ease,
+  transition:
+    transform 120ms ease,
+    border-color 140ms ease,
     background 140ms ease;
   font-weight: 700;
 }
@@ -725,8 +791,9 @@
 
 .captionHeader {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   font-weight: 800;
 }
 
@@ -752,10 +819,45 @@
   cursor: pointer;
 }
 
+.captionRepostBanner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #cbd5e1;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.captionRepostIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #cbd5e1;
+}
+
+.captionRepostText {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.captionRepostLink {
+  color: #f8fafc;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.captionRepostLink:hover {
+  text-decoration: underline;
+}
+
 .captionText {
   color: #e2e8f0;
   line-height: 1.5;
   font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .captionTextClickable {
@@ -774,10 +876,6 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   font-size: 14px;
-}
-
-.captionExpanded {
-  white-space: pre-wrap;
 }
 
 .hashtags {
@@ -822,7 +920,9 @@
   text-align: left;
   cursor: pointer;
   color: #e2e8f0;
-  transition: transform 120ms ease, border-color 140ms ease;
+  transition:
+    transform 120ms ease,
+    border-color 140ms ease;
 }
 
 .thumb span {

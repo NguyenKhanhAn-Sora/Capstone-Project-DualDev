@@ -39,6 +39,7 @@ const audienceOptions = [
 ];
 
 const REEL_MAX_DURATION_SECONDS = 90;
+const REEL_MAX_BYTES = 50 * 1024 * 1024; // 50MB hard cap
 const MAX_MEDIA_ITEMS = 10;
 
 type Step = "select" | "details";
@@ -188,17 +189,9 @@ export default function CreatePostPage() {
       }
     };
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowEmojiPicker(false);
-      }
-    };
-
     document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
@@ -291,6 +284,10 @@ export default function CreatePostPage() {
       const videoFile = valid.find((file) => file.type.startsWith("video/"));
       if (!videoFile) {
         setError("Reels require a video file.");
+        return;
+      }
+      if (videoFile.size > REEL_MAX_BYTES) {
+        setError("Reel file must be 50MB or smaller.");
         return;
       }
       const duration = await readVideoDuration(videoFile);
@@ -1064,7 +1061,7 @@ export default function CreatePostPage() {
               </h2>
               <p className={styles.dropText}>
                 {mode === "reel"
-                  ? "MP4 / MOV, vertical preferred (9:16), max 90s."
+                  ? "MP4 / MOV, vertical preferred (9:16), max 90s, up to 50MB."
                   : "Supports .jpg, .png, .mp4, .mov. Up to 10 items."}
               </p>
               <div className={styles.actions}>
@@ -1259,7 +1256,6 @@ export default function CreatePostPage() {
                       <EmojiPicker
                         onEmojiClick={(emojiData) => {
                           insertEmoji(emojiData.emoji || "");
-                          setShowEmojiPicker(false);
                         }}
                         searchDisabled={false}
                         skinTonesDisabled={false}

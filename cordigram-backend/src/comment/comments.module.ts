@@ -9,12 +9,14 @@ import { Post, PostSchema } from 'src/posts/post.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { CommentsController } from './comments.controller';
 import { CommentsService } from './comments.service';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
   imports: [
     forwardRef(() => AuthModule),
     forwardRef(() => UsersModule),
     ProfilesModule,
+    CloudinaryModule,
     MongooseModule.forFeature([
       { name: Comment.name, schema: CommentSchema },
       { name: CommentLike.name, schema: CommentLikeSchema },

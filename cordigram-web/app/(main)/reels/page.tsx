@@ -4,16 +4,19 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import EmojiPicker from "emoji-picker-react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   fetchReelsFeed,
   fetchReelDetail,
+  fetchFeed,
+  fetchUserPosts,
   likePost,
   unlikePost,
   savePost,
   unsavePost,
   repostPost,
-  unrepostPost,
+  createPost,
+  createReel,
   followUser,
   unfollowUser,
   viewPost,
@@ -45,8 +48,26 @@ const REEL_STATS_POLL_INTERVAL = 5000;
 const VIEW_THRESHOLD = 0.5;
 const VIEW_DWELL_MS = 2000;
 const VIEW_COOLDOWN_MS = 5 * 60 * 1000;
+const COMMENT_PANEL_WIDTH = "clamp(320px, 28vw, 420px)";
 
 type ReelItem = FeedItem & { durationSeconds?: number };
+
+const isRepostOfReel = (item: FeedItem): boolean => {
+  const duration = (item as any)?.durationSeconds as number | undefined;
+  const mediaIsVideo = item.media?.some((m) => m?.type === "video");
+  return Boolean(
+    item.repostOf &&
+    (item.kind === "reel" || typeof duration === "number" || mediaIsVideo),
+  );
+};
+
+const coerceReelKind = (item: ReelItem): ReelItem => {
+  if (item.kind === "reel") return item;
+  if (isRepostOfReel(item)) {
+    return { ...item, kind: "reel" } as ReelItem;
+  }
+  return item;
+};
 
 type ReportCategory = {
   key:
@@ -205,6 +226,12 @@ const findActiveMention = (value: string, caret: number) => {
   return { handle, start, end: caret };
 };
 
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const QUOTE_CHAR_LIMIT = 500;
+const REPOST_ANIMATION_MS = 200;
+
 type ReelVideoProps = {
   item: ReelItem;
   autoplay: boolean;
@@ -292,47 +319,33 @@ const IconSave = ({ filled }: { filled?: boolean }) => (
   </svg>
 );
 
-const IconRepost = ({ filled }: { filled?: boolean }) => (
-  <svg aria-hidden width="26" height="26" viewBox="0 0 24 24">
-    {filled ? (
-      <>
-        <path
-          d="M7 7h10.5L15 4.5M17.5 7 15 9.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M17 17H6.5L9 19.5M6.5 17 9 14.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </>
-    ) : (
-      <>
-        <path
-          d="M7 7h10.5L15 4.5M17.5 7 15 9.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M17 17H6.5L9 19.5M6.5 17 9 14.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </>
-    )}
+const IconRepost = () => (
+  <svg aria-hidden width="26" height="26" viewBox="0 0 48 48" fill="none">
+    <path
+      fill="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      d="M21.68 3.18a2 2 0 0 1 2.14.32l21.5 19a2 2 0 0 1-.02 3.02l-21.5 18.5a2 2 0 0 1-3.3-1.52v-9.97c-5.68.28-11.95 1.75-16.09 5.88A2 2 0 0 1 1 37c0-11.68 7.7-21.05 19.5-21.94V5a2 2 0 0 1 1.18-1.82ZM24.5 30.5v7.64l16.46-14.16L24.5 9.44V17a2 2 0 0 1-2.05 2c-8.4-.21-15.62 5.34-17.09 13.66 4.47-2.7 9.8-3.87 14.98-4.13.68-.03 1.22-.04 1.6-.04 1.19 0 2.56.26 2.56 2.01Z"
+    />
+  </svg>
+);
+
+const IconReup = ({ size = 16 }: { size?: number }) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      stroke="none"
+      strokeWidth={1}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"
+    />
   </svg>
 );
 
@@ -390,7 +403,7 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
       clearTimeout(timeoutId);
       observer.disconnect();
     };
-  }, [item.content, item.content?.length, item.hashtags?.length]);
+  }, [item.id, item.content, item.content?.length, item.hashtags?.length]);
 
   useEffect(() => {
     viewSentRef.current = false;
@@ -478,7 +491,7 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = Math.min(
       1,
-      Math.max(0, (e.clientX - rect.left) / Math.max(rect.width, 1))
+      Math.max(0, (e.clientX - rect.left) / Math.max(rect.width, 1)),
     );
     const video = videoRef.current;
     if (video && duration) {
@@ -496,10 +509,7 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
   };
 
   const percent = duration ? Math.min(100, (current / duration) * 100) : 0;
-  const hashtags = useMemo(
-    () => item.hashtags?.map((tag) => `#${tag}`) ?? [],
-    [item.hashtags]
-  );
+  const hashtags = useMemo(() => item.hashtags ?? [], [item.hashtags]);
   const shellClass = [
     styles.videoShell,
     !isPlaying ? styles.videoShellPaused : "",
@@ -549,6 +559,28 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
       </div>
       <div className={styles.captionCard}>
         <div className={styles.captionHeader}>
+          {item.repostOfAuthorUsername ? (
+            <div className={styles.captionRepostBanner}>
+              <span className={styles.captionRepostIcon}>
+                <IconReup size={14} />
+              </span>
+              <span className={styles.captionRepostText}>
+                Reposted from{" "}
+                {item.repostOfAuthorId ? (
+                  <Link
+                    href={`/profile/${item.repostOfAuthorId}`}
+                    className={styles.captionRepostLink}
+                  >
+                    @{item.repostOfAuthorUsername}
+                  </Link>
+                ) : (
+                  <span className={styles.captionRepostLink}>
+                    @{item.repostOfAuthorUsername}
+                  </span>
+                )}
+              </span>
+            </div>
+          ) : null}
           {item.authorUsername ? (
             item.authorId ? (
               <Link
@@ -577,9 +609,14 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
           <span>{item.content || ""}</span>
           {hashtags.length ? " " : ""}
           {hashtags.map((tag) => (
-            <span key={tag} className={styles.hashtagInline}>
-              {tag}
-            </span>
+            <Link
+              key={tag}
+              href={`/hashtag/${encodeURIComponent(tag)}`}
+              className={styles.hashtagInline}
+              onClick={(e) => e.stopPropagation()}
+            >
+              #{tag}
+            </Link>
           ))}
         </div>
       </div>
@@ -599,14 +636,14 @@ function ReelActions({
   item: ReelItem;
   onLike: (id: string, liked: boolean) => void;
   onSave: (id: string, saved: boolean) => void;
-  onRepost: (id: string, reposted: boolean) => void;
+  onRepost: (id: string, reposted: boolean, anchor?: DOMRect | null) => void;
   onComment: (id: string) => void;
   onFollow: (authorId: string, nextFollow: boolean) => void;
   viewerId?: string;
 }) {
   const following = Boolean(
     item.flags?.following ??
-      (item as unknown as { following?: boolean }).following
+    (item as unknown as { following?: boolean }).following,
   );
   const isSelf = Boolean(viewerId && item.authorId === viewerId);
   const hideLikeCount =
@@ -707,11 +744,17 @@ function ReelActions({
         className={`${styles.actionBtn} ${
           item.reposted ? styles.actionActive : ""
         }`}
-        onClick={() => onRepost(item.id, Boolean(item.reposted))}
+        onClick={(e) =>
+          onRepost(
+            item.id,
+            Boolean(item.reposted),
+            e.currentTarget.getBoundingClientRect(),
+          )
+        }
         aria-label="Repost reel"
       >
         <span className={`${styles.actionBtnWrap}`}>
-          <IconRepost filled={item.reposted} />
+          <IconRepost />
         </span>
         <span>{formatCount(item.stats?.reposts)}</span>
       </button>
@@ -720,13 +763,15 @@ function ReelActions({
 }
 
 export default function ReelPage() {
+  const REELS_PAGE_SIZE = 10;
   const canRender = useRequireAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams<{ id?: string | string[] }>();
   const [viewerId, setViewerId] = useState<string | undefined>(() =>
     typeof window === "undefined"
       ? undefined
-      : getUserIdFromToken(localStorage.getItem("accessToken"))
+      : getUserIdFromToken(localStorage.getItem("accessToken")),
   );
   const requestedReelId = useMemo(() => {
     const fromPath = params?.id
@@ -751,14 +796,26 @@ export default function ReelPage() {
 
     return undefined;
   }, [params, viewerId]);
+  const singleMode = useMemo(
+    () => searchParams?.get("single") === "1",
+    [searchParams],
+  );
+  const originReelId = useMemo(
+    () => searchParams?.get("origin") || undefined,
+    [searchParams],
+  );
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string>("");
   const [items, setItems] = useState<ReelItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const activeIndexRef = useRef(0);
   const listRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const autoLoadLockRef = useRef(false);
   const visibleReelsRef = useRef<Set<string>>(new Set());
   const viewCooldownRef = useRef<Map<string, number>>(new Map());
   const [transition, setTransition] = useState<"next" | "prev" | null>(null);
@@ -767,11 +824,10 @@ export default function ReelPage() {
   const [commentsRender, setCommentsRender] = useState(false);
   const commentPanelRef = useRef<HTMLElement | null>(null);
   const commentCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+    null,
   );
   const missingDetailRef = useRef<Set<string>>(new Set());
   const [openMoreMenuId, setOpenMoreMenuId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportClosing, setReportClosing] = useState(false);
   const reportHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -782,6 +838,30 @@ export default function ReelPage() {
   const [reportNote, setReportNote] = useState("");
   const [reportError, setReportError] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [repostTarget, setRepostTarget] = useState<{
+    postId: string;
+    label: string;
+    kind: "reel" | "post";
+  } | null>(null);
+  const [repostMenuAnchor, setRepostMenuAnchor] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [repostMode, setRepostMode] = useState<"quote" | "repost" | null>(null);
+  const [repostNote, setRepostNote] = useState("");
+  const [quoteVisibility, setQuoteVisibility] = useState<
+    "public" | "followers" | "private"
+  >("public");
+  const [quoteAllowComments, setQuoteAllowComments] = useState(true);
+  const [quoteAllowDownload, setQuoteAllowDownload] = useState(true);
+  const [quoteHideLikeCount, setQuoteHideLikeCount] = useState(false);
+  const [quoteLocation, setQuoteLocation] = useState("");
+  const [quoteHashtags, setQuoteHashtags] = useState<string[]>([]);
+  const [quoteHashtagDraft, setQuoteHashtagDraft] = useState("");
+  const [repostSubmitting, setRepostSubmitting] = useState(false);
+  const [repostError, setRepostError] = useState("");
+  const [repostClosing, setRepostClosing] = useState(false);
   const [visibilityModalOpen, setVisibilityModalOpen] = useState(false);
   const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [visibilitySelected, setVisibilitySelected] = useState<
@@ -828,11 +908,13 @@ export default function ReelPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const repostHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!openMoreMenuId) return;
     const handleClick = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      const target = event.target as HTMLElement;
+      if (!target.closest(`[data-more-menu-id="${openMoreMenuId}"]`)) {
         setOpenMoreMenuId(null);
       }
     };
@@ -866,6 +948,7 @@ export default function ReelPage() {
   useEffect(() => {
     return () => {
       if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
+      if (repostHideTimerRef.current) clearTimeout(repostHideTimerRef.current);
       if (commentCloseTimerRef.current)
         clearTimeout(commentCloseTimerRef.current);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -989,38 +1072,184 @@ export default function ReelPage() {
     setViewerId(getUserIdFromToken(stored));
   }, [canRender]);
 
-  useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
+  const loadPage = useCallback(
+    async (nextPage: number, opts?: { initial?: boolean }) => {
+      if (!token) return;
+      const isInitial = Boolean(opts?.initial);
+      if (isInitial) setLoading(true);
+      else setLoadingMore(true);
 
-    const load = async () => {
-      setLoading(true);
       try {
-        let nextItems = (await fetchReelsFeed({ token })) || [];
+        const limit = nextPage * REELS_PAGE_SIZE;
+
+        let base = ((await fetchReelsFeed({ token, limit })) || []).map(
+          coerceReelKind,
+        );
+        let nextItems = [...base];
+        let nextHasMore = base.length >= limit;
+
+        // Bring in reposted reels that may only be delivered via main feed
+        try {
+          const repostCandidates = (
+            (await fetchFeed({ token, limit: 40 })) || []
+          )
+            .filter(isRepostOfReel)
+            .map(coerceReelKind);
+          if (repostCandidates.length) {
+            const seen = new Set(nextItems.map((it) => it.id));
+            repostCandidates.forEach((it) => {
+              if (!seen.has(it.id)) {
+                seen.add(it.id);
+                nextItems.push(it);
+              }
+            });
+          }
+        } catch {}
 
         if (!nextItems.length && viewerId) {
-          const owned =
+          const ownedBase = (
             (await fetchReelsFeed({
               token,
               authorId: viewerId,
               includeOwned: true,
-            })) || [];
+              limit,
+            })) || []
+          ).map(coerceReelKind);
+          nextHasMore = ownedBase.length >= limit;
+          const owned = [...ownedBase];
+          try {
+            const repostOwned = (
+              (await fetchUserPosts({ token, userId: viewerId, limit: 40 })) ||
+              []
+            )
+              .filter(isRepostOfReel)
+              .map(coerceReelKind);
+            const seenOwned = new Set(owned.map((it) => it.id));
+            repostOwned.forEach((it) => {
+              if (!seenOwned.has(it.id)) {
+                seenOwned.add(it.id);
+                owned.push(it);
+              }
+            });
+          } catch {}
           if (owned.length) nextItems = owned;
         }
 
-        if (cancelled) return;
+        nextItems = nextItems.slice(0, limit);
 
         setItems(nextItems);
-        const initialIndex = requestedReelId
-          ? nextItems.findIndex((it) => it.id === requestedReelId)
-          : 0;
-        setActiveIndex(initialIndex >= 0 ? initialIndex : 0);
+        setHasMore(nextHasMore);
+        setPage(nextPage);
+
+        if (isInitial) {
+          const initialIndex = requestedReelId
+            ? nextItems.findIndex((it) => it.id === requestedReelId)
+            : 0;
+          setActiveIndex(initialIndex >= 0 ? initialIndex : 0);
+        }
+
+        setError("");
+      } catch (err) {
+        setError(
+          (err as { message?: string })?.message ||
+            "Không tải được danh sách reel",
+        );
+      } finally {
+        if (isInitial) setLoading(false);
+        else setLoadingMore(false);
+      }
+    },
+    [REELS_PAGE_SIZE, requestedReelId, token, viewerId],
+  );
+
+  const loadMore = useCallback(() => {
+    if (!token) return;
+    if (singleMode) return;
+    if (loading || loadingMore) return;
+    if (!hasMore) return;
+    void loadPage(page + 1);
+  }, [hasMore, loadPage, loading, loadingMore, page, singleMode, token]);
+
+  useEffect(() => {
+    if (!token) return;
+    if (singleMode && requestedReelId) return;
+    void loadPage(1, { initial: true });
+  }, [loadPage, requestedReelId, singleMode, token, viewerId]);
+
+  useEffect(() => {
+    if (!loadingMore) autoLoadLockRef.current = false;
+  }, [loadingMore]);
+
+  useEffect(() => {
+    const container = listRef.current;
+    if (!container) return;
+    if (singleMode) return;
+    if (!items.length) return;
+    if (!hasMore) return;
+    if (loading || loadingMore) return;
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const triggerIndex = Math.max(0, items.length - 2);
+    const triggerItem = items[triggerIndex];
+    const triggerEl = triggerItem ? itemRefs.current[triggerItem.id] : null;
+    if (!triggerEl) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isVisible = entries.some((entry) => entry.isIntersecting);
+        if (!isVisible) return;
+        if (autoLoadLockRef.current) return;
+        autoLoadLockRef.current = true;
+        loadMore();
+      },
+      {
+        root: container,
+        threshold: 0.6,
+      },
+    );
+
+    observer.observe(triggerEl);
+    return () => observer.disconnect();
+  }, [hasMore, items, loadMore, loading, loadingMore, singleMode]);
+
+  useEffect(() => {
+    if (!singleMode || !token || !requestedReelId) return;
+    let cancelled = false;
+    setLoading(true);
+    const load = async () => {
+      try {
+        const detail = await fetchReelDetail({
+          token,
+          reelId: requestedReelId,
+        });
+        if (cancelled || !detail) return;
+        setItems([coerceReelKind(detail as ReelItem)]);
+        setActiveIndex(0);
         setError("");
       } catch (err) {
         if (cancelled) return;
+        if (originReelId && originReelId !== requestedReelId) {
+          try {
+            const fallback = await fetchReelDetail({
+              token,
+              reelId: originReelId,
+            });
+            if (cancelled || !fallback) return;
+            setItems([coerceReelKind(fallback as ReelItem)]);
+            setActiveIndex(0);
+            setError("");
+            return;
+          } catch (fallbackErr) {
+            setError(
+              (fallbackErr as { message?: string })?.message ||
+                (err as { message?: string })?.message ||
+                "Không tải được reel",
+            );
+            return;
+          }
+        }
         setError(
-          (err as { message?: string })?.message ||
-            "Không tải được danh sách reel"
+          (err as { message?: string })?.message || "Không tải được reel",
         );
       } finally {
         if (!cancelled) setLoading(false);
@@ -1028,10 +1257,11 @@ export default function ReelPage() {
     };
 
     void load();
+
     return () => {
       cancelled = true;
     };
-  }, [token, viewerId, requestedReelId]);
+  }, [singleMode, token, requestedReelId, originReelId]);
 
   useEffect(() => {
     if (!token || !viewerId) return;
@@ -1090,7 +1320,7 @@ export default function ReelPage() {
       .catch((err) => {
         if (cancelled) return;
         setError(
-          (err as { message?: string })?.message || "Không tải được reel"
+          (err as { message?: string })?.message || "Không tải được reel",
         );
       });
 
@@ -1101,14 +1331,14 @@ export default function ReelPage() {
 
   const updateItem = (id: string, patch: Partial<ReelItem>) => {
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, ...patch } : it))
+      prev.map((it) => (it.id === id ? { ...it, ...patch } : it)),
     );
   };
 
   const updateStats = (
     id: string,
     field: keyof NonNullable<FeedItem["stats"]>,
-    delta: number
+    delta: number,
   ) => {
     setItems((prev) =>
       prev.map((it) =>
@@ -1120,8 +1350,8 @@ export default function ReelPage() {
                 [field]: Math.max(0, (it.stats?.[field] ?? 0) + delta),
               },
             }
-          : it
-      )
+          : it,
+      ),
     );
   };
 
@@ -1137,11 +1367,11 @@ export default function ReelPage() {
                   ...patch,
                 },
               }
-            : it
-        )
+            : it,
+        ),
       );
     },
-    []
+    [],
   );
 
   const showToast = useCallback((message: string, duration = 1600) => {
@@ -1176,10 +1406,10 @@ export default function ReelPage() {
     setEditAllowDownload(
       Boolean(
         (current as any)?.allowDownload ??
-          (current as any)?.allowDownloads ??
-          (current as any)?.flags?.allowDownload ??
-          (current as any)?.permissions?.allowDownload
-      )
+        (current as any)?.allowDownloads ??
+        (current as any)?.flags?.allowDownload ??
+        (current as any)?.permissions?.allowDownload,
+      ),
     );
     setEditHideLikeCount(Boolean(current?.hideLikeCount));
     setEditError("");
@@ -1199,7 +1429,7 @@ export default function ReelPage() {
   };
 
   const handleCaptionChange = (
-    event: React.ChangeEvent<HTMLTextAreaElement>
+    event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
     const value = event.target.value;
     const caret = event.target.selectionStart ?? value.length;
@@ -1274,7 +1504,7 @@ export default function ReelPage() {
       e.preventDefault();
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
-        prev + 1 < mentionSuggestions.length ? prev + 1 : 0
+        prev + 1 < mentionSuggestions.length ? prev + 1 : 0,
       );
       return;
     }
@@ -1282,7 +1512,7 @@ export default function ReelPage() {
       e.preventDefault();
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1,
       );
       return;
     }
@@ -1331,14 +1561,14 @@ export default function ReelPage() {
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setLocationHighlight((prev) =>
-        prev + 1 < locationSuggestions.length ? prev + 1 : 0
+        prev + 1 < locationSuggestions.length ? prev + 1 : 0,
       );
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
       setLocationHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1,
       );
       return;
     }
@@ -1360,7 +1590,7 @@ export default function ReelPage() {
     }
 
     const normalizedHashtags = Array.from(
-      new Set(editHashtags.map((t) => normalizeHashtag(t.toString())))
+      new Set(editHashtags.map((t) => normalizeHashtag(t.toString()))),
     ).filter(Boolean);
 
     const normalizedMentions = Array.from(
@@ -1368,10 +1598,10 @@ export default function ReelPage() {
         [
           ...extractMentionsFromCaption(editCaption || ""),
           ...editMentions.map((t) =>
-            t.toString().trim().replace(/^@/, "").toLowerCase()
+            t.toString().trim().replace(/^@/, "").toLowerCase(),
           ),
-        ].filter(Boolean)
-      )
+        ].filter(Boolean),
+      ),
     );
 
     const trimmedLocation = editLocation.trim();
@@ -1394,7 +1624,7 @@ export default function ReelPage() {
         payload,
       });
       setItems((prev) =>
-        prev.map((it) => (it.id === active.id ? { ...it, ...updated } : it))
+        prev.map((it) => (it.id === active.id ? { ...it, ...updated } : it)),
       );
       setEditSuccess("Reel updated");
       setEditOpen(false);
@@ -1435,7 +1665,7 @@ export default function ReelPage() {
             ? 0
             : Math.max(
                 0,
-                Math.min(idx === -1 ? activeIndex : idx, next.length - 1)
+                Math.min(idx === -1 ? activeIndex : idx, next.length - 1),
               );
         nextTargetId = next[plannedIndex]?.id ?? null;
         setActiveIndex(plannedIndex);
@@ -1480,7 +1710,7 @@ export default function ReelPage() {
       });
       updateStats(id, "hearts", liked ? 1 : -1);
       setError(
-        (err as { message?: string })?.message || "Không thể cập nhật like"
+        (err as { message?: string })?.message || "Không thể cập nhật like",
       );
     }
   };
@@ -1508,27 +1738,163 @@ export default function ReelPage() {
     }
   };
 
-  const handleRepost = async (id: string, reposted: boolean) => {
-    if (!token) return;
-    updateItem(id, {
-      reposted: !reposted,
-      flags: {
-        ...(items.find((x) => x.id === id)?.flags || {}),
-        reposted: !reposted,
-      },
-    });
-    updateStats(id, "reposts", reposted ? -1 : 1);
-    try {
-      if (reposted) await unrepostPost({ token, postId: id });
-      else await repostPost({ token, postId: id });
-    } catch (err) {
-      updateItem(id, {
-        reposted,
-        flags: { ...(items.find((x) => x.id === id)?.flags || {}), reposted },
-      });
-      updateStats(id, "reposts", reposted ? 1 : -1);
-      setError((err as { message?: string })?.message || "Không thể repost");
+  const incrementRepostStat = useCallback((postId: string) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== postId) return it;
+        const currentShares = it.stats?.reposts ?? it.stats?.shares ?? 0;
+        const nextShares = currentShares + 1;
+        return {
+          ...it,
+          stats: {
+            ...it.stats,
+            shares: nextShares,
+            reposts: nextShares,
+          },
+          reposted: true,
+          flags: { ...(it.flags || {}), reposted: true },
+        };
+      }),
+    );
+  }, []);
+
+  const openRepostMenuForItem = (
+    postId: string,
+    label: string,
+    kind: "reel" | "post",
+    anchor?: DOMRect | null,
+  ) => {
+    if (!token) {
+      showToast("Sign in to repost");
+      return;
     }
+    if (repostHideTimerRef.current) clearTimeout(repostHideTimerRef.current);
+    setRepostClosing(false);
+    setRepostTarget({ postId, label, kind });
+    resetQuoteState();
+    setQuoteOpen(false);
+    if (anchor) {
+      setRepostMenuAnchor({
+        x: anchor.left + anchor.width / 2,
+        y: anchor.bottom,
+      });
+    } else {
+      setRepostMenuAnchor(
+        typeof window !== "undefined"
+          ? { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+          : null,
+      );
+    }
+  };
+
+  const closeRepostModal = () => {
+    if (repostHideTimerRef.current) clearTimeout(repostHideTimerRef.current);
+    setRepostClosing(true);
+    repostHideTimerRef.current = setTimeout(() => {
+      setRepostTarget(null);
+      resetQuoteState();
+      setRepostClosing(false);
+    }, REPOST_ANIMATION_MS);
+  };
+
+  const closeRepostMenu = () => {
+    setRepostMenuAnchor(null);
+  };
+
+  const handleQuickRepost = () => {
+    if (!repostTarget) return;
+    setRepostMode("repost");
+    closeRepostMenu();
+    void submitRepost("repost");
+  };
+
+  const openQuoteComposer = () => {
+    if (!repostTarget) return;
+    setRepostMode("quote");
+    setQuoteOpen(true);
+    setRepostError("");
+    closeRepostMenu();
+  };
+
+  const submitRepost = async (modeOverride?: "quote" | "repost") => {
+    const mode = modeOverride ?? repostMode;
+    if (!token || !repostTarget || !mode) {
+      setRepostError("Choose an option to continue");
+      return;
+    }
+    const originalId = resolveOriginalPostId(repostTarget.postId);
+    const targetId = repostTarget.postId;
+    setRepostSubmitting(true);
+    setRepostError("");
+    try {
+      if (mode === "repost") {
+        await createPost({ token, payload: { repostOf: originalId } });
+        incrementRepostStat(originalId);
+        if (originalId !== targetId) {
+          incrementRepostStat(targetId);
+          try {
+            await repostPost({ token, postId: targetId });
+          } catch {}
+        }
+        showToast("Reposted");
+        closeRepostModal();
+        return;
+      }
+
+      const note = repostNote.trim();
+      const mentions = extractMentionsFromCaption(note);
+      const payload = {
+        repostOf: originalId,
+        content: note || undefined,
+        hashtags: quoteHashtags.length ? quoteHashtags : undefined,
+        location: quoteLocation.trim() || undefined,
+        allowComments: quoteAllowComments,
+        allowDownload: quoteAllowDownload,
+        hideLikeCount: quoteHideLikeCount,
+        visibility: quoteVisibility,
+        mentions: mentions.length ? mentions : undefined,
+      } as const;
+
+      if (repostTarget.kind === "reel") {
+        await createReel({ token, payload: payload as any });
+      } else {
+        await createPost({ token, payload: payload as any });
+      }
+
+      incrementRepostStat(originalId);
+      if (originalId !== targetId) {
+        incrementRepostStat(targetId);
+        try {
+          await repostPost({ token, postId: targetId });
+        } catch {}
+      }
+      showToast("Reposted with quote");
+      closeRepostModal();
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Could not repost";
+      setRepostError(message || "Could not repost");
+    } finally {
+      setRepostSubmitting(false);
+    }
+  };
+
+  const handleRepost = (
+    id: string,
+    _reposted: boolean,
+    anchor?: DOMRect | null,
+  ) => {
+    const target = items.find((x) => x.id === id);
+    if (!target) return;
+    const label =
+      target.authorUsername ||
+      target.authorDisplayName ||
+      target.authorId ||
+      "creator";
+    const kind = (target as any)?.kind === "post" ? "post" : "reel";
+    openRepostMenuForItem(id, label, kind, anchor);
   };
 
   const handleViewed = (id: string, ms?: number) => {
@@ -1549,13 +1915,89 @@ export default function ReelPage() {
   const active = items[activeIndex];
   const isAuthor = useMemo(
     () => Boolean(active?.authorId && viewerId && active.authorId === viewerId),
-    [active?.authorId, viewerId]
+    [active?.authorId, viewerId],
   );
 
   const selectedReportGroup = useMemo(
     () => REPORT_GROUPS.find((g) => g.key === reportCategory),
-    [reportCategory]
+    [reportCategory],
   );
+
+  const repostMenuStyle = useMemo(() => {
+    if (!repostMenuAnchor || typeof window === "undefined") return null;
+    const width = 240;
+    const height = 132;
+    const margin = 12;
+    const left = clamp(
+      repostMenuAnchor.x - width / 2,
+      margin,
+      window.innerWidth - width - margin,
+    );
+    const top = clamp(
+      repostMenuAnchor.y + 10,
+      margin,
+      window.innerHeight - height - margin,
+    );
+    return { left, top, width };
+  }, [repostMenuAnchor]);
+
+  const quoteVisibilityOptions = useMemo(
+    () => [
+      {
+        value: "public" as const,
+        title: "Public",
+        description: "Anyone can view this repost",
+      },
+      {
+        value: "followers" as const,
+        title: "Followers",
+        description: "Only followers can view this repost",
+      },
+      {
+        value: "private" as const,
+        title: "Private",
+        description: "Only you can view this repost",
+      },
+    ],
+    [],
+  );
+
+  const resolveOriginalPostId = useCallback(
+    (postId: string) => {
+      const target = items.find((it) => it.id === postId);
+      return (target as any)?.repostOf || postId;
+    },
+    [items],
+  );
+
+  const resetQuoteState = useCallback(() => {
+    setRepostMode(null);
+    setRepostNote("");
+    setQuoteVisibility("public");
+    setQuoteAllowComments(true);
+    setQuoteAllowDownload(true);
+    setQuoteHideLikeCount(false);
+    setQuoteLocation("");
+    setQuoteHashtags([]);
+    setQuoteHashtagDraft("");
+    setRepostError("");
+    setRepostSubmitting(false);
+    setQuoteOpen(false);
+    setRepostMenuAnchor(null);
+  }, []);
+
+  const addQuoteHashtag = useCallback(() => {
+    const clean = normalizeHashtag(quoteHashtagDraft);
+    if (!clean) return;
+    setQuoteHashtags((prev) =>
+      prev.includes(clean) ? prev : [...prev, clean].slice(0, 12),
+    );
+    setQuoteHashtagDraft("");
+  }, [quoteHashtagDraft]);
+
+  const removeQuoteHashtag = useCallback((tag: string) => {
+    setQuoteHashtags((prev) => prev.filter((item) => item !== tag));
+  }, []);
 
   const commentsToggleLabel =
     active?.allowComments === false ? "Turn on comments" : "Turn off comments";
@@ -1568,18 +2010,18 @@ export default function ReelPage() {
     () =>
       Boolean(
         active &&
-          ((active as any)?.allowDownloads ??
-            (active as any)?.allowDownload ??
-            (active as any)?.flags?.allowDownloads ??
-            (active as any)?.flags?.allowDownload ??
-            (active as any)?.permissions?.allowDownloads ??
-            (active as any)?.permissions?.allowDownload)
+        ((active as any)?.allowDownloads ??
+          (active as any)?.allowDownload ??
+          (active as any)?.flags?.allowDownloads ??
+          (active as any)?.flags?.allowDownload ??
+          (active as any)?.permissions?.allowDownloads ??
+          (active as any)?.permissions?.allowDownload),
       ),
-    [active]
+    [active],
   );
 
   const activeFollowing = Boolean(
-    active?.flags?.following ?? (active as any)?.following
+    active?.flags?.following ?? (active as any)?.following,
   );
 
   const activeSaved = Boolean(active?.flags?.saved ?? active?.saved);
@@ -1603,7 +2045,12 @@ export default function ReelPage() {
 
   useEffect(() => {
     if (!transition) return;
-    const id = setTimeout(() => setTransition(null), 420);
+    const id = setTimeout(() => {
+      setTransition(null);
+      transitionRef.current = null;
+      // Force update state after transition ends
+      computeNearestRef.current?.();
+    }, 600);
     return () => clearTimeout(id);
   }, [transition]);
 
@@ -1616,8 +2063,20 @@ export default function ReelPage() {
     if (nextIndex <= activeIndex) return;
     const target = items[nextIndex];
     const el = target ? itemRefs.current[target.id] : null;
+    const container = listRef.current;
+
+    transitionRef.current = "next";
+
+    // Manually apply noSnap class immediately to prevent snap fighting
+    if (container && styles.noSnap) {
+      container.classList.add(styles.noSnap);
+    }
+
     setTransition("next");
-    if (el) {
+    if (el && container) {
+      const targetTop = el.offsetTop;
+      container.scrollTo({ top: targetTop, behavior: "smooth" });
+    } else if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     } else {
       setActiveIndex(nextIndex);
@@ -1629,8 +2088,21 @@ export default function ReelPage() {
     if (nextIndex >= activeIndex) return;
     const target = items[nextIndex];
     const el = target ? itemRefs.current[target.id] : null;
+    const container = listRef.current;
+
+    transitionRef.current = "prev";
+
+    // Manually apply noSnap class immediately to prevent snap fighting
+    if (container && styles.noSnap) {
+      container.classList.add(styles.noSnap);
+    }
+
     setTransition("prev");
-    if (el) {
+    if (el && container) {
+      // Use element offset relative to the scroll container to avoid layout transforms and page offsets
+      const targetTop = el.offsetTop;
+      container.scrollTo({ top: targetTop, behavior: "smooth" });
+    } else if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     } else {
       setActiveIndex(nextIndex);
@@ -1663,13 +2135,17 @@ export default function ReelPage() {
   const scrollTickingRef = useRef(false);
   const urlSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSyncedIdRef = useRef<string | null>(null);
+
   const lastSyncedPathRef = useRef<string | null>(null);
+  const transitionRef = useRef<"next" | "prev" | null>(null);
+  const computeNearestRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const container = listRef.current;
     if (!container || !items.length) return;
 
     const computeNearest = () => {
+      if (transitionRef.current) return;
       if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
       scrollRafRef.current = requestAnimationFrame(() => {
         const rect = container.getBoundingClientRect();
@@ -1696,6 +2172,8 @@ export default function ReelPage() {
         }
       });
     };
+
+    computeNearestRef.current = computeNearest;
 
     const handleScroll = () => {
       if (scrollTickingRef.current) return;
@@ -1738,7 +2216,7 @@ export default function ReelPage() {
           }
         });
       },
-      { root: container, threshold: [VIEW_THRESHOLD] }
+      { root: container, threshold: [VIEW_THRESHOLD] },
     );
 
     items.forEach((it) => {
@@ -1793,6 +2271,7 @@ export default function ReelPage() {
 
   useEffect(() => {
     if (!currentReelId) return;
+    if (singleMode) return;
 
     if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
     urlSyncTimerRef.current = setTimeout(() => {
@@ -1814,7 +2293,7 @@ export default function ReelPage() {
     return () => {
       if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
     };
-  }, [currentReelId]);
+  }, [currentReelId, singleMode]);
 
   useEffect(() => {
     if (!token) return;
@@ -1848,8 +2327,8 @@ export default function ReelPage() {
                   saved: detail.saved ?? it.saved,
                   reposted: detail.reposted ?? it.reposted,
                 }
-              : it
-          )
+              : it,
+          ),
         );
       } catch {
         /* silent */
@@ -1999,7 +2478,7 @@ export default function ReelPage() {
         try {
           localStorage.setItem(
             "lastOwnedReelId",
-            JSON.stringify({ id: active.id, ownerId: active.authorId })
+            JSON.stringify({ id: active.id, ownerId: active.authorId }),
           );
         } catch {
           /* ignore storage errors */
@@ -2133,7 +2612,7 @@ export default function ReelPage() {
   const handleFollowFromMenu = () => {
     if (!active?.authorId) return;
     const currentFollowing = Boolean(
-      active.flags?.following ?? (active as any)?.following
+      active.flags?.following ?? (active as any)?.following,
     );
     onFollow(active.authorId, !currentFollowing);
     setOpenMoreMenuId(null);
@@ -2147,6 +2626,14 @@ export default function ReelPage() {
   const handleGoProfile = () => {
     if (!active?.authorId) return;
     const target = `/profile/${active.authorId}`;
+    setOpenMoreMenuId(null);
+    router.push(target);
+  };
+
+  const handleGoReel = () => {
+    const targetId = active?.repostOf || active?.id;
+    if (!targetId) return;
+    const target = `/reels/${targetId}?single=1`;
     setOpenMoreMenuId(null);
     router.push(target);
   };
@@ -2166,8 +2653,8 @@ export default function ReelPage() {
       prev.map((p) =>
         p.authorId === authorId
           ? { ...p, flags: { ...p.flags, following: nextFollow } }
-          : p
-      )
+          : p,
+      ),
     );
     try {
       if (nextFollow) await followUser({ token, userId: authorId });
@@ -2177,11 +2664,11 @@ export default function ReelPage() {
         prev.map((p) =>
           p.authorId === authorId
             ? { ...p, flags: { ...p.flags, following: !nextFollow } }
-            : p
-        )
+            : p,
+        ),
       );
       setError(
-        (err as { message?: string })?.message || "Không thể cập nhật follow"
+        (err as { message?: string })?.message || "Không thể cập nhật follow",
       );
     }
   };
@@ -2190,7 +2677,25 @@ export default function ReelPage() {
     (reelId: string, total: number) => {
       syncStats(reelId, { comments: total });
     },
-    [syncStats]
+    [syncStats],
+  );
+
+  const commentTarget = useMemo(
+    () => items.find((it) => it.id === commentReelId),
+    [commentReelId, items],
+  );
+
+  const showComments = commentsRender && commentReelId;
+
+  const commentDockStyle = useMemo(
+    () =>
+      ({
+        "--sidebar-width": COMMENT_PANEL_WIDTH,
+        width: COMMENT_PANEL_WIDTH,
+        maxWidth: COMMENT_PANEL_WIDTH,
+        minWidth: COMMENT_PANEL_WIDTH,
+      }) as React.CSSProperties,
+    [],
   );
 
   if (!canRender) return null;
@@ -2207,7 +2712,12 @@ export default function ReelPage() {
             <div className={styles.stateCard}>No reels yet.</div>
           ) : (
             <div className={styles.stageShell}>
-              <div className={styles.feedScroll} ref={listRef}>
+              <div
+                className={`${styles.feedScroll} ${
+                  transition ? styles.noSnap : ""
+                }`}
+                ref={listRef}
+              >
                 {items.map((item) => {
                   const isActive = active?.id === item.id;
                   return (
@@ -2219,226 +2729,259 @@ export default function ReelPage() {
                       data-reel-id={item.id}
                       className={styles.feedItem}
                     >
-                      {isActive ? (
-                        <div
-                          className={`${styles.stage} ${
-                            commentsRender ? styles.stageWithComments : ""
-                          } ${commentsOpen ? styles.stageShifted : ""}`}
-                        >
-                          <div className={styles.videoColumn}>
-                            <div
-                              className={`${styles.reelWrapper} ${
-                                transition === "next"
-                                  ? styles.slideNext
-                                  : transition === "prev"
+                      <div
+                        className={`${styles.stage} ${
+                          !isActive ? styles.stageInactive : ""
+                        }`}
+                      >
+                        <div className={styles.videoColumn}>
+                          <div
+                            className={`${styles.reelWrapper} ${
+                              transition === "next" && isActive
+                                ? styles.slideNext
+                                : transition === "prev" && isActive
                                   ? styles.slidePrev
                                   : ""
-                              }`}
+                            }`}
+                          >
+                            <ReelVideo
+                              item={item}
+                              autoplay={isActive}
+                              onViewed={(ms) => handleViewed(item.id, ms)}
                             >
-                              <ReelVideo
-                                item={item}
-                                autoplay
-                                onViewed={(ms) => handleViewed(item.id, ms)}
+                              <div
+                                className={`${styles.moreMenuWrap} ${
+                                  openMoreMenuId === item.id
+                                    ? styles.moreMenuWrapVisible
+                                    : ""
+                                }`}
+                                style={{
+                                  opacity: isActive ? undefined : 0,
+                                  pointerEvents: isActive ? undefined : "none",
+                                }}
+                                data-more-menu-id={item.id}
                               >
-                                <div
-                                  className={`${styles.moreMenuWrap} ${
-                                    openMoreMenuId === item.id
-                                      ? styles.moreMenuWrapVisible
-                                      : ""
-                                  }`}
-                                  ref={menuRef}
+                                <button
+                                  type="button"
+                                  className={styles.moreBtn}
+                                  aria-haspopup="true"
+                                  aria-expanded={openMoreMenuId === item.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenMoreMenuId((prev) =>
+                                      prev === item.id ? null : item.id,
+                                    );
+                                  }}
                                 >
-                                  <button
-                                    type="button"
-                                    className={styles.moreBtn}
-                                    aria-haspopup="true"
-                                    aria-expanded={openMoreMenuId === item.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenMoreMenuId((prev) =>
-                                        prev === item.id ? null : item.id
-                                      );
-                                    }}
+                                  <svg
+                                    aria-hidden="true"
+                                    width="22"
+                                    height="22"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
                                   >
-                                    <svg
-                                      aria-hidden="true"
-                                      width="22"
-                                      height="22"
-                                      viewBox="0 0 24 24"
-                                      fill="currentColor"
-                                    >
-                                      <circle cx="5" cy="12" r="1.5" />
-                                      <circle cx="12" cy="12" r="1.5" />
-                                      <circle cx="19" cy="12" r="1.5" />
-                                    </svg>
-                                  </button>
-                                  {openMoreMenuId === item.id ? (
-                                    <div
-                                      className={styles.moreMenu}
-                                      role="menu"
-                                    >
-                                      {isAuthor ? (
-                                        <>
+                                    <circle cx="5" cy="12" r="1.5" />
+                                    <circle cx="12" cy="12" r="1.5" />
+                                    <circle cx="19" cy="12" r="1.5" />
+                                  </svg>
+                                </button>
+                                {openMoreMenuId === item.id ? (
+                                  <div className={styles.moreMenu} role="menu">
+                                    {isAuthor ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          className={styles.moreMenuItem}
+                                          role="menuitem"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleEditPost();
+                                          }}
+                                        >
+                                          Edit Reel
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={styles.moreMenuItem}
+                                          role="menuitem"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            openVisibilityModal();
+                                          }}
+                                        >
+                                          Edit visibility
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={styles.moreMenuItem}
+                                          role="menuitem"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMuteNotifications();
+                                          }}
+                                        >
+                                          Mute notifications
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={styles.moreMenuItem}
+                                          role="menuitem"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleAllowComments();
+                                          }}
+                                        >
+                                          {commentsToggleLabel}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={styles.moreMenuItem}
+                                          role="menuitem"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleHideLikeCount();
+                                          }}
+                                        >
+                                          {hideLikeToggleLabel}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={styles.moreMenuItem}
+                                          role="menuitem"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            copyLink();
+                                          }}
+                                        >
+                                          Copy link
+                                        </button>
+                                        {item.repostOf ? (
                                           <button
                                             type="button"
                                             className={styles.moreMenuItem}
                                             role="menuitem"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              handleEditPost();
+                                              handleGoReel();
                                             }}
                                           >
-                                            Edit Reel
+                                            Go to this reel
                                           </button>
+                                        ) : null}
+                                        <button
+                                          type="button"
+                                          className={`${styles.moreMenuItem} ${styles.moreMenuDanger}`}
+                                          role="menuitem"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeletePost();
+                                          }}
+                                        >
+                                          Delete reel
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button
+                                          type="button"
+                                          className={styles.moreMenuItem}
+                                          role="menuitem"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSaveFromMenu();
+                                          }}
+                                        >
+                                          {activeSaved
+                                            ? "Unsave this reel"
+                                            : "Save this reel"}
+                                        </button>
+                                        {item.authorId ? (
                                           <button
                                             type="button"
                                             className={styles.moreMenuItem}
                                             role="menuitem"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              openVisibilityModal();
+                                              handleFollowFromMenu();
                                             }}
                                           >
-                                            Edit visibility
+                                            {activeFollowing
+                                              ? "Unfollow"
+                                              : "Follow"}
                                           </button>
+                                        ) : null}
+                                        {allowDownloads ? (
                                           <button
                                             type="button"
                                             className={styles.moreMenuItem}
                                             role="menuitem"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              handleMuteNotifications();
+                                              handleDownloadCurrentMedia();
                                             }}
                                           >
-                                            Mute notifications
+                                            Download
                                           </button>
+                                        ) : null}
+                                        <button
+                                          type="button"
+                                          className={styles.moreMenuItem}
+                                          role="menuitem"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleReportFromMenu();
+                                          }}
+                                        >
+                                          Report
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={styles.moreMenuItem}
+                                          role="menuitem"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            copyLink();
+                                          }}
+                                        >
+                                          Copy link
+                                        </button>
+                                        {item.repostOf ? (
                                           <button
                                             type="button"
                                             className={styles.moreMenuItem}
                                             role="menuitem"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              toggleAllowComments();
+                                              handleGoReel();
                                             }}
                                           >
-                                            {commentsToggleLabel}
+                                            Go to this reel
                                           </button>
-                                          <button
-                                            type="button"
-                                            className={styles.moreMenuItem}
-                                            role="menuitem"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              toggleHideLikeCount();
-                                            }}
-                                          >
-                                            {hideLikeToggleLabel}
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className={styles.moreMenuItem}
-                                            role="menuitem"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              copyLink();
-                                            }}
-                                          >
-                                            Copy link
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className={`${styles.moreMenuItem} ${styles.moreMenuDanger}`}
-                                            role="menuitem"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDeletePost();
-                                            }}
-                                          >
-                                            Delete reel
-                                          </button>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <button
-                                            type="button"
-                                            className={styles.moreMenuItem}
-                                            role="menuitem"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleSaveFromMenu();
-                                            }}
-                                          >
-                                            {activeSaved
-                                              ? "Unsave this reel"
-                                              : "Save this reel"}
-                                          </button>
-                                          {item.authorId ? (
-                                            <button
-                                              type="button"
-                                              className={styles.moreMenuItem}
-                                              role="menuitem"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleFollowFromMenu();
-                                              }}
-                                            >
-                                              {activeFollowing
-                                                ? "Unfollow"
-                                                : "Follow"}
-                                            </button>
-                                          ) : null}
-                                          {allowDownloads ? (
-                                            <button
-                                              type="button"
-                                              className={styles.moreMenuItem}
-                                              role="menuitem"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDownloadCurrentMedia();
-                                              }}
-                                            >
-                                              Download
-                                            </button>
-                                          ) : null}
-                                          <button
-                                            type="button"
-                                            className={styles.moreMenuItem}
-                                            role="menuitem"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleReportFromMenu();
-                                            }}
-                                          >
-                                            Report
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className={styles.moreMenuItem}
-                                            role="menuitem"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              copyLink();
-                                            }}
-                                          >
-                                            Copy link
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className={styles.moreMenuItem}
-                                            role="menuitem"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleGoProfile();
-                                            }}
-                                          >
-                                            Go to this profile
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  ) : null}
-                                </div>
-                              </ReelVideo>
+                                        ) : null}
+                                        <button
+                                          type="button"
+                                          className={styles.moreMenuItem}
+                                          role="menuitem"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleGoProfile();
+                                          }}
+                                        >
+                                          Go to this profile
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </ReelVideo>
+                            <div
+                              style={{
+                                opacity: isActive ? 1 : 0,
+                                transition: "opacity 0.2s",
+                                pointerEvents: isActive ? "auto" : "none",
+                              }}
+                            >
                               <ReelActions
                                 item={item}
                                 onLike={handleLike}
@@ -2450,68 +2993,306 @@ export default function ReelPage() {
                               />
                             </div>
                           </div>
-                          <div className={styles.navColumn}>
-                            <button
-                              className={styles.navBtn}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                goPrev();
-                              }}
-                              disabled={activeIndex <= 0}
-                              aria-label="Previous reel"
-                            >
-                              <IconArrow up />
-                            </button>
-                            <button
-                              className={styles.navBtn}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                goNext();
-                              }}
-                              disabled={activeIndex >= items.length - 1}
-                              aria-label="Next reel"
-                            >
-                              <IconArrow />
-                            </button>
-                          </div>
-                          {commentsRender && commentReelId ? (
-                            <ReelComments
-                              open={commentsOpen}
-                              postId={commentReelId}
-                              token={token}
-                              panelRef={commentPanelRef}
-                              viewerId={viewerId}
-                              postAuthorId={item.authorId}
-                              allowComments={item.allowComments}
-                              initialCount={item.stats?.comments}
-                              onTotalChange={handleCommentTotal}
-                              onClose={() => {
-                                setCommentsOpen(false);
-                              }}
-                            />
-                          ) : null}
                         </div>
-                      ) : (
-                        <div className={styles.stageGhost}>
-                          <div className={styles.videoColumn}>
-                            <div className={styles.reelWrapper}>
-                              <ReelVideo
-                                item={item}
-                                autoplay={false}
-                                onViewed={(ms) => handleViewed(item.id, ms)}
-                              />
-                            </div>
-                          </div>
+                        <div
+                          className={styles.navColumn}
+                          style={{
+                            opacity: isActive ? 1 : 0,
+                            transition: "opacity 0.2s",
+                            pointerEvents: isActive ? "auto" : "none",
+                          }}
+                        >
+                          <button
+                            className={styles.navBtn}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              goPrev();
+                            }}
+                            disabled={activeIndex <= 0}
+                            aria-label="Previous reel"
+                          >
+                            <IconArrow up />
+                          </button>
+                          <button
+                            className={styles.navBtn}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              goNext();
+                            }}
+                            disabled={activeIndex >= items.length - 1}
+                            aria-label="Next reel"
+                          >
+                            <IconArrow />
+                          </button>
                         </div>
-                      )}
+                      </div>
                     </div>
                   );
                 })}
               </div>
+              {showComments && commentTarget ? (
+                <ReelComments
+                  open={Boolean(commentsOpen)}
+                  postId={commentTarget.id}
+                  token={token}
+                  panelRef={commentPanelRef}
+                  viewerId={viewerId}
+                  postAuthorId={commentTarget.authorId}
+                  allowComments={commentTarget.allowComments}
+                  initialCount={commentTarget.stats?.comments}
+                  onTotalChange={handleCommentTotal}
+                  style={commentDockStyle}
+                  onClose={() => {
+                    setCommentsOpen(false);
+                  }}
+                />
+              ) : null}
             </div>
           )}
         </div>
       </div>
+
+      {quoteOpen && repostTarget ? (
+        <div
+          className={`${feedStyles.modalOverlay} ${
+            repostClosing
+              ? feedStyles.modalOverlayClosing
+              : feedStyles.modalOverlayOpen
+          }`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeRepostModal}
+        >
+          <div
+            className={`${feedStyles.modalCard} ${feedStyles.repostCard} ${
+              repostClosing
+                ? feedStyles.modalCardClosing
+                : feedStyles.modalCardOpen
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className={`${feedStyles.modalHeader} ${feedStyles.repostHeader}`}
+            >
+              <div>
+                <h3 className={feedStyles.modalTitle}>Quote</h3>
+                <p className={feedStyles.repostSub}>
+                  {`Quoting @${repostTarget.label}'s ${repostTarget.kind}`}
+                </p>
+              </div>
+              <button
+                className={feedStyles.closeBtn}
+                onClick={closeRepostModal}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <label className={feedStyles.repostNoteLabel}>
+              Caption
+              <div className={feedStyles.editTextareaShell}>
+                <textarea
+                  className={feedStyles.repostTextarea}
+                  value={repostNote}
+                  onChange={(e) => setRepostNote(e.target.value)}
+                  maxLength={QUOTE_CHAR_LIMIT}
+                  placeholder="Add your thoughts..."
+                />
+                <span className={feedStyles.charCount}>
+                  {repostNote.length}/{QUOTE_CHAR_LIMIT}
+                </span>
+              </div>
+            </label>
+
+            <div className={feedStyles.editField}>
+              <div className={feedStyles.editLabelRow}>
+                <span className={feedStyles.editLabelText}>Visibility</span>
+              </div>
+              <div className={feedStyles.visibilityList}>
+                {quoteVisibilityOptions.map((opt) => {
+                  const active = quoteVisibility === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      className={`${feedStyles.visibilityOption} ${
+                        active ? feedStyles.visibilityOptionActive : ""
+                      }`}
+                      onClick={() => setQuoteVisibility(opt.value)}
+                    >
+                      <span className={feedStyles.visibilityRadio}>
+                        {active ? "✓" : ""}
+                      </span>
+                      <span className={feedStyles.visibilityCopy}>
+                        <span className={feedStyles.visibilityTitle}>
+                          {opt.title}
+                        </span>
+                        <span className={feedStyles.visibilityDesc}>
+                          {opt.description}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className={feedStyles.switchGroup}>
+              <label className={feedStyles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={quoteAllowComments}
+                  onChange={() => setQuoteAllowComments((prev) => !prev)}
+                />
+                <div>
+                  <p className={feedStyles.switchTitle}>Allow comments</p>
+                  <p className={feedStyles.switchHint}>
+                    People can reply to your quote
+                  </p>
+                </div>
+              </label>
+
+              <label className={feedStyles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={quoteAllowDownload}
+                  onChange={() => setQuoteAllowDownload((prev) => !prev)}
+                />
+                <div>
+                  <p className={feedStyles.switchTitle}>Allow downloads</p>
+                  <p className={feedStyles.switchHint}>
+                    Let followers save the media from the original post
+                  </p>
+                </div>
+              </label>
+
+              <label className={feedStyles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={quoteHideLikeCount}
+                  onChange={() => setQuoteHideLikeCount((prev) => !prev)}
+                />
+                <div>
+                  <p className={feedStyles.switchTitle}>Hide like</p>
+                  <p className={feedStyles.switchHint}>
+                    Only you will see like counts on this quote
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div className={feedStyles.editField}>
+              <div className={feedStyles.editLabelRow}>
+                <span className={feedStyles.editLabelText}>Location</span>
+              </div>
+              <input
+                className={feedStyles.editInput}
+                placeholder="Add a place"
+                value={quoteLocation}
+                onChange={(e) => setQuoteLocation(e.target.value)}
+              />
+            </div>
+
+            <div className={feedStyles.editField}>
+              <div className={feedStyles.editLabelRow}>
+                <span className={feedStyles.editLabelText}>Hashtags</span>
+              </div>
+              <div className={feedStyles.chipRow}>
+                {quoteHashtags.map((tag) => (
+                  <span key={tag} className={feedStyles.chip}>
+                    #{tag}
+                    <button
+                      type="button"
+                      className={feedStyles.chipRemove}
+                      onClick={() => removeQuoteHashtag(tag)}
+                      aria-label={`Remove ${tag}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  className={feedStyles.editInput}
+                  placeholder="Add hashtag"
+                  value={quoteHashtagDraft}
+                  onChange={(e) => setQuoteHashtagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === ",") {
+                      e.preventDefault();
+                      addQuoteHashtag();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            {repostError ? (
+              <div className={feedStyles.inlineError}>{repostError}</div>
+            ) : null}
+
+            <div className={feedStyles.modalActions}>
+              <button
+                className={feedStyles.modalSecondary}
+                onClick={closeRepostModal}
+                disabled={repostSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className={feedStyles.modalPrimary}
+                onClick={() => submitRepost("quote")}
+                disabled={repostSubmitting}
+              >
+                {repostSubmitting ? "Sharing..." : "Share quote"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {repostTarget && !quoteOpen ? (
+        <div
+          className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeRepostModal}
+        >
+          <div
+            className={feedStyles.repostSheet}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={feedStyles.repostSheetHeader}>
+              <p className={feedStyles.repostSheetTitle}>Repost</p>
+              <p className={feedStyles.repostSheetSubtitle}>
+                {`@${repostTarget.label} · ${repostTarget.kind}`}
+              </p>
+            </div>
+            <div className={feedStyles.repostSheetList} role="menu">
+              <button
+                className={`${feedStyles.repostSheetItem} ${feedStyles.repostSheetPrimary}`}
+                onClick={handleQuickRepost}
+                disabled={repostSubmitting}
+              >
+                Repost
+              </button>
+              <button
+                className={feedStyles.repostSheetItem}
+                onClick={openQuoteComposer}
+                disabled={repostSubmitting}
+              >
+                Quote
+              </button>
+              <button
+                className={feedStyles.repostSheetItem}
+                onClick={closeRepostModal}
+                disabled={repostSubmitting}
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {toastMessage ? (
         <div className={postStyles.toast} role="status" aria-live="polite">
@@ -3010,7 +3791,7 @@ export default function ReelPage() {
                         setReportReason(
                           group.reasons.length === 1
                             ? group.reasons[0].key
-                            : null
+                            : null,
                         );
                       }}
                     >

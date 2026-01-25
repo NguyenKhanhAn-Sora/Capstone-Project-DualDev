@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,8 +9,12 @@ import {
   Post,
   Query,
   Req,
+  UnauthorizedException,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/jwt.strategy';
@@ -17,6 +22,13 @@ import { CommentsService } from './comments.service';
 import { CreateCommentDto } from '../comment/dto/create-comment.dto';
 import { DeleteCommentDto } from './dto/delete-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
+
+type UploadedFile = {
+  originalname: string;
+  mimetype: string;
+  buffer: Buffer;
+  size: number;
+};
 
 @Controller('posts/:postId/comments')
 @UseGuards(JwtAuthGuard)
@@ -47,6 +59,37 @@ export class CommentsController {
   ) {
     const user = req.user as AuthenticatedUser | undefined;
     return this.commentsService.create(user?.userId ?? '', postId, dto);
+  }
+
+  @Post('upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: Number(
+          process.env.CLOUDINARY_MAX_FILE_SIZE ?? 15 * 1024 * 1024,
+        ),
+      },
+    }),
+  )
+  async uploadMedia(
+    @Req() req: Request,
+    @Param('postId') postId: string,
+    @UploadedFile() file: UploadedFile | undefined,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    if (!file) {
+      throw new BadRequestException('Missing file');
+    }
+    if (
+      !file.mimetype.startsWith('image/') &&
+      !file.mimetype.startsWith('video/')
+    ) {
+      throw new BadRequestException('Only image or video files are allowed');
+    }
+    return this.commentsService.uploadMedia(user.userId, postId, file);
   }
 
   @Post(':commentId/like')

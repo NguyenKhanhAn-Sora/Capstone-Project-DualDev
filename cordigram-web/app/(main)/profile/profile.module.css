@@ -3,7 +3,8 @@
   display: flex;
   justify-content: center;
   padding: 48px 16px 64px;
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 20% 20%,
       rgba(120, 149, 255, 0.08),
       transparent 30%
@@ -27,7 +28,9 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 22px;
   padding: 28px;
-  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.28), 0 2px 10px rgba(0, 0, 0, 0.18);
+  box-shadow:
+    0 25px 70px rgba(0, 0, 0, 0.28),
+    0 2px 10px rgba(0, 0, 0, 0.18);
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -36,7 +39,8 @@
 :global([data-theme="light"]) .card {
   background: linear-gradient(160deg, #ffffff, #f5f7fb);
   border: 1px solid var(--color-border);
-  box-shadow: 0 18px 50px rgba(15, 22, 41, 0.12),
+  box-shadow:
+    0 18px 50px rgba(15, 22, 41, 0.12),
     0 2px 10px rgba(15, 22, 41, 0.08);
 }
 
@@ -71,6 +75,39 @@
   border-radius: 50%;
   background: var(--color-surface-muted);
   border: 2px solid rgba(255, 255, 255, 0.04);
+}
+
+.avatarRingButton {
+  border: none;
+  background: transparent;
+  padding: 5px;
+  cursor: pointer;
+  position: relative;
+}
+
+.avatarRingButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+}
+
+.avatarEditBadge {
+  position: absolute;
+  right: 8px;
+  bottom: 10px;
+  background: rgba(10, 15, 28, 0.72);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+:global([data-theme="light"]) .avatarEditBadge {
+  background: rgba(15, 22, 41, 0.75);
+}
+
+.avatarFileInput {
+  display: none;
 }
 
 .identity {
@@ -130,8 +167,12 @@
   font-weight: 700;
   font-size: 15px;
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease,
-    border-color 120ms ease, color 120ms ease;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
 .primaryButton {
@@ -273,7 +314,8 @@
   top: calc(100% + 10px);
   right: 0;
   min-width: 170px;
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 20% 20%,
       rgba(255, 255, 255, 0.04),
       transparent 40%
@@ -306,7 +348,9 @@
   padding: 10px 12px;
   border-radius: 10px;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .menuItem:hover {
@@ -349,6 +393,156 @@
   padding: 22px;
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.28);
   color: var(--color-title-primary);
+}
+
+
+.modalPrimaryAccent:hover {
+  transform: translateY(-1px);
+}
+
+.avatarMenuCard {
+  width: min(360px, 92vw);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.28);
+}
+
+.avatarMenuItem {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: var(--color-surface-muted);
+  color: var(--color-title-primary);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+.avatarMenuItem:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:global([data-theme="light"]) .avatarMenuItem:hover {
+  background: var(--color-surface);
+}
+
+.avatarMenuDanger {
+  color: #ef4444;
+}
+
+.avatarCropCard {
+  width: min(860px, 94vw);
+}
+
+.avatarCropHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.avatarCropGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr);
+  gap: 14px;
+}
+
+.avatarCropperCard {
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface-muted);
+  padding: 12px;
+  min-height: 280px;
+}
+
+.cropperWrapper {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  background: rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.avatarPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 320px;
+  border: 1px dashed var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.avatarCropControls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sliderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sliderRow input[type="range"] {
+  flex: 1;
+  accent-color: #7f9bff;
+}
+
+.sliderLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-title-primary);
+}
+
+.sliderValue {
+  font-size: 12px;
+  font-weight: 700;
+  color: #7f9bff;
+}
+
+.avatarThumbSmall {
+  width: 96px;
+  height: 96px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 2px solid #7bd8ff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+.avatarThumbSmall img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarCropActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 860px) {
+  .avatarCropGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .modalCardOpen {
@@ -408,7 +602,8 @@
 }
 
 .modalSecondary,
-.modalPrimary {
+.modalPrimary,
+.modalPrimaryAccent {
   border: 1px solid var(--color-border);
   background: transparent;
   color: var(--color-title-primary);
@@ -417,8 +612,17 @@
   cursor: pointer;
   font-weight: 700;
   min-width: 120px;
-  transition: transform 120ms ease, border-color 120ms ease,
-    background 120ms ease, color 120ms ease;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.modalPrimaryAccent {
+  background: linear-gradient(120deg, #6ddcff, #7f9bff);
+  color: var(--color-text);
+  border: none;
 }
 
 .modalSecondary:hover,
@@ -459,7 +663,10 @@
   padding: 10px 12px;
   color: var(--color-title-primary);
   cursor: pointer;
-  transition: transform 120ms ease, border 120ms ease, box-shadow 120ms ease;
+  transition:
+    transform 120ms ease,
+    border 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .categoryCard:hover {
@@ -513,7 +720,9 @@
   background: transparent;
   color: var(--color-title-primary);
   cursor: pointer;
-  transition: background 120ms ease, border 120ms ease;
+  transition:
+    background 120ms ease,
+    border 120ms ease;
   text-align: left;
 }
 
@@ -588,7 +797,10 @@
   color: var(--color-text-muted);
   padding: 6px;
   cursor: pointer;
-  transition: color 120ms ease, transform 120ms ease, border 120ms ease;
+  transition:
+    color 120ms ease,
+    transform 120ms ease,
+    border 120ms ease;
 }
 
 .closeBtn:hover {
@@ -654,7 +866,10 @@
   font-weight: 800;
   font-size: 15px;
   box-shadow: 0 14px 34px rgba(79, 70, 229, 0.3);
-  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
 }
 
 .blockedButton:hover {
@@ -774,7 +989,9 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: color 120ms ease, transform 120ms ease;
+  transition:
+    color 120ms ease,
+    transform 120ms ease;
   border-radius: 12px;
   text-align: center;
 }

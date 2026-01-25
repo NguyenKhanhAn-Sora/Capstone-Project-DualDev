@@ -163,7 +163,10 @@
   background: linear-gradient(120deg, #559ac2 0%, #3470a2 55%, #9aacef 100%);
   color: #ffffff;
   box-shadow: 0 8px 24px rgba(52, 112, 162, 0.38);
-  transition: transform 3000ms ease, box-shadow 300ms ease, filter 300ms ease;
+  transition:
+    transform 3000ms ease,
+    box-shadow 300ms ease,
+    filter 300ms ease;
 }
 
 .primary-button:hover {
@@ -194,7 +197,9 @@
   color: #0f172a;
   background: #ffffff;
   box-shadow: 0 2px 6px rgba(17, 24, 39, 0.04);
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease;
 }
 
 .passwordField {
@@ -241,7 +246,9 @@
   color: #0f172a;
   background: #ffffff;
   box-shadow: 0 2px 6px rgba(17, 24, 39, 0.04);
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease;
   resize: vertical;
 }
 
@@ -249,6 +256,112 @@
   outline: none;
   border-color: #559ac2;
   box-shadow: 0 0 0 4px rgba(154, 172, 239, 0.35);
+}
+
+.locationCombo {
+  position: relative;
+}
+
+.locationInputShell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #d7e5f2;
+  background: #ffffff;
+  padding: 0 10px;
+  box-shadow: 0 2px 6px rgba(17, 24, 39, 0.04);
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.locationInputShell:focus-within {
+  outline: none;
+  border-color: #559ac2;
+  box-shadow: 0 0 0 4px rgba(154, 172, 239, 0.35);
+}
+
+.locationInputShell input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.locationButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #d7e5f2;
+  background: #f2f6fb;
+  color: #3470a2;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.locationButton:hover:not(:disabled) {
+  border-color: #3470a2;
+  box-shadow: 0 8px 18px rgba(52, 112, 162, 0.18);
+}
+
+.locationButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.locationSuggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #d7e5f2;
+  border-radius: 12px;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
+  z-index: 12;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.locationSuggestion {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  color: #1e293b;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  transition: background 120ms ease;
+}
+
+.locationSuggestion:hover,
+.locationSuggestionActive {
+  background: #f8fbff;
+}
+
+.locationSuggestionText {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.locationSuggestionMuted {
+  padding: 10px 12px;
+  color: #6b7280;
+  font-size: 14px;
 }
 
 .dateInputWrapper {
@@ -297,11 +410,67 @@
   color: #5b718f;
 }
 
+.radioGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.radioPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #d7e5f2;
+  border-radius: 12px;
+  background: #ffffff;
+  font-weight: 700;
+  color: #2f3b4a;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(17, 24, 39, 0.04);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.radioPill input {
+  accent-color: #3470a2;
+}
+
+.radioPill:hover {
+  border-color: #3470a2;
+  transform: translateY(-1px);
+}
+
+.radioPillActive {
+  border-color: #3470a2;
+  color: #1e293b;
+}
+
 .cardHeader {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+  position: relative;
+}
+
+.backButton {
+  position: absolute;
+  left: -40px;
+  top: -0px;
+  width: 38px;
+  height: 38px;
+  color: #000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.backButton:active {
+  transform: translateY(0px) scale(0.98);
 }
 
 .stepper {
@@ -412,7 +581,10 @@
   background: linear-gradient(120deg, #559ac2 0%, #3470a2 55%, #9aacef 100%);
   color: #ffffff;
   box-shadow: 0 8px 24px rgba(52, 112, 162, 0.38);
-  transition: transform 300ms ease, box-shadow 300ms ease, filter 300ms ease;
+  transition:
+    transform 300ms ease,
+    box-shadow 300ms ease,
+    filter 300ms ease;
   border: none;
   height: 44px;
   width: 100%;
@@ -450,7 +622,10 @@
   font-weight: 700;
   color: #1f2937;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
-  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease;
 }
 
 .oauthButton:hover {
@@ -639,6 +814,14 @@
 .avatarActions {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.avatarActions > .ghostButton,
+.avatarActions > .primaryButton {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
 }
 
 .ghostButton {

@@ -208,6 +208,7 @@
   color: #ffffff;
   box-shadow: 0 8px 24px rgba(52, 112, 162, 0.38);
   transition: transform 3000ms ease, box-shadow 300ms ease, filter 300ms ease;
+  cursor: pointer;
 }
 
 .primary-button:hover {

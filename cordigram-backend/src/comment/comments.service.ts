@@ -15,6 +15,15 @@ import { BlocksService } from '../users/blocks.service';
 import { Profile } from '../profiles/profile.schema';
 import { DeleteCommentDto } from './dto/delete-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { ConfigService } from '../config/config.service';
+
+type UploadedFile = {
+  originalname: string;
+  mimetype: string;
+  buffer: Buffer;
+  size: number;
+};
 
 @Injectable()
 export class CommentsService {
@@ -28,6 +37,8 @@ export class CommentsService {
     @InjectModel(Profile.name)
     private readonly profileModel: Model<Profile>,
     private readonly blocksService: BlocksService,
+    private readonly cloudinary: CloudinaryService,
+    private readonly config: ConfigService,
   ) {}
 
   async create(userId: string, postId: string, dto: CreateCommentDto) {
@@ -49,9 +60,10 @@ export class CommentsService {
       throw new ForbiddenException();
     }
 
-    const content = dto.content?.trim?.();
-    if (!content) {
-      throw new BadRequestException('Comment content is required');
+    const content = dto.content?.trim?.() ?? '';
+    const media = dto.media ?? null;
+    if (!content && !media) {
+      throw new BadRequestException('Comment content or media is required');
     }
 
     let parentId: Types.ObjectId | null = null;
@@ -74,10 +86,14 @@ export class CommentsService {
       rootCommentId = parent.rootCommentId ?? parent._id;
     }
 
+    const mentions = this.normalizeMentions(dto.mentions, content);
+
     const created = await this.commentModel.create({
       postId: postObjectId,
       authorId: userObjectId,
       content,
+      mentions,
+      media,
       parentId,
       rootCommentId,
       deletedAt: null,
@@ -438,7 +454,9 @@ export class CommentsService {
 
     const comment = await this.commentModel
       .findOne({ _id: commentObjectId, postId: postObjectId, deletedAt: null })
-      .select('_id authorId content createdAt updatedAt parentId rootCommentId')
+      .select(
+        '_id authorId content media createdAt updatedAt parentId rootCommentId mentions',
+      )
       .lean();
 
     if (!comment) {
@@ -449,15 +467,33 @@ export class CommentsService {
       throw new ForbiddenException('Not allowed to edit this comment');
     }
 
-    const content = dto.content?.trim?.();
-    if (!content) {
-      throw new BadRequestException('Comment content is required');
+    const hasIncomingContent = typeof dto.content === 'string';
+    const nextContent = hasIncomingContent
+      ? (dto.content ?? '').trim()
+      : (comment.content ?? '');
+    const nextMedia =
+      dto.media === undefined ? ((comment as any).media ?? null) : dto.media;
+
+    if (!nextContent && !nextMedia) {
+      throw new BadRequestException('Comment content or media is required');
     }
+
+    const mentions = this.normalizeMentions(
+      dto.mentions ?? comment.mentions ?? [],
+      nextContent,
+    );
 
     await this.commentModel
       .updateOne(
         { _id: commentObjectId },
-        { $set: { content, updatedAt: new Date() } },
+        {
+          $set: {
+            content: nextContent,
+            mentions,
+            media: nextMedia,
+            updatedAt: new Date(),
+          },
+        },
       )
       .exec();
 
@@ -469,7 +505,9 @@ export class CommentsService {
     return this.toResponse(
       {
         ...comment,
-        content,
+        content: nextContent,
+        mentions,
+        media: nextMedia,
         updatedAt: new Date(),
       },
       profile || null,
@@ -501,6 +539,24 @@ export class CommentsService {
           }
         : undefined,
       content: comment.content,
+      mentions: Array.isArray(comment.mentions)
+        ? comment.mentions.map((m) => {
+            if (typeof m === 'string') {
+              return { username: m };
+            }
+            return {
+              userId: (m as any)?.userId?.toString?.(),
+              username: (m as any)?.username,
+            };
+          })
+        : [],
+      media: comment.media
+        ? {
+            type: (comment as any).media?.type,
+            url: (comment as any).media?.url,
+            metadata: (comment as any).media?.metadata ?? null,
+          }
+        : null,
       parentId: comment.parentId?.toString?.() ?? null,
       rootCommentId: comment.rootCommentId?.toString?.() ?? null,
       createdAt: (comment as { createdAt?: Date }).createdAt,
@@ -511,10 +567,131 @@ export class CommentsService {
     };
   }
 
+  async uploadMedia(userId: string, postId: string, file: UploadedFile) {
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    if (!file) {
+      throw new BadRequestException('Missing file');
+    }
+
+    const userObjectId = this.asObjectId(userId, 'userId');
+    const postObjectId = this.asObjectId(postId, 'postId');
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('allowComments')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (post.allowComments === false) {
+      throw new ForbiddenException('Comments are disabled');
+    }
+
+    return this.uploadSingle(userObjectId.toString(), file);
+  }
+
+  private buildUploadFolder(authorId: string): string {
+    const now = new Date();
+    const parts = [
+      this.config.cloudinaryFolder,
+      'comments',
+      authorId,
+      now.getFullYear().toString(),
+      `${now.getMonth() + 1}`.padStart(2, '0'),
+    ].filter(Boolean);
+
+    return parts.join('/');
+  }
+
+  private async uploadSingle(authorId: string, file: UploadedFile) {
+    const resourceType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+    const folder = this.buildUploadFolder(authorId);
+
+    const upload = await this.cloudinary.uploadBuffer({
+      buffer: file.buffer,
+      folder,
+      resourceType,
+      overwrite: false,
+    });
+
+    return {
+      folder,
+      url: upload.url,
+      secureUrl: upload.secureUrl,
+      publicId: upload.publicId,
+      resourceType: upload.resourceType,
+      bytes: upload.bytes,
+      format: upload.format,
+      width: upload.width,
+      height: upload.height,
+      duration: upload.duration,
+    };
+  }
+
   private asObjectId(id: string, field: string): Types.ObjectId {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException(`Invalid ${field}`);
     }
     return new Types.ObjectId(id);
+  }
+
+  private normalizeMentions(raw: unknown, content: string) {
+    type Mention = { userId?: string; username?: string };
+    const map = new Map<string, Mention>();
+
+    if (Array.isArray(raw)) {
+      raw.forEach((val) => {
+        if (typeof val === 'string') {
+          const username = val.trim().replace(/^@/, '').toLowerCase();
+          if (username && /^[a-z0-9_.]{1,30}$/i.test(username)) {
+            const existing = map.get(username) ?? {};
+            map.set(username, { ...existing, username });
+          }
+          return;
+        }
+
+        if (val && typeof val === 'object') {
+          const username = (val as any).username?.toString?.().trim?.();
+          const userId = (val as any).userId?.toString?.();
+          if (username && /^[a-z0-9_.]{1,30}$/i.test(username)) {
+            const key = username.toLowerCase();
+            const existing = map.get(key) ?? {};
+            map.set(key, {
+              username: key,
+              userId:
+                userId && Types.ObjectId.isValid(userId)
+                  ? new Types.ObjectId(userId).toString()
+                  : existing.userId,
+            });
+          }
+        }
+      });
+    }
+
+    const regex = /@([a-zA-Z0-9_.]{1,30})/g;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(content))) {
+      const username = match[1].toLowerCase();
+      const existing = map.get(username) ?? {};
+      map.set(username, { ...existing, username });
+    }
+
+    return Array.from(map.entries())
+      .slice(0, 20)
+      .map(([username, value]) => {
+        const userId =
+          value.userId && Types.ObjectId.isValid(value.userId)
+            ? new Types.ObjectId(value.userId)
+            : undefined;
+        return {
+          userId,
+          username,
+        };
+      });
   }
 }

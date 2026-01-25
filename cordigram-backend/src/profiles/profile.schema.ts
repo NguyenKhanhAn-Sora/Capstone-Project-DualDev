@@ -36,6 +36,13 @@ export class Profile extends Document {
   @Prop({ default: '' })
   location: string;
 
+  @Prop({
+    type: String,
+    enum: ['male', 'female', 'other', ''],
+    default: '',
+  })
+  gender: 'male' | 'female' | 'other' | '';
+
   @Prop({ type: Object, default: {} })
   links: Record<string, string>;
 

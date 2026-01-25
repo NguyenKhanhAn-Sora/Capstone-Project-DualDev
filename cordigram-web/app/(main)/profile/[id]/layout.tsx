@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import styles from "../profile.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
@@ -11,10 +11,15 @@ import {
   followUser,
   reportUser,
   unfollowUser,
+  fetchUserPosts,
+  fetchUserReels,
   type ProfileDetailResponse,
+  resetProfileAvatar,
+  uploadProfileAvatar,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import { ProfileProvider } from "./profile-context";
+import Cropper, { Area } from "react-easy-crop";
 
 const compactFormatter = new Intl.NumberFormat("en", {
   notation: "compact",
@@ -112,6 +117,85 @@ const USER_REPORT_GROUPS: UserReportCategory[] = [
 ];
 
 const REPORT_MODAL_MS = 200;
+const DEFAULT_AVATAR_URL =
+  "https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg";
+
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = (err) => reject(err);
+    img.src = src;
+  });
+}
+
+async function getCroppedBlob(
+  imageSrc: string,
+  croppedAreaPixels: Area,
+): Promise<Blob> {
+  const image = await loadImage(imageSrc);
+  const canvas = document.createElement("canvas");
+  canvas.width = croppedAreaPixels.width;
+  canvas.height = croppedAreaPixels.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas not supported");
+  }
+
+  ctx.drawImage(
+    image,
+    croppedAreaPixels.x,
+    croppedAreaPixels.y,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+    0,
+    0,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+  );
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Failed to crop image"));
+          return;
+        }
+        resolve(blob);
+      },
+      "image/jpeg",
+      0.9,
+    );
+  });
+}
+
+async function getCroppedDataUrl(
+  imageSrc: string,
+  croppedAreaPixels: Area,
+): Promise<string> {
+  const image = await loadImage(imageSrc);
+  const canvas = document.createElement("canvas");
+  canvas.width = croppedAreaPixels.width;
+  canvas.height = croppedAreaPixels.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas not supported");
+  }
+
+  ctx.drawImage(
+    image,
+    croppedAreaPixels.x,
+    croppedAreaPixels.y,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+    0,
+    0,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+  );
+
+  return canvas.toDataURL("image/jpeg", 0.9);
+}
 
 export default function ProfileLayout({
   children,
@@ -149,11 +233,25 @@ export default function ProfileLayout({
   const [reportError, setReportError] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportClosing, setReportClosing] = useState(false);
+  const [authoredCount, setAuthoredCount] = useState<number | null>(null);
   const reportHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [avatarConfirmOpen, setAvatarConfirmOpen] = useState(false);
+  const [avatarCropOpen, setAvatarCropOpen] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarThumb, setAvatarThumb] = useState<string | null>(null);
+  const [crop, setCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [avatarSubmitting, setAvatarSubmitting] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const selectedReportGroup = useMemo(
     () => USER_REPORT_GROUPS.find((g) => g.key === reportCategory),
-    [reportCategory]
+    [reportCategory],
   );
+  const isOwner = profile && viewerId && profile.userId === viewerId;
 
   useEffect(() => {
     if (!canRender) return;
@@ -199,6 +297,24 @@ export default function ProfileLayout({
   }, [canRender, profileId]);
 
   useEffect(() => {
+    const token = getStoredAccessToken();
+    const ownerId = profile?.userId;
+    if (!token || !ownerId) return;
+    setAuthoredCount(null);
+    Promise.all([
+      fetchUserPosts({ token, userId: ownerId, limit: 200 }),
+      fetchUserReels({ token, userId: ownerId, limit: 200 }),
+    ])
+      .then(([posts, reels]) => {
+        const originals = [...(posts || []), ...(reels || [])].filter(
+          (item) => !item?.repostOf,
+        );
+        setAuthoredCount(originals.length);
+      })
+      .catch(() => setAuthoredCount(null));
+  }, [profile?.userId]);
+
+  useEffect(() => {
     if (!menuOpen) return;
     const handleClick = (event: MouseEvent) => {
       const target = event.target as Node | null;
@@ -228,6 +344,25 @@ export default function ProfileLayout({
     };
   }, []);
 
+  useEffect(() => {
+    if (!avatarPreview || !croppedAreaPixels) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const dataUrl = await getCroppedDataUrl(
+          avatarPreview,
+          croppedAreaPixels,
+        );
+        if (!cancelled) setAvatarThumb(dataUrl);
+      } catch (_err) {
+        if (!cancelled) setAvatarThumb(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [avatarPreview, croppedAreaPixels]);
+
   const handleFollowToggle = async () => {
     if (!profile || followLoading) return;
     const token = getStoredAccessToken();
@@ -253,11 +388,11 @@ export default function ProfileLayout({
                 ...prev.stats,
                 followers: Math.max(
                   0,
-                  prev.stats.followers + (nextFollow ? 1 : -1)
+                  prev.stats.followers + (nextFollow ? 1 : -1),
                 ),
               },
             }
-          : prev
+          : prev,
       );
     } catch (err) {
       const message =
@@ -441,6 +576,149 @@ export default function ProfileLayout({
     }
   };
 
+  const resetAvatarSelection = () => {
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setAvatarThumb(null);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
+  };
+
+  const openAvatarMenu = () => {
+    if (!isOwner) return;
+    setAvatarError("");
+    setAvatarMenuOpen(true);
+  };
+
+  const closeAvatarMenu = () => {
+    setAvatarMenuOpen(false);
+  };
+
+  const openAvatarCrop = () => {
+    setAvatarError("");
+    setAvatarCropOpen(true);
+  };
+
+  const closeAvatarCrop = () => {
+    if (avatarSubmitting) return;
+    setAvatarCropOpen(false);
+    resetAvatarSelection();
+  };
+
+  const openAvatarConfirm = () => {
+    setAvatarError("");
+    setAvatarConfirmOpen(true);
+  };
+
+  const closeAvatarConfirm = () => {
+    if (avatarSubmitting) return;
+    setAvatarConfirmOpen(false);
+  };
+
+  const handleAvatarUploadSelect = () => {
+    setAvatarMenuOpen(false);
+    avatarInputRef.current?.click();
+  };
+
+  const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setAvatarPreview(result);
+        openAvatarCrop();
+      }
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+
+  const handleSubmitAvatar = async () => {
+    if (avatarSubmitting) return;
+    const token = getStoredAccessToken();
+    if (!token) {
+      setAvatarError("Session expired. Please sign in again.");
+      return;
+    }
+    if (!avatarFile || !avatarPreview || !croppedAreaPixels) {
+      setAvatarError("Please select an image to upload");
+      return;
+    }
+
+    setAvatarSubmitting(true);
+    setAvatarError("");
+    try {
+      const croppedBlob = await getCroppedBlob(
+        avatarPreview,
+        croppedAreaPixels,
+      );
+      const form = new FormData();
+      form.append("original", avatarFile, avatarFile.name);
+      form.append(
+        "cropped",
+        new File([croppedBlob], `avatar-cropped-${Date.now()}.jpg`, {
+          type: "image/jpeg",
+        }),
+      );
+
+      const res = await uploadProfileAvatar({ token, form });
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              avatarUrl: res.avatarUrl,
+            }
+          : prev,
+      );
+      showToast("Avatar updated");
+      closeAvatarCrop();
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Unable to update avatar";
+      setAvatarError(message || "Unable to update avatar");
+    } finally {
+      setAvatarSubmitting(false);
+    }
+  };
+
+  const handleConfirmRemoveAvatar = async () => {
+    if (avatarSubmitting) return;
+    const token = getStoredAccessToken();
+    if (!token) {
+      setAvatarError("Session expired. Please sign in again.");
+      return;
+    }
+    setAvatarSubmitting(true);
+    setAvatarError("");
+    try {
+      const res = await resetProfileAvatar({ token });
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              avatarUrl: res.avatarUrl || DEFAULT_AVATAR_URL,
+            }
+          : prev,
+      );
+      showToast("Avatar removed");
+      closeAvatarConfirm();
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Unable to remove avatar";
+      setAvatarError(message || "Unable to remove avatar");
+    } finally {
+      setAvatarSubmitting(false);
+    }
+  };
+
   function BlockedProfile({ onHome }: { onHome: () => void }) {
     return (
       <div className={styles.blockedWrap}>
@@ -458,7 +736,9 @@ export default function ProfileLayout({
     );
   }
 
-  const isOwner = profile && viewerId && profile.userId === viewerId;
+  const statsOriginalFallback =
+    (profile?.stats?.posts ?? 0) + (profile?.stats?.reels ?? 0);
+  const displayedPostsCount = authoredCount ?? statsOriginalFallback;
 
   const navItems = isOwner
     ? [
@@ -510,14 +790,37 @@ export default function ProfileLayout({
           ) : profile ? (
             <ProfileProvider value={{ profile, viewerId }}>
               <div className={styles.header}>
-                <div className={styles.avatarRing}>
-                  <img
-                    src={profile.avatarUrl}
-                    alt={`${profile.displayName} avatar`}
-                    className={styles.avatarImg}
-                    loading="lazy"
-                  />
-                </div>
+                {isOwner ? (
+                  <button
+                    type="button"
+                    className={`${styles.avatarRing} ${styles.avatarRingButton}`}
+                    onClick={openAvatarMenu}
+                    aria-label="Change avatar"
+                  >
+                    <img
+                      src={profile.avatarUrl || DEFAULT_AVATAR_URL}
+                      alt={`${profile.displayName} avatar`}
+                      className={styles.avatarImg}
+                      loading="lazy"
+                    />
+                  </button>
+                ) : (
+                  <div className={styles.avatarRing}>
+                    <img
+                      src={profile.avatarUrl || DEFAULT_AVATAR_URL}
+                      alt={`${profile.displayName} avatar`}
+                      className={styles.avatarImg}
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className={styles.avatarFileInput}
+                  onChange={handleAvatarFileChange}
+                />
                 <div>
                   <div className={styles.identity}>
                     <h1 className={styles.displayName}>
@@ -534,7 +837,7 @@ export default function ProfileLayout({
                   <div className={styles.statsRow}>
                     <StatCard
                       label="Posts"
-                      value={formatCount(profile.stats.totalPosts)}
+                      value={formatCount(displayedPostsCount)}
                     />
                     <StatCard
                       label="Followers"
@@ -587,8 +890,8 @@ export default function ProfileLayout({
                           {followLoading
                             ? "Updating..."
                             : profile.isFollowing
-                            ? "Following"
-                            : "Follow"}
+                              ? "Following"
+                              : "Follow"}
                         </button>
                         <button
                           className={styles.secondaryButton}
@@ -653,6 +956,183 @@ export default function ProfileLayout({
           ) : null}
         </div>
       )}
+      {avatarMenuOpen ? (
+        <div
+          className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeAvatarMenu}
+        >
+          <div
+            className={styles.avatarMenuCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className={styles.avatarMenuItem}
+              onClick={handleAvatarUploadSelect}
+            >
+              Upload photo
+            </button>
+            <button
+              type="button"
+              className={`${styles.avatarMenuItem}`}
+              onClick={() => {
+                closeAvatarMenu();
+                openAvatarConfirm();
+              }}
+            >
+              Remove current photo
+            </button>
+            <button
+              type="button"
+              className={`${styles.avatarMenuItem} ${styles.avatarMenuDanger}`}
+              onClick={closeAvatarMenu}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {avatarConfirmOpen ? (
+        <div
+          className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeAvatarConfirm}
+        >
+          <div
+            className={styles.modalCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <div>
+                <h3 className={styles.modalTitle}>Remove avatar?</h3>
+                <p className={styles.modalBody}>
+                  This will reset your avatar to the default image.
+                </p>
+              </div>
+            </div>
+            {avatarError ? (
+              <div className={styles.modalError}>{avatarError}</div>
+            ) : null}
+            <div className={styles.modalActions}>
+              <button
+                className={styles.modalSecondary}
+                onClick={closeAvatarConfirm}
+                disabled={avatarSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className={`${styles.modalPrimary} ${styles.modalDanger}`}
+                onClick={handleConfirmRemoveAvatar}
+                disabled={avatarSubmitting}
+              >
+                {avatarSubmitting ? "Removing..." : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {avatarCropOpen ? (
+        <div
+          className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeAvatarCrop}
+        >
+          <div
+            className={`${styles.modalCard} ${styles.avatarCropCard}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.avatarCropHeader}>
+              <div>
+                <h3 className={styles.modalTitle}>Crop avatar</h3>
+                <p className={styles.modalBody}>
+                  Adjust the frame and zoom to choose the best area.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.closeBtn}
+                aria-label="Close"
+                onClick={closeAvatarCrop}
+              >
+                <span aria-hidden>X</span>
+              </button>
+            </div>
+            <div className={styles.avatarCropGrid}>
+              <div className={styles.avatarCropperCard}>
+                {avatarPreview ? (
+                  <div className={styles.cropperWrapper}>
+                    <Cropper
+                      image={avatarPreview}
+                      crop={crop}
+                      zoom={zoom}
+                      aspect={1}
+                      onCropChange={setCrop}
+                      onZoomChange={setZoom}
+                      onCropComplete={(_, croppedPixels) =>
+                        setCroppedAreaPixels(croppedPixels)
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div className={styles.avatarPlaceholder}>
+                    No image selected
+                  </div>
+                )}
+              </div>
+              <div className={styles.avatarCropControls}>
+                <div className={styles.avatarThumbSmall}>
+                  {avatarThumb ? (
+                    <img src={avatarThumb} alt="Preview" />
+                  ) : (
+                    <img
+                      src={profile?.avatarUrl || DEFAULT_AVATAR_URL}
+                      alt="Current avatar"
+                    />
+                  )}
+                </div>
+                <div className={styles.sliderRow}>
+                  <span className={styles.sliderLabel}>Zoom</span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={3}
+                    step={0.1}
+                    value={zoom}
+                    onChange={(e) => setZoom(Number(e.target.value))}
+                  />
+                  <span className={styles.sliderValue}>{zoom.toFixed(1)}x</span>
+                </div>
+                {avatarError ? (
+                  <div className={styles.inlineError}>{avatarError}</div>
+                ) : null}
+                <div className={styles.avatarCropActions}>
+                  <button
+                    type="button"
+                    className={styles.modalSecondary}
+                    onClick={closeAvatarCrop}
+                    disabled={avatarSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.modalPrimaryAccent}
+                    onClick={handleSubmitAvatar}
+                    disabled={avatarSubmitting}
+                  >
+                    {avatarSubmitting ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {blockOpen ? (
         <div
           className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
@@ -747,7 +1227,7 @@ export default function ProfileLayout({
                         setReportReason(
                           group.reasons.length === 1
                             ? group.reasons[0].key
-                            : null
+                            : null,
                         );
                       }}
                     >
@@ -1011,32 +1491,20 @@ function IconBookmark() {
 
 function IconRepeat() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <svg
+      aria-hidden
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="var(--color-text-muted)"
+      xmlns="http://www.w3.org/2000/svg"
+    >
       <path
-        d="M4 7.5c.6-1.8 2.3-3 4.2-3h9.3"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <path
-        d="m14.5 2.5 3 2.7-3 2.7"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M20 16.5c-.6 1.8-2.3 3-4.2 3H6.5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <path
-        d="m9.5 21.5-3-2.7 3-2.7"
-        stroke="currentColor"
-        strokeWidth="1.6"
+        stroke="none"
+        strokeWidth={1}
         strokeLinecap="round"
         strokeLinejoin="round"
+        d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"
       />
     </svg>
   );

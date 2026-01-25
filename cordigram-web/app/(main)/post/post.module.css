@@ -107,7 +107,9 @@
   padding: 10px 10px;
   border-radius: 10px;
   cursor: pointer;
-  transition: background 140ms ease, transform 120ms ease;
+  transition:
+    background 140ms ease,
+    transform 120ms ease;
 }
 
 .moreMenuItem:hover {
@@ -233,7 +235,9 @@
   color: var(--color-text, #e5e7eb);
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease,
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
     transform 0.12s ease;
   font-size: 14px;
 }
@@ -350,11 +354,15 @@
 }
 
 .mediaEnterNext {
-  animation: mediaFade 220ms ease forwards, mediaSlideNext 260ms ease forwards;
+  animation:
+    mediaFade 220ms ease forwards,
+    mediaSlideNext 260ms ease forwards;
 }
 
 .mediaEnterPrev {
-  animation: mediaFade 220ms ease forwards, mediaSlidePrev 260ms ease forwards;
+  animation:
+    mediaFade 220ms ease forwards,
+    mediaSlidePrev 260ms ease forwards;
 }
 
 .mediaPlaceholder {
@@ -373,7 +381,9 @@
   cursor: pointer;
   display: grid;
   place-items: center;
-  transition: background 0.15s ease, transform 0.12s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.12s ease;
 }
 
 .mediaNavBtn:hover {
@@ -395,10 +405,9 @@
   padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
   height: 100%;
   min-height: 0;
-  max-height: 640px;
+  max-height: clamp(520px, 93vh, 820px);
 }
 
 .infoScrollArea {
@@ -484,7 +493,10 @@
   padding: 4px 8px;
   border-radius: 10px;
   cursor: pointer;
-  transition: color 180ms ease, transform 180ms ease, background 180ms ease;
+  transition:
+    color 180ms ease,
+    transform 180ms ease,
+    background 180ms ease;
 }
 
 .statButton:hover {
@@ -624,8 +636,11 @@
   place-items: center;
   color: var(--color-text-muted, #94a3b8);
   cursor: pointer;
-  transition: transform 120ms ease, background 140ms ease,
-    border-color 140ms ease, color 140ms ease;
+  transition:
+    transform 120ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
 }
 
 .commentMoreBtn:hover {
@@ -679,7 +694,10 @@
   padding: 10px 10px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, transform 120ms ease;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 120ms ease;
 }
 
 .commentMoreItem:hover {
@@ -740,6 +758,73 @@
   margin-top: auto;
 }
 
+.commentComposer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  background: var(--color-surface, #0f172a);
+  border-radius: 18px;
+  padding: 6px 10px 10px;
+}
+
+.commentComposerRow {
+  display: flex;
+  flex-direction: column;
+}
+
+.composerActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.composerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.composerInput {
+  flex: 1;
+  position: relative;
+}
+
+.composerSubmit {
+  border-radius: 999px;
+  border: none;
+  padding: 8px 14px;
+  font-weight: 700;
+  background: var(--color-primary-strong, #7c3aed);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.composerSubmit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.commentComposer .input {
+  border: none;
+  background: transparent;
+  padding: 6px 4px;
+  min-height: 60px;
+  resize: none;
+}
+
+.inputColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
 .commentsLockedNotice {
   border: 1px dashed var(--color-border, rgba(255, 255, 255, 0.15));
   background: var(--color-surface-muted, rgba(255, 255, 255, 0.04));
@@ -765,6 +850,16 @@
   align-self: center;
 }
 
+.mediaWrap {
+  position: relative;
+  align-self: center;
+}
+
+.stickerWrap {
+  position: relative;
+  align-self: center;
+}
+
 .emojiButton {
   border-radius: 10px;
   cursor: pointer;
@@ -772,11 +867,116 @@
   line-height: 1;
   padding: 8px;
   color: var(--color-text, #e5e7eb);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.mediaButton {
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 8px;
+  color: var(--color-text, #e5e7eb);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.stickerButton {
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 8px;
+  color: var(--color-text, #e5e7eb);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.mediaButton:hover {
+  transform: translateY(-1px);
+}
+
+.stickerButton:hover {
+  transform: translateY(-1px);
 }
 
 .emojiButton:hover {
   transform: translateY(-1px);
+}
+
+.commentMedia {
+  margin-top: 6px;
+  max-width: 320px;
+}
+
+.commentMediaCompact {
+  max-width: 200px;
+}
+
+.commentMediaImage,
+.commentMediaVideo {
+  width: 100%;
+  max-height: 280px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.commentMediaImageCompact {
+  max-height: 180px;
+  object-fit: contain;
+}
+
+.commentMediaVideo {
+  background: #0b1220;
+}
+
+.commentMediaPreview {
+  margin-top: 8px;
+  position: relative;
+  max-width: 120px;
+}
+
+.commentMediaPreviewImage,
+.commentMediaPreviewVideo {
+  width: 100%;
+  max-height: 120px;
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+.commentMediaRemove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(15, 23, 42, 0.85);
+  color: #e2e8f0;
+  font-size: 18px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.commentMediaError {
+  font-size: 12px;
+  color: #fca5a5;
+}
+
+.mentionDropdownWrap {
+  width: 100%;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 6;
 }
 
 .emojiPopover {
@@ -788,9 +988,77 @@
   z-index: 20;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
   border-radius: 12px;
-  overflow: hidden;
   background: var(--color-surface, #0f172a);
-  max-width: min(320px, 80vw);
+  width: min(360px, 92vw);
+  max-width: none;
+}
+
+.stickerPopover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: min(360px, 92vw);
+  background: var(--color-surface, #0f172a);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  padding: 10px;
+  z-index: 20;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+}
+
+.stickerSearch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.stickerSearchInput {
+  flex: 1;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  background: var(--color-surface-muted, rgba(255, 255, 255, 0.04));
+  color: var(--color-text, #e5e7eb);
+  padding: 6px 10px;
+}
+
+.stickerSearchBtn {
+  border-radius: 10px;
+  border: none;
+  padding: 6px 10px;
+  background: var(--color-primary-strong, #7c3aed);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stickerHint {
+  font-size: 12px;
+  color: var(--color-text-muted, #94a3b8);
+  margin-bottom: 6px;
+}
+
+.stickerGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.stickerTile {
+  border: none;
+  background: transparent;
+  padding: 2px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.stickerTile img {
+  max-width: 100%;
+  max-height: 70px;
+  object-fit: contain;
 }
 
 .submitBtn,
@@ -815,7 +1083,7 @@
   gap: 8px;
   color: var(--color-text, #e5e7eb);
   font-size: 14px;
-  padding: 0px 12px;
+  padding: 5px 12px;
 }
 
 .replyBadge button {
@@ -921,12 +1189,68 @@
   color: var(--color-text-muted, #94a3b8);
   font-size: 28px;
   cursor: pointer;
-  transition: color 120ms ease, transform 120ms ease, border 120ms ease;
+  transition:
+    color 120ms ease,
+    transform 120ms ease,
+    border 120ms ease;
   transform: translateY(-10px);
 }
 
 .reportClose:hover {
   color: var(--color-text, #e5e7eb);
+}
+
+.commentImageOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 7, 18, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 95;
+  backdrop-filter: blur(6px);
+  padding: 24px;
+}
+
+.commentImageFigure {
+  max-width: min(96vw, 980px);
+  max-height: 92vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.commentImagePreview {
+  max-width: 96vw;
+  max-height: 92vh;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  background: #0f172a;
+}
+
+.commentImageClose {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(15, 23, 42, 0.75);
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition:
+    transform 120ms ease,
+    background 120ms ease;
+}
+
+.commentImageClose:hover {
+  transform: scale(1.05);
+  background: rgba(15, 23, 42, 0.9);
 }
 
 .reportGrid {
@@ -952,7 +1276,10 @@
   padding: 10px 12px;
   color: var(--color-text, #e5e7eb);
   cursor: pointer;
-  transition: transform 120ms ease, border 120ms ease, box-shadow 120ms ease;
+  transition:
+    transform 120ms ease,
+    border 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .reportCategoryCard:hover {
@@ -1006,7 +1333,9 @@
   background: transparent;
   color: var(--color-text, #e5e7eb);
   cursor: pointer;
-  transition: background 120ms ease, border 120ms ease;
+  transition:
+    background 120ms ease,
+    border 120ms ease;
   text-align: left;
 }
 
@@ -1090,7 +1419,10 @@
   font-weight: 700;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: transform 120ms ease, background 120ms ease, color 120ms ease,
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    color 120ms ease,
     filter 120ms ease;
 }
 

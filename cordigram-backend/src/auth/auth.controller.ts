@@ -182,6 +182,7 @@ export class AuthController {
       coverUrl: dto.coverUrl,
       bio: dto.bio,
       location: dto.location,
+      gender: dto.gender,
       links: dto.links,
       password: dto.password,
     });

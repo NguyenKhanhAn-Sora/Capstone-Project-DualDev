@@ -43,7 +43,7 @@ export async function apiFetch<T = unknown>(options: FetchOptions): Promise<T> {
   if (!res.ok) {
     const payload: { message?: string } & Record<string, unknown> =
       await toJson<{ message?: string } & Record<string, unknown>>(res).catch(
-        () => ({} as { message?: string })
+        () => ({}) as { message?: string },
       );
     throw {
       status: res.status,
@@ -90,7 +90,6 @@ export type UpdatePostRequest = {
 export type CreatePostResponse = {
   kind: "post" | "reel";
   id: string;
-  repostOf?: string | null;
   content: string;
   media: Array<{
     type: "image" | "video";
@@ -120,6 +119,16 @@ export type CreatePostResponse = {
     reports?: number;
   };
   repostOf?: string | null;
+  repostOfAuthorId?: string;
+  repostOfAuthorDisplayName?: string;
+  repostOfAuthorUsername?: string;
+  repostOfAuthorAvatarUrl?: string;
+  repostOfAuthor?: {
+    id?: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+  };
   serverId?: string | null;
   channelId?: string | null;
   createdAt: string;
@@ -153,6 +162,16 @@ export type FeedItem = CreatePostResponse & {
   liked?: boolean;
   saved?: boolean;
   following?: boolean;
+  repostOfAuthorId?: string;
+  repostOfAuthorDisplayName?: string;
+  repostOfAuthorUsername?: string;
+  repostOfAuthorAvatarUrl?: string;
+  repostOfAuthor?: {
+    id?: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+  };
   reposted?: boolean;
   authorId?: string;
   authorUsername?: string;
@@ -194,6 +213,12 @@ export async function updatePostVisibility(opts: {
   });
 }
 
+export type CommentMedia = {
+  type: "image" | "video";
+  url: string;
+  metadata?: Record<string, unknown> | null;
+};
+
 export type CommentItem = {
   id: string;
   postId: string;
@@ -205,6 +230,14 @@ export type CommentItem = {
     avatarUrl?: string;
   };
   content: string;
+  media?: CommentMedia | null;
+  mentions?: Array<
+    | string
+    | {
+        userId?: string;
+        username?: string;
+      }
+  >;
   parentId: string | null;
   rootCommentId: string | null;
   createdAt?: string;
@@ -317,6 +350,42 @@ export async function fetchUserPosts(opts: {
 
   return apiFetch<FeedItem[]>({
     path: `/posts/user/${userId}?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchPostsByHashtag(opts: {
+  token: string;
+  tag: string;
+  limit?: number;
+}): Promise<FeedItem[]> {
+  const { token, tag, limit = 30 } = opts;
+  const params = new URLSearchParams();
+  if (limit) params.set("limit", String(limit));
+
+  return apiFetch<FeedItem[]>({
+    path: `/posts/hashtag/${encodeURIComponent(tag)}?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchReelsByHashtag(opts: {
+  token: string;
+  tag: string;
+  limit?: number;
+}): Promise<FeedItem[]> {
+  const { token, tag, limit = 30 } = opts;
+  const params = new URLSearchParams();
+  if (limit) params.set("limit", String(limit));
+
+  return apiFetch<FeedItem[]>({
+    path: `/posts/hashtag/${encodeURIComponent(tag)}/reels?${params.toString()}`,
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -452,17 +521,30 @@ export async function fetchComments(opts: {
 export async function createComment(opts: {
   token: string;
   postId: string;
-  content: string;
+  content?: string;
   parentId?: string;
+  mentions?: Array<
+    | string
+    | {
+        userId?: string;
+        username?: string;
+      }
+  >;
+  media?: CommentMedia | null;
 }): Promise<CommentItem> {
-  const { token, postId, content, parentId } = opts;
+  const { token, postId, content, parentId, mentions, media } = opts;
+  const payload: Record<string, unknown> = {};
+  if (typeof content === "string") payload.content = content;
+  if (mentions) payload.mentions = mentions;
+  if (media !== undefined) payload.media = media;
+  if (parentId) payload.parentId = parentId;
   return apiFetch<CommentItem>({
     path: `/posts/${postId}/comments`,
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(parentId ? { content, parentId } : { content }),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -485,16 +567,28 @@ export async function updateComment(opts: {
   token: string;
   postId: string;
   commentId: string;
-  content: string;
+  content?: string;
+  mentions?: Array<
+    | string
+    | {
+        userId?: string;
+        username?: string;
+      }
+  >;
+  media?: CommentMedia | null;
 }): Promise<UpdateCommentResponse> {
-  const { token, postId, commentId, content } = opts;
+  const { token, postId, commentId, content, mentions, media } = opts;
+  const payload: Record<string, unknown> = {};
+  if (typeof content === "string") payload.content = content;
+  if (mentions) payload.mentions = mentions;
+  if (media !== undefined) payload.media = media;
   return apiFetch<UpdateCommentResponse>({
     path: `/posts/${postId}/comments/${commentId}`,
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -700,7 +794,7 @@ export async function viewPost(opts: {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(
-      typeof durationMs === "number" ? { durationMs } : { durationMs: null }
+      typeof durationMs === "number" ? { durationMs } : { durationMs: null },
     ),
   });
 }
@@ -819,6 +913,13 @@ export type CurrentProfileResponse = {
   avatarUrl: string;
 };
 
+export type UpdateAvatarResponse = {
+  avatarUrl: string;
+  avatarOriginalUrl: string;
+  avatarPublicId: string;
+  avatarOriginalPublicId: string;
+};
+
 export type UserSettingsResponse = {
   theme: "light" | "dark";
 };
@@ -842,6 +943,46 @@ export async function fetchCurrentProfile(opts: {
   return apiFetch<CurrentProfileResponse>({
     path: "/profiles/me",
     method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function uploadProfileAvatar(opts: {
+  token: string;
+  form: FormData;
+}): Promise<UpdateAvatarResponse> {
+  const { token, form } = opts;
+  const res = await fetch(`${apiBaseUrl}/profiles/avatar/upload`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    throw {
+      status: res.status,
+      message: payload.message || "Avatar upload failed",
+      data: payload,
+    } satisfies ApiError;
+  }
+
+  return (await res.json()) as UpdateAvatarResponse;
+}
+
+export async function resetProfileAvatar(opts: {
+  token: string;
+}): Promise<UpdateAvatarResponse> {
+  const { token } = opts;
+  return apiFetch<UpdateAvatarResponse>({
+    path: "/profiles/avatar",
+    method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -941,7 +1082,7 @@ export async function clearRecentAccounts(opts: {
 }
 
 export async function requestPasswordReset(
-  email: string
+  email: string,
 ): Promise<{ ok: true }> {
   return apiFetch<{ ok: true }>({
     path: "/auth/password/forgot",
@@ -1020,6 +1161,38 @@ export async function uploadPostMedia(opts: {
 }): Promise<UploadPostMediaResponse> {
   const { token, file } = opts;
   const url = `${apiBaseUrl}/posts/upload`;
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    throw {
+      status: res.status,
+      message: payload.message || "Upload failed",
+      data: payload,
+    } satisfies ApiError;
+  }
+
+  return (await res.json()) as UploadPostMediaResponse;
+}
+
+export async function uploadCommentMedia(opts: {
+  token: string;
+  postId: string;
+  file: File;
+}): Promise<UploadPostMediaResponse> {
+  const { token, postId, file } = opts;
+  const url = `${apiBaseUrl}/posts/${postId}/comments/upload`;
   const form = new FormData();
   form.append("file", file);
 

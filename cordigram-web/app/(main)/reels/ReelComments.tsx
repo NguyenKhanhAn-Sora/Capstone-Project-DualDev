@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import type { JSX, MutableRefObject } from "react";
+import type { JSX, MutableRefObject, CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { formatDistanceToNow } from "date-fns";
 import EmojiPicker from "emoji-picker-react";
@@ -16,9 +16,13 @@ import {
   deleteComment,
   reportComment,
   blockUser,
+  searchProfiles,
+  uploadCommentMedia,
+  type ProfileSearchItem,
 } from "@/lib/api";
 import postStyles from "../post/post.module.css";
 import styles from "./reel.module.css";
+import feedStyles from "../home-feed.module.css";
 
 const COMMENT_POLL_INTERVAL = 4000;
 const COMMENT_PAGE_SIZE = 20;
@@ -40,6 +44,7 @@ type ReelCommentsProps = {
   allowComments?: boolean;
   initialCount?: number;
   onTotalChange?: (postId: string, total: number) => void;
+  style?: CSSProperties;
 };
 
 type ReplyState = {
@@ -53,6 +58,25 @@ type ReplyState = {
 
 const ensureId = (item: CommentItem): string =>
   item.id || `${item.postId}-${item.createdAt ?? Date.now()}`;
+
+const extractMentionsFromText = (value: string) => {
+  const handles = new Set<string>();
+  const regex = /@([a-zA-Z0-9_.]{1,30})/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(value))) {
+    handles.add(match[1].toLowerCase());
+  }
+  return Array.from(handles);
+};
+
+const findActiveMention = (value: string, caret: number) => {
+  const beforeCaret = value.slice(0, caret);
+  const match = /(^|[\s([{.,!?])@([a-zA-Z0-9_.]{0,30})$/i.exec(beforeCaret);
+  if (!match) return null;
+  const handle = match[2];
+  const start = caret - handle.length - 1;
+  return { handle, start, end: caret };
+};
 
 type ReportCategory = {
   key:
@@ -68,6 +92,11 @@ type ReportCategory = {
   label: string;
   accent: string;
   reasons: Array<{ key: string; label: string }>;
+};
+
+type MentionRef = {
+  userId?: string;
+  username?: string;
 };
 
 const REPORT_GROUPS: ReportCategory[] = [
@@ -213,6 +242,7 @@ export default function ReelComments({
   allowComments,
   initialCount,
   onTotalChange,
+  style,
 }: ReelCommentsProps) {
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [page, setPage] = useState(1);
@@ -221,23 +251,74 @@ export default function ReelComments({
   const [error, setError] = useState<string>("");
   const [totalCount, setTotalCount] = useState<number>(initialCount ?? 0);
   const [text, setText] = useState("");
+  const [commentMediaFile, setCommentMediaFile] = useState<File | null>(null);
+  const [commentMediaExternal, setCommentMediaExternal] = useState<
+    CommentItem["media"] | null
+  >(null);
+  const [commentMediaPreview, setCommentMediaPreview] = useState<string | null>(
+    null,
+  );
+  const [commentMediaError, setCommentMediaError] = useState("");
+  const [commentMediaUploading, setCommentMediaUploading] = useState(false);
+  const [commentMentions, setCommentMentions] = useState<MentionRef[]>([]);
+  const [mentionDraft, setMentionDraft] = useState("");
+  const [mentionSuggestions, setMentionSuggestions] = useState<
+    ProfileSearchItem[]
+  >([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const [mentionError, setMentionError] = useState("");
+  const [mentionHighlight, setMentionHighlight] = useState(-1);
+  const [activeMentionRange, setActiveMentionRange] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [stickerQuery, setStickerQuery] = useState("");
+  const [stickerLoading, setStickerLoading] = useState(false);
+  const [stickerError, setStickerError] = useState("");
+  const [stickerResults, setStickerResults] = useState<
+    Array<{
+      id: string;
+      url: string;
+      preview: string;
+      width?: number;
+      height?: number;
+    }>
+  >([]);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifQuery, setGifQuery] = useState("");
+  const [gifLoading, setGifLoading] = useState(false);
+  const [gifError, setGifError] = useState("");
+  const [gifResults, setGifResults] = useState<
+    Array<{
+      id: string;
+      url: string;
+      preview: string;
+      width?: number;
+      height?: number;
+    }>
+  >([]);
+  const [commentImageViewerUrl, setCommentImageViewerUrl] = useState<
+    string | null
+  >(null);
   const [replyTarget, setReplyTarget] = useState<{
     id: string;
     username?: string;
   } | null>(null);
   const [replyState, setReplyState] = useState<Record<string, ReplyState>>({});
   const [openCommentMenuId, setOpenCommentMenuId] = useState<string | null>(
-    null
+    null,
   );
   const [commentMenuClosingId, setCommentMenuClosingId] = useState<
     string | null
   >(null);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(
-    null
+    null,
   );
   const [deleteTarget, setDeleteTarget] = useState<CommentItem | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
@@ -247,6 +328,7 @@ export default function ReelComments({
     label: string;
   } | null>(null);
   const [blocking, setBlocking] = useState(false);
+  const lastTotalSentRef = useRef<number | null>(null);
   const [reportCategory, setReportCategory] = useState<
     ReportCategory["key"] | null
   >(null);
@@ -256,47 +338,240 @@ export default function ReelComments({
   const [reportError, setReportError] = useState("");
   const [reportClosing, setReportClosing] = useState(false);
   const emojiRef = useRef<HTMLDivElement | null>(null);
+  const stickerRef = useRef<HTMLDivElement | null>(null);
+  const gifRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const commentMediaInputRef = useRef<HTMLInputElement | null>(null);
   const commentMenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+    null,
   );
   const commentRefs = useRef<Record<string, HTMLElement | null>>({});
   const hasDOM = typeof document !== "undefined";
+
+  const normalizeMentionRefs = useCallback((raw?: CommentItem["mentions"]) => {
+    if (!Array.isArray(raw)) return [] as MentionRef[];
+    const seen = new Set<string>();
+    const result: MentionRef[] = [];
+    raw.forEach((m) => {
+      if (typeof m === "string") {
+        const username = m.trim().replace(/^@/, "").toLowerCase();
+        if (!username || seen.has(username)) return;
+        seen.add(username);
+        result.push({ username });
+        return;
+      }
+      if (m && typeof m === "object") {
+        const username = (m as any).username?.toString?.().trim?.();
+        const userId = (m as any).userId?.toString?.();
+        const key = (username || userId || "").toLowerCase();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        result.push({ username: username?.toLowerCase(), userId });
+      }
+    });
+    return result.slice(0, 20);
+  }, []);
+
+  const clearCommentMedia = useCallback(() => {
+    setCommentMediaFile(null);
+    setCommentMediaExternal(null);
+    setCommentMediaError("");
+    setCommentMediaPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    if (commentMediaInputRef.current) {
+      commentMediaInputRef.current.value = "";
+    }
+  }, []);
+
+  const clearStickerSelection = useCallback(() => {
+    setCommentMediaExternal(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (commentMediaPreview) {
+        URL.revokeObjectURL(commentMediaPreview);
+      }
+    };
+  }, [commentMediaPreview]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!commentImageViewerUrl) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [commentImageViewerUrl]);
+
+  const giphyApiKey =
+    typeof window !== "undefined"
+      ? (process.env.NEXT_PUBLIC_GIPHY_API_KEY as string | undefined)
+      : undefined;
+
+  const fetchStickers = useCallback(
+    async (query?: string) => {
+      if (!giphyApiKey) {
+        setStickerError("Missing GIPHY API key");
+        return;
+      }
+      setStickerLoading(true);
+      setStickerError("");
+      try {
+        const endpoint = query?.trim() ? "search" : "trending";
+        const params = new URLSearchParams({
+          api_key: giphyApiKey,
+          limit: "24",
+          rating: "pg",
+        });
+        if (query?.trim()) params.set("q", query.trim());
+        const res = await fetch(
+          `https://api.giphy.com/v1/stickers/${endpoint}?${params.toString()}`,
+        );
+        if (!res.ok) throw new Error("Failed to load stickers");
+        const data = await res.json();
+        const results = Array.isArray(data?.data) ? data.data : [];
+        const mapped = results
+          .map((item: any) => {
+            const images = item?.images || {};
+            const primary =
+              images.fixed_height_small ||
+              images.preview_gif ||
+              images.original;
+            if (!primary?.url) return null;
+            return {
+              id: item?.id?.toString?.() ?? primary.url,
+              url: primary.url as string,
+              preview:
+                images.fixed_height_small_still?.url ||
+                images.preview_gif?.url ||
+                primary.url,
+              width: Number(primary.width) || undefined,
+              height: Number(primary.height) || undefined,
+            };
+          })
+          .filter(Boolean);
+        setStickerResults(mapped);
+      } catch (err: any) {
+        setStickerError(err?.message || "Failed to load stickers");
+      } finally {
+        setStickerLoading(false);
+      }
+    },
+    [giphyApiKey],
+  );
+
+  const fetchGifs = useCallback(
+    async (query?: string) => {
+      if (!giphyApiKey) {
+        setGifError("Missing GIPHY API key");
+        return;
+      }
+      setGifLoading(true);
+      setGifError("");
+      try {
+        const endpoint = query?.trim() ? "search" : "trending";
+        const params = new URLSearchParams({
+          api_key: giphyApiKey,
+          limit: "24",
+          rating: "pg",
+        });
+        if (query?.trim()) params.set("q", query.trim());
+        const res = await fetch(
+          `https://api.giphy.com/v1/gifs/${endpoint}?${params.toString()}`,
+        );
+        if (!res.ok) throw new Error("Failed to load GIFs");
+        const data = await res.json();
+        const results = Array.isArray(data?.data) ? data.data : [];
+        const mapped = results
+          .map((item: any) => {
+            const images = item?.images || {};
+            const primary =
+              images.fixed_height_small ||
+              images.preview_gif ||
+              images.original;
+            if (!primary?.url) return null;
+            return {
+              id: item?.id?.toString?.() ?? primary.url,
+              url: primary.url as string,
+              preview:
+                images.fixed_height_small_still?.url ||
+                images.preview_gif?.url ||
+                primary.url,
+              width: Number(primary.width) || undefined,
+              height: Number(primary.height) || undefined,
+            };
+          })
+          .filter(Boolean);
+        setGifResults(mapped);
+      } catch (err: any) {
+        setGifError(err?.message || "Failed to load GIFs");
+      } finally {
+        setGifLoading(false);
+      }
+    },
+    [giphyApiKey],
+  );
+
+  useEffect(() => {
+    if (!showStickerPicker) return;
+    fetchStickers(stickerQuery);
+  }, [fetchStickers, showStickerPicker, stickerQuery]);
+
+  useEffect(() => {
+    if (!showGifPicker) return;
+    fetchGifs(gifQuery);
+  }, [fetchGifs, showGifPicker, gifQuery]);
+
+  const resetMentionState = useCallback(() => {
+    setMentionDraft("");
+    setMentionSuggestions([]);
+    setMentionOpen(false);
+    setMentionLoading(false);
+    setMentionError("");
+    setMentionHighlight(-1);
+    setActiveMentionRange(null);
+  }, []);
 
   const updateTotal = useCallback(
     (next: number | ((prev: number) => number)) => {
       setTotalCount((prev) =>
         typeof next === "function"
           ? (next as (p: number) => number)(prev)
-          : next
+          : next,
       );
     },
-    [onTotalChange, postId]
+    [onTotalChange, postId],
   );
 
   useEffect(() => {
     if (!postId || !onTotalChange) return;
+    if (lastTotalSentRef.current === totalCount) return;
+    lastTotalSentRef.current = totalCount;
     onTotalChange(postId, totalCount);
   }, [onTotalChange, postId, totalCount]);
 
   const commentsLocked = useMemo(
     () => allowComments === false,
-    [allowComments]
+    [allowComments],
   );
 
   const canInteract = useMemo(
     () => Boolean(open && token && postId && !commentsLocked),
-    [commentsLocked, open, postId, token]
+    [commentsLocked, open, postId, token],
   );
 
   const topLevelComments = useMemo(
     () => comments.filter((c) => !c.parentId),
-    [comments]
+    [comments],
   );
 
   const selectedReportGroup = useMemo(
     () => REPORT_GROUPS.find((g) => g.key === reportCategory),
-    [reportCategory]
+    [reportCategory],
   );
 
   const scrollToComment = useCallback((commentId?: string | null) => {
@@ -315,8 +590,8 @@ export default function ReelComments({
         (c) =>
           c.id !== targetId &&
           c.parentId !== targetId &&
-          c.rootCommentId !== targetId
-      )
+          c.rootCommentId !== targetId,
+      ),
     );
 
     setReplyState((prev) => {
@@ -326,7 +601,7 @@ export default function ReelComments({
           (c) =>
             c.id !== targetId &&
             c.parentId !== targetId &&
-            c.rootCommentId !== targetId
+            c.rootCommentId !== targetId,
         );
         if (parentId === targetId) continue;
         next[parentId] =
@@ -352,7 +627,10 @@ export default function ReelComments({
     setReplyTarget(null);
     setEditingCommentId(null);
     setEmojiOpen(false);
-  }, [commentsLocked]);
+    setCommentMentions([]);
+    clearCommentMedia();
+    resetMentionState();
+  }, [clearCommentMedia, commentsLocked, resetMentionState]);
 
   const closeCommentMenu = useCallback(() => {
     if (commentMenuCloseTimerRef.current)
@@ -373,6 +651,16 @@ export default function ReelComments({
     setReplyTarget(null);
     setEditingCommentId(comment.id);
     setText(comment.content || "");
+    setCommentMentions(normalizeMentionRefs(comment.mentions));
+    clearCommentMedia();
+    if (comment.media) {
+      setCommentMediaExternal({
+        type: comment.media.type,
+        url: comment.media.url,
+        metadata: comment.media.metadata ?? null,
+      });
+    }
+    resetMentionState();
     focusInput();
   };
 
@@ -405,7 +693,7 @@ export default function ReelComments({
       setDeleteTarget(null);
     } catch (err) {
       setDeleteError(
-        (err as { message?: string })?.message || "Failed to delete comment"
+        (err as { message?: string })?.message || "Failed to delete comment",
       );
     } finally {
       setDeleteSubmitting(false);
@@ -437,7 +725,7 @@ export default function ReelComments({
           const keep = (c.author?.id || c.authorId) !== blockTarget.id;
           if (!keep) removed += 1;
           return keep;
-        })
+        }),
       );
       setReplyState((prev) => {
         const next: Record<string, ReplyState> = {};
@@ -457,7 +745,7 @@ export default function ReelComments({
       setBlockTarget(null);
     } catch (err) {
       setError(
-        (err as { message?: string })?.message || "Failed to block user"
+        (err as { message?: string })?.message || "Failed to block user",
       );
     } finally {
       setBlocking(false);
@@ -510,7 +798,7 @@ export default function ReelComments({
     } catch (err) {
       setReportSubmitting(false);
       setReportError(
-        (err as { message?: string })?.message || "Failed to report comment"
+        (err as { message?: string })?.message || "Failed to report comment",
       );
     }
   };
@@ -520,9 +808,68 @@ export default function ReelComments({
     focusInput();
   };
 
+  const renderCommentContent = (comment: CommentItem) => {
+    const content = comment.content || "";
+    const mentionMap = new Map<string, { userId?: string }>();
+    (comment.mentions ?? []).forEach((m) => {
+      if (typeof m === "string") {
+        mentionMap.set(m.toLowerCase(), {});
+      } else if (m && typeof m === "object") {
+        const username = (m as any).username?.toString?.().toLowerCase?.();
+        const userId = (m as any).userId?.toString?.();
+        if (username) mentionMap.set(username, { userId });
+      }
+    });
+
+    const parts: JSX.Element[] = [];
+    const regex = /@([a-zA-Z0-9_.]{1,30})/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(content))) {
+      const start = match.index;
+      if (start > lastIndex) {
+        parts.push(
+          <span key={`text-${comment.id}-${start}`}>
+            {content.slice(lastIndex, start)}
+          </span>,
+        );
+      }
+
+      const handle = match[1];
+      const lower = handle.toLowerCase();
+      const meta = mentionMap.get(lower);
+      const hasId = Boolean(meta?.userId);
+
+      parts.push(
+        hasId ? (
+          <Link
+            key={`mention-${comment.id}-${start}`}
+            href={`/profile/${meta?.userId}`}
+            className={feedStyles.mentionLink}
+          >
+            @{handle}
+          </Link>
+        ) : (
+          <span key={`mention-${comment.id}-${start}`}>@{handle}</span>
+        ),
+      );
+
+      lastIndex = start + match[0].length;
+    }
+
+    if (lastIndex < content.length) {
+      parts.push(
+        <span key={`text-${comment.id}-tail`}>{content.slice(lastIndex)}</span>,
+      );
+    }
+
+    return parts.length ? parts : content;
+  };
+
   const renderCommentThread = (
     comment: CommentItem,
-    depth = 0
+    depth = 0,
   ): JSX.Element => {
     const replies = replyState[comment.id]?.items ?? [];
     const hasMoreReplies = replyState[comment.id]?.hasMore ?? false;
@@ -538,10 +885,10 @@ export default function ReelComments({
     const timeAgo = formatCompactDistance(comment.createdAt);
     const authorId = comment.author?.id || comment.authorId;
     const isCommentOwner = Boolean(
-      viewerId && authorId && viewerId === authorId
+      viewerId && authorId && viewerId === authorId,
     );
     const isPostOwner = Boolean(
-      viewerId && postAuthorId && viewerId === postAuthorId
+      viewerId && postAuthorId && viewerId === postAuthorId,
     );
 
     const toggleRepliesVisibility = () => {
@@ -638,7 +985,53 @@ export default function ReelComments({
               )}
             </span>
           </div>
-          <div className={postStyles.commentText}>{comment.content}</div>
+          {comment.content ? (
+            <div className={postStyles.commentText}>
+              {renderCommentContent(comment)}
+            </div>
+          ) : null}
+          {comment.media ? (
+            <div
+              className={`${postStyles.commentMedia} ${
+                comment.media?.metadata &&
+                (comment.media.metadata as any)?.provider === "giphy"
+                  ? postStyles.commentMediaCompact
+                  : ""
+              }`}
+            >
+              {comment.media.type === "video" ? (
+                <video
+                  className={postStyles.commentMediaVideo}
+                  src={comment.media.url}
+                  controls
+                  controlsList="nodownload noremoteplayback"
+                  onContextMenu={(e) => e.preventDefault()}
+                  preload="metadata"
+                />
+              ) : (
+                <img
+                  className={`${postStyles.commentMediaImage} ${
+                    comment.media?.metadata &&
+                    (comment.media.metadata as any)?.provider === "giphy"
+                      ? postStyles.commentMediaImageCompact
+                      : ""
+                  }`}
+                  src={comment.media.url}
+                  alt="Comment attachment"
+                  loading="lazy"
+                  onContextMenu={(e) => e.preventDefault()}
+                  onClick={() => {
+                    const isGiphy = Boolean(
+                      comment.media?.metadata &&
+                      (comment.media.metadata as any)?.provider === "giphy",
+                    );
+                    if (isGiphy) return;
+                    setCommentImageViewerUrl(comment.media?.url || null);
+                  }}
+                />
+              )}
+            </div>
+          ) : null}
           <div className={postStyles.commentActions}>
             <span className={postStyles.commentMeta}>{timeAgo}</span>
             <button
@@ -766,7 +1159,7 @@ export default function ReelComments({
                       </div>
                     </div>
                   </div>,
-                  document.body
+                  document.body,
                 )
               : null}
           </div>
@@ -780,8 +1173,8 @@ export default function ReelComments({
               {loadingReplies
                 ? "Loading..."
                 : expanded
-                ? "Hide replies"
-                : `View replies${replyCountLabel}`}
+                  ? "Hide replies"
+                  : `View replies${replyCountLabel}`}
             </button>
           ) : null}
 
@@ -794,7 +1187,7 @@ export default function ReelComments({
                   onClick={() =>
                     loadReplies(
                       comment.id,
-                      (replyState[comment.id]?.page ?? 1) + 1
+                      (replyState[comment.id]?.page ?? 1) + 1,
                     )
                   }
                   disabled={loadingReplies}
@@ -844,21 +1237,85 @@ export default function ReelComments({
   }, [initialCount, postId]);
 
   useEffect(() => {
-    if (!emojiOpen) return;
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (!emojiRef.current) return;
-      if (!emojiRef.current.contains(event.target as Node)) {
+      const target = event.target as Node | null;
+      if (emojiRef.current && target && !emojiRef.current.contains(target)) {
         setEmojiOpen(false);
+      }
+      if (
+        stickerRef.current &&
+        target &&
+        !stickerRef.current.contains(target)
+      ) {
+        setShowStickerPicker(false);
+      }
+      if (gifRef.current && target && !gifRef.current.contains(target)) {
+        setShowGifPicker(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setEmojiOpen(false);
+        setShowStickerPicker(false);
+        setShowGifPicker(false);
+        setCommentImageViewerUrl(null);
+        closeCommentMenu();
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("touchstart", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
     };
-  }, [emojiOpen]);
+  }, [closeCommentMenu]);
+
+  useEffect(() => {
+    if (mentionOpen && !mentionDraft.trim()) {
+      resetMentionState();
+    }
+
+    const cleaned = mentionDraft.trim().replace(/^@/, "");
+    if (!cleaned) return;
+
+    if (!token) {
+      setMentionSuggestions([]);
+      setMentionOpen(false);
+      setMentionHighlight(-1);
+      setMentionError("Sign in to mention users");
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setMentionLoading(true);
+      setMentionError("");
+      try {
+        const res = await searchProfiles({ token, query: cleaned, limit: 8 });
+        if (cancelled) return;
+        setMentionSuggestions(res.items);
+        setMentionOpen(res.items.length > 0);
+        setMentionHighlight(res.items.length ? 0 : -1);
+        if (!res.items.length) setMentionError("User not found");
+      } catch (err) {
+        if (cancelled) return;
+        setMentionSuggestions([]);
+        setMentionOpen(false);
+        setMentionHighlight(-1);
+        setMentionError("User not found");
+      } finally {
+        if (!cancelled) setMentionLoading(false);
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [mentionDraft, mentionOpen, resetMentionState, token]);
 
   useEffect(() => {
     if (!open) setEmojiOpen(false);
@@ -886,7 +1343,8 @@ export default function ReelComments({
       }
     } catch (err) {
       setError(
-        (err as { message?: string })?.message || "Failed to load more comments"
+        (err as { message?: string })?.message ||
+          "Failed to load more comments",
       );
     } finally {
       setLoadingMore(false);
@@ -896,7 +1354,7 @@ export default function ReelComments({
   const updateCommentEverywhere = useCallback(
     (targetId: string, updater: (c: CommentItem) => CommentItem) => {
       setComments((prev) =>
-        prev.map((c) => (c.id === targetId ? updater(c) : c))
+        prev.map((c) => (c.id === targetId ? updater(c) : c)),
       );
 
       setReplyState((prev) => {
@@ -904,7 +1362,7 @@ export default function ReelComments({
         let changed = false;
         for (const [parentId, state] of Object.entries(prev)) {
           const items = state.items.map((c) =>
-            c.id === targetId ? updater(c) : c
+            c.id === targetId ? updater(c) : c,
           );
           const mutated = items.some((c, idx) => c !== state.items[idx]);
           next[parentId] = mutated ? { ...state, items } : state;
@@ -913,7 +1371,7 @@ export default function ReelComments({
         return changed ? next : prev;
       });
     },
-    []
+    [],
   );
 
   const mergeLatestComments = useCallback((latest: CommentItem[]) => {
@@ -1008,7 +1466,7 @@ export default function ReelComments({
         }));
       }
     },
-    [postId, token]
+    [postId, token],
   );
 
   useEffect(() => {
@@ -1040,7 +1498,7 @@ export default function ReelComments({
             hasMore: true,
             loading: false,
             expanded: false,
-          }
+          },
         );
       };
 
@@ -1105,7 +1563,7 @@ export default function ReelComments({
           } catch {
             /* ignore per-thread errors */
           }
-        })
+        }),
       );
     };
 
@@ -1173,7 +1631,7 @@ export default function ReelComments({
         likesCount:
           typeof res?.likesCount === "number"
             ? res.likesCount
-            : c.likesCount ?? 0,
+            : (c.likesCount ?? 0),
       }));
     } catch (err) {
       updateCommentEverywhere(commentId, (c) => ({
@@ -1182,15 +1640,75 @@ export default function ReelComments({
         likesCount: Math.max(0, (c.likesCount ?? 0) + (liked ? 1 : -1)),
       }));
       setError(
-        (err as { message?: string })?.message || "Unable to update like"
+        (err as { message?: string })?.message || "Unable to update like",
       );
     }
   };
 
   const handleSubmit = async () => {
     if (!token || !postId || submitting || commentsLocked) return;
+    if (commentMediaUploading) return;
     const content = text.trim();
-    if (!content) return;
+    const hasMedia = Boolean(commentMediaFile || commentMediaExternal);
+    if (!content && !hasMedia) return;
+
+    const handlesFromContent = extractMentionsFromText(content);
+    const mentionMap = new Map<string, MentionRef>();
+
+    commentMentions.forEach((m) => {
+      const username = m.username?.toLowerCase?.();
+      if (!username) return;
+      mentionMap.set(username, { username, userId: m.userId });
+    });
+
+    handlesFromContent.forEach((handle) => {
+      const existing = mentionMap.get(handle) ?? {};
+      mentionMap.set(handle, {
+        username: handle,
+        userId: existing.userId,
+      });
+    });
+
+    const normalizedMentions = Array.from(mentionMap.values()).slice(0, 20);
+
+    let uploadedMedia: CommentItem["media"] | null = null;
+    if (commentMediaExternal) {
+      uploadedMedia = commentMediaExternal;
+    }
+    if (!uploadedMedia && commentMediaFile) {
+      setCommentMediaUploading(true);
+      try {
+        const upload = await uploadCommentMedia({
+          token,
+          postId,
+          file: commentMediaFile,
+        });
+        const uploadedUrl = upload.secureUrl || upload.url;
+        uploadedMedia = {
+          type: commentMediaFile.type.startsWith("video/") ? "video" : "image",
+          url: uploadedUrl,
+          metadata: {
+            publicId: upload.publicId,
+            folder: upload.folder,
+            bytes: upload.bytes,
+            resourceType: upload.resourceType,
+            format: upload.format,
+            width: upload.width,
+            height: upload.height,
+            duration: upload.duration,
+          },
+        };
+      } catch (err) {
+        setError(
+          (err as { message?: string })?.message || "Failed to upload media",
+        );
+        setSubmitting(false);
+        setCommentMediaUploading(false);
+        return;
+      } finally {
+        setCommentMediaUploading(false);
+      }
+    }
 
     if (editingCommentId) {
       setSubmitting(true);
@@ -1200,20 +1718,25 @@ export default function ReelComments({
           postId,
           commentId: editingCommentId,
           content,
+          mentions: normalizedMentions,
+          media: uploadedMedia,
         });
 
         updateCommentEverywhere(editingCommentId, (c) => ({
           ...c,
           content: updated.content,
+          mentions: updated.mentions,
+          media: updated.media ?? uploadedMedia ?? null,
           updatedAt: updated.updatedAt ?? c.updatedAt,
         }));
 
         setText("");
+        clearCommentMedia();
         setEditingCommentId(null);
         setReplyTarget(null);
       } catch (err) {
         setError(
-          (err as { message?: string })?.message || "Failed to update comment"
+          (err as { message?: string })?.message || "Failed to update comment",
         );
       } finally {
         setSubmitting(false);
@@ -1221,16 +1744,20 @@ export default function ReelComments({
       return;
     }
 
+    setSubmitting(true);
+
     const parentId = replyTarget?.id ?? null;
 
     const optimistic: CommentItem = {
       id: `tmp-${Date.now()}`,
       postId,
       content,
+      media: uploadedMedia,
       parentId,
       rootCommentId: parentId,
       likesCount: 0,
       liked: false,
+      mentions: normalizedMentions,
       repliesCount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1260,7 +1787,6 @@ export default function ReelComments({
     }
 
     setText("");
-    setSubmitting(true);
 
     const incrementRepliesCount = (targetId: string | null | undefined) => {
       if (!targetId) return;
@@ -1277,6 +1803,8 @@ export default function ReelComments({
         postId,
         content,
         parentId: parentId ?? undefined,
+        mentions: normalizedMentions,
+        media: uploadedMedia,
       });
 
       if (parentId) {
@@ -1289,7 +1817,7 @@ export default function ReelComments({
             expanded: true,
           };
           const items = state.items.map((c) =>
-            c.id === optimistic.id ? saved : c
+            c.id === optimistic.id ? saved : c,
           );
           return { ...prev, [parentId]: { ...state, items } };
         });
@@ -1299,10 +1827,11 @@ export default function ReelComments({
         }
       } else {
         setComments((prev) =>
-          prev.map((c) => (c.id === optimistic.id ? saved : c))
+          prev.map((c) => (c.id === optimistic.id ? saved : c)),
         );
       }
       updateTotal((prev) => prev + 1);
+      clearCommentMedia();
     } catch (err) {
       if (parentId) {
         setReplyState((prev) => {
@@ -1320,7 +1849,7 @@ export default function ReelComments({
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
       }
       setError(
-        (err as { message?: string })?.message || "Unable to send comment"
+        (err as { message?: string })?.message || "Unable to send comment",
       );
     } finally {
       setSubmitting(false);
@@ -1333,6 +1862,9 @@ export default function ReelComments({
     if (submitting) return;
     setEditingCommentId(null);
     setText("");
+    setCommentMentions([]);
+    clearCommentMedia();
+    resetMentionState();
   };
 
   const insertEmoji = (emoji: string) => {
@@ -1355,18 +1887,147 @@ export default function ReelComments({
     });
   };
 
+  const handleTextChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = event.target.value;
+    const caret = event.target.selectionStart ?? value.length;
+    setText(value);
+
+    const active = findActiveMention(value, caret);
+    if (active) {
+      setActiveMentionRange({ start: active.start, end: active.end });
+      setMentionDraft(active.handle);
+      setMentionOpen(true);
+      setMentionError("");
+      setMentionHighlight(0);
+    } else {
+      setActiveMentionRange(null);
+      resetMentionState();
+    }
+  };
+
+  const handleCommentMediaChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      setCommentMediaError("Only image or video files are allowed");
+      if (commentMediaInputRef.current) {
+        commentMediaInputRef.current.value = "";
+      }
+      return;
+    }
+
+    setCommentMediaError("");
+    clearStickerSelection();
+    setCommentMediaFile(file);
+    setCommentMediaPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  };
+
+  const selectSticker = (sticker: { id: string; url: string }) => {
+    setCommentMediaError("");
+    setCommentMediaFile(null);
+    setCommentMediaPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    if (commentMediaInputRef.current) {
+      commentMediaInputRef.current.value = "";
+    }
+    setCommentMediaExternal({
+      type: "image",
+      url: sticker.url,
+      metadata: { provider: "giphy", id: sticker.id },
+    });
+    setShowStickerPicker(false);
+  };
+
+  const selectGif = (gif: { id: string; url: string }) => {
+    setCommentMediaError("");
+    setCommentMediaFile(null);
+    setCommentMediaPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    if (commentMediaInputRef.current) {
+      commentMediaInputRef.current.value = "";
+    }
+    setCommentMediaExternal({
+      type: "image",
+      url: gif.url,
+      metadata: { provider: "giphy", id: gif.id, kind: "gif" },
+    });
+    setShowGifPicker(false);
+  };
+
+  const selectMention = (opt: {
+    id?: string;
+    userId?: string;
+    username: string;
+  }) => {
+    const handle = opt.username.toLowerCase();
+    const value = text || "";
+    const range = activeMentionRange ?? {
+      start: value.length,
+      end: value.length,
+    };
+    const before = value.slice(0, range.start);
+    const after = value.slice(range.end);
+    const insertion = `@${handle}`;
+    const needsSpaceAfter = after.startsWith(" ") || after === "" ? "" : " ";
+    const next = `${before}${insertion}${needsSpaceAfter}${after}`;
+
+    const nextMentions = (() => {
+      const exists = commentMentions.some(
+        (m) =>
+          (m.userId && m.userId === (opt.userId || opt.id)) ||
+          (m.username && m.username.toLowerCase() === handle),
+      );
+      if (exists) return commentMentions;
+      return [
+        ...commentMentions,
+        {
+          userId: opt.userId || opt.id,
+          username: handle,
+        },
+      ].slice(0, 20);
+    })();
+
+    setText(next);
+    setCommentMentions(nextMentions);
+    resetMentionState();
+
+    setTimeout(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      const caretPos =
+        range.start + insertion.length + (needsSpaceAfter ? 1 : 0);
+      el.focus();
+      el.setSelectionRange(caretPos, caretPos);
+    }, 0);
+  };
+
   if (!postId) return null;
 
   const sidebarAnimClass = open
     ? styles.commentSidebarEnter
     : styles.commentSidebarExit;
+  const commentPreviewUrl = commentMediaPreview || commentMediaExternal?.url;
+  const commentPreviewIsVideo = Boolean(
+    commentMediaFile?.type.startsWith("video/") ||
+    commentMediaExternal?.type === "video",
+  );
 
   return (
     <>
       <aside
-        className={`${styles.commentSidebar} ${sidebarAnimClass}`}
+        className={`${styles.commentSidebar} ${styles.commentSidebarDocked} ${sidebarAnimClass}`}
         role="complementary"
         aria-label="Comments"
+        style={style}
         ref={(node) => {
           if (panelRef) panelRef.current = node;
         }}
@@ -1440,64 +2101,464 @@ export default function ReelComments({
             ) : null}
 
             <div
-              className={postStyles.formRow}
+              className={postStyles.commentComposer}
               style={{ paddingBottom: 12, paddingRight: 12 }}
             >
-              <div className={postStyles.emojiWrap} ref={emojiRef}>
-                <button
-                  type="button"
-                  className={postStyles.emojiButton}
-                  onClick={() => setEmojiOpen((prev) => !prev)}
-                  aria-label="Add emoji"
-                  disabled={!canInteract}
-                >
-                  <svg
-                    aria-label="Emoji icon"
-                    fill="currentColor"
-                    height="22"
-                    role="img"
-                    viewBox="0 0 24 24"
-                    width="22"
-                  >
-                    <title>Emoji icon</title>
-                    <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
-                  </svg>
-                </button>
-                {emojiOpen ? (
-                  <div className={postStyles.emojiPopover}>
-                    <EmojiPicker
-                      onEmojiClick={(emojiData) => {
-                        insertEmoji(emojiData.emoji || "");
-                      }}
-                      searchDisabled={false}
-                      skinTonesDisabled={false}
-                      lazyLoadEmojis
-                    />
+              <div className={postStyles.commentComposerRow}>
+                <div className={postStyles.composerInput}>
+                  <textarea
+                    className={postStyles.input}
+                    placeholder="Add a comment..."
+                    value={text}
+                    onChange={handleTextChange}
+                    rows={3}
+                    ref={textareaRef}
+                    onKeyDown={(e) => {
+                      if (mentionOpen) {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          if (!mentionSuggestions.length) return;
+                          setMentionHighlight((prev) =>
+                            prev + 1 < mentionSuggestions.length ? prev + 1 : 0,
+                          );
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          if (!mentionSuggestions.length) return;
+                          setMentionHighlight((prev) =>
+                            prev - 1 >= 0
+                              ? prev - 1
+                              : mentionSuggestions.length - 1,
+                          );
+                          return;
+                        }
+                        if (e.key === "Enter") {
+                          if (
+                            mentionSuggestions.length &&
+                            mentionHighlight >= 0
+                          ) {
+                            e.preventDefault();
+                            const opt = mentionSuggestions[mentionHighlight];
+                            if (opt) selectMention(opt);
+                            return;
+                          }
+                        }
+                        if (e.key === "Escape") {
+                          resetMentionState();
+                          return;
+                        }
+                      }
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (
+                          text.trim() ||
+                          commentMediaFile ||
+                          commentMediaExternal
+                        ) {
+                          handleSubmit();
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        resetMentionState();
+                      }, 120);
+                    }}
+                    disabled={!canInteract || submitting}
+                  />
+                  {mentionOpen ? (
+                    <div className={postStyles.mentionDropdownWrap}>
+                      <div className={feedStyles.mentionDropdown}>
+                        {mentionLoading ? (
+                          <div className={feedStyles.mentionItem}>
+                            Searching...
+                          </div>
+                        ) : null}
+                        {!mentionLoading && mentionSuggestions.length === 0 ? (
+                          <div className={feedStyles.mentionItem}>
+                            {mentionError || "No matches"}
+                          </div>
+                        ) : null}
+                        {mentionSuggestions.map((opt, idx) => {
+                          const active = idx === mentionHighlight;
+                          const avatarInitials = (
+                            opt.displayName ||
+                            opt.username ||
+                            "?"
+                          )
+                            .slice(0, 2)
+                            .toUpperCase();
+                          return (
+                            <button
+                              type="button"
+                              key={opt.id || opt.username}
+                              className={`${feedStyles.mentionItem} ${
+                                active ? feedStyles.mentionItemActive : ""
+                              }`}
+                              onMouseDown={(evt) => evt.preventDefault()}
+                              onClick={() => selectMention(opt)}
+                            >
+                              <span
+                                className={feedStyles.mentionAvatar}
+                                aria-hidden
+                              >
+                                {opt.avatarUrl ? (
+                                  <img
+                                    src={opt.avatarUrl}
+                                    alt={opt.displayName || opt.username}
+                                    className={feedStyles.mentionAvatarImg}
+                                  />
+                                ) : (
+                                  <span
+                                    className={feedStyles.mentionAvatarFallback}
+                                  >
+                                    {avatarInitials}
+                                  </span>
+                                )}
+                              </span>
+                              <span className={feedStyles.mentionCopy}>
+                                <span className={feedStyles.mentionHandle}>
+                                  @{opt.username}
+                                </span>
+                                {opt.displayName ? (
+                                  <span className={feedStyles.mentionName}>
+                                    {opt.displayName}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+                <div className={postStyles.composerFooter}>
+                  <div className={postStyles.composerActions}>
+                    <div className={postStyles.emojiWrap} ref={emojiRef}>
+                      <button
+                        type="button"
+                        className={postStyles.emojiButton}
+                        onClick={() => setEmojiOpen((prev) => !prev)}
+                        aria-label="Add emoji"
+                        disabled={!canInteract}
+                      >
+                        <svg
+                          aria-label="Emoji icon"
+                          fill="currentColor"
+                          height="22"
+                          role="img"
+                          viewBox="0 0 24 24"
+                          width="22"
+                        >
+                          <title>Emoji icon</title>
+                          <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
+                        </svg>
+                      </button>
+                      {emojiOpen ? (
+                        <div className={postStyles.emojiPopover}>
+                          <EmojiPicker
+                            onEmojiClick={(emojiData) => {
+                              insertEmoji(emojiData.emoji || "");
+                            }}
+                            searchDisabled={false}
+                            skinTonesDisabled={false}
+                            lazyLoadEmojis
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className={postStyles.mediaWrap}>
+                      <button
+                        type="button"
+                        className={postStyles.mediaButton}
+                        onClick={() => commentMediaInputRef.current?.click()}
+                        aria-label="Attach photo or video"
+                        disabled={!canInteract || submitting}
+                      >
+                        <svg
+                          aria-hidden
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5Z"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                          />
+                          <path
+                            d="M8 10.5 10.5 8l2.5 3 2-2.5 3 4"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <circle cx="9" cy="7" r="1" fill="currentColor" />
+                        </svg>
+                      </button>
+                      <input
+                        ref={commentMediaInputRef}
+                        type="file"
+                        accept="image/*,video/*"
+                        onChange={handleCommentMediaChange}
+                        hidden
+                      />
+                    </div>
+                    <div className={postStyles.stickerWrap} ref={gifRef}>
+                      <button
+                        type="button"
+                        className={postStyles.stickerButton}
+                        onClick={() => setShowGifPicker((prev) => !prev)}
+                        aria-label="Add GIF"
+                        disabled={!canInteract || submitting}
+                      >
+                        <svg
+                          aria-hidden
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <rect
+                            x="4"
+                            y="5"
+                            width="16"
+                            height="14"
+                            rx="3"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                          />
+                          <path
+                            d="M8 12c0-1.66 1.34-3 3-3h5"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                          />
+                          <path
+                            d="M8 12c0 1.66 1.34 3 3 3h5"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                          />
+                          <path
+                            d="M16 9v6"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </button>
+                      {showGifPicker ? (
+                        <div
+                          className={`${postStyles.stickerPopover} ${styles.reelStickerPopover}`}
+                        >
+                          <div className={postStyles.stickerSearch}>
+                            <input
+                              className={postStyles.stickerSearchInput}
+                              placeholder="Search GIFs"
+                              value={gifQuery}
+                              onChange={(e) => setGifQuery(e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className={postStyles.stickerSearchBtn}
+                              onClick={() => fetchGifs(gifQuery)}
+                              disabled={gifLoading}
+                            >
+                              Search
+                            </button>
+                          </div>
+                          {gifLoading ? (
+                            <div className={postStyles.stickerHint}>
+                              Loading GIFs...
+                            </div>
+                          ) : null}
+                          {gifError ? (
+                            <div className={postStyles.stickerHint}>
+                              {gifError}
+                            </div>
+                          ) : null}
+                          <div className={postStyles.stickerGrid}>
+                            {gifResults.map((gif) => (
+                              <button
+                                key={gif.id}
+                                type="button"
+                                className={postStyles.stickerTile}
+                                onClick={() => selectGif(gif)}
+                              >
+                                <img
+                                  src={gif.preview}
+                                  alt="GIF"
+                                  loading="lazy"
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className={postStyles.stickerWrap} ref={stickerRef}>
+                      <button
+                        type="button"
+                        className={postStyles.stickerButton}
+                        onClick={() => setShowStickerPicker((prev) => !prev)}
+                        aria-label="Add sticker"
+                        disabled={!canInteract || submitting}
+                      >
+                        <svg
+                          aria-hidden
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <rect
+                            x="4"
+                            y="4"
+                            width="16"
+                            height="16"
+                            rx="4"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                          />
+                          <circle cx="10" cy="11" r="1" fill="currentColor" />
+                          <circle cx="14" cy="11" r="1" fill="currentColor" />
+                          <path
+                            d="M9 15c1.2 1 4.8 1 6 0"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </button>
+                      {showStickerPicker ? (
+                        <div
+                          className={`${postStyles.stickerPopover} ${styles.reelStickerPopover}`}
+                        >
+                          <div className={postStyles.stickerSearch}>
+                            <input
+                              className={postStyles.stickerSearchInput}
+                              placeholder="Search stickers"
+                              value={stickerQuery}
+                              onChange={(e) => setStickerQuery(e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className={postStyles.stickerSearchBtn}
+                              onClick={() => fetchStickers(stickerQuery)}
+                              disabled={stickerLoading}
+                            >
+                              Search
+                            </button>
+                          </div>
+                          {stickerLoading ? (
+                            <div className={postStyles.stickerHint}>
+                              Loading stickers...
+                            </div>
+                          ) : null}
+                          {stickerError ? (
+                            <div className={postStyles.stickerHint}>
+                              {stickerError}
+                            </div>
+                          ) : null}
+                          <div className={postStyles.stickerGrid}>
+                            {stickerResults.map((sticker) => (
+                              <button
+                                key={sticker.id}
+                                type="button"
+                                className={postStyles.stickerTile}
+                                onClick={() => selectSticker(sticker)}
+                              >
+                                <img
+                                  src={sticker.preview}
+                                  alt="Sticker"
+                                  loading="lazy"
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
-                ) : null}
+                  <button
+                    className={postStyles.composerSubmit}
+                    onClick={handleSubmit}
+                    aria-label={submitting ? "Sending" : "Post"}
+                    disabled={
+                      !canInteract ||
+                      submitting ||
+                      commentMediaUploading ||
+                      (!text.trim() &&
+                        !commentMediaFile &&
+                        !commentMediaExternal)
+                    }
+                  >
+                    <svg
+                      aria-hidden
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M4 12l16-7-4.8 14-4.2-5.2L4 12Z"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M10.5 13.8 20 5"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <textarea
-                className={postStyles.input}
-                placeholder="Add a comment..."
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                rows={3}
-                ref={textareaRef}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit();
-                  }
-                }}
-                disabled={!canInteract || submitting}
-              />
-              <button
-                className={postStyles.submitBtn}
-                onClick={handleSubmit}
-                disabled={!canInteract || submitting || !text.trim()}
-              >
-                {submitting ? "Sending..." : "Post"}
-              </button>
+              {commentPreviewUrl ? (
+                <div className={postStyles.commentMediaPreview}>
+                  {commentPreviewIsVideo ? (
+                    <video
+                      className={postStyles.commentMediaPreviewVideo}
+                      src={commentPreviewUrl}
+                      controls
+                      controlsList="nodownload noremoteplayback"
+                      onContextMenu={(e) => e.preventDefault()}
+                      muted
+                    />
+                  ) : (
+                    <img
+                      className={postStyles.commentMediaPreviewImage}
+                      src={commentPreviewUrl}
+                      alt="Selected media"
+                      onContextMenu={(e) => e.preventDefault()}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    className={postStyles.commentMediaRemove}
+                    onClick={clearCommentMedia}
+                    aria-label="Remove attachment"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : null}
+              {commentMediaError ? (
+                <div className={postStyles.commentMediaError}>
+                  {commentMediaError}
+                </div>
+              ) : null}
             </div>
           </>
         )}
@@ -1558,7 +2619,7 @@ export default function ReelComments({
                         setReportReason(
                           group.reasons.length === 1
                             ? group.reasons[0].key
-                            : null
+                            : null,
                         );
                       }}
                     >
@@ -1740,6 +2801,38 @@ export default function ReelComments({
                 {blocking ? "Blocking..." : "Block"}
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {commentImageViewerUrl ? (
+        <div
+          className={postStyles.commentImageOverlay}
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setCommentImageViewerUrl(null)}
+        >
+          <button
+            type="button"
+            className={postStyles.commentImageClose}
+            aria-label="Close image"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCommentImageViewerUrl(null);
+            }}
+          >
+            ×
+          </button>
+          <div
+            className={postStyles.commentImageFigure}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              className={postStyles.commentImagePreview}
+              src={commentImageViewerUrl}
+              alt="Comment image"
+              onContextMenu={(e) => e.preventDefault()}
+            />
           </div>
         </div>
       ) : null}

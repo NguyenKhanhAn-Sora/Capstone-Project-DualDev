@@ -24,6 +24,37 @@
   backdrop-filter: blur(8px);
 }
 
+.repostBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.repostIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+.repostText {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.repostLink {
+  color: var(--color-text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.repostLink:hover {
+  text-decoration: underline;
+}
+
 .feedHeader {
   display: flex;
   justify-content: space-between;
@@ -39,7 +70,10 @@
 .followBtn {
   margin-left: 10px;
   font-weight: 700;
-  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease;
   color: var(--color-text);
   cursor: pointer;
 }
@@ -140,6 +174,7 @@
 
 .contentCollapsed {
   display: -webkit-box;
+  line-clamp: 3;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -170,6 +205,16 @@
   text-decoration: underline;
 }
 
+.hashtagLink {
+  color: var(--color-primary-strong);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.hashtagLink:hover {
+  text-decoration: underline;
+}
+
 .contentBlock {
   display: flex;
   flex-direction: column;
@@ -191,6 +236,18 @@
   padding: 4px 8px;
   border-radius: 12px;
   color: var(--color-text);
+}
+
+.metaLink {
+  text-decoration: none;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.metaLink:hover {
+  text-decoration: underline;
+  box-shadow: 0 6px 16px rgba(74, 163, 228, 0.2);
 }
 
 .mediaGrid {
@@ -247,7 +304,9 @@
   cursor: pointer;
   display: grid;
   place-items: center;
-  transition: background 0.15s ease, transform 0.12s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.12s ease;
 }
 
 .mediaNavBtn:hover {
@@ -286,7 +345,10 @@
   font-weight: 700;
   cursor: pointer;
   backdrop-filter: blur(4px);
-  transition: transform 120ms ease, background 120ms ease, border 120ms ease;
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    border 120ms ease;
 }
 
 .soundToggle:hover:not(:disabled) {
@@ -329,6 +391,16 @@
   background: rgba(74, 163, 228, 0.16);
   color: var(--color-primary-strong);
   border: 1px solid rgba(74, 163, 228, 0.35);
+}
+
+.tagLink {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tagLink:hover {
+  text-decoration: underline;
 }
 
 .statRow {
@@ -407,7 +479,9 @@
   border-radius: 10px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
   font-size: 14px;
 }
 
@@ -434,6 +508,8 @@
   justify-content: center;
   z-index: 2000;
   backdrop-filter: blur(6px);
+  overflow-y: auto;
+  padding: 20px 12px;
 }
 
 .modalOverlayOpen {
@@ -458,7 +534,138 @@
   width: min(520px, 94vw);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+.repostHeader {
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.repostSub {
+  color: var(--color-text-muted);
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.repostBadgeRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.repostBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 13px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.repostMenuOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.repostMenu {
+  position: absolute;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-strong);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  min-width: 170px;
+}
+
+.repostMenuTitle {
+  font-weight: 700;
+  font-size: 14px;
+  padding: 2px 4px 6px;
+  color: var(--color-text-muted);
+}
+
+.repostMenuItem {
+  color: var(--color-text);
+  padding: 6px 8px;
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  transition:
+    background 120ms ease,
+    border 120ms ease,
+    transform 120ms ease;
+}
+
+.repostMenuItem:hover {
+  background: var(--color-surface-muted);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.repostSheet {
+  width: min(440px, 92vw);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-strong);
+  border-radius: 18px;
+  overflow: hidden;
+  color: var(--color-text);
+}
+
+.repostSheetHeader {
+  padding: 16px 18px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.repostSheetTitle {
+  margin: 0;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.repostSheetSubtitle {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.repostSheetList {
+  display: flex;
+  flex-direction: column;
+}
+
+.repostSheetItem {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-weight: 700;
+  padding: 14px 18px;
+  text-align: center;
+  cursor: pointer;
+  border-top: 1px solid var(--color-border);
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.repostSheetItem:hover {
+  background: var(--color-surface-muted);
+}
+
+.repostSheetPrimary {
+  color: var(--color-primary);
 }
 
 .repostGrid {
@@ -475,12 +682,16 @@
   text-align: left;
   color: var(--color-text);
   cursor: pointer;
-  transition: transform 120ms ease, border 120ms ease, box-shadow 120ms ease,
+  transition:
+    transform 120ms ease,
+    border 120ms ease,
+    box-shadow 120ms ease,
     background 120ms ease;
   display: flex;
   flex-direction: column;
   gap: 8px;
   height: 100%;
+  min-height: 120px;
 }
 
 .repostOption:hover {
@@ -526,12 +737,12 @@
   color: var(--color-text);
   padding: 10px 12px;
   resize: vertical;
+  width: 100%;
 }
 
 .repostTextarea:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 1px var(--color-primary);
-  background: rgba(0, 0, 0, 0.2);
 }
 
 .editCard {
@@ -587,7 +798,9 @@
   padding: 10px 12px;
   font-size: 14px;
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease,
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
     background 0.15s ease;
 }
 
@@ -653,7 +866,9 @@
   cursor: pointer;
   font-size: 18px;
   line-height: 1;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
   color: var(--color-text);
 }
 
@@ -706,12 +921,15 @@
 
 .mentionDropdown,
 .locationDropdown {
-  margin-top: -4px;
+  margin-top: 0;
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-surface);
   box-shadow: var(--shadow-strong);
-  overflow: hidden;
+  max-height: 320px; /* ~6 rows */
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .mentionItem,
@@ -798,8 +1016,11 @@
   background: var(--color-surface-muted);
   color: var(--color-text);
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease,
-    transform 0.12s ease, background 0.12s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.12s ease,
+    background 0.12s ease;
 }
 
 .toggleCardActive {
@@ -829,7 +1050,9 @@
   align-items: flex-start;
   padding: 10px;
   border-radius: 10px;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
   border: 1px solid transparent;
   cursor: pointer;
 }
@@ -872,7 +1095,10 @@
   color: var(--color-text-muted);
   padding: 6px;
   cursor: pointer;
-  transition: color 120ms ease, transform 120ms ease, border 120ms ease;
+  transition:
+    color 120ms ease,
+    transform 120ms ease,
+    border 120ms ease;
 }
 
 .closeBtn:hover {
@@ -913,7 +1139,10 @@
   color: var(--color-text);
   text-align: left;
   cursor: pointer;
-  transition: transform 120ms ease, border 140ms ease, box-shadow 140ms ease,
+  transition:
+    transform 120ms ease,
+    border 140ms ease,
+    box-shadow 140ms ease,
     background 140ms ease;
 }
 
@@ -976,7 +1205,10 @@
   font-weight: 700;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: transform 120ms ease, background 120ms ease, color 120ms ease;
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .modalPrimary {
@@ -988,7 +1220,9 @@
   border: 1px solid var(--color-primary);
   background: var(--color-primary);
   color: #fff;
-  transition: transform 120ms ease, filter 120ms ease;
+  transition:
+    transform 120ms ease,
+    filter 120ms ease;
 }
 
 .modalPrimary:hover:not(:disabled) {
@@ -1051,7 +1285,10 @@
   padding: 10px 12px;
   color: var(--color-text);
   cursor: pointer;
-  transition: transform 120ms ease, border 120ms ease, box-shadow 120ms ease;
+  transition:
+    transform 120ms ease,
+    border 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .categoryCard:hover {
@@ -1105,7 +1342,9 @@
   background: transparent;
   color: var(--color-text);
   cursor: pointer;
-  transition: background 120ms ease, border 120ms ease;
+  transition:
+    background 120ms ease,
+    border 120ms ease;
   text-align: left;
 }
 

@@ -42,7 +42,7 @@ export default function ProfileSavedPage() {
 
   const isOwner = useMemo(
     () => Boolean(profile && viewerId && profile.userId === viewerId),
-    [profile, viewerId]
+    [profile, viewerId],
   );
 
   useEffect(() => {
@@ -59,9 +59,9 @@ export default function ProfileSavedPage() {
             .sort(
               (a, b) =>
                 (b.createdAt ? new Date(b.createdAt).getTime() : 0) -
-                (a.createdAt ? new Date(a.createdAt).getTime() : 0)
-            )
-        )
+                (a.createdAt ? new Date(a.createdAt).getTime() : 0),
+            ),
+        ),
       )
       .catch((err: unknown) => {
         const message =
@@ -100,6 +100,16 @@ function SavedGrid({
   loading: boolean;
   onSelect: (path: string) => void;
 }) {
+  const resolveTargetPath = (item: FeedItem) => {
+    const kind = (item as any)?.repostKind || item.kind;
+    const isReel = kind === "reel" || item.media?.[0]?.type === "video";
+    if (isReel) {
+      const originId = (item as any)?.repostOf as string | undefined;
+      const query = originId ? `?single=1&origin=${originId}` : "?single=1";
+      return `/reels/${item.id}${query}`;
+    }
+    return `/post/${item.id}`;
+  };
   const handleEnter = (e: React.MouseEvent<HTMLVideoElement>) => {
     const el = e.currentTarget;
     el.currentTime = 0;
@@ -131,8 +141,7 @@ function SavedGrid({
       {items.map((item) => {
         const media = item.media?.[0];
         if (!media) return null;
-        const targetPath =
-          item.kind === "reel" ? `/reels/${item.id}` : `/post/${item.id}`;
+        const targetPath = resolveTargetPath(item);
         return (
           <button
             key={item.id}

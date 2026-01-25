@@ -13,6 +13,7 @@ import {
 } from './post-interaction.schema';
 import { Follow, FollowSchema } from '../users/follow.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
+import { Hashtag, HashtagSchema } from '../hashtags/hashtag.schema';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { Profile, ProfileSchema } from '../profiles/profile.schema';
       { name: PostInteraction.name, schema: PostInteractionSchema },
       { name: Follow.name, schema: FollowSchema },
       { name: Profile.name, schema: ProfileSchema },
+      { name: Hashtag.name, schema: HashtagSchema },
     ]),
   ],
   controllers: [PostsController, ReelsController],

@@ -122,7 +122,7 @@ export class AuthService {
     }
 
     if (!user.passwordHash) {
-      throw new UnauthorizedException('Password sai');
+      throw new UnauthorizedException('Invalid sign-in method');
     }
 
     const passwordOk = await bcrypt.compare(params.password, user.passwordHash);
@@ -225,6 +225,7 @@ export class AuthService {
     coverUrl?: string;
     bio?: string;
     location?: string;
+    gender?: 'male' | 'female' | 'other';
     links?: Record<string, string>;
     password?: string;
   }): Promise<{ accessToken: string; refreshToken: string }> {
@@ -256,6 +257,7 @@ export class AuthService {
       coverUrl: params.coverUrl,
       bio: params.bio,
       location: params.location,
+      gender: params.gender,
       links: params.links,
       birthdate,
     });

@@ -46,7 +46,7 @@ export default function ProfilePostsPage() {
     setPostsLoading(true);
     setError("");
     fetchUserPosts({ token, userId: profile.userId, limit: 30 })
-      .then((items) => setPosts(items))
+      .then((items) => setPosts(items.filter((item) => !item.repostOf)))
       .catch((err: unknown) => {
         const message =
           typeof err === "object" && err && "message" in err
@@ -63,7 +63,7 @@ export default function ProfilePostsPage() {
       <PostGrid
         items={posts}
         loading={postsLoading}
-        onSelect={(id) => router.push(`/post/${id}`)}
+        onSelect={(path) => router.push(path)}
       />
     </>
   );
@@ -76,7 +76,7 @@ function PostGrid({
 }: {
   items: FeedItem[];
   loading: boolean;
-  onSelect: (id: string) => void;
+  onSelect: (path: string) => void;
 }) {
   const handleEnter = (e: React.MouseEvent<HTMLVideoElement>) => {
     const el = e.currentTarget;
@@ -100,17 +100,23 @@ function PostGrid({
     );
   }
 
+  if (!items.length) {
+    return <div className={styles.errorBox}>No posts yet.</div>;
+  }
+
   return (
     <div className={styles.grid}>
       {items.map((item) => {
         const media = item.media?.[0];
         if (!media) return null;
+        const targetPath =
+          item.kind === "reel" ? `/reels/${item.id}` : `/post/${item.id}`;
         return (
           <button
             key={item.id}
             type="button"
             className={styles.tile}
-            onClick={() => onSelect(item.id)}
+            onClick={() => onSelect(targetPath)}
           >
             {media.type === "video" ? (
               <video

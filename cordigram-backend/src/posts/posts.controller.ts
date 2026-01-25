@@ -88,6 +88,42 @@ export class PostsController {
     return this.postsService.getSavedPosts(user.userId, parsedLimit ?? 24);
   }
 
+  @Get('hashtag/:tag')
+  async listByHashtag(
+    @Req() req: Request,
+    @Param('tag') tag: string,
+    @Query('limit') limit?: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.postsService.getPostsByHashtag({
+      viewerId: user.userId,
+      tag,
+      limit: parsedLimit,
+    });
+  }
+
+  @Get('hashtag/:tag/reels')
+  async listReelsByHashtag(
+    @Req() req: Request,
+    @Param('tag') tag: string,
+    @Query('limit') limit?: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.postsService.getReelsByHashtag({
+      viewerId: user.userId,
+      tag,
+      limit: parsedLimit,
+    });
+  }
+
   @Get('user/:id')
   async listByUser(
     @Req() req: Request,

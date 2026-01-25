@@ -63,7 +63,7 @@ export default function LoginPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [recentAccounts, setRecentAccounts] = useState<RecentAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<RecentAccount | null>(
-    null
+    null,
   );
   const [modalPassword, setModalPassword] = useState("");
   const [showModalPassword, setShowModalPassword] = useState(false);
@@ -143,8 +143,8 @@ export default function LoginPage() {
   };
 
   const isDisabled = useMemo(
-    () => !email.trim() || !password.trim() || loading || checkingSession,
-    [email, password, loading, checkingSession]
+    () => !email.trim() || loading || checkingSession,
+    [email, loading, checkingSession],
   );
 
   const saveRecentAccounts = (items: RecentAccount[]) => {
@@ -187,7 +187,7 @@ export default function LoginPage() {
   };
 
   const normalizeRecentAccountsFromServer = (
-    items: RecentAccountResponse[] | undefined
+    items: RecentAccountResponse[] | undefined,
   ): RecentAccount[] => {
     const mapped = (items ?? []).map((item) => ({
       email: item.email.trim().toLowerCase(),
@@ -208,7 +208,7 @@ export default function LoginPage() {
   }) => {
     if (!payload?.recentAccounts) return;
     const normalized = normalizeRecentAccountsFromServer(
-      payload.recentAccounts
+      payload.recentAccounts,
     );
     setRecentAccounts(normalized);
     saveRecentAccounts(normalized);
@@ -247,6 +247,13 @@ export default function LoginPage() {
     event.preventDefault();
     if (!selectedAccount) return;
     setModalError(null);
+
+    const trimmedModalPassword = modalPassword.trim();
+    if (!trimmedModalPassword) {
+      setModalError("Invalid sign-in method");
+      return;
+    }
+
     setModalSubmitting(true);
 
     const trimmedEmail = selectedAccount.email.toLowerCase();
@@ -255,7 +262,10 @@ export default function LoginPage() {
       const result = await apiFetch<{ accessToken: string }>({
         path: "/auth/login",
         method: "POST",
-        body: JSON.stringify({ email: trimmedEmail, password: modalPassword }),
+        body: JSON.stringify({
+          email: trimmedEmail,
+          password: trimmedModalPassword,
+        }),
         credentials: "include",
         headers:
           typeof navigator !== "undefined"
@@ -301,12 +311,21 @@ export default function LoginPage() {
       return;
     }
 
+    const trimmedPassword = password.trim();
+    if (!trimmedPassword) {
+      setError("Invalid sign-in method");
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await apiFetch<{ accessToken: string }>({
         path: "/auth/login",
         method: "POST",
-        body: JSON.stringify({ email: trimmedEmail, password }),
+        body: JSON.stringify({
+          email: trimmedEmail,
+          password: trimmedPassword,
+        }),
         credentials: "include",
         headers:
           typeof navigator !== "undefined"
@@ -402,7 +421,7 @@ export default function LoginPage() {
 
   const handleCardKeyDown = (
     event: KeyboardEvent<HTMLDivElement>,
-    account: RecentAccount
+    account: RecentAccount,
   ) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -588,7 +607,10 @@ export default function LoginPage() {
                       type={showPassword ? "text" : "password"}
                       name="password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setError(null);
+                      }}
                       placeholder="Enter your password"
                       autoComplete="current-password"
                       className={`h-11 w-full max-w-[360px] rounded-[10px] border border-[#d7e5f2] bg-white pl-3 pr-11 text-[14px] font-medium text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:outline-none focus-visible:border-[#559AC2] focus-visible:ring-4 focus-visible:ring-[#9AACEF]/45 ${styles.passwordInput}`}
@@ -741,7 +763,10 @@ export default function LoginPage() {
                   autoFocus
                   placeholder="Enter your password"
                   value={modalPassword}
-                  onChange={(e) => setModalPassword(e.target.value)}
+                  onChange={(e) => {
+                    setModalPassword(e.target.value);
+                    setModalError(null);
+                  }}
                   className={`${styles["overlay-input"]} ${styles.passwordInput}`}
                   autoComplete="current-password"
                 />
@@ -763,7 +788,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 className={styles["overlay-button"]}
-                disabled={!modalPassword.trim() || modalSubmitting}
+                disabled={modalSubmitting}
               >
                 {modalSubmitting ? "Logging in..." : "Log in"}
               </button>

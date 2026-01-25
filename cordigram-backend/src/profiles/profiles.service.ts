@@ -24,6 +24,15 @@ export class ProfilesService {
   private readonly DEFAULT_AVATAR_URL =
     'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
 
+  private buildAvatarResponse(profile: Profile) {
+    return {
+      avatarUrl: profile.avatarUrl || this.DEFAULT_AVATAR_URL,
+      avatarOriginalUrl: profile.avatarOriginalUrl || this.DEFAULT_AVATAR_URL,
+      avatarPublicId: profile.avatarPublicId || '',
+      avatarOriginalPublicId: profile.avatarOriginalPublicId || '',
+    };
+  }
+
   private asObjectId(input: string | Types.ObjectId): Types.ObjectId | null {
     if (input instanceof Types.ObjectId) return input;
     if (!Types.ObjectId.isValid(input)) return null;
@@ -38,6 +47,7 @@ export class ProfilesService {
     avatarOriginalUrl?: string;
     avatarPublicId?: string;
     avatarOriginalPublicId?: string;
+    gender?: 'male' | 'female' | 'other' | '';
     coverUrl?: string;
     bio?: string;
     location?: string;
@@ -69,6 +79,7 @@ export class ProfilesService {
       profile.coverUrl = data.coverUrl ?? profile.coverUrl;
       profile.bio = data.bio ?? profile.bio;
       profile.location = data.location ?? profile.location;
+      profile.gender = data.gender ?? profile.gender;
       profile.links = data.links ?? profile.links;
       profile.birthdate = data.birthdate ?? profile.birthdate;
       await profile.save();
@@ -86,6 +97,7 @@ export class ProfilesService {
       coverUrl: data.coverUrl ?? '',
       bio: data.bio ?? '',
       location: data.location ?? '',
+      gender: data.gender ?? '',
       links: data.links ?? {},
       birthdate: data.birthdate ?? null,
     });
@@ -120,6 +132,56 @@ export class ProfilesService {
     }
 
     return this.profileModel.findOne({ userId: objectId }).exec();
+  }
+
+  async updateAvatarForUser(params: {
+    userId: string;
+    avatarUrl: string;
+    avatarOriginalUrl: string;
+    avatarPublicId: string;
+    avatarOriginalPublicId: string;
+  }): Promise<{
+    avatarUrl: string;
+    avatarOriginalUrl: string;
+    avatarPublicId: string;
+    avatarOriginalPublicId: string;
+  }> {
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(params.userId) })
+      .exec();
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    profile.avatarUrl = params.avatarUrl;
+    profile.avatarOriginalUrl = params.avatarOriginalUrl;
+    profile.avatarPublicId = params.avatarPublicId;
+    profile.avatarOriginalPublicId = params.avatarOriginalPublicId;
+    await profile.save();
+
+    return this.buildAvatarResponse(profile);
+  }
+
+  async resetAvatarForUser(userId: string): Promise<{
+    avatarUrl: string;
+    avatarOriginalUrl: string;
+    avatarPublicId: string;
+    avatarOriginalPublicId: string;
+  }> {
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(userId) })
+      .exec();
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    profile.avatarUrl = this.DEFAULT_AVATAR_URL;
+    profile.avatarOriginalUrl = this.DEFAULT_AVATAR_URL;
+    profile.avatarPublicId = '';
+    profile.avatarOriginalPublicId = '';
+    await profile.save();
+
+    return this.buildAvatarResponse(profile);
   }
 
   async searchProfiles(params: {
@@ -216,6 +278,7 @@ export class ProfilesService {
     avatarUrl: string;
     coverUrl?: string;
     bio?: string;
+    gender?: string;
     location?: string;
     stats: {
       posts: number;
@@ -288,6 +351,7 @@ export class ProfilesService {
       avatarUrl: profile.avatarUrl || this.DEFAULT_AVATAR_URL,
       coverUrl: profile.coverUrl || '',
       bio: profile.bio || '',
+      gender: profile.gender || '',
       location: profile.location || '',
       stats: {
         posts: postsCount,

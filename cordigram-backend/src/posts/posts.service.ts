@@ -23,6 +23,7 @@ import { PostInteraction, InteractionType } from './post-interaction.schema';
 import { Follow } from '../users/follow.schema';
 import { Profile } from '../profiles/profile.schema';
 import { BlocksService } from '../users/blocks.service';
+import { Hashtag } from '../hashtags/hashtag.schema';
 type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
@@ -40,6 +41,7 @@ export class PostsService {
     private readonly postInteractionModel: Model<PostInteraction>,
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
     @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
+    @InjectModel(Hashtag.name) private readonly hashtagModel: Model<Hashtag>,
     private readonly blocksService: BlocksService,
     private readonly cloudinary: CloudinaryService,
     private readonly config: ConfigService,
@@ -128,6 +130,8 @@ export class PostsService {
       deletedAt: null,
     });
 
+    await this.upsertHashtags(normalizedHashtags);
+
     if (repostOf) {
       await this.postModel
         .updateOne({ _id: repostOf }, { $inc: { 'stats.reposts': 1 } })
@@ -149,7 +153,7 @@ export class PostsService {
 
     const post = await this.postModel
       .findOne({ _id: postObjectId, deletedAt: null })
-      .select('authorId')
+      .select('authorId hashtags')
       .lean();
 
     if (!post) {
@@ -161,12 +165,20 @@ export class PostsService {
     }
 
     const update: Record<string, unknown> = {};
+    const prevHashtags = Array.isArray(post.hashtags) ? post.hashtags : [];
+    let addedHashtags: string[] = [];
+    let removedHashtags: string[] = [];
 
     if (dto.content !== undefined) {
       update.content = dto.content ?? '';
     }
     if (dto.hashtags !== undefined) {
-      update.hashtags = this.normalizeHashtags(dto.hashtags ?? []);
+      const nextHashtags = this.normalizeHashtags(dto.hashtags ?? []);
+      update.hashtags = nextHashtags;
+      const prevSet = new Set(prevHashtags);
+      const nextSet = new Set(nextHashtags);
+      addedHashtags = nextHashtags.filter((tag) => !prevSet.has(tag));
+      removedHashtags = prevHashtags.filter((tag) => !nextSet.has(tag));
     }
     if (dto.mentions !== undefined) {
       update.mentions = this.normalizeMentions(dto.mentions ?? []);
@@ -197,6 +209,13 @@ export class PostsService {
     await this.postModel
       .updateOne({ _id: postObjectId }, { $set: update })
       .exec();
+
+    if (addedHashtags.length) {
+      await this.upsertHashtags(addedHashtags);
+    }
+    if (removedHashtags.length) {
+      await this.decrementHashtags(removedHashtags);
+    }
 
     const fresh = await this.postModel
       .findOne({ _id: postObjectId, deletedAt: null })
@@ -286,6 +305,8 @@ export class PostsService {
       deletedAt: null,
     });
 
+    await this.upsertHashtags(normalizedHashtags);
+
     return this.toResponse(doc);
   }
 
@@ -297,7 +318,7 @@ export class PostsService {
 
     const post = await this.postModel
       .findOne({ _id: postObjectId, deletedAt: null })
-      .select('authorId kind')
+      .select('authorId kind hashtags')
       .lean();
 
     if (!post) {
@@ -321,6 +342,10 @@ export class PostsService {
 
     await this.postInteractionModel.deleteMany({ postId: postObjectId }).exec();
 
+    if (Array.isArray(post.hashtags) && post.hashtags.length) {
+      await this.decrementHashtags(post.hashtags);
+    }
+
     return { deleted: true };
   }
 
@@ -332,6 +357,40 @@ export class PostsService {
           .filter(Boolean),
       ),
     ).slice(0, 30);
+  }
+
+  private async upsertHashtags(tags: string[]) {
+    if (!tags.length) return;
+    const now = new Date();
+    await this.hashtagModel.bulkWrite(
+      tags.map((tag) => ({
+        updateOne: {
+          filter: { name: tag },
+          update: {
+            $setOnInsert: { name: tag },
+            $set: { lastUsedAt: now },
+            $inc: { usageCount: 1 },
+          },
+          upsert: true,
+        },
+      })),
+      { ordered: false },
+    );
+  }
+
+  private async decrementHashtags(tags: string[]) {
+    if (!tags.length) return;
+    await this.hashtagModel.bulkWrite(
+      tags.map((tag) => ({
+        updateOne: {
+          filter: { name: tag },
+          update: {
+            $inc: { usageCount: -1 },
+          },
+        },
+      })),
+      { ordered: false },
+    );
   }
 
   private normalizeMentions(handles: string[]): string[] {
@@ -367,6 +426,12 @@ export class PostsService {
       saved?: boolean;
       following?: boolean;
       reposted?: boolean;
+    } | null,
+    repostSourceProfile?: {
+      userId?: Types.ObjectId;
+      displayName?: string;
+      username?: string;
+      avatarUrl?: string;
     } | null,
   ) {
     return {
@@ -407,6 +472,18 @@ export class PostsService {
       saved: userFlags?.saved ?? false,
       following: userFlags?.following ?? false,
       reposted: userFlags?.reposted ?? false,
+      repostOfAuthorId: repostSourceProfile?.userId?.toString?.(),
+      repostOfAuthorDisplayName: repostSourceProfile?.displayName,
+      repostOfAuthorUsername: repostSourceProfile?.username,
+      repostOfAuthorAvatarUrl: repostSourceProfile?.avatarUrl,
+      repostOfAuthor: repostSourceProfile
+        ? {
+            id: repostSourceProfile.userId?.toString?.(),
+            displayName: repostSourceProfile.displayName,
+            username: repostSourceProfile.username,
+            avatarUrl: repostSourceProfile.avatarUrl,
+          }
+        : undefined,
       flags: {
         liked: userFlags?.liked ?? false,
         saved: userFlags?.saved ?? false,
@@ -539,8 +616,9 @@ export class PostsService {
     const followeeSet = new Set(followeeIds);
     const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
 
+    // Show all posts during development; no freshness window so older posts still appear.
     const now = new Date();
-    const freshnessWindow = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+    // const freshnessWindow = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
 
     const { blockedIds, blockedByIds } =
       await this.blocksService.getBlockLists(userObjectId);
@@ -584,7 +662,7 @@ export class PostsService {
         visibility: 'public',
         deletedAt: null,
         publishedAt: { $ne: null },
-        createdAt: { $gte: freshnessWindow },
+        // createdAt: { $lte: freshnessWindow },
         _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
       })
       .sort({ 'stats.hearts': -1, 'stats.comments': -1, createdAt: -1 })
@@ -658,6 +736,58 @@ export class PostsService {
 
     const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
 
+    const repostSourceIds = Array.from(
+      new Set(
+        topPosts
+          .map((p) => p.repostOf?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+
+    let repostSourceProfileMap = new Map<
+      string,
+      (typeof profiles)[number] | null
+    >();
+
+    if (repostSourceIds.length) {
+      const repostSources = await this.postModel
+        .find({ _id: { $in: repostSourceIds }, deletedAt: null })
+        .select('authorId')
+        .lean();
+
+      const repostAuthorIds = Array.from(
+        new Set(
+          repostSources
+            .map((p) => p.authorId?.toString?.())
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ).map((id) => new Types.ObjectId(id));
+
+      if (repostAuthorIds.length) {
+        const repostProfiles = await this.profileModel
+          .find({ userId: { $in: repostAuthorIds } })
+          .select('userId displayName username avatarUrl')
+          .lean();
+
+        repostProfiles.forEach((p) => profileMap.set(p.userId.toString(), p));
+
+        repostSourceProfileMap = new Map(
+          repostSources
+            .map((src) => {
+              const key = src._id?.toString?.();
+              if (!key) return null;
+              const prof = src.authorId
+                ? profileMap.get(src.authorId.toString()) || null
+                : null;
+              return [key, prof] as [string, (typeof profiles)[number] | null];
+            })
+            .filter(Boolean) as Array<
+            [string, (typeof profiles)[number] | null]
+          >,
+        );
+      }
+    }
+
     const postIds = topPosts.map((p) => p._id);
     const interactions = await this.postInteractionModel
       .find({
@@ -689,12 +819,260 @@ export class PostsService {
       const following = post.authorId
         ? followeeSet.has(post.authorId.toString())
         : false;
-      return this.toResponse(post, profile, { ...baseFlags, following });
+      const repostProfile = post.repostOf
+        ? repostSourceProfileMap.get(post.repostOf.toString()) || null
+        : null;
+      return this.toResponse(
+        post,
+        profile,
+        { ...baseFlags, following },
+        repostProfile,
+      );
     });
   }
 
   async getReelsFeed(userId: string, limit = 20) {
     return this.getFeed(userId, limit, ['reel']);
+  }
+
+  async getPostsByHashtag(params: {
+    viewerId: string;
+    tag: string;
+    limit?: number;
+  }) {
+    const { viewerId, tag } = params;
+    const safeLimit = Math.min(Math.max(params.limit ?? 30, 1), 60);
+
+    const normalizedTag = this.normalizeHashtags([tag])[0];
+    if (!normalizedTag) {
+      throw new BadRequestException('Invalid hashtag');
+    }
+
+    const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
+
+    const hidden = await this.postInteractionModel
+      .find({ userId: viewerObjectId, type: 'hide' })
+      .select('postId')
+      .lean();
+    const hiddenIds = new Set(
+      hidden.map((h) => h.postId?.toString?.()).filter(Boolean),
+    );
+
+    const followees = await this.followModel
+      .find({ followerId: viewerObjectId })
+      .select('followeeId')
+      .lean();
+    const followeeIds = followees.map((f) => f.followeeId.toString());
+    const followeeSet = new Set(followeeIds);
+    const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
+
+    const { blockedIds, blockedByIds } =
+      await this.blocksService.getBlockLists(viewerObjectId);
+    const excludedAuthorIds = Array.from(
+      new Set([...blockedIds, ...blockedByIds]),
+      (id) => new Types.ObjectId(id),
+    );
+
+    const posts = await this.postModel
+      .find({
+        hashtags: normalizedTag,
+        kind: 'post',
+        status: 'published',
+        deletedAt: null,
+        publishedAt: { $ne: null },
+        authorId: { $nin: excludedAuthorIds },
+        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
+        $or: [
+          { authorId: viewerObjectId },
+          { visibility: 'public' },
+          {
+            visibility: 'followers',
+            authorId: { $in: followeeObjectIds },
+          },
+        ],
+      })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit * 3)
+      .lean();
+
+    if (!posts.length) return [] as ReturnType<typeof this.toResponse>[];
+
+    const now = new Date();
+    const scored = posts
+      .map((raw) => this.postModel.hydrate(raw) as Post)
+      .map((post) => ({ post, score: this.scorePost(post, followeeSet, now) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, safeLimit)
+      .map((item) => item.post);
+
+    const authorIds = Array.from(
+      new Set(
+        scored
+          .map((p) => p.authorId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+
+    const profiles = await this.profileModel
+      .find({ userId: { $in: authorIds } })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+
+    const postIds = scored.map((p) => p._id);
+    const interactions = await this.postInteractionModel
+      .find({
+        userId: viewerObjectId,
+        postId: { $in: postIds },
+        type: { $in: ['like', 'save', 'repost'] },
+      })
+      .select('postId type')
+      .lean();
+
+    const interactionMap = new Map<
+      string,
+      { liked?: boolean; saved?: boolean; reposted?: boolean }
+    >();
+
+    interactions.forEach((item) => {
+      const key = item.postId?.toString?.();
+      if (!key) return;
+      const current = interactionMap.get(key) || {};
+      if (item.type === 'like') current.liked = true;
+      if (item.type === 'save') current.saved = true;
+      if (item.type === 'repost') current.reposted = true;
+      interactionMap.set(key, current);
+    });
+
+    return scored.map((post) => {
+      const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
+      const baseFlags = interactionMap.get(post._id?.toString?.() ?? '') || {};
+      const following = post.authorId
+        ? followeeSet.has(post.authorId.toString())
+        : false;
+      return this.toResponse(post, profile, { ...baseFlags, following });
+    });
+  }
+
+  async getReelsByHashtag(params: {
+    viewerId: string;
+    tag: string;
+    limit?: number;
+  }) {
+    const { viewerId, tag } = params;
+    const safeLimit = Math.min(Math.max(params.limit ?? 30, 1), 60);
+
+    const normalizedTag = this.normalizeHashtags([tag])[0];
+    if (!normalizedTag) {
+      throw new BadRequestException('Invalid hashtag');
+    }
+
+    const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
+
+    const hidden = await this.postInteractionModel
+      .find({ userId: viewerObjectId, type: 'hide' })
+      .select('postId')
+      .lean();
+    const hiddenIds = new Set(
+      hidden.map((h) => h.postId?.toString?.()).filter(Boolean),
+    );
+
+    const followees = await this.followModel
+      .find({ followerId: viewerObjectId })
+      .select('followeeId')
+      .lean();
+    const followeeIds = followees.map((f) => f.followeeId.toString());
+    const followeeSet = new Set(followeeIds);
+    const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
+
+    const { blockedIds, blockedByIds } =
+      await this.blocksService.getBlockLists(viewerObjectId);
+    const excludedAuthorIds = Array.from(
+      new Set([...blockedIds, ...blockedByIds]),
+      (id) => new Types.ObjectId(id),
+    );
+
+    const posts = await this.postModel
+      .find({
+        hashtags: normalizedTag,
+        kind: 'reel',
+        status: 'published',
+        deletedAt: null,
+        publishedAt: { $ne: null },
+        authorId: { $nin: excludedAuthorIds },
+        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
+        $or: [
+          { authorId: viewerObjectId },
+          { visibility: 'public' },
+          {
+            visibility: 'followers',
+            authorId: { $in: followeeObjectIds },
+          },
+        ],
+      })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit * 3)
+      .lean();
+
+    if (!posts.length) return [] as ReturnType<typeof this.toResponse>[];
+
+    const now = new Date();
+    const scored = posts
+      .map((raw) => this.postModel.hydrate(raw) as Post)
+      .map((post) => ({ post, score: this.scorePost(post, followeeSet, now) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, safeLimit)
+      .map((item) => item.post);
+
+    const authorIds = Array.from(
+      new Set(
+        scored
+          .map((p) => p.authorId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+
+    const profiles = await this.profileModel
+      .find({ userId: { $in: authorIds } })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+
+    const postIds = scored.map((p) => p._id);
+    const interactions = await this.postInteractionModel
+      .find({
+        userId: viewerObjectId,
+        postId: { $in: postIds },
+        type: { $in: ['like', 'save', 'repost'] },
+      })
+      .select('postId type')
+      .lean();
+
+    const interactionMap = new Map<
+      string,
+      { liked?: boolean; saved?: boolean; reposted?: boolean }
+    >();
+
+    interactions.forEach((item) => {
+      const key = item.postId?.toString?.();
+      if (!key) return;
+      const current = interactionMap.get(key) || {};
+      if (item.type === 'like') current.liked = true;
+      if (item.type === 'save') current.saved = true;
+      if (item.type === 'repost') current.reposted = true;
+      interactionMap.set(key, current);
+    });
+
+    return scored.map((post) => {
+      const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
+      const baseFlags = interactionMap.get(post._id?.toString?.() ?? '') || {};
+      const following = post.authorId
+        ? followeeSet.has(post.authorId.toString())
+        : false;
+      return this.toResponse(post, profile, { ...baseFlags, following });
+    });
   }
 
   async getUserPosts(params: {
@@ -828,10 +1206,7 @@ export class PostsService {
       const doc = this.postModel.hydrate(raw) as Post;
 
       try {
-        await this.blocksService.assertNotBlocked(
-          viewerObjectId,
-          doc.authorId,
-        );
+        await this.blocksService.assertNotBlocked(viewerObjectId, doc.authorId);
       } catch {
         continue;
       }
@@ -1406,7 +1781,12 @@ export class PostsService {
       )
       .exec();
 
-    return Boolean((result as { upsertedCount?: number }).upsertedCount);
+    const upserted =
+      Boolean((result as { upsertedCount?: number }).upsertedCount) ||
+      Boolean((result as { upsertedId?: unknown }).upsertedId) ||
+      (result.matchedCount === 0 && result.modifiedCount === 0);
+
+    return upserted;
   }
 
   private async removeUniqueInteraction(
