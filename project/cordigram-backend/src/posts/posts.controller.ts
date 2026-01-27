@@ -69,13 +69,38 @@ export class PostsController {
   }
 
   @Get('feed')
-  async feed(@Req() req: Request, @Query('limit') limit?: string) {
+  async feed(
+    @Req() req: Request,
+    @Query('limit') limit?: string,
+    @Query('scope') scope?: string,
+    @Query('kinds') kinds?: string,
+  ) {
     const user = req.user as AuthenticatedUser | undefined;
     if (!user) {
       throw new UnauthorizedException();
     }
     const parsedLimit = limit ? Number(limit) : undefined;
-    return this.postsService.getFeed(user.userId, parsedLimit ?? 20);
+
+    const parsedKinds = kinds
+      ? kinds
+          .split(',')
+          .map((k) => k.trim())
+          .filter((k) => k === 'post' || k === 'reel')
+      : undefined;
+
+    if (scope === 'following') {
+      return this.postsService.getFollowingFeed(
+        user.userId,
+        parsedLimit ?? 20,
+        (parsedKinds as any) ?? undefined,
+      );
+    }
+
+    return this.postsService.getFeed(
+      user.userId,
+      parsedLimit ?? 20,
+      (parsedKinds as any) ?? undefined,
+    );
   }
 
   @Get('saved')

@@ -1,0 +1,70 @@
+.header {
+  background: var(--color-bg-home);
+  width: min(640px, 100%);
+  margin: 0 auto;
+}
+
+.header > * {
+  margin-left: auto;
+  margin-right: auto;
+  width: min(640px, 100%);
+}
+
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.tabs {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 999px;
+  gap: 6px;
+  width: fit-content;
+  margin: 14px 0 0;
+  padding: 6px;
+  display: inline-flex;
+}
+
+.tabBtn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.tabBtn:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-primary);
+}
+
+.tabBtnActive {
+  color: var(--color-text);
+  background: linear-gradient(120deg, #6ddcff2e, #7f9bff33);
+  border-color: rgba(124, 58, 237, 0.35);
+}

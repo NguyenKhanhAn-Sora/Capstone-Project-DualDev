@@ -30,12 +30,23 @@ export class ReelsController {
   }
 
   @Get('feed')
-  async feed(@Req() req: Request, @Query('limit') limit?: string) {
+  async feed(
+    @Req() req: Request,
+    @Query('limit') limit?: string,
+    @Query('scope') scope?: string,
+  ) {
     const user = req.user as AuthenticatedUser | undefined;
     if (!user) {
       throw new UnauthorizedException();
     }
     const parsedLimit = limit ? Number(limit) : undefined;
+    if (scope === 'following') {
+      return this.postsService.getFollowingFeed(
+        user.userId,
+        parsedLimit ?? 20,
+        ['reel'],
+      );
+    }
     return this.postsService.getReelsFeed(user.userId, parsedLimit ?? 20);
   }
 

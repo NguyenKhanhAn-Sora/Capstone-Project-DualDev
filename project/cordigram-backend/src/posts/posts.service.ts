@@ -831,6 +831,190 @@ export class PostsService {
     });
   }
 
+  async getFollowingFeed(
+    userId: string,
+    limit = 20,
+    kinds: PostKind[] = ['post', 'reel'],
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    const allowedKinds = kinds.length ? kinds : ['post', 'reel'];
+    const safeLimit = Math.min(Math.max(limit, 1), 50);
+    const userObjectId = this.asObjectId(userId, 'userId');
+
+    const hidden = await this.postInteractionModel
+      .find({ userId: userObjectId, type: 'hide' })
+      .select('postId')
+      .lean();
+    const hiddenIds = new Set(
+      hidden.map((h) => h.postId?.toString?.()).filter(Boolean),
+    );
+
+    const followees = await this.followModel
+      .find({ followerId: userObjectId })
+      .select('followeeId')
+      .lean();
+
+    const followeeIds = followees.map((f) => f.followeeId.toString());
+    const followeeSet = new Set(followeeIds);
+    if (!followeeIds.length) {
+      return [];
+    }
+
+    const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
+
+    const { blockedIds, blockedByIds } =
+      await this.blocksService.getBlockLists(userObjectId);
+    const excludedAuthorIds = Array.from(
+      new Set([...blockedIds, ...blockedByIds]),
+      (id) => new Types.ObjectId(id),
+    );
+
+    const followCandidates = await this.postModel
+      .find({
+        authorId: { $in: followeeObjectIds, $nin: excludedAuthorIds },
+        kind: { $in: allowedKinds },
+        status: 'published',
+        visibility: { $ne: 'private' },
+        deletedAt: null,
+        publishedAt: { $ne: null },
+        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
+      })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit * 2)
+      .lean();
+
+    const merged: Post[] = [];
+    const seen = new Set<string>();
+
+    const pushCandidate = (raw: unknown) => {
+      const candidate = raw as Post;
+      const id = (
+        candidate as { _id?: Types.ObjectId | string }
+      )?._id?.toString?.();
+      if (!id || seen.has(id) || hiddenIds.has(id)) {
+        return;
+      }
+      merged.push(this.postModel.hydrate(candidate) as Post);
+      seen.add(id);
+    };
+
+    followCandidates.forEach((raw) => pushCandidate(raw));
+
+    const topPosts = merged.slice(0, safeLimit);
+
+    const authorIds = Array.from(
+      new Set(
+        topPosts
+          .map((p) => p.authorId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+
+    const profiles = await this.profileModel
+      .find({ userId: { $in: authorIds } })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+
+    const repostSourceIds = Array.from(
+      new Set(
+        topPosts
+          .map((p) => p.repostOf?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+
+    let repostSourceProfileMap = new Map<
+      string,
+      (typeof profiles)[number] | null
+    >();
+
+    if (repostSourceIds.length) {
+      const repostSources = await this.postModel
+        .find({ _id: { $in: repostSourceIds }, deletedAt: null })
+        .select('authorId')
+        .lean();
+
+      const repostAuthorIds = Array.from(
+        new Set(
+          repostSources
+            .map((p) => p.authorId?.toString?.())
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ).map((id) => new Types.ObjectId(id));
+
+      if (repostAuthorIds.length) {
+        const repostProfiles = await this.profileModel
+          .find({ userId: { $in: repostAuthorIds } })
+          .select('userId displayName username avatarUrl')
+          .lean();
+
+        repostProfiles.forEach((p) => profileMap.set(p.userId.toString(), p));
+
+        repostSourceProfileMap = new Map(
+          repostSources
+            .map((src) => {
+              const key = src._id?.toString?.();
+              if (!key) return null;
+              const prof = src.authorId
+                ? profileMap.get(src.authorId.toString()) || null
+                : null;
+              return [key, prof] as [string, (typeof profiles)[number] | null];
+            })
+            .filter(Boolean) as Array<
+            [string, (typeof profiles)[number] | null]
+          >,
+        );
+      }
+    }
+
+    const postIds = topPosts.map((p) => p._id);
+    const interactions = await this.postInteractionModel
+      .find({
+        userId: userObjectId,
+        postId: { $in: postIds },
+        type: { $in: ['like', 'save', 'repost'] },
+      })
+      .select('postId type')
+      .lean();
+
+    const interactionMap = new Map<
+      string,
+      { liked?: boolean; saved?: boolean; reposted?: boolean }
+    >();
+
+    interactions.forEach((item) => {
+      const key = item.postId?.toString?.();
+      if (!key) return;
+      const current = interactionMap.get(key) || {};
+      if (item.type === 'like') current.liked = true;
+      if (item.type === 'save') current.saved = true;
+      if (item.type === 'repost') current.reposted = true;
+      interactionMap.set(key, current);
+    });
+
+    return topPosts.map((post) => {
+      const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
+      const baseFlags = interactionMap.get(post._id?.toString?.() ?? '') || {};
+      const following = post.authorId
+        ? followeeSet.has(post.authorId.toString())
+        : false;
+      const repostProfile = post.repostOf
+        ? repostSourceProfileMap.get(post.repostOf.toString()) || null
+        : null;
+      return this.toResponse(
+        post,
+        profile,
+        { ...baseFlags, following },
+        repostProfile,
+      );
+    });
+  }
+
   async getReelsFeed(userId: string, limit = 20) {
     return this.getFeed(userId, limit, ['reel']);
   }

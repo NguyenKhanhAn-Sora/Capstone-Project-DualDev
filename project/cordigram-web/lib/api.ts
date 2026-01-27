@@ -325,10 +325,14 @@ export async function createReel(opts: {
 export async function fetchFeed(opts: {
   token: string;
   limit?: number;
+  scope?: "all" | "following";
+  kinds?: Array<"post" | "reel">;
 }): Promise<FeedItem[]> {
-  const { token, limit = 20 } = opts;
+  const { token, limit = 20, scope, kinds } = opts;
   const params = new URLSearchParams();
   params.set("limit", String(limit));
+  if (scope) params.set("scope", scope);
+  if (kinds?.length) params.set("kinds", kinds.join(","));
 
   return apiFetch<FeedItem[]>({
     path: `/posts/feed?${params.toString()}`,
@@ -450,12 +454,14 @@ export async function fetchReelsFeed(opts: {
   limit?: number;
   authorId?: string;
   includeOwned?: boolean;
+  scope?: "all" | "following";
 }): Promise<FeedItem[]> {
-  const { token, limit = 20, authorId, includeOwned } = opts;
+  const { token, limit = 20, authorId, includeOwned, scope } = opts;
   const params = new URLSearchParams();
   params.set("limit", String(limit));
   if (authorId) params.set("authorId", authorId);
   if (includeOwned) params.set("includeOwned", "1");
+  if (scope) params.set("scope", scope);
 
   return apiFetch<FeedItem[]>({
     path: `/reels/feed?${params.toString()}`,

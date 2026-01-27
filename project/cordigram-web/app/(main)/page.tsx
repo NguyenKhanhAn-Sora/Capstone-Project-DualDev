@@ -383,7 +383,13 @@ const REPORT_GROUPS: ReportCategory[] = [
   },
 ];
 
-export default function HomePage() {
+export default function HomePage({
+  scopeOverride,
+  kindsOverride,
+}: {
+  scopeOverride?: "all" | "following";
+  kindsOverride?: Array<"post" | "reel">;
+} = {}) {
   const canRender = useRequireAuth();
   const pathname = usePathname();
   const [items, setItems] = useState<PostViewState[]>([]);
@@ -456,6 +462,13 @@ export default function HomePage() {
   const viewCooldownRef = useRef<Map<string, number>>(new Map());
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const autoLoadLockRef = useRef(false);
+
+  const feedCacheKey = useMemo(() => {
+    const scope = scopeOverride ?? "all";
+    return scope === "following"
+      ? `${FEED_CACHE_KEY}:following`
+      : FEED_CACHE_KEY;
+  }, [scopeOverride]);
 
   const repostHeartsByOriginalId = useMemo(() => {
     const totals = new Map<string, number>();
@@ -586,7 +599,7 @@ export default function HomePage() {
       };
       try {
         sessionStorage.setItem(
-          FEED_CACHE_KEY,
+          feedCacheKey,
           JSON.stringify({
             items: data.items,
             page: data.page,
@@ -597,12 +610,12 @@ export default function HomePage() {
         );
       } catch {}
     },
-    [hasMore, items, page, viewerId],
+    [feedCacheKey, hasMore, items, page, viewerId],
   );
 
   const tryHydrateFromCache = useCallback(() => {
     if (typeof window === "undefined") return false;
-    const raw = sessionStorage.getItem(FEED_CACHE_KEY);
+    const raw = sessionStorage.getItem(feedCacheKey);
     if (!raw) return false;
     try {
       const cached = JSON.parse(raw) as {
@@ -627,7 +640,7 @@ export default function HomePage() {
     } catch {
       return false;
     }
-  }, [viewerId]);
+  }, [feedCacheKey, viewerId]);
 
   const showToast = useCallback((message: string, duration = 1600) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -679,7 +692,12 @@ export default function HomePage() {
     if (!token) return;
     try {
       const limit = page * PAGE_SIZE;
-      const data = await fetchFeed({ token, limit });
+      const data = await fetchFeed({
+        token,
+        limit,
+        scope: scopeOverride,
+        kinds: kindsOverride,
+      });
       const posts = onlyPostItems(data);
       const map = new Map(posts.map((item) => [item.id, item]));
       setItems((prev) =>
@@ -698,7 +716,7 @@ export default function HomePage() {
         }),
       );
     } catch {}
-  }, [page, token]);
+  }, [kindsOverride, page, scopeOverride, token]);
 
   const load = useCallback(
     async (nextPage: number) => {
@@ -710,7 +728,12 @@ export default function HomePage() {
       setError("");
       try {
         const limit = nextPage * PAGE_SIZE;
-        const data = await fetchFeed({ token, limit });
+        const data = await fetchFeed({
+          token,
+          limit,
+          scope: scopeOverride,
+          kinds: kindsOverride,
+        });
         const posts = onlyPostItems(data);
         setHasMore(data.length >= limit);
         const mapped = posts.map((item) => ({
@@ -740,7 +763,7 @@ export default function HomePage() {
         setLoading(false);
       }
     },
-    [persistFeedCache, token],
+    [kindsOverride, persistFeedCache, scopeOverride, token],
   );
 
   const handleLoadMore = useCallback(() => {

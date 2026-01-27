@@ -802,12 +802,20 @@ function ReelActions({
   );
 }
 
-export default function ReelPage() {
+export default function ReelPage({
+  scopeOverride,
+}: {
+  scopeOverride?: "all" | "following";
+} = {}) {
   const REELS_PAGE_SIZE = 10;
   const canRender = useRequireAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const params = useParams<{ id?: string | string[] }>();
+  const scope = useMemo<"all" | "following">(() => {
+    if (scopeOverride) return scopeOverride;
+    return searchParams?.get("scope") === "following" ? "following" : "all";
+  }, [scopeOverride, searchParams]);
   const [viewerId, setViewerId] = useState<string | undefined>(() =>
     typeof window === "undefined"
       ? undefined
@@ -1122,7 +1130,7 @@ export default function ReelPage() {
       try {
         const limit = nextPage * REELS_PAGE_SIZE;
 
-        let base = ((await fetchReelsFeed({ token, limit })) || []).map(
+        let base = ((await fetchReelsFeed({ token, limit, scope })) || []).map(
           coerceReelKind,
         );
         let nextItems = [...base];
@@ -1131,7 +1139,7 @@ export default function ReelPage() {
         // Bring in reposted reels that may only be delivered via main feed
         try {
           const repostCandidates = (
-            (await fetchFeed({ token, limit: 40 })) || []
+            (await fetchFeed({ token, limit: 40, scope })) || []
           )
             .filter(isRepostOfReel)
             .map(coerceReelKind);
@@ -1146,12 +1154,13 @@ export default function ReelPage() {
           }
         } catch {}
 
-        if (!nextItems.length && viewerId) {
+        if (!nextItems.length && viewerId && scope !== "following") {
           const ownedBase = (
             (await fetchReelsFeed({
               token,
               authorId: viewerId,
               includeOwned: true,
+              scope,
               limit,
             })) || []
           ).map(coerceReelKind);
@@ -1199,7 +1208,7 @@ export default function ReelPage() {
         else setLoadingMore(false);
       }
     },
-    [REELS_PAGE_SIZE, requestedReelId, token, viewerId],
+    [REELS_PAGE_SIZE, requestedReelId, scope, token, viewerId],
   );
 
   const loadMore = useCallback(() => {
