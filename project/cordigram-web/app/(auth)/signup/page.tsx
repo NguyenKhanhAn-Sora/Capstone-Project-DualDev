@@ -303,7 +303,7 @@ export default function SignupPage() {
           lastUsed: Date.now(),
         },
         ...filtered,
-      ].slice(0, 5);
+      ].slice(0, 6);
       window.localStorage.setItem("recentAccounts", JSON.stringify(next));
     } catch (_err) {
       // ignore localStorage errors

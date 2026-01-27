@@ -10,7 +10,7 @@ function decodeJwtEmail(token: string): string | null {
   try {
     const payload = token.split(".")[1];
     const json = JSON.parse(
-      atob(payload.replace(/-/g, "+").replace(/_/g, "/"))
+      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
     );
     return typeof json?.email === "string" ? json.email : null;
   } catch (_err) {
@@ -49,7 +49,7 @@ export default function GoogleCallbackPage() {
       username?: string;
       displayName?: string;
       avatarUrl?: string;
-    } | null
+    } | null,
   ) => {
     if (typeof window === "undefined" || !account?.email) return;
     const normalizedEmail = account.email.trim().toLowerCase();
@@ -68,7 +68,7 @@ export default function GoogleCallbackPage() {
           lastUsed: Date.now(),
         },
         ...filtered,
-      ].slice(0, 5);
+      ].slice(0, 6);
       window.localStorage.setItem(key, JSON.stringify(next));
     } catch (_err) {
       // ignore
@@ -100,7 +100,7 @@ export default function GoogleCallbackPage() {
                   displayName: profile.displayName,
                   avatarUrl: profile.avatarUrl,
                 }
-              : null
+              : null,
           );
         })
         .catch(() => {

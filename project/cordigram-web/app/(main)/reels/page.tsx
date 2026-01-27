@@ -36,6 +36,25 @@ import styles from "./reel.module.css";
 import postStyles from "../post/post.module.css";
 import feedStyles from "../home-feed.module.css";
 
+function LocationPinIcon() {
+  return (
+    <svg
+      aria-hidden
+      width={14}
+      height={14}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 21s-6-5.5-6-10a6 6 0 1 1 12 0c0 4.5-6 10-6 10Z" />
+      <circle cx="12" cy="11" r="2.5" />
+    </svg>
+  );
+}
+
 const formatCount = (value?: number) => {
   const n = value ?? 0;
   if (n >= 1_000_000)
@@ -581,6 +600,27 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
               </span>
             </div>
           ) : null}
+
+          {item.location ? (
+            <a
+              className={styles.captionLocationRow}
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                item.location,
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <span className={styles.captionLocationIcon} aria-hidden>
+                <LocationPinIcon />
+              </span>
+              <span className={styles.captionLocationLink}>
+                {item.location}
+              </span>
+            </a>
+          ) : null}
+
           {item.authorUsername ? (
             item.authorId ? (
               <Link

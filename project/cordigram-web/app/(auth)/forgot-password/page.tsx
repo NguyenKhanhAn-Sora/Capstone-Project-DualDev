@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
 
   const canSendEmail = useMemo(
     () => !!email.trim() && !loading,
-    [email, loading]
+    [email, loading],
   );
 
   const canVerifyOtp = useMemo(() => !!otp.trim() && !loading, [otp, loading]);
@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
       newPassword === confirmPassword &&
       newPassword.length >= 8 &&
       !loading,
-    [newPassword, confirmPassword, loading]
+    [newPassword, confirmPassword, loading],
   );
 
   const handleSendEmail = async (event: FormEvent) => {
@@ -148,10 +148,10 @@ export default function ForgotPasswordPage() {
                 lastUsed: Date.now(),
               },
               ...filtered,
-            ].slice(0, 5);
+            ].slice(0, 6);
             window.localStorage.setItem(
               RECENT_ACCOUNTS_KEY,
-              JSON.stringify(next)
+              JSON.stringify(next),
             );
           }
         } catch (_err) {

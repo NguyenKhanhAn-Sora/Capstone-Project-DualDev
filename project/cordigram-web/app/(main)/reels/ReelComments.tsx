@@ -2074,7 +2074,7 @@ export default function ReelComments({
             The post owner has turned off comments.
           </div>
         ) : (
-          <>
+          <div>
             {replyTarget ? (
               <div className={postStyles.replyBadge}>
                 Replying to @{replyTarget.username || "comment"}
@@ -2560,7 +2560,7 @@ export default function ReelComments({
                 </div>
               ) : null}
             </div>
-          </>
+          </div>
         )}
       </aside>
       {reportingCommentId ? (

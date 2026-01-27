@@ -24,6 +24,7 @@ import {
 } from "@/lib/auth";
 
 const RECENT_ACCOUNTS_KEY = "recentAccounts";
+const MAX_RECENT_ACCOUNTS = 6;
 
 type RecentAccount = {
   email: string;
@@ -138,6 +139,32 @@ export default function LoginPage() {
     };
   }, [router]);
 
+  const overlayOpen = !!selectedAccount || !!confirmEmail || confirmAll;
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!overlayOpen) return;
+
+    const body = document.body;
+    const prevOverflow = body.style.overflow;
+    const prevPaddingRight = body.style.paddingRight;
+
+    const scrollbarWidth =
+      typeof window !== "undefined"
+        ? window.innerWidth - document.documentElement.clientWidth
+        : 0;
+
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      body.style.overflow = prevOverflow;
+      body.style.paddingRight = prevPaddingRight;
+    };
+  }, [overlayOpen]);
+
   const handleGoogleLogin = () => {
     window.location.href = `${getApiBaseUrl()}/auth/google`;
   };
@@ -180,7 +207,7 @@ export default function LoginPage() {
 
     setRecentAccounts((prev) => {
       const filtered = prev.filter((item) => item.email !== normalized.email);
-      const next = [normalized, ...filtered].slice(0, 5);
+      const next = [normalized, ...filtered].slice(0, MAX_RECENT_ACCOUNTS);
       saveRecentAccounts(next);
       return next;
     });
@@ -200,7 +227,7 @@ export default function LoginPage() {
     return mapped
       .filter((item) => emailRegex.test(item.email))
       .sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0))
-      .slice(0, 5);
+      .slice(0, MAX_RECENT_ACCOUNTS);
   };
 
   const applyServerRecentAccounts = (payload?: {
@@ -560,19 +587,6 @@ export default function LoginPage() {
 
           <div className={styles["login-right"]}>
             <div className="w-full max-w-[420px] rounded-2xl border border-[#e5edf5] bg-white p-10 shadow-xl">
-              {checkingSession ? (
-                <div className={styles["session-banner"]}>
-                  <div className={styles["session-spinner"]} />
-                  <div>
-                    <p className={styles["session-title"]}>
-                      Restoring your session
-                    </p>
-                    <p className={styles["session-sub"]}>
-                      Checking secure cookies and refreshing access.
-                    </p>
-                  </div>
-                </div>
-              ) : null}
               <h1 className="text-[32px] font-semibold leading-[1.2] text-slate-900 text-center">
                 Login
               </h1>

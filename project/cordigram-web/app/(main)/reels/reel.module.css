@@ -281,7 +281,6 @@
   border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
   display: flex;
   flex-direction: column;
-  gap: 12px;
   min-width: var(--sidebar-width);
   color: var(--color-text, #e5e7eb);
   margin-left: auto;
@@ -319,7 +318,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 12px 0px;
+  padding: 12px;
 }
 
 .commentSidebarTitle {
@@ -851,6 +850,55 @@
   text-decoration: underline;
 }
 
+.captionLocationRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #cbd5e1;
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+  max-width: min(520px, 78vw);
+  transition:
+    transform 120ms ease,
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.captionLocationRow:hover {
+  background: rgba(15, 23, 42, 0.36);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.captionLocationIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #cbd5e1;
+}
+
+.captionLocationLink {
+  color: #f8fafc;
+  font-weight: 700;
+  text-decoration: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.captionLocationLink:hover {
+  text-decoration: underline;
+}
+
 .captionText {
   color: #e2e8f0;
   line-height: 1.5;
@@ -869,6 +917,10 @@
   color: #f1f5f9;
 }
 
+.captionBody {
+  position: relative;
+}
+
 .captionCollapsed {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -876,6 +928,58 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   font-size: 14px;
+}
+
+.captionToggleCollapsed {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  border: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(5, 10, 21, 0) 0%,
+    rgba(5, 10, 21, 0.82) 45%,
+    rgba(5, 10, 21, 0.9) 100%
+  );
+  color: #f8fafc;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 0 0 0 26px;
+  height: 20px;
+  display: inline-flex;
+  align-items: flex-end;
+  cursor: pointer;
+}
+
+.captionToggleCollapsed:hover {
+  text-decoration: underline;
+}
+
+.captionToggleCollapsed:focus-visible {
+  outline: 2px solid rgba(248, 250, 252, 0.9);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.captionToggleInline {
+  border: 0;
+  background: transparent;
+  color: #f8fafc;
+  font-weight: 800;
+  font-size: 13px;
+  margin-left: 8px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.captionToggleInline:hover {
+  text-decoration: underline;
+}
+
+.captionToggleInline:focus-visible {
+  outline: 2px solid rgba(248, 250, 252, 0.9);
+  outline-offset: 3px;
+  border-radius: 8px;
 }
 
 .hashtags {
