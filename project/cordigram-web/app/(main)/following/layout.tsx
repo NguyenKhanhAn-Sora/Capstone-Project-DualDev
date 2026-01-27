@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useSelectedLayoutSegment } from "next/navigation";
+import { useEffect } from "react";
 import styles from "./following.module.css";
 
 export default function FollowingLayout({
@@ -9,12 +10,24 @@ export default function FollowingLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const isReels = pathname?.startsWith("/following/reels");
+  const segment = useSelectedLayoutSegment();
+  const isReels = segment === "reels";
+
+  useEffect(() => {
+    if (isReels) return;
+
+    const scrollRoot =
+      document.querySelector<HTMLElement>("[data-scroll-root]");
+    if (!scrollRoot) return;
+
+    scrollRoot.scrollTo({ top: 0, behavior: "auto" });
+  }, [isReels, segment]);
 
   return (
-    <>
-      <header className={styles.header}>
+    <div
+      className={`${styles.layout} ${isReels ? styles.layoutReels : styles.layoutPosts}`}
+    >
+      <nav className={styles.nav} aria-label="Following">
         <div className={styles.tabs} role="tablist" aria-label="Following tabs">
           <Link
             href="/following"
@@ -33,8 +46,9 @@ export default function FollowingLayout({
             Reels
           </Link>
         </div>
-      </header>
-      {children}
-    </>
+      </nav>
+
+      <div className={styles.content}>{children}</div>
+    </div>
   );
 }

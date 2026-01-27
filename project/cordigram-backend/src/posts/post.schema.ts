@@ -54,6 +54,9 @@ export class Post extends Document {
   @Prop({ type: [MediaSchema], default: [] })
   media: Media[];
 
+  @Prop({ type: Number, default: null })
+  primaryVideoDurationMs?: number | null;
+
   @Prop({
     type: [String],
     default: [],
@@ -170,4 +173,5 @@ PostSchema.index({ mentions: 1 });
 PostSchema.index({ repostOf: 1 });
 PostSchema.index({ visibility: 1, createdAt: -1 });
 PostSchema.index({ kind: 1, createdAt: -1 });
+PostSchema.index({ primaryVideoDurationMs: 1 });
 PostSchema.index({ topics: 1, createdAt: -1 });

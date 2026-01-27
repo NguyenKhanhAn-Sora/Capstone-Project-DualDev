@@ -160,7 +160,7 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  color: #e2e8f0;
+  color: #fff;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -296,13 +296,8 @@
 
 .commentSidebarDocked {
   position: fixed;
-  top: 12px;
-  right: 12px;
-  bottom: 12px;
-  height: calc(100vh - 24px);
+  height: 100vh;
   z-index: 32;
-  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
-  border-radius: 16px;
 }
 
 .commentSidebarEnter {

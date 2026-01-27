@@ -14,6 +14,15 @@ import {
 import { Follow, FollowSchema } from '../users/follow.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { Hashtag, HashtagSchema } from '../hashtags/hashtag.schema';
+import { ExploreController } from '../explore/explore.controller';
+import {
+  UserTasteProfile,
+  UserTasteProfileSchema,
+} from '../explore/user-taste.schema';
+import {
+  PostImpressionEvent,
+  PostImpressionEventSchema,
+} from '../explore/impression-event.schema';
 
 @Module({
   imports: [
@@ -26,9 +35,11 @@ import { Hashtag, HashtagSchema } from '../hashtags/hashtag.schema';
       { name: Follow.name, schema: FollowSchema },
       { name: Profile.name, schema: ProfileSchema },
       { name: Hashtag.name, schema: HashtagSchema },
+      { name: UserTasteProfile.name, schema: UserTasteProfileSchema },
+      { name: PostImpressionEvent.name, schema: PostImpressionEventSchema },
     ]),
   ],
-  controllers: [PostsController, ReelsController],
+  controllers: [PostsController, ReelsController, ExploreController],
   providers: [PostsService],
   exports: [PostsService],
 })

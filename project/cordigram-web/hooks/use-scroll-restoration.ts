@@ -8,7 +8,7 @@ export function useScrollRestoration(
   key: string,
   ready: boolean,
   getTarget?: () => HTMLElement | null,
-  saveEnabled = true
+  saveEnabled = true,
 ) {
   const restoredRef = useRef(false);
   const [target, setTarget] = useState<ScrollTarget | null>(null);
@@ -53,6 +53,14 @@ export function useScrollRestoration(
     if (!target) return;
     if (!ready || restoredRef.current) return;
 
+    // If saving is disabled for this route, also skip restoring.
+    // This prevents other pages that reuse the same scroll container
+    // from inheriting the last saved position.
+    if (!saveEnabled) {
+      restoredRef.current = true;
+      return;
+    }
+
     const saved = sessionStorage.getItem(key);
     if (saved) {
       const top = Number(saved) || 0;
@@ -60,7 +68,7 @@ export function useScrollRestoration(
       requestAnimationFrame(() => scrollTo(top));
     }
     restoredRef.current = true;
-  }, [key, ready, target]);
+  }, [key, ready, target, saveEnabled]);
 
   useEffect(() => {
     if (!target) return;

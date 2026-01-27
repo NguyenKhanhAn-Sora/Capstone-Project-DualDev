@@ -365,10 +365,12 @@ export async function fetchPostsByHashtag(opts: {
   token: string;
   tag: string;
   limit?: number;
+  page?: number;
 }): Promise<FeedItem[]> {
-  const { token, tag, limit = 30 } = opts;
+  const { token, tag, limit = 30, page } = opts;
   const params = new URLSearchParams();
   if (limit) params.set("limit", String(limit));
+  if (page) params.set("page", String(page));
 
   return apiFetch<FeedItem[]>({
     path: `/posts/hashtag/${encodeURIComponent(tag)}?${params.toString()}`,
@@ -383,10 +385,12 @@ export async function fetchReelsByHashtag(opts: {
   token: string;
   tag: string;
   limit?: number;
+  page?: number;
 }): Promise<FeedItem[]> {
-  const { token, tag, limit = 30 } = opts;
+  const { token, tag, limit = 30, page } = opts;
   const params = new URLSearchParams();
   if (limit) params.set("limit", String(limit));
+  if (page) params.set("page", String(page));
 
   return apiFetch<FeedItem[]>({
     path: `/posts/hashtag/${encodeURIComponent(tag)}/reels?${params.toString()}`,
@@ -469,6 +473,50 @@ export async function fetchReelsFeed(opts: {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+  });
+}
+
+export async function fetchExploreFeed(opts: {
+  token: string;
+  limit?: number;
+  page?: number;
+  kinds?: Array<"post" | "reel">;
+}): Promise<FeedItem[]> {
+  const { token, limit = 30, page = 1, kinds } = opts;
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  params.set("page", String(page));
+  if (kinds?.length) params.set("kinds", kinds.join(","));
+
+  return apiFetch<FeedItem[]>({
+    path: `/explore?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function recordExploreImpression(opts: {
+  token: string;
+  postId: string;
+  sessionId: string;
+  position?: number | null;
+  source?: string;
+}): Promise<{ impressed: boolean; created?: boolean }> {
+  const { token, postId, sessionId, position, source } = opts;
+  return apiFetch<{ impressed: boolean; created?: boolean }>({
+    path: "/explore/impression",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      postId,
+      sessionId,
+      position: typeof position === "number" ? position : null,
+      source: source ?? "explore",
+    }),
   });
 }
 

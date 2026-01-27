@@ -1,13 +1,29 @@
-.header {
-  background: var(--color-bg-home);
-  width: min(640px, 100%);
-  margin: 0 auto;
+.layout {
+  width: 100%;
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 18px;
+  align-items: start;
 }
 
-.header > * {
-  margin-left: auto;
-  margin-right: auto;
-  width: min(640px, 100%);
+.layoutPosts {
+  grid-template-columns: 168px minmax(0, 1fr) 168px;
+}
+
+.layoutReels {
+  grid-template-columns: 168px minmax(0, 1fr);
+}
+
+.nav {
+  position: sticky;
+  top: 18px;
+  height: fit-content;
+  margin-left: -18px;
+}
+
+.content {
+  min-width: 0;
 }
 
 .titleRow {
@@ -33,24 +49,29 @@
 .tabs {
   border: 1px solid var(--color-border);
   background: var(--color-surface);
-  border-radius: 999px;
+  border-radius: 18px;
   gap: 6px;
-  width: fit-content;
-  margin: 14px 0 0;
-  padding: 6px;
-  display: inline-flex;
+  width: 100%;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
 }
 
 .tabBtn {
-  padding: 8px 16px;
-  border-radius: 999px;
+  padding: 10px 12px;
+  border-radius: 14px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--color-text-muted);
-  font-weight: 800;
+  font-weight: 700;
   font-size: 13px;
   cursor: pointer;
   text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  user-select: none;
   transition:
     transform 120ms ease,
     border-color 120ms ease,
@@ -65,6 +86,46 @@
 
 .tabBtnActive {
   color: var(--color-text);
-  background: linear-gradient(120deg, #6ddcff2e, #7f9bff33);
-  border-color: rgba(124, 58, 237, 0.35);
+  background: linear-gradient(
+    120deg,
+    rgba(109, 220, 255, 0.18),
+    rgba(127, 155, 255, 0.2)
+  );
+  border-color: rgba(74, 163, 228, 0.45);
+  box-shadow: 0 10px 24px rgba(74, 163, 228, 0.12);
+}
+
+@media (max-width: 720px) {
+  .layout {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .layoutPosts {
+    grid-template-columns: 1fr;
+  }
+
+  .layoutReels {
+    grid-template-columns: 1fr;
+  }
+
+  .nav {
+    position: static;
+    margin-left: 0;
+  }
+
+  .tabs {
+    flex-direction: row;
+    width: fit-content;
+    border-radius: 999px;
+    padding: 6px;
+    margin: 0 auto 12px;
+  }
+
+  .tabBtn {
+    width: auto;
+    border-radius: 999px;
+    padding: 8px 16px;
+    justify-content: center;
+  }
 }

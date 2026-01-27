@@ -43,7 +43,6 @@ const navItems = [
     label: "Following",
     href: "/following",
     icon: IconFollowing,
-    hasAvatar: true,
   },
   { label: "Explore", href: "/explore", icon: IconCompass },
   { label: "Notification", href: "/notifications", icon: IconBell },
@@ -76,7 +75,7 @@ export default function Sidebar() {
 
       router.push("/");
     },
-    [router]
+    [router],
   );
 
   useEffect(() => {
@@ -194,7 +193,7 @@ export default function Sidebar() {
       setSwitchAccountOpen(false);
       router.replace("/");
     },
-    [router]
+    [router],
   );
 
   return (
@@ -583,7 +582,7 @@ function IconFollowing() {
       strokeWidth="2"
     >
       <circle cx="9" cy="8" r="4" />
-      <path d="M17 11v6M14 14h6" />
+      <path d="M14.2 15.2l1.4 1.4 3-3" strokeLinecap="round" />
       <path d="M3 19c.8-2.5 3-4 6-4" />
     </svg>
   );

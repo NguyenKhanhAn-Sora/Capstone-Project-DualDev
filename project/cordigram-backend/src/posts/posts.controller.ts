@@ -72,6 +72,7 @@ export class PostsController {
   async feed(
     @Req() req: Request,
     @Query('limit') limit?: string,
+    @Query('page') page?: string,
     @Query('scope') scope?: string,
     @Query('kinds') kinds?: string,
   ) {
@@ -93,6 +94,7 @@ export class PostsController {
         user.userId,
         parsedLimit ?? 20,
         (parsedKinds as any) ?? undefined,
+        page ? Number(page) : undefined,
       );
     }
 
@@ -100,6 +102,7 @@ export class PostsController {
       user.userId,
       parsedLimit ?? 20,
       (parsedKinds as any) ?? undefined,
+      page ? Number(page) : undefined,
     );
   }
 
@@ -118,6 +121,7 @@ export class PostsController {
     @Req() req: Request,
     @Param('tag') tag: string,
     @Query('limit') limit?: string,
+    @Query('page') page?: string,
   ) {
     const user = req.user as AuthenticatedUser | undefined;
     if (!user) {
@@ -128,6 +132,7 @@ export class PostsController {
       viewerId: user.userId,
       tag,
       limit: parsedLimit,
+      page: page ? Number(page) : undefined,
     });
   }
 
@@ -136,6 +141,7 @@ export class PostsController {
     @Req() req: Request,
     @Param('tag') tag: string,
     @Query('limit') limit?: string,
+    @Query('page') page?: string,
   ) {
     const user = req.user as AuthenticatedUser | undefined;
     if (!user) {
@@ -146,6 +152,7 @@ export class PostsController {
       viewerId: user.userId,
       tag,
       limit: parsedLimit,
+      page: page ? Number(page) : undefined,
     });
   }
 

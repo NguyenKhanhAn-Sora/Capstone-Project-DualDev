@@ -53,6 +53,12 @@ export class PostInteraction extends Document {
 
   @Prop({ type: Object, default: null })
   metadata?: Record<string, unknown> | null;
+
+  @Prop({ type: Date })
+  createdAt: Date;
+
+  @Prop({ type: Date })
+  updatedAt: Date;
 }
 
 export const PostInteractionSchema =

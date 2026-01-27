@@ -33,6 +33,7 @@ export class ReelsController {
   async feed(
     @Req() req: Request,
     @Query('limit') limit?: string,
+    @Query('page') page?: string,
     @Query('scope') scope?: string,
   ) {
     const user = req.user as AuthenticatedUser | undefined;
@@ -45,9 +46,14 @@ export class ReelsController {
         user.userId,
         parsedLimit ?? 20,
         ['reel'],
+        page ? Number(page) : undefined,
       );
     }
-    return this.postsService.getReelsFeed(user.userId, parsedLimit ?? 20);
+    return this.postsService.getReelsFeed(
+      user.userId,
+      parsedLimit ?? 20,
+      page ? Number(page) : undefined,
+    );
   }
 
   @Get('saved')
