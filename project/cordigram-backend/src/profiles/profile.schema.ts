@@ -37,6 +37,16 @@ export class Profile extends Document {
   location: string;
 
   @Prop({
+    type: {
+      companyId: { type: Types.ObjectId, ref: 'Company', default: null },
+      companyName: { type: String, default: '' },
+    },
+    _id: false,
+    default: { companyId: null, companyName: '' },
+  })
+  workplace: { companyId: Types.ObjectId | null; companyName: string };
+
+  @Prop({
     type: String,
     enum: ['male', 'female', 'other', 'prefer_not_to_say', ''],
     default: '',

@@ -14,6 +14,7 @@ import { ReportProblemModule } from './reportproblem/reportproblem.module';
 import { CommentsModule } from './comment/comments.module';
 import { ReportPostModule } from './reportpost/reportpost.module';
 import { ReportCommentModule } from './reportcomment/reportcomment.module';
+import { CompaniesModule } from './companies/companies.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ReportCommentModule } from './reportcomment/reportcomment.module';
     CloudinaryModule,
     PostsModule,
     CommentsModule,
+    CompaniesModule,
     ReportProblemModule,
     ReportPostModule,
     ReportCommentModule,

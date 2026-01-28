@@ -8,14 +8,234 @@ import { Model, Types } from 'mongoose';
 import { User } from './user.schema';
 import { Follow } from './follow.schema';
 import { BlocksService } from './blocks.service';
+import { Profile } from '../profiles/profile.schema';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
+    @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
     private readonly blocksService: BlocksService,
   ) {}
+
+  async listFollowers(params: {
+    viewerId: string;
+    userId: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<{
+    items: Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      isFollowing: boolean;
+    }>;
+    nextCursor: string | null;
+  }> {
+    const viewerId = this.asObjectId(params.viewerId, 'viewerId');
+    const ownerId = this.asObjectId(params.userId, 'userId');
+
+    const blocked = await this.blocksService.isBlockedEither(viewerId, ownerId);
+    if (blocked) {
+      throw new ForbiddenException('Action forbidden due to block');
+    }
+
+    const limit = Math.min(Math.max(Number(params.limit) || 20, 1), 50);
+    const cursor = params.cursor
+      ? this.asObjectId(params.cursor, 'cursor')
+      : null;
+
+    const { blockedIds, blockedByIds } =
+      await this.blocksService.getBlockLists(viewerId);
+    const excluded = [...blockedIds, ...blockedByIds]
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const follows = await this.followModel
+      .find({
+        followeeId: ownerId,
+        ...(cursor ? { _id: { $lt: cursor } } : {}),
+        ...(excluded.length ? { followerId: { $nin: excluded } } : {}),
+      })
+      .sort({ _id: -1 })
+      .limit(limit + 1)
+      .select('_id followerId')
+      .lean()
+      .exec();
+
+    const slice = follows.slice(0, limit);
+    const nextCursor =
+      follows.length > limit ? follows[limit]._id.toString() : null;
+
+    const userIds = slice
+      .map((doc) => doc.followerId?.toString?.())
+      .filter(Boolean) as string[];
+
+    if (!userIds.length) {
+      return { items: [], nextCursor };
+    }
+
+    const [profiles, viewerFollowing] = await Promise.all([
+      this.profileModel
+        .find({ userId: { $in: userIds.map((id) => new Types.ObjectId(id)) } })
+        .select('userId username displayName avatarUrl')
+        .lean()
+        .exec(),
+      this.followModel
+        .find({
+          followerId: viewerId,
+          followeeId: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+        })
+        .select('followeeId')
+        .lean()
+        .exec(),
+    ]);
+
+    const profileByUserId = new Map<string, any>();
+    profiles.forEach((p: any) => {
+      const id = p.userId?.toString?.();
+      if (id) profileByUserId.set(id, p);
+    });
+
+    const followingSet = new Set<string>();
+    viewerFollowing.forEach((doc: any) => {
+      const id = doc.followeeId?.toString?.();
+      if (id) followingSet.add(id);
+    });
+
+    const items = userIds
+      .map((id) => {
+        const p = profileByUserId.get(id);
+        if (!p) return null;
+        return {
+          userId: id,
+          username: p.username ?? '',
+          displayName: p.displayName ?? p.username ?? '',
+          avatarUrl: p.avatarUrl ?? '',
+          isFollowing: followingSet.has(id),
+        };
+      })
+      .filter(Boolean) as Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      isFollowing: boolean;
+    }>;
+
+    return { items, nextCursor };
+  }
+
+  async listFollowing(params: {
+    viewerId: string;
+    userId: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<{
+    items: Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      isFollowing: boolean;
+    }>;
+    nextCursor: string | null;
+  }> {
+    const viewerId = this.asObjectId(params.viewerId, 'viewerId');
+    const ownerId = this.asObjectId(params.userId, 'userId');
+
+    const blocked = await this.blocksService.isBlockedEither(viewerId, ownerId);
+    if (blocked) {
+      throw new ForbiddenException('Action forbidden due to block');
+    }
+
+    const limit = Math.min(Math.max(Number(params.limit) || 20, 1), 50);
+    const cursor = params.cursor
+      ? this.asObjectId(params.cursor, 'cursor')
+      : null;
+
+    const { blockedIds, blockedByIds } =
+      await this.blocksService.getBlockLists(viewerId);
+    const excluded = [...blockedIds, ...blockedByIds]
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const follows = await this.followModel
+      .find({
+        followerId: ownerId,
+        ...(cursor ? { _id: { $lt: cursor } } : {}),
+        ...(excluded.length ? { followeeId: { $nin: excluded } } : {}),
+      })
+      .sort({ _id: -1 })
+      .limit(limit + 1)
+      .select('_id followeeId')
+      .lean()
+      .exec();
+
+    const slice = follows.slice(0, limit);
+    const nextCursor =
+      follows.length > limit ? follows[limit]._id.toString() : null;
+
+    const userIds = slice
+      .map((doc) => doc.followeeId?.toString?.())
+      .filter(Boolean) as string[];
+
+    if (!userIds.length) {
+      return { items: [], nextCursor };
+    }
+
+    const [profiles, viewerFollowing] = await Promise.all([
+      this.profileModel
+        .find({ userId: { $in: userIds.map((id) => new Types.ObjectId(id)) } })
+        .select('userId username displayName avatarUrl')
+        .lean()
+        .exec(),
+      this.followModel
+        .find({
+          followerId: viewerId,
+          followeeId: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+        })
+        .select('followeeId')
+        .lean()
+        .exec(),
+    ]);
+
+    const profileByUserId = new Map<string, any>();
+    profiles.forEach((p: any) => {
+      const id = p.userId?.toString?.();
+      if (id) profileByUserId.set(id, p);
+    });
+
+    const followingSet = new Set<string>();
+    viewerFollowing.forEach((doc: any) => {
+      const id = doc.followeeId?.toString?.();
+      if (id) followingSet.add(id);
+    });
+
+    const items = userIds
+      .map((id) => {
+        const p = profileByUserId.get(id);
+        if (!p) return null;
+        return {
+          userId: id,
+          username: p.username ?? '',
+          displayName: p.displayName ?? p.username ?? '',
+          avatarUrl: p.avatarUrl ?? '',
+          isFollowing: followingSet.has(id),
+        };
+      })
+      .filter(Boolean) as Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      isFollowing: boolean;
+    }>;
+
+    return { items, nextCursor };
+  }
 
   private sanitizeRecentAccounts(list: User['recentAccounts'] = []) {
     return (list ?? [])

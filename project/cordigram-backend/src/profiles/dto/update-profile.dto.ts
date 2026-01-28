@@ -1,5 +1,6 @@
 import {
   IsDateString,
+  IsMongoId,
   IsOptional,
   IsString,
   Matches,
@@ -35,4 +36,14 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsDateString()
   birthdate?: string;
+
+  // LinkedIn-style workplace
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  workplaceName?: string;
+
+  @IsOptional()
+  @IsMongoId()
+  workplaceCompanyId?: string;
 }

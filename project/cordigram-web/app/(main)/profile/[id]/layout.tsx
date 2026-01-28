@@ -14,6 +14,9 @@ import styles from "../profile.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
 import ProfileEditOverlay from "@/ui/profile-edit-overlay/profile-edit-overlay";
+import FollowersOverlay, {
+  type FollowersOverlayTab,
+} from "@/ui/followers-overlay/followers-overlay";
 import {
   fetchProfileDetail,
   blockUser,
@@ -27,6 +30,7 @@ import {
   type ProfileDetailResponse,
   resetProfileAvatar,
   uploadProfileAvatar,
+  type FollowListItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import {
@@ -249,11 +253,22 @@ export default function ProfileLayout({
   const [reportError, setReportError] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportClosing, setReportClosing] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [aboutClosing, setAboutClosing] = useState(false);
+  const [followersOpen, setFollowersOpen] = useState(false);
+  const [followersClosing, setFollowersClosing] = useState(false);
+  const [followersTab, setFollowersTab] =
+    useState<FollowersOverlayTab>("followers");
   const [authoredCount, setAuthoredCount] = useState<number | null>(null);
   const reportHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aboutHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const followersHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [avatarViewerUrl, setAvatarViewerUrl] = useState<string | null>(null);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const bioRef = useRef<HTMLParagraphElement | null>(null);
+  const [bioCollapsed, setBioCollapsed] = useState(true);
+  const [bioCanExpand, setBioCanExpand] = useState(false);
   const [avatarConfirmOpen, setAvatarConfirmOpen] = useState(false);
   const [avatarCropOpen, setAvatarCropOpen] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -338,6 +353,28 @@ export default function ProfileLayout({
       })
       .finally(() => setLoading(false));
   }, [canRender, profileId]);
+
+  useEffect(() => {
+    const el = bioRef.current;
+    if (!el) return;
+
+    // Reset first so we measure the full height (unclamped).
+    setBioCanExpand(false);
+    setBioCollapsed(true);
+
+    const raf = requestAnimationFrame(() => {
+      const node = bioRef.current;
+      if (!node) return;
+      const lineHeight = parseFloat(getComputedStyle(node).lineHeight || "0");
+      if (!lineHeight) return;
+      const lines = node.scrollHeight / lineHeight;
+      const shouldCollapse = lines > 5.2;
+      setBioCanExpand(shouldCollapse);
+      setBioCollapsed(shouldCollapse);
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [profile?.bio]);
 
   const prefetchTab = useCallback(
     async (key: ProfileTabKey) => {
@@ -515,8 +552,60 @@ export default function ProfileLayout({
       if (reportHideTimer.current) {
         clearTimeout(reportHideTimer.current);
       }
+      if (aboutHideTimer.current) {
+        clearTimeout(aboutHideTimer.current);
+      }
+      if (followersHideTimer.current) {
+        clearTimeout(followersHideTimer.current);
+      }
     };
   }, []);
+
+  const closeAboutModal = () => {
+    if (aboutHideTimer.current) {
+      clearTimeout(aboutHideTimer.current);
+    }
+    setAboutClosing(true);
+    aboutHideTimer.current = setTimeout(() => {
+      setAboutOpen(false);
+      setAboutClosing(false);
+    }, REPORT_MODAL_MS);
+  };
+
+  useEffect(() => {
+    if (!aboutOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeAboutModal();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [aboutOpen]);
+
+  const closeFollowersModal = () => {
+    if (followersHideTimer.current) {
+      clearTimeout(followersHideTimer.current);
+    }
+    setFollowersClosing(true);
+    followersHideTimer.current = setTimeout(() => {
+      setFollowersOpen(false);
+      setFollowersClosing(false);
+    }, REPORT_MODAL_MS);
+  };
+
+  useEffect(() => {
+    if (!followersOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeFollowersModal();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [followersOpen]);
 
   useEffect(() => {
     if (!avatarPreview || !croppedAreaPixels) return;
@@ -735,6 +824,11 @@ export default function ProfileLayout({
 
   const handleMenuSelect = (key: string) => {
     switch (key) {
+      case "about":
+        setMenuOpen(false);
+        setAboutOpen(true);
+        setAboutClosing(false);
+        break;
       case "block":
         openBlockModal();
         break;
@@ -936,6 +1030,7 @@ export default function ProfileLayout({
       ];
 
   const menuItems = [
+    { key: "about", label: "About this user" },
     { key: "block", label: "Block this user" },
     { key: "report", label: "Report" },
     { key: "copy-link", label: "Copy link" },
@@ -1011,13 +1106,7 @@ export default function ProfileLayout({
                     <h1 className={styles.displayName}>
                       {profile.displayName}
                     </h1>
-                    <p className={styles.username}>@{profile.username}</p>
-                    {profile.bio ? (
-                      <p className={styles.bio}>{profile.bio}</p>
-                    ) : null}
-                    {profile.location ? (
-                      <p className={styles.location}>{profile.location}</p>
-                    ) : null}
+                    <div className={styles.username}>@{profile.username}</div>
                   </div>
                   <div className={styles.statsRow}>
                     <StatCard
@@ -1027,10 +1116,18 @@ export default function ProfileLayout({
                     <StatCard
                       label="Followers"
                       value={formatCount(profile.stats.followers)}
+                      onClick={() => {
+                        setFollowersTab("followers");
+                        setFollowersOpen(true);
+                      }}
                     />
                     <StatCard
                       label="Following"
                       value={formatCount(profile.stats.following)}
+                      onClick={() => {
+                        setFollowersTab("following");
+                        setFollowersOpen(true);
+                      }}
                     />
                   </div>
                   <div
@@ -1118,6 +1215,27 @@ export default function ProfileLayout({
                   </div>
                 </div>
               </div>
+              {profile.bio ? (
+                <div className={`${styles.bioSection} ml-[188px]`}>
+                  <p
+                    ref={bioRef}
+                    className={`${styles.bio} ${styles.bioCollapsible} ${
+                      bioCollapsed && bioCanExpand ? styles.bioCollapsed : ""
+                    }`}
+                  >
+                    {profile.bio}
+                  </p>
+                  {bioCanExpand ? (
+                    <button
+                      type="button"
+                      className={styles.bioToggle}
+                      onClick={() => setBioCollapsed((prev) => !prev)}
+                    >
+                      {bioCollapsed ? "See more" : "Collapse"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className={styles.navRow}>
                 {navItems.map((item) => (
@@ -1521,18 +1639,193 @@ export default function ProfileLayout({
           </div>
         </div>
       ) : null}
+      {!isOwner && profile && (aboutOpen || aboutClosing)
+        ? (() => {
+            const p = profile!;
+            return (
+              <div
+                className={`${styles.modalOverlay} ${
+                  aboutClosing
+                    ? styles.modalOverlayClosing
+                    : styles.modalOverlayOpen
+                }`}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="about-user-title"
+                onClick={closeAboutModal}
+              >
+                <div
+                  className={`${styles.modalCard} ${styles.aboutCard}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className={styles.aboutHeader}>
+                    <div>
+                      <h3 className={styles.aboutTitle} id="about-user-title">
+                        About this user
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.aboutClose}
+                      aria-label="Close"
+                      onClick={closeAboutModal}
+                    >
+                      <IconClose />
+                    </button>
+                  </div>
+
+                  <div className={styles.aboutGrid}>
+                    <div className={styles.aboutLeft}>
+                      <div className={styles.aboutIdentityRow}>
+                        <div className={styles.aboutAvatarRing}>
+                          <img
+                            src={p.avatarUrl || DEFAULT_AVATAR_URL}
+                            alt={`${p.displayName} avatar`}
+                            className={styles.aboutAvatar}
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className={styles.aboutIdentityText}>
+                          <div className={styles.aboutName}>
+                            {p.displayName}
+                          </div>
+                          <div className={styles.aboutHandle}>
+                            @{p.username}
+                          </div>
+                        </div>
+                      </div>
+
+                      {p.bio ? (
+                        <div className={styles.aboutBio}>{p.bio}</div>
+                      ) : (
+                        <div className={styles.aboutMuted}>
+                          No bio provided.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className={styles.aboutRight}>
+                      <div className={`${styles.aboutSectionTitle}`}>
+                        Details
+                      </div>
+                      <div className={styles.aboutRows}>
+                        <div className={styles.aboutRow}>
+                          <div className={styles.aboutLabel}>Workplace</div>
+                          <div className={styles.aboutValue}>
+                            {p.workplace?.companyName?.trim()
+                              ? p.workplace.companyName
+                              : "—"}
+                          </div>
+                        </div>
+                        <div className={styles.aboutRow}>
+                          <div className={styles.aboutLabel}>Location</div>
+                          <div className={styles.aboutValue}>
+                            {p.location?.trim() ? p.location : "—"}
+                          </div>
+                        </div>
+                        <div className={styles.aboutRow}>
+                          <div className={styles.aboutLabel}>Gender</div>
+                          <div className={styles.aboutValue}>
+                            {p.gender?.trim()
+                              ? humanizeUnderscoreValue(p.gender)
+                              : "—"}
+                          </div>
+                        </div>
+                        <div className={styles.aboutRow}>
+                          <div className={styles.aboutLabel}>Birthdate</div>
+                          <div className={styles.aboutValue}>
+                            {p.birthdate?.trim() ? p.birthdate : "—"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={`${styles.aboutSectionTitle}`}>Stats</div>
+                      <div className={styles.aboutStatsGrid}>
+                        <div className={styles.aboutStat}>
+                          <div className={styles.aboutStatValue}>
+                            {formatCount(p.stats.totalPosts)}
+                          </div>
+                          <div className={styles.aboutStatLabel}>Posts</div>
+                        </div>
+                        <div className={styles.aboutStat}>
+                          <div className={styles.aboutStatValue}>
+                            {formatCount(p.stats.followers)}
+                          </div>
+                          <div className={styles.aboutStatLabel}>Followers</div>
+                        </div>
+                        <div className={styles.aboutStat}>
+                          <div className={styles.aboutStatValue}>
+                            {formatCount(p.stats.following)}
+                          </div>
+                          <div className={styles.aboutStatLabel}>Following</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()
+        : null}
       {toast ? <div className={styles.toast}>{toast}</div> : null}
+      {profile ? (
+        <FollowersOverlay
+          open={followersOpen}
+          closing={followersClosing}
+          ownerUserId={profile.userId}
+          ownerUsername={profile.username}
+          initialTab={followersTab}
+          viewerId={viewerId}
+          onClose={closeFollowersModal}
+        />
+      ) : null}
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({
+  label,
+  value,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  onClick?: () => void;
+}) {
   return (
-    <div className={styles.statCard}>
+    <div
+      className={`${styles.statCard} ${onClick ? styles.statCardClickable : ""}`}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (!onClick) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
       <span className={styles.statValue}>{value}</span>
       <span className={styles.statLabel}>{label}</span>
     </div>
   );
+}
+
+function humanizeUnderscoreValue(value?: string | null) {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (!trimmed.includes("_")) return trimmed;
+  return trimmed
+    .split("_")
+    .filter(Boolean)
+    .map((part) =>
+      part.length
+        ? `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`
+        : part,
+    )
+    .join(" ");
 }
 
 function ProfileSkeleton() {
@@ -1590,6 +1883,19 @@ function IconDots() {
       <circle cx="6" cy="12" r="1.6" stroke="currentColor" strokeWidth="1.6" />
       <circle cx="12" cy="12" r="1.6" stroke="currentColor" strokeWidth="1.6" />
       <circle cx="18" cy="12" r="1.6" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+function IconClose() {
+  return (
+    <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M6 6l12 12M18 6L6 18"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

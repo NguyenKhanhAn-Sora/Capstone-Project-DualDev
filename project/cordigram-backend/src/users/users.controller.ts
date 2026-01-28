@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Patch,
+  Query,
   Req,
   UseGuards,
   UnauthorizedException,
@@ -99,5 +100,43 @@ export class UsersController {
       throw new UnauthorizedException('Unauthorized');
     }
     return this.blocksService.unblock(userId, targetUserId);
+  }
+
+  @Get(':id/followers')
+  async listFollowers(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('id') targetUserId: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.usersService.listFollowers({
+      viewerId: userId,
+      userId: targetUserId,
+      limit: limit ? Number(limit) : undefined,
+      cursor: cursor || undefined,
+    });
+  }
+
+  @Get(':id/following')
+  async listFollowing(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('id') targetUserId: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.usersService.listFollowing({
+      viewerId: userId,
+      userId: targetUserId,
+      limit: limit ? Number(limit) : undefined,
+      cursor: cursor || undefined,
+    });
   }
 }

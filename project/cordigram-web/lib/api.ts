@@ -959,6 +959,59 @@ export async function unfollowUser(opts: {
   });
 }
 
+export type FollowListItem = {
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+  isFollowing: boolean;
+};
+
+export type FollowListResponse = {
+  items: FollowListItem[];
+  nextCursor: string | null;
+};
+
+export async function fetchFollowers(opts: {
+  token: string;
+  userId: string;
+  limit?: number;
+  cursor?: string;
+}): Promise<FollowListResponse> {
+  const { token, userId, limit, cursor } = opts;
+  const query = new URLSearchParams();
+  if (limit) query.set("limit", String(limit));
+  if (cursor) query.set("cursor", cursor);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiFetch<FollowListResponse>({
+    path: `/users/${userId}/followers${suffix}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchFollowing(opts: {
+  token: string;
+  userId: string;
+  limit?: number;
+  cursor?: string;
+}): Promise<FollowListResponse> {
+  const { token, userId, limit, cursor } = opts;
+  const query = new URLSearchParams();
+  if (limit) query.set("limit", String(limit));
+  if (cursor) query.set("cursor", cursor);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiFetch<FollowListResponse>({
+    path: `/users/${userId}/following${suffix}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export type CurrentProfileResponse = {
   userId?: string;
   id: string;
@@ -1292,6 +1345,10 @@ export type ProfileDetailResponse = {
   bio?: string;
   gender?: string;
   location?: string;
+  workplace?: {
+    companyId: string;
+    companyName: string;
+  };
   birthdate?: string;
   stats: {
     posts: number;
@@ -1343,7 +1400,36 @@ export type UpdateMyProfilePayload = {
   location?: string;
   gender?: "male" | "female" | "other" | "prefer_not_to_say";
   birthdate?: string;
+  workplaceName?: string;
+  workplaceCompanyId?: string;
 };
+
+export type CompanySuggestItem = {
+  id: string;
+  name: string;
+  memberCount: number;
+};
+
+export async function suggestCompanies(opts: {
+  token: string;
+  query: string;
+  limit?: number;
+  signal?: AbortSignal;
+}): Promise<{ items: CompanySuggestItem[]; count: number }> {
+  const { token, query, limit, signal } = opts;
+  const params = new URLSearchParams();
+  params.set("q", query);
+  if (limit) params.set("limit", String(limit));
+
+  return apiFetch<{ items: CompanySuggestItem[]; count: number }>({
+    path: `/companies/suggest?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    signal,
+  });
+}
 
 export async function updateMyProfile(opts: {
   token: string;

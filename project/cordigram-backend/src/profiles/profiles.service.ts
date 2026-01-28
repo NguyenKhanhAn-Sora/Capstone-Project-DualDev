@@ -8,6 +8,7 @@ import { Model, Types, PipelineStage } from 'mongoose';
 import { Profile } from './profile.schema';
 import { Follow } from '../users/follow.schema';
 import { Post } from '../posts/post.schema';
+import { CompaniesService } from '../companies/companies.service';
 
 @Injectable()
 export class ProfilesService {
@@ -15,6 +16,7 @@ export class ProfilesService {
     @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
+    private readonly companiesService: CompaniesService,
   ) {}
 
   private escapeRegex(input: string): string {
@@ -171,6 +173,8 @@ export class ProfilesService {
       location?: string;
       gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
       birthdate?: string;
+      workplaceName?: string;
+      workplaceCompanyId?: string;
     },
   ): Promise<void> {
     const objectId = this.asObjectId(userId);
@@ -199,11 +203,56 @@ export class ProfilesService {
     }
 
     if (data.bio !== undefined) {
-      profile.bio = data.bio.trim();
+      // Preserve user-entered formatting (newlines/spaces). Normalize line endings.
+      profile.bio = data.bio.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     }
 
     if (data.location !== undefined) {
       profile.location = data.location.trim();
+    }
+
+    if (
+      data.workplaceName !== undefined ||
+      data.workplaceCompanyId !== undefined
+    ) {
+      const prevCompanyId = profile.workplace?.companyId ?? null;
+      const requestedName = (data.workplaceName ?? '').trim();
+      const requestedCompanyId = (data.workplaceCompanyId ?? '').trim();
+
+      if (!requestedName && !requestedCompanyId) {
+        profile.workplace = { companyId: null, companyName: '' };
+        if (prevCompanyId) {
+          await this.companiesService.incrementMemberCount(prevCompanyId, -1);
+        }
+      } else {
+        const company = requestedCompanyId
+          ? await this.companiesService.findById(requestedCompanyId)
+          : await this.companiesService.ensureCompanyByName(requestedName);
+
+        if (!company) {
+          throw new BadRequestException('workplace is invalid');
+        }
+
+        const nextCompanyId = company._id as Types.ObjectId;
+        profile.workplace = {
+          companyId: nextCompanyId,
+          companyName: company.name,
+        };
+
+        const prevIdStr = prevCompanyId?.toString?.() ?? '';
+        const nextIdStr = nextCompanyId?.toString?.() ?? '';
+        if (
+          prevCompanyId &&
+          prevIdStr &&
+          nextIdStr &&
+          prevIdStr !== nextIdStr
+        ) {
+          await this.companiesService.incrementMemberCount(prevCompanyId, -1);
+        }
+        if (nextCompanyId && nextIdStr && prevIdStr !== nextIdStr) {
+          await this.companiesService.incrementMemberCount(nextCompanyId, 1);
+        }
+      }
     }
 
     if (data.gender !== undefined) {
@@ -336,6 +385,7 @@ export class ProfilesService {
     bio?: string;
     gender?: string;
     location?: string;
+    workplace?: { companyId: string; companyName: string };
     birthdate?: string;
     stats: {
       posts: number;
@@ -411,6 +461,12 @@ export class ProfilesService {
       bio: profile.bio || '',
       gender: profile.gender || '',
       location: profile.location || '',
+      workplace: profile.workplace?.companyId
+        ? {
+            companyId: (profile.workplace.companyId as any).toString(),
+            companyName: profile.workplace.companyName || '',
+          }
+        : { companyId: '', companyName: profile.workplace?.companyName || '' },
       birthdate: profile.birthdate
         ? new Date(profile.birthdate).toISOString().slice(0, 10)
         : '',

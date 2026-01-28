@@ -144,8 +144,8 @@ export class ProfilesController {
     }
 
     if (dto.bio !== undefined) {
-      const trimmedLength = dto.bio.trim().length;
-      if (trimmedLength > BIO_CHAR_LIMIT) {
+      const length = dto.bio.length;
+      if (length > BIO_CHAR_LIMIT) {
         throw new BadRequestException(
           `bio must be at most ${BIO_CHAR_LIMIT} characters`,
         );
@@ -159,6 +159,8 @@ export class ProfilesController {
       location: dto.location,
       gender: dto.gender,
       birthdate: dto.birthdate,
+      workplaceName: dto.workplaceName,
+      workplaceCompanyId: dto.workplaceCompanyId,
     });
 
     return this.profilesService.getProfileDetails({

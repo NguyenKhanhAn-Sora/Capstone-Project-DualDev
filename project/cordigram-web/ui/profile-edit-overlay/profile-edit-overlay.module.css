@@ -721,18 +721,18 @@
 
 .primary {
   border-color: transparent;
-  background: linear-gradient(
-    120deg,
-    var(--color-primary) 0%,
-    var(--color-primary-strong) 55%,
-    var(--color-primary-accent) 100%
-  );
-  color: #fff;
+  background: linear-gradient(120deg, #6ddcff, #7f9bff);
+  color: #0a0f1c;
+}
+
+.primary:hover:not(:disabled) {
+  filter: saturate(0.9) brightness(1.02);
 }
 
 .primary:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+  filter: none;
 }
 
 .secondary:disabled {

@@ -5,9 +5,11 @@ import { ProfilesService } from './profiles.service';
 import { ProfilesController } from './profiles.controller';
 import { Follow, FollowSchema } from '../users/follow.schema';
 import { Post, PostSchema } from '../posts/post.schema';
+import { CompaniesModule } from '../companies/companies.module';
 
 @Module({
   imports: [
+    CompaniesModule,
     MongooseModule.forFeature([
       { name: Profile.name, schema: ProfileSchema },
       { name: Follow.name, schema: FollowSchema },

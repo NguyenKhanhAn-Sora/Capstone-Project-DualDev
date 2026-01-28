@@ -6,7 +6,9 @@ import styles from "./profile-edit-overlay.module.css";
 import { DateSelect } from "@/ui/date-select/date-select";
 import {
   apiFetch,
+  suggestCompanies,
   updateMyProfile,
+  type CompanySuggestItem,
   type ProfileDetailResponse,
   type UpdateMyProfilePayload,
 } from "@/lib/api";
@@ -123,6 +125,19 @@ export default function ProfileEditOverlay({
   const [username, setUsername] = useState("");
   const [gender, setGender] = useState<GenderValue>("");
   const [location, setLocation] = useState("");
+  const [workplaceInput, setWorkplaceInput] = useState("");
+  const [workplaceQuery, setWorkplaceQuery] = useState("");
+  const [workplaceSuggestions, setWorkplaceSuggestions] = useState<
+    CompanySuggestItem[]
+  >([]);
+  const [workplaceLoading, setWorkplaceLoading] = useState(false);
+  const [workplaceError, setWorkplaceError] = useState("");
+  const [workplaceOpen, setWorkplaceOpen] = useState(false);
+  const [workplaceHighlight, setWorkplaceHighlight] = useState(-1);
+  const [workplaceSelectedId, setWorkplaceSelectedId] = useState<string | null>(
+    null,
+  );
+  const [workplaceInteracted, setWorkplaceInteracted] = useState(false);
   const [bio, setBio] = useState("");
   const [birthdate, setBirthdate] = useState("");
 
@@ -188,6 +203,17 @@ export default function ProfileEditOverlay({
     setGeoStatus("idle");
     setLocationInteracted(false);
 
+    const nextWorkplace = profile.workplace?.companyName || "";
+    setWorkplaceInput(nextWorkplace);
+    setWorkplaceQuery(nextWorkplace);
+    setWorkplaceSuggestions([]);
+    setWorkplaceOpen(false);
+    setWorkplaceHighlight(-1);
+    setWorkplaceError("");
+    setWorkplaceLoading(false);
+    setWorkplaceSelectedId(profile.workplace?.companyId || null);
+    setWorkplaceInteracted(false);
+
     setBio(profile.bio || "");
     setBirthdate(profile.birthdate || "");
 
@@ -195,6 +221,56 @@ export default function ProfileEditOverlay({
     setUsernameError(null);
     setGenderOpen(false);
   }, [open, profile]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!token) return;
+    if (!workplaceInteracted) return;
+
+    if (!workplaceQuery.trim()) {
+      setWorkplaceSuggestions([]);
+      setWorkplaceOpen(false);
+      setWorkplaceHighlight(-1);
+      setWorkplaceError("");
+      setWorkplaceLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setWorkplaceLoading(true);
+      setWorkplaceError("");
+      try {
+        const res = await suggestCompanies({
+          token,
+          query: workplaceQuery,
+          limit: 8,
+          signal: controller.signal,
+        });
+        const items = res?.items ?? [];
+        setWorkplaceSuggestions(items);
+        setWorkplaceOpen(true);
+        setWorkplaceHighlight(items.length ? 0 : -1);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setWorkplaceSuggestions([]);
+        setWorkplaceOpen(false);
+        setWorkplaceHighlight(-1);
+        const message =
+          typeof err === "object" && err && "message" in err
+            ? String((err as { message?: unknown }).message)
+            : "Unable to fetch suggestions";
+        setWorkplaceError(message || "Unable to fetch suggestions");
+      } finally {
+        if (!controller.signal.aborted) setWorkplaceLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [open, token, workplaceQuery]);
 
   useEffect(() => {
     if (!open) return;
@@ -523,7 +599,8 @@ export default function ProfileEditOverlay({
       username: (profile?.username ?? "").trim().toLowerCase(),
       gender: ((profile?.gender ?? "") as GenderValue) || "",
       location: (profile?.location ?? "").trim(),
-      bio: (profile?.bio ?? "").trim(),
+      workplace: (profile?.workplace?.companyName ?? "").trim(),
+      bio: profile?.bio ?? "",
       birthdate: (profile?.birthdate ?? "").trim(),
     };
   }, [profile]);
@@ -534,10 +611,19 @@ export default function ProfileEditOverlay({
       username: username.trim().toLowerCase(),
       gender: gender || "",
       location: locationInput.trim(),
-      bio: bio.trim(),
+      workplace: workplaceInput.trim(),
+      bio,
       birthdate: birthdate.trim(),
     };
-  }, [displayName, username, gender, locationInput, bio, birthdate]);
+  }, [
+    displayName,
+    username,
+    gender,
+    locationInput,
+    workplaceInput,
+    bio,
+    birthdate,
+  ]);
 
   const dirty = useMemo(() => {
     return (
@@ -545,6 +631,7 @@ export default function ProfileEditOverlay({
       normalizedCurrent.username !== normalizedInitial.username ||
       normalizedCurrent.gender !== normalizedInitial.gender ||
       normalizedCurrent.location !== normalizedInitial.location ||
+      normalizedCurrent.workplace !== normalizedInitial.workplace ||
       normalizedCurrent.bio !== normalizedInitial.bio ||
       normalizedCurrent.birthdate !== normalizedInitial.birthdate
     );
@@ -604,7 +691,9 @@ export default function ProfileEditOverlay({
         username: username.trim().toLowerCase(),
         gender: gender as Exclude<GenderValue, "">,
         location: locationInput.trim(),
-        bio: bio.trim(),
+        workplaceName: workplaceInput.trim(),
+        workplaceCompanyId: workplaceSelectedId || undefined,
+        bio,
         birthdate: birthdate.trim() || undefined,
       };
 
@@ -832,6 +921,94 @@ export default function ProfileEditOverlay({
                       >
                         <span className={styles.locationSuggestionText}>
                           {option.label}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <label className={styles.label}>Workplace</label>
+            <div className={styles.selectShell}>
+              <input
+                className={styles.input}
+                value={workplaceInput}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setWorkplaceInteracted(true);
+                  setWorkplaceInput(next);
+                  setWorkplaceQuery(next);
+                  setWorkplaceSelectedId(null);
+                }}
+                onFocus={() => {
+                  setWorkplaceInteracted(true);
+                  if (workplaceInput.trim()) setWorkplaceOpen(true);
+                }}
+                onBlur={() => {
+                  // Let option clicks land before closing.
+                  setTimeout(() => setWorkplaceOpen(false), 120);
+                }}
+                placeholder="Search company"
+              />
+
+              {workplaceOpen ? (
+                <div className={styles.locationSuggestions} role="listbox">
+                  {!workplaceLoading && workplaceInput.trim() ? (
+                    <button
+                      type="button"
+                      className={styles.locationSuggestion}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        // Keep typed value; save will create/link company.
+                        setWorkplaceSelectedId(null);
+                        setWorkplaceOpen(false);
+                      }}
+                      role="option"
+                      aria-selected={false}
+                    >
+                      <span className={styles.locationSuggestionText}>
+                        Add &quot;{workplaceInput.trim()}&quot;
+                      </span>
+                    </button>
+                  ) : null}
+                  {workplaceLoading ? (
+                    <div className={styles.locationSuggestionMuted}>
+                      Searching...
+                    </div>
+                  ) : null}
+                  {!workplaceLoading && workplaceSuggestions.length === 0 ? (
+                    <div className={styles.locationSuggestionMuted}>
+                      {workplaceError ||
+                        (workplaceInput.trim()
+                          ? "No matches yet — you can add it"
+                          : "No suggestions found")}
+                    </div>
+                  ) : null}
+                  {!workplaceLoading &&
+                    workplaceSuggestions.map((option, idx) => (
+                      <button
+                        type="button"
+                        key={option.id}
+                        className={`${styles.locationSuggestion} ${
+                          idx === workplaceHighlight
+                            ? styles.locationSuggestionActive
+                            : ""
+                        }`}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setWorkplaceInput(option.name);
+                          setWorkplaceQuery(option.name);
+                          setWorkplaceSelectedId(option.id);
+                          setWorkplaceOpen(false);
+                        }}
+                        onMouseEnter={() => setWorkplaceHighlight(idx)}
+                        role="option"
+                        aria-selected={idx === workplaceHighlight}
+                      >
+                        <span className={styles.locationSuggestionText}>
+                          {option.name}
                         </span>
                       </button>
                     ))}
