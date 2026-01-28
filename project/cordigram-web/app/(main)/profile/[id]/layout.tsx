@@ -33,6 +33,7 @@ import {
   type FollowListItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import { emitCurrentProfileUpdated } from "@/lib/events";
 import {
   ProfileProvider,
   type ProfileTabKey,
@@ -939,9 +940,11 @@ export default function ProfileLayout({
           ? {
               ...prev,
               avatarUrl: res.avatarUrl,
+              avatarOriginalUrl: res.avatarOriginalUrl,
             }
           : prev,
       );
+      emitCurrentProfileUpdated();
       showToast("Avatar updated");
       closeAvatarCrop();
     } catch (err) {
@@ -971,9 +974,11 @@ export default function ProfileLayout({
           ? {
               ...prev,
               avatarUrl: res.avatarUrl || DEFAULT_AVATAR_URL,
+              avatarOriginalUrl: res.avatarOriginalUrl,
             }
           : prev,
       );
+      emitCurrentProfileUpdated();
       showToast("Avatar removed");
       closeAvatarConfirm();
     } catch (err) {
@@ -1383,7 +1388,7 @@ export default function ProfileLayout({
                 aria-label="Close"
                 onClick={closeAvatarCrop}
               >
-                <span aria-hidden>X</span>
+                <IconClose />
               </button>
             </div>
             <div className={styles.avatarCropGrid}>

@@ -13,6 +13,7 @@ import {
   fetchCurrentProfile,
   type CurrentProfileResponse,
 } from "@/lib/api";
+import { CURRENT_PROFILE_UPDATED_EVENT } from "@/lib/events";
 import { useTheme } from "@/component/theme-provider";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -108,10 +109,19 @@ export default function Sidebar() {
       }
     };
 
+    const onProfileUpdated = () => {
+      loadProfile();
+    };
+
     window.addEventListener("storage", onStorage);
+    window.addEventListener(CURRENT_PROFILE_UPDATED_EVENT, onProfileUpdated);
     return () => {
       active = false;
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener(
+        CURRENT_PROFILE_UPDATED_EVENT,
+        onProfileUpdated,
+      );
     };
   }, []);
 
