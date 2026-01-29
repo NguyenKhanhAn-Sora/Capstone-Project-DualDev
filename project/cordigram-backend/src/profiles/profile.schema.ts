@@ -72,3 +72,4 @@ export class Profile extends Document {
 
 export const ProfileSchema = SchemaFactory.createForClass(Profile);
 ProfileSchema.index({ username: 1 }, { unique: true });
+ProfileSchema.index({ 'workplace.companyId': 1 });

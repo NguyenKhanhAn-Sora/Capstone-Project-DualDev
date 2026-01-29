@@ -1,0 +1,561 @@
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(6px);
+  overflow-y: auto;
+  padding: 20px 12px;
+}
+
+.modalOverlayOpen {
+  animation: overlayFadeIn 160ms ease forwards;
+}
+
+.modalOverlayClosing {
+  animation: overlayFadeOut 160ms ease forwards;
+}
+
+.modalCard {
+  width: min(420px, 92vw);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-strong);
+  border-radius: 16px;
+  padding: 20px;
+  color: var(--color-text);
+}
+
+.modalCardOpen {
+  animation: modalSlideIn 200ms ease forwards;
+}
+
+.modalCardClosing {
+  animation: modalSlideOut 180ms ease forwards;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modalTitle {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--color-title-primary);
+  letter-spacing: 1px;
+}
+
+.closeBtn {
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: 6px;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    transform 120ms ease,
+    border 120ms ease;
+}
+
+.closeBtn:hover {
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+
+.repostCard {
+  width: min(520px, 94vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+.repostHeader {
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.repostSub {
+  color: var(--color-text-muted);
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.repostSheet {
+  width: min(440px, 92vw);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-strong);
+  border-radius: 18px;
+  overflow: hidden;
+  color: var(--color-text);
+}
+
+.repostSheetHeader {
+  padding: 16px 18px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.repostSheetTitle {
+  margin: 0;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.repostSheetSubtitle {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.repostSheetList {
+  display: flex;
+  flex-direction: column;
+}
+
+.repostSheetItem {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-weight: 700;
+  padding: 14px 18px;
+  text-align: center;
+  cursor: pointer;
+  border-top: 1px solid var(--color-border);
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.repostSheetItem:hover {
+  background: var(--color-surface-muted);
+}
+
+.repostSheetPrimary {
+  color: var(--color-primary);
+}
+
+.repostNoteLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.captionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.emojiWrap {
+  position: relative;
+}
+
+.emojiButton {
+  padding: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 10px;
+  cursor: pointer;
+  line-height: 1;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.emojiButton:hover {
+  transform: translateY(-1px);
+}
+
+.emojiPopover {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  z-index: 30;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.editTextareaShell {
+  position: relative;
+}
+
+.repostTextarea {
+  min-height: 120px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 10px 12px;
+  resize: vertical;
+  width: 100%;
+}
+
+.repostTextarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.charCount {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.editField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.editLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.editLabelText {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.visibilityList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.visibilityOption {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    border 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+
+.visibilityOption:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.visibilityOptionActive {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.visibilityRadio {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.visibilityOptionActive .visibilityRadio {
+  border-color: var(--color-primary);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.visibilityCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.visibilityTitle {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.visibilityDesc {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.switchGroup {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+}
+
+.switchRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px;
+  border-radius: 10px;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.switchRow:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.switchRow input {
+  margin-top: 4px;
+}
+
+.switchTitle {
+  margin: 0;
+  font-weight: 700;
+}
+
+.switchHint {
+  margin: 2px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.editInput {
+  width: 100%;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.locationCombo {
+  position: relative;
+}
+
+.locationDropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-strong);
+  overflow: hidden;
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 20;
+}
+.locationItem {
+  width: 100%;
+  display: block;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 14px;
+}
+.locationItem:hover,
+.locationItemActive {
+  background: var(--color-surface-muted);
+}
+.locationItem:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.chipShell {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--color-primary), #22d3ee);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  box-shadow: 0 8px 18px rgba(14, 165, 233, 0.15);
+}
+
+.chip button {
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+
+.chip button:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.chipInput {
+  min-width: 140px;
+  flex: 1 1 120px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  padding: 6px 4px;
+  color: var(--color-text);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modalSecondary {
+  min-width: 96px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.modalSecondary:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.modalPrimary {
+  min-width: 120px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+  transition:
+    transform 120ms ease,
+    filter 120ms ease;
+}
+
+.modalPrimary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.modalPrimary:disabled,
+.modalSecondary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.inlineError {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #fecdd3;
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlayFadeOut {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modalSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}

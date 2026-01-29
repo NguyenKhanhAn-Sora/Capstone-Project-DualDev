@@ -972,6 +972,37 @@ export type FollowListResponse = {
   nextCursor: string | null;
 };
 
+export type PeopleSuggestionItem = {
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+  reason: string;
+  mutualCount?: number;
+  isFollowing: boolean;
+};
+
+export type PeopleSuggestionsResponse = {
+  items: PeopleSuggestionItem[];
+};
+
+export async function fetchPeopleSuggestions(opts: {
+  token: string;
+  limit?: number;
+}): Promise<PeopleSuggestionsResponse> {
+  const { token, limit } = opts;
+  const query = new URLSearchParams();
+  if (limit) query.set("limit", String(limit));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiFetch<PeopleSuggestionsResponse>({
+    path: `/users/suggestions${suffix}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function fetchFollowers(opts: {
   token: string;
   userId: string;

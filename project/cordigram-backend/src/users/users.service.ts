@@ -9,6 +9,7 @@ import { User } from './user.schema';
 import { Follow } from './follow.schema';
 import { BlocksService } from './blocks.service';
 import { Profile } from '../profiles/profile.schema';
+import { UserTasteProfile } from '../explore/user-taste.schema';
 
 @Injectable()
 export class UsersService {
@@ -16,6 +17,8 @@ export class UsersService {
     @InjectModel(User.name) private readonly userModel: Model<User>,
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
     @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
+    @InjectModel(UserTasteProfile.name)
+    private readonly tasteProfileModel: Model<UserTasteProfile>,
     private readonly blocksService: BlocksService,
   ) {}
 
@@ -235,6 +238,329 @@ export class UsersService {
     }>;
 
     return { items, nextCursor };
+  }
+
+  async suggestPeople(params: { viewerId: string; limit?: number }): Promise<{
+    items: Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      reason: string;
+      mutualCount?: number;
+      isFollowing: boolean;
+    }>;
+  }> {
+    const viewerId = this.asObjectId(params.viewerId, 'viewerId');
+    const limit = Math.min(Math.max(Number(params.limit) || 10, 1), 20);
+
+    const buildFallbackItems = async (
+      excludeIds: Set<string>,
+      take: number,
+    ): Promise<
+      Array<{
+        userId: string;
+        username: string;
+        displayName: string;
+        avatarUrl: string;
+        reason: string;
+        mutualCount?: number;
+        isFollowing: boolean;
+      }>
+    > => {
+      if (take <= 0) return [];
+
+      const excludedObjectIds = Array.from(excludeIds)
+        .filter(Types.ObjectId.isValid)
+        .map((id) => new Types.ObjectId(id));
+
+      const fetchSize = Math.min(Math.max(take * 12, take), 300);
+
+      const fallbackUsers = await this.userModel
+        .find({ _id: { $nin: excludedObjectIds } })
+        .sort({ followerCount: -1, _id: -1 })
+        .limit(fetchSize)
+        .select('_id')
+        .lean()
+        .exec();
+
+      const ids = fallbackUsers
+        .map((u: any) => u._id?.toString?.())
+        .filter(Boolean) as string[];
+      if (!ids.length) return [];
+
+      const profiles = await this.profileModel
+        .find({ userId: { $in: ids.map((id) => new Types.ObjectId(id)) } })
+        .select('userId username displayName avatarUrl')
+        .lean()
+        .exec();
+      const profileByUserId = new Map<string, any>();
+      profiles.forEach((p: any) => {
+        const id = p.userId?.toString?.();
+        if (id) profileByUserId.set(id, p);
+      });
+
+      const items: Array<{
+        userId: string;
+        username: string;
+        displayName: string;
+        avatarUrl: string;
+        reason: string;
+        mutualCount?: number;
+        isFollowing: boolean;
+      }> = [];
+
+      for (const id of ids) {
+        if (items.length >= take) break;
+        const p = profileByUserId.get(id);
+        if (!p) continue;
+        items.push({
+          userId: id,
+          username: p.username ?? '',
+          displayName: p.displayName ?? p.username ?? '',
+          avatarUrl: p.avatarUrl ?? '',
+          reason: 'Suggested for you',
+          mutualCount: 0,
+          isFollowing: false,
+        });
+      }
+
+      return items;
+    };
+
+    const { blockedIds, blockedByIds } =
+      await this.blocksService.getBlockLists(viewerId);
+
+    const [viewerFollowingDocs, viewerProfile, taste] = await Promise.all([
+      this.followModel
+        .find({ followerId: viewerId })
+        .select('followeeId')
+        .lean()
+        .exec(),
+      this.profileModel
+        .findOne({ userId: viewerId })
+        .select('workplace')
+        .lean()
+        .exec(),
+      this.tasteProfileModel
+        .findOne({ userId: viewerId })
+        .select('authorWeights')
+        .lean()
+        .exec(),
+    ]);
+
+    const alreadyFollowing = new Set<string>();
+    viewerFollowingDocs.forEach((doc: any) => {
+      const id = doc.followeeId?.toString?.();
+      if (id) alreadyFollowing.add(id);
+    });
+
+    const excluded = new Set<string>();
+    excluded.add(viewerId.toString());
+    alreadyFollowing.forEach((id) => excluded.add(id));
+    blockedIds.forEach((id) => excluded.add(id));
+    blockedByIds.forEach((id) => excluded.add(id));
+
+    const followingIds = Array.from(alreadyFollowing)
+      .filter((id) => Types.ObjectId.isValid(id))
+      .slice(0, 2000)
+      .map((id) => new Types.ObjectId(id));
+
+    const mutualCandidates: Array<{ userId: string; mutualCount: number }> =
+      followingIds.length
+        ? (
+            (await this.followModel
+              .aggregate([
+                {
+                  $match: {
+                    followerId: { $in: followingIds },
+                  },
+                },
+                {
+                  $group: {
+                    _id: '$followeeId',
+                    mutualCount: { $sum: 1 },
+                  },
+                },
+                { $sort: { mutualCount: -1, _id: -1 } },
+                { $limit: 200 },
+              ])
+              .exec()) as Array<{ _id: Types.ObjectId; mutualCount: number }>
+          ).map((row) => ({
+            userId: row._id?.toString?.() ?? '',
+            mutualCount: Number(row.mutualCount ?? 0),
+          }))
+        : [];
+
+    const mutualMap = new Map<string, number>();
+    mutualCandidates.forEach((c) => {
+      if (c.userId) mutualMap.set(c.userId, c.mutualCount);
+    });
+
+    const tasteAuthorWeights: Array<{ userId: string; w: number }> = [];
+    const authorWeights = (taste as any)?.authorWeights as
+      | Map<string, number>
+      | Record<string, number>
+      | undefined;
+    if (authorWeights) {
+      const entries =
+        authorWeights instanceof Map
+          ? Array.from(authorWeights.entries())
+          : Object.entries(authorWeights);
+      entries
+        .filter(([k, v]) => Types.ObjectId.isValid(k) && Number(v) > 0)
+        .sort((a, b) => Number(b[1]) - Number(a[1]))
+        .slice(0, 60)
+        .forEach(([k, v]) =>
+          tasteAuthorWeights.push({ userId: k, w: Number(v) }),
+        );
+    }
+
+    const sameCompanyIds: string[] = [];
+    const companyId = (viewerProfile as any)?.workplace?.companyId;
+    if (companyId) {
+      const companyProfiles = await this.profileModel
+        .find({ 'workplace.companyId': companyId })
+        .select('userId')
+        .limit(200)
+        .lean()
+        .exec();
+      companyProfiles.forEach((p: any) => {
+        const id = p.userId?.toString?.();
+        if (id) sameCompanyIds.push(id);
+      });
+    }
+
+    const candidateSet = new Set<string>();
+    for (const c of mutualCandidates) {
+      if (!c.userId) continue;
+      if (excluded.has(c.userId)) continue;
+      if (c.mutualCount <= 0) continue;
+      candidateSet.add(c.userId);
+      if (candidateSet.size >= 250) break;
+    }
+    for (const c of sameCompanyIds) {
+      if (excluded.has(c)) continue;
+      candidateSet.add(c);
+      if (candidateSet.size >= 250) break;
+    }
+    for (const c of tasteAuthorWeights) {
+      if (excluded.has(c.userId)) continue;
+      candidateSet.add(c.userId);
+      if (candidateSet.size >= 250) break;
+    }
+
+    const candidateIds = Array.from(candidateSet)
+      .filter((id) => Types.ObjectId.isValid(id))
+      .slice(0, 250)
+      .map((id) => new Types.ObjectId(id));
+
+    if (!candidateIds.length) {
+      const excludedFallback = new Set<string>(excluded);
+      const items = await buildFallbackItems(excludedFallback, limit);
+      return { items };
+    }
+
+    const [profiles, users] = await Promise.all([
+      this.profileModel
+        .find({ userId: { $in: candidateIds } })
+        .select('userId username displayName avatarUrl workplace')
+        .lean()
+        .exec(),
+      this.userModel
+        .find({ _id: { $in: candidateIds } })
+        .select('_id followerCount')
+        .lean()
+        .exec(),
+    ]);
+
+    const profileByUserId = new Map<string, any>();
+    profiles.forEach((p: any) => {
+      const id = p.userId?.toString?.();
+      if (id) profileByUserId.set(id, p);
+    });
+    const followerCountByUserId = new Map<string, number>();
+    users.forEach((u: any) => {
+      const id = u._id?.toString?.();
+      if (id) followerCountByUserId.set(id, Number(u.followerCount ?? 0));
+    });
+
+    const sameCompanySet = new Set(sameCompanyIds);
+    const tasteWeightMap = new Map<string, number>();
+    tasteAuthorWeights.forEach((t) => tasteWeightMap.set(t.userId, t.w));
+
+    const scored = Array.from(candidateSet)
+      .filter((id) => !excluded.has(id))
+      .map((id) => {
+        const mutual = mutualMap.get(id) ?? 0;
+        const sameCompany = sameCompanySet.has(id) ? 1 : 0;
+        const tasteW = tasteWeightMap.get(id) ?? 0;
+        const popularity = followerCountByUserId.get(id) ?? 0;
+        const score =
+          mutual * 10 +
+          sameCompany * 6 +
+          tasteW * 2 +
+          Math.log10(1 + popularity);
+
+        let reason = 'Suggested for you';
+        if (mutual >= 3) reason = `${mutual} mutual connections`;
+        else if (mutual >= 1) reason = `${mutual} mutual connection`;
+        else if (sameCompany) reason = 'Same workplace';
+        else if (tasteW > 0) reason = 'Based on your interests';
+
+        return {
+          userId: id,
+          score,
+          mutualCount: mutual,
+          reason,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit * 3);
+
+    const picked: string[] = [];
+    for (const s of scored) {
+      if (picked.length >= limit) break;
+      if (!profileByUserId.has(s.userId)) continue;
+      picked.push(s.userId);
+    }
+
+    const scoreByUserId = new Map<string, any>();
+    scored.forEach((s) => scoreByUserId.set(s.userId, s));
+
+    let items = picked
+      .map((id) => {
+        const p = profileByUserId.get(id);
+        const s = scoreByUserId.get(id);
+        if (!p) return null;
+        return {
+          userId: id,
+          username: p.username ?? '',
+          displayName: p.displayName ?? p.username ?? '',
+          avatarUrl: p.avatarUrl ?? '',
+          reason: s?.reason ?? 'Suggested for you',
+          mutualCount: s?.mutualCount ?? 0,
+          isFollowing: false,
+        };
+      })
+      .filter(Boolean) as Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      reason: string;
+      mutualCount?: number;
+      isFollowing: boolean;
+    }>;
+
+    if (items.length < limit) {
+      const excludeMore = new Set<string>(excluded);
+      picked.forEach((id) => excludeMore.add(id));
+      const extra = await buildFallbackItems(excludeMore, limit - items.length);
+      items = [...items, ...extra];
+    }
+
+    return { items };
   }
 
   private sanitizeRecentAccounts(list: User['recentAccounts'] = []) {

@@ -8,6 +8,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   fetchReelsFeed,
   fetchReelDetail,
+  fetchPostDetail,
   fetchFeed,
   fetchUserPosts,
   likePost,
@@ -35,6 +36,10 @@ import ReelComments from "./ReelComments";
 import styles from "./reel.module.css";
 import postStyles from "../post/post.module.css";
 import feedStyles from "../home-feed.module.css";
+import RepostOverlay, {
+  type QuoteInput,
+  type RepostTarget,
+} from "@/ui/repost-overlay/repost-overlay";
 
 function LocationPinIcon() {
   return (
@@ -886,30 +891,7 @@ export default function ReelPage({
   const [reportNote, setReportNote] = useState("");
   const [reportError, setReportError] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
-  const [repostTarget, setRepostTarget] = useState<{
-    postId: string;
-    label: string;
-    kind: "reel" | "post";
-  } | null>(null);
-  const [repostMenuAnchor, setRepostMenuAnchor] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  const [quoteOpen, setQuoteOpen] = useState(false);
-  const [repostMode, setRepostMode] = useState<"quote" | "repost" | null>(null);
-  const [repostNote, setRepostNote] = useState("");
-  const [quoteVisibility, setQuoteVisibility] = useState<
-    "public" | "followers" | "private"
-  >("public");
-  const [quoteAllowComments, setQuoteAllowComments] = useState(true);
-  const [quoteAllowDownload, setQuoteAllowDownload] = useState(true);
-  const [quoteHideLikeCount, setQuoteHideLikeCount] = useState(false);
-  const [quoteLocation, setQuoteLocation] = useState("");
-  const [quoteHashtags, setQuoteHashtags] = useState<string[]>([]);
-  const [quoteHashtagDraft, setQuoteHashtagDraft] = useState("");
-  const [repostSubmitting, setRepostSubmitting] = useState(false);
-  const [repostError, setRepostError] = useState("");
-  const [repostClosing, setRepostClosing] = useState(false);
+  const [repostTarget, setRepostTarget] = useState<RepostTarget | null>(null);
   const [visibilityModalOpen, setVisibilityModalOpen] = useState(false);
   const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [visibilitySelected, setVisibilitySelected] = useState<
@@ -919,6 +901,7 @@ export default function ReelPage({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [editTargetId, setEditTargetId] = useState<string | null>(null);
   const [editCaption, setEditCaption] = useState("");
   const editCaptionRef = useRef<HTMLTextAreaElement | null>(null);
   const editEmojiRef = useRef<HTMLDivElement | null>(null);
@@ -943,12 +926,19 @@ export default function ReelPage({
   const [locationSuggestions, setLocationSuggestions] = useState<
     Array<{ label: string; lat: string; lon: string }>
   >([]);
+  const suppressNextLocationSuggestRef = useRef(false);
+  const [locationFocused, setLocationFocused] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [locationOpen, setLocationOpen] = useState(false);
   const [locationHighlight, setLocationHighlight] = useState(-1);
   const [editAllowComments, setEditAllowComments] = useState(true);
   const [editAllowDownload, setEditAllowDownload] = useState(false);
+  const [lockedEditAllowDownload, setLockedEditAllowDownload] = useState<
+    boolean | null
+  >(null);
+  const [lockedEditAllowDownloadLoading, setLockedEditAllowDownloadLoading] =
+    useState(false);
   const [editHideLikeCount, setEditHideLikeCount] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
@@ -956,7 +946,53 @@ export default function ReelPage({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  const repostHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const activeReel = items[activeIndex];
+
+  const editingReel = useMemo(() => {
+    if (!editTargetId) return null;
+    return items.find((it) => it.id === editTargetId) ?? null;
+  }, [editTargetId, items]);
+
+  useEffect(() => {
+    if (!editOpen) {
+      setLockedEditAllowDownload(null);
+      setLockedEditAllowDownloadLoading(false);
+      return;
+    }
+    if (!token || !editingReel?.repostOf) {
+      setLockedEditAllowDownload(null);
+      setLockedEditAllowDownloadLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLockedEditAllowDownloadLoading(true);
+    (async () => {
+      try {
+        const originalId = String(editingReel.repostOf);
+        let original: FeedItem | null = null;
+        try {
+          original = await fetchReelDetail({ token, reelId: originalId });
+        } catch {
+          original = await fetchPostDetail({ token, postId: originalId });
+        }
+        if (cancelled) return;
+        const next = Boolean(original?.allowDownload);
+        setLockedEditAllowDownload(next);
+        setEditAllowDownload(next);
+      } catch {
+        if (cancelled) return;
+        setLockedEditAllowDownload(null);
+      } finally {
+        if (!cancelled) setLockedEditAllowDownloadLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editingReel?.id, editingReel?.repostOf, editOpen, token]);
 
   useEffect(() => {
     if (!openMoreMenuId) return;
@@ -996,7 +1032,6 @@ export default function ReelPage({
   useEffect(() => {
     return () => {
       if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
-      if (repostHideTimerRef.current) clearTimeout(repostHideTimerRef.current);
       if (commentCloseTimerRef.current)
         clearTimeout(commentCloseTimerRef.current);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -1058,6 +1093,18 @@ export default function ReelPage({
 
   useEffect(() => {
     if (!editOpen) return;
+
+    if (suppressNextLocationSuggestRef.current) {
+      suppressNextLocationSuggestRef.current = false;
+      return;
+    }
+
+    // Only suggest while the input is actively focused. This avoids the dropdown
+    // popping open just because we seeded an existing location when opening edit.
+    if (!locationFocused) {
+      return;
+    }
+
     if (!locationQuery.trim()) {
       setLocationSuggestions([]);
       setLocationOpen(false);
@@ -1094,7 +1141,7 @@ export default function ReelPage({
             }))
           : [];
         setLocationSuggestions(mapped);
-        setLocationOpen(true);
+        setLocationOpen(mapped.length > 0);
         setLocationHighlight(mapped.length ? 0 : -1);
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -1111,7 +1158,7 @@ export default function ReelPage({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [editOpen, locationQuery]);
+  }, [editOpen, locationFocused, locationQuery]);
 
   useEffect(() => {
     if (!canRender) return;
@@ -1467,6 +1514,7 @@ export default function ReelPage({
 
   const openEditModal = () => {
     if (!active) return;
+    setEditTargetId(active.id);
     applyEditSeed(active);
     setEditOpen(true);
     setOpenMoreMenuId(null);
@@ -1475,6 +1523,8 @@ export default function ReelPage({
   const closeEditModal = () => {
     if (editSaving) return;
     setEditOpen(false);
+    setEditTargetId(null);
+    setLocationFocused(false);
   };
 
   const handleCaptionChange = (
@@ -1598,6 +1648,7 @@ export default function ReelPage({
   };
 
   const pickLocation = (label: string) => {
+    suppressNextLocationSuggestRef.current = true;
     setEditLocation(label);
     setLocationQuery(label);
     setLocationOpen(false);
@@ -1633,7 +1684,8 @@ export default function ReelPage({
     setEditError("");
     setEditSuccess("");
 
-    if (!token || !active) {
+    const targetId = editTargetId ?? active?.id;
+    if (!token || !targetId) {
       setEditError("Please sign in to edit reels");
       return;
     }
@@ -1655,28 +1707,37 @@ export default function ReelPage({
 
     const trimmedLocation = editLocation.trim();
 
-    const payload = {
+    const isRepost = Boolean((editingReel ?? active)?.repostOf);
+    const payload: any = {
       content: editCaption || "",
       hashtags: normalizedHashtags,
       mentions: normalizedMentions,
       location: trimmedLocation || undefined,
       allowComments: editAllowComments,
-      allowDownload: editAllowDownload,
       hideLikeCount: editHideLikeCount,
-    } as const;
+    };
+
+    if (isRepost) {
+      payload.allowDownload = Boolean(
+        lockedEditAllowDownload ?? editAllowDownload,
+      );
+    } else {
+      payload.allowDownload = editAllowDownload;
+    }
 
     try {
       setEditSaving(true);
       const updated = await updatePost({
         token,
-        postId: active.id,
+        postId: targetId,
         payload,
       });
       setItems((prev) =>
-        prev.map((it) => (it.id === active.id ? { ...it, ...updated } : it)),
+        prev.map((it) => (it.id === targetId ? { ...it, ...updated } : it)),
       );
       setEditSuccess("Reel updated");
       setEditOpen(false);
+      setEditTargetId(null);
       showToast("Reel updated");
     } catch (err: any) {
       const message =
@@ -1807,104 +1868,59 @@ export default function ReelPage({
     );
   }, []);
 
-  const openRepostMenuForItem = (
-    postId: string,
-    label: string,
-    kind: "reel" | "post",
-    anchor?: DOMRect | null,
-  ) => {
-    if (!token) {
-      showToast("Sign in to repost");
-      return;
-    }
-    if (repostHideTimerRef.current) clearTimeout(repostHideTimerRef.current);
-    setRepostClosing(false);
-    setRepostTarget({ postId, label, kind });
-    resetQuoteState();
-    setQuoteOpen(false);
-    if (anchor) {
-      setRepostMenuAnchor({
-        x: anchor.left + anchor.width / 2,
-        y: anchor.bottom,
-      });
-    } else {
-      setRepostMenuAnchor(
-        typeof window !== "undefined"
-          ? { x: window.innerWidth / 2, y: window.innerHeight / 2 }
-          : null,
-      );
-    }
-  };
+  const resolveOriginalPostId = useCallback(
+    (postId: string) => {
+      const target = items.find((it) => it.id === postId);
+      return (target as any)?.repostOf || postId;
+    },
+    [items],
+  );
 
-  const closeRepostModal = () => {
-    if (repostHideTimerRef.current) clearTimeout(repostHideTimerRef.current);
-    setRepostClosing(true);
-    repostHideTimerRef.current = setTimeout(() => {
-      setRepostTarget(null);
-      resetQuoteState();
-      setRepostClosing(false);
-    }, REPOST_ANIMATION_MS);
-  };
-
-  const closeRepostMenu = () => {
-    setRepostMenuAnchor(null);
-  };
-
-  const handleQuickRepost = () => {
-    if (!repostTarget) return;
-    setRepostMode("repost");
-    closeRepostMenu();
-    void submitRepost("repost");
-  };
-
-  const openQuoteComposer = () => {
-    if (!repostTarget) return;
-    setRepostMode("quote");
-    setQuoteOpen(true);
-    setRepostError("");
-    closeRepostMenu();
-  };
-
-  const submitRepost = async (modeOverride?: "quote" | "repost") => {
-    const mode = modeOverride ?? repostMode;
-    if (!token || !repostTarget || !mode) {
-      setRepostError("Choose an option to continue");
-      return;
-    }
-    const originalId = resolveOriginalPostId(repostTarget.postId);
-    const targetId = repostTarget.postId;
-    setRepostSubmitting(true);
-    setRepostError("");
-    try {
-      if (mode === "repost") {
-        await createPost({ token, payload: { repostOf: originalId } });
-        incrementRepostStat(originalId);
-        if (originalId !== targetId) {
-          incrementRepostStat(targetId);
-          try {
-            await repostPost({ token, postId: targetId });
-          } catch {}
-        }
-        showToast("Reposted");
-        closeRepostModal();
+  const handleQuickRepost = useCallback(
+    async (target: RepostTarget) => {
+      if (!token) {
+        showToast("Sign in to repost");
         return;
       }
+      const originalId = resolveOriginalPostId(target.postId);
+      const targetId = target.postId;
+      await createPost({ token, payload: { repostOf: originalId } });
+      incrementRepostStat(originalId);
+      if (originalId !== targetId) {
+        incrementRepostStat(targetId);
+        try {
+          await repostPost({ token, postId: targetId });
+        } catch {}
+      }
+      showToast("Reposted");
+    },
+    [incrementRepostStat, resolveOriginalPostId, showToast, token],
+  );
 
-      const note = repostNote.trim();
+  const handleShareQuote = useCallback(
+    async (target: RepostTarget, input: QuoteInput) => {
+      if (!token) {
+        showToast("Sign in to repost");
+        return;
+      }
+      const originalId = resolveOriginalPostId(target.postId);
+      const targetId = target.postId;
+
+      const note = input.content.trim();
       const mentions = extractMentionsFromCaption(note);
       const payload = {
         repostOf: originalId,
         content: note || undefined,
-        hashtags: quoteHashtags.length ? quoteHashtags : undefined,
-        location: quoteLocation.trim() || undefined,
-        allowComments: quoteAllowComments,
-        allowDownload: quoteAllowDownload,
-        hideLikeCount: quoteHideLikeCount,
-        visibility: quoteVisibility,
+        hashtags: input.hashtags.length ? input.hashtags : undefined,
+        location: input.location.trim() || undefined,
+        allowComments: input.allowComments,
+        allowDownload: Boolean(target.originalAllowDownload),
+        hideLikeCount: input.hideLikeCount,
+        visibility: input.visibility,
         mentions: mentions.length ? mentions : undefined,
       } as const;
 
-      if (repostTarget.kind === "reel") {
+      if (target.kind === "reel") {
         await createReel({ token, payload: payload as any });
       } else {
         await createPost({ token, payload: payload as any });
@@ -1917,18 +1933,11 @@ export default function ReelPage({
           await repostPost({ token, postId: targetId });
         } catch {}
       }
+
       showToast("Reposted with quote");
-      closeRepostModal();
-    } catch (err) {
-      const message =
-        typeof err === "object" && err && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Could not repost";
-      setRepostError(message || "Could not repost");
-    } finally {
-      setRepostSubmitting(false);
-    }
-  };
+    },
+    [incrementRepostStat, resolveOriginalPostId, showToast, token],
+  );
 
   const handleRepost = (
     id: string,
@@ -1943,7 +1952,16 @@ export default function ReelPage({
       target.authorId ||
       "creator";
     const kind = (target as any)?.kind === "post" ? "post" : "reel";
-    openRepostMenuForItem(id, label, kind, anchor);
+    if (!token) {
+      showToast("Sign in to repost");
+      return;
+    }
+    setRepostTarget({
+      postId: id,
+      label,
+      kind,
+      originalAllowDownload: Boolean(target.allowDownload),
+    });
   };
 
   const handleViewed = (id: string, ms?: number) => {
@@ -1972,82 +1990,6 @@ export default function ReelPage({
     [reportCategory],
   );
 
-  const repostMenuStyle = useMemo(() => {
-    if (!repostMenuAnchor || typeof window === "undefined") return null;
-    const width = 240;
-    const height = 132;
-    const margin = 12;
-    const left = clamp(
-      repostMenuAnchor.x - width / 2,
-      margin,
-      window.innerWidth - width - margin,
-    );
-    const top = clamp(
-      repostMenuAnchor.y + 10,
-      margin,
-      window.innerHeight - height - margin,
-    );
-    return { left, top, width };
-  }, [repostMenuAnchor]);
-
-  const quoteVisibilityOptions = useMemo(
-    () => [
-      {
-        value: "public" as const,
-        title: "Public",
-        description: "Anyone can view this repost",
-      },
-      {
-        value: "followers" as const,
-        title: "Followers",
-        description: "Only followers can view this repost",
-      },
-      {
-        value: "private" as const,
-        title: "Private",
-        description: "Only you can view this repost",
-      },
-    ],
-    [],
-  );
-
-  const resolveOriginalPostId = useCallback(
-    (postId: string) => {
-      const target = items.find((it) => it.id === postId);
-      return (target as any)?.repostOf || postId;
-    },
-    [items],
-  );
-
-  const resetQuoteState = useCallback(() => {
-    setRepostMode(null);
-    setRepostNote("");
-    setQuoteVisibility("public");
-    setQuoteAllowComments(true);
-    setQuoteAllowDownload(true);
-    setQuoteHideLikeCount(false);
-    setQuoteLocation("");
-    setQuoteHashtags([]);
-    setQuoteHashtagDraft("");
-    setRepostError("");
-    setRepostSubmitting(false);
-    setQuoteOpen(false);
-    setRepostMenuAnchor(null);
-  }, []);
-
-  const addQuoteHashtag = useCallback(() => {
-    const clean = normalizeHashtag(quoteHashtagDraft);
-    if (!clean) return;
-    setQuoteHashtags((prev) =>
-      prev.includes(clean) ? prev : [...prev, clean].slice(0, 12),
-    );
-    setQuoteHashtagDraft("");
-  }, [quoteHashtagDraft]);
-
-  const removeQuoteHashtag = useCallback((tag: string) => {
-    setQuoteHashtags((prev) => prev.filter((item) => item !== tag));
-  }, []);
-
   const commentsToggleLabel =
     active?.allowComments === false ? "Turn on comments" : "Turn off comments";
 
@@ -2075,10 +2017,9 @@ export default function ReelPage({
 
   const activeSaved = Boolean(active?.flags?.saved ?? active?.saved);
 
-  useEffect(() => {
-    if (!editOpen) return;
-    applyEditSeed(active);
-  }, [active, applyEditSeed, editOpen]);
+  // NOTE: Do not re-seed edit form values while the modal is open.
+  // The active reel can change due to scrolling / navigation, and re-seeding would
+  // overwrite user input mid-typing (e.g., location field getting cleared).
 
   useEffect(() => {
     if (!active) return;
@@ -3101,247 +3042,14 @@ export default function ReelPage({
         </div>
       </div>
 
-      {quoteOpen && repostTarget ? (
-        <div
-          className={`${feedStyles.modalOverlay} ${
-            repostClosing
-              ? feedStyles.modalOverlayClosing
-              : feedStyles.modalOverlayOpen
-          }`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeRepostModal}
-        >
-          <div
-            className={`${feedStyles.modalCard} ${feedStyles.repostCard} ${
-              repostClosing
-                ? feedStyles.modalCardClosing
-                : feedStyles.modalCardOpen
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className={`${feedStyles.modalHeader} ${feedStyles.repostHeader}`}
-            >
-              <div>
-                <h3 className={feedStyles.modalTitle}>Quote</h3>
-                <p className={feedStyles.repostSub}>
-                  {`Quoting @${repostTarget.label}'s ${repostTarget.kind}`}
-                </p>
-              </div>
-              <button
-                className={feedStyles.closeBtn}
-                onClick={closeRepostModal}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-
-            <label className={feedStyles.repostNoteLabel}>
-              Caption
-              <div className={feedStyles.editTextareaShell}>
-                <textarea
-                  className={feedStyles.repostTextarea}
-                  value={repostNote}
-                  onChange={(e) => setRepostNote(e.target.value)}
-                  maxLength={QUOTE_CHAR_LIMIT}
-                  placeholder="Add your thoughts..."
-                />
-                <span className={feedStyles.charCount}>
-                  {repostNote.length}/{QUOTE_CHAR_LIMIT}
-                </span>
-              </div>
-            </label>
-
-            <div className={feedStyles.editField}>
-              <div className={feedStyles.editLabelRow}>
-                <span className={feedStyles.editLabelText}>Visibility</span>
-              </div>
-              <div className={feedStyles.visibilityList}>
-                {quoteVisibilityOptions.map((opt) => {
-                  const active = quoteVisibility === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      className={`${feedStyles.visibilityOption} ${
-                        active ? feedStyles.visibilityOptionActive : ""
-                      }`}
-                      onClick={() => setQuoteVisibility(opt.value)}
-                    >
-                      <span className={feedStyles.visibilityRadio}>
-                        {active ? "✓" : ""}
-                      </span>
-                      <span className={feedStyles.visibilityCopy}>
-                        <span className={feedStyles.visibilityTitle}>
-                          {opt.title}
-                        </span>
-                        <span className={feedStyles.visibilityDesc}>
-                          {opt.description}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className={feedStyles.switchGroup}>
-              <label className={feedStyles.switchRow}>
-                <input
-                  type="checkbox"
-                  checked={quoteAllowComments}
-                  onChange={() => setQuoteAllowComments((prev) => !prev)}
-                />
-                <div>
-                  <p className={feedStyles.switchTitle}>Allow comments</p>
-                  <p className={feedStyles.switchHint}>
-                    People can reply to your quote
-                  </p>
-                </div>
-              </label>
-
-              <label className={feedStyles.switchRow}>
-                <input
-                  type="checkbox"
-                  checked={quoteAllowDownload}
-                  onChange={() => setQuoteAllowDownload((prev) => !prev)}
-                />
-                <div>
-                  <p className={feedStyles.switchTitle}>Allow downloads</p>
-                  <p className={feedStyles.switchHint}>
-                    Let followers save the media from the original post
-                  </p>
-                </div>
-              </label>
-
-              <label className={feedStyles.switchRow}>
-                <input
-                  type="checkbox"
-                  checked={quoteHideLikeCount}
-                  onChange={() => setQuoteHideLikeCount((prev) => !prev)}
-                />
-                <div>
-                  <p className={feedStyles.switchTitle}>Hide like</p>
-                  <p className={feedStyles.switchHint}>
-                    Only you will see like counts on this quote
-                  </p>
-                </div>
-              </label>
-            </div>
-
-            <div className={feedStyles.editField}>
-              <div className={feedStyles.editLabelRow}>
-                <span className={feedStyles.editLabelText}>Location</span>
-              </div>
-              <input
-                className={feedStyles.editInput}
-                placeholder="Add a place"
-                value={quoteLocation}
-                onChange={(e) => setQuoteLocation(e.target.value)}
-              />
-            </div>
-
-            <div className={feedStyles.editField}>
-              <div className={feedStyles.editLabelRow}>
-                <span className={feedStyles.editLabelText}>Hashtags</span>
-              </div>
-              <div className={feedStyles.chipRow}>
-                {quoteHashtags.map((tag) => (
-                  <span key={tag} className={feedStyles.chip}>
-                    #{tag}
-                    <button
-                      type="button"
-                      className={feedStyles.chipRemove}
-                      onClick={() => removeQuoteHashtag(tag)}
-                      aria-label={`Remove ${tag}`}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-                <input
-                  className={feedStyles.editInput}
-                  placeholder="Add hashtag"
-                  value={quoteHashtagDraft}
-                  onChange={(e) => setQuoteHashtagDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === ",") {
-                      e.preventDefault();
-                      addQuoteHashtag();
-                    }
-                  }}
-                />
-              </div>
-            </div>
-
-            {repostError ? (
-              <div className={feedStyles.inlineError}>{repostError}</div>
-            ) : null}
-
-            <div className={feedStyles.modalActions}>
-              <button
-                className={feedStyles.modalSecondary}
-                onClick={closeRepostModal}
-                disabled={repostSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className={feedStyles.modalPrimary}
-                onClick={() => submitRepost("quote")}
-                disabled={repostSubmitting}
-              >
-                {repostSubmitting ? "Sharing..." : "Share quote"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {repostTarget && !quoteOpen ? (
-        <div
-          className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeRepostModal}
-        >
-          <div
-            className={feedStyles.repostSheet}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={feedStyles.repostSheetHeader}>
-              <p className={feedStyles.repostSheetTitle}>Repost</p>
-              <p className={feedStyles.repostSheetSubtitle}>
-                {`@${repostTarget.label} · ${repostTarget.kind}`}
-              </p>
-            </div>
-            <div className={feedStyles.repostSheetList} role="menu">
-              <button
-                className={`${feedStyles.repostSheetItem} ${feedStyles.repostSheetPrimary}`}
-                onClick={handleQuickRepost}
-                disabled={repostSubmitting}
-              >
-                Repost
-              </button>
-              <button
-                className={feedStyles.repostSheetItem}
-                onClick={openQuoteComposer}
-                disabled={repostSubmitting}
-              >
-                Quote
-              </button>
-              <button
-                className={feedStyles.repostSheetItem}
-                onClick={closeRepostModal}
-                disabled={repostSubmitting}
-              >
-                Hủy
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <RepostOverlay
+        target={repostTarget}
+        onRequestClose={() => setRepostTarget(null)}
+        onQuickRepost={handleQuickRepost}
+        onShareQuote={handleShareQuote}
+        quoteCharLimit={QUOTE_CHAR_LIMIT}
+        animationMs={REPOST_ANIMATION_MS}
+      />
 
       {toastMessage ? (
         <div className={postStyles.toast} role="status" aria-live="polite">
@@ -3363,10 +3071,6 @@ export default function ReelPage({
             <div className={feedStyles.modalHeader}>
               <div>
                 <h3 className={feedStyles.modalTitle}>Edit reel</h3>
-                <p className={feedStyles.modalBody}>
-                  Update caption, hashtags, mentions, location, and reel
-                  controls.
-                </p>
               </div>
               <button
                 className={feedStyles.closeBtn}
@@ -3503,32 +3207,33 @@ export default function ReelPage({
                 <div className={feedStyles.editLabelRow}>
                   <span className={feedStyles.editLabelText}>Hashtags</span>
                 </div>
-                <div className={feedStyles.chipRow}>
-                  {editHashtags.map((tag) => (
-                    <span key={tag} className={feedStyles.chip}>
-                      #{tag}
-                      <button
-                        type="button"
-                        className={feedStyles.chipRemove}
-                        onClick={() => removeHashtag(tag)}
-                        aria-label={`Remove ${tag}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    className={feedStyles.editInput}
-                    placeholder="Add hashtag"
-                    value={hashtagDraft}
-                    onChange={(e) => setHashtagDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === ",") {
-                        e.preventDefault();
-                        addHashtag();
-                      }
-                    }}
-                  />
+                <div className={feedStyles.chipShell}>
+                  <div className={feedStyles.chips}>
+                    {editHashtags.map((tag) => (
+                      <span key={tag} className={feedStyles.chip}>
+                        #{tag}
+                        <button
+                          type="button"
+                          onClick={() => removeHashtag(tag)}
+                          aria-label={`Remove ${tag}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    <input
+                      className={feedStyles.chipInput}
+                      placeholder="Add hashtag"
+                      value={hashtagDraft}
+                      onChange={(e) => setHashtagDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === ",") {
+                          e.preventDefault();
+                          addHashtag();
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -3544,9 +3249,16 @@ export default function ReelPage({
                     setEditLocation(e.target.value);
                     setLocationQuery(e.target.value);
                   }}
-                  onFocus={() =>
-                    setLocationOpen(Boolean(locationSuggestions.length))
-                  }
+                  onFocus={() => {
+                    setLocationFocused(true);
+                    setLocationOpen(Boolean(locationSuggestions.length));
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      setLocationFocused(false);
+                      setLocationOpen(false);
+                    }, 120);
+                  }}
                   onKeyDown={onLocationKeyDown}
                 />
                 {locationOpen ? (
@@ -3598,13 +3310,26 @@ export default function ReelPage({
                 <label className={feedStyles.switchRow}>
                   <input
                     type="checkbox"
-                    checked={editAllowDownload}
-                    onChange={() => setEditAllowDownload((prev) => !prev)}
+                    checked={
+                      editingReel?.repostOf
+                        ? Boolean(lockedEditAllowDownload ?? editAllowDownload)
+                        : editAllowDownload
+                    }
+                    disabled={Boolean(editingReel?.repostOf)}
+                    onChange={
+                      editingReel?.repostOf
+                        ? undefined
+                        : () => setEditAllowDownload((prev) => !prev)
+                    }
                   />
                   <div>
                     <p className={feedStyles.switchTitle}>Allow downloads</p>
                     <p className={feedStyles.switchHint}>
-                      Share the original file with people you trust
+                      {editingReel?.repostOf
+                        ? lockedEditAllowDownloadLoading
+                          ? "Inherited from original post (loading…)"
+                          : "Inherited from the original post (can’t be changed)"
+                        : "Share the original file with people you trust"}
                     </p>
                   </div>
                 </label>

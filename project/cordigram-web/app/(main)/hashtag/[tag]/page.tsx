@@ -1,34 +1,43 @@
 "use client";
 
+import type React from "react";
 import { JSX, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
-import styles from "./hashtag.module.css";
-import feedStyles from "../../home-feed.module.css";
+import { useParams, useRouter } from "next/navigation";
 import {
+  blockUser,
+  createPost,
+  createReel,
+  deletePost,
   fetchPostsByHashtag,
   fetchReelsByHashtag,
-  createPost,
-  deletePost,
+  followUser,
   hidePost,
   likePost,
-  unlikePost,
-  followUser,
-  unfollowUser,
-  reportPost,
-  blockUser,
-  savePost,
-  unsavePost,
   repostPost,
+  reportPost,
+  savePost,
   setPostAllowComments,
   setPostHideLikeCount,
+  unfollowUser,
+  unlikePost,
+  unsavePost,
   updatePostVisibility,
   type FeedItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import styles from "./hashtag.module.css";
+import feedStyles from "../../home-feed.module.css";
 import PostEditOverlay from "@/ui/post-edit-overlay";
 import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
+import RepostOverlay, {
+  type QuoteInput,
+  type RepostTarget,
+} from "@/ui/repost-overlay/repost-overlay";
+
+const REPORT_ANIMATION_MS = 200;
+const QUOTE_CHAR_LIMIT = 500;
 
 type IconProps = { size?: number; filled?: boolean };
 
@@ -42,17 +51,9 @@ const IconLike = ({ size = 20, filled }: IconProps) => (
     xmlns="http://www.w3.org/2000/svg"
   >
     <path
-      d="M6 10h3.2V6.6a2.1 2.1 0 0 1 2.1-2.1c.46 0 .91.16 1.27.45l.22.18c.32.26.51.66.51 1.07V10h3.6a2 2 0 0 1 1.97 2.35l-1 5.3A2.2 2.2 0 0 1 15.43 20H8.2A2.2 2.2 0 0 1 6 17.8Z"
+      d="M12.1 20.4s-7.2-4-9.6-8.7C.8 7.9 3 4.8 6.3 4.8c2 0 3.6 1.2 4.5 2.5.9-1.3 2.5-2.5 4.5-2.5 3.3 0 5.5 3.1 3.8 6.9-2.4 4.7-9.6 8.7-9.6 8.7Z"
       stroke="currentColor"
       strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M4 10h2v10H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
       strokeLinejoin="round"
       fill={filled ? "currentColor" : "none"}
     />
@@ -69,10 +70,9 @@ const IconComment = ({ size = 20 }: IconProps) => (
     xmlns="http://www.w3.org/2000/svg"
   >
     <path
-      d="M5.5 5.5h13a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H10l-3.6 2.8a.6.6 0 0 1-.96-.48V7.5a2 2 0 0 1 2-2Z"
+      d="M4.7 5.4h14.6c.9 0 1.7.8 1.7 1.7v9.5c0 .9-.8 1.7-1.7 1.7H9.4l-3.8 3.1v-3.1H4.7c-.9 0-1.7-.8-1.7-1.7V7.1c0-.9.8-1.7 1.7-1.7Z"
       stroke="currentColor"
       strokeWidth={1.6}
-      strokeLinecap="round"
       strokeLinejoin="round"
     />
   </svg>
@@ -84,16 +84,23 @@ const IconReup = ({ size = 20 }: IconProps) => (
     width={size}
     height={size}
     viewBox="0 0 24 24"
-    fill="var(--color-text-muted)"
+    fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >
     <path
-      stroke="none"
-      strokeWidth={1}
+      d="M7.5 7.5h9v-3l3.5 3.5L16.5 11v-3h-9a4 4 0 0 0-4 4v.3"
+      stroke="currentColor"
+      strokeWidth={1.6}
       strokeLinecap="round"
       strokeLinejoin="round"
-      d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"
-    ></path>
+    />
+    <path
+      d="M16.5 16.5h-9v3L4 16l3.5-3.5v3h9a4 4 0 0 0 4-4v-.3"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -193,9 +200,6 @@ const IconView = () => (
     <circle cx="12" cy="12" r="3.2" fill="currentColor" />
   </svg>
 );
-
-const REPORT_ANIMATION_MS = 200;
-const QUOTE_CHAR_LIMIT = 500;
 
 type ReportCategory = {
   key:
@@ -397,25 +401,7 @@ export default function HashtagPage() {
     "public" | "followers" | "private"
   >("public");
   const [visibilityError, setVisibilityError] = useState("");
-  const [repostTarget, setRepostTarget] = useState<{
-    postId: string;
-    label: string;
-  } | null>(null);
-  const [quoteOpen, setQuoteOpen] = useState(false);
-  const [repostMode, setRepostMode] = useState<"quote" | "repost" | null>(null);
-  const [repostNote, setRepostNote] = useState("");
-  const [quoteVisibility, setQuoteVisibility] = useState<
-    "public" | "followers" | "private"
-  >("public");
-  const [quoteAllowComments, setQuoteAllowComments] = useState(true);
-  const [quoteAllowDownload, setQuoteAllowDownload] = useState(true);
-  const [quoteHideLikeCount, setQuoteHideLikeCount] = useState(false);
-  const [quoteLocation, setQuoteLocation] = useState("");
-  const [quoteHashtags, setQuoteHashtags] = useState<string[]>([]);
-  const [quoteHashtagDraft, setQuoteHashtagDraft] = useState("");
-  const [repostSubmitting, setRepostSubmitting] = useState(false);
-  const [repostError, setRepostError] = useState("");
-  const [repostClosing, setRepostClosing] = useState(false);
+  const [repostTarget, setRepostTarget] = useState<RepostTarget | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const updatePost = (
@@ -436,55 +422,6 @@ export default function HashtagPage() {
     () => REPORT_GROUPS.find((g) => g.key === reportCategory),
     [reportCategory],
   );
-
-  const quoteVisibilityOptions = useMemo(
-    () => [
-      {
-        value: "public" as const,
-        title: "Public",
-        description: "Anyone can view this repost",
-      },
-      {
-        value: "followers" as const,
-        title: "Followers",
-        description: "Only followers can view this repost",
-      },
-      {
-        value: "private" as const,
-        title: "Private",
-        description: "Only you can view this repost",
-      },
-    ],
-    [],
-  );
-
-  const resetQuoteState = () => {
-    setRepostMode(null);
-    setRepostNote("");
-    setQuoteVisibility("public");
-    setQuoteAllowComments(true);
-    setQuoteAllowDownload(true);
-    setQuoteHideLikeCount(false);
-    setQuoteLocation("");
-    setQuoteHashtags([]);
-    setQuoteHashtagDraft("");
-    setRepostError("");
-    setRepostSubmitting(false);
-    setQuoteOpen(false);
-  };
-
-  const addQuoteHashtag = () => {
-    const clean = normalizeHashtag(quoteHashtagDraft);
-    if (!clean) return;
-    setQuoteHashtags((prev) =>
-      prev.includes(clean) ? prev : [...prev, clean].slice(0, 12),
-    );
-    setQuoteHashtagDraft("");
-  };
-
-  const removeQuoteHashtag = (tag: string) => {
-    setQuoteHashtags((prev) => prev.filter((item) => item !== tag));
-  };
 
   const incrementRepostStat = (postId: string) => {
     updatePost(postId, (item) => {
@@ -507,105 +444,74 @@ export default function HashtagPage() {
     return target?.repostOf || postId;
   };
 
-  const submitRepost = async (modeOverride?: "quote" | "repost") => {
-    const token = getStoredAccessToken();
-    const mode = modeOverride ?? repostMode;
-    if (!token || !repostTarget || !mode) {
-      setRepostError("Choose an option to continue");
-      return;
-    }
-    const originalId = resolveOriginalPostId(repostTarget.postId);
-    const targetId = repostTarget.postId;
-    setRepostSubmitting(true);
-    setRepostError("");
-    try {
-      if (mode === "repost") {
-        await createPost({ token, payload: { repostOf: originalId } });
-        incrementRepostStat(originalId);
-        if (originalId !== targetId) {
-          incrementRepostStat(targetId);
-          try {
-            await repostPost({ token, postId: targetId });
-          } catch {}
-        }
-        showToast("Reposted");
-        closeRepostModal();
-        return;
-      }
-
-      const note = repostNote.trim();
-      const mentions = extractMentionsFromCaption(note);
-      const payload = {
-        repostOf: originalId,
-        content: note || undefined,
-        hashtags: quoteHashtags.length ? quoteHashtags : undefined,
-        location: quoteLocation.trim() || undefined,
-        allowComments: quoteAllowComments,
-        allowDownload: quoteAllowDownload,
-        hideLikeCount: quoteHideLikeCount,
-        visibility: quoteVisibility,
-        mentions: mentions.length ? mentions : undefined,
-      };
-      await createPost({ token, payload });
-      incrementRepostStat(originalId);
-      if (originalId !== targetId) {
-        incrementRepostStat(targetId);
-        try {
-          await repostPost({ token, postId: targetId });
-        } catch {}
-      }
-      showToast("Reposted with quote");
-      closeRepostModal();
-    } catch (err) {
-      const message =
-        typeof err === "object" && err && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Could not repost";
-      setRepostError(message || "Could not repost");
-    } finally {
-      setRepostSubmitting(false);
-    }
-  };
-
-  const closeRepostModal = () => {
-    setRepostClosing(true);
-    window.setTimeout(() => {
-      setRepostTarget(null);
-      resetQuoteState();
-      setRepostClosing(false);
-    }, REPORT_ANIMATION_MS);
-  };
-
-  const handleQuickRepost = () => {
-    if (!repostTarget) return;
-    setRepostMode("repost");
-    void submitRepost("repost");
-  };
-
-  const openQuoteComposer = () => {
-    if (!repostTarget) return;
-    setRepostMode("quote");
-    setQuoteOpen(true);
-    setRepostError("");
-  };
-
-  const onRepostIntent = (postId: string, label: string) => {
+  const handleQuickRepost = async (target: RepostTarget) => {
     const token = getStoredAccessToken();
     if (!token) return;
-    setRepostClosing(false);
-    setRepostTarget({ postId, label });
-    setRepostMode(null);
-    setRepostNote("");
-    setQuoteOpen(false);
-    setQuoteVisibility("public");
-    setQuoteAllowComments(true);
-    setQuoteAllowDownload(true);
-    setQuoteHideLikeCount(false);
-    setQuoteLocation("");
-    setQuoteHashtags([]);
-    setQuoteHashtagDraft("");
-    setRepostError("");
-    setRepostSubmitting(false);
+    const originalId = resolveOriginalPostId(target.postId);
+    const targetId = target.postId;
+    await createPost({ token, payload: { repostOf: originalId } });
+    incrementRepostStat(originalId);
+    if (originalId !== targetId) {
+      incrementRepostStat(targetId);
+      try {
+        await repostPost({ token, postId: targetId });
+      } catch {}
+    }
+    showToast("Reposted");
+  };
+
+  const handleShareQuote = async (target: RepostTarget, input: QuoteInput) => {
+    const token = getStoredAccessToken();
+    if (!token) return;
+    const originalId = resolveOriginalPostId(target.postId);
+    const targetId = target.postId;
+
+    const note = input.content.trim();
+    const mentions = extractMentionsFromCaption(note);
+    const payload = {
+      repostOf: originalId,
+      content: note || undefined,
+      hashtags: input.hashtags.length ? input.hashtags : undefined,
+      location: input.location.trim() || undefined,
+      allowComments: input.allowComments,
+      allowDownload: Boolean(target.originalAllowDownload),
+      hideLikeCount: input.hideLikeCount,
+      visibility: input.visibility,
+      mentions: mentions.length ? mentions : undefined,
+    };
+
+    if (target.kind === "reel") {
+      await createReel({ token, payload: payload as any });
+    } else {
+      await createPost({ token, payload });
+    }
+
+    incrementRepostStat(originalId);
+    if (originalId !== targetId) {
+      incrementRepostStat(targetId);
+      try {
+        await repostPost({ token, postId: targetId });
+      } catch {}
+    }
+
+    showToast("Reposted with quote");
+  };
+
+  const onRepostIntent = (
+    postId: string,
+    label: string,
+    kindOverride?: "post" | "reel",
+  ) => {
+    const token = getStoredAccessToken();
+    if (!token) return;
+    const kind = kindOverride ?? (tab === "reels" ? "reel" : "post");
+    const source = posts.find((item) => item.id === postId);
+    setRepostTarget({
+      postId,
+      label,
+      kind,
+      originalAllowDownload: Boolean(source?.allowDownload),
+    });
   };
 
   const onReportIntent = (postId: string, label: string) => {
@@ -1039,6 +945,15 @@ export default function HashtagPage() {
         }}
       />
 
+      <RepostOverlay
+        target={repostTarget}
+        onRequestClose={() => setRepostTarget(null)}
+        onQuickRepost={handleQuickRepost}
+        onShareQuote={handleShareQuote}
+        quoteCharLimit={QUOTE_CHAR_LIMIT}
+        animationMs={REPORT_ANIMATION_MS}
+      />
+
       {deleteTarget ? (
         <div
           className={feedStyles.modalOverlay}
@@ -1324,250 +1239,6 @@ export default function HashtagPage() {
                 onClick={submitVisibility}
               >
                 Save
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {quoteOpen && repostTarget ? (
-        <div
-          className={`${feedStyles.modalOverlay} ${
-            repostClosing
-              ? feedStyles.modalOverlayClosing
-              : feedStyles.modalOverlayOpen
-          }`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeRepostModal}
-        >
-          <div
-            className={`${feedStyles.modalCard} ${feedStyles.repostCard} ${
-              repostClosing
-                ? feedStyles.modalCardClosing
-                : feedStyles.modalCardOpen
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className={`${feedStyles.modalHeader} ${feedStyles.repostHeader}`}
-            >
-              <div>
-                <h3 className={feedStyles.modalTitle}>Quote</h3>
-                <p className={feedStyles.repostSub}>
-                  {`Quoting @${repostTarget.label}'s post`}
-                </p>
-              </div>
-              <button
-                className={feedStyles.closeBtn}
-                onClick={closeRepostModal}
-                aria-label="Close"
-              >
-                <IconClose size={18} />
-              </button>
-            </div>
-
-            <label className={feedStyles.repostNoteLabel}>
-              Caption
-              <div className={feedStyles.editTextareaShell}>
-                <textarea
-                  className={feedStyles.repostTextarea}
-                  value={repostNote}
-                  onChange={(e) => setRepostNote(e.target.value)}
-                  maxLength={QUOTE_CHAR_LIMIT}
-                  placeholder="Add your thoughts..."
-                />
-                <span className={feedStyles.charCount}>
-                  {repostNote.length}/{QUOTE_CHAR_LIMIT}
-                </span>
-              </div>
-            </label>
-
-            <div className={feedStyles.editField}>
-              <div className={feedStyles.editLabelRow}>
-                <span className={feedStyles.editLabelText}>Visibility</span>
-              </div>
-              <div className={feedStyles.visibilityList}>
-                {quoteVisibilityOptions.map((opt) => {
-                  const active = quoteVisibility === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      className={`${feedStyles.visibilityOption} ${
-                        active ? feedStyles.visibilityOptionActive : ""
-                      }`}
-                      onClick={() => setQuoteVisibility(opt.value)}
-                    >
-                      <span className={feedStyles.visibilityRadio}>
-                        {active ? "✓" : ""}
-                      </span>
-                      <span className={feedStyles.visibilityCopy}>
-                        <span className={feedStyles.visibilityTitle}>
-                          {opt.title}
-                        </span>
-                        <span className={feedStyles.visibilityDesc}>
-                          {opt.description}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className={feedStyles.switchGroup}>
-              <label className={feedStyles.switchRow}>
-                <input
-                  type="checkbox"
-                  checked={quoteAllowComments}
-                  onChange={() => setQuoteAllowComments((prev) => !prev)}
-                />
-                <div>
-                  <p className={feedStyles.switchTitle}>Allow comments</p>
-                  <p className={feedStyles.switchHint}>
-                    People can reply to your quote
-                  </p>
-                </div>
-              </label>
-
-              <label className={feedStyles.switchRow}>
-                <input
-                  type="checkbox"
-                  checked={quoteAllowDownload}
-                  onChange={() => setQuoteAllowDownload((prev) => !prev)}
-                />
-                <div>
-                  <p className={feedStyles.switchTitle}>Allow downloads</p>
-                  <p className={feedStyles.switchHint}>
-                    Let followers save the media from the original post
-                  </p>
-                </div>
-              </label>
-
-              <label className={feedStyles.switchRow}>
-                <input
-                  type="checkbox"
-                  checked={quoteHideLikeCount}
-                  onChange={() => setQuoteHideLikeCount((prev) => !prev)}
-                />
-                <div>
-                  <p className={feedStyles.switchTitle}>Hide like</p>
-                  <p className={feedStyles.switchHint}>
-                    Only you will see like counts on this quote
-                  </p>
-                </div>
-              </label>
-            </div>
-
-            <div className={feedStyles.editField}>
-              <div className={feedStyles.editLabelRow}>
-                <span className={feedStyles.editLabelText}>Location</span>
-              </div>
-              <input
-                className={feedStyles.editInput}
-                placeholder="Add a place"
-                value={quoteLocation}
-                onChange={(e) => setQuoteLocation(e.target.value)}
-              />
-            </div>
-
-            <div className={feedStyles.editField}>
-              <div className={feedStyles.editLabelRow}>
-                <span className={feedStyles.editLabelText}>Hashtags</span>
-              </div>
-              <div className={feedStyles.chipRow}>
-                {quoteHashtags.map((tag) => (
-                  <span key={tag} className={feedStyles.chip}>
-                    #{tag}
-                    <button
-                      type="button"
-                      className={feedStyles.chipRemove}
-                      onClick={() => removeQuoteHashtag(tag)}
-                      aria-label={`Remove ${tag}`}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-                <input
-                  className={feedStyles.editInput}
-                  placeholder="Add hashtag"
-                  value={quoteHashtagDraft}
-                  onChange={(e) => setQuoteHashtagDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === ",") {
-                      e.preventDefault();
-                      addQuoteHashtag();
-                    }
-                  }}
-                />
-              </div>
-            </div>
-
-            {repostError ? (
-              <div className={feedStyles.inlineError}>{repostError}</div>
-            ) : null}
-
-            <div className={feedStyles.modalActions}>
-              <button
-                className={feedStyles.modalSecondary}
-                onClick={closeRepostModal}
-                disabled={repostSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className={feedStyles.modalPrimary}
-                onClick={() => submitRepost("quote")}
-                disabled={repostSubmitting}
-              >
-                {repostSubmitting ? "Sharing..." : "Share quote"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {repostTarget && !quoteOpen ? (
-        <div
-          className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeRepostModal}
-        >
-          <div
-            className={feedStyles.repostSheet}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={feedStyles.repostSheetHeader}>
-              <p className={feedStyles.repostSheetTitle}>Repost</p>
-              <p className={feedStyles.repostSheetSubtitle}>
-                {`@${repostTarget.label} · post`}
-              </p>
-            </div>
-            <div className={feedStyles.repostSheetList} role="menu">
-              <button
-                className={`${feedStyles.repostSheetItem} ${
-                  feedStyles.repostSheetPrimary
-                }`}
-                onClick={handleQuickRepost}
-                disabled={repostSubmitting}
-              >
-                Repost
-              </button>
-              <button
-                className={feedStyles.repostSheetItem}
-                onClick={openQuoteComposer}
-                disabled={repostSubmitting}
-              >
-                Quote
-              </button>
-              <button
-                className={feedStyles.repostSheetItem}
-                onClick={closeRepostModal}
-                disabled={repostSubmitting}
-              >
-                Hủy
               </button>
             </div>
           </div>

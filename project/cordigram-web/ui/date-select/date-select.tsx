@@ -54,8 +54,6 @@ type PopoverPos = {
   maxHeight: number;
 };
 
-const YEAR_PAGE_SIZE = 10;
-
 const clamp = (v: number, min: number, max: number) =>
   Math.max(min, Math.min(max, v));
 
@@ -65,17 +63,33 @@ export function DateSelect({
   placeholder = "mm/dd/yyyy",
   disabled = false,
   maxDate,
-  minYear = 1,
+  minYear = 1900,
 }: DateSelectProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const monthShellRef = useRef<HTMLDivElement | null>(null);
+  const activeMonthRef = useRef<HTMLButtonElement | null>(null);
+  const yearShellRef = useRef<HTMLDivElement | null>(null);
+  const activeYearRef = useRef<HTMLButtonElement | null>(null);
 
   const [open, setOpen] = useState(false);
+  const [monthMenuOpen, setMonthMenuOpen] = useState(false);
+  const [yearMenuOpen, setYearMenuOpen] = useState(false);
   const [view, setView] = useState<Date>(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [pos, setPos] = useState<PopoverPos | null>(null);
+
+  const monthMenuOpenRef = useRef(false);
+  useEffect(() => {
+    monthMenuOpenRef.current = monthMenuOpen;
+  }, [monthMenuOpen]);
+
+  const yearMenuOpenRef = useRef(false);
+  useEffect(() => {
+    yearMenuOpenRef.current = yearMenuOpen;
+  }, [yearMenuOpen]);
 
   const maxAllowed = useMemo(() => {
     const dt = maxDate ? new Date(maxDate) : new Date();
@@ -98,31 +112,11 @@ export function DateSelect({
 
   const maxYear = maxAllowed.getFullYear();
 
-  const shiftYearBy = (delta: number) => {
-    setView((prev) => {
-      const nextYear = clamp(prev.getFullYear() + delta, minYear, maxYear);
-      const maxMonth =
-        nextYear === maxAllowed.getFullYear() ? maxAllowed.getMonth() : 11;
-      const nextMonth = Math.min(prev.getMonth(), maxMonth);
-      return new Date(nextYear, nextMonth, 1);
-    });
-  };
-
   const yearOptions = useMemo(() => {
-    const viewYear = view.getFullYear();
-
-    const lastStart = Math.max(minYear, maxYear - (YEAR_PAGE_SIZE - 1));
-    const centeredStart = clamp(
-      viewYear - Math.floor(YEAR_PAGE_SIZE / 2),
-      minYear,
-      lastStart,
-    );
-
-    const ys = Array.from({ length: YEAR_PAGE_SIZE })
-      .map((_, i) => centeredStart + i)
-      .filter((y) => y >= minYear && y <= maxYear);
-    return ys.sort((a, b) => b - a);
-  }, [view, minYear, maxYear]);
+    const ys: number[] = [];
+    for (let y = maxYear; y >= minYear; y--) ys.push(y);
+    return ys;
+  }, [minYear, maxYear]);
 
   const computePosition = () => {
     const btn = buttonRef.current;
@@ -165,6 +159,9 @@ export function DateSelect({
   useEffect(() => {
     if (!open) return;
 
+    setMonthMenuOpen(false);
+    setYearMenuOpen(false);
+
     const base = selected ?? maxAllowed;
     setView(new Date(base.getFullYear(), base.getMonth(), 1));
     computePosition();
@@ -183,7 +180,16 @@ export function DateSelect({
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      if (monthMenuOpenRef.current) {
+        setMonthMenuOpen(false);
+        return;
+      }
+      if (yearMenuOpenRef.current) {
+        setYearMenuOpen(false);
+        return;
+      }
+      setOpen(false);
     };
 
     const onWindowChange = () => computePosition();
@@ -202,6 +208,30 @@ export function DateSelect({
       window.removeEventListener("scroll", onWindowChange, true);
     };
   }, [open, selected, maxAllowed]);
+
+  useEffect(() => {
+    if (!monthMenuOpen) return;
+    const id = window.requestAnimationFrame(() => {
+      activeMonthRef.current?.scrollIntoView({ block: "center" });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [monthMenuOpen, view]);
+
+  useEffect(() => {
+    if (!yearMenuOpen) return;
+    const id = window.requestAnimationFrame(() => {
+      activeYearRef.current?.scrollIntoView({ block: "center" });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [yearMenuOpen, view]);
+
+  const setActiveYearEl = (el: HTMLButtonElement | null) => {
+    activeYearRef.current = el;
+  };
+
+  const setActiveMonthEl = (el: HTMLButtonElement | null) => {
+    activeMonthRef.current = el;
+  };
 
   const setValue = (next: string) => {
     onChange(next);
@@ -237,6 +267,16 @@ export function DateSelect({
               data-date-select-portal="true"
               className={styles.popover}
               role="dialog"
+              onMouseDownCapture={(e) => {
+                if (!monthMenuOpen && !yearMenuOpen) return;
+                const target = e.target as Node;
+                const monthShell = monthShellRef.current;
+                const yearShell = yearShellRef.current;
+                if (monthShell && monthShell.contains(target)) return;
+                if (yearShell && yearShell.contains(target)) return;
+                setMonthMenuOpen(false);
+                setYearMenuOpen(false);
+              }}
               style={{
                 left: pos.left,
                 top: pos.top,
@@ -257,63 +297,128 @@ export function DateSelect({
                 </button>
 
                 <div className={styles.headerControls}>
-                  <select
-                    className={styles.headerSelect}
-                    value={view.getMonth()}
-                    aria-label="Month"
-                    onChange={(e) => {
-                      const month = Number(e.target.value);
-                      setView((prev) => {
-                        const nextYear = prev.getFullYear();
-                        const maxMonth =
-                          nextYear === maxAllowed.getFullYear()
-                            ? maxAllowed.getMonth()
-                            : 11;
-                        const nextMonth = Math.min(month, maxMonth);
-                        return new Date(nextYear, nextMonth, 1);
-                      });
-                    }}
-                  >
-                    {Array.from({ length: 12 }).map((_, idx) => {
-                      const maxMonth =
-                        view.getFullYear() === maxAllowed.getFullYear()
-                          ? maxAllowed.getMonth()
-                          : 11;
-                      const disabledMonth = idx > maxMonth;
-                      return (
-                        <option key={idx} value={idx} disabled={disabledMonth}>
-                          {format(new Date(2000, idx, 1), "MMMM")}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <select
-                    className={styles.headerSelect}
-                    value={view.getFullYear()}
-                    aria-label="Year"
-                    onChange={(e) => {
-                      const nextYear = Number(e.target.value);
-                      if (!Number.isFinite(nextYear)) return;
-                      const clamped = Math.min(
-                        Math.max(minYear, nextYear),
-                        maxYear,
-                      );
-                      setView((prev) => {
-                        const maxMonth =
-                          clamped === maxAllowed.getFullYear()
-                            ? maxAllowed.getMonth()
-                            : 11;
-                        const nextMonth = Math.min(prev.getMonth(), maxMonth);
-                        return new Date(clamped, nextMonth, 1);
-                      });
-                    }}
-                  >
-                    {yearOptions.map((y) => (
-                      <option key={y} value={y}>
-                        {y}
-                      </option>
-                    ))}
-                  </select>
+                  <div className={styles.monthShell} ref={monthShellRef}>
+                    <button
+                      type="button"
+                      className={`${styles.headerSelect} ${styles.monthButton}`}
+                      aria-label="Month"
+                      aria-haspopup="listbox"
+                      aria-expanded={monthMenuOpen}
+                      onClick={() => {
+                        setYearMenuOpen(false);
+                        setMonthMenuOpen((v) => !v);
+                      }}
+                    >
+                      <span>
+                        {format(new Date(2000, view.getMonth(), 1), "MMMM")}
+                      </span>
+                      <span className={styles.monthChevron} aria-hidden />
+                    </button>
+
+                    {monthMenuOpen ? (
+                      <div
+                        className={styles.monthMenu}
+                        role="listbox"
+                        aria-label="Month"
+                      >
+                        {Array.from({ length: 12 }).map((_, idx) => {
+                          const maxMonth =
+                            view.getFullYear() === maxAllowed.getFullYear()
+                              ? maxAllowed.getMonth()
+                              : 11;
+                          const disabledMonth = idx > maxMonth;
+                          const active = idx === view.getMonth();
+                          const label = format(new Date(2000, idx, 1), "MMMM");
+
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              ref={active ? setActiveMonthEl : undefined}
+                              className={`${styles.monthOption} ${
+                                active ? styles.monthOptionActive : ""
+                              }`}
+                              role="option"
+                              aria-selected={active}
+                              disabled={disabledMonth}
+                              onClick={() => {
+                                if (disabledMonth) return;
+                                setView((prev) => {
+                                  const nextYear = prev.getFullYear();
+                                  const nextMonth = Math.min(idx, maxMonth);
+                                  return new Date(nextYear, nextMonth, 1);
+                                });
+                                setMonthMenuOpen(false);
+                              }}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className={styles.yearShell} ref={yearShellRef}>
+                    <button
+                      type="button"
+                      className={`${styles.headerSelect} ${styles.yearButton}`}
+                      aria-label="Year"
+                      aria-haspopup="listbox"
+                      aria-expanded={yearMenuOpen}
+                      onClick={() => {
+                        setMonthMenuOpen(false);
+                        setYearMenuOpen((v) => !v);
+                      }}
+                    >
+                      <span>{view.getFullYear()}</span>
+                      <span className={styles.yearChevron} aria-hidden />
+                    </button>
+
+                    {yearMenuOpen ? (
+                      <div
+                        className={styles.yearMenu}
+                        role="listbox"
+                        aria-label="Year"
+                      >
+                        {yearOptions.map((y) => {
+                          const active = y === view.getFullYear();
+                          return (
+                            <button
+                              key={y}
+                              type="button"
+                              ref={active ? setActiveYearEl : undefined}
+                              className={`${styles.yearOption} ${
+                                active ? styles.yearOptionActive : ""
+                              }`}
+                              role="option"
+                              aria-selected={active}
+                              onClick={() => {
+                                const clamped = Math.min(
+                                  Math.max(minYear, y),
+                                  maxYear,
+                                );
+                                setView((prev) => {
+                                  const maxMonth =
+                                    clamped === maxAllowed.getFullYear()
+                                      ? maxAllowed.getMonth()
+                                      : 11;
+                                  const nextMonth = Math.min(
+                                    prev.getMonth(),
+                                    maxMonth,
+                                  );
+                                  return new Date(clamped, nextMonth, 1);
+                                });
+                                setYearMenuOpen(false);
+                              }}
+                            >
+                              {y}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 <button

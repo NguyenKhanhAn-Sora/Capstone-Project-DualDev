@@ -38,6 +38,21 @@ export class UsersController {
     return result;
   }
 
+  @Get('suggestions')
+  async suggestPeople(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Query('limit') limit?: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.usersService.suggestPeople({
+      viewerId: userId,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
   @Patch('settings')
   async updateSettings(
     @Req() req: Request & { user?: AuthenticatedUser },

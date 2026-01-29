@@ -4,6 +4,10 @@ import { User, UserSchema } from './user.schema';
 import { Follow, FollowSchema } from './follow.schema';
 import { Block, BlockSchema } from './block.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
+import {
+  UserTasteProfile,
+  UserTasteProfileSchema,
+} from '../explore/user-taste.schema';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { BlocksService } from './blocks.service';
@@ -16,6 +20,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: Follow.name, schema: FollowSchema },
       { name: Block.name, schema: BlockSchema },
       { name: Profile.name, schema: ProfileSchema },
+      { name: UserTasteProfile.name, schema: UserTasteProfileSchema },
     ]),
     forwardRef(() => AuthModule),
   ],

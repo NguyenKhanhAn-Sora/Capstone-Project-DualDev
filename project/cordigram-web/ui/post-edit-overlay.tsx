@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
 import styles from "@/app/(main)/home-feed.module.css";
 import {
+  fetchPostDetail,
+  fetchReelDetail,
   searchProfiles,
   updatePost,
   type FeedItem,
@@ -112,6 +114,11 @@ export default function PostEditOverlay({
   const [locationHighlight, setLocationHighlight] = useState(-1);
   const [editAllowComments, setEditAllowComments] = useState(true);
   const [editAllowDownload, setEditAllowDownload] = useState(false);
+  const [lockedAllowDownload, setLockedAllowDownload] = useState<
+    boolean | null
+  >(null);
+  const [lockedAllowDownloadLoading, setLockedAllowDownloadLoading] =
+    useState(false);
   const [editHideLikeCount, setEditHideLikeCount] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
@@ -143,6 +150,8 @@ export default function PostEditOverlay({
     setLocationHighlight(-1);
     setEditAllowComments(Boolean(post.allowComments));
     setEditAllowDownload(Boolean(post.allowDownload));
+    setLockedAllowDownload(null);
+    setLockedAllowDownloadLoading(false);
     setEditHideLikeCount(Boolean(post.hideLikeCount));
     setEditError("");
     setEditSuccess("");
@@ -151,6 +160,42 @@ export default function PostEditOverlay({
   useEffect(() => {
     if (open) resetEditState();
   }, [open, resetEditState, post?.id]);
+
+  useEffect(() => {
+    if (!open || !post || !token) return;
+    if (!post.repostOf) {
+      setLockedAllowDownload(null);
+      setLockedAllowDownloadLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLockedAllowDownloadLoading(true);
+    (async () => {
+      try {
+        const originalId = String(post.repostOf);
+        let original: FeedItem | null = null;
+        try {
+          original = await fetchPostDetail({ token, postId: originalId });
+        } catch {
+          original = await fetchReelDetail({ token, reelId: originalId });
+        }
+        if (cancelled) return;
+        const next = Boolean(original?.allowDownload);
+        setLockedAllowDownload(next);
+        setEditAllowDownload(next);
+      } catch {
+        if (cancelled) return;
+        setLockedAllowDownload(null);
+      } finally {
+        if (!cancelled) setLockedAllowDownloadLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, post?.id, post?.repostOf, token]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -469,15 +514,19 @@ export default function PostEditOverlay({
 
     const trimmedLocation = editLocation.trim();
 
-    const payload = {
+    const isRepost = Boolean(post.repostOf);
+    const payload: any = {
       content: editCaption || "",
       hashtags: normalizedHashtags,
       mentions: normalizedMentions,
       location: trimmedLocation || undefined,
       allowComments: editAllowComments,
-      allowDownload: editAllowDownload,
       hideLikeCount: editHideLikeCount,
-    } as const;
+    };
+
+    if (!isRepost) {
+      payload.allowDownload = editAllowDownload;
+    }
 
     try {
       setEditSaving(true);
@@ -501,6 +550,8 @@ export default function PostEditOverlay({
   };
 
   if (!open || !post) return null;
+
+  const isRepost = Boolean(post.repostOf);
 
   const editModal = (
     <div
@@ -741,13 +792,24 @@ export default function PostEditOverlay({
             <label className={styles.switchRow}>
               <input
                 type="checkbox"
-                checked={editAllowDownload}
-                onChange={() => setEditAllowDownload((prev) => !prev)}
+                checked={
+                  isRepost
+                    ? Boolean(lockedAllowDownload ?? editAllowDownload)
+                    : editAllowDownload
+                }
+                disabled={isRepost}
+                onChange={
+                  isRepost ? undefined : () => setEditAllowDownload((p) => !p)
+                }
               />
               <div>
                 <p className={styles.switchTitle}>Allow downloads</p>
                 <p className={styles.switchHint}>
-                  Share the original file with people you trust
+                  {isRepost
+                    ? lockedAllowDownloadLoading
+                      ? "Inherited from original post (loading…)"
+                      : "Inherited from the original post (can’t be changed)"
+                    : "Share the original file with people you trust"}
                 </p>
               </div>
             </label>

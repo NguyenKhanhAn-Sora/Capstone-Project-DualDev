@@ -720,9 +720,9 @@
 }
 
 .primary {
-  border-color: transparent;
   background: linear-gradient(120deg, #6ddcff, #7f9bff);
-  color: #0a0f1c;
+  color: #fff;
+  padding: 0 20px;
 }
 
 .primary:hover:not(:disabled) {

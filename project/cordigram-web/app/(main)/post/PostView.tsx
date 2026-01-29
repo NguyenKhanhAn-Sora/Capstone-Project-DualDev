@@ -13,6 +13,7 @@ import {
   fetchComments,
   fetchCurrentProfile,
   fetchPostDetail,
+  fetchReelDetail,
   followUser,
   reportComment,
   reportPost,
@@ -368,6 +369,11 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [locationHighlight, setLocationHighlight] = useState(-1);
   const [editAllowComments, setEditAllowComments] = useState(true);
   const [editAllowDownload, setEditAllowDownload] = useState(false);
+  const [lockedEditAllowDownload, setLockedEditAllowDownload] = useState<
+    boolean | null
+  >(null);
+  const [lockedEditAllowDownloadLoading, setLockedEditAllowDownloadLoading] =
+    useState(false);
   const [editHideLikeCount, setEditHideLikeCount] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
@@ -571,6 +577,46 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       clearTimeout(timer);
     };
   }, [editOpen, locationQuery]);
+
+  useEffect(() => {
+    if (!editOpen) {
+      setLockedEditAllowDownload(null);
+      setLockedEditAllowDownloadLoading(false);
+      return;
+    }
+    if (!token || !post?.repostOf) {
+      setLockedEditAllowDownload(null);
+      setLockedEditAllowDownloadLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLockedEditAllowDownloadLoading(true);
+    (async () => {
+      try {
+        const originalId = String(post.repostOf);
+        let original: FeedItem | null = null;
+        try {
+          original = await fetchPostDetail({ token, postId: originalId });
+        } catch {
+          original = await fetchReelDetail({ token, reelId: originalId });
+        }
+        if (cancelled) return;
+        const next = Boolean(original?.allowDownload);
+        setLockedEditAllowDownload(next);
+        setEditAllowDownload(next);
+      } catch {
+        if (cancelled) return;
+        setLockedEditAllowDownload(null);
+      } finally {
+        if (!cancelled) setLockedEditAllowDownloadLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editOpen, post?.id, post?.repostOf, token]);
 
   const updateCommentEverywhere = useCallback(
     (id: string, updater: (comment: CommentItem) => CommentItem) => {
@@ -855,15 +901,19 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
     const trimmedLocation = editLocation.trim();
 
-    const payload = {
+    const isRepost = Boolean(post?.repostOf);
+    const payload: any = {
       content: editCaption || "",
       hashtags: normalizedHashtags,
       mentions: normalizedMentions,
       location: trimmedLocation || undefined,
       allowComments: editAllowComments,
-      allowDownload: editAllowDownload,
       hideLikeCount: editHideLikeCount,
-    } as const;
+    };
+
+    if (!isRepost) {
+      payload.allowDownload = editAllowDownload;
+    }
 
     try {
       setEditSaving(true);
@@ -3462,9 +3512,6 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         <div className={feedStyles.modalHeader}>
           <div>
             <h3 className={feedStyles.modalTitle}>Edit post</h3>
-            <p className={feedStyles.modalBody}>
-              Update caption, hashtags, mentions, location, and post controls.
-            </p>
           </div>
           <button
             className={feedStyles.closeBtn}
@@ -3689,13 +3736,26 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             <label className={feedStyles.switchRow}>
               <input
                 type="checkbox"
-                checked={editAllowDownload}
-                onChange={() => setEditAllowDownload((prev) => !prev)}
+                checked={
+                  post?.repostOf
+                    ? Boolean(lockedEditAllowDownload ?? editAllowDownload)
+                    : editAllowDownload
+                }
+                disabled={Boolean(post?.repostOf)}
+                onChange={
+                  post?.repostOf
+                    ? undefined
+                    : () => setEditAllowDownload((prev) => !prev)
+                }
               />
               <div>
                 <p className={feedStyles.switchTitle}>Allow downloads</p>
                 <p className={feedStyles.switchHint}>
-                  Share the original file with people you trust
+                  {post?.repostOf
+                    ? lockedEditAllowDownloadLoading
+                      ? "Inherited from original post (loading…)"
+                      : "Inherited from the original post (can’t be changed)"
+                    : "Share the original file with people you trust"}
                 </p>
               </div>
             </label>

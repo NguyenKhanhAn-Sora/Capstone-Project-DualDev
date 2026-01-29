@@ -189,6 +189,198 @@
   appearance: none;
 }
 
+.monthShell {
+  position: relative;
+}
+
+.monthButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 132px;
+  padding-right: 28px;
+}
+
+.monthChevron {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--color-text-muted, #5b718f);
+  border-bottom: 2px solid var(--color-text-muted, #5b718f);
+  transform: translateY(-60%) rotate(45deg);
+  pointer-events: none;
+}
+
+.monthMenu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 14px;
+  border: 1px solid var(--color-border, rgba(215, 229, 242, 0.95));
+  background: var(--color-surface, #ffffff);
+  box-shadow:
+    0 20px 50px rgba(15, 49, 87, 0.22),
+    0 6px 16px rgba(15, 49, 87, 0.12);
+  z-index: 10000;
+  padding: 6px;
+}
+
+.monthOption {
+  width: 100%;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--color-text, #0f172a);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 120ms ease;
+}
+
+.monthOption:hover {
+  background: color-mix(
+    in srgb,
+    var(--color-primary, #3470a2) 12%,
+    transparent
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--color-primary, #3470a2) 16%,
+    transparent
+  );
+}
+
+.monthOption:active {
+  transform: translateY(1px);
+}
+
+.monthOption:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.monthOption:disabled:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
+.monthOptionActive {
+  background: linear-gradient(120deg, #559ac2 0%, #3470a2 55%, #9aacef 100%);
+  border-color: color-mix(
+    in srgb,
+    var(--color-primary, #3470a2) 35%,
+    transparent
+  );
+  color: #ffffff;
+}
+
+.monthOptionActive:hover {
+  filter: brightness(1.05);
+}
+
+.yearShell {
+  position: relative;
+}
+
+.yearButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 92px;
+  padding-right: 28px;
+}
+
+.yearChevron {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--color-text-muted, #5b718f);
+  border-bottom: 2px solid var(--color-text-muted, #5b718f);
+  transform: translateY(-60%) rotate(45deg);
+  pointer-events: none;
+}
+
+.yearMenu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 14px;
+  border: 1px solid var(--color-border, rgba(215, 229, 242, 0.95));
+  background: var(--color-surface, #ffffff);
+  box-shadow:
+    0 20px 50px rgba(15, 49, 87, 0.22),
+    0 6px 16px rgba(15, 49, 87, 0.12);
+  z-index: 10000;
+  padding: 6px;
+}
+
+.yearOption {
+  width: 100%;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--color-text, #0f172a);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 120ms ease;
+}
+
+.yearOption:hover {
+  background: color-mix(
+    in srgb,
+    var(--color-primary, #3470a2) 12%,
+    transparent
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--color-primary, #3470a2) 16%,
+    transparent
+  );
+}
+
+.yearOption:active {
+  transform: translateY(1px);
+}
+
+.yearOptionActive {
+  background: linear-gradient(120deg, #559ac2 0%, #3470a2 55%, #9aacef 100%);
+  border-color: color-mix(
+    in srgb,
+    var(--color-primary, #3470a2) 35%,
+    transparent
+  );
+  color: #ffffff;
+}
+
 .yearPageButton {
   width: 28px;
   height: 34px;
