@@ -166,9 +166,6 @@ export class UsersService {
         .exec();
     }
   }
-<<<<<<< HEAD
-
-  async getRecentAccounts(userId: string) {
 
   async getRecentAccounts(userId: string) {
     const user = await this.userModel

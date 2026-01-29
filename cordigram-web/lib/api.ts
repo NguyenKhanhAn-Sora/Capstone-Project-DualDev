@@ -290,7 +290,6 @@ export async function createReel(opts: {
   });
 }
 
-<<<<<<< HEAD
 export async function fetchFeed(opts: {
   token: string;
   limit?: number;
@@ -1458,8 +1457,4 @@ export async function getMyVote(opts: {
   }
 
   return response.json();
-}
-
-export function getApiBaseUrl(): string {
-  return apiBaseUrl;
 }
