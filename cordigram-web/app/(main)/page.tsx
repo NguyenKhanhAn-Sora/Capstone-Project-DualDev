@@ -2593,7 +2593,7 @@ function FeedCard({
                     onClick={() => removeHashtag(tag)}
                     aria-label={`Remove ${tag}`}
                   >
-                    ×
+                    Ã—
                   </button>
                 </span>
               ))}
@@ -2696,7 +2696,7 @@ function FeedCard({
               <div>
                 <p className={styles.switchTitle}>Hide like</p>
                 <p className={styles.switchHint}>
-                  Viewers won’t see the number of likes on this post
+                  Viewers wonâ€™t see the number of likes on this post
                 </p>
               </div>
             </label>
@@ -2768,7 +2768,7 @@ function FeedCard({
                 onClick={() => setVisibilitySelected(opt.value)}
               >
                 <span className={styles.visibilityRadio}>
-                  {active ? "✓" : ""}
+                  {active ? "âœ“" : ""}
                 </span>
                 <span className={styles.visibilityCopy}>
                   <span className={styles.visibilityTitle}>{opt.title}</span>
@@ -2835,7 +2835,7 @@ function FeedCard({
                 <>
                   <span aria-hidden="true" className={`${styles.followBtn}`}>
                     {" "}
-                    ·{" "}
+                    Â·{" "}
                   </span>
                   <button
                     className={`${styles.followBtn} ${

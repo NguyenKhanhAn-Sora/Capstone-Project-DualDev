@@ -42,7 +42,6 @@ export class UsersService {
   findById(userId: string): Promise<User | null> {
     return this.userModel.findById(userId).exec();
   }
-
   async createPending(email: string): Promise<User> {
     const existing = await this.findByEmail(email);
     if (existing) {
@@ -167,6 +166,9 @@ export class UsersService {
         .exec();
     }
   }
+<<<<<<< HEAD
+
+  async getRecentAccounts(userId: string) {
 
   async getRecentAccounts(userId: string) {
     const user = await this.userModel

@@ -100,6 +100,7 @@ export type CreatePostResponse = {
   hashtags: string[];
   mentions: string[];
   topics?: string[];
+  videoDurationSec?: number | null;
   location?: string | null;
   visibility: "public" | "followers" | "private";
   allowComments: boolean;
@@ -119,6 +120,7 @@ export type CreatePostResponse = {
     hides?: number;
     reports?: number;
   };
+  repostOf?: string | null;
   serverId?: string | null;
   channelId?: string | null;
   createdAt: string;
@@ -288,6 +290,7 @@ export async function createReel(opts: {
   });
 }
 
+<<<<<<< HEAD
 export async function fetchFeed(opts: {
   token: string;
   limit?: number;
@@ -1455,4 +1458,8 @@ export async function getMyVote(opts: {
   }
 
   return response.json();
+}
+
+export function getApiBaseUrl(): string {
+  return apiBaseUrl;
 }

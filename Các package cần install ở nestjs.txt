@@ -1,0 +1,27 @@
+$ npm i @nestjs/mongoose mongoose
+
+$ npm i bcrypt
+$ npm i @types/bcrypt
+
+$ npm install @nestjs/jwt
+$ npm i @nestjs/core
+
+$ npm i class-validator class-transformer
+
+$ npm i @nestjs/websockets @nestjs/platform-socket.io socket.io\
+
+$ npm i @nestjs/platform-ws
+$ npm i rxjs ws uuid
+
+$ npm i nodemailer
+$ npm i dotenv
+$ npm i cloudinary
+
+
+nest g resource users --no-spec
+
+-------------------------------------------
+
+$npm i socket.io-client
+
+

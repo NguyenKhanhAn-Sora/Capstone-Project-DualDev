@@ -689,7 +689,7 @@ export default function CreatePostPage() {
         err.code === err.PERMISSION_DENIED
           ? "You denied location access. Please allow it to autofill your place."
           : err.code === err.POSITION_UNAVAILABLE
-          ? "We couldn’t get a location fix. Try again or check GPS/Wi‑Fi."
+          ? "We couldnâ€™t get a location fix. Try again or check GPS/Wiâ€‘Fi."
           : err.code === err.TIMEOUT
           ? "Location request took too long. Please retry."
           : "Could not fetch your location.";
@@ -1098,7 +1098,7 @@ export default function CreatePostPage() {
                 <>
                   <li>Maximum size: 30 GB, video duration: 60 minutes.</li>
                   <li>
-                    Recommended: “.mp4”. Other major formats are supported.
+                    Recommended: â€œ.mp4â€. Other major formats are supported.
                   </li>
                   <li>High-resolution recommended: 1080p, 1440p, 4K.</li>
                   <li>Recommended: 16:9 for landscape, 9:16 for vertical.</li>
@@ -1179,7 +1179,7 @@ export default function CreatePostPage() {
                         onClick={() => removeMedia(index)}
                         aria-label={`Remove ${item.file.name}`}
                       >
-                        ×
+                        Ã—
                       </button>
                       {item.kind === "video" ? (
                         <video
@@ -1202,7 +1202,7 @@ export default function CreatePostPage() {
                       )}
                       {mode === "post" ? (
                         <p className={styles.previewMeta}>
-                          {item.file.name} ·{" "}
+                          {item.file.name} Â·{" "}
                           {(item.file.size / 1024 / 1024).toFixed(1)} MB
                         </p>
                       ) : null}
@@ -1296,7 +1296,7 @@ export default function CreatePostPage() {
                   <div className={styles.mentionSuggestions}>
                     {mentionLoading && (
                       <div className={styles.mentionSuggestionMuted}>
-                        Đang tìm người dùng...
+                        Äang tÃ¬m ngÆ°á»i dÃ¹ng...
                       </div>
                     )}
                     {!mentionLoading &&
@@ -1346,7 +1346,7 @@ export default function CreatePostPage() {
                 )}
               </div>
               <p className={styles.helper}>
-                Gõ @ để tag bạn bè trực tiếp trong caption.
+                GÃµ @ Ä‘á»ƒ tag báº¡n bÃ¨ trá»±c tiáº¿p trong caption.
               </p>
               {form.mentions.length > 0 && (
                 <div className={styles.chipShell}>
@@ -1359,7 +1359,7 @@ export default function CreatePostPage() {
                           onClick={() => removeMention(handle)}
                           aria-label={`Remove tag ${handle}`}
                         >
-                          ×
+                          Ã—
                         </button>
                       </span>
                     ))}
@@ -1381,7 +1381,7 @@ export default function CreatePostPage() {
                           onClick={() => removeHashtag(tag)}
                           aria-label={`Remove hashtag ${tag}`}
                         >
-                          ×
+                          Ã—
                         </button>
                       </span>
                     ))}
@@ -1429,7 +1429,7 @@ export default function CreatePostPage() {
                     <div className={styles.locationSuggestions}>
                       {locationLoading && (
                         <div className={styles.locationSuggestionMuted}>
-                          Đang tìm kiếm...
+                          Äang tÃ¬m kiáº¿m...
                         </div>
                       )}
                       {!locationLoading && locationSuggestions.length === 0 && (
@@ -1487,7 +1487,7 @@ export default function CreatePostPage() {
                       }`}
                       aria-hidden
                     >
-                      ▼
+                      â–¼
                     </span>
                   </button>
                   {audienceOpen && (
@@ -1518,7 +1518,7 @@ export default function CreatePostPage() {
                             }`}
                             aria-hidden
                           >
-                            {form.audience === option.value ? "✓" : ""}
+                            {form.audience === option.value ? "âœ“" : ""}
                           </span>
                         </button>
                       ))}
@@ -1566,7 +1566,7 @@ export default function CreatePostPage() {
                 <div>
                   <p className={styles.switchTitle}>Hide like</p>
                   <p className={styles.switchHint}>
-                    Viewers won’t see the number of likes on this post
+                    Viewers wonâ€™t see the number of likes on this post
                   </p>
                 </div>
               </label>

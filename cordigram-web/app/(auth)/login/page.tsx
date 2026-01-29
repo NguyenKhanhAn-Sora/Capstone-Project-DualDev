@@ -557,6 +557,7 @@ export default function LoginPage() {
               <h1 className="text-[32px] font-semibold leading-[1.2] text-slate-900 text-center">
                 Login
               </h1>
+
               <form
                 className="mt-[30px] space-y-[20px]"
                 onSubmit={handleSubmit}

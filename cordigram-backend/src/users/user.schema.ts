@@ -20,6 +20,7 @@ export type RecentAccount = {
 export type UserSettings = {
   theme: 'light' | 'dark';
 };
+
 @Schema({ timestamps: true })
 export class User extends Document {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })

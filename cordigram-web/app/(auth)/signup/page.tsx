@@ -314,7 +314,7 @@ export default function SignupPage() {
           setFieldError((prev) => ({ ...prev, username: undefined }));
         }
       } catch (_err) {
-        // Nếu API lỗi, không chặn nhưng cũng không đặt available
+        // Náº¿u API lá»—i, khÃ´ng cháº·n nhÆ°ng cÅ©ng khÃ´ng Ä‘áº·t available
       } finally {
         setUsernameChecking(false);
       }
@@ -385,7 +385,7 @@ export default function SignupPage() {
       const apiErr = err as ApiError<{ retryAfterSec?: number }>;
       if (
         apiErr.message?.toLowerCase().includes("email") &&
-        apiErr.message?.toLowerCase().includes("đã")
+        apiErr.message?.toLowerCase().includes("Ä‘Ã£")
       ) {
         setFieldError({ email: apiErr.message });
         setError("");
@@ -445,7 +445,7 @@ export default function SignupPage() {
     if (usernameError || usernameChecking) {
       setFieldError((prev) => ({
         ...prev,
-        username: usernameError || "Đang kiểm tra username",
+        username: usernameError || "Äang kiá»ƒm tra username",
       }));
       return;
     }
@@ -958,7 +958,7 @@ export default function SignupPage() {
                           active ? styles.stepBulletActive : ""
                         } ${done ? styles.stepBulletDone : ""}`}
                       >
-                        {done ? "✓" : index + 1}
+                        {done ? "âœ“" : index + 1}
                       </div>
                       <span className={styles.stepLabel}>{label}</span>
                     </div>
@@ -1053,15 +1053,15 @@ export default function SignupPage() {
 
                 <div className={styles["hero-badges"]}>
                   <div className={styles["hero-badge"]}>
-                    <span className={styles["hero-badge-icon"]}>◆</span>
+                    <span className={styles["hero-badge-icon"]}>â—†</span>
                     <p>Permissions and roles to manage communities safely.</p>
                   </div>
                   <div className={styles["hero-badge"]}>
-                    <span className={styles["hero-badge-icon"]}>⇆</span>
+                    <span className={styles["hero-badge-icon"]}>â‡†</span>
                     Multi-device sync with instant notifications.
                   </div>
                   <div className={styles["hero-badge"]}>
-                    <span className={styles["hero-badge-icon"]}>★</span>
+                    <span className={styles["hero-badge-icon"]}>â˜…</span>
                     Modern UI optimized for sharing content.
                   </div>
                 </div>

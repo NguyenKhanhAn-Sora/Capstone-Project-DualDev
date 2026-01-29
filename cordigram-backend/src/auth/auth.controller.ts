@@ -35,6 +35,7 @@ import { v4 as uuid } from 'uuid';
 import type { Response, Request } from 'express';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import type { AuthenticatedUser } from './jwt.strategy';
+
 type MulterFile = {
   buffer: Buffer;
   mimetype: string;
@@ -357,6 +358,7 @@ export class AuthController {
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }
+
 
   private setRefreshCookie(res: Response, token: string) {
     const isProduction = process.env.NODE_ENV === 'production';

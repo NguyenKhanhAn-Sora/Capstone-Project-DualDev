@@ -419,7 +419,7 @@ function SwitchAccountOverlay({
           className={styles.closeButton}
           onClick={onClose}
         >
-          ×
+          Ã—
         </button>
 
         <div className={`${styles.switchHeader}`}>
