@@ -15,6 +15,8 @@ import { CommentsModule } from './comment/comments.module';
 import { ReportPostModule } from './reportpost/reportpost.module';
 import { ReportCommentModule } from './reportcomment/reportcomment.module';
 import { CompaniesModule } from './companies/companies.module';
+import { HashtagsModule } from './hashtags/hashtags.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { CompaniesModule } from './companies/companies.module';
     PostsModule,
     CommentsModule,
     CompaniesModule,
+    HashtagsModule,
+    SearchModule,
     ReportProblemModule,
     ReportPostModule,
     ReportCommentModule,

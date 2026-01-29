@@ -47,7 +47,14 @@
   text-decoration: none;
   font-size: 18px;
   font-weight: 500;
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
 }
 
 .item:hover {
@@ -166,7 +173,9 @@
   border-radius: 12px;
   cursor: pointer;
   text-align: left;
-  transition: background 0.12s ease, transform 0.12s ease;
+  transition:
+    background 0.12s ease,
+    transform 0.12s ease;
 }
 
 .menuItem:hover {
@@ -224,7 +233,9 @@
   font-size: 18px;
   font-weight: 400;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
   font-size: 28px !important;
 }
 
@@ -289,7 +300,9 @@
   color: var(--color-text);
   background: var(--color-surface);
   box-shadow: 0 6px 14px rgba(15, 22, 41, 0.04);
-  transition: border 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border 0.15s ease,
+    box-shadow 0.15s ease;
   width: 100%;
 }
 
@@ -349,7 +362,10 @@
   letter-spacing: 0.01em;
   box-shadow: 0 12px 28px rgba(52, 112, 162, 0.28);
   cursor: pointer;
-  transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    filter 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .switchSubmit:hover {
@@ -412,7 +428,10 @@
   font-weight: 700;
   color: var(--color-text);
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
-  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease;
 }
 
 .switchGoogle:hover {

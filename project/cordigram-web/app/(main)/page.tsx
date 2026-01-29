@@ -33,6 +33,7 @@ import {
   updatePostVisibility,
   updatePost,
   searchProfiles,
+  searchPosts,
   type ProfileSearchItem,
   type FeedItem,
 } from "@/lib/api";
@@ -391,9 +392,13 @@ const REPORT_GROUPS: ReportCategory[] = [
 export default function HomePage({
   scopeOverride,
   kindsOverride,
+  searchQueryOverride,
+  headerSlot,
 }: {
   scopeOverride?: "all" | "following";
   kindsOverride?: Array<"post" | "reel">;
+  searchQueryOverride?: string;
+  headerSlot?: React.ReactNode;
 } = {}) {
   const canRender = useRequireAuth();
   const pathname = usePathname();
@@ -443,11 +448,17 @@ export default function HomePage({
   const autoLoadLockRef = useRef(false);
 
   const feedCacheKey = useMemo(() => {
+    const searchKey = (searchQueryOverride ?? "").trim();
+    if (searchKey) {
+      return `${FEED_CACHE_KEY}:search:${searchKey}`;
+    }
     const scope = scopeOverride ?? "all";
     return scope === "following"
       ? `${FEED_CACHE_KEY}:following`
       : FEED_CACHE_KEY;
-  }, [scopeOverride]);
+  }, [scopeOverride, searchQueryOverride]);
+
+  const isSearchMode = Boolean((searchQueryOverride ?? "").trim());
 
   const repostHeartsByOriginalId = useMemo(() => {
     const totals = new Map<string, number>();
@@ -569,20 +580,33 @@ export default function HomePage({
 
   useEffect(() => {
     if (!initialized) return;
+    if (isSearchMode) return;
     persistFeedCache();
-  }, [initialized, items, page, hasMore, persistFeedCache]);
+  }, [initialized, isSearchMode, items, page, hasMore, persistFeedCache]);
 
   const syncStats = useCallback(async () => {
     if (!token) return;
     try {
       const limit = page * PAGE_SIZE;
-      const data = await fetchFeed({
-        token,
-        limit,
-        scope: scopeOverride,
-        kinds: kindsOverride,
-      });
-      const posts = onlyPostItems(data);
+      const searchKey = (searchQueryOverride ?? "").trim();
+      const data = searchKey
+        ? ((
+            await searchPosts({
+              token,
+              query: searchKey,
+              limit,
+              page: 1,
+              kinds: kindsOverride ?? ["post"],
+              sort: "trending",
+            })
+          )?.items ?? [])
+        : await fetchFeed({
+            token,
+            limit,
+            scope: scopeOverride,
+            kinds: kindsOverride,
+          });
+      const posts = onlyPostItems(Array.isArray(data) ? data : []);
       const map = new Map(posts.map((item) => [item.id, item]));
       setItems((prev) =>
         prev.map((p) => {
@@ -600,7 +624,7 @@ export default function HomePage({
         }),
       );
     } catch {}
-  }, [kindsOverride, page, scopeOverride, token]);
+  }, [kindsOverride, page, scopeOverride, searchQueryOverride, token]);
 
   const load = useCallback(
     async (nextPage: number) => {
@@ -612,14 +636,29 @@ export default function HomePage({
       setError("");
       try {
         const limit = nextPage * PAGE_SIZE;
-        const data = await fetchFeed({
-          token,
-          limit,
-          scope: scopeOverride,
-          kinds: kindsOverride,
-        });
-        const posts = onlyPostItems(data);
-        setHasMore(data.length >= limit);
+        const searchKey = (searchQueryOverride ?? "").trim();
+        const data = searchKey
+          ? await searchPosts({
+              token,
+              query: searchKey,
+              limit: PAGE_SIZE,
+              page: nextPage,
+              kinds: kindsOverride ?? ["post"],
+              sort: "trending",
+            })
+          : await fetchFeed({
+              token,
+              limit,
+              scope: scopeOverride,
+              kinds: kindsOverride,
+            });
+
+        const rawItems = Array.isArray(data) ? data : data.items;
+        const posts = onlyPostItems(rawItems);
+        const nextHasMore = Array.isArray(data)
+          ? rawItems.length >= limit
+          : Boolean(data.hasMore);
+        setHasMore(nextHasMore);
         const mapped = posts.map((item) => ({
           item,
           flags: {
@@ -630,11 +669,13 @@ export default function HomePage({
           },
         }));
         setItems(mapped);
-        persistFeedCache({
-          items: mapped,
-          page: nextPage,
-          hasMore: data.length >= limit,
-        });
+        if (!searchKey) {
+          persistFeedCache({
+            items: mapped,
+            page: nextPage,
+            hasMore: nextHasMore,
+          });
+        }
         setPage(nextPage);
       } catch (err) {
         const msg =
@@ -647,8 +688,20 @@ export default function HomePage({
         setLoading(false);
       }
     },
-    [kindsOverride, persistFeedCache, scopeOverride, token],
+    [
+      kindsOverride,
+      persistFeedCache,
+      scopeOverride,
+      searchQueryOverride,
+      token,
+    ],
   );
+
+  const loadRef = useRef(load);
+
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
 
   const handleLoadMore = useCallback(() => {
     if (loading || !hasMore) return;
@@ -700,11 +753,15 @@ export default function HomePage({
 
   useEffect(() => {
     if (!canRender) return;
+    if (isSearchMode) {
+      void loadRef.current(1);
+      return;
+    }
     const shouldHydrate = sessionStorage.getItem(FEED_CACHE_INTENT_KEY);
     if (shouldHydrate && tryHydrateFromCache()) return;
     if (tryHydrateFromCache()) return;
-    void load(1);
-  }, [canRender, tryHydrateFromCache]);
+    void loadRef.current(1);
+  }, [canRender, isSearchMode, tryHydrateFromCache]);
 
   const onLike = async (postId: string, liked: boolean) => {
     if (!token) return;
@@ -1197,6 +1254,7 @@ export default function HomePage({
   return (
     <div className={styles.page}>
       <div className={styles.centerColumn}>
+        {headerSlot}
         {items.map(({ item, flags }) => (
           <FeedCard
             key={item.id}
@@ -1534,6 +1592,31 @@ function FeedCard({
     repostOfAuthorAvatarUrl,
   } = data;
 
+  const mediaKey = useMemo(() => {
+    if (!Array.isArray(media) || media.length === 0) return "";
+    return media
+      .map((item) => `${item?.type ?? ""}:${item?.url ?? ""}`)
+      .join("|");
+  }, [media]);
+
+  const hashtagsKey = Array.isArray(hashtags) ? hashtags.join("\u0001") : "";
+  const mentionsKey = Array.isArray(mentions) ? mentions.join("\u0001") : "";
+  const stableHashtags = useMemo(
+    () => (Array.isArray(hashtags) ? hashtags : []),
+    // Depend on contents, not reference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hashtagsKey],
+  );
+  const stableMentions = useMemo(
+    () => (Array.isArray(mentions) ? mentions : []),
+    // Depend on contents, not reference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mentionsKey],
+  );
+  const locationKey =
+    typeof location === "string" ? location : (location as any)?.label;
+  const stableLocation = typeof locationKey === "string" ? locationKey : "";
+
   const displayName = authorDisplayName || author?.displayName;
   const username = authorUsername || author?.username;
   const avatarUrl = authorAvatarUrl || author?.avatarUrl;
@@ -1718,9 +1801,9 @@ function FeedCard({
 
   const resetEditState = useCallback(() => {
     setEditCaption(content || "");
-    setEditHashtags(hashtags || []);
+    setEditHashtags(stableHashtags);
     setHashtagDraft("");
-    setEditMentions(mentions || []);
+    setEditMentions(stableMentions);
     setMentionDraft("");
     setMentionSuggestions([]);
     setMentionOpen(false);
@@ -1728,8 +1811,8 @@ function FeedCard({
     setMentionError("");
     setMentionHighlight(-1);
     setActiveMentionRange(null);
-    setEditLocation(location || "");
-    setLocationQuery(location || "");
+    setEditLocation(stableLocation || "");
+    setLocationQuery(stableLocation || "");
     setLocationSuggestions([]);
     setLocationOpen(false);
     setLocationLoading(false);
@@ -1744,15 +1827,37 @@ function FeedCard({
     allowComments,
     allowDownload,
     content,
-    hashtags,
     hideLikeCount,
-    location,
-    mentions,
+    stableHashtags,
+    stableLocation,
+    stableMentions,
   ]);
 
+  const resetKey = useMemo(
+    () =>
+      `${id}\u0001${content ?? ""}\u0001${allowComments ? 1 : 0}\u0001${
+        allowDownload ? 1 : 0
+      }\u0001${hideLikeCount ? 1 : 0}\u0001${hashtagsKey}\u0001${mentionsKey}\u0001${
+        stableLocation
+      }`,
+    [
+      id,
+      content,
+      allowComments,
+      allowDownload,
+      hideLikeCount,
+      hashtagsKey,
+      mentionsKey,
+      stableLocation,
+    ],
+  );
+
   useEffect(() => {
+    // Reset local edit UI only when switching to a different post or its core
+    // editable fields change. Use a stable key to avoid dependency churn.
     resetEditState();
-  }, [resetEditState, id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -2240,7 +2345,7 @@ function FeedCard({
     }
     setMediaIndex((prev) => (prev >= mediaCount ? 0 : prev));
     setSoundOn(false);
-  }, [media]);
+  }, [mediaKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2268,7 +2373,7 @@ function FeedCard({
       resumeAppliedRef.current = true;
     } catch {}
     sessionStorage.removeItem(key);
-  }, [id, media]);
+  }, [id, mediaKey]);
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -2325,7 +2430,7 @@ function FeedCard({
       observer.disconnect();
       videoEl.pause();
     };
-  }, [mediaIndex, media]);
+  }, [mediaIndex, mediaKey]);
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -2370,10 +2475,10 @@ function FeedCard({
     if (!content) return null;
     const parts: Array<string | JSX.Element> = [];
     const normalizedMentions = new Set(
-      (mentions || []).map((m) => m.toLowerCase()),
+      (stableMentions || []).map((m) => m.toLowerCase()),
     );
     const normalizedHashtags = new Set(
-      (hashtags || []).map((tag) => tag.toLowerCase()),
+      (stableHashtags || []).map((tag) => tag.toLowerCase()),
     );
     const pushText = (text: string, keyBase: string) => {
       const chunks = text.split("\n");
@@ -2439,21 +2544,33 @@ function FeedCard({
       pushText(content.slice(lastIndex), `text-tail-${lastIndex}`);
     }
     return parts;
-  }, [content, mentions, hashtags]);
+  }, [content, mentionsKey, hashtagsKey]);
+
+  const captionMeasureKey = useMemo(
+    () => `${content}\u0001${mentionsKey}\u0001${hashtagsKey}`,
+    [content, mentionsKey, hashtagsKey],
+  );
+  const lastCaptionMeasureKeyRef = useRef<string>("");
 
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
-    const measure = () => {
-      const lineHeight = parseFloat(getComputedStyle(el).lineHeight || "0");
-      if (!lineHeight) return;
-      const lines = el.scrollHeight / lineHeight;
-      const shouldCollapse = lines > 3.2;
-      setCanExpand(shouldCollapse);
-      setCollapsed((prev) => (shouldCollapse ? true : false));
-    };
-    measure();
-  }, [content, captionNodes]);
+
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight || "0");
+    if (!lineHeight) return;
+    const lines = el.scrollHeight / lineHeight;
+    const shouldCollapse = lines > 3.2;
+
+    setCanExpand((prev) => (prev === shouldCollapse ? prev : shouldCollapse));
+
+    if (!shouldCollapse) {
+      setCollapsed((prev) => (prev === false ? prev : false));
+    } else if (lastCaptionMeasureKeyRef.current !== captionMeasureKey) {
+      setCollapsed((prev) => (prev === true ? prev : true));
+    }
+
+    lastCaptionMeasureKeyRef.current = captionMeasureKey;
+  }, [captionMeasureKey]);
 
   const authorLine = useMemo(() => {
     if (displayName) return displayName;

@@ -175,3 +175,13 @@ PostSchema.index({ visibility: 1, createdAt: -1 });
 PostSchema.index({ kind: 1, createdAt: -1 });
 PostSchema.index({ primaryVideoDurationMs: 1 });
 PostSchema.index({ topics: 1, createdAt: -1 });
+
+// Full-text search (used by /search/posts)
+PostSchema.index(
+  { content: 'text', hashtags: 'text', topics: 'text' },
+  {
+    name: 'PostTextIndex',
+    weights: { content: 10, hashtags: 5, topics: 2 },
+    default_language: 'none',
+  },
+);

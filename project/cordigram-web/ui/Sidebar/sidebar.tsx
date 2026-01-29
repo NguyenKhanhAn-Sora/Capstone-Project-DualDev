@@ -15,6 +15,7 @@ import {
 } from "@/lib/api";
 import { CURRENT_PROFILE_UPDATED_EVENT } from "@/lib/events";
 import { useTheme } from "@/component/theme-provider";
+import SearchOverlay from "@/ui/search-overlay/search-overlay";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -56,6 +57,8 @@ export default function Sidebar() {
   const [profile, setProfile] = useState<CurrentProfileResponse | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchClosing, setSearchClosing] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const { theme, toggleTheme } = useTheme();
   const clearSessionAndGoHome = useCallback(
@@ -222,23 +225,37 @@ export default function Sidebar() {
         </Link>
 
         <nav className={styles.nav}>
-          {navItems.map(({ label, href, icon: Icon, hasAvatar }) => (
-            <Link
-              key={label}
-              href={href}
-              className={styles.item}
-              onClick={label === "Home" ? clearSessionAndGoHome : undefined}
-            >
-              <span className={styles.icon}>
-                {hasAvatar ? (
-                  <div className={styles.avatarFallback}>S</div>
-                ) : (
+          {navItems.map(({ label, href, icon: Icon, hasAvatar }) =>
+            label === "Search" ? (
+              <button
+                key={label}
+                type="button"
+                className={styles.item}
+                onClick={() => setSearchOpen(true)}
+              >
+                <span className={styles.icon}>
                   <Icon />
-                )}
-              </span>
-              <span className={styles.label}>{label}</span>
-            </Link>
-          ))}
+                </span>
+                <span className={styles.label}>{label}</span>
+              </button>
+            ) : (
+              <Link
+                key={label}
+                href={href}
+                className={styles.item}
+                onClick={label === "Home" ? clearSessionAndGoHome : undefined}
+              >
+                <span className={styles.icon}>
+                  {hasAvatar ? (
+                    <div className={styles.avatarFallback}>S</div>
+                  ) : (
+                    <Icon />
+                  )}
+                </span>
+                <span className={styles.label}>{label}</span>
+              </Link>
+            ),
+          )}
         </nav>
 
         {profile ? (
@@ -318,6 +335,18 @@ export default function Sidebar() {
           </div>
         ) : null}
       </aside>
+
+      <SearchOverlay
+        open={searchOpen}
+        closing={searchClosing}
+        onClose={() => {
+          setSearchClosing(true);
+          window.setTimeout(() => {
+            setSearchOpen(false);
+            setSearchClosing(false);
+          }, 180);
+        }}
+      />
 
       <SwitchAccountOverlay
         open={switchAccountOpen}

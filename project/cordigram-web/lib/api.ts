@@ -1441,6 +1441,205 @@ export type CompanySuggestItem = {
   memberCount: number;
 };
 
+export type HashtagSuggestItem = {
+  id: string;
+  name: string;
+  usageCount: number;
+  lastUsedAt?: string | null;
+};
+
+export async function suggestHashtags(opts: {
+  token: string;
+  query: string;
+  limit?: number;
+  signal?: AbortSignal;
+}): Promise<{ items: HashtagSuggestItem[]; count: number }> {
+  const { token, query, limit, signal } = opts;
+  const params = new URLSearchParams();
+  params.set("q", query);
+  if (limit) params.set("limit", String(limit));
+
+  return apiFetch<{ items: HashtagSuggestItem[]; count: number }>({
+    path: `/hashtags/suggest?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    signal,
+  });
+}
+
+export type SearchSuggestionItem =
+  | {
+      type: "profile";
+      id: string;
+      label: string;
+      subtitle: string;
+      imageUrl: string;
+      data: ProfileSearchItem;
+    }
+  | {
+      type: "hashtag";
+      id: string;
+      label: string;
+      subtitle: string;
+      imageUrl: string;
+      data: HashtagSuggestItem;
+    };
+
+export async function searchSuggest(opts: {
+  token: string;
+  query: string;
+  limit?: number;
+  signal?: AbortSignal;
+}): Promise<{ items: SearchSuggestionItem[]; count: number }> {
+  const { token, query, limit, signal } = opts;
+  const params = new URLSearchParams();
+  params.set("q", query);
+  if (limit) params.set("limit", String(limit));
+
+  return apiFetch<{ items: SearchSuggestionItem[]; count: number }>({
+    path: `/search/suggest?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    signal,
+  });
+}
+
+export async function searchPosts(opts: {
+  token: string;
+  query: string;
+  limit?: number;
+  page?: number;
+  kinds?: Array<"post" | "reel">;
+  sort?: "relevance" | "trending";
+  signal?: AbortSignal;
+}): Promise<{
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  items: FeedItem[];
+}> {
+  const { token, query, limit, page, kinds, sort, signal } = opts;
+  const params = new URLSearchParams();
+  params.set("q", query);
+  if (limit) params.set("limit", String(limit));
+  if (page) params.set("page", String(page));
+  if (kinds?.length) params.set("kinds", kinds.join(","));
+  if (sort) params.set("sort", sort);
+
+  return apiFetch<{
+    page: number;
+    limit: number;
+    hasMore: boolean;
+    items: FeedItem[];
+  }>({
+    path: `/search/posts?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    signal,
+  });
+}
+
+export type SearchHistoryItem = {
+  id: string;
+  kind: "profile" | "hashtag" | "post" | "reel" | "query";
+  key: string;
+  label: string;
+  subtitle: string;
+  imageUrl: string;
+  mediaType?: "image" | "video" | "";
+  refId: string;
+  refSlug: string;
+  lastUsedAt?: string | null;
+};
+
+export async function fetchSearchHistory(opts: {
+  token: string;
+  signal?: AbortSignal;
+}): Promise<{ items: SearchHistoryItem[]; count: number }> {
+  const { token, signal } = opts;
+  return apiFetch<{ items: SearchHistoryItem[]; count: number }>({
+    path: "/search/history",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    signal,
+  });
+}
+
+export async function addSearchHistory(opts: {
+  token: string;
+  item:
+    | {
+        kind: "profile";
+        userId: string;
+        username?: string;
+        displayName?: string;
+        avatarUrl?: string;
+      }
+    | { kind: "hashtag"; tag: string }
+    | {
+        kind: "post";
+        postId: string;
+        content?: string;
+        mediaUrl?: string;
+        mediaType?: "image" | "video" | "";
+        authorUsername?: string;
+      }
+    | {
+        kind: "reel";
+        postId: string;
+        content?: string;
+        mediaUrl?: string;
+        mediaType?: "image" | "video" | "";
+        authorUsername?: string;
+      }
+    | { kind: "query"; query: string };
+}): Promise<SearchHistoryItem> {
+  const { token, item } = opts;
+  return apiFetch<SearchHistoryItem>({
+    path: "/search/history",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(item),
+  });
+}
+
+export async function deleteSearchHistoryItem(opts: {
+  token: string;
+  id: string;
+}): Promise<{ deleted: boolean }> {
+  const { token, id } = opts;
+  return apiFetch<{ deleted: boolean }>({
+    path: `/search/history/${encodeURIComponent(id)}`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function clearSearchHistory(opts: {
+  token: string;
+}): Promise<{ cleared: boolean }> {
+  const { token } = opts;
+  return apiFetch<{ cleared: boolean }>({
+    path: "/search/history",
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function suggestCompanies(opts: {
   token: string;
   query: string;
