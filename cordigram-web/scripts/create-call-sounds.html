@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generate Call Sounds</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    button {
+      background: #43b581;
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      margin: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background: #3ca374;
+    }
+    button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+    .output {
+      background: #2a2a2a;
+      padding: 20px;
+      border-radius: 5px;
+      margin-top: 20px;
+      white-space: pre-wrap;
+      font-family: monospace;
+    }
+    .success {
+      color: #43b581;
+    }
+    .error {
+      color: #ed4245;
+    }
+    .info {
+      color: #5865f2;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔊 Generate Call Sounds</h1>
+  <p>Generate simple MP3 sounds for incoming and outgoing calls.</p>
+  
+  <div>
+    <button onclick="generateIncomingSound()">Generate Incoming Call Sound</button>
+    <button onclick="generateOutgoingSound()">Generate Outgoing Call Sound</button>
+    <button onclick="testIncoming()">Test Incoming</button>
+    <button onclick="testOutgoing()">Test Outgoing</button>
+  </div>
+  
+  <div class="output" id="output">
+    <span class="info">Click a button to generate sounds...</span>
+  </div>
+
+  <script>
+    const output = document.getElementById('output');
+    
+    function log(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      output.innerHTML += `\n<span class="${type}">[${timestamp}] ${message}</span>`;
+      output.scrollTop = output.scrollHeight;
+    }
+
+    // Generate incoming call ringtone (double beep pattern)
+    async function generateIncomingSound() {
+      log('🎵 Generating incoming call sound...', 'info');
+      
+      try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const sampleRate = audioContext.sampleRate;
+        const duration = 2; // 2 seconds
+        const numSamples = sampleRate * duration;
+        
+        // Create stereo buffer
+        const audioBuffer = audioContext.createBuffer(2, numSamples, sampleRate);
+        
+        // Generate double beep pattern
+        for (let channel = 0; channel < 2; channel++) {
+          const channelData = audioBuffer.getChannelData(channel);
+          
+          for (let i = 0; i < numSamples; i++) {
+            const t = i / sampleRate;
+            let sample = 0;
+            
+            // First beep: 800Hz, 0-0.3s
+            if (t < 0.3) {
+              const envelope = Math.min(1, t / 0.01); // Fade in
+              sample = Math.sin(2 * Math.PI * 800 * t) * envelope * 0.3;
+            }
+            // Second beep: 1000Hz, 0.5-0.8s
+            else if (t >= 0.5 && t < 0.8) {
+              const localT = t - 0.5;
+              const envelope = Math.min(1, localT / 0.01); // Fade in
+              sample = Math.sin(2 * Math.PI * 1000 * t) * envelope * 0.3;
+            }
+            
+            channelData[i] = sample;
+          }
+        }
+        
+        // Convert to WAV and download
+        const wavBlob = bufferToWave(audioBuffer);
+        downloadBlob(wavBlob, 'incoming-call.wav');
+        
+        log(' Incoming call sound generated! Check your downloads.', 'success');
+        log(' Move "incoming-call.wav" to: public/sounds/', 'info');
+        
+      } catch (error) {
+        log(` Error: ${error.message}`, 'error');
+      }
+    }
+
+    // Generate outgoing call dialing tone (single beep)
+    async function generateOutgoingSound() {
+      log('🎵 Generating outgoing call sound...', 'info');
+      
+      try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const sampleRate = audioContext.sampleRate;
+        const duration = 1.5; // 1.5 seconds
+        const numSamples = sampleRate * duration;
+        
+        // Create stereo buffer
+        const audioBuffer = audioContext.createBuffer(2, numSamples, sampleRate);
+        
+        // Generate single beep
+        for (let channel = 0; channel < 2; channel++) {
+          const channelData = audioBuffer.getChannelData(channel);
+          
+          for (let i = 0; i < numSamples; i++) {
+            const t = i / sampleRate;
+            let sample = 0;
+            
+            // Single tone: 440Hz (A note), 0-0.5s
+            if (t < 0.5) {
+              const fadeIn = Math.min(1, t / 0.02);
+              const fadeOut = t > 0.45 ? (0.5 - t) / 0.05 : 1;
+              const envelope = fadeIn * fadeOut;
+              sample = Math.sin(2 * Math.PI * 440 * t) * envelope * 0.25;
+            }
+            
+            channelData[i] = sample;
+          }
+        }
+        
+        // Convert to WAV and download
+        const wavBlob = bufferToWave(audioBuffer);
+        downloadBlob(wavBlob, 'outgoing-call.wav');
+        
+        log('✅ Outgoing call sound generated! Check your downloads.', 'success');
+        log('📁 Move "outgoing-call.wav" to: public/sounds/', 'info');
+        
+      } catch (error) {
+        log(`❌ Error: ${error.message}`, 'error');
+      }
+    }
+
+    // Convert AudioBuffer to WAV blob
+    function bufferToWave(audioBuffer) {
+      const numChannels = audioBuffer.numberOfChannels;
+      const sampleRate = audioBuffer.sampleRate;
+      const format = 1; // PCM
+      const bitDepth = 16;
+      
+      const bytesPerSample = bitDepth / 8;
+      const blockAlign = numChannels * bytesPerSample;
+      
+      const data = [];
+      for (let i = 0; i < audioBuffer.length; i++) {
+        for (let channel = 0; channel < numChannels; channel++) {
+          const sample = audioBuffer.getChannelData(channel)[i];
+          const intSample = Math.max(-1, Math.min(1, sample));
+          data.push(intSample < 0 ? intSample * 0x8000 : intSample * 0x7FFF);
+        }
+      }
+      
+      const dataLength = data.length * bytesPerSample;
+      const buffer = new ArrayBuffer(44 + dataLength);
+      const view = new DataView(buffer);
+      
+      // WAV header
+      writeString(view, 0, 'RIFF');
+      view.setUint32(4, 36 + dataLength, true);
+      writeString(view, 8, 'WAVE');
+      writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, format, true);
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * blockAlign, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, bitDepth, true);
+      writeString(view, 36, 'data');
+      view.setUint32(40, dataLength, true);
+      
+      // Write PCM samples
+      let offset = 44;
+      for (let i = 0; i < data.length; i++) {
+        view.setInt16(offset, data[i], true);
+        offset += 2;
+      }
+      
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    function writeString(view, offset, string) {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // Test sounds
+    function testIncoming() {
+      log('🔊 Testing incoming sound...', 'info');
+      const audio = new Audio();
+      audio.src = '/sounds/incoming-call.wav';
+      audio.play().catch(() => {
+        log('⚠️ Sound file not found. Generate it first!', 'error');
+      });
+    }
+
+    function testOutgoing() {
+      log('🔊 Testing outgoing sound...', 'info');
+      const audio = new Audio();
+      audio.src = '/sounds/outgoing-call.wav';
+      audio.play().catch(() => {
+        log('⚠️ Sound file not found. Generate it first!', 'error');
+      });
+    }
+
+    log('Ready! Click buttons to generate sounds.', 'success');
+  </script>
+</body>
+</html>
