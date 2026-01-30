@@ -266,6 +266,25 @@ export class PostsController {
     return this.postsService.unlike(user.userId, postId);
   }
 
+  @Get(':id/likes')
+  async listLikes(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('id') postId: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.listPostLikes({
+      viewerId: user.userId,
+      postId,
+      limit: limit ? Number(limit) : undefined,
+      cursor: cursor || undefined,
+    });
+  }
+
   @Post(':id/save')
   async save(@Req() req: Request, @Param('id') postId: string) {
     const user = req.user as AuthenticatedUser | undefined;

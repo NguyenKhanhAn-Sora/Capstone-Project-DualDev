@@ -14,6 +14,7 @@ import {
   fetchCurrentProfile,
   fetchPostDetail,
   fetchReelDetail,
+  fetchPostLikes,
   followUser,
   reportComment,
   reportPost,
@@ -38,8 +39,10 @@ import {
   type CommentListResponse,
   type CurrentProfileResponse,
   type FeedItem,
+  type PostLikeItem,
   type ProfileSearchItem,
 } from "@/lib/api";
+import PostLikesOverlay from "@/ui/post-likes-overlay/post-likes-overlay";
 
 function upsertById(list: CommentItem[], incoming: CommentItem): CommentItem[] {
   const idx = list.findIndex((c) => c.id === incoming.id);
@@ -976,6 +979,21 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   };
 
   const [viewer, setViewer] = useState<CurrentProfileResponse | null>(null);
+  const [likesOverlayOpen, setLikesOverlayOpen] = useState(false);
+  const [likesOverlayClosing, setLikesOverlayClosing] = useState(false);
+  const [likePeekOpen, setLikePeekOpen] = useState(false);
+  const [likePeekState, setLikePeekState] = useState<{
+    items: PostLikeItem[];
+    nextCursor: string | null;
+    loading: boolean;
+    error: string;
+  }>({
+    items: [],
+    nextCursor: null,
+    loading: false,
+    error: "",
+  });
+  const likePeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [commentText, setCommentText] = useState("");
   const [commentMentions, setCommentMentions] = useState<MentionRef[]>([]);
   const [commentMediaFile, setCommentMediaFile] = useState<File | null>(null);
@@ -3498,6 +3516,97 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     }
   };
 
+  const openLikesOverlay = () => {
+    setLikesOverlayOpen(true);
+    setLikesOverlayClosing(false);
+  };
+
+  const closeLikesOverlay = () => {
+    setLikesOverlayClosing(true);
+    window.setTimeout(() => {
+      setLikesOverlayOpen(false);
+      setLikesOverlayClosing(false);
+    }, 180);
+  };
+
+  const loadLikePeek = async () => {
+    if (!token) {
+      setLikePeekState({
+        items: [],
+        nextCursor: null,
+        loading: false,
+        error: "Sign in to view likes",
+      });
+      return;
+    }
+
+    setLikePeekState((p) => ({ ...p, loading: true, error: "" }));
+    try {
+      const res = await fetchPostLikes({ token, postId, limit: 10 });
+      setLikePeekState({
+        items: res.items ?? [],
+        nextCursor: res.nextCursor ?? null,
+        loading: false,
+        error: "",
+      });
+    } catch (err: any) {
+      setLikePeekState((p) => ({
+        ...p,
+        loading: false,
+        error: err?.message || "Failed to load likes",
+      }));
+    }
+  };
+
+  const handleLikePeekEnter = () => {
+    if (likePeekTimerRef.current) {
+      clearTimeout(likePeekTimerRef.current);
+      likePeekTimerRef.current = null;
+    }
+    setLikePeekOpen(true);
+    if (!likePeekState.items.length && !likePeekState.loading) {
+      void loadLikePeek();
+    }
+  };
+
+  const handleLikePeekLeave = () => {
+    if (likePeekTimerRef.current) {
+      clearTimeout(likePeekTimerRef.current);
+    }
+    likePeekTimerRef.current = setTimeout(() => {
+      setLikePeekOpen(false);
+    }, 140);
+  };
+
+  const toggleLikePeekFollow = async (item: PostLikeItem) => {
+    if (!token) return;
+    const viewerId = viewer?.userId || viewer?.id;
+    if (viewerId && item.userId === viewerId) return;
+
+    const next = !item.isFollowing;
+    setLikePeekState((p) => ({
+      ...p,
+      items: p.items.map((u) =>
+        u.userId === item.userId ? { ...u, isFollowing: next } : u,
+      ),
+    }));
+
+    try {
+      if (next) {
+        await followUser({ token, userId: item.userId });
+      } else {
+        await unfollowUser({ token, userId: item.userId });
+      }
+    } catch (err) {
+      setLikePeekState((p) => ({
+        ...p,
+        items: p.items.map((u) =>
+          u.userId === item.userId ? { ...u, isFollowing: !next } : u,
+        ),
+      }));
+    }
+  };
+
   const editModal = (
     <div
       className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
@@ -4246,19 +4355,119 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     </div>
                   )}
                   <div className={styles.statsRow}>
-                    <button
-                      type="button"
-                      className={`${styles.statButton} ${
-                        liked ? styles.statButtonActive : ""
-                      }`}
-                      onClick={toggleLike}
-                      aria-label={liked ? "Unlike" : "Like"}
+                    <div
+                      className={styles.likePeekWrap}
+                      onMouseEnter={handleLikePeekEnter}
+                      onMouseLeave={handleLikePeekLeave}
                     >
-                      <IconLike size={18} filled={liked} />
-                      {!(hideLikeCount && !isAuthor) ? (
-                        <span>{post.stats?.hearts ?? 0}</span>
+                      <button
+                        type="button"
+                        className={`${styles.statButton} ${
+                          liked ? styles.statButtonActive : ""
+                        }`}
+                        onClick={toggleLike}
+                        aria-label={liked ? "Unlike" : "Like"}
+                      >
+                        <IconLike size={18} filled={liked} />
+                        {!(hideLikeCount && !isAuthor) ? (
+                          <span>{post.stats?.hearts ?? 0}</span>
+                        ) : null}
+                      </button>
+                      {likePeekOpen ? (
+                        <div
+                          className={styles.likePeekPopover}
+                          onMouseEnter={handleLikePeekEnter}
+                          onMouseLeave={handleLikePeekLeave}
+                        > 
+                          {likePeekState.loading ? (
+                            <div className={styles.likePeekState}>Loading…</div>
+                          ) : null}
+                          {likePeekState.error && !likePeekState.loading ? (
+                            <div className={styles.likePeekState}>
+                              {likePeekState.error}
+                            </div>
+                          ) : null}
+                          {!likePeekState.loading &&
+                          !likePeekState.error &&
+                          !likePeekState.items.length ? (
+                            <div className={styles.likePeekState}>
+                              No likes yet
+                            </div>
+                          ) : null}
+                          <div className={styles.likePeekList}>
+                            {likePeekState.items.map((item) => (
+                              <div
+                                key={item.userId}
+                                className={styles.likePeekRow}
+                              >
+                                <Link
+                                  href={`/profile/${encodeURIComponent(
+                                    item.userId,
+                                  )}`}
+                                  aria-label={`View ${item.username} profile`}
+                                >
+                                  <img
+                                    className={styles.likePeekAvatar}
+                                    src={
+                                      item.avatarUrl ||
+                                      "https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg"
+                                    }
+                                    alt=""
+                                    loading="lazy"
+                                  />
+                                </Link>
+                                <div className={styles.likePeekIdentity}>
+                                  <Link
+                                    href={`/profile/${encodeURIComponent(
+                                      item.userId,
+                                    )}`}
+                                    className={styles.likePeekName}
+                                  >
+                                    {item.displayName || item.username}
+                                  </Link>
+                                  <div className={styles.likePeekUsername}>
+                                    @{item.username}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  className={`${styles.likePeekFollow} ${
+                                    item.isFollowing
+                                      ? ""
+                                      : styles.likePeekFollowPrimary
+                                  }`}
+                                  onClick={() => toggleLikePeekFollow(item)}
+                                  disabled={Boolean(
+                                    (viewer?.userId || viewer?.id) &&
+                                    item.userId ===
+                                      (viewer?.userId || viewer?.id),
+                                  )}
+                                >
+                                  {(viewer?.userId || viewer?.id) &&
+                                  item.userId === (viewer?.userId || viewer?.id)
+                                    ? "You"
+                                    : item.isFollowing
+                                      ? "Following"
+                                      : "Follow"}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          {likePeekState.nextCursor ? (
+                            <button
+                              type="button"
+                              className={styles.likePeekMore}
+                              onClick={() => {
+                                setLikePeekOpen(false);
+                                openLikesOverlay();
+                              }}
+                            >
+                              See more
+                            </button>
+                          ) : null}
+                        </div>
                       ) : null}
-                    </button>
+                    </div>
                     <span className={styles.statItem}>
                       <svg
                         aria-hidden="true"
@@ -5368,6 +5577,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {postId ? (
+        <PostLikesOverlay
+          open={likesOverlayOpen}
+          closing={likesOverlayClosing}
+          postId={postId}
+          viewerId={viewer?.userId || viewer?.id}
+          onClose={closeLikesOverlay}
+        />
       ) : null}
     </div>
   );

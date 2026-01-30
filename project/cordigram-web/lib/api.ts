@@ -972,6 +972,19 @@ export type FollowListResponse = {
   nextCursor: string | null;
 };
 
+export type PostLikeItem = {
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+  isFollowing: boolean;
+};
+
+export type PostLikeListResponse = {
+  items: PostLikeItem[];
+  nextCursor: string | null;
+};
+
 export type PeopleSuggestionItem = {
   userId: string;
   username: string;
@@ -1043,6 +1056,26 @@ export async function fetchFollowing(opts: {
   });
 }
 
+export async function fetchPostLikes(opts: {
+  token: string;
+  postId: string;
+  limit?: number;
+  cursor?: string;
+}): Promise<PostLikeListResponse> {
+  const { token, postId, limit, cursor } = opts;
+  const query = new URLSearchParams();
+  if (limit) query.set("limit", String(limit));
+  if (cursor) query.set("cursor", cursor);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiFetch<PostLikeListResponse>({
+    path: `/posts/${postId}/likes${suffix}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export type CurrentProfileResponse = {
   userId?: string;
   id: string;
@@ -1060,6 +1093,39 @@ export type UpdateAvatarResponse = {
 
 export type UserSettingsResponse = {
   theme: "light" | "dark";
+};
+
+export type NotificationItem = {
+  id: string;
+  type: "post_like" | "post_comment";
+  actor: {
+    id: string;
+    displayName: string;
+    username: string;
+    avatarUrl: string;
+  };
+  postId: string | null;
+  postKind: "post" | "reel";
+  likeCount: number;
+  commentCount: number;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type NotificationListResponse = {
+  items: NotificationItem[];
+};
+
+export type NotificationUnreadCountResponse = {
+  unreadCount: number;
+};
+
+export type NotificationReadAllResponse = {
+  updated: number;
+};
+
+export type NotificationReadResponse = {
+  updated: boolean;
 };
 
 export type RecentAccountResponse = {
@@ -1152,6 +1218,63 @@ export async function updateUserSettings(opts: {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ theme }),
+  });
+}
+
+export async function fetchNotifications(opts: {
+  token: string;
+  limit?: number;
+}): Promise<NotificationListResponse> {
+  const { token, limit } = opts;
+  const query = new URLSearchParams();
+  if (limit) query.set("limit", String(limit));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiFetch<NotificationListResponse>({
+    path: `/notifications${suffix}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchNotificationUnreadCount(opts: {
+  token: string;
+}): Promise<NotificationUnreadCountResponse> {
+  const { token } = opts;
+  return apiFetch<NotificationUnreadCountResponse>({
+    path: "/notifications/unread-count",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function markAllNotificationsRead(opts: {
+  token: string;
+}): Promise<NotificationReadAllResponse> {
+  const { token } = opts;
+  return apiFetch<NotificationReadAllResponse>({
+    path: "/notifications/read-all",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function markNotificationRead(opts: {
+  token: string;
+  notificationId: string;
+}): Promise<NotificationReadResponse> {
+  const { token, notificationId } = opts;
+  return apiFetch<NotificationReadResponse>({
+    path: `/notifications/${notificationId}/read`,
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 }
 
@@ -1461,6 +1584,33 @@ export async function suggestHashtags(opts: {
 
   return apiFetch<{ items: HashtagSuggestItem[]; count: number }>({
     path: `/hashtags/suggest?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    signal,
+  });
+}
+
+export async function searchHashtags(opts: {
+  token: string;
+  query: string;
+  limit?: number;
+  page?: number;
+  signal?: AbortSignal;
+}): Promise<{ items: HashtagSuggestItem[]; count: number; hasMore: boolean }> {
+  const { token, query, limit, page, signal } = opts;
+  const params = new URLSearchParams();
+  params.set("q", query);
+  if (limit) params.set("limit", String(limit));
+  if (page) params.set("page", String(page));
+
+  return apiFetch<{
+    items: HashtagSuggestItem[];
+    count: number;
+    hasMore: boolean;
+  }>({
+    path: `/hashtags/search?${params.toString()}`,
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,

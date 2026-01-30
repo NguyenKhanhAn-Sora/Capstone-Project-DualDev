@@ -1,18 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import styles from "../search.module.css";
-import { addSearchHistory, searchPosts, type FeedItem } from "@/lib/api";
+import { IconClear, HashTile } from "../_components/search-shared";
 import { getStoredAccessToken } from "@/lib/auth";
-import { IconClear, IconView, formatCount } from "../_components/search-shared";
+import { searchHashtags } from "@/lib/api";
 
 function useDebouncedUrlQueryParam(param: string, delayMs: number) {
   const router = useRouter();
@@ -43,7 +37,7 @@ function useDebouncedUrlQueryParam(param: string, delayMs: number) {
   return { value, setValueAndUrl };
 }
 
-export default function SearchReelsPage() {
+export default function SearchHashtagsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -53,11 +47,16 @@ export default function SearchReelsPage() {
   );
   const normalized = useMemo(() => query.trim(), [query]);
 
-  const [items, setItems] = useState<FeedItem[]>([]);
+  const [items, setItems] = useState<
+    Array<{ id: string; name: string; usageCount: number }>
+  >([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const autoLoadLockRef = useRef(false);
 
   useEffect(() => {
     setItems([]);
@@ -81,14 +80,15 @@ export default function SearchReelsPage() {
     }
 
     let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     setError("");
-    searchPosts({ token, query: normalized, limit: 24, page, kinds: ["reel"] })
+
+    searchHashtags({ token, query: normalized, limit: 20, page, signal: controller.signal })
       .then((res) => {
         if (cancelled) return;
-        setItems((prev) =>
-          page === 1 ? (res.items ?? []) : [...prev, ...(res.items ?? [])],
-        );
+        const nextItems = res.items ?? [];
+        setItems((prev) => (page === 1 ? nextItems : [...prev, ...nextItems]));
         setHasMore(Boolean(res.hasMore));
       })
       .catch((err: any) => {
@@ -101,49 +101,38 @@ export default function SearchReelsPage() {
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [normalized, page]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const anchor = loadMoreRef.current;
+    if (!anchor) return;
+    if (!hasMore) return;
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isVisible = entries.some((entry) => entry.isIntersecting);
+        if (!isVisible) return;
+        if (autoLoadLockRef.current) return;
+        if (loading || !hasMore) return;
+        autoLoadLockRef.current = true;
+        setPage((p) => p + 1);
+      },
+      { rootMargin: "600px 0px", threshold: 0 },
+    );
+
+    observer.observe(anchor);
+    return () => observer.disconnect();
+  }, [hasMore, loading, items.length]);
+
+  useEffect(() => {
+    if (!loading) autoLoadLockRef.current = false;
+  }, [loading]);
+
   const qParam = encodeURIComponent(searchParams?.get("q") || normalized);
-
-  const addToHistory = async (reel: FeedItem, targetId: string) => {
-    const token = getStoredAccessToken();
-    if (!token) return;
-    const first = reel.media?.[0];
-    const mediaUrl = typeof first?.url === "string" ? first.url : "";
-    const mediaType =
-      first?.type === "video"
-        ? "video"
-        : first?.type === "image"
-          ? "image"
-          : "";
-    try {
-      await addSearchHistory({
-        token,
-        item: {
-          kind: "reel",
-          postId: targetId,
-          content: reel.content,
-          mediaUrl,
-          mediaType,
-          authorUsername: reel.authorUsername,
-        },
-      });
-    } catch {
-      /* best-effort */
-    }
-  };
-
-  const handleEnter = (e: React.MouseEvent<HTMLVideoElement>) => {
-    const el = e.currentTarget;
-    el.currentTime = 0;
-    void el.play().catch(() => undefined);
-  };
-  const handleLeave = (e: React.MouseEvent<HTMLVideoElement>) => {
-    const el = e.currentTarget;
-    el.pause();
-    el.currentTime = 0;
-  };
 
   const handleEnterToSearch = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "Enter") return;
@@ -166,7 +155,7 @@ export default function SearchReelsPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleEnterToSearch}
-            placeholder="Search reels"
+            placeholder="Search hashtags"
             spellCheck={false}
           />
           {query.trim() ? (
@@ -188,10 +177,10 @@ export default function SearchReelsPage() {
           <Link className={styles.tab} href={`/search/people?q=${qParam}`}>
             People
           </Link>
-          <Link
-            className={`${styles.tab} ${styles.tabActive}`}
-            href={`/search/reels?q=${qParam}`}
-          >
+          <Link className={`${styles.tab} ${styles.tabActive}`} href={`/search/hashtags?q=${qParam}`}>
+            Hashtags
+          </Link>
+          <Link className={styles.tab} href={`/search/reels?q=${qParam}`}>
             Reels
           </Link>
           <Link className={styles.tab} href={`/search/post?q=${qParam}`}>
@@ -201,68 +190,28 @@ export default function SearchReelsPage() {
       </div>
 
       <div className={styles.body}>
-        {!normalized ? (
-          <div className={styles.muted}>Type to search.</div>
-        ) : null}
-        {loading && page === 1 ? (
-          <div className={styles.muted}>Searching…</div>
-        ) : null}
-        <Link className={styles.tab} href={`/search/hashtags?q=${qParam}`}>
-          Hashtags
-        </Link>
+        {!normalized ? <div className={styles.muted}>Type to search.</div> : null}
+        {loading && page === 1 ? <div className={styles.muted}>Searching…</div> : null}
         {error ? <div className={styles.error}>{error}</div> : null}
 
-        {items.length ? (
-          <div className={styles.reelsGrid}>
-            {items.map((item) => {
-              const media = item.media?.[0];
-              if (!media) return null;
-              const targetId = (item as any)?.repostOf || item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={styles.reelTile}
-                  onClick={async () => {
-                    await addToHistory(item, targetId);
-                    router.push(
-                      `/reels/${encodeURIComponent(targetId)}?single=1`,
-                    );
-                  }}
-                >
-                  <video
-                    className={styles.reelMedia}
-                    src={media.url}
-                    muted
-                    playsInline
-                    preload="metadata"
-                    onMouseEnter={handleEnter}
-                    onMouseLeave={handleLeave}
-                  />
-                  <div className={styles.reelBadge}>
-                    <IconView />
-                    {formatCount(
-                      (item.stats as any)?.views ??
-                        (item.stats as any)?.impressions,
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        ) : !loading && !error && normalized ? (
-          <div className={styles.muted}>No reels found.</div>
-        ) : null}
-
-        {hasMore ? (
-          <button
-            className={styles.loadMore}
-            type="button"
-            disabled={loading}
-            onClick={() => setPage((p) => p + 1)}
+        {items.map((t) => (
+          <div
+            key={t.id}
+            className={styles.row}
+            onClick={() => router.push(`/hashtag/${encodeURIComponent(t.name)}`)}
           >
-            {loading ? "Loading…" : "Load more"}
-          </button>
+            <HashTile className={styles.hashTile} />
+            <div className={styles.meta}>
+              <div className={styles.label}>#{t.name}</div>
+              <div className={styles.subtitle}>{t.usageCount} posts</div>
+            </div>
+          </div>
+        ))}
+
+        {loading && page > 1 ? <div className={styles.muted}>Loading more…</div> : null}
+        <div ref={loadMoreRef} style={{ height: 1 }} aria-hidden />
+        {!loading && !error && normalized && items.length === 0 ? (
+          <div className={styles.muted}>No results.</div>
         ) : null}
       </div>
     </div>

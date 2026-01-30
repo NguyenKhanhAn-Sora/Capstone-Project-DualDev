@@ -10,6 +10,7 @@ import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { CommentsController } from './comments.controller';
 import { CommentsService } from './comments.service';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { CloudinaryModule } from '../cloudinary/cloudinary.module';
     forwardRef(() => UsersModule),
     ProfilesModule,
     CloudinaryModule,
+    NotificationsModule,
     MongooseModule.forFeature([
       { name: Comment.name, schema: CommentSchema },
       { name: CommentLike.name, schema: CommentLikeSchema },

@@ -5,6 +5,7 @@ import Image from "next/image";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { io, type Socket } from "socket.io-client";
 import styles from "./sidebar.module.css";
 import {
   apiFetch,
@@ -12,10 +13,19 @@ import {
   type ApiError,
   fetchCurrentProfile,
   type CurrentProfileResponse,
+  fetchNotificationUnreadCount,
+  type NotificationItem,
 } from "@/lib/api";
-import { CURRENT_PROFILE_UPDATED_EVENT } from "@/lib/events";
+import {
+  CURRENT_PROFILE_UPDATED_EVENT,
+  emitNotificationReceived,
+  NOTIFICATION_READ_EVENT,
+  type NotificationReadDetail,
+} from "@/lib/events";
 import { useTheme } from "@/component/theme-provider";
 import SearchOverlay from "@/ui/search-overlay/search-overlay";
+import NotificationsOverlay from "@/ui/notifications-overlay/notifications-overlay";
+import { getStoredAccessToken } from "@/lib/auth";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -59,7 +69,12 @@ export default function Sidebar() {
   const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchClosing, setSearchClosing] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationClosing, setNotificationClosing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const notificationOpenRef = useRef(false);
+  const socketRef = useRef<Socket | null>(null);
   const { theme, toggleTheme } = useTheme();
   const clearSessionAndGoHome = useCallback(
     (event?: React.MouseEvent<HTMLAnchorElement>) => {
@@ -129,6 +144,10 @@ export default function Sidebar() {
   }, []);
 
   useEffect(() => {
+    notificationOpenRef.current = notificationOpen;
+  }, [notificationOpen]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (!menuRef.current) return;
       if (!menuRef.current.contains(event.target as Node)) {
@@ -142,6 +161,64 @@ export default function Sidebar() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [menuOpen]);
+
+  const connectNotifications = useCallback((token: string) => {
+    socketRef.current?.disconnect();
+
+    const socket = io(`${getApiBaseUrl()}/notifications`, {
+      auth: { token },
+      transports: ["websocket"],
+    });
+
+    socket.on(
+      "notification:new",
+      (payload: { notification: NotificationItem; unreadCount?: number }) => {
+        if (!payload?.notification) return;
+        emitNotificationReceived({ notification: payload.notification });
+
+        if (typeof payload.unreadCount === "number") {
+          setUnreadCount(payload.unreadCount);
+        } else {
+          setUnreadCount((prev) => prev + 1);
+        }
+      },
+    );
+
+    socketRef.current = socket;
+  }, []);
+
+  useEffect(() => {
+    const token = getStoredAccessToken();
+    if (!token) {
+      setUnreadCount(0);
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+      return;
+    }
+
+    fetchNotificationUnreadCount({ token })
+      .then((res) => setUnreadCount(res.unreadCount ?? 0))
+      .catch(() => setUnreadCount(0));
+
+    connectNotifications(token);
+
+    return () => {
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
+  }, [connectNotifications, profile?.id, profile?.userId]);
+
+  useEffect(() => {
+    const handleRead = (event: Event) => {
+      const detail = (event as CustomEvent<NotificationReadDetail>).detail;
+      if (!detail?.id) return;
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    };
+
+    window.addEventListener(NOTIFICATION_READ_EVENT, handleRead);
+    return () =>
+      window.removeEventListener(NOTIFICATION_READ_EVENT, handleRead);
+  }, []);
 
   const avatarLetter = useMemo(() => {
     const source = profile?.displayName || profile?.username || "";
@@ -238,6 +315,26 @@ export default function Sidebar() {
                 </span>
                 <span className={styles.label}>{label}</span>
               </button>
+            ) : label === "Notification" ? (
+              <button
+                key={label}
+                type="button"
+                className={styles.item}
+                onClick={() => {
+                  setNotificationClosing(false);
+                  setNotificationOpen(true);
+                }}
+              >
+                <span className={styles.icon}>
+                  <Icon />
+                </span>
+                <span className={styles.label}>{label}</span>
+                {unreadCount > 0 ? (
+                  <span className={styles.badge}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                ) : null}
+              </button>
             ) : (
               <Link
                 key={label}
@@ -293,7 +390,14 @@ export default function Sidebar() {
                   icon={<IconProfile />}
                   onClick={handleProfileClick}
                 />
-                <MenuItem label="Settings" icon={<IconSettings />} />
+                <MenuItem
+                  label="Settings"
+                  icon={<IconSettings />}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    router.push("/settings");
+                  }}
+                />
                 <MenuItem
                   label="Saved"
                   icon={<IconSaved />}
@@ -344,6 +448,18 @@ export default function Sidebar() {
           window.setTimeout(() => {
             setSearchOpen(false);
             setSearchClosing(false);
+          }, 180);
+        }}
+      />
+
+      <NotificationsOverlay
+        open={notificationOpen}
+        closing={notificationClosing}
+        onClose={() => {
+          setNotificationClosing(true);
+          window.setTimeout(() => {
+            setNotificationOpen(false);
+            setNotificationClosing(false);
           }, 180);
         }}
       />

@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import styles from "../search.module.css";
 import { IconClear } from "../_components/search-shared";
@@ -37,6 +43,7 @@ function useDebouncedUrlQueryParam(param: string, delayMs: number) {
 }
 
 export default function SearchPostsPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const { value: query, setValueAndUrl: setQuery } = useDebouncedUrlQueryParam(
@@ -46,6 +53,14 @@ export default function SearchPostsPage() {
   const normalized = useMemo(() => query.trim(), [query]);
   const qParam = encodeURIComponent(searchParams?.get("q") || normalized);
   const kindsOverride = useMemo(() => ["post"] as Array<"post" | "reel">, []);
+
+  const handleEnterToSearch = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    e.preventDefault();
+    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+  };
 
   const header = (
     <div className={styles.header}>
@@ -58,6 +73,7 @@ export default function SearchPostsPage() {
           className={styles.input}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleEnterToSearch}
           placeholder="Search posts"
           spellCheck={false}
         />
@@ -79,6 +95,9 @@ export default function SearchPostsPage() {
         </Link>
         <Link className={styles.tab} href={`/search/people?q=${qParam}`}>
           People
+        </Link>
+        <Link className={styles.tab} href={`/search/hashtags?q=${qParam}`}>
+          Hashtags
         </Link>
         <Link className={styles.tab} href={`/search/reels?q=${qParam}`}>
           Reels

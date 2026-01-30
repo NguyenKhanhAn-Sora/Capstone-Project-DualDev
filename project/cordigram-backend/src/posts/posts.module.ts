@@ -1,3 +1,4 @@
+import { NotificationsModule } from '../notifications/notifications.module';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
@@ -29,6 +30,7 @@ import {
     AuthModule,
     CloudinaryModule,
     UsersModule,
+    NotificationsModule,
     MongooseModule.forFeature([
       { name: Post.name, schema: PostSchema },
       { name: PostInteraction.name, schema: PostInteractionSchema },

@@ -2,10 +2,20 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import styles from "../search.module.css";
-import { addSearchHistory, searchProfiles, type ProfileSearchItem } from "@/lib/api";
+import {
+  addSearchHistory,
+  searchProfiles,
+  type ProfileSearchItem,
+} from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import { IconClear } from "../_components/search-shared";
 
@@ -111,6 +121,14 @@ export default function SearchPeoplePage() {
     }
   };
 
+  const handleEnterToSearch = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    e.preventDefault();
+    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -123,6 +141,7 @@ export default function SearchPeoplePage() {
             className={styles.input}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleEnterToSearch}
             placeholder="Search people"
             spellCheck={false}
           />
@@ -142,7 +161,10 @@ export default function SearchPeoplePage() {
           <Link className={styles.tab} href={`/search?q=${qParam}`}>
             All
           </Link>
-          <Link className={`${styles.tab} ${styles.tabActive}`} href={`/search/people?q=${qParam}`}>
+          <Link
+            className={`${styles.tab} ${styles.tabActive}`}
+            href={`/search/people?q=${qParam}`}
+          >
             People
           </Link>
           <Link className={styles.tab} href={`/search/reels?q=${qParam}`}>
@@ -155,10 +177,15 @@ export default function SearchPeoplePage() {
       </div>
 
       <div className={styles.body}>
-        {!normalized ? <div className={styles.muted}>Type to search.</div> : null}
+        {!normalized ? (
+          <div className={styles.muted}>Type to search.</div>
+        ) : null}
         {loading ? <div className={styles.muted}>Searching…</div> : null}
         {error ? <div className={styles.error}>{error}</div> : null}
 
+        <Link className={styles.tab} href={`/search/hashtags?q=${qParam}`}>
+          Hashtags
+        </Link>
         {items.map((p) => (
           <div
             key={p.userId}

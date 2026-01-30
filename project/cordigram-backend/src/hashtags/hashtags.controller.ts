@@ -51,4 +51,24 @@ export class HashtagsController {
 
     return { items, count: items.length };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('search')
+  async search(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+  ) {
+    const user = req.user;
+    if (!user) throw new UnauthorizedException('Unauthorized');
+
+    if (!q || !q.trim()) throw new BadRequestException('q is required');
+
+    return this.hashtagsService.search({
+      q,
+      limit: limit ? Number(limit) : 20,
+      page: page ? Number(page) : 1,
+    });
+  }
 }

@@ -74,6 +74,21 @@
   line-height: 1;
 }
 
+.badge {
+  margin-left: auto;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff6b6b, #ff8f6b);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .avatarFallback {
   width: 32px;
   height: 32px;

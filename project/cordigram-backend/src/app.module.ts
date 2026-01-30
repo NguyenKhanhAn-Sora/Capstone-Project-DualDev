@@ -17,6 +17,7 @@ import { ReportCommentModule } from './reportcomment/reportcomment.module';
 import { CompaniesModule } from './companies/companies.module';
 import { HashtagsModule } from './hashtags/hashtags.module';
 import { SearchModule } from './search/search.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { SearchModule } from './search/search.module';
     ReportProblemModule,
     ReportPostModule,
     ReportCommentModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

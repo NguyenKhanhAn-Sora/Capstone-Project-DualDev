@@ -1,7 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import styles from "./search-overlay.module.css";
 import {
@@ -503,6 +510,15 @@ export default function SearchOverlay(props: {
     el.currentTime = 0;
   };
 
+  const handleEnterToSearch = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    e.preventDefault();
+    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+    onClose();
+  };
+
   if (!open) return null;
 
   return (
@@ -531,6 +547,7 @@ export default function SearchOverlay(props: {
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleEnterToSearch}
               className={styles.input}
               placeholder="Search people, #hashtags, posts, reels"
               spellCheck={false}

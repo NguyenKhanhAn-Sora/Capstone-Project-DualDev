@@ -128,7 +128,7 @@ export default function CreatePostPage() {
   const [error, setError] = useState<string>("");
   const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
-    null
+    null,
   );
   const [hashtagDraft, setHashtagDraft] = useState("");
   const [mentionDraft, setMentionDraft] = useState("");
@@ -171,14 +171,14 @@ export default function CreatePostPage() {
 
   const canAddMore = useMemo(
     () => (mode === "post" ? mediaItems.length < MAX_MEDIA_ITEMS : false),
-    [mode, mediaItems.length]
+    [mode, mediaItems.length],
   );
 
   const selectedAudience = useMemo(
     () =>
       audienceOptions.find((option) => option.value === form.audience) ||
       audienceOptions[0],
-    [form.audience]
+    [form.audience],
   );
 
   useEffect(() => {
@@ -293,7 +293,7 @@ export default function CreatePostPage() {
       const duration = await readVideoDuration(videoFile);
       if (duration !== null && duration > REEL_MAX_DURATION_SECONDS) {
         setError(
-          `Reel video must be ${REEL_MAX_DURATION_SECONDS}s or shorter.`
+          `Reel video must be ${REEL_MAX_DURATION_SECONDS}s or shorter.`,
         );
         return;
       }
@@ -361,7 +361,7 @@ export default function CreatePostPage() {
   const openFileDialog = () => fileInputRef.current?.click();
 
   const handleCaptionChange = (
-    event: React.ChangeEvent<HTMLTextAreaElement>
+    event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
     const value = event.target.value;
     const caret = event.target.selectionStart ?? value.length;
@@ -390,7 +390,7 @@ export default function CreatePostPage() {
       e.preventDefault();
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
-        prev + 1 < mentionSuggestions.length ? prev + 1 : 0
+        prev + 1 < mentionSuggestions.length ? prev + 1 : 0,
       );
       return;
     }
@@ -398,7 +398,7 @@ export default function CreatePostPage() {
       e.preventDefault();
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1,
       );
       return;
     }
@@ -460,7 +460,7 @@ export default function CreatePostPage() {
 
     if (!mediaItems.length) {
       setSubmitError(
-        "Please choose at least one photo or video before publishing."
+        "Please choose at least one photo or video before publishing.",
       );
       return;
     }
@@ -473,7 +473,7 @@ export default function CreatePostPage() {
       }
       if (reel.duration !== null && reel.duration > REEL_MAX_DURATION_SECONDS) {
         setSubmitError(
-          `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`
+          `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`,
         );
         return;
       }
@@ -489,7 +489,7 @@ export default function CreatePostPage() {
     }
 
     const normalizedHashtags = Array.from(
-      new Set((form.hashtags || []).map((t) => normalizeHashtag(t.toString())))
+      new Set((form.hashtags || []).map((t) => normalizeHashtag(t.toString()))),
     ).filter(Boolean);
 
     const normalizedMentions = Array.from(
@@ -497,10 +497,10 @@ export default function CreatePostPage() {
         [
           ...extractMentionsFromCaption(form.caption || ""),
           ...(form.mentions || []).map((t) =>
-            t.toString().trim().replace(/^@/, "").toLowerCase()
+            t.toString().trim().replace(/^@/, "").toLowerCase(),
           ),
-        ].filter(Boolean)
-      )
+        ].filter(Boolean),
+      ),
     );
 
     const scheduledAtIso =
@@ -532,8 +532,8 @@ export default function CreatePostPage() {
           typeof upload.duration === "number"
             ? upload.duration
             : typeof upload.duration === "string"
-            ? Number(upload.duration)
-            : null;
+              ? Number(upload.duration)
+              : null;
 
         const finalDuration =
           typeof uploadDurationRaw === "number" &&
@@ -548,7 +548,7 @@ export default function CreatePostPage() {
           setSubmitError(
             finalDuration === null
               ? "Missing video duration. Please re-upload your reel."
-              : `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`
+              : `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`,
           );
           setSubmitting(false);
           return;
@@ -627,7 +627,7 @@ export default function CreatePostPage() {
     const resolveAddress = async (
       latitude: number,
       longitude: number,
-      fallback: string
+      fallback: string,
     ) => {
       try {
         const url = new URL("https://nominatim.openstreetmap.org/reverse");
@@ -666,7 +666,7 @@ export default function CreatePostPage() {
 
     const handleError = (
       err: GeolocationPositionError,
-      isFallback: boolean
+      isFallback: boolean,
     ) => {
       const shouldRetry =
         !isFallback &&
@@ -677,7 +677,7 @@ export default function CreatePostPage() {
           handleSuccess,
           (err2) => handleError(err2, true),
           // --------------------------------
-          highOptions
+          highOptions,
         );
         return;
       }
@@ -686,17 +686,17 @@ export default function CreatePostPage() {
         err.code === err.PERMISSION_DENIED
           ? "You denied location access. Please allow it to autofill your place."
           : err.code === err.POSITION_UNAVAILABLE
-          ? "We couldn’t get a location fix. Try again or check GPS/Wi‑Fi."
-          : err.code === err.TIMEOUT
-          ? "Location request took too long. Please retry."
-          : "Could not fetch your location.";
+            ? "We couldn’t get a location fix. Try again or check GPS/Wi‑Fi."
+            : err.code === err.TIMEOUT
+              ? "Location request took too long. Please retry."
+              : "Could not fetch your location.";
       setGeoStatus(err.code === err.PERMISSION_DENIED ? "denied" : "error");
     };
 
     navigator.geolocation.getCurrentPosition(
       handleSuccess,
       (err) => handleError(err, false),
-      highOptions
+      highOptions,
     );
   };
 
@@ -704,7 +704,7 @@ export default function CreatePostPage() {
     key: keyof Pick<
       FormState,
       "allowComments" | "allowDownload" | "hideLikeCount"
-    >
+    >,
   ) => {
     setForm((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -733,7 +733,7 @@ export default function CreatePostPage() {
       mentions: prev.mentions.filter((t) => t !== handle),
       caption: prev.caption.replace(
         new RegExp(`@${escaped}(?![a-zA-Z0-9_.])`, "gi"),
-        ""
+        "",
       ),
     }));
   };
@@ -755,7 +755,7 @@ export default function CreatePostPage() {
       e.preventDefault();
       setLocationOpen(true);
       setLocationHighlight((prev) =>
-        prev + 1 < locationSuggestions.length ? prev + 1 : 0
+        prev + 1 < locationSuggestions.length ? prev + 1 : 0,
       );
     }
     if (e.key === "ArrowUp") {
@@ -763,7 +763,7 @@ export default function CreatePostPage() {
       e.preventDefault();
       setLocationOpen(true);
       setLocationHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1,
       );
     }
     if (e.key === "Escape") {
@@ -1062,7 +1062,7 @@ export default function CreatePostPage() {
               <p className={styles.dropText}>
                 {mode === "reel"
                   ? "MP4 / MOV, vertical preferred (9:16), max 90s, up to 50MB."
-                  : "Supports .jpg, .png, .mp4, .mov. Up to 10 items."}
+                  : "Supports .jpg, .png, .mp4, .mov."}
               </p>
               <div className={styles.actions}>
                 <button

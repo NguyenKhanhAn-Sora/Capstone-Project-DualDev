@@ -17,6 +17,7 @@ import { DeleteCommentDto } from './dto/delete-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { ConfigService } from '../config/config.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type UploadedFile = {
   originalname: string;
@@ -39,6 +40,7 @@ export class CommentsService {
     private readonly blocksService: BlocksService,
     private readonly cloudinary: CloudinaryService,
     private readonly config: ConfigService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(userId: string, postId: string, dto: CreateCommentDto) {
@@ -47,7 +49,7 @@ export class CommentsService {
 
     const post = await this.postModel
       .findOne({ _id: postObjectId, deletedAt: null })
-      .select('authorId allowComments status')
+      .select('authorId allowComments status kind')
       .lean();
 
     if (!post) {
@@ -102,6 +104,15 @@ export class CommentsService {
     await this.postModel
       .updateOne({ _id: postObjectId }, { $inc: { 'stats.comments': 1 } })
       .exec();
+
+    if (post.authorId && !post.authorId.equals(userObjectId)) {
+      await this.notificationsService.createPostCommentNotification({
+        actorId: userObjectId.toString(),
+        recipientId: post.authorId.toString(),
+        postId: postObjectId.toString(),
+        postKind: post.kind ?? 'post',
+      });
+    }
 
     const profile = await this.profileModel
       .findOne({ userId: userObjectId })
@@ -367,6 +378,27 @@ export class CommentsService {
       await this.commentLikeModel
         .deleteMany({ commentId: { $in: idsToDelete } })
         .exec();
+
+      const [latest, distinctAuthors] = await Promise.all([
+        this.commentModel
+          .findOne({ postId: postObjectId, deletedAt: null })
+          .sort({ createdAt: -1 })
+          .select('authorId')
+          .lean(),
+        this.commentModel.distinct('authorId', {
+          postId: postObjectId,
+          deletedAt: null,
+        }),
+      ]);
+
+      if (post.authorId) {
+        await this.notificationsService.decrementPostCommentNotification({
+          recipientId: post.authorId.toString(),
+          postId: postObjectId.toString(),
+          actorIds: (distinctAuthors ?? []).map((id) => id.toString()),
+          latestActorId: latest?.authorId?.toString() ?? null,
+        });
+      }
     }
 
     return { deleted: true, count: deletedCount };

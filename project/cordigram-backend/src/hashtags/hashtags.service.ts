@@ -72,4 +72,40 @@ export class HashtagsService {
       lastUsedAt: t.lastUsedAt ?? null,
     }));
   }
+
+  async search(params: { q: string; limit?: number; page?: number }) {
+    const limit = Math.min(Math.max(Number(params.limit) || 20, 1), 50);
+    const page = Math.min(Math.max(Number(params.page) || 1, 1), 100);
+    const raw = (params.q ?? '').trim().replace(/^#/, '').toLowerCase();
+    if (!raw) return { items: [], count: 0, hasMore: false };
+
+    const escaped = this.escapeRegex(raw);
+    const contains = new RegExp(escaped, 'i');
+    const filter = { name: { $regex: contains } };
+
+    const [items, total] = await Promise.all([
+      this.hashtagModel
+        .find(filter)
+        .sort({ usageCount: -1, lastUsedAt: -1, name: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .select('_id name usageCount lastUsedAt')
+        .lean()
+        .exec(),
+      this.hashtagModel.countDocuments(filter).exec(),
+    ]);
+
+    const mapped = items.map((t) => ({
+      id: t._id?.toString?.() ?? (t as any).id,
+      name: t.name,
+      usageCount: t.usageCount ?? 0,
+      lastUsedAt: t.lastUsedAt ?? null,
+    }));
+
+    return {
+      items: mapped,
+      count: total,
+      hasMore: page * limit < total,
+    };
+  }
 }

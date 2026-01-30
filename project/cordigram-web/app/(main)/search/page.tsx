@@ -2,7 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import styles from "./search.module.css";
 import {
@@ -14,12 +21,12 @@ import {
   type ProfileSearchItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import HomePage from "../page";
 import {
   formatCount,
   HashTile,
   IconClear,
   IconView,
-  PostTile,
 } from "./_components/search-shared";
 
 const DEFAULT_AVATAR_URL =
@@ -99,12 +106,12 @@ export default function SearchAllPage() {
       setError("");
       try {
         const [p, t, po, r] = await Promise.all([
-          searchProfiles({ token, query: normalized, limit: 10 }),
+          searchProfiles({ token, query: normalized, limit: 12 }),
           suggestHashtags({ token, query: normalized, limit: 10 }),
           searchPosts({
             token,
             query: normalized,
-            limit: 10,
+            limit: 3,
             page: 1,
             kinds: ["post"],
           }),
@@ -160,6 +167,14 @@ export default function SearchAllPage() {
     el.currentTime = 0;
   };
 
+  const handleEnterToSearch = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    e.preventDefault();
+    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -172,6 +187,7 @@ export default function SearchAllPage() {
             className={styles.input}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleEnterToSearch}
             placeholder="Search people, #hashtags, posts, reels"
             spellCheck={false}
           />
@@ -196,6 +212,9 @@ export default function SearchAllPage() {
           </Link>
           <Link className={styles.tab} href={`/search/people?q=${qParam}`}>
             People
+          </Link>
+          <Link className={styles.tab} href={`/search/hashtags?q=${qParam}`}>
+            Hashtags
           </Link>
           <Link className={styles.tab} href={`/search/reels?q=${qParam}`}>
             Reels
@@ -226,7 +245,7 @@ export default function SearchAllPage() {
                     See all
                   </Link>
                 </div>
-                {people.map((p) => (
+                {people.slice(0, 12).map((p) => (
                   <div
                     key={p.userId}
                     className={styles.row}
@@ -261,8 +280,14 @@ export default function SearchAllPage() {
               <>
                 <div className={styles.sectionHeader}>
                   <div className={styles.sectionTitle}>Hashtags</div>
+                  <Link
+                    className={styles.tab}
+                    href={`/search/hashtags?q=${qParam}`}
+                  >
+                    See all
+                  </Link>
                 </div>
-                {hashtags.map((t) => (
+                {hashtags.slice(0, 10).map((t) => (
                   <div
                     key={t.id}
                     className={styles.row}
@@ -294,51 +319,19 @@ export default function SearchAllPage() {
                     See all
                   </Link>
                 </div>
-                {posts.map((p) => (
-                  <div
-                    key={p.id}
-                    className={styles.row}
-                    onClick={async () => {
-                      const first = p.media?.[0];
-                      const mediaUrl =
-                        typeof first?.url === "string" ? first.url : "";
-                      const mediaType =
-                        first?.type === "video"
-                          ? "video"
-                          : first?.type === "image"
-                            ? "image"
-                            : "";
-                      await addToHistory({
-                        kind: "post",
-                        postId: p.id,
-                        content: p.content,
-                        mediaUrl,
-                        mediaType,
-                        authorUsername: p.authorUsername,
-                      });
-                      router.push(`/post/${encodeURIComponent(p.id)}`);
-                    }}
-                  >
-                    <PostTile
-                      mediaUrl={p.media?.[0]?.url ?? ""}
-                      mediaType={(p.media?.[0]?.type as any) ?? ""}
-                      classNameTile={styles.postTile}
-                      classNameThumb={styles.postThumb}
-                      classNameGlyph={styles.postGlyph}
-                      classNamePlay={styles.postPlay}
-                    />
-                    <div className={styles.meta}>
-                      <div className={styles.postLabel}>
-                        {(p.content || "").trim().slice(0, 90) ||
-                          "(no caption)"}
-                      </div>
-                      <div className={styles.postSubtitle}>
-                        Post by{" "}
-                        {p.authorUsername ? `@${p.authorUsername}` : "unknown"}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                <div className={styles.compactFeedWrap}>
+                  <HomePage
+                    scopeOverride="all"
+                    kindsOverride={["post"]}
+                    searchQueryOverride={normalized}
+                    pageSizeOverride={3}
+                    maxItems={3}
+                    embedded
+                    hideSidebar
+                    hideLoadMore
+                    cardClassName={styles.compactFeedCard}
+                  />
+                </div>
               </>
             ) : null}
 
@@ -354,7 +347,7 @@ export default function SearchAllPage() {
                   </Link>
                 </div>
                 <div className={styles.reelsGrid}>
-                  {reels.map((item) => {
+                  {reels.slice(0, 12).map((item) => {
                     const media = item.media?.[0];
                     if (!media) return null;
                     const targetId = (item as any)?.repostOf || item.id;

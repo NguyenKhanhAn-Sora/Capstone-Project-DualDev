@@ -394,14 +394,27 @@ export default function HomePage({
   kindsOverride,
   searchQueryOverride,
   headerSlot,
+  pageSizeOverride,
+  maxItems,
+  embedded,
+  hideSidebar,
+  hideLoadMore,
+  cardClassName,
 }: {
   scopeOverride?: "all" | "following";
   kindsOverride?: Array<"post" | "reel">;
   searchQueryOverride?: string;
   headerSlot?: React.ReactNode;
+  pageSizeOverride?: number;
+  maxItems?: number;
+  embedded?: boolean;
+  hideSidebar?: boolean;
+  hideLoadMore?: boolean;
+  cardClassName?: string;
 } = {}) {
   const canRender = useRequireAuth();
   const pathname = usePathname();
+  const pageSize = pageSizeOverride ?? PAGE_SIZE;
   const [items, setItems] = useState<PostViewState[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(false);
@@ -459,17 +472,24 @@ export default function HomePage({
   }, [scopeOverride, searchQueryOverride]);
 
   const isSearchMode = Boolean((searchQueryOverride ?? "").trim());
+  const visibleItems = useMemo(
+    () => (maxItems ? items.slice(0, maxItems) : items),
+    [items, maxItems],
+  );
+  const showLoadMore = !hideLoadMore && !maxItems;
+  const autoLoadEnabled = showLoadMore;
+  const showSidebar = !embedded && !hideSidebar;
 
   const repostHeartsByOriginalId = useMemo(() => {
     const totals = new Map<string, number>();
-    for (const entry of items) {
+    for (const entry of visibleItems) {
       const repostOf = entry.item?.repostOf;
       if (!repostOf) continue;
       const hearts = entry.item?.stats?.hearts ?? 0;
       totals.set(repostOf, (totals.get(repostOf) ?? 0) + hearts);
     }
     return totals;
-  }, [items]);
+  }, [visibleItems]);
 
   const getScrollTarget = useCallback(() => {
     if (typeof document === "undefined") return null;
@@ -587,7 +607,7 @@ export default function HomePage({
   const syncStats = useCallback(async () => {
     if (!token) return;
     try {
-      const limit = page * PAGE_SIZE;
+      const limit = page * pageSize;
       const searchKey = (searchQueryOverride ?? "").trim();
       const data = searchKey
         ? ((
@@ -624,7 +644,14 @@ export default function HomePage({
         }),
       );
     } catch {}
-  }, [kindsOverride, page, scopeOverride, searchQueryOverride, token]);
+  }, [
+    kindsOverride,
+    page,
+    pageSize,
+    scopeOverride,
+    searchQueryOverride,
+    token,
+  ]);
 
   const load = useCallback(
     async (nextPage: number) => {
@@ -635,13 +662,13 @@ export default function HomePage({
       setLoading(true);
       setError("");
       try {
-        const limit = nextPage * PAGE_SIZE;
+        const limit = nextPage * pageSize;
         const searchKey = (searchQueryOverride ?? "").trim();
         const data = searchKey
           ? await searchPosts({
               token,
               query: searchKey,
-              limit: PAGE_SIZE,
+              limit: pageSize,
               page: nextPage,
               kinds: kindsOverride ?? ["post"],
               sort: "trending",
@@ -690,6 +717,7 @@ export default function HomePage({
     },
     [
       kindsOverride,
+      pageSize,
       persistFeedCache,
       scopeOverride,
       searchQueryOverride,
@@ -714,6 +742,7 @@ export default function HomePage({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!autoLoadEnabled) return;
     const anchor = loadMoreRef.current;
     if (!anchor) return;
     if (!hasMore) return;
@@ -749,7 +778,14 @@ export default function HomePage({
 
     observer.observe(anchor);
     return () => observer.disconnect();
-  }, [getScrollTarget, handleLoadMore, hasMore, loading, items.length]);
+  }, [
+    autoLoadEnabled,
+    getScrollTarget,
+    handleLoadMore,
+    hasMore,
+    loading,
+    items.length,
+  ]);
 
   useEffect(() => {
     if (!canRender) return;
@@ -1252,10 +1288,10 @@ export default function HomePage({
   if (!canRender) return null;
 
   return (
-    <div className={styles.page}>
-      <div className={styles.centerColumn}>
+    <div className={embedded ? undefined : styles.page}>
+      <div className={embedded ? styles.embedded : styles.centerColumn}>
         {headerSlot}
-        {items.map(({ item, flags }) => (
+        {visibleItems.map(({ item, flags }) => (
           <FeedCard
             key={item.id}
             data={item}
@@ -1263,6 +1299,7 @@ export default function HomePage({
             saved={Boolean(flags.saved)}
             flags={flags}
             repostHeartsBoost={repostHeartsByOriginalId.get(item.id) ?? 0}
+            cardClassName={cardClassName}
             onLike={onLike}
             onSave={onSave}
             onShare={(id, anchor) =>
@@ -1292,18 +1329,20 @@ export default function HomePage({
 
         {loading && <SkeletonList count={3} />}
         <div ref={loadMoreRef} style={{ height: 1 }} aria-hidden />
-        {hasMore && !loading && (
+        {showLoadMore && hasMore && !loading && (
           <button className={styles.loadMore} onClick={handleLoadMore}>
             Load more
           </button>
         )}
       </div>
 
-      <aside className={styles.rightColumn} aria-label="Suggestions">
-        <div className={styles.rightStack}>
-          <PeopleYouMayKnow token={token} />
-        </div>
-      </aside>
+      {showSidebar ? (
+        <aside className={styles.rightColumn} aria-label="Suggestions">
+          <div className={styles.rightStack}>
+            <PeopleYouMayKnow token={token} />
+          </div>
+        </aside>
+      ) : null}
 
       {deleteTarget ? (
         <div
@@ -1527,6 +1566,7 @@ function FeedCard({
   saved,
   flags,
   repostHeartsBoost,
+  cardClassName,
   onLike,
   onSave,
   onShare,
@@ -1549,6 +1589,7 @@ function FeedCard({
   saved: boolean;
   flags: LocalFlags;
   repostHeartsBoost?: number;
+  cardClassName?: string;
   onLike: (postId: string, liked: boolean) => void;
   onSave: (postId: string, saved: boolean) => void;
   onShare: (postId: string, anchor?: DOMRect | null) => void;
@@ -3014,7 +3055,10 @@ function FeedCard({
   );
 
   return (
-    <article className={styles.feedCard} ref={cardRef}>
+    <article
+      className={`${styles.feedCard} ${cardClassName ?? ""}`}
+      ref={cardRef}
+    >
       {repostOf ? (
         <div className={styles.repostBanner}>
           <span className={styles.repostIcon}>

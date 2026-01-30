@@ -19,6 +19,13 @@
   gap: 16px;
 }
 
+.embedded {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
 .rightColumn {
   grid-column: 3;
   align-self: start;

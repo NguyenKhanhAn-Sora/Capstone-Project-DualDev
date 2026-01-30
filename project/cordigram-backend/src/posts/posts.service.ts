@@ -26,6 +26,7 @@ import { BlocksService } from '../users/blocks.service';
 import { Hashtag } from '../hashtags/hashtag.schema';
 import { UserTasteProfile } from '../explore/user-taste.schema';
 import { PostImpressionEvent } from '../explore/impression-event.schema';
+import { NotificationsService } from '../notifications/notifications.service';
 type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
@@ -51,6 +52,7 @@ export class PostsService {
     private readonly blocksService: BlocksService,
     private readonly cloudinary: CloudinaryService,
     private readonly config: ConfigService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(authorId: string, dto: CreatePostDto) {
@@ -376,6 +378,24 @@ export class PostsService {
           .filter(Boolean),
       ),
     ).slice(0, 30);
+  }
+
+  private escapeRegex(input: string): string {
+    return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private buildHashtagPrefixes(tag: string, minLength = 4, maxLength = 18) {
+    const safeTag = tag?.toString().trim().toLowerCase();
+    if (!safeTag) return [] as string[];
+
+    const upper = Math.min(maxLength, safeTag.length - 1);
+    if (upper < minLength) return [] as string[];
+
+    const prefixes: string[] = [];
+    for (let i = minLength; i <= upper; i += 1) {
+      prefixes.push(safeTag.slice(0, i));
+    }
+    return prefixes;
   }
 
   private async upsertHashtags(tags: string[]) {
@@ -1526,6 +1546,18 @@ export class PostsService {
       throw new BadRequestException('Invalid hashtag');
     }
 
+    const escapedTag = this.escapeRegex(normalizedTag);
+    const hashtagRegex = new RegExp(`^${escapedTag}`, 'i');
+    const relatedPrefixes = this.buildHashtagPrefixes(normalizedTag);
+    const hashtagMatch = relatedPrefixes.length
+      ? {
+          $or: [
+            { hashtags: { $regex: hashtagRegex } },
+            { hashtags: { $in: relatedPrefixes } },
+          ],
+        }
+      : { hashtags: { $regex: hashtagRegex } };
+
     const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
 
     const hidden = await this.postInteractionModel
@@ -1544,6 +1576,17 @@ export class PostsService {
     const followeeSet = new Set(followeeIds);
     const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
 
+    const visibilityMatch = {
+      $or: [
+        { authorId: viewerObjectId },
+        { visibility: 'public' },
+        {
+          visibility: 'followers',
+          authorId: { $in: followeeObjectIds },
+        },
+      ],
+    };
+
     const { blockedIds, blockedByIds } =
       await this.blocksService.getBlockLists(viewerObjectId);
     const excludedAuthorIds = Array.from(
@@ -1553,21 +1596,13 @@ export class PostsService {
 
     const posts = await this.postModel
       .find({
-        hashtags: normalizedTag,
         kind: 'post',
         status: 'published',
         deletedAt: null,
         publishedAt: { $ne: null },
         authorId: { $nin: excludedAuthorIds },
         _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
-        $or: [
-          { authorId: viewerObjectId },
-          { visibility: 'public' },
-          {
-            visibility: 'followers',
-            authorId: { $in: followeeObjectIds },
-          },
-        ],
+        $and: [hashtagMatch, visibilityMatch],
       })
       .sort({ createdAt: -1 })
       .limit(candidateLimit)
@@ -1665,6 +1700,18 @@ export class PostsService {
       throw new BadRequestException('Invalid hashtag');
     }
 
+    const escapedTag = this.escapeRegex(normalizedTag);
+    const hashtagRegex = new RegExp(`^${escapedTag}`, 'i');
+    const relatedPrefixes = this.buildHashtagPrefixes(normalizedTag);
+    const hashtagMatch = relatedPrefixes.length
+      ? {
+          $or: [
+            { hashtags: { $regex: hashtagRegex } },
+            { hashtags: { $in: relatedPrefixes } },
+          ],
+        }
+      : { hashtags: { $regex: hashtagRegex } };
+
     const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
 
     const hidden = await this.postInteractionModel
@@ -1683,6 +1730,17 @@ export class PostsService {
     const followeeSet = new Set(followeeIds);
     const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
 
+    const visibilityMatch = {
+      $or: [
+        { authorId: viewerObjectId },
+        { visibility: 'public' },
+        {
+          visibility: 'followers',
+          authorId: { $in: followeeObjectIds },
+        },
+      ],
+    };
+
     const { blockedIds, blockedByIds } =
       await this.blocksService.getBlockLists(viewerObjectId);
     const excludedAuthorIds = Array.from(
@@ -1692,21 +1750,13 @@ export class PostsService {
 
     const posts = await this.postModel
       .find({
-        hashtags: normalizedTag,
         kind: 'reel',
         status: 'published',
         deletedAt: null,
         publishedAt: { $ne: null },
         authorId: { $nin: excludedAuthorIds },
         _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
-        $or: [
-          { authorId: viewerObjectId },
-          { visibility: 'public' },
-          {
-            visibility: 'followers',
-            authorId: { $in: followeeObjectIds },
-          },
-        ],
+        $and: [hashtagMatch, visibilityMatch],
       })
       .sort({ createdAt: -1 })
       .limit(candidateLimit)
@@ -2142,6 +2192,11 @@ export class PostsService {
     );
     await this.assertPostAccessible(userObjectId, postObjectId);
 
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId kind')
+      .lean();
+
     const inserted = await this.upsertUniqueInteraction(
       userObjectId,
       postObjectId,
@@ -2150,6 +2205,15 @@ export class PostsService {
     );
     if (inserted) {
       await this.bumpCounters(postObjectId, { 'stats.hearts': 1 });
+
+      if (post?.authorId && !post.authorId.equals(userObjectId)) {
+        await this.notificationsService.createPostLikeNotification({
+          actorId: userObjectId.toString(),
+          recipientId: post.authorId.toString(),
+          postId: postObjectId.toString(),
+          postKind: post.kind ?? 'post',
+        });
+      }
     }
     return { liked: true, created: inserted };
   }
@@ -2161,6 +2225,11 @@ export class PostsService {
     );
     await this.assertPostAccessible(userObjectId, postObjectId);
 
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId')
+      .lean();
+
     const removed = await this.removeUniqueInteraction(
       userObjectId,
       postObjectId,
@@ -2169,8 +2238,163 @@ export class PostsService {
     );
     if (removed) {
       await this.bumpCounters(postObjectId, { 'stats.hearts': -1 });
+
+      if (post?.authorId && !post.authorId.equals(userObjectId)) {
+        const latest = await this.postInteractionModel
+          .findOne({ postId: postObjectId, type: 'like' })
+          .sort({ createdAt: -1 })
+          .select('userId')
+          .lean();
+
+        await this.notificationsService.decrementPostLikeNotification({
+          recipientId: post.authorId.toString(),
+          postId: postObjectId.toString(),
+          latestActorId: latest?.userId?.toString() ?? null,
+        });
+      }
     }
     return { liked: !removed };
+  }
+
+  async listPostLikes(params: {
+    viewerId: string;
+    postId: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<{
+    items: Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      isFollowing: boolean;
+    }>;
+    nextCursor: string | null;
+  }> {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      params.viewerId,
+      params.postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId visibility status')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (!post.authorId) {
+      throw new ForbiddenException('Post author missing');
+    }
+
+    await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
+
+    const isAuthor = post.authorId?.equals(userObjectId) ?? false;
+    if (!isAuthor) {
+      if (post.status !== 'published') {
+        throw new ForbiddenException('Post is not published');
+      }
+      if (post.visibility === 'private') {
+        throw new ForbiddenException('Post is private');
+      }
+      if (post.visibility === 'followers') {
+        const follows = await this.followModel
+          .findOne({ followerId: userObjectId, followeeId: post.authorId })
+          .select('_id')
+          .lean();
+        if (!follows?._id) {
+          throw new ForbiddenException('Post is followers-only');
+        }
+      }
+    }
+
+    const limit = Math.min(Math.max(Number(params.limit) || 10, 1), 50);
+    const cursor = params.cursor
+      ? this.asObjectId(params.cursor, 'cursor')
+      : null;
+
+    const { blockedIds, blockedByIds } =
+      await this.blocksService.getBlockLists(userObjectId);
+    const excluded = [...blockedIds, ...blockedByIds]
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const likes = await this.postInteractionModel
+      .find({
+        postId: postObjectId,
+        type: 'like',
+        ...(cursor ? { _id: { $lt: cursor } } : {}),
+        ...(excluded.length ? { userId: { $nin: excluded } } : {}),
+      })
+      .sort({ _id: -1 })
+      .limit(limit + 1)
+      .select('_id userId')
+      .lean()
+      .exec();
+
+    const slice = likes.slice(0, limit);
+    const nextCursor =
+      likes.length > limit ? (likes[limit]._id?.toString?.() ?? null) : null;
+
+    const userIds = slice
+      .map((doc) => doc.userId?.toString?.())
+      .filter(Boolean) as string[];
+
+    if (!userIds.length) {
+      return { items: [], nextCursor };
+    }
+
+    const [profiles, viewerFollowing] = await Promise.all([
+      this.profileModel
+        .find({ userId: { $in: userIds.map((id) => new Types.ObjectId(id)) } })
+        .select('userId username displayName avatarUrl')
+        .lean()
+        .exec(),
+      this.followModel
+        .find({
+          followerId: userObjectId,
+          followeeId: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+        })
+        .select('followeeId')
+        .lean()
+        .exec(),
+    ]);
+
+    const profileByUserId = new Map<string, any>();
+    profiles.forEach((p: any) => {
+      const id = p.userId?.toString?.();
+      if (id) profileByUserId.set(id, p);
+    });
+
+    const followingSet = new Set<string>();
+    viewerFollowing.forEach((doc: any) => {
+      const id = doc.followeeId?.toString?.();
+      if (id) followingSet.add(id);
+    });
+
+    const items = userIds
+      .map((id) => {
+        const p = profileByUserId.get(id);
+        if (!p) return null;
+        return {
+          userId: id,
+          username: p.username ?? '',
+          displayName: p.displayName ?? p.username ?? '',
+          avatarUrl: p.avatarUrl ?? '',
+          isFollowing: followingSet.has(id),
+        };
+      })
+      .filter(Boolean) as Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      isFollowing: boolean;
+    }>;
+
+    return { items, nextCursor };
   }
 
   async save(userId: string, postId: string) {

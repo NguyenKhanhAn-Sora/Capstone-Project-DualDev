@@ -9,6 +9,19 @@
   gap: 16px;
 }
 
+.compactFeedWrap {
+  width: 100%;
+  max-width: 640px;
+}
+
+.compactFeedCard {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 12px;
+  border-radius: 12px;
+}
+
 .header {
   display: flex;
   flex-direction: column;
