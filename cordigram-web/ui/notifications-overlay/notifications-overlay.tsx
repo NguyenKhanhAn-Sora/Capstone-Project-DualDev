@@ -149,11 +149,11 @@ const TABS: TabConfig[] = [
 ];
 
 const TAB_FILTER: Record<TabKey, Array<NotificationItem["type"]>> = {
-  all: ["post_like", "post_comment"],
+  all: ["post_like", "post_comment", "post_mention", "follow"],
   likes: ["post_like"],
   comments: ["post_comment"],
-  mentions: [],
-  followers: [],
+  mentions: ["post_mention"],
+  followers: ["follow"],
 };
 
 function formatRelativeTime(value: string): string {
@@ -182,8 +182,7 @@ function buildMessage(item: NotificationItem): JSX.Element {
       ? `@${item.actor.username}`
       : item.actor.displayName || "Someone";
     const othersCount = Math.max(0, (item.likeCount ?? 1) - 1);
-    const othersLabel =
-      othersCount === 1 ? "1 other" : `${othersCount} others`;
+    const othersLabel = othersCount === 1 ? "1 other" : `${othersCount} others`;
     const targetLabel = item.postKind === "reel" ? "reel" : "post";
     return (
       <>
@@ -197,13 +196,35 @@ function buildMessage(item: NotificationItem): JSX.Element {
       ? `@${item.actor.username}`
       : item.actor.displayName || "Someone";
     const othersCount = Math.max(0, (item.commentCount ?? 1) - 1);
-    const othersLabel =
-      othersCount === 1 ? "1 other" : `${othersCount} others`;
+    const othersLabel = othersCount === 1 ? "1 other" : `${othersCount} others`;
     const targetLabel = item.postKind === "reel" ? "reel" : "post";
     return (
       <>
         <span className={styles.itemName}>{name}</span>
-        {othersCount > 0 ? ` and ${othersLabel}` : ""} commented on your {targetLabel}
+        {othersCount > 0 ? ` and ${othersLabel}` : ""} commented on your{" "}
+        {targetLabel}
+      </>
+    );
+  }
+  if (item.type === "post_mention") {
+    const name = item.actor.username
+      ? `@${item.actor.username}`
+      : item.actor.displayName || "Someone";
+    const sourceLabel = item.mentionSource === "comment" ? "comment" : "post";
+    return (
+      <>
+        <span className={styles.itemName}>{name}</span>
+        {` mentioned you in a ${sourceLabel}`}
+      </>
+    );
+  }
+  if (item.type === "follow") {
+    const name = item.actor.username
+      ? `@${item.actor.username}`
+      : item.actor.displayName || "Someone";
+    return (
+      <>
+        <span className={styles.itemName}>{name}</span> followed you
       </>
     );
   }
@@ -310,7 +331,12 @@ export default function NotificationsOverlay(props: {
   }, [open]);
 
   const handleItemClick = (item: NotificationItem) => {
-    if (!item.postId) return;
+    const targetUrl = item.postId
+      ? `/post/${item.postId}`
+      : item.type === "follow" && item.actor?.id
+        ? `/profile/${item.actor.id}`
+        : null;
+    if (!targetUrl) return;
     if (!item.readAt) {
       const token = getStoredAccessToken();
       if (token) {
@@ -329,7 +355,7 @@ export default function NotificationsOverlay(props: {
       emitNotificationRead({ id: item.id });
     }
     onClose();
-    router.push(`/post/${item.postId}`);
+    router.push(targetUrl);
   };
 
   if (!open) return null;
@@ -399,10 +425,14 @@ export default function NotificationsOverlay(props: {
                     item.readAt ? "" : styles.listItemUnread
                   }`}
                   onClick={() => handleItemClick(item)}
-                  role={item.postId ? "button" : undefined}
-                  tabIndex={item.postId ? 0 : undefined}
+                  role={
+                    item.postId || item.type === "follow" ? "button" : undefined
+                  }
+                  tabIndex={
+                    item.postId || item.type === "follow" ? 0 : undefined
+                  }
                   onKeyDown={(event) => {
-                    if (!item.postId) return;
+                    if (!item.postId && item.type !== "follow") return;
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
                       handleItemClick(item);
@@ -421,7 +451,7 @@ export default function NotificationsOverlay(props: {
                   <div className={styles.itemContent}>
                     <p className={styles.itemText}>{buildMessage(item)}</p>
                     <span className={styles.itemTime}>
-                      {formatRelativeTime(item.createdAt)}
+                      {formatRelativeTime(item.activityAt || item.createdAt)}
                     </span>
                   </div>
                   {!item.readAt ? (

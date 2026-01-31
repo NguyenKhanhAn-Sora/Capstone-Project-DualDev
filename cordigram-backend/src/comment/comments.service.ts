@@ -105,6 +105,13 @@ export class CommentsService {
       .updateOne({ _id: postObjectId }, { $inc: { 'stats.comments': 1 } })
       .exec();
 
+    await this.notifyMentionedUsers({
+      actorId: userObjectId.toString(),
+      postId: postObjectId.toString(),
+      postKind: post.kind ?? 'post',
+      mentions,
+    });
+
     if (post.authorId && !post.authorId.equals(userObjectId)) {
       await this.notificationsService.createPostCommentNotification({
         actorId: userObjectId.toString(),
@@ -499,6 +506,11 @@ export class CommentsService {
       throw new ForbiddenException('Not allowed to edit this comment');
     }
 
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('kind')
+      .lean();
+
     const hasIncomingContent = typeof dto.content === 'string';
     const nextContent = hasIncomingContent
       ? (dto.content ?? '').trim()
@@ -510,9 +522,19 @@ export class CommentsService {
       throw new BadRequestException('Comment content or media is required');
     }
 
+    const prevMentions = Array.isArray(comment.mentions)
+      ? comment.mentions
+      : [];
+    const prevMentionNames = prevMentions
+      .map((m) => (typeof m === 'string' ? m : m?.username))
+      .filter((m): m is string => Boolean(m));
     const mentions = this.normalizeMentions(
       dto.mentions ?? comment.mentions ?? [],
       nextContent,
+    );
+    const nextMentionNames = mentions.map((m) => m.username);
+    const addedMentions = nextMentionNames.filter(
+      (m) => !prevMentionNames.includes(m),
     );
 
     await this.commentModel
@@ -528,6 +550,15 @@ export class CommentsService {
         },
       )
       .exec();
+
+    if (addedMentions.length) {
+      await this.notifyMentionedUsers({
+        actorId: userObjectId.toString(),
+        postId: postObjectId.toString(),
+        postKind: (post as { kind?: 'post' | 'reel' } | null)?.kind ?? 'post',
+        mentions: mentions.filter((m) => addedMentions.includes(m.username)),
+      });
+    }
 
     const profile = await this.profileModel
       .findOne({ userId: userObjectId })
@@ -725,5 +756,52 @@ export class CommentsService {
           username,
         };
       });
+  }
+
+  private async notifyMentionedUsers(params: {
+    actorId: string;
+    postId: string;
+    postKind: 'post' | 'reel';
+    mentions: Array<{ userId?: Types.ObjectId; username: string }>;
+  }): Promise<void> {
+    const { actorId, postId, postKind, mentions } = params;
+    if (!mentions.length) return;
+
+    const directIds = mentions
+      .map((m) => m.userId?.toString?.())
+      .filter(Boolean) as string[];
+
+    const missingUsernames = mentions
+      .filter((m) => !m.userId)
+      .map((m) => m.username)
+      .filter(Boolean);
+
+    const profiles = missingUsernames.length
+      ? await this.profileModel
+          .find({ username: { $in: missingUsernames } })
+          .select('userId')
+          .lean()
+      : [];
+
+    const resolvedIds = profiles
+      .map((p) => p.userId?.toString?.())
+      .filter(Boolean) as string[];
+
+    const actorIdStr = actorId.toString();
+    const recipientIds = Array.from(
+      new Set([...directIds, ...resolvedIds]),
+    ).filter((id) => id && id !== actorIdStr);
+
+    await Promise.all(
+      recipientIds.map((recipientId) =>
+        this.notificationsService.createPostMentionNotification({
+          actorId,
+          recipientId,
+          postId,
+          postKind,
+          source: 'comment',
+        }),
+      ),
+    );
   }
 }

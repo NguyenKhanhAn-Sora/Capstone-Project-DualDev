@@ -10,6 +10,7 @@ import { Follow } from './follow.schema';
 import { BlocksService } from './blocks.service';
 import { Profile } from '../profiles/profile.schema';
 import { UserTasteProfile } from '../explore/user-taste.schema';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class UsersService {
@@ -20,6 +21,7 @@ export class UsersService {
     @InjectModel(UserTasteProfile.name)
     private readonly tasteProfileModel: Model<UserTasteProfile>,
     private readonly blocksService: BlocksService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async listFollowers(params: {
@@ -817,6 +819,11 @@ export class UsersService {
           .updateOne({ _id: followerId }, { $inc: { followingCount: 1 } })
           .exec(),
       ]);
+
+      await this.notificationsService.createFollowNotification({
+        actorId: followerId.toString(),
+        recipientId: followeeId.toString(),
+      });
     }
 
     return { following: true };
@@ -843,6 +850,11 @@ export class UsersService {
           .updateOne({ _id: followerId }, { $inc: { followingCount: -1 } })
           .exec(),
       ]);
+
+      await this.notificationsService.removeFollowNotification({
+        actorId: followerId.toString(),
+        recipientId: followeeId.toString(),
+      });
     }
 
     return { following: false };

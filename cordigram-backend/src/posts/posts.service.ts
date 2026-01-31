@@ -150,6 +150,14 @@ export class PostsService {
 
     await this.upsertHashtags(normalizedHashtags);
 
+    await this.notifyMentionedUsers({
+      actorId: authorId,
+      postId: doc._id.toString(),
+      postKind: doc.kind ?? 'post',
+      mentions: normalizedMentions,
+      source: 'post',
+    });
+
     if (repostOf) {
       await this.postModel
         .updateOne({ _id: repostOf }, { $inc: { 'stats.reposts': 1 } })
@@ -171,7 +179,7 @@ export class PostsService {
 
     const post = await this.postModel
       .findOne({ _id: postObjectId, deletedAt: null })
-      .select('authorId hashtags')
+      .select('authorId hashtags mentions kind')
       .lean();
 
     if (!post) {
@@ -198,8 +206,13 @@ export class PostsService {
       addedHashtags = nextHashtags.filter((tag) => !prevSet.has(tag));
       removedHashtags = prevHashtags.filter((tag) => !nextSet.has(tag));
     }
+    let addedMentions: string[] = [];
     if (dto.mentions !== undefined) {
-      update.mentions = this.normalizeMentions(dto.mentions ?? []);
+      const prevMentions = Array.isArray(post.mentions) ? post.mentions : [];
+      const nextMentions = this.normalizeMentions(dto.mentions ?? []);
+      update.mentions = nextMentions;
+      const prevSet = new Set(prevMentions);
+      addedMentions = nextMentions.filter((m) => !prevSet.has(m));
     }
     if (dto.topics !== undefined) {
       update.topics = this.normalizeTopics(dto.topics ?? []);
@@ -241,6 +254,17 @@ export class PostsService {
 
     if (!fresh) {
       throw new NotFoundException('Post not found after update');
+    }
+
+    if (addedMentions.length) {
+      const freshKind = (fresh as { kind?: PostKind }).kind ?? 'post';
+      await this.notifyMentionedUsers({
+        actorId: authorId,
+        postId: postObjectId.toString(),
+        postKind: freshKind,
+        mentions: addedMentions,
+        source: 'post',
+      });
     }
 
     return this.toResponse(this.postModel.hydrate(fresh) as Post);
@@ -327,6 +351,14 @@ export class PostsService {
     });
 
     await this.upsertHashtags(normalizedHashtags);
+
+    await this.notifyMentionedUsers({
+      actorId: authorId,
+      postId: doc._id.toString(),
+      postKind: doc.kind ?? 'reel',
+      mentions: normalizedMentions,
+      source: 'post',
+    });
 
     return this.toResponse(doc);
   }
@@ -450,6 +482,39 @@ export class PostsService {
           .filter(Boolean),
       ),
     ).slice(0, 20);
+  }
+
+  private async notifyMentionedUsers(params: {
+    actorId: string;
+    postId: string;
+    postKind: PostKind;
+    mentions: string[];
+    source: 'post' | 'comment';
+  }): Promise<void> {
+    const { actorId, postId, postKind, mentions, source } = params;
+    if (!mentions.length) return;
+
+    const profiles = await this.profileModel
+      .find({ username: { $in: mentions } })
+      .select('userId')
+      .lean();
+
+    const actorObjectId = new Types.ObjectId(actorId);
+    const recipientIds = Array.from(
+      new Set(profiles.map((p) => p.userId?.toString?.()).filter(Boolean)),
+    ).filter((id) => id !== actorObjectId.toString());
+
+    await Promise.all(
+      recipientIds.map((recipientId) =>
+        this.notificationsService.createPostMentionNotification({
+          actorId,
+          recipientId,
+          postId,
+          postKind,
+          source,
+        }),
+      ),
+    );
   }
 
   private toResponse(

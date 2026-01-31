@@ -24,8 +24,11 @@ export type NotificationItem = {
   postKind: PostKind;
   likeCount: number;
   commentCount: number;
+  mentionCount: number;
+  mentionSource: 'post' | 'comment';
   readAt: string | null;
   createdAt: string;
+  activityAt: string;
 };
 
 export type NotificationRealtimePayload = {
@@ -42,6 +45,9 @@ type NotificationDoc = {
   likeCount?: number;
   commentCount?: number;
   commentActorIds?: Types.ObjectId[];
+  mentionCount?: number;
+  mentionActorIds?: Types.ObjectId[];
+  mentionSource?: 'post' | 'comment';
   readAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -227,6 +233,113 @@ export class NotificationsService {
     return response;
   }
 
+  async createPostMentionNotification(params: {
+    actorId: string;
+    recipientId: string;
+    postId: string;
+    postKind: PostKind;
+    source: 'post' | 'comment';
+  }): Promise<NotificationItem> {
+    const { actorId, recipientId, postId, postKind, source } = params;
+
+    const doc = await this.notificationModel
+      .findOneAndUpdate(
+        {
+          recipientId: new Types.ObjectId(recipientId),
+          postId: new Types.ObjectId(postId),
+          type: 'post_mention',
+        },
+        {
+          $set: {
+            actorId: new Types.ObjectId(actorId),
+            readAt: null,
+            mentionSource: source,
+            updatedAt: new Date(),
+          },
+          $addToSet: { mentionActorIds: new Types.ObjectId(actorId) },
+          $setOnInsert: {
+            recipientId: new Types.ObjectId(recipientId),
+            postId: new Types.ObjectId(postId),
+            type: 'post_mention',
+            postKind,
+            mentionCount: 1,
+          },
+        },
+        { new: true, upsert: true },
+      )
+      .exec();
+
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(actorId) })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const response = this.toResponse(doc, profile ?? null);
+    const { unreadCount } = await this.getUnreadCount(recipientId);
+    this.gateway.emitToUser(recipientId, 'notification:new', {
+      notification: response,
+      unreadCount,
+    } satisfies NotificationRealtimePayload);
+
+    return response;
+  }
+
+  async createFollowNotification(params: {
+    actorId: string;
+    recipientId: string;
+  }): Promise<NotificationItem> {
+    const { actorId, recipientId } = params;
+    const filter = {
+      recipientId: new Types.ObjectId(recipientId),
+      actorId: new Types.ObjectId(actorId),
+      type: 'follow' as const,
+      postId: null,
+    };
+
+    const existing = await this.notificationModel.findOne(filter).lean();
+    if (existing) {
+      await this.notificationModel
+        .updateOne(filter, { $set: { updatedAt: new Date() } })
+        .exec();
+      const profile = await this.profileModel
+        .findOne({ userId: new Types.ObjectId(actorId) })
+        .select('userId displayName username avatarUrl')
+        .lean();
+      const response = this.toResponse(
+        existing as NotificationDoc,
+        profile ?? null,
+      );
+      return response;
+    }
+
+    const created = await this.notificationModel.create({
+      ...filter,
+      readAt: null,
+    });
+
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(actorId) })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const response = this.toResponse(created, profile ?? null);
+    const { unreadCount } = await this.getUnreadCount(recipientId);
+    this.gateway.emitToUser(recipientId, 'notification:new', {
+      notification: response,
+      unreadCount,
+    } satisfies NotificationRealtimePayload);
+
+    return response;
+  }
+
+  async removeFollowNotification(params: {
+    actorId: string;
+    recipientId: string;
+  }): Promise<void> {
+    // Intentionally keep the follow notification to avoid spam on re-follow.
+    return;
+  }
+
   async decrementPostLikeNotification(params: {
     recipientId: string;
     postId: string;
@@ -309,6 +422,10 @@ export class NotificationsService {
     > | null,
   ): NotificationItem {
     const actorId = doc.actorId?.toString() ?? '';
+    const createdAt =
+      doc.createdAt?.toISOString?.() ?? new Date().toISOString();
+    const activityAt = doc.updatedAt?.toISOString?.() ?? createdAt;
+
     return {
       id: doc._id.toString(),
       type: doc.type,
@@ -324,11 +441,13 @@ export class NotificationsService {
       commentCount:
         doc.commentActorIds?.length ??
         (typeof doc.commentCount === 'number' ? doc.commentCount : 0),
+      mentionCount:
+        doc.mentionActorIds?.length ??
+        (typeof doc.mentionCount === 'number' ? doc.mentionCount : 0),
+      mentionSource: doc.mentionSource ?? 'post',
       readAt: doc.readAt ? doc.readAt.toISOString() : null,
-      createdAt:
-        doc.updatedAt?.toISOString?.() ??
-        doc.createdAt?.toISOString?.() ??
-        new Date().toISOString(),
+      createdAt,
+      activityAt,
     };
   }
 }

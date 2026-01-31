@@ -13,7 +13,7 @@ import {
   type ApiError,
   fetchCurrentProfile,
   type CurrentProfileResponse,
-  fetchNotificationUnreadCount,
+  fetchNotifications,
   type NotificationItem,
 } from "@/lib/api";
 import {
@@ -28,6 +28,7 @@ import NotificationsOverlay from "@/ui/notifications-overlay/notifications-overl
 import { getStoredAccessToken } from "@/lib/auth";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const NOTIFICATION_SEEN_KEY = "cordigram:notification-seen-at";
 
 const EyeIcon = ({ open }: { open: boolean }) => (
   <svg
@@ -72,6 +73,13 @@ export default function Sidebar() {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationClosing, setNotificationClosing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [lastSeenAt, setLastSeenAt] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const stored = window.localStorage.getItem(NOTIFICATION_SEEN_KEY);
+    const parsed = stored ? Number(stored) : NaN;
+    return Number.isFinite(parsed) ? parsed : null;
+  });
+  const [lastSeenReady, setLastSeenReady] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const notificationOpenRef = useRef(false);
   const socketRef = useRef<Socket | null>(null);
@@ -148,6 +156,11 @@ export default function Sidebar() {
   }, [notificationOpen]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    setLastSeenReady(true);
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (!menuRef.current) return;
       if (!menuRef.current.contains(event.target as Node)) {
@@ -162,32 +175,36 @@ export default function Sidebar() {
     };
   }, [menuOpen]);
 
-  const connectNotifications = useCallback((token: string) => {
-    socketRef.current?.disconnect();
+  const connectNotifications = useCallback(
+    (token: string) => {
+      socketRef.current?.disconnect();
 
-    const socket = io(`${getApiBaseUrl()}/notifications`, {
-      auth: { token },
-      transports: ["websocket"],
-    });
+      const socket = io(`${getApiBaseUrl()}/notifications`, {
+        auth: { token },
+        transports: ["websocket"],
+      });
 
-    socket.on(
-      "notification:new",
-      (payload: { notification: NotificationItem; unreadCount?: number }) => {
-        if (!payload?.notification) return;
-        emitNotificationReceived({ notification: payload.notification });
+      socket.on(
+        "notification:new",
+        (payload: { notification: NotificationItem; unreadCount?: number }) => {
+          if (!payload?.notification) return;
+          emitNotificationReceived({ notification: payload.notification });
 
-        if (typeof payload.unreadCount === "number") {
-          setUnreadCount(payload.unreadCount);
-        } else {
-          setUnreadCount((prev) => prev + 1);
-        }
-      },
-    );
+          const createdAt = new Date(payload.notification.createdAt).getTime();
+          const cutoff = lastSeenAt ?? 0;
+          if (createdAt > cutoff) {
+            setUnreadCount((prev) => prev + 1);
+          }
+        },
+      );
 
-    socketRef.current = socket;
-  }, []);
+      socketRef.current = socket;
+    },
+    [lastSeenAt],
+  );
 
   useEffect(() => {
+    if (!lastSeenReady) return;
     const token = getStoredAccessToken();
     if (!token) {
       setUnreadCount(0);
@@ -196,8 +213,15 @@ export default function Sidebar() {
       return;
     }
 
-    fetchNotificationUnreadCount({ token })
-      .then((res) => setUnreadCount(res.unreadCount ?? 0))
+    fetchNotifications({ token, limit: 50 })
+      .then((res) => {
+        const cutoff = lastSeenAt ?? 0;
+        const count = (res.items ?? []).filter((item) => {
+          const created = new Date(item.createdAt).getTime();
+          return created > cutoff;
+        }).length;
+        setUnreadCount(count);
+      })
       .catch(() => setUnreadCount(0));
 
     connectNotifications(token);
@@ -206,7 +230,13 @@ export default function Sidebar() {
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
-  }, [connectNotifications, profile?.id, profile?.userId]);
+  }, [
+    connectNotifications,
+    profile?.id,
+    profile?.userId,
+    lastSeenAt,
+    lastSeenReady,
+  ]);
 
   useEffect(() => {
     const handleRead = (event: Event) => {
@@ -322,6 +352,15 @@ export default function Sidebar() {
                 className={styles.item}
                 onClick={() => {
                   setNotificationClosing(false);
+                  const now = Date.now();
+                  setLastSeenAt(now);
+                  if (typeof window !== "undefined") {
+                    window.localStorage.setItem(
+                      NOTIFICATION_SEEN_KEY,
+                      String(now),
+                    );
+                  }
+                  setUnreadCount(0);
                   setNotificationOpen(true);
                 }}
               >

@@ -1097,7 +1097,7 @@ export type UserSettingsResponse = {
 
 export type NotificationItem = {
   id: string;
-  type: "post_like" | "post_comment";
+  type: "post_like" | "post_comment" | "post_mention" | "follow";
   actor: {
     id: string;
     displayName: string;
@@ -1108,8 +1108,11 @@ export type NotificationItem = {
   postKind: "post" | "reel";
   likeCount: number;
   commentCount: number;
+  mentionCount: number;
+  mentionSource: "post" | "comment";
   readAt: string | null;
   createdAt: string;
+  activityAt: string;
 };
 
 export type NotificationListResponse = {

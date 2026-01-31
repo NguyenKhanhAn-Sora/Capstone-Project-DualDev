@@ -286,6 +286,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
   const [post, setPost] = useState<FeedItem | null>(null);
+  const [captionMentionMap, setCaptionMentionMap] = useState<
+    Record<string, string>
+  >({});
   const [followingAuthor, setFollowingAuthor] = useState(false);
   const [postError, setPostError] = useState<string>("");
   const [loadingPost, setLoadingPost] = useState(true);
@@ -3205,6 +3208,80 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     visibilitySaving ||
     visibilitySelected === ((post?.visibility as any) ?? "public");
 
+  const mentionLookupKey = useMemo(() => {
+    if (!post?.mentions?.length) return "";
+    return post.mentions
+      .map((m) => m.toString().trim().replace(/^@/, "").toLowerCase())
+      .filter(Boolean)
+      .sort()
+      .join("|");
+  }, [post?.mentions]);
+
+  useEffect(() => {
+    if (!mentionLookupKey) {
+      setCaptionMentionMap({});
+      return;
+    }
+
+    const baseMap: Record<string, string> = {};
+    if (viewer?.username && viewerUserId) {
+      baseMap[viewer.username.toLowerCase()] = String(viewerUserId);
+    }
+
+    if (!token) {
+      setCaptionMentionMap(baseMap);
+      return;
+    }
+
+    let cancelled = false;
+    const handles = mentionLookupKey.split("|").filter(Boolean).slice(0, 20);
+
+    setCaptionMentionMap(baseMap);
+
+    (async () => {
+      const results = await Promise.all(
+        handles.map(async (handle) => {
+          try {
+            const res = await searchProfiles({
+              token,
+              query: handle,
+              limit: 5,
+            });
+            const exact = res.items.find(
+              (item) => item.username?.toLowerCase() === handle,
+            );
+            const id = exact?.userId || exact?.id;
+            return id ? [handle, String(id)] : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      if (cancelled) return;
+      const nextMap: Record<string, string> = { ...baseMap };
+      results.forEach((entry) => {
+        if (!entry) return;
+        nextMap[entry[0]] = entry[1];
+      });
+      setCaptionMentionMap(nextMap);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mentionLookupKey, token]);
+
+  useEffect(() => {
+    if (!viewer?.username || !viewerUserId) return;
+    const key = viewer.username.toLowerCase();
+    const value = String(viewerUserId);
+    setCaptionMentionMap((prev) => {
+      if (prev[key] === value) return prev;
+      return { ...prev, [key]: value };
+    });
+  }, [viewer?.username, viewerUserId]);
+
   const captionNodes = useMemo(() => {
     if (!post?.content) return null;
     const content = post.content;
@@ -3234,14 +3311,15 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       const token = match[0];
       if (token.startsWith("@")) {
         const handle = token.slice(1);
+        const handleKey = handle.toLowerCase();
         const canLink =
-          normalizedMentions.size === 0 ||
-          normalizedMentions.has(handle.toLowerCase());
-        if (canLink) {
+          normalizedMentions.size === 0 || normalizedMentions.has(handleKey);
+        const targetId = captionMentionMap[handleKey];
+        if (canLink && targetId) {
           parts.push(
             <a
               key={`${handle}-${start}`}
-              href={`/profiles/${handle}`}
+              href={`/profile/${encodeURIComponent(targetId)}`}
               className={feedStyles.mentionLink}
             >
               {token}
@@ -3275,7 +3353,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       pushText(content.slice(lastIndex), `text-tail-${lastIndex}`);
     }
     return parts;
-  }, [post?.content, post?.mentions, post?.hashtags]);
+  }, [post?.content, post?.mentions, post?.hashtags, captionMentionMap]);
 
   useEffect(() => {
     if (commentsLocked) {
@@ -4378,7 +4456,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                           className={styles.likePeekPopover}
                           onMouseEnter={handleLikePeekEnter}
                           onMouseLeave={handleLikePeekLeave}
-                        > 
+                        >
                           {likePeekState.loading ? (
                             <div className={styles.likePeekState}>Loading…</div>
                           ) : null}

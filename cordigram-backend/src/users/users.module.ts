@@ -12,6 +12,7 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { BlocksService } from './blocks.service';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: UserTasteProfile.name, schema: UserTasteProfileSchema },
     ]),
     forwardRef(() => AuthModule),
+    NotificationsModule,
   ],
   controllers: [UsersController],
   providers: [UsersService, BlocksService],

@@ -1,8 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Document, Types } from 'mongoose';
 
-export type NotificationType = 'post_like' | 'post_comment';
 import type { PostKind } from '../posts/post.schema';
+
+export type NotificationType =
+  | 'post_like'
+  | 'post_comment'
+  | 'post_mention'
+  | 'follow';
 
 @Schema({ timestamps: true })
 export class Notification extends Document {
@@ -35,7 +40,7 @@ export class Notification extends Document {
 
   @Prop({
     type: String,
-    enum: ['post_like', 'post_comment'],
+    enum: ['post_like', 'post_comment', 'post_mention', 'follow'],
     index: true,
     required: true,
   })
@@ -49,6 +54,15 @@ export class Notification extends Document {
 
   @Prop({ type: [mongoose.Schema.Types.ObjectId], ref: 'User', default: [] })
   commentActorIds: Types.ObjectId[];
+
+  @Prop({ type: Number, default: 0 })
+  mentionCount: number;
+
+  @Prop({ type: [mongoose.Schema.Types.ObjectId], ref: 'User', default: [] })
+  mentionActorIds: Types.ObjectId[];
+
+  @Prop({ type: String, enum: ['post', 'comment'], default: 'post' })
+  mentionSource: 'post' | 'comment';
 
   @Prop({ type: Date, default: null })
   readAt: Date | null;
@@ -68,5 +82,12 @@ NotificationSchema.index(
   {
     unique: true,
     partialFilterExpression: { postId: { $ne: null } },
+  },
+);
+NotificationSchema.index(
+  { recipientId: 1, actorId: 1, type: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { postId: null, type: 'follow' },
   },
 );

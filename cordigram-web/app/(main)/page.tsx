@@ -32,10 +32,12 @@ import {
   unfollowUser,
   updatePostVisibility,
   updatePost,
+  fetchCurrentProfile,
   searchProfiles,
   searchPosts,
   type ProfileSearchItem,
   type FeedItem,
+  type CurrentProfileResponse,
 } from "@/lib/api";
 import PeopleYouMayKnow from "@/ui/people-you-may-know/people-you-may-know";
 import { formatDistanceToNow } from "date-fns";
@@ -453,6 +455,8 @@ export default function HomePage({
       ? undefined
       : getUserIdFromToken(localStorage.getItem("accessToken")),
   );
+  const [viewerProfile, setViewerProfile] =
+    useState<CurrentProfileResponse | null>(null);
   const viewTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
@@ -502,6 +506,16 @@ export default function HomePage({
     if (typeof window === "undefined") return null;
     return localStorage.getItem("accessToken");
   }, []);
+
+  useEffect(() => {
+    if (!token) {
+      setViewerProfile(null);
+      return;
+    }
+    fetchCurrentProfile({ token })
+      .then(setViewerProfile)
+      .catch(() => setViewerProfile(null));
+  }, [token]);
 
   useScrollRestoration(
     "feed-scroll",
@@ -1320,6 +1334,7 @@ export default function HomePage({
             onView={onView}
             onBlockUser={onBlockIntent}
             viewerId={viewerId}
+            viewerUsername={viewerProfile?.username}
             onFollow={onFollow}
             token={token}
             onRemoteUpdate={onRemoteUpdate}
@@ -1579,6 +1594,7 @@ function FeedCard({
   onView,
   onBlockUser,
   viewerId,
+  viewerUsername,
   onFollow,
   token,
   onRemoteUpdate,
@@ -1602,6 +1618,7 @@ function FeedCard({
   onView: (postId: string, durationMs?: number) => void;
   onBlockUser: (userId?: string, label?: string) => void | Promise<void>;
   viewerId?: string;
+  viewerUsername?: string;
   onFollow: (authorId: string, nextFollow: boolean) => void;
   token: string | null;
   onRemoteUpdate: (postId: string, patch: FeedRemotePatch) => void;
@@ -1654,6 +1671,9 @@ function FeedCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mentionsKey],
   );
+  const [captionMentionMap, setCaptionMentionMap] = useState<
+    Record<string, string>
+  >({});
   const locationKey =
     typeof location === "string" ? location : (location as any)?.label;
   const stableLocation = typeof locationKey === "string" ? locationKey : "";
@@ -1666,6 +1686,74 @@ function FeedCard({
   const lastViewAt = useRef<number>(0);
   const router = useRouter();
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const mentionLookupKey = useMemo(() => {
+    const handles = new Set<string>();
+    stableMentions.forEach((m) => {
+      const handle = m.toString().trim().replace(/^@/, "").toLowerCase();
+      if (handle) handles.add(handle);
+    });
+    extractMentionsFromCaption(content || "").forEach((h) => handles.add(h));
+    if (!handles.size) return "";
+    return Array.from(handles).sort().join("|");
+  }, [mentionsKey, content]);
+
+  useEffect(() => {
+    if (!mentionLookupKey) {
+      setCaptionMentionMap({});
+      return;
+    }
+    if (!token) {
+      setCaptionMentionMap({});
+      return;
+    }
+
+    let cancelled = false;
+    const handles = mentionLookupKey.split("|").filter(Boolean).slice(0, 20);
+
+    (async () => {
+      const results = await Promise.all(
+        handles.map(async (handle) => {
+          try {
+            const res = await searchProfiles({
+              token,
+              query: handle,
+              limit: 5,
+            });
+            const exact = res.items.find(
+              (item) => item.username?.toLowerCase() === handle,
+            );
+            const id = exact?.userId || exact?.id;
+            return id ? [handle, String(id)] : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      if (cancelled) return;
+      const nextMap: Record<string, string> = {};
+      results.forEach((entry) => {
+        if (!entry) return;
+        nextMap[entry[0]] = entry[1];
+      });
+      setCaptionMentionMap(nextMap);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mentionLookupKey, token]);
+
+  useEffect(() => {
+    if (!viewerUsername || !viewerId) return;
+    const key = viewerUsername.toLowerCase();
+    const value = String(viewerId);
+    setCaptionMentionMap((prev) => {
+      if (prev[key] === value) return prev;
+      return { ...prev, [key]: value };
+    });
+  }, [viewerUsername, viewerId]);
 
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
@@ -2543,14 +2631,21 @@ function FeedCard({
       if (token.startsWith("@")) {
         const handle = token.slice(1);
         const display = `@${handle}`;
+        const handleKey = handle.toLowerCase();
         const canLink =
-          normalizedMentions.size === 0 ||
-          normalizedMentions.has(handle.toLowerCase());
-        if (canLink) {
+          normalizedMentions.size === 0 || normalizedMentions.has(handleKey);
+        const selfId =
+          viewerUsername &&
+          viewerId &&
+          viewerUsername.toLowerCase() === handleKey
+            ? String(viewerId)
+            : undefined;
+        const targetId = captionMentionMap[handleKey] || selfId;
+        if (canLink && targetId) {
           parts.push(
             <a
               key={`${handle}-${start}`}
-              href={`/profiles/${handle}`}
+              href={`/profile/${encodeURIComponent(targetId)}`}
               className={styles.mentionLink}
             >
               {display}
@@ -2585,7 +2680,7 @@ function FeedCard({
       pushText(content.slice(lastIndex), `text-tail-${lastIndex}`);
     }
     return parts;
-  }, [content, mentionsKey, hashtagsKey]);
+  }, [content, mentionsKey, hashtagsKey, captionMentionMap]);
 
   const captionMeasureKey = useMemo(
     () => `${content}\u0001${mentionsKey}\u0001${hashtagsKey}`,
