@@ -154,4 +154,20 @@ export class UsersController {
       cursor: cursor || undefined,
     });
   }
+
+  @Get(':id/is-following')
+  async isFollowing(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('id') targetUserId: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const isFollowing = await this.usersService.isFollowing(
+      userId,
+      targetUserId,
+    );
+    return { isFollowing };
+  }
 }

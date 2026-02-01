@@ -126,4 +126,16 @@ export class ConfigService {
   get googleCallbackUrl(): string {
     return this.require('GOOGLE_CALLBACK_URL');
   }
+
+  get livekitApiKey(): string {
+    return this.require('LIVEKIT_API_KEY');
+  }
+
+  get livekitApiSecret(): string {
+    return this.require('LIVEKIT_API_SECRET');
+  }
+
+  get livekitUrl(): string {
+    return this.require('NEXT_PUBLIC_LIVEKIT_URL');
+  }
 }

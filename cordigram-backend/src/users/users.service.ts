@@ -860,6 +860,23 @@ export class UsersService {
     return { following: false };
   }
 
+  async isFollowing(userId: string, targetUserId: string) {
+    if (userId === targetUserId) {
+      return false;
+    }
+
+    const followerId = this.asObjectId(userId, 'userId');
+    const followeeId = this.asObjectId(targetUserId, 'targetUserId');
+
+    const follow = await this.followModel
+      .findOne({ followerId, followeeId })
+      .select('_id')
+      .lean()
+      .exec();
+
+    return Boolean(follow?._id);
+  }
+
   private asObjectId(id: string, field: string): Types.ObjectId {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException(`Invalid ${field}`);

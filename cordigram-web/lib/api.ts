@@ -1863,6 +1863,300 @@ export async function createReportProblem(opts: {
   return (await res.json()) as CreateReportProblemResponse;
 }
 
+export async function getDirectMessages(
+  userId: string,
+  opts?: { token?: string; limit?: number; skip?: number },
+): Promise<any[]> {
+  const token =
+    opts?.token ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("token");
+  const limit = opts?.limit || 50;
+  const skip = opts?.skip || 0;
+
+  return apiFetch<any[]>({
+    path: `/direct-messages/conversation/${userId}?limit=${limit}&skip=${skip}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function sendDirectMessage(
+  receiverId: string,
+  opts: {
+    token?: string;
+    content?: string;
+    attachments?: string[];
+    type?: "text" | "gif" | "sticker" | "voice";
+    giphyId?: string;
+    voiceUrl?: string;
+    voiceDuration?: number;
+  },
+): Promise<any> {
+  const token =
+    opts.token ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("token");
+
+  return apiFetch<any>({
+    path: `/direct-messages/${receiverId}`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      content: opts.content || "",
+      attachments: opts.attachments || [],
+      type: opts.type || "text",
+      giphyId: opts.giphyId || undefined,
+      voiceUrl: opts.voiceUrl || undefined,
+      voiceDuration: opts.voiceDuration || undefined,
+    }),
+  });
+}
+
+export async function getAvailableUsers(opts?: {
+  token?: string;
+}): Promise<any[]> {
+  const token =
+    opts?.token ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("token");
+
+  return apiFetch<any[]>({
+    path: `/direct-messages/available-users/list`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+// Upload media response type
+export type UploadMediaResponse = {
+  folder: string;
+  url: string;
+  secureUrl: string;
+  publicId: string;
+  resourceType: string; // 'image' or 'video'
+  bytes: number;
+  format?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+};
+
+// Upload media (image/video) for messages
+export async function uploadMedia(opts: {
+  token: string;
+  file: File;
+}): Promise<UploadMediaResponse> {
+  const { token, file } = opts;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${apiBaseUrl}/posts/upload`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to upload media");
+  }
+
+  return response.json();
+}
+
+// Upload multiple media files
+export async function uploadMediaBatch(opts: {
+  token: string;
+  files: File[];
+}): Promise<Array<UploadMediaResponse>> {
+  const { token, files } = opts;
+
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append("files", file);
+  });
+
+  const response = await fetch(`${apiBaseUrl}/posts/upload/batch`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to upload media");
+  }
+
+  return response.json();
+}
+
+// ==================== Polls API ====================
+
+export interface Poll {
+  _id: string;
+  creatorId: {
+    _id: string;
+    username: string;
+    displayName?: string;
+    avatarUrl?: string;
+  };
+  question: string;
+  options: string[];
+  durationHours: number;
+  allowMultipleAnswers: boolean;
+  expiresAt: string;
+  votes: Array<{
+    userId: string;
+    optionIndex: number;
+    votedAt: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PollResults {
+  _id: string;
+  question: string;
+  options: string[];
+  allowMultipleAnswers: boolean;
+  results: Array<{
+    option: string;
+    voteCount: number;
+    percentage: number;
+  }>;
+  totalVotes: number;
+  uniqueVoters: number;
+  expiresAt: string;
+  hoursLeft: number;
+  isExpired: boolean;
+  creatorId: any;
+}
+
+export async function createPoll(opts: {
+  token: string;
+  question: string;
+  options: string[];
+  durationHours?: number;
+  allowMultipleAnswers?: boolean;
+}): Promise<Poll> {
+  const { token, ...data } = opts;
+
+  const response = await fetch(`${apiBaseUrl}/polls`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to create poll");
+  }
+
+  return response.json();
+}
+
+export async function getPoll(opts: {
+  token: string;
+  pollId: string;
+}): Promise<Poll> {
+  const { token, pollId } = opts;
+
+  const response = await fetch(`${apiBaseUrl}/polls/${pollId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to get poll");
+  }
+
+  return response.json();
+}
+
+export async function votePoll(opts: {
+  token: string;
+  pollId: string;
+  optionIndexes: number[];
+}): Promise<Poll> {
+  const { token, pollId, optionIndexes } = opts;
+
+  const response = await fetch(`${apiBaseUrl}/polls/${pollId}/vote`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ optionIndexes }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to vote");
+  }
+
+  return response.json();
+}
+
+export async function getPollResults(opts: {
+  token: string;
+  pollId: string;
+}): Promise<PollResults> {
+  const { token, pollId } = opts;
+
+  const response = await fetch(`${apiBaseUrl}/polls/${pollId}/results`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to get results");
+  }
+
+  return response.json();
+}
+
+export async function getMyVote(opts: {
+  token: string;
+  pollId: string;
+}): Promise<number[]> {
+  const { token, pollId } = opts;
+
+  const response = await fetch(`${apiBaseUrl}/polls/${pollId}/my-vote`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to get vote");
+  }
+
+  return response.json();
+}
+
 export function getApiBaseUrl(): string {
   return apiBaseUrl;
 }

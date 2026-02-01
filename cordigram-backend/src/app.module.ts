@@ -18,6 +18,12 @@ import { CompaniesModule } from './companies/companies.module';
 import { HashtagsModule } from './hashtags/hashtags.module';
 import { SearchModule } from './search/search.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ServersModule } from './servers/servers.module';
+import { ChannelsModule } from './channels/channels.module';
+import { MessagesModule } from './messages/messages.module';
+import { DirectMessagesModule } from './direct-messages/direct-messages.module';
+import { PollsModule } from './polls/polls.module';
+import { LivekitModule } from './livekit/livekit.module';
 
 @Module({
   imports: [
@@ -38,6 +44,12 @@ import { NotificationsModule } from './notifications/notifications.module';
     ReportPostModule,
     ReportCommentModule,
     NotificationsModule,
+    ServersModule,
+    ChannelsModule,
+    MessagesModule,
+    DirectMessagesModule,
+    PollsModule,
+    LivekitModule,
   ],
   controllers: [AppController],
   providers: [AppService],

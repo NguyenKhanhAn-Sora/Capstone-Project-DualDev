@@ -19,8 +19,10 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: config.frontendUrl,
+    origin: [config.frontendUrl, 'http://localhost:3000'],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-device-info'],
   });
 
   await app.listen(config.port, () => {
