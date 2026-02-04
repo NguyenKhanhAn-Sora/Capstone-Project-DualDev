@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import EmojiPicker from "emoji-picker-react";
 import styles from "./create.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { DateSelect } from "@/ui/date-select/date-select";
+import { TimeSelect } from "@/ui/time-select/time-select";
 import {
   createPost,
   createReel,
@@ -75,6 +77,38 @@ const normalizeHashtag = (value: string) =>
     .replace(/\s+/g, "")
     .replace(/[^a-zA-Z0-9_]/g, "")
     .toLowerCase();
+
+const formatLocalDate = (value: Date) => {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatLocalTime = (value: Date) => {
+  const hours = String(value.getHours()).padStart(2, "0");
+  const minutes = String(value.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+};
+
+const splitSchedule = (value: string) => {
+  if (!value) return { date: "", time: "" };
+  const [date, time = ""] = value.split("T");
+  return { date, time: time.slice(0, 5) };
+};
+
+const buildSchedule = (date: string, time: string) =>
+  date && time ? `${date}T${time}` : "";
+
+const clampTimeForDate = (date: string, time: string) => {
+  if (!date) return time;
+  const now = new Date();
+  const today = formatLocalDate(now);
+  if (date !== today) return time;
+  const minTime = formatLocalTime(now);
+  if (!time || time < minTime) return minTime;
+  return time;
+};
 
 const cleanLocationLabel = (label: string) =>
   label
@@ -180,6 +214,13 @@ export default function CreatePostPage() {
       audienceOptions[0],
     [form.audience],
   );
+
+  const scheduleParts = useMemo(
+    () => splitSchedule(form.scheduledAt),
+    [form.scheduledAt],
+  );
+  const scheduledDate = scheduleParts.date;
+  const scheduledTime = scheduleParts.time;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -772,13 +813,6 @@ export default function CreatePostPage() {
     }
   };
 
-  const onScheduleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  };
-
   const onHashtagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
@@ -1292,7 +1326,7 @@ export default function CreatePostPage() {
                   <div className={styles.mentionSuggestions}>
                     {mentionLoading && (
                       <div className={styles.mentionSuggestionMuted}>
-                        Đang tìm người dùng...
+                        Searching users...
                       </div>
                     )}
                     {!mentionLoading &&
@@ -1342,7 +1376,7 @@ export default function CreatePostPage() {
                 )}
               </div>
               <p className={styles.helper}>
-                Gõ @ để tag bạn bè trực tiếp trong caption.
+                Type @ to tag friends directly in the caption.
               </p>
               {form.mentions.length > 0 && (
                 <div className={styles.chipShell}>
@@ -1425,7 +1459,7 @@ export default function CreatePostPage() {
                     <div className={styles.locationSuggestions}>
                       {locationLoading && (
                         <div className={styles.locationSuggestionMuted}>
-                          Đang tìm kiếm...
+                          Searching...
                         </div>
                       )}
                       {!locationLoading && locationSuggestions.length === 0 && (
@@ -1590,7 +1624,20 @@ export default function CreatePostPage() {
                     value="schedule"
                     checked={form.publishMode === "schedule"}
                     onChange={() =>
-                      setForm((prev) => ({ ...prev, publishMode: "schedule" }))
+                      setForm((prev) => {
+                        const now = new Date();
+                        const parts = splitSchedule(prev.scheduledAt);
+                        const nextDate = parts.date || formatLocalDate(now);
+                        const nextTime = clampTimeForDate(
+                          nextDate,
+                          parts.time || formatLocalTime(now),
+                        );
+                        return {
+                          ...prev,
+                          publishMode: "schedule",
+                          scheduledAt: buildSchedule(nextDate, nextTime),
+                        };
+                      })
                     }
                   />
                   <span>Schedule</span>
@@ -1601,19 +1648,73 @@ export default function CreatePostPage() {
               </div>
 
               {form.publishMode === "schedule" && (
-                <div className={styles.inputShell}>
-                  <input
-                    type="datetime-local"
-                    value={form.scheduledAt}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        scheduledAt: e.target.value,
-                      }))
-                    }
-                    onKeyDown={onScheduleKeyDown}
-                    min={new Date().toISOString().slice(0, 16)}
-                  />
+                <div className={styles.schedulerCard}>
+                  <div className={styles.schedulerHeader}>
+                    <div>
+                      <p className={styles.schedulerLabel}>Schedule</p>
+                      <p className={styles.schedulerTitle}>
+                        Choose date and time
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className={styles.schedulerGrid}>
+                    <div className={styles.schedulerField}>
+                      <label className={styles.schedulerFieldLabel}>Date</label>
+                      <DateSelect
+                        value={scheduledDate}
+                        minDate={new Date()}
+                        maxDate={null}
+                        minYear={new Date().getFullYear()}
+                        placeholder="mm/dd/yyyy"
+                        onChange={(next) => {
+                          if (!next) {
+                            setForm((prev) => ({
+                              ...prev,
+                              scheduledAt: "",
+                            }));
+                            return;
+                          }
+                          setForm((prev) => {
+                            const parts = splitSchedule(prev.scheduledAt);
+                            const nextTime = clampTimeForDate(
+                              next,
+                              parts.time || formatLocalTime(new Date()),
+                            );
+                            return {
+                              ...prev,
+                              scheduledAt: buildSchedule(next, nextTime),
+                            };
+                          });
+                        }}
+                      />
+                    </div>
+
+                    <div className={styles.schedulerField}>
+                      <label className={styles.schedulerFieldLabel}>Time</label>
+                      <TimeSelect
+                        value={scheduledTime}
+                        selectedDate={scheduledDate}
+                        minDateTime={new Date()}
+                        disabled={!scheduledDate}
+                        onChange={(next) => {
+                          setForm((prev) => {
+                            const parts = splitSchedule(prev.scheduledAt);
+                            if (!parts.date) return prev;
+                            const nextTime = clampTimeForDate(parts.date, next);
+                            return {
+                              ...prev,
+                              scheduledAt: buildSchedule(parts.date, nextTime),
+                            };
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <p className={styles.schedulerHint}>
+                    You can only select dates and times from now onward.
+                  </p>
                 </div>
               )}
             </div>

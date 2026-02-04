@@ -14,6 +14,7 @@ import { ReportProblemModule } from './reportproblem/reportproblem.module';
 import { CommentsModule } from './comment/comments.module';
 import { ReportPostModule } from './reportpost/reportpost.module';
 import { ReportCommentModule } from './reportcomment/reportcomment.module';
+import { ReportUserModule } from './reportuser/reportuser.module';
 import { CompaniesModule } from './companies/companies.module';
 import { HashtagsModule } from './hashtags/hashtags.module';
 import { SearchModule } from './search/search.module';
@@ -24,6 +25,7 @@ import { MessagesModule } from './messages/messages.module';
 import { DirectMessagesModule } from './direct-messages/direct-messages.module';
 import { PollsModule } from './polls/polls.module';
 import { LivekitModule } from './livekit/livekit.module';
+import { ActivityModule } from './activity/activity.module';
 
 @Module({
   imports: [
@@ -43,6 +45,7 @@ import { LivekitModule } from './livekit/livekit.module';
     ReportProblemModule,
     ReportPostModule,
     ReportCommentModule,
+    ReportUserModule,
     NotificationsModule,
     ServersModule,
     ChannelsModule,
@@ -50,6 +53,7 @@ import { LivekitModule } from './livekit/livekit.module';
     DirectMessagesModule,
     PollsModule,
     LivekitModule,
+    ActivityModule,
   ],
   controllers: [AppController],
   providers: [AppService],

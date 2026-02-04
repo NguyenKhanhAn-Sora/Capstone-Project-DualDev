@@ -3,18 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../login/login.module.css";
-import {
-  apiFetch,
-  requestPasswordReset,
-  resetPassword,
-  verifyResetOtp,
-  fetchCurrentProfile,
-} from "@/lib/api";
-import { setStoredAccessToken } from "@/lib/auth";
-
-const RECENT_ACCOUNTS_KEY = "recentAccounts";
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
+import { requestPasswordReset, resetPassword, verifyResetOtp } from "@/lib/api";
 const EyeIcon = ({ open }: { open: boolean }) => (
   <svg
     aria-hidden
@@ -74,7 +63,7 @@ export default function ForgotPasswordPage() {
       setMessage("OTP sent. Please check your inbox.");
     } catch (err) {
       const apiErr = err as { message?: string };
-      setError(apiErr?.message || "Không gửi được OTP, thử lại.");
+      setError(apiErr?.message || "Unable to send OTP, please try again.");
     } finally {
       setLoading(false);
     }
@@ -92,7 +81,7 @@ export default function ForgotPasswordPage() {
       setMessage("OTP verified. Set your new password.");
     } catch (err) {
       const apiErr = err as { message?: string };
-      setError(apiErr?.message || "OTP không hợp lệ, thử lại.");
+      setError(apiErr?.message || "Invalid OTP, please try again.");
     } finally {
       setLoading(false);
     }
@@ -110,58 +99,8 @@ export default function ForgotPasswordPage() {
         otp: otp.trim(),
         newPassword: newPassword.trim(),
       });
-      setMessage("Password updated. Signing you in...");
-
-      try {
-        const loginRes = await apiFetch<{ accessToken: string }>({
-          path: "/auth/login",
-          method: "POST",
-          body: JSON.stringify({
-            email: email.trim().toLowerCase(),
-            password: newPassword.trim(),
-          }),
-          credentials: "include",
-        });
-        setStoredAccessToken(loginRes.accessToken);
-
-        // đồng bộ recent account để màn login hiển thị đúng
-        try {
-          const profile = await fetchCurrentProfile({
-            token: loginRes.accessToken,
-          });
-          const normalizedEmail = email.trim().toLowerCase();
-          if (
-            emailRegex.test(normalizedEmail) &&
-            typeof window !== "undefined"
-          ) {
-            const raw = window.localStorage.getItem(RECENT_ACCOUNTS_KEY);
-            const parsed = raw ? (JSON.parse(raw) as any[]) : [];
-            const filtered = Array.isArray(parsed)
-              ? parsed.filter((item) => item?.email !== normalizedEmail)
-              : [];
-            const next = [
-              {
-                email: normalizedEmail,
-                username: profile.username,
-                displayName: profile.displayName,
-                avatarUrl: profile.avatarUrl,
-                lastUsed: Date.now(),
-              },
-              ...filtered,
-            ].slice(0, 6);
-            window.localStorage.setItem(
-              RECENT_ACCOUNTS_KEY,
-              JSON.stringify(next),
-            );
-          }
-        } catch (_err) {
-          // ignore recent-account update failure
-        }
-        setTimeout(() => router.push("/"), 300);
-      } catch (_err) {
-        setMessage("Password updated. Please sign in again.");
-        setTimeout(() => router.push("/login"), 500);
-      }
+      setMessage("Password updated. Redirecting to login...");
+      setTimeout(() => router.push("/login"), 500);
     } catch (err) {
       const apiErr = err as { message?: string };
       setError(apiErr?.message || "Password reset failed, please try again.");

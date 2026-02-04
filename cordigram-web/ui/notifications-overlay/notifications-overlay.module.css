@@ -187,14 +187,17 @@
 
 .listItem {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   gap: 12px;
   padding: 10px 12px;
+  padding-right: 30px;
   border-radius: 14px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
+  position: relative;
+  z-index: 0;
   transition:
     background 0.12s ease,
     border-color 0.12s ease;
@@ -203,6 +206,11 @@
 .listItem:hover {
   background: rgba(88, 135, 255, 0.08);
   border-color: rgba(88, 135, 255, 0.2);
+  z-index: 2;
+}
+
+.listItemMenuOpen {
+  z-index: 3;
 }
 
 .listItemUnread {
@@ -262,5 +270,297 @@
   border-radius: 50%;
   background: rgba(88, 135, 255, 0.9);
   box-shadow: 0 0 0 4px rgba(88, 135, 255, 0.18);
-  align-self: center;
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  transition: opacity 0.12s ease;
+}
+
+.listItem:hover .itemDot {
+  opacity: 0;
+}
+
+.listItemMenuOpen .itemDot {
+  opacity: 0;
+}
+
+.itemActions {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 58px;
+}
+
+.itemMenuButton {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.listItem:hover .itemMenuButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.itemMenuButtonVisible {
+  opacity: 1;
+  pointer-events: auto;
+  background: rgba(109, 220, 255, 0.12);
+  border-color: rgba(127, 155, 255, 0.35);
+  color: var(--color-title-primary);
+}
+
+.itemMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 180px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(10, 18, 40, 0.18);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.itemMenuItem {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.itemMenuItem:hover {
+  background: rgba(109, 220, 255, 0.12);
+}
+
+.itemMenuDanger {
+  color: #ef4444;
+}
+
+.detailBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 18, 40, 0.35);
+  display: grid;
+  place-items: center;
+  z-index: 2400;
+}
+
+.detailCard {
+  width: min(360px, 90vw);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.detailHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detailTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.detailClose {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.detailBody {
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-text-muted);
+}
+
+.detailRow span:last-child {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.muteBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 18, 40, 0.35);
+  display: grid;
+  place-items: center;
+  z-index: 2400;
+}
+
+.muteCard {
+  width: min(420px, 92vw);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.muteHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.muteTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.muteBody {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.muteClose {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.muteOptionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.muteOption {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: left;
+}
+
+.muteOptionActive {
+  color: var(--color-title-primary);
+  border-color: rgba(127, 155, 255, 0.55);
+  background: rgba(109, 220, 255, 0.14);
+}
+
+.muteOptionTitle {
+  display: block;
+}
+
+.muteCustomRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mutePicker {
+  display: grid;
+  gap: 6px;
+}
+
+.muteLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.muteError {
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.muteActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.mutePrimary {
+  border: 1px solid rgba(109, 220, 255, 0.45);
+  background: rgba(109, 220, 255, 0.2);
+  color: var(--color-title-primary);
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.muteSecondary {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .muteCustomRow {
+    grid-template-columns: 1fr;
+  }
 }

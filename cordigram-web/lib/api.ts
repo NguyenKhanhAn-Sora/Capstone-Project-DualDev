@@ -31,14 +31,27 @@ async function toJson<T>(res: Response): Promise<T> {
 export async function apiFetch<T = unknown>(options: FetchOptions): Promise<T> {
   const { path, headers, ...rest } = options;
   const url = `${apiBaseUrl}${path.startsWith("/") ? "" : "/"}${path}`;
+  const deviceId =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("cordigramDeviceId")
+      : null;
+  const mergedHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(headers || {}),
+  } as Record<string, string>;
+  if (deviceId && !mergedHeaders["x-device-id"]) {
+    mergedHeaders["x-device-id"] = deviceId;
+  }
 
   const res = await fetch(url, {
     ...rest,
-    headers: {
-      "Content-Type": "application/json",
-      ...(headers || {}),
-    },
+    headers: mergedHeaders,
   });
+
+  if (res.status === 401 && typeof window !== "undefined") {
+    window.localStorage.removeItem("accessToken");
+    window.location.href = "/login";
+  }
 
   if (!res.ok) {
     const payload: { message?: string } & Record<string, unknown> =
@@ -107,6 +120,8 @@ export type CreatePostResponse = {
   status: "published" | "scheduled";
   scheduledAt?: string | null;
   publishedAt?: string | null;
+  notificationsMutedUntil?: string | null;
+  notificationsMutedIndefinitely?: boolean;
   stats: {
     hearts: number;
     comments: number;
@@ -189,6 +204,10 @@ export type FeedItem = CreatePostResponse & {
     following?: boolean;
     reposted?: boolean;
   };
+};
+
+export type HiddenPostItem = FeedItem & {
+  hiddenAt?: string | null;
 };
 
 export type UpdateVisibilityResponse = {
@@ -788,6 +807,43 @@ export async function hidePost(opts: {
   });
 }
 
+export async function unhidePost(opts: {
+  token: string;
+  postId: string;
+}): Promise<{ hidden: boolean }> {
+  const { token, postId } = opts;
+  return apiFetch<{ hidden: boolean }>({
+    path: `/posts/${postId}/hide`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export type HiddenPostsResponse = {
+  items: HiddenPostItem[];
+};
+
+export async function fetchHiddenPosts(opts: {
+  token: string;
+  limit?: number;
+}): Promise<HiddenPostsResponse> {
+  const { token, limit } = opts;
+  const query = new URLSearchParams();
+  if (typeof limit === "number") {
+    query.set("limit", String(limit));
+  }
+  const qs = query.toString();
+  return apiFetch<HiddenPostsResponse>({
+    path: `/posts/hidden${qs ? `?${qs}` : ""}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 type ReportCategoryKey =
   | "abuse"
   | "violence"
@@ -903,6 +959,30 @@ export async function setPostHideLikeCount(opts: {
   });
 }
 
+export type PostNotificationMuteResponse = {
+  enabled: boolean;
+  mutedUntil: string | null;
+  mutedIndefinitely: boolean;
+};
+
+export async function updatePostNotificationMute(opts: {
+  token: string;
+  postId: string;
+  enabled?: boolean;
+  mutedUntil?: string | null;
+  mutedIndefinitely?: boolean;
+}): Promise<PostNotificationMuteResponse> {
+  const { token, postId, enabled, mutedUntil, mutedIndefinitely } = opts;
+  return apiFetch<PostNotificationMuteResponse>({
+    path: `/posts/${postId}/notifications/mute`,
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ enabled, mutedUntil, mutedIndefinitely }),
+  });
+}
+
 export async function followUser(opts: {
   token: string;
   userId: string;
@@ -939,6 +1019,103 @@ export async function unblockUser(opts: {
   return apiFetch<{ blocked: boolean }>({
     path: `/users/${userId}/block`,
     method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export type BlockedUserItem = {
+  userId: string;
+  username?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  blockedAt?: string | null;
+};
+
+export type BlockedUsersResponse = {
+  items: BlockedUserItem[];
+};
+
+export type ActivityType =
+  | "post_like"
+  | "comment_like"
+  | "comment"
+  | "repost"
+  | "save"
+  | "follow"
+  | "report_post"
+  | "report_user";
+
+export type ActivityItem = {
+  id: string;
+  type: ActivityType;
+  postId?: string | null;
+  commentId?: string | null;
+  targetUserId?: string | null;
+  postKind?: "post" | "reel" | null;
+  meta?: {
+    postCaption?: string | null;
+    postMediaUrl?: string | null;
+    postAuthorId?: string | null;
+    postAuthorDisplayName?: string | null;
+    postAuthorUsername?: string | null;
+    postAuthorAvatarUrl?: string | null;
+    commentSnippet?: string | null;
+    targetDisplayName?: string | null;
+    targetUsername?: string | null;
+    targetAvatarUrl?: string | null;
+    reportCategory?: string | null;
+    reportReason?: string | null;
+  } | null;
+  createdAt?: string | null;
+};
+
+export type ActivityLogResponse = {
+  items: ActivityItem[];
+  nextCursor: string | null;
+};
+
+export async function fetchBlockedUsers(opts: {
+  token: string;
+  limit?: number;
+}): Promise<BlockedUsersResponse> {
+  const { token, limit } = opts;
+  const query = new URLSearchParams();
+  if (typeof limit === "number") {
+    query.set("limit", String(limit));
+  }
+  const qs = query.toString();
+  return apiFetch<BlockedUsersResponse>({
+    path: `/users/blocked${qs ? `?${qs}` : ""}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchActivityLog(opts: {
+  token: string;
+  limit?: number;
+  cursor?: string | null;
+  types?: ActivityType[];
+}): Promise<ActivityLogResponse> {
+  const { token, limit, cursor, types } = opts;
+  const query = new URLSearchParams();
+  if (typeof limit === "number") {
+    query.set("limit", String(limit));
+  }
+  if (cursor) {
+    query.set("cursor", cursor);
+  }
+  if (types?.length) {
+    query.set("type", types.join(","));
+  }
+  const qs = query.toString();
+  return apiFetch<ActivityLogResponse>({
+    path: `/users/activity${qs ? `?${qs}` : ""}`,
+    method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -1093,11 +1270,36 @@ export type UpdateAvatarResponse = {
 
 export type UserSettingsResponse = {
   theme: "light" | "dark";
+  language?: "en" | "vi";
+};
+
+export type NotificationCategoryKey =
+  | "follow"
+  | "comment"
+  | "like"
+  | "mentions";
+
+export type NotificationCategorySettings = {
+  enabled: boolean;
+  mutedUntil: string | null;
+  mutedIndefinitely: boolean;
+};
+
+export type NotificationSettingsResponse = {
+  enabled: boolean;
+  mutedUntil: string | null;
+  mutedIndefinitely: boolean;
+  categories: Record<NotificationCategoryKey, NotificationCategorySettings>;
 };
 
 export type NotificationItem = {
   id: string;
-  type: "post_like" | "post_comment" | "post_mention" | "follow";
+  type:
+    | "post_like"
+    | "post_comment"
+    | "post_mention"
+    | "follow"
+    | "login_alert";
   actor: {
     id: string;
     displayName: string;
@@ -1106,6 +1308,9 @@ export type NotificationItem = {
   };
   postId: string | null;
   postKind: "post" | "reel";
+  isOwnPost?: boolean;
+  postMutedUntil?: string | null;
+  postMutedIndefinitely?: boolean;
   likeCount: number;
   commentCount: number;
   mentionCount: number;
@@ -1113,6 +1318,14 @@ export type NotificationItem = {
   readAt: string | null;
   createdAt: string;
   activityAt: string;
+  deviceInfo?: string;
+  deviceType?: string;
+  os?: string;
+  browser?: string;
+  location?: string;
+  ip?: string;
+  deviceIdHash?: string;
+  loginAt?: string | null;
 };
 
 export type NotificationListResponse = {
@@ -1129,6 +1342,14 @@ export type NotificationReadAllResponse = {
 
 export type NotificationReadResponse = {
   updated: boolean;
+};
+
+export type NotificationUnreadResponse = {
+  updated: boolean;
+};
+
+export type NotificationDeleteResponse = {
+  deleted: boolean;
 };
 
 export type RecentAccountResponse = {
@@ -1212,15 +1433,123 @@ export async function fetchUserSettings(opts: {
 export async function updateUserSettings(opts: {
   token: string;
   theme?: "light" | "dark";
+  language?: "en" | "vi";
 }): Promise<UserSettingsResponse> {
-  const { token, theme } = opts;
+  const { token, theme, language } = opts;
   return apiFetch<UserSettingsResponse>({
     path: "/users/settings",
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ theme }),
+    body: JSON.stringify({ theme, language }),
+  });
+}
+
+export async function fetchNotificationSettings(opts: {
+  token: string;
+}): Promise<NotificationSettingsResponse> {
+  const { token } = opts;
+  return apiFetch<NotificationSettingsResponse>({
+    path: "/users/notifications/settings",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function updateNotificationSettings(opts: {
+  token: string;
+  category?: NotificationCategoryKey;
+  enabled?: boolean;
+  mutedUntil?: string | null;
+  mutedIndefinitely?: boolean;
+}): Promise<NotificationSettingsResponse> {
+  const { token, category, enabled, mutedUntil, mutedIndefinitely } = opts;
+  return apiFetch<NotificationSettingsResponse>({
+    path: "/users/notifications/settings",
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      category,
+      enabled,
+      mutedUntil,
+      mutedIndefinitely,
+    }),
+  });
+}
+
+export type ChangeEmailOtpResponse = {
+  expiresSec: number;
+};
+
+export type ChangeEmailVerifyResponse = {
+  verified?: boolean;
+  updated?: boolean;
+  email?: string;
+  accessToken?: string;
+};
+
+export async function requestChangeEmailCurrentOtp(opts: {
+  token: string;
+  password: string;
+}): Promise<ChangeEmailOtpResponse> {
+  const { token, password } = opts;
+  return apiFetch<ChangeEmailOtpResponse>({
+    path: "/users/email-change/request-current-otp",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ password }),
+  });
+}
+
+export async function verifyChangeEmailCurrentOtp(opts: {
+  token: string;
+  code: string;
+}): Promise<ChangeEmailVerifyResponse> {
+  const { token, code } = opts;
+  return apiFetch<ChangeEmailVerifyResponse>({
+    path: "/users/email-change/verify-current-otp",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ code }),
+  });
+}
+
+export async function requestChangeEmailNewOtp(opts: {
+  token: string;
+  newEmail: string;
+}): Promise<ChangeEmailOtpResponse> {
+  const { token, newEmail } = opts;
+  return apiFetch<ChangeEmailOtpResponse>({
+    path: "/users/email-change/request-new-otp",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ newEmail }),
+  });
+}
+
+export async function verifyChangeEmailNewOtp(opts: {
+  token: string;
+  code: string;
+}): Promise<ChangeEmailVerifyResponse> {
+  const { token, code } = opts;
+  return apiFetch<ChangeEmailVerifyResponse>({
+    path: "/users/email-change/verify-new-otp",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ code }),
   });
 }
 
@@ -1275,6 +1604,34 @@ export async function markNotificationRead(opts: {
   return apiFetch<NotificationReadResponse>({
     path: `/notifications/${notificationId}/read`,
     method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function markNotificationUnread(opts: {
+  token: string;
+  notificationId: string;
+}): Promise<NotificationUnreadResponse> {
+  const { token, notificationId } = opts;
+  return apiFetch<NotificationUnreadResponse>({
+    path: `/notifications/${notificationId}/unread`,
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function deleteNotification(opts: {
+  token: string;
+  notificationId: string;
+}): Promise<NotificationDeleteResponse> {
+  const { token, notificationId } = opts;
+  return apiFetch<NotificationDeleteResponse>({
+    path: `/notifications/${notificationId}`,
+    method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -1491,6 +1848,19 @@ export type ProfileSearchItem = {
   followersCount: number;
 };
 
+export type ProfileFieldVisibility = "public" | "followers" | "private";
+export type ProfileVisibility = {
+  gender: ProfileFieldVisibility;
+  birthdate: ProfileFieldVisibility;
+  location: ProfileFieldVisibility;
+  workplace: ProfileFieldVisibility;
+  bio: ProfileFieldVisibility;
+  followers: ProfileFieldVisibility;
+  following: ProfileFieldVisibility;
+  about: ProfileFieldVisibility;
+  profile: ProfileFieldVisibility;
+};
+
 export type ProfileDetailResponse = {
   id: string;
   userId: string;
@@ -1507,6 +1877,7 @@ export type ProfileDetailResponse = {
     companyName: string;
   };
   birthdate?: string;
+  visibility?: ProfileVisibility;
   stats: {
     posts: number;
     reels: number;
@@ -1559,6 +1930,54 @@ export type UpdateMyProfilePayload = {
   birthdate?: string;
   workplaceName?: string;
   workplaceCompanyId?: string;
+  genderVisibility?: ProfileFieldVisibility;
+  birthdateVisibility?: ProfileFieldVisibility;
+  locationVisibility?: ProfileFieldVisibility;
+  workplaceVisibility?: ProfileFieldVisibility;
+  bioVisibility?: ProfileFieldVisibility;
+  followersVisibility?: ProfileFieldVisibility;
+  followingVisibility?: ProfileFieldVisibility;
+  aboutVisibility?: ProfileFieldVisibility;
+  profileVisibility?: ProfileFieldVisibility;
+};
+
+export type RequestPasswordChangeOtpResponse = {
+  expiresSec: number;
+};
+
+export type VerifyPasswordChangeOtpResponse = {
+  verified: boolean;
+};
+
+export type ConfirmPasswordChangeResponse = {
+  updated: boolean;
+};
+
+export type PasswordChangeStatusResponse = {
+  lastChangedAt: string | null;
+};
+
+export type PasskeyStatusResponse = {
+  hasPasskey: boolean;
+};
+
+export type PasskeyVerifyResponse = {
+  verified: boolean;
+  hasPasskey: boolean;
+  currentPasskey?: string;
+};
+
+export type PasskeyConfirmResponse = {
+  updated: boolean;
+};
+
+export type DeviceTrustStatusResponse = {
+  trusted: boolean;
+  hasPasskey: boolean;
+};
+
+export type VerifyDeviceTrustResponse = {
+  trusted: boolean;
 };
 
 export type CompanySuggestItem = {
@@ -1829,6 +2248,226 @@ export async function updateMyProfile(opts: {
   });
 }
 
+export async function requestPasswordChangeOtp(opts: {
+  token: string;
+}): Promise<RequestPasswordChangeOtpResponse> {
+  const { token } = opts;
+  return apiFetch<RequestPasswordChangeOtpResponse>({
+    path: "/users/password-change/request-otp",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function verifyPasswordChangeOtp(opts: {
+  token: string;
+  code: string;
+}): Promise<VerifyPasswordChangeOtpResponse> {
+  const { token, code } = opts;
+  return apiFetch<VerifyPasswordChangeOtpResponse>({
+    path: "/users/password-change/verify-otp",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ code }),
+  });
+}
+
+export async function confirmPasswordChange(opts: {
+  token: string;
+  currentPassword: string;
+  newPassword: string;
+}): Promise<ConfirmPasswordChangeResponse> {
+  const { token, currentPassword, newPassword } = opts;
+  return apiFetch<ConfirmPasswordChangeResponse>({
+    path: "/users/password-change/confirm",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
+export async function fetchPasswordChangeStatus(opts: {
+  token: string;
+}): Promise<PasswordChangeStatusResponse> {
+  const { token } = opts;
+  return apiFetch<PasswordChangeStatusResponse>({
+    path: "/users/password-change/status",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchPasskeyStatus(opts: {
+  token: string;
+}): Promise<PasskeyStatusResponse> {
+  const { token } = opts;
+  return apiFetch<PasskeyStatusResponse>({
+    path: "/users/passkey/status",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export type TwoFactorStatusResponse = {
+  enabled: boolean;
+};
+
+export async function fetchTwoFactorStatus(opts: {
+  token: string;
+}): Promise<TwoFactorStatusResponse> {
+  const { token } = opts;
+  return apiFetch<TwoFactorStatusResponse>({
+    path: "/users/two-factor/status",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function requestTwoFactorOtp(opts: {
+  token: string;
+  enable: boolean;
+}): Promise<{ expiresSec: number }> {
+  const { token, enable } = opts;
+  return apiFetch<{ expiresSec: number }>({
+    path: "/users/two-factor/request-otp",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ enable }),
+  });
+}
+
+export async function verifyTwoFactorOtp(opts: {
+  token: string;
+  code: string;
+  enable: boolean;
+}): Promise<{ enabled: boolean }> {
+  const { token, code, enable } = opts;
+  return apiFetch<{ enabled: boolean }>({
+    path: "/users/two-factor/verify-otp",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ code, enable }),
+  });
+}
+
+export async function verifyTwoFactorLogin(opts: {
+  token: string;
+  code: string;
+  trustDevice?: boolean;
+}): Promise<{ accessToken: string }> {
+  const { token, code, trustDevice } = opts;
+  return apiFetch<{ accessToken: string }>({
+    path: "/auth/two-factor/verify",
+    method: "POST",
+    body: JSON.stringify({ token, code, trustDevice }),
+    credentials: "include",
+  });
+}
+
+export async function resendTwoFactorLoginOtp(opts: {
+  token: string;
+}): Promise<{ expiresSec: number }> {
+  const { token } = opts;
+  return apiFetch<{ expiresSec: number }>({
+    path: "/auth/two-factor/resend",
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export async function requestPasskeyOtp(opts: {
+  token: string;
+  password: string;
+}): Promise<{ expiresSec: number }> {
+  const { token, password } = opts;
+  return apiFetch<{ expiresSec: number }>({
+    path: "/users/passkey/request-otp",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ password }),
+  });
+}
+
+export async function verifyPasskeyOtp(opts: {
+  token: string;
+  code: string;
+}): Promise<PasskeyVerifyResponse> {
+  const { token, code } = opts;
+  return apiFetch<PasskeyVerifyResponse>({
+    path: "/users/passkey/verify-otp",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ code }),
+  });
+}
+
+export async function confirmPasskey(opts: {
+  token: string;
+  currentPasskey?: string;
+  newPasskey: string;
+}): Promise<PasskeyConfirmResponse> {
+  const { token, currentPasskey, newPasskey } = opts;
+  return apiFetch<PasskeyConfirmResponse>({
+    path: "/users/passkey/confirm",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ currentPasskey, newPasskey }),
+  });
+}
+
+export async function fetchDeviceTrustStatus(opts: {
+  token: string;
+  deviceId: string;
+}): Promise<DeviceTrustStatusResponse> {
+  const { token, deviceId } = opts;
+  const params = new URLSearchParams({ deviceId });
+  return apiFetch<DeviceTrustStatusResponse>({
+    path: `/users/device-trust/status?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function verifyDeviceTrust(opts: {
+  token: string;
+  deviceId: string;
+  passkey: string;
+}): Promise<VerifyDeviceTrustResponse> {
+  const { token, deviceId, passkey } = opts;
+  return apiFetch<VerifyDeviceTrustResponse>({
+    path: "/users/device-trust/verify",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ deviceId, passkey }),
+  });
+}
+
 export async function createReportProblem(opts: {
   token: string;
   description: string;
@@ -1917,6 +2556,69 @@ export async function sendDirectMessage(
   });
 }
 
+export type LoginDeviceItem = {
+  deviceIdHash: string;
+  userAgent?: string;
+  deviceInfo?: string;
+  ip?: string;
+  location?: string;
+  deviceType?: string;
+  os?: string;
+  browser?: string;
+  loginMethod?: string;
+  firstSeenAt?: string | null;
+  lastSeenAt?: string | null;
+};
+
+export type LoginDevicesResponse = {
+  currentDeviceIdHash?: string;
+  devices: LoginDeviceItem[];
+};
+
+export async function fetchLoginDevices(opts: {
+  token: string;
+  deviceId?: string | null;
+}): Promise<LoginDevicesResponse> {
+  const { token, deviceId } = opts;
+  return apiFetch<LoginDevicesResponse>({
+    path: "/users/login-devices",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(deviceId ? { "x-device-id": deviceId } : {}),
+    },
+  });
+}
+
+export async function logoutLoginDevice(opts: {
+  token: string;
+  deviceIdHash: string;
+}): Promise<{ loggedOut: boolean }> {
+  const { token, deviceIdHash } = opts;
+  return apiFetch<{ loggedOut: boolean }>({
+    path: "/users/login-devices/logout",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ deviceIdHash }),
+  });
+}
+
+export async function logoutAllDevices(opts: {
+  token: string;
+  deviceId?: string | null;
+}): Promise<{ loggedOut: boolean; currentDeviceIdHash?: string }> {
+  const { token, deviceId } = opts;
+  return apiFetch<{ loggedOut: boolean; currentDeviceIdHash?: string }>({
+    path: "/users/login-devices/logout-all",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(deviceId ? { "x-device-id": deviceId } : {}),
+    },
+  });
+}
 export async function getAvailableUsers(opts?: {
   token?: string;
 }): Promise<any[]> {

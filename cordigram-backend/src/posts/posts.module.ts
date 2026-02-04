@@ -24,6 +24,8 @@ import {
   PostImpressionEvent,
   PostImpressionEventSchema,
 } from '../explore/impression-event.schema';
+import { ActivityModule } from '../activity/activity.module';
+import { PostSchedulerService } from './post-scheduler.service';
 
 @Module({
   imports: [
@@ -31,6 +33,7 @@ import {
     CloudinaryModule,
     UsersModule,
     NotificationsModule,
+    ActivityModule,
     MongooseModule.forFeature([
       { name: Post.name, schema: PostSchema },
       { name: PostInteraction.name, schema: PostInteractionSchema },
@@ -42,7 +45,7 @@ import {
     ]),
   ],
   controllers: [PostsController, ReelsController, ExploreController],
-  providers: [PostsService],
+  providers: [PostsService, PostSchedulerService],
   exports: [PostsService],
 })
 export class PostsModule {}

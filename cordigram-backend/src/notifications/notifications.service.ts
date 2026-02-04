@@ -5,6 +5,8 @@ import { Notification, NotificationType } from './notification.schema';
 import type { PostKind } from '../posts/post.schema';
 import { Profile } from '../profiles/profile.schema';
 import { NotificationsGateway } from './notifications.gateway';
+import { User } from '../users/user.schema';
+import { Post } from '../posts/post.schema';
 
 const DEFAULT_AVATAR_URL =
   'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
@@ -22,6 +24,9 @@ export type NotificationItem = {
   actor: NotificationActor;
   postId: string | null;
   postKind: PostKind;
+  isOwnPost?: boolean;
+  postMutedUntil?: string | null;
+  postMutedIndefinitely?: boolean;
   likeCount: number;
   commentCount: number;
   mentionCount: number;
@@ -29,6 +34,14 @@ export type NotificationItem = {
   readAt: string | null;
   createdAt: string;
   activityAt: string;
+  deviceInfo?: string;
+  deviceType?: string;
+  os?: string;
+  browser?: string;
+  location?: string;
+  ip?: string;
+  deviceIdHash?: string;
+  loginAt?: string | null;
 };
 
 export type NotificationRealtimePayload = {
@@ -42,6 +55,14 @@ type NotificationDoc = {
   actorId?: Types.ObjectId | null;
   postId?: Types.ObjectId | null;
   postKind?: PostKind;
+  deviceInfo?: string;
+  deviceType?: string;
+  os?: string;
+  browser?: string;
+  location?: string;
+  ip?: string;
+  deviceIdHash?: string;
+  loginAt?: Date | null;
   likeCount?: number;
   commentCount?: number;
   commentActorIds?: Types.ObjectId[];
@@ -53,6 +74,8 @@ type NotificationDoc = {
   updatedAt?: Date;
 };
 
+type NotificationCategoryKey = 'follow' | 'comment' | 'like' | 'mentions';
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -60,8 +83,134 @@ export class NotificationsService {
     private readonly notificationModel: Model<Notification>,
     @InjectModel(Profile.name)
     private readonly profileModel: Model<Profile>,
+    @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(Post.name) private readonly postModel: Model<Post>,
     private readonly gateway: NotificationsGateway,
   ) {}
+
+  private async canEmitNotification(userId: string): Promise<boolean> {
+    const user = await this.userModel
+      .findById(userId)
+      .select('settings.notifications')
+      .lean()
+      .exec();
+
+    const mutedUntil = user?.settings?.notifications?.mutedUntil ?? null;
+    const mutedIndefinitely =
+      user?.settings?.notifications?.mutedIndefinitely ?? false;
+
+    const now = new Date();
+
+    if (mutedIndefinitely) {
+      return false;
+    }
+
+    if (mutedUntil) {
+      const mutedUntilDate = new Date(mutedUntil);
+      if (mutedUntilDate.getTime() > now.getTime()) {
+        return false;
+      }
+
+      await this.userModel
+        .updateOne(
+          { _id: userId },
+          {
+            $set: {
+              'settings.notifications.mutedUntil': null,
+              'settings.notifications.mutedIndefinitely': false,
+            },
+          },
+        )
+        .exec();
+    }
+
+    return true;
+  }
+
+  private async canEmitCategoryNotification(
+    userId: string,
+    category: NotificationCategoryKey,
+  ): Promise<boolean> {
+    const user = await this.userModel
+      .findById(userId)
+      .select('settings.notifications.categories')
+      .lean()
+      .exec();
+
+    const settings =
+      user?.settings?.notifications?.categories?.[category] ?? null;
+
+    const mutedUntil = settings?.mutedUntil ?? null;
+    const mutedIndefinitely = settings?.mutedIndefinitely ?? false;
+
+    const now = new Date();
+
+    if (mutedIndefinitely) {
+      return false;
+    }
+
+    if (mutedUntil) {
+      const mutedUntilDate = new Date(mutedUntil);
+      if (mutedUntilDate.getTime() > now.getTime()) {
+        return false;
+      }
+
+      await this.userModel
+        .updateOne(
+          { _id: userId },
+          {
+            $set: {
+              [`settings.notifications.categories.${category}.mutedUntil`]:
+                null,
+              [`settings.notifications.categories.${category}.mutedIndefinitely`]: false,
+            },
+          },
+        )
+        .exec();
+    }
+
+    return true;
+  }
+
+  private async canEmitPostNotification(
+    recipientId: string,
+    postId?: string | null,
+  ): Promise<boolean> {
+    if (!postId) return true;
+    const post = await this.postModel
+      .findOne({ _id: new Types.ObjectId(postId), deletedAt: null })
+      .select('authorId notificationsMutedUntil notificationsMutedIndefinitely')
+      .lean();
+
+    if (!post?.authorId) return true;
+    if (post.authorId.toString() !== recipientId) return true;
+
+    if (post.notificationsMutedIndefinitely) {
+      return false;
+    }
+
+    if (post.notificationsMutedUntil) {
+      const now = new Date();
+      const mutedUntil = new Date(post.notificationsMutedUntil);
+      if (mutedUntil.getTime() > now.getTime()) {
+        return false;
+      }
+
+      await this.postModel
+        .updateOne(
+          { _id: post._id },
+          {
+            $set: {
+              notificationsMutedUntil: null,
+              notificationsMutedIndefinitely: false,
+            },
+          },
+        )
+        .exec();
+    }
+
+    return true;
+  }
 
   async list(
     userId: string,
@@ -73,6 +222,21 @@ export class NotificationsService {
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
+
+    const postIds = Array.from(
+      new Set(docs.map((doc) => doc.postId?.toString()).filter(Boolean)),
+    ).map((id) => new Types.ObjectId(id));
+
+    const posts = postIds.length
+      ? await this.postModel
+          .find({ _id: { $in: postIds } })
+          .select(
+            '_id authorId notificationsMutedUntil notificationsMutedIndefinitely',
+          )
+          .lean()
+      : [];
+
+    const postMap = new Map(posts.map((post) => [post._id.toString(), post]));
 
     const actorIds = Array.from(
       new Set(docs.map((doc) => doc.actorId?.toString()).filter(Boolean)),
@@ -92,7 +256,8 @@ export class NotificationsService {
     const items = docs.map((doc) => {
       const actorId = doc.actorId?.toString();
       const profile = actorId ? (profileMap.get(actorId) ?? null) : null;
-      return this.toResponse(doc, profile);
+      const post = doc.postId ? postMap.get(doc.postId.toString()) : null;
+      return this.toResponse(doc, profile, { recipientId: userId, post });
     });
 
     return { items };
@@ -135,13 +300,52 @@ export class NotificationsService {
     return { updated: Boolean(result.modifiedCount) };
   }
 
+  async markUnread(
+    userId: string,
+    notificationId: string,
+  ): Promise<{ updated: boolean }> {
+    if (!Types.ObjectId.isValid(notificationId)) {
+      return { updated: false };
+    }
+
+    const result = await this.notificationModel.updateOne(
+      {
+        _id: new Types.ObjectId(notificationId),
+        recipientId: new Types.ObjectId(userId),
+      },
+      { $set: { readAt: null } },
+    );
+
+    return { updated: Boolean(result.modifiedCount) };
+  }
+
+  async deleteNotification(
+    userId: string,
+    notificationId: string,
+  ): Promise<{ deleted: boolean }> {
+    if (!Types.ObjectId.isValid(notificationId)) {
+      return { deleted: false };
+    }
+
+    const result = await this.notificationModel.deleteOne({
+      _id: new Types.ObjectId(notificationId),
+      recipientId: new Types.ObjectId(userId),
+    });
+
+    return { deleted: Boolean(result.deletedCount) };
+  }
+
   async createPostLikeNotification(params: {
     actorId: string;
     recipientId: string;
     postId: string;
     postKind: PostKind;
-  }): Promise<NotificationItem> {
+  }): Promise<NotificationItem | null> {
     const { actorId, recipientId, postId, postKind } = params;
+
+    if (!(await this.canEmitCategoryNotification(recipientId, 'like'))) {
+      return null;
+    }
 
     const doc = await this.notificationModel
       .findOneAndUpdate(
@@ -173,13 +377,25 @@ export class NotificationsService {
       .select('userId displayName username avatarUrl')
       .lean();
 
-    const response = this.toResponse(doc, profile ?? null);
+    const post = await this.postModel
+      .findById(postId)
+      .select('authorId notificationsMutedUntil notificationsMutedIndefinitely')
+      .lean();
+    const response = this.toResponse(doc, profile ?? null, {
+      recipientId,
+      post,
+    });
 
     const { unreadCount } = await this.getUnreadCount(recipientId);
-    this.gateway.emitToUser(recipientId, 'notification:new', {
-      notification: response,
-      unreadCount,
-    } satisfies NotificationRealtimePayload);
+    if (
+      (await this.canEmitNotification(recipientId)) &&
+      (await this.canEmitPostNotification(recipientId, postId))
+    ) {
+      this.gateway.emitToUser(recipientId, 'notification:new', {
+        notification: response,
+        unreadCount,
+      } satisfies NotificationRealtimePayload);
+    }
 
     return response;
   }
@@ -189,8 +405,12 @@ export class NotificationsService {
     recipientId: string;
     postId: string;
     postKind: PostKind;
-  }): Promise<NotificationItem> {
+  }): Promise<NotificationItem | null> {
     const { actorId, recipientId, postId, postKind } = params;
+
+    if (!(await this.canEmitCategoryNotification(recipientId, 'comment'))) {
+      return null;
+    }
 
     const doc = await this.notificationModel
       .findOneAndUpdate(
@@ -223,12 +443,24 @@ export class NotificationsService {
       .select('userId displayName username avatarUrl')
       .lean();
 
-    const response = this.toResponse(doc, profile ?? null);
+    const post = await this.postModel
+      .findById(postId)
+      .select('authorId notificationsMutedUntil notificationsMutedIndefinitely')
+      .lean();
+    const response = this.toResponse(doc, profile ?? null, {
+      recipientId,
+      post,
+    });
     const { unreadCount } = await this.getUnreadCount(recipientId);
-    this.gateway.emitToUser(recipientId, 'notification:new', {
-      notification: response,
-      unreadCount,
-    } satisfies NotificationRealtimePayload);
+    if (
+      (await this.canEmitNotification(recipientId)) &&
+      (await this.canEmitPostNotification(recipientId, postId))
+    ) {
+      this.gateway.emitToUser(recipientId, 'notification:new', {
+        notification: response,
+        unreadCount,
+      } satisfies NotificationRealtimePayload);
+    }
 
     return response;
   }
@@ -239,8 +471,12 @@ export class NotificationsService {
     postId: string;
     postKind: PostKind;
     source: 'post' | 'comment';
-  }): Promise<NotificationItem> {
+  }): Promise<NotificationItem | null> {
     const { actorId, recipientId, postId, postKind, source } = params;
+
+    if (!(await this.canEmitCategoryNotification(recipientId, 'mentions'))) {
+      return null;
+    }
 
     const doc = await this.notificationModel
       .findOneAndUpdate(
@@ -274,12 +510,74 @@ export class NotificationsService {
       .select('userId displayName username avatarUrl')
       .lean();
 
-    const response = this.toResponse(doc, profile ?? null);
+    const post = await this.postModel
+      .findById(postId)
+      .select('authorId notificationsMutedUntil notificationsMutedIndefinitely')
+      .lean();
+    const response = this.toResponse(doc, profile ?? null, {
+      recipientId,
+      post,
+    });
     const { unreadCount } = await this.getUnreadCount(recipientId);
-    this.gateway.emitToUser(recipientId, 'notification:new', {
-      notification: response,
-      unreadCount,
-    } satisfies NotificationRealtimePayload);
+    if (
+      (await this.canEmitNotification(recipientId)) &&
+      (await this.canEmitPostNotification(recipientId, postId))
+    ) {
+      this.gateway.emitToUser(recipientId, 'notification:new', {
+        notification: response,
+        unreadCount,
+      } satisfies NotificationRealtimePayload);
+    }
+
+    return response;
+  }
+
+  async createLoginAlertNotification(params: {
+    recipientId: string;
+    deviceInfo?: string;
+    deviceType?: string;
+    os?: string;
+    browser?: string;
+    location?: string;
+    ip?: string;
+    deviceIdHash?: string;
+    loginAt?: Date;
+  }): Promise<NotificationItem> {
+    const recipientId = new Types.ObjectId(params.recipientId);
+    const doc = await this.notificationModel
+      .create({
+        recipientId,
+        actorId: recipientId,
+        postId: null,
+        postKind: 'post',
+        type: 'login_alert',
+        deviceInfo: params.deviceInfo ?? '',
+        deviceType: params.deviceType ?? '',
+        os: params.os ?? '',
+        browser: params.browser ?? '',
+        location: params.location ?? '',
+        ip: params.ip ?? '',
+        deviceIdHash: params.deviceIdHash ?? '',
+        loginAt: params.loginAt ?? new Date(),
+        readAt: null,
+      })
+      .then((created) => created.toObject() as NotificationDoc);
+
+    const profile = await this.profileModel
+      .findOne({ userId: recipientId })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const response = this.toResponse(doc, profile ?? null, {
+      recipientId: params.recipientId,
+    });
+    const { unreadCount } = await this.getUnreadCount(params.recipientId);
+    if (await this.canEmitNotification(params.recipientId)) {
+      this.gateway.emitToUser(params.recipientId, 'notification:new', {
+        notification: response,
+        unreadCount,
+      } satisfies NotificationRealtimePayload);
+    }
 
     return response;
   }
@@ -287,8 +585,11 @@ export class NotificationsService {
   async createFollowNotification(params: {
     actorId: string;
     recipientId: string;
-  }): Promise<NotificationItem> {
+  }): Promise<NotificationItem | null> {
     const { actorId, recipientId } = params;
+    if (!(await this.canEmitCategoryNotification(recipientId, 'follow'))) {
+      return null;
+    }
     const filter = {
       recipientId: new Types.ObjectId(recipientId),
       actorId: new Types.ObjectId(actorId),
@@ -322,12 +623,16 @@ export class NotificationsService {
       .select('userId displayName username avatarUrl')
       .lean();
 
-    const response = this.toResponse(created, profile ?? null);
+    const response = this.toResponse(created, profile ?? null, {
+      recipientId,
+    });
     const { unreadCount } = await this.getUnreadCount(recipientId);
-    this.gateway.emitToUser(recipientId, 'notification:new', {
-      notification: response,
-      unreadCount,
-    } satisfies NotificationRealtimePayload);
+    if (await this.canEmitNotification(recipientId)) {
+      this.gateway.emitToUser(recipientId, 'notification:new', {
+        notification: response,
+        unreadCount,
+      } satisfies NotificationRealtimePayload);
+    }
 
     return response;
   }
@@ -420,11 +725,32 @@ export class NotificationsService {
       Profile,
       'userId' | 'displayName' | 'username' | 'avatarUrl'
     > | null,
+    context?: {
+      recipientId?: string;
+      post?: {
+        authorId?: Types.ObjectId | string | null;
+        notificationsMutedUntil?: Date | string | null;
+        notificationsMutedIndefinitely?: boolean | null;
+      } | null;
+    },
   ): NotificationItem {
     const actorId = doc.actorId?.toString() ?? '';
     const createdAt =
       doc.createdAt?.toISOString?.() ?? new Date().toISOString();
     const activityAt = doc.updatedAt?.toISOString?.() ?? createdAt;
+    const postAuthorId = context?.post?.authorId?.toString?.()
+      ? context?.post?.authorId?.toString?.()
+      : typeof context?.post?.authorId === 'string'
+        ? context?.post?.authorId
+        : null;
+    const recipientId = context?.recipientId ?? null;
+    const isOwnPost = Boolean(postAuthorId && recipientId === postAuthorId);
+    const postMutedUntilRaw = context?.post?.notificationsMutedUntil ?? null;
+    const postMutedUntil = postMutedUntilRaw
+      ? new Date(postMutedUntilRaw).toISOString()
+      : null;
+    const postMutedIndefinitely =
+      context?.post?.notificationsMutedIndefinitely ?? false;
 
     return {
       id: doc._id.toString(),
@@ -437,6 +763,9 @@ export class NotificationsService {
       },
       postId: doc.postId ? doc.postId.toString() : null,
       postKind: doc.postKind ?? 'post',
+      isOwnPost: isOwnPost || undefined,
+      postMutedUntil,
+      postMutedIndefinitely,
       likeCount: typeof doc.likeCount === 'number' ? doc.likeCount : 1,
       commentCount:
         doc.commentActorIds?.length ??
@@ -448,6 +777,14 @@ export class NotificationsService {
       readAt: doc.readAt ? doc.readAt.toISOString() : null,
       createdAt,
       activityAt,
+      deviceInfo: doc.deviceInfo ?? '',
+      deviceType: doc.deviceType ?? '',
+      os: doc.os ?? '',
+      browser: doc.browser ?? '',
+      location: doc.location ?? '',
+      ip: doc.ip ?? '',
+      deviceIdHash: doc.deviceIdHash ?? '',
+      loginAt: doc.loginAt ? doc.loginAt.toISOString() : null,
     };
   }
 }

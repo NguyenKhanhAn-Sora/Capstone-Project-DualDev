@@ -20,6 +20,7 @@ import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { LoginDto } from './dto/login.dto';
+import { TwoFactorResendDto, TwoFactorVerifyDto } from './dto/two-factor.dto';
 import { UpsertRecentAccountDto } from './dto/upsert-recent-account.dto';
 import {
   ForgotPasswordRequestDto,
@@ -197,16 +198,60 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0] ||
+      req.ip ||
+      '';
     const email = dto.email.toLowerCase();
     const result = await this.authService.login({
       email,
       password: dto.password,
       userAgent: req.headers['user-agent'],
       deviceInfo: req.headers['x-device-info'] as string,
+      deviceId: req.headers['x-device-id'] as string,
+      ip,
+      loginMethod: dto.loginMethod ?? (req.headers['x-login-method'] as string),
+    });
+
+    if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
+      return res.json(result);
+    }
+
+    const { accessToken, refreshToken } = result as {
+      accessToken: string;
+      refreshToken: string;
+    };
+    this.setRefreshCookie(res, refreshToken);
+    return res.json({ accessToken });
+  }
+
+  @Post('two-factor/verify')
+  async verifyTwoFactor(
+    @Body() dto: TwoFactorVerifyDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0] ||
+      req.ip ||
+      '';
+    const result = await this.authService.verifyTwoFactorLogin({
+      token: dto.token,
+      code: dto.code,
+      trustDevice: dto.trustDevice,
+      userAgent: req.headers['user-agent'] as string,
+      deviceInfo: req.headers['x-device-info'] as string,
+      deviceId: req.headers['x-device-id'] as string,
+      ip,
     });
 
     this.setRefreshCookie(res, result.refreshToken);
     return res.json({ accessToken: result.accessToken });
+  }
+
+  @Post('two-factor/resend')
+  async resendTwoFactor(@Body() dto: TwoFactorResendDto) {
+    return this.authService.resendTwoFactorOtp(dto.token);
   }
 
   @Get('google')
@@ -216,6 +261,14 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleCallback(@Req() req: Request, @Res() res: Response) {
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0] ||
+      req.ip ||
+      '';
+    const deviceId =
+      (req.cookies?.['device_id'] as string | undefined) ||
+      (req.headers['x-device-id'] as string | undefined) ||
+      '';
     const user = req.user as
       | undefined
       | {
@@ -234,6 +287,8 @@ export class AuthController {
       refreshToken: user.refreshToken ?? null,
       userAgent: req.headers['user-agent'] as string,
       deviceInfo: req.headers['x-device-info'] as string,
+      deviceId,
+      ip,
     });
 
     const params = new URLSearchParams();
@@ -254,10 +309,16 @@ export class AuthController {
   async refresh(@Req() req: Request, @Res() res: Response) {
     const token = (req as Request & { cookies?: Record<string, string> })
       .cookies?.['refresh_token'];
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0] ||
+      req.ip ||
+      '';
     const result = await this.authService.refreshAccessToken({
       refreshToken: token,
       userAgent: req.headers['user-agent'] as string,
       deviceInfo: req.headers['x-device-info'] as string,
+      deviceId: req.headers['x-device-id'] as string,
+      ip,
     });
     this.setRefreshCookie(res, result.refreshToken);
     return res.json({ accessToken: result.accessToken });

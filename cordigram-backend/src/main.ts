@@ -22,7 +22,13 @@ async function bootstrap() {
     origin: [config.frontendUrl, 'http://localhost:3000'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-device-info'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-device-info',
+      'x-device-id',
+      'x-login-method',
+    ],
   });
 
   await app.listen(config.port, () => {

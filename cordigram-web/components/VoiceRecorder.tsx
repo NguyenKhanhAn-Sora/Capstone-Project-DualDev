@@ -73,7 +73,7 @@ export default function VoiceRecorder({
       }, 100);
     } catch (error) {
       console.error("Failed to access microphone:", error);
-      alert("Không thể truy cập microphone. Vui lòng cho phép quyền truy cập.");
+      alert("Unable to access the microphone. Please allow microphone access.");
       onCancel();
     }
   };
@@ -138,7 +138,7 @@ export default function VoiceRecorder({
         <button
           className={styles.cancelButton}
           onClick={handleCancel}
-          title="Hủy"
+          title="Cancel"
         >
           <svg
             width="24"
@@ -179,7 +179,7 @@ export default function VoiceRecorder({
         <button
           className={styles.pauseButton}
           onClick={handlePauseResume}
-          title={isPaused ? "Tiếp tục" : "Tạm dừng"}
+          title={isPaused ? "Resume" : "Pause"}
         >
           {isPaused ? (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -198,7 +198,7 @@ export default function VoiceRecorder({
           className={styles.sendButton}
           onClick={handleSend}
           disabled={recordingTime < 1000}
-          title="Gửi"
+          title="Send"
         >
           <svg
             width="20"
@@ -217,13 +217,13 @@ export default function VoiceRecorder({
       {isRecording && !isPaused && (
         <div className={styles.recordingIndicator}>
           <div className={styles.recordingDot}></div>
-          <span>Đang ghi âm...</span>
+          <span>Recording...</span>
         </div>
       )}
 
       {isPaused && (
         <div className={styles.pausedIndicator}>
-          <span>Đã tạm dừng</span>
+          <span>Paused</span>
         </div>
       )}
     </div>

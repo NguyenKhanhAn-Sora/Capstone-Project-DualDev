@@ -46,4 +46,49 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsMongoId()
   workplaceCompanyId?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(public|followers|private)$/)
+  genderVisibility?: 'public' | 'followers' | 'private';
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(public|followers|private)$/)
+  birthdateVisibility?: 'public' | 'followers' | 'private';
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(public|followers|private)$/)
+  locationVisibility?: 'public' | 'followers' | 'private';
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(public|followers|private)$/)
+  workplaceVisibility?: 'public' | 'followers' | 'private';
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(public|followers|private)$/)
+  bioVisibility?: 'public' | 'followers' | 'private';
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(public|followers|private)$/)
+  followersVisibility?: 'public' | 'followers' | 'private';
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(public|followers|private)$/)
+  followingVisibility?: 'public' | 'followers' | 'private';
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(public|followers|private)$/)
+  aboutVisibility?: 'public' | 'followers' | 'private';
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(public|followers|private)$/)
+  profileVisibility?: 'public' | 'followers' | 'private';
 }

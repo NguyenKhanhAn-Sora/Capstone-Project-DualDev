@@ -11,6 +11,7 @@ import { CommentsController } from './comments.controller';
 import { CommentsService } from './comments.service';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ActivityModule } from '../activity/activity.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ProfilesModule,
     CloudinaryModule,
     NotificationsModule,
+    ActivityModule,
     MongooseModule.forFeature([
       { name: Comment.name, schema: CommentSchema },
       { name: CommentLike.name, schema: CommentLikeSchema },

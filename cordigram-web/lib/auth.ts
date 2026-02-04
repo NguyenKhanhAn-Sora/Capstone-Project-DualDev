@@ -4,7 +4,7 @@ export function decodeJwt(token: string): { exp?: number } | null {
   try {
     const payload = token.split(".")[1];
     const json = JSON.parse(
-      atob(payload.replace(/-/g, "+").replace(/_/g, "/"))
+      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
     );
     return json;
   } catch (_err) {
@@ -36,9 +36,16 @@ export function clearStoredAccessToken(): void {
 }
 
 export async function refreshSession(): Promise<string> {
+  const deviceId =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("cordigramDeviceId")
+      : null;
   const res = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
     method: "POST",
     credentials: "include",
+    headers: deviceId
+      ? { "x-device-id": deviceId, "x-login-method": "refresh" }
+      : { "x-login-method": "refresh" },
   });
 
   const text = await res.text();

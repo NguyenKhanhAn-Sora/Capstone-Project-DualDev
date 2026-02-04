@@ -18,6 +18,7 @@ import { UpdateCommentDto } from './dto/update-comment.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { ConfigService } from '../config/config.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ActivityLogService } from '../activity/activity.service';
 
 type UploadedFile = {
   originalname: string;
@@ -41,6 +42,7 @@ export class CommentsService {
     private readonly cloudinary: CloudinaryService,
     private readonly config: ConfigService,
     private readonly notificationsService: NotificationsService,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async create(userId: string, postId: string, dto: CreateCommentDto) {
@@ -49,7 +51,7 @@ export class CommentsService {
 
     const post = await this.postModel
       .findOne({ _id: postObjectId, deletedAt: null })
-      .select('authorId allowComments status kind')
+      .select('authorId allowComments status kind content media')
       .lean();
 
     if (!post) {
@@ -125,6 +127,30 @@ export class CommentsService {
       .findOne({ userId: userObjectId })
       .select('userId displayName username avatarUrl')
       .lean();
+
+    const postAuthorProfile = post.authorId
+      ? await this.profileModel
+          .findOne({ userId: post.authorId })
+          .select('displayName username avatarUrl')
+          .lean()
+      : null;
+
+    await this.activityLogService.log({
+      userId: userObjectId,
+      type: 'comment',
+      postId: postObjectId,
+      commentId: created._id,
+      postKind: post.kind ?? 'post',
+      meta: {
+        commentSnippet: content || null,
+        postCaption: post.content ?? null,
+        postMediaUrl: post.media?.[0]?.url ?? null,
+        postAuthorId: post.authorId?.toString?.() ?? null,
+        postAuthorDisplayName: postAuthorProfile?.displayName ?? null,
+        postAuthorUsername: postAuthorProfile?.username ?? null,
+        postAuthorAvatarUrl: postAuthorProfile?.avatarUrl ?? null,
+      },
+    });
 
     return this.toResponse(created, profile || null, {
       repliesCount: 0,
@@ -418,7 +444,7 @@ export class CommentsService {
 
     const comment = await this.commentModel
       .findOne({ _id: commentObjectId, postId: postObjectId, deletedAt: null })
-      .select('authorId')
+      .select('authorId content')
       .lean();
 
     if (!comment) {
@@ -447,6 +473,37 @@ export class CommentsService {
     const likesCount = await this.commentLikeModel.countDocuments({
       commentId: commentObjectId,
     });
+
+    if (created) {
+      const post = await this.postModel
+        .findOne({ _id: postObjectId, deletedAt: null })
+        .select('authorId kind content media')
+        .lean();
+
+      const postAuthorProfile = post?.authorId
+        ? await this.profileModel
+            .findOne({ userId: post.authorId })
+            .select('displayName username avatarUrl')
+            .lean()
+        : null;
+
+      await this.activityLogService.log({
+        userId: userObjectId,
+        type: 'comment_like',
+        postId: postObjectId,
+        commentId: commentObjectId,
+        postKind: post?.kind ?? 'post',
+        meta: {
+          commentSnippet: comment?.content ?? null,
+          postCaption: post?.content ?? null,
+          postMediaUrl: post?.media?.[0]?.url ?? null,
+          postAuthorId: post?.authorId?.toString?.() ?? null,
+          postAuthorDisplayName: postAuthorProfile?.displayName ?? null,
+          postAuthorUsername: postAuthorProfile?.username ?? null,
+          postAuthorAvatarUrl: postAuthorProfile?.avatarUrl ?? null,
+        },
+      });
+    }
 
     return { liked: true, created, likesCount };
   }

@@ -27,6 +27,7 @@ import {
   setPostHideLikeCount,
   updatePostVisibility,
   updatePost,
+  updatePostNotificationMute,
   deletePost,
   searchProfiles,
   type ProfileSearchItem,
@@ -36,6 +37,8 @@ import ReelComments from "./ReelComments";
 import styles from "./reel.module.css";
 import postStyles from "../post/post.module.css";
 import feedStyles from "../home-feed.module.css";
+import { DateSelect } from "@/ui/date-select/date-select";
+import { TimeSelect } from "@/ui/time-select/time-select";
 import RepostOverlay, {
   type QuoteInput,
   type RepostTarget,
@@ -239,6 +242,13 @@ const extractMentionsFromCaption = (value: string) => {
     handles.add(match[1].toLowerCase());
   }
   return Array.from(handles);
+};
+
+const buildLocalDateTimeIso = (date: string, time: string) => {
+  if (!date || !time) return null;
+  const dt = new Date(`${date}T${time}:00`);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString();
 };
 
 const findActiveMention = (value: string, caret: number) => {
@@ -741,7 +751,7 @@ function ReelActions({
               following ? styles.followBadgeOn : styles.followBadgeOff
             }`}
             onClick={() => onFollow(item.authorId!, !following)}
-            aria-label={following ? "Đang theo dõi" : "Theo dõi"}
+            aria-label={following ? "Following" : "Follow"}
           >
             {following ? (
               <span className={styles.tickIcon}>✓</span>
@@ -898,6 +908,13 @@ export default function ReelPage({
     "public" | "followers" | "private"
   >("public");
   const [visibilityError, setVisibilityError] = useState("");
+  const [muteModalOpen, setMuteModalOpen] = useState(false);
+  const [muteTargetId, setMuteTargetId] = useState<string | null>(null);
+  const [muteOption, setMuteOption] = useState("5m");
+  const [muteCustomDate, setMuteCustomDate] = useState("");
+  const [muteCustomTime, setMuteCustomTime] = useState("");
+  const [muteSaving, setMuteSaving] = useState(false);
+  const [muteError, setMuteError] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -1247,8 +1264,7 @@ export default function ReelPage({
         setError("");
       } catch (err) {
         setError(
-          (err as { message?: string })?.message ||
-            "Không tải được danh sách reel",
+          (err as { message?: string })?.message || "Unable to load reels",
         );
       } finally {
         if (isInitial) setLoading(false);
@@ -1339,13 +1355,13 @@ export default function ReelPage({
             setError(
               (fallbackErr as { message?: string })?.message ||
                 (err as { message?: string })?.message ||
-                "Không tải được reel",
+                "Unable to load reel",
             );
             return;
           }
         }
         setError(
-          (err as { message?: string })?.message || "Không tải được reel",
+          (err as { message?: string })?.message || "Unable to load reel",
         );
       } finally {
         if (!cancelled) setLoading(false);
@@ -1416,7 +1432,7 @@ export default function ReelPage({
       .catch((err) => {
         if (cancelled) return;
         setError(
-          (err as { message?: string })?.message || "Không tải được reel",
+          (err as { message?: string })?.message || "Unable to load reel",
         );
       });
 
@@ -1820,7 +1836,7 @@ export default function ReelPage({
       });
       updateStats(id, "hearts", liked ? 1 : -1);
       setError(
-        (err as { message?: string })?.message || "Không thể cập nhật like",
+        (err as { message?: string })?.message || "Unable to update like",
       );
     }
   };
@@ -1844,7 +1860,7 @@ export default function ReelPage({
         flags: { ...(items.find((x) => x.id === id)?.flags || {}), saved },
       });
       updateStats(id, "saves", saved ? 1 : -1);
-      setError((err as { message?: string })?.message || "Không thể lưu reel");
+      setError((err as { message?: string })?.message || "Unable to save reel");
     }
   };
 
@@ -2016,6 +2032,37 @@ export default function ReelPage({
   );
 
   const activeSaved = Boolean(active?.flags?.saved ?? active?.saved);
+
+  const muteOptions = useMemo(
+    () => [
+      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
+      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
+      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
+      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
+      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
+      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: "Until I turn it back on", ms: null },
+      { key: "custom", label: "Choose date & time", ms: null },
+    ],
+    [],
+  );
+
+  const muteTarget = useMemo(
+    () => (muteTargetId ? items.find((it) => it.id === muteTargetId) : null),
+    [items, muteTargetId],
+  );
+
+  const isMutedForItem = (item?: ReelItem | null) => {
+    if (!item) return false;
+    if (item.notificationsMutedIndefinitely) return true;
+    if (item.notificationsMutedUntil) {
+      const dt = new Date(item.notificationsMutedUntil);
+      if (!Number.isNaN(dt.getTime()) && dt.getTime() > Date.now()) {
+        return true;
+      }
+    }
+    return false;
+  };
 
   // NOTE: Do not re-seed edit form values while the modal is open.
   // The active reel can change due to scrolling / navigation, and re-seeding would
@@ -2581,9 +2628,96 @@ export default function ReelPage({
     openEditModal();
   };
 
-  const handleMuteNotifications = () => {
+  const openMuteModal = (item: ReelItem) => {
+    setMuteTargetId(item.id);
+    setMuteError("");
+    setMuteOption("5m");
+    setMuteCustomDate("");
+    setMuteCustomTime("");
+    setMuteModalOpen(true);
     setOpenMoreMenuId(null);
-    showToast("Notifications muted for this reel");
+  };
+
+  const closeMuteModal = () => {
+    if (muteSaving) return;
+    setMuteModalOpen(false);
+    setMuteTargetId(null);
+  };
+
+  const handleEnableReelNotifications = async (item: ReelItem) => {
+    if (!token) return;
+    setOpenMoreMenuId(null);
+    setMuteSaving(true);
+    setMuteError("");
+    try {
+      const res = await updatePostNotificationMute({
+        token,
+        postId: item.id,
+        enabled: true,
+      });
+      updateItem(item.id, {
+        notificationsMutedUntil: res.mutedUntil ?? null,
+        notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+      });
+      setMuteModalOpen(false);
+      setMuteTargetId(null);
+    } catch (err: any) {
+      setMuteError(err?.message || "Failed to update notifications");
+    } finally {
+      setMuteSaving(false);
+    }
+  };
+
+  const handleSaveReelMute = async () => {
+    if (!token || !muteTarget) return;
+    setMuteSaving(true);
+    setMuteError("");
+
+    try {
+      let mutedUntil: string | null = null;
+      let mutedIndefinitely = false;
+      const selected = muteOptions.find((opt) => opt.key === muteOption);
+
+      if (muteOption === "until") {
+        mutedIndefinitely = true;
+      } else if (muteOption === "custom") {
+        const iso = buildLocalDateTimeIso(muteCustomDate, muteCustomTime);
+        if (!iso) {
+          setMuteError("Please select a valid date and time.");
+          setMuteSaving(false);
+          return;
+        }
+        const dt = new Date(iso);
+        if (dt.getTime() <= Date.now()) {
+          setMuteError("Please choose a future time.");
+          setMuteSaving(false);
+          return;
+        }
+        mutedUntil = iso;
+      } else if (selected?.ms) {
+        mutedUntil = new Date(Date.now() + selected.ms).toISOString();
+      } else {
+        mutedIndefinitely = true;
+      }
+
+      const res = await updatePostNotificationMute({
+        token,
+        postId: muteTarget.id,
+        mutedUntil,
+        mutedIndefinitely,
+      });
+
+      updateItem(muteTarget.id, {
+        notificationsMutedUntil: res.mutedUntil ?? null,
+        notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+      });
+      setMuteModalOpen(false);
+      setMuteTargetId(null);
+    } catch (err: any) {
+      setMuteError(err?.message || "Failed to update notifications");
+    } finally {
+      setMuteSaving(false);
+    }
   };
 
   const handleDeletePost = () => {
@@ -2658,7 +2792,7 @@ export default function ReelPage({
         ),
       );
       setError(
-        (err as { message?: string })?.message || "Không thể cập nhật follow",
+        (err as { message?: string })?.message || "Unable to update follow",
       );
     }
   };
@@ -2710,6 +2844,10 @@ export default function ReelPage({
               >
                 {items.map((item) => {
                   const isActive = active?.id === item.id;
+                  const isSelf = Boolean(
+                    item.authorId && viewerId && item.authorId === viewerId,
+                  );
+                  const isMutedForReel = isMutedForItem(item);
                   return (
                     <div
                       key={item.id}
@@ -2751,217 +2889,253 @@ export default function ReelPage({
                                 }}
                                 data-more-menu-id={item.id}
                               >
-                                <button
-                                  type="button"
-                                  className={styles.moreBtn}
-                                  aria-haspopup="true"
-                                  aria-expanded={openMoreMenuId === item.id}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenMoreMenuId((prev) =>
-                                      prev === item.id ? null : item.id,
-                                    );
-                                  }}
-                                >
-                                  <svg
-                                    aria-hidden="true"
-                                    width="22"
-                                    height="22"
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
+                                <div className={styles.moreMenuButton}>
+                                  <button
+                                    type="button"
+                                    className={styles.moreBtn}
+                                    aria-haspopup="true"
+                                    aria-expanded={openMoreMenuId === item.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenMoreMenuId((prev) =>
+                                        prev === item.id ? null : item.id,
+                                      );
+                                    }}
                                   >
-                                    <circle cx="5" cy="12" r="1.5" />
-                                    <circle cx="12" cy="12" r="1.5" />
-                                    <circle cx="19" cy="12" r="1.5" />
-                                  </svg>
-                                </button>
-                                {openMoreMenuId === item.id ? (
-                                  <div className={styles.moreMenu} role="menu">
-                                    {isAuthor ? (
-                                      <>
-                                        <button
-                                          type="button"
-                                          className={styles.moreMenuItem}
-                                          role="menuitem"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleEditPost();
-                                          }}
-                                        >
-                                          Edit Reel
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={styles.moreMenuItem}
-                                          role="menuitem"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            openVisibilityModal();
-                                          }}
-                                        >
-                                          Edit visibility
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={styles.moreMenuItem}
-                                          role="menuitem"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleMuteNotifications();
-                                          }}
-                                        >
-                                          Mute notifications
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={styles.moreMenuItem}
-                                          role="menuitem"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleAllowComments();
-                                          }}
-                                        >
-                                          {commentsToggleLabel}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={styles.moreMenuItem}
-                                          role="menuitem"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleHideLikeCount();
-                                          }}
-                                        >
-                                          {hideLikeToggleLabel}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={styles.moreMenuItem}
-                                          role="menuitem"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            copyLink();
-                                          }}
-                                        >
-                                          Copy link
-                                        </button>
-                                        {item.repostOf ? (
+                                    <svg
+                                      aria-hidden="true"
+                                      width="22"
+                                      height="22"
+                                      viewBox="0 0 24 24"
+                                      fill="currentColor"
+                                    >
+                                      <circle cx="5" cy="12" r="1.5" />
+                                      <circle cx="12" cy="12" r="1.5" />
+                                      <circle cx="19" cy="12" r="1.5" />
+                                    </svg>
+                                  </button>
+                                  {openMoreMenuId === item.id ? (
+                                    <div
+                                      className={styles.moreMenu}
+                                      role="menu"
+                                    >
+                                      {isAuthor ? (
+                                        <>
                                           <button
                                             type="button"
                                             className={styles.moreMenuItem}
                                             role="menuitem"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              handleGoReel();
+                                              handleEditPost();
                                             }}
                                           >
-                                            Go to this reel
+                                            Edit Reel
                                           </button>
-                                        ) : null}
-                                        <button
-                                          type="button"
-                                          className={`${styles.moreMenuItem} ${styles.moreMenuDanger}`}
-                                          role="menuitem"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeletePost();
-                                          }}
-                                        >
-                                          Delete reel
-                                        </button>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <button
-                                          type="button"
-                                          className={styles.moreMenuItem}
-                                          role="menuitem"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleSaveFromMenu();
-                                          }}
-                                        >
-                                          {activeSaved
-                                            ? "Unsave this reel"
-                                            : "Save this reel"}
-                                        </button>
-                                        {item.authorId ? (
                                           <button
                                             type="button"
                                             className={styles.moreMenuItem}
                                             role="menuitem"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              handleFollowFromMenu();
+                                              openVisibilityModal();
                                             }}
                                           >
-                                            {activeFollowing
-                                              ? "Unfollow"
-                                              : "Follow"}
+                                            Edit visibility
                                           </button>
-                                        ) : null}
-                                        {allowDownloads ? (
                                           <button
                                             type="button"
                                             className={styles.moreMenuItem}
                                             role="menuitem"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              handleDownloadCurrentMedia();
+                                              if (isMutedForItem(item)) {
+                                                handleEnableReelNotifications(
+                                                  item,
+                                                );
+                                              } else {
+                                                openMuteModal(item);
+                                              }
                                             }}
                                           >
-                                            Download
+                                            {isMutedForItem(item)
+                                              ? "Turn on notification"
+                                              : "Mute notifications"}
                                           </button>
-                                        ) : null}
-                                        <button
-                                          type="button"
-                                          className={styles.moreMenuItem}
-                                          role="menuitem"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleReportFromMenu();
-                                          }}
-                                        >
-                                          Report
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={styles.moreMenuItem}
-                                          role="menuitem"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            copyLink();
-                                          }}
-                                        >
-                                          Copy link
-                                        </button>
-                                        {item.repostOf ? (
                                           <button
                                             type="button"
                                             className={styles.moreMenuItem}
                                             role="menuitem"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              handleGoReel();
+                                              toggleAllowComments();
                                             }}
                                           >
-                                            Go to this reel
+                                            {commentsToggleLabel}
                                           </button>
-                                        ) : null}
-                                        <button
-                                          type="button"
-                                          className={styles.moreMenuItem}
-                                          role="menuitem"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleGoProfile();
-                                          }}
-                                        >
-                                          Go to this profile
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              toggleHideLikeCount();
+                                            }}
+                                          >
+                                            {hideLikeToggleLabel}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              copyLink();
+                                            }}
+                                          >
+                                            Copy link
+                                          </button>
+                                          {item.repostOf ? (
+                                            <button
+                                              type="button"
+                                              className={styles.moreMenuItem}
+                                              role="menuitem"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleGoReel();
+                                              }}
+                                            >
+                                              Go to this reel
+                                            </button>
+                                          ) : null}
+                                          <button
+                                            type="button"
+                                            className={`${styles.moreMenuItem} ${styles.moreMenuDanger}`}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeletePost();
+                                            }}
+                                          >
+                                            Delete reel
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleSaveFromMenu();
+                                            }}
+                                          >
+                                            {activeSaved
+                                              ? "Unsave this reel"
+                                              : "Save this reel"}
+                                          </button>
+                                          {item.authorId ? (
+                                            <button
+                                              type="button"
+                                              className={styles.moreMenuItem}
+                                              role="menuitem"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleFollowFromMenu();
+                                              }}
+                                            >
+                                              {activeFollowing
+                                                ? "Unfollow"
+                                                : "Follow"}
+                                            </button>
+                                          ) : null}
+                                          {allowDownloads ? (
+                                            <button
+                                              type="button"
+                                              className={styles.moreMenuItem}
+                                              role="menuitem"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDownloadCurrentMedia();
+                                              }}
+                                            >
+                                              Download
+                                            </button>
+                                          ) : null}
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleReportFromMenu();
+                                            }}
+                                          >
+                                            Report
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              copyLink();
+                                            }}
+                                          >
+                                            Copy link
+                                          </button>
+                                          {item.repostOf ? (
+                                            <button
+                                              type="button"
+                                              className={styles.moreMenuItem}
+                                              role="menuitem"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleGoReel();
+                                              }}
+                                            >
+                                              Go to this reel
+                                            </button>
+                                          ) : null}
+                                          <button
+                                            type="button"
+                                            className={styles.moreMenuItem}
+                                            role="menuitem"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleGoProfile();
+                                            }}
+                                          >
+                                            Go to this profile
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  ) : null}
+                                </div>
+                                {isSelf && isMutedForReel ? (
+                                  <span
+                                    className={styles.muteBadge}
+                                    title="Notifications muted"
+                                    aria-label="Notifications muted"
+                                  >
+                                    <svg
+                                      aria-hidden
+                                      width="18"
+                                      height="18"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
+                                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                                      <line x1="3" y1="3" x2="21" y2="21" />
+                                    </svg>
+                                  </span>
                                 ) : null}
                               </div>
                             </ReelVideo>
@@ -3503,6 +3677,94 @@ export default function ReelPage({
                 disabled={visibilitySaving}
               >
                 {visibilitySaving ? "Updating..." : "Update visibility"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {muteModalOpen && muteTarget ? (
+        <div
+          className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeMuteModal}
+        >
+          <div
+            className={`${feedStyles.modalCard} ${feedStyles.modalCardOpen}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={feedStyles.modalHeader}>
+              <div>
+                <h3 className={feedStyles.modalTitle}>Mute notifications</h3>
+                <p className={feedStyles.modalBody}>
+                  Choose how long to pause alerts for this reel.
+                </p>
+              </div>
+              <button
+                className={feedStyles.closeBtn}
+                aria-label="Close"
+                onClick={closeMuteModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={feedStyles.muteOptionGrid}>
+              {muteOptions.map((option) => (
+                <button
+                  key={option.key}
+                  className={`${feedStyles.muteOption} ${
+                    muteOption === option.key ? feedStyles.muteOptionActive : ""
+                  }`}
+                  onClick={() => setMuteOption(option.key)}
+                  type="button"
+                >
+                  <span className={feedStyles.muteOptionTitle}>
+                    {option.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {muteOption === "custom" ? (
+              <div className={feedStyles.muteCustomRow}>
+                <div className={feedStyles.mutePicker}>
+                  <label className={feedStyles.editLabel}>Date</label>
+                  <DateSelect
+                    value={muteCustomDate}
+                    onChange={setMuteCustomDate}
+                    minDate={new Date()}
+                    maxDate={null}
+                    placeholder="yyyy-mm-dd"
+                  />
+                </div>
+                <div className={feedStyles.mutePicker}>
+                  <label className={feedStyles.editLabel}>Time</label>
+                  <TimeSelect
+                    value={muteCustomTime}
+                    onChange={setMuteCustomTime}
+                    selectedDate={muteCustomDate}
+                    minDateTime={new Date()}
+                    disabled={!muteCustomDate}
+                    placeholder="hh:mm"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {muteError ? (
+              <div className={feedStyles.inlineError}>{muteError}</div>
+            ) : null}
+
+            <div className={feedStyles.modalActions}>
+              <button
+                type="button"
+                className={feedStyles.modalPrimary}
+                onClick={handleSaveReelMute}
+                disabled={muteSaving}
+              >
+                {muteSaving ? "Saving..." : "Save"}
               </button>
             </div>
           </div>

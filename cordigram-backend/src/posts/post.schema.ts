@@ -122,6 +122,12 @@ export class Post extends Document {
   @Prop({ type: Date, default: null })
   publishedAt?: Date | null;
 
+  @Prop({ type: Date, default: null })
+  notificationsMutedUntil?: Date | null;
+
+  @Prop({ type: Boolean, default: false })
+  notificationsMutedIndefinitely?: boolean;
+
   @Prop({
     type: {
       hearts: { type: Number, default: 0 },

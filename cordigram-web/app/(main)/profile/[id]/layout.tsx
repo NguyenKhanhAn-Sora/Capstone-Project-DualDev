@@ -52,6 +52,46 @@ const formatCount = (value?: number) =>
 
 const isValidProfileId = (value: string) => /^[a-f0-9]{24}$/i.test(value);
 
+const getVisibilityStatus = (
+  visibility?: "public" | "followers" | "private",
+): "Private" | "Followers only" | "" => {
+  if (visibility === "private") return "Private";
+  if (visibility === "followers") return "Followers only";
+  return "";
+};
+
+const getFieldDisplay = (
+  value: string,
+  visibility?: "public" | "followers" | "private",
+): { text: string; muted: boolean } => {
+  const trimmed = value?.trim?.() ?? "";
+  if (trimmed) return { text: trimmed, muted: false };
+  const status = getVisibilityStatus(visibility);
+  if (status) return { text: status, muted: true };
+  return { text: "—", muted: true };
+};
+
+const canViewByVisibility = (
+  visibility: "public" | "followers" | "private" | undefined,
+  isOwner: boolean,
+  isFollower: boolean,
+) => {
+  if (isOwner) return true;
+  if (!visibility || visibility === "public") return true;
+  if (visibility === "followers") return isFollower;
+  return false;
+};
+
+const getVisibilityRestrictionMessage = (
+  visibility: "public" | "followers" | "private" | undefined,
+  fallback: string,
+) => {
+  if (visibility === "private") return `This ${fallback} is private.`;
+  if (visibility === "followers")
+    return `This ${fallback} is visible to followers only.`;
+  return "";
+};
+
 const getUserIdFromToken = (token: string | null): string | undefined => {
   if (!token) return undefined;
   try {
@@ -286,6 +326,35 @@ export default function ProfileLayout({
     [reportCategory],
   );
   const isOwner = profile && viewerId && profile.userId === viewerId;
+  const isFollower = Boolean(profile?.isFollowing);
+  const canViewProfile = profile
+    ? canViewByVisibility(
+        profile.visibility?.profile,
+        Boolean(isOwner),
+        isFollower,
+      )
+    : true;
+  const canViewAbout = profile
+    ? canViewByVisibility(
+        profile.visibility?.about,
+        Boolean(isOwner),
+        isFollower,
+      )
+    : false;
+  const canViewFollowers = profile
+    ? canViewByVisibility(
+        profile.visibility?.followers,
+        Boolean(isOwner),
+        isFollower,
+      )
+    : false;
+  const canViewFollowing = profile
+    ? canViewByVisibility(
+        profile.visibility?.following,
+        Boolean(isOwner),
+        isFollower,
+      )
+    : false;
 
   const createEmptyTab = useCallback((): ProfileTabState => {
     return { items: [], loading: false, loaded: false, error: "" };
@@ -669,6 +738,25 @@ export default function ProfileLayout({
     }
   };
 
+  const handleOverlayCountsChange = useCallback(
+    (delta: { followers?: number; following?: number }) => {
+      setProfile((prev) => {
+        if (!prev) return prev;
+        const nextFollowers = prev.stats.followers + (delta.followers ?? 0);
+        const nextFollowing = prev.stats.following + (delta.following ?? 0);
+        return {
+          ...prev,
+          stats: {
+            ...prev.stats,
+            followers: Math.max(0, nextFollowers),
+            following: Math.max(0, nextFollowing),
+          },
+        };
+      });
+    },
+    [],
+  );
+
   const handleSettings = () => {
     router.push("/settings");
   };
@@ -728,7 +816,7 @@ export default function ProfileLayout({
     setBlockError("");
     try {
       await blockUser({ token, userId: profile.userId });
-      showToast(`Đã chặn @${profile.username}`);
+      showToast(`Blocked @${profile.username}`);
       setBlockOpen(false);
       setBlockedView(true);
       setProfile(null);
@@ -737,7 +825,7 @@ export default function ProfileLayout({
       const message =
         typeof err === "object" && err && "message" in err
           ? String((err as { message?: string }).message)
-          : "Không thể chặn người dùng";
+          : "Unable to block user";
       setBlockError(message);
       showToast(message);
     } finally {
@@ -760,7 +848,7 @@ export default function ProfileLayout({
       return;
     }
     if (viewerId && profile.userId === viewerId) {
-      showToast("Bạn không thể báo cáo chính mình");
+      showToast("You cannot report yourself");
       setMenuOpen(false);
       return;
     }
@@ -827,6 +915,14 @@ export default function ProfileLayout({
     switch (key) {
       case "about":
         setMenuOpen(false);
+        if (!canViewAbout) {
+          const message = getVisibilityRestrictionMessage(
+            profile?.visibility?.about,
+            "about section",
+          );
+          showToast(message || "About section is not available.");
+          break;
+        }
         setAboutOpen(true);
         setAboutClosing(false);
         break;
@@ -1061,6 +1157,8 @@ export default function ProfileLayout({
             <ProfileSkeleton />
           ) : error ? (
             <div className={styles.errorBox}>{error}</div>
+          ) : profile && !canViewProfile ? (
+            <div className={styles.errorBox}>This profile is private.</div>
           ) : profile ? (
             <ProfileProvider value={{ profile, viewerId, tabs, prefetchTab }}>
               <div className={styles.header}>
@@ -1122,6 +1220,16 @@ export default function ProfileLayout({
                       label="Followers"
                       value={formatCount(profile.stats.followers)}
                       onClick={() => {
+                        if (!canViewFollowers) {
+                          const message = getVisibilityRestrictionMessage(
+                            profile.visibility?.followers,
+                            "followers list",
+                          );
+                          showToast(
+                            message || "Followers list is not available.",
+                          );
+                          return;
+                        }
                         setFollowersTab("followers");
                         setFollowersOpen(true);
                       }}
@@ -1130,6 +1238,16 @@ export default function ProfileLayout({
                       label="Following"
                       value={formatCount(profile.stats.following)}
                       onClick={() => {
+                        if (!canViewFollowing) {
+                          const message = getVisibilityRestrictionMessage(
+                            profile.visibility?.following,
+                            "following list",
+                          );
+                          showToast(
+                            message || "Following list is not available.",
+                          );
+                          return;
+                        }
                         setFollowersTab("following");
                         setFollowersOpen(true);
                       }}
@@ -1644,7 +1762,7 @@ export default function ProfileLayout({
           </div>
         </div>
       ) : null}
-      {!isOwner && profile && (aboutOpen || aboutClosing)
+      {!isOwner && profile && canViewAbout && (aboutOpen || aboutClosing)
         ? (() => {
             const p = profile!;
             return (
@@ -1702,6 +1820,12 @@ export default function ProfileLayout({
 
                       {p.bio ? (
                         <div className={styles.aboutBio}>{p.bio}</div>
+                      ) : getVisibilityStatus(p.visibility?.bio) ? (
+                        <div className={styles.aboutMuted}>
+                          {getVisibilityStatus(p.visibility?.bio) === "Private"
+                            ? "This bio is private."
+                            : "Bio visible to followers only."}
+                        </div>
                       ) : (
                         <div className={styles.aboutMuted}>
                           No bio provided.
@@ -1716,31 +1840,77 @@ export default function ProfileLayout({
                       <div className={styles.aboutRows}>
                         <div className={styles.aboutRow}>
                           <div className={styles.aboutLabel}>Workplace</div>
-                          <div className={styles.aboutValue}>
-                            {p.workplace?.companyName?.trim()
-                              ? p.workplace.companyName
-                              : "—"}
-                          </div>
+                          {(() => {
+                            const display = getFieldDisplay(
+                              p.workplace?.companyName ?? "",
+                              p.visibility?.workplace,
+                            );
+                            return (
+                              <div
+                                className={`${styles.aboutValue} ${
+                                  display.muted ? styles.aboutValueMuted : ""
+                                }`}
+                              >
+                                {display.text}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className={styles.aboutRow}>
                           <div className={styles.aboutLabel}>Location</div>
-                          <div className={styles.aboutValue}>
-                            {p.location?.trim() ? p.location : "—"}
-                          </div>
+                          {(() => {
+                            const display = getFieldDisplay(
+                              p.location ?? "",
+                              p.visibility?.location,
+                            );
+                            return (
+                              <div
+                                className={`${styles.aboutValue} ${
+                                  display.muted ? styles.aboutValueMuted : ""
+                                }`}
+                              >
+                                {display.text}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className={styles.aboutRow}>
                           <div className={styles.aboutLabel}>Gender</div>
-                          <div className={styles.aboutValue}>
-                            {p.gender?.trim()
-                              ? humanizeUnderscoreValue(p.gender)
-                              : "—"}
-                          </div>
+                          {(() => {
+                            const display = getFieldDisplay(
+                              p.gender?.trim()
+                                ? humanizeUnderscoreValue(p.gender)
+                                : "",
+                              p.visibility?.gender,
+                            );
+                            return (
+                              <div
+                                className={`${styles.aboutValue} ${
+                                  display.muted ? styles.aboutValueMuted : ""
+                                }`}
+                              >
+                                {display.text}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className={styles.aboutRow}>
                           <div className={styles.aboutLabel}>Birthdate</div>
-                          <div className={styles.aboutValue}>
-                            {p.birthdate?.trim() ? p.birthdate : "—"}
-                          </div>
+                          {(() => {
+                            const display = getFieldDisplay(
+                              p.birthdate ?? "",
+                              p.visibility?.birthdate,
+                            );
+                            return (
+                              <div
+                                className={`${styles.aboutValue} ${
+                                  display.muted ? styles.aboutValueMuted : ""
+                                }`}
+                              >
+                                {display.text}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -1774,15 +1944,18 @@ export default function ProfileLayout({
         : null}
       {toast ? <div className={styles.toast}>{toast}</div> : null}
       {profile ? (
-        <FollowersOverlay
-          open={followersOpen}
-          closing={followersClosing}
-          ownerUserId={profile.userId}
-          ownerUsername={profile.username}
-          initialTab={followersTab}
-          viewerId={viewerId}
-          onClose={closeFollowersModal}
-        />
+        (followersTab === "followers" ? canViewFollowers : canViewFollowing) ? (
+          <FollowersOverlay
+            open={followersOpen}
+            closing={followersClosing}
+            ownerUserId={profile.userId}
+            ownerUsername={profile.username}
+            initialTab={followersTab}
+            viewerId={viewerId}
+            onCountsChange={handleOverlayCountsChange}
+            onClose={closeFollowersModal}
+          />
+        ) : null
       ) : null}
     </div>
   );

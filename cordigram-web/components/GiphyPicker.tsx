@@ -65,7 +65,7 @@ export default function GiphyPicker({
       setGifs(response.data);
     } catch (err) {
       console.error("Failed to load trending:", err);
-      setError("Không thể tải nội dung phổ biến");
+      setError("Unable to load trending content");
     } finally {
       setLoading(false);
     }
@@ -88,7 +88,7 @@ export default function GiphyPicker({
         setGifs(response.data);
       } catch (err) {
         console.error("Failed to search:", err);
-        setError("Không thể tìm kiếm");
+        setError("Unable to search");
       } finally {
         setLoading(false);
       }
@@ -145,7 +145,7 @@ export default function GiphyPicker({
             ref={searchInputRef}
             type="text"
             className={styles.searchInput}
-            placeholder={`Tìm ${activeTab === "gif" ? "GIF" : "sticker"}...`}
+            placeholder={`Search ${activeTab === "gif" ? "GIFs" : "stickers"}...`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -156,20 +156,20 @@ export default function GiphyPicker({
           {loading && (
             <div className={styles.loading}>
               <div className={styles.spinner}></div>
-              <p>Đang tải...</p>
+              <p>Loading...</p>
             </div>
           )}
 
           {error && (
             <div className={styles.error}>
               <p>{error}</p>
-              <button onClick={loadTrending}>Thử lại</button>
+              <button onClick={loadTrending}>Try again</button>
             </div>
           )}
 
           {!loading && !error && gifs.length === 0 && (
             <div className={styles.empty}>
-              <p>Không tìm thấy kết quả</p>
+              <p>No results found</p>
             </div>
           )}
 

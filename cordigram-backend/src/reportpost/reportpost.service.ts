@@ -6,8 +6,10 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Post } from '../posts/post.schema';
+import { Profile } from '../profiles/profile.schema';
 import { CreateReportPostDto } from './dto/create-reportpost.dto';
 import { ReportPost, ReportPostReasons } from './reportpost.schema';
+import { ActivityLogService } from '../activity/activity.service';
 
 @Injectable()
 export class ReportPostService {
@@ -16,6 +18,9 @@ export class ReportPostService {
     private readonly reportPostModel: Model<ReportPost>,
     @InjectModel(Post.name)
     private readonly postModel: Model<Post>,
+    @InjectModel(Profile.name)
+    private readonly profileModel: Model<Profile>,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async create(
@@ -28,7 +33,10 @@ export class ReportPostService {
       throw new BadRequestException('Invalid report reason');
     }
 
-    const post = await this.postModel.findById(postId).select('_id');
+    const post = await this.postModel
+      .findById(postId)
+      .select('authorId kind content media')
+      .lean();
     if (!post) {
       throw new NotFoundException('Post not found');
     }
@@ -53,6 +61,30 @@ export class ReportPostService {
       { _id: postId },
       { $inc: { 'stats.reports': 1 } },
     );
+
+    const authorProfile = post.authorId
+      ? await this.profileModel
+          .findOne({ userId: post.authorId })
+          .select('displayName username avatarUrl')
+          .lean()
+      : null;
+
+    await this.activityLogService.log({
+      userId: reporterId,
+      type: 'report_post',
+      postId,
+      postKind: post.kind ?? 'post',
+      meta: {
+        postCaption: post.content ?? null,
+        postMediaUrl: post.media?.[0]?.url ?? null,
+        postAuthorId: post.authorId?.toString?.() ?? null,
+        postAuthorDisplayName: authorProfile?.displayName ?? null,
+        postAuthorUsername: authorProfile?.username ?? null,
+        postAuthorAvatarUrl: authorProfile?.avatarUrl ?? null,
+        reportCategory: dto.category,
+        reportReason: dto.reason,
+      },
+    });
 
     return created;
   }

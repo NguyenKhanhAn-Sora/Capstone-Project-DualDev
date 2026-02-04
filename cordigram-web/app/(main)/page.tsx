@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import styles from "./home-feed.module.css";
 import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
 import RepostOverlay, {
   type QuoteInput,
@@ -23,6 +22,7 @@ import {
   createReel,
   setPostAllowComments,
   setPostHideLikeCount,
+  updatePostNotificationMute,
   deletePost,
   fetchPostDetail,
   reportPost,
@@ -39,10 +39,14 @@ import {
   type FeedItem,
   type CurrentProfileResponse,
 } from "@/lib/api";
+import { DateSelect } from "@/ui/date-select/date-select";
+import { TimeSelect } from "@/ui/time-select/time-select";
 import PeopleYouMayKnow from "@/ui/people-you-may-know/people-you-may-know";
 import { formatDistanceToNow } from "date-fns";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useScrollRestoration } from "@/hooks/use-scroll-restoration";
+import { useTranslations } from "next-intl";
+import styles from "./home-feed.module.css";
 
 type LocalFlags = {
   liked?: boolean;
@@ -72,6 +76,8 @@ const onlyPostViews = (items: PostViewState[]): PostViewState[] =>
 type FeedRemotePatch = Partial<FeedItem> & {
   liked?: boolean;
   saved?: boolean;
+  notificationsMutedUntil?: string | null;
+  notificationsMutedIndefinitely?: boolean;
 };
 
 const getUserIdFromToken = (token: string | null): string | undefined => {
@@ -115,6 +121,20 @@ const cleanLocationLabel = (label: string) =>
     .replace(/\s*,\s*$/g, "")
     .replace(/^\s*,\s*/g, "")
     .trim();
+
+const formatLocalDate = (value: Date) => {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const buildLocalDateTimeIso = (date: string, time: string) => {
+  if (!date || !time) return null;
+  const dt = new Date(`${date}T${time}:00`);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString();
+};
 
 const extractMentionsFromCaption = (value: string) => {
   const handles = new Set<string>();
@@ -301,96 +321,6 @@ type ReportCategory = {
   reasons: Array<{ key: string; label: string }>;
 };
 
-const REPORT_GROUPS: ReportCategory[] = [
-  {
-    key: "abuse",
-    label: "Harassment / Hate speech",
-    accent: "#f59e0b",
-    reasons: [
-      { key: "harassment", label: "Targets an individual to harass" },
-      { key: "hate_speech", label: "Hate speech or discrimination" },
-      { key: "offensive_discrimination", label: "Attacks vulnerable groups" },
-    ],
-  },
-  {
-    key: "violence",
-    label: "Violence / Threats",
-    accent: "#ef4444",
-    reasons: [
-      { key: "violence_threats", label: "Threatens or promotes violence" },
-      { key: "graphic_violence", label: "Graphic violent imagery" },
-      { key: "extremism", label: "Extremism or terrorism" },
-      { key: "self_harm", label: "Self-harm or suicide" },
-    ],
-  },
-  {
-    key: "sensitive",
-    label: "Sensitive content",
-    accent: "#a855f7",
-    reasons: [
-      { key: "nudity", label: "Nudity or adult content" },
-      { key: "minor_nudity", label: "Minor safety risk" },
-      { key: "sexual_solicitation", label: "Sexual solicitation" },
-    ],
-  },
-  {
-    key: "misinfo",
-    label: "Impersonation / Misinformation",
-    accent: "#22c55e",
-    reasons: [
-      { key: "fake_news", label: "False or misleading information" },
-      { key: "impersonation", label: "Impersonation of a person or org" },
-    ],
-  },
-  {
-    key: "spam",
-    label: "Spam / Scam",
-    accent: "#14b8a6",
-    reasons: [
-      { key: "spam", label: "Spam or irrelevant content" },
-      { key: "financial_scam", label: "Financial scam" },
-      { key: "unsolicited_ads", label: "Unwanted advertising" },
-    ],
-  },
-  {
-    key: "ip",
-    label: "Intellectual property",
-    accent: "#3b82f6",
-    reasons: [
-      { key: "copyright", label: "Copyright infringement" },
-      { key: "trademark", label: "Trademark violation" },
-      { key: "brand_impersonation", label: "Brand impersonation" },
-    ],
-  },
-  {
-    key: "illegal",
-    label: "Illegal activity",
-    accent: "#f97316",
-    reasons: [
-      { key: "contraband", label: "Contraband" },
-      { key: "illegal_transaction", label: "Illegal transaction" },
-    ],
-  },
-  {
-    key: "privacy",
-    label: "Privacy violation",
-    accent: "#06b6d4",
-    reasons: [
-      { key: "doxxing", label: "Doxxing private information" },
-      {
-        key: "nonconsensual_intimate",
-        label: "Non-consensual intimate content",
-      },
-    ],
-  },
-  {
-    key: "other",
-    label: "Other",
-    accent: "#94a3b8",
-    reasons: [{ key: "other", label: "Other reason" }],
-  },
-];
-
 export default function HomePage({
   scopeOverride,
   kindsOverride,
@@ -415,6 +345,8 @@ export default function HomePage({
   cardClassName?: string;
 } = {}) {
   const canRender = useRequireAuth();
+  const t = useTranslations("home");
+  const tCommon = useTranslations("common");
   const pathname = usePathname();
   const pageSize = pageSizeOverride ?? PAGE_SIZE;
   const [items, setItems] = useState<PostViewState[]>([]);
@@ -484,6 +416,167 @@ export default function HomePage({
   const autoLoadEnabled = showLoadMore;
   const showSidebar = !embedded && !hideSidebar;
 
+  const reportGroups = useMemo<ReportCategory[]>(
+    () => [
+      {
+        key: "abuse",
+        label: t("report.groups.abuse.label"),
+        accent: "#f59e0b",
+        reasons: [
+          {
+            key: "harassment",
+            label: t("report.groups.abuse.reasons.harassment"),
+          },
+          {
+            key: "hate_speech",
+            label: t("report.groups.abuse.reasons.hateSpeech"),
+          },
+          {
+            key: "offensive_discrimination",
+            label: t("report.groups.abuse.reasons.offensiveDiscrimination"),
+          },
+        ],
+      },
+      {
+        key: "violence",
+        label: t("report.groups.violence.label"),
+        accent: "#ef4444",
+        reasons: [
+          {
+            key: "violence_threats",
+            label: t("report.groups.violence.reasons.violenceThreats"),
+          },
+          {
+            key: "graphic_violence",
+            label: t("report.groups.violence.reasons.graphicViolence"),
+          },
+          {
+            key: "extremism",
+            label: t("report.groups.violence.reasons.extremism"),
+          },
+          {
+            key: "self_harm",
+            label: t("report.groups.violence.reasons.selfHarm"),
+          },
+        ],
+      },
+      {
+        key: "sensitive",
+        label: t("report.groups.sensitive.label"),
+        accent: "#a855f7",
+        reasons: [
+          {
+            key: "nudity",
+            label: t("report.groups.sensitive.reasons.nudity"),
+          },
+          {
+            key: "minor_nudity",
+            label: t("report.groups.sensitive.reasons.minorNudity"),
+          },
+          {
+            key: "sexual_solicitation",
+            label: t("report.groups.sensitive.reasons.sexualSolicitation"),
+          },
+        ],
+      },
+      {
+        key: "misinfo",
+        label: t("report.groups.misinfo.label"),
+        accent: "#22c55e",
+        reasons: [
+          {
+            key: "fake_news",
+            label: t("report.groups.misinfo.reasons.fakeNews"),
+          },
+          {
+            key: "impersonation",
+            label: t("report.groups.misinfo.reasons.impersonation"),
+          },
+        ],
+      },
+      {
+        key: "spam",
+        label: t("report.groups.spam.label"),
+        accent: "#14b8a6",
+        reasons: [
+          {
+            key: "spam",
+            label: t("report.groups.spam.reasons.spam"),
+          },
+          {
+            key: "financial_scam",
+            label: t("report.groups.spam.reasons.financialScam"),
+          },
+          {
+            key: "unsolicited_ads",
+            label: t("report.groups.spam.reasons.unsolicitedAds"),
+          },
+        ],
+      },
+      {
+        key: "ip",
+        label: t("report.groups.ip.label"),
+        accent: "#3b82f6",
+        reasons: [
+          {
+            key: "copyright",
+            label: t("report.groups.ip.reasons.copyright"),
+          },
+          {
+            key: "trademark",
+            label: t("report.groups.ip.reasons.trademark"),
+          },
+          {
+            key: "brand_impersonation",
+            label: t("report.groups.ip.reasons.brandImpersonation"),
+          },
+        ],
+      },
+      {
+        key: "illegal",
+        label: t("report.groups.illegal.label"),
+        accent: "#f97316",
+        reasons: [
+          {
+            key: "contraband",
+            label: t("report.groups.illegal.reasons.contraband"),
+          },
+          {
+            key: "illegal_transaction",
+            label: t("report.groups.illegal.reasons.illegalTransaction"),
+          },
+        ],
+      },
+      {
+        key: "privacy",
+        label: t("report.groups.privacy.label"),
+        accent: "#06b6d4",
+        reasons: [
+          {
+            key: "doxxing",
+            label: t("report.groups.privacy.reasons.doxxing"),
+          },
+          {
+            key: "nonconsensual_intimate",
+            label: t("report.groups.privacy.reasons.nonconsensualIntimate"),
+          },
+        ],
+      },
+      {
+        key: "other",
+        label: t("report.groups.other.label"),
+        accent: "#94a3b8",
+        reasons: [
+          {
+            key: "other",
+            label: t("report.groups.other.reasons.other"),
+          },
+        ],
+      },
+    ],
+    [t],
+  );
+
   const repostHeartsByOriginalId = useMemo(() => {
     const totals = new Map<string, number>();
     for (const entry of visibleItems) {
@@ -525,8 +618,8 @@ export default function HomePage({
   );
 
   const selectedReportGroup = useMemo(
-    () => REPORT_GROUPS.find((g) => g.key === reportCategory),
-    [reportCategory],
+    () => reportGroups.find((g) => g.key === reportCategory),
+    [reportCategory, reportGroups],
   );
 
   const resolveOriginalPostId = useCallback(
@@ -670,7 +763,7 @@ export default function HomePage({
   const load = useCallback(
     async (nextPage: number) => {
       if (!token) {
-        setError("Sign in to view the feed");
+        setError(t("feed.signInToView"));
         return;
       }
       setLoading(true);
@@ -721,8 +814,8 @@ export default function HomePage({
       } catch (err) {
         const msg =
           typeof err === "object" && err && "message" in err
-            ? (err as { message?: string }).message || "Unable to load feed"
-            : "Unable to load feed";
+            ? (err as { message?: string }).message || t("feed.unableToLoad")
+            : t("feed.unableToLoad");
         setError(msg);
       } finally {
         setInitialized(true);
@@ -735,6 +828,7 @@ export default function HomePage({
       persistFeedCache,
       scopeOverride,
       searchQueryOverride,
+      t,
       token,
     ],
   );
@@ -926,7 +1020,7 @@ export default function HomePage({
     anchor?: DOMRect | null,
   ) => {
     if (!token) {
-      showToast("Sign in to repost");
+      showToast(t("toast.signInToRepost"));
       return;
     }
     setRepostTarget({ postId, label, kind, originalAllowDownload });
@@ -957,7 +1051,7 @@ export default function HomePage({
   const handleQuickRepost = useCallback(
     async (target: RepostTarget) => {
       if (!token) {
-        showToast("Sign in to repost");
+        showToast(t("toast.signInToRepost"));
         return;
       }
       const originalId = resolveOriginalPostId(target.postId);
@@ -970,15 +1064,15 @@ export default function HomePage({
           await repostPost({ token, postId: targetId });
         } catch {}
       }
-      showToast("Reposted");
+      showToast(t("toast.reposted"));
     },
-    [incrementRepostStat, resolveOriginalPostId, showToast, token],
+    [incrementRepostStat, resolveOriginalPostId, showToast, t, token],
   );
 
   const handleShareQuote = useCallback(
     async (target: RepostTarget, input: QuoteInput) => {
       if (!token) {
-        showToast("Sign in to repost");
+        showToast(t("toast.signInToRepost"));
         return;
       }
       const originalId = resolveOriginalPostId(target.postId);
@@ -1012,9 +1106,9 @@ export default function HomePage({
         } catch {}
       }
 
-      showToast("Reposted with quote");
+      showToast(t("toast.repostedWithQuote"));
     },
-    [incrementRepostStat, resolveOriginalPostId, showToast, token],
+    [incrementRepostStat, resolveOriginalPostId, showToast, t, token],
   );
 
   const onHide = async (postId: string) => {
@@ -1034,7 +1128,7 @@ export default function HomePage({
     );
     try {
       await setPostAllowComments({ token, postId, allowComments });
-      showToast(allowComments ? "Comments turned on" : "Comments turned off");
+      showToast(allowComments ? t("toast.commentsOn") : t("toast.commentsOff"));
     } catch {
       setItems((prev) =>
         prev.map((p) =>
@@ -1043,7 +1137,7 @@ export default function HomePage({
             : p,
         ),
       );
-      showToast("Failed to update comments");
+      showToast(t("toast.commentsUpdateFailed"));
     }
   };
 
@@ -1059,7 +1153,11 @@ export default function HomePage({
     );
     try {
       await setPostHideLikeCount({ token, postId, hideLikeCount });
-      showToast(hideLikeCount ? "Like count hidden" : "Like count visible");
+      showToast(
+        hideLikeCount
+          ? t("toast.likeCountHidden")
+          : t("toast.likeCountVisible"),
+      );
     } catch {
       setItems((prev) =>
         prev.map((p) =>
@@ -1068,7 +1166,7 @@ export default function HomePage({
             : p,
         ),
       );
-      showToast("Failed to update like count visibility");
+      showToast(t("toast.likeCountUpdateFailed"));
     }
   };
 
@@ -1090,6 +1188,12 @@ export default function HomePage({
                   visibility: patch.visibility ?? p.item.visibility,
                   allowComments: patch.allowComments ?? p.item.allowComments,
                   hideLikeCount: patch.hideLikeCount ?? p.item.hideLikeCount,
+                  notificationsMutedUntil:
+                    patch.notificationsMutedUntil ??
+                    p.item.notificationsMutedUntil,
+                  notificationsMutedIndefinitely:
+                    patch.notificationsMutedIndefinitely ??
+                    p.item.notificationsMutedIndefinitely,
                   stats: patch.stats ?? p.item.stats,
                 },
                 flags: {
@@ -1123,17 +1227,17 @@ export default function HomePage({
           document.execCommand("copy");
           document.body.removeChild(textarea);
         }
-        showToast("Link copied to clipboard");
+        showToast(t("toast.linkCopied"));
       } catch {
-        showToast("Failed to copy link");
+        showToast(t("toast.linkCopyFailed"));
       }
     },
-    [showToast],
+    [showToast, t],
   );
 
   const onDeleteIntent = (postId: string, label: string) => {
     if (!token) {
-      showToast("Please sign in to delete posts");
+      showToast(t("toast.signInToDelete"));
       return;
     }
     setDeleteTarget({ postId, label });
@@ -1148,7 +1252,7 @@ export default function HomePage({
 
   const confirmDelete = async () => {
     if (!token || !deleteTarget) {
-      setDeleteError("Please sign in to delete posts");
+      setDeleteError(t("toast.signInToDelete"));
       return;
     }
     setDeleteSubmitting(true);
@@ -1161,12 +1265,12 @@ export default function HomePage({
         return next;
       });
       setDeleteTarget(null);
-      showToast("Deleted post");
+      showToast(t("toast.deletedPost"));
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Failed to delete post"
-          : "Failed to delete post";
+          ? (err as { message?: string }).message || t("toast.deleteFailed")
+          : t("toast.deleteFailed");
       setDeleteError(message);
     } finally {
       setDeleteSubmitting(false);
@@ -1212,12 +1316,13 @@ export default function HomePage({
         note: reportNote.trim() || undefined,
       });
       closeReportModal();
-      showToast("Report submitted");
+      showToast(t("toast.reportSubmitted"));
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Could not submit report"
-          : "Could not submit report";
+          ? (err as { message?: string }).message ||
+            t("toast.reportSubmitFailed")
+          : t("toast.reportSubmitFailed");
       setReportError(message);
     } finally {
       setReportSubmitting(false);
@@ -1249,15 +1354,15 @@ export default function HomePage({
       );
       const message =
         typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Action failed"
-          : "Action failed";
+          ? (err as { message?: string }).message || t("toast.actionFailed")
+          : t("toast.actionFailed");
       setError(message);
     }
   };
 
   const onBlockIntent = (userId?: string, label?: string) => {
     if (!token || !userId) return;
-    setBlockTarget({ userId, label: label || "this user" });
+    setBlockTarget({ userId, label: label || t("block.thisUser") });
   };
 
   const confirmBlock = async () => {
@@ -1274,8 +1379,8 @@ export default function HomePage({
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Block failed"
-          : "Block failed";
+          ? (err as { message?: string }).message || t("toast.blockFailed")
+          : t("toast.blockFailed");
       setError(message);
     } finally {
       setBlocking(false);
@@ -1346,13 +1451,16 @@ export default function HomePage({
         <div ref={loadMoreRef} style={{ height: 1 }} aria-hidden />
         {showLoadMore && hasMore && !loading && (
           <button className={styles.loadMore} onClick={handleLoadMore}>
-            Load more
+            {t("feed.loadMore")}
           </button>
         )}
       </div>
 
       {showSidebar ? (
-        <aside className={styles.rightColumn} aria-label="Suggestions">
+        <aside
+          className={styles.rightColumn}
+          aria-label={t("feed.suggestionsAria")}
+        >
           <div className={styles.rightStack}>
             <PeopleYouMayKnow token={token} />
           </div>
@@ -1370,9 +1478,9 @@ export default function HomePage({
             className={styles.modalCard}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className={styles.modalTitle}>Delete this post?</h3>
+            <h3 className={styles.modalTitle}>{t("delete.title")}</h3>
             <p className={styles.modalBody}>
-              {`${deleteTarget.label}'s post will be removed for everyone. This action cannot be undone.`}
+              {t("delete.body", { name: deleteTarget.label })}
             </p>
             {deleteError ? (
               <div className={styles.inlineError}>{deleteError}</div>
@@ -1383,14 +1491,14 @@ export default function HomePage({
                 onClick={closeDeleteModal}
                 disabled={deleteSubmitting}
               >
-                Cancel
+                {t("delete.cancel")}
               </button>
               <button
                 className={styles.modalDanger}
                 onClick={confirmDelete}
                 disabled={deleteSubmitting}
               >
-                {deleteSubmitting ? "Deleting..." : "Delete"}
+                {deleteSubmitting ? t("delete.deleting") : t("delete.confirm")}
               </button>
             </div>
           </div>
@@ -1400,9 +1508,9 @@ export default function HomePage({
       {blockTarget ? (
         <div className={styles.modalOverlay} role="dialog" aria-modal="true">
           <div className={styles.modalCard}>
-            <h3 className={styles.modalTitle}>Block this account?</h3>
+            <h3 className={styles.modalTitle}>{t("block.title")}</h3>
             <p className={styles.modalBody}>
-              {`You are about to block ${blockTarget.label}. They will no longer be able to interact with you.`}
+              {t("block.body", { name: blockTarget.label })}
             </p>
             <div className={styles.modalActions}>
               <button
@@ -1410,14 +1518,14 @@ export default function HomePage({
                 onClick={() => setBlockTarget(undefined)}
                 disabled={blocking}
               >
-                Cancel
+                {t("block.cancel")}
               </button>
               <button
                 className={styles.modalDanger}
                 onClick={confirmBlock}
                 disabled={blocking}
               >
-                {blocking ? "Blocking..." : "Block"}
+                {blocking ? t("block.blocking") : t("block.confirm")}
               </button>
             </div>
           </div>
@@ -1439,14 +1547,14 @@ export default function HomePage({
           >
             <div className={styles.modalHeader}>
               <div>
-                <h3 className={styles.modalTitle}>Report this post</h3>
+                <h3 className={styles.modalTitle}>{t("report.title")}</h3>
                 <p className={styles.modalBody}>
-                  {`Reporting @${reportTarget.label} post. Please pick the most accurate reason.`}
+                  {t("report.description", { name: reportTarget.label })}
                 </p>
               </div>
               <button
                 className={styles.closeBtn}
-                aria-label="Close"
+                aria-label={tCommon("close")}
                 onClick={closeReportModal}
               >
                 <IconClose size={24} />
@@ -1455,7 +1563,7 @@ export default function HomePage({
 
             <div className={styles.reportGrid}>
               <div className={styles.categoryGrid}>
-                {REPORT_GROUPS.map((group) => {
+                {reportGroups.map((group) => {
                   const isActive = reportCategory === group.key;
                   return (
                     <button
@@ -1492,7 +1600,7 @@ export default function HomePage({
 
               <div className={styles.reasonPanel}>
                 <div className={styles.reasonHeader}>
-                  Select a specific reason
+                  {t("report.selectReason")}
                 </div>
                 {selectedReportGroup ? (
                   <div className={styles.reasonList}>
@@ -1521,15 +1629,15 @@ export default function HomePage({
                   </div>
                 ) : (
                   <div className={styles.reasonPlaceholder}>
-                    Pick a category first.
+                    {t("report.pickCategory")}
                   </div>
                 )}
 
                 <label className={styles.noteLabel}>
-                  Additional notes (optional)
+                  {t("report.notes.label")}
                   <textarea
                     className={styles.noteInput}
-                    placeholder="Add brief context if needed..."
+                    placeholder={t("report.notes.placeholder")}
                     value={reportNote}
                     onChange={(e) => setReportNote(e.target.value)}
                     maxLength={500}
@@ -1547,14 +1655,14 @@ export default function HomePage({
                 onClick={closeReportModal}
                 disabled={reportSubmitting}
               >
-                Cancel
+                {t("report.cancel")}
               </button>
               <button
                 className={styles.modalPrimary}
                 disabled={!reportReason || reportSubmitting}
                 onClick={submitReport}
               >
-                {reportSubmitting ? "Submitting..." : "Submit report"}
+                {reportSubmitting ? t("report.submitting") : t("report.submit")}
               </button>
             </div>
           </div>
@@ -1624,6 +1732,8 @@ function FeedCard({
   onRemoteUpdate: (postId: string, patch: FeedRemotePatch) => void;
   onPersistFeedCache?: () => void;
 }) {
+  const t = useTranslations("home");
+  const tCommon = useTranslations("common");
   const {
     id,
     authorId,
@@ -1633,6 +1743,7 @@ function FeedCard({
     author,
     content,
     createdAt,
+    publishedAt,
     media,
     stats,
     mentions,
@@ -1648,7 +1759,11 @@ function FeedCard({
     repostOfAuthorUsername,
     repostOfAuthorDisplayName,
     repostOfAuthorAvatarUrl,
+    notificationsMutedUntil,
+    notificationsMutedIndefinitely,
   } = data;
+
+  const displayAt = publishedAt || createdAt;
 
   const mediaKey = useMemo(() => {
     if (!Array.isArray(media) || media.length === 0) return "";
@@ -1898,6 +2013,12 @@ function FeedCard({
   >(visibility ?? "public");
   const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [visibilityError, setVisibilityError] = useState<string>("");
+  const [muteModalOpen, setMuteModalOpen] = useState(false);
+  const [muteOption, setMuteOption] = useState("5m");
+  const [muteCustomDate, setMuteCustomDate] = useState("");
+  const [muteCustomTime, setMuteCustomTime] = useState("");
+  const [muteError, setMuteError] = useState<string>("");
+  const [muteSaving, setMuteSaving] = useState(false);
   const visibilityOptions: Array<{
     value: "public" | "followers" | "private";
     title: string;
@@ -1905,20 +2026,34 @@ function FeedCard({
   }> = [
     {
       value: "public",
-      title: "Public",
-      description: "Anyone can view this post",
+      title: t("visibility.options.public.title"),
+      description: t("visibility.options.public.description"),
     },
     {
       value: "followers",
-      title: "Friends / Following",
-      description: "Only followers can view this post",
+      title: t("visibility.options.followers.title"),
+      description: t("visibility.options.followers.description"),
     },
     {
       value: "private",
-      title: "Private",
-      description: "Only you can view this post",
+      title: t("visibility.options.private.title"),
+      description: t("visibility.options.private.description"),
     },
   ];
+
+  const muteOptions = useMemo(
+    () => [
+      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
+      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
+      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
+      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
+      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
+      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: "Until I turn it back on", ms: null },
+      { key: "custom", label: "Choose date & time", ms: null },
+    ],
+    [],
+  );
 
   useEffect(() => {
     setVisibilitySelected(visibility ?? "public");
@@ -2116,7 +2251,7 @@ function FeedCard({
       setMentionSuggestions([]);
       setMentionOpen(false);
       setMentionHighlight(-1);
-      setMentionError("Sign in to mention users");
+      setMentionError(t("mention.signIn"));
       return;
     }
 
@@ -2135,14 +2270,14 @@ function FeedCard({
         setMentionOpen(res.items.length > 0);
         setMentionHighlight(res.items.length ? 0 : -1);
         if (!res.items.length) {
-          setMentionError("User not found");
+          setMentionError(t("mention.userNotFound"));
         }
       } catch (err) {
         if (cancelled) return;
         setMentionSuggestions([]);
         setMentionOpen(false);
         setMentionHighlight(-1);
-        setMentionError("User not found");
+        setMentionError(t("mention.userNotFound"));
       } finally {
         if (!cancelled) setMentionLoading(false);
       }
@@ -2249,7 +2384,7 @@ function FeedCard({
         setLocationSuggestions([]);
         setLocationOpen(false);
         setLocationHighlight(-1);
-        setLocationError("No suggestions found, try different keywords.");
+        setLocationError(t("edit.location.noSuggestionsError"));
       } finally {
         if (!controller.signal.aborted) setLocationLoading(false);
       }
@@ -2336,7 +2471,7 @@ function FeedCard({
     setEditSuccess("");
 
     if (!token) {
-      setEditError("Please sign in to edit posts");
+      setEditError(t("edit.signInToEdit"));
       return;
     }
 
@@ -2375,13 +2510,13 @@ function FeedCard({
       setEditSaving(true);
       const updated = await updatePost({ token, postId: id, payload });
       onRemoteUpdate(id, updated);
-      setEditSuccess("Post updated");
+      setEditSuccess(t("edit.updated"));
       setEditOpen(false);
     } catch (err: any) {
       const message =
         (err && typeof err === "object" && "message" in err
           ? (err as { message?: string }).message
-          : null) || "Failed to update post";
+          : null) || t("edit.updateFailed");
       setEditError(message);
     } finally {
       setEditSaving(false);
@@ -2727,9 +2862,11 @@ function FeedCard({
     repostOfAuthorDisplayName ||
     (repostOfAuthorUsername ? `@${repostOfAuthorUsername}` : null);
   const commentsToggleLabel = allowComments
-    ? "Turn off comments"
-    : "Turn on comments";
-  const hideLikeToggleLabel = hideLikeCount ? "Show like" : "Hide like";
+    ? t("menu.turnOffComments")
+    : t("menu.turnOnComments");
+  const hideLikeToggleLabel = hideLikeCount
+    ? t("menu.showLike")
+    : t("menu.hideLike");
   const showInlineFollow =
     !isSelf &&
     Boolean(authorOwnerId) &&
@@ -2737,12 +2874,24 @@ function FeedCard({
 
   const shareCount = stats.reposts ?? stats.shares ?? 0;
 
+  const isMutedForPost = useMemo(() => {
+    if (!isSelf) return false;
+    if (notificationsMutedIndefinitely) return true;
+    if (notificationsMutedUntil) {
+      const dt = new Date(notificationsMutedUntil);
+      if (!Number.isNaN(dt.getTime()) && dt.getTime() > Date.now()) {
+        return true;
+      }
+    }
+    return false;
+  }, [isSelf, notificationsMutedIndefinitely, notificationsMutedUntil]);
+
   const disableVisibilityUpdate =
     visibilitySaving || visibilitySelected === (visibility ?? "public");
 
   const submitVisibilityUpdate = async () => {
     if (!token) {
-      setVisibilityError("Please sign in");
+      setVisibilityError(t("visibility.signIn"));
       return;
     }
     if (disableVisibilityUpdate) return;
@@ -2759,7 +2908,7 @@ function FeedCard({
       onRemoteUpdate(id, { visibility: visibilitySelected });
       setVisibilityModalOpen(false);
     } catch (err: any) {
-      setVisibilityError(err?.message || "Failed to update visibility");
+      setVisibilityError(err?.message || t("visibility.updateFailed"));
     } finally {
       setVisibilitySaving(false);
     }
@@ -2768,6 +2917,101 @@ function FeedCard({
   const closeVisibilityModal = () => {
     if (visibilitySaving) return;
     setVisibilityModalOpen(false);
+  };
+
+  const openMuteModal = () => {
+    setMuteError("");
+    setMuteOption("5m");
+    setMuteCustomDate("");
+    setMuteCustomTime("");
+    setMuteModalOpen(true);
+  };
+
+  const closeMuteModal = () => {
+    if (muteSaving) return;
+    setMuteModalOpen(false);
+  };
+
+  const handleEnablePostNotifications = async () => {
+    if (!token) {
+      setMuteError(t("visibility.signIn"));
+      return;
+    }
+    setMuteSaving(true);
+    setMuteError("");
+    try {
+      const res = await updatePostNotificationMute({
+        token,
+        postId: id,
+        enabled: true,
+      });
+      onRemoteUpdate(id, {
+        notificationsMutedUntil: res.mutedUntil ?? null,
+        notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+      });
+      setMuteModalOpen(false);
+    } catch (err: any) {
+      setMuteError(err?.message || t("visibility.updateFailed"));
+    } finally {
+      setMuteSaving(false);
+    }
+  };
+
+  const handleSavePostMute = async () => {
+    if (!token) {
+      setMuteError(t("visibility.signIn"));
+      return;
+    }
+
+    setMuteSaving(true);
+    setMuteError("");
+
+    try {
+      let mutedUntil: string | null = null;
+      let mutedIndefinitely = false;
+
+      const selected = muteOptions.find((opt) => opt.key === muteOption);
+
+      if (muteOption === "until") {
+        mutedIndefinitely = true;
+      } else if (muteOption === "custom") {
+        const iso = buildLocalDateTimeIso(muteCustomDate, muteCustomTime);
+        if (!iso) {
+          setMuteError("Please select a valid date and time.");
+          setMuteSaving(false);
+          return;
+        }
+        const dt = new Date(iso);
+        if (dt.getTime() <= Date.now()) {
+          setMuteError("Please choose a future time.");
+          setMuteSaving(false);
+          return;
+        }
+        mutedUntil = iso;
+      } else if (selected?.ms) {
+        mutedUntil = new Date(Date.now() + selected.ms).toISOString();
+      } else {
+        mutedIndefinitely = true;
+      }
+
+      const res = await updatePostNotificationMute({
+        token,
+        postId: id,
+        mutedUntil,
+        mutedIndefinitely,
+      });
+
+      onRemoteUpdate(id, {
+        notificationsMutedUntil: res.mutedUntil ?? null,
+        notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+      });
+
+      setMuteModalOpen(false);
+    } catch (err: any) {
+      setMuteError(err?.message || t("visibility.updateFailed"));
+    } finally {
+      setMuteSaving(false);
+    }
   };
 
   const editModal = (
@@ -2783,11 +3027,11 @@ function FeedCard({
       >
         <div className={styles.modalHeader}>
           <div>
-            <h3 className={styles.modalTitle}>Edit post</h3>
+            <h3 className={styles.modalTitle}>{t("edit.title")}</h3>
           </div>
           <button
             className={styles.closeBtn}
-            aria-label="Close"
+            aria-label={tCommon("close")}
             onClick={closeEditModal}
             type="button"
           >
@@ -2798,23 +3042,23 @@ function FeedCard({
         <form className={styles.editForm} onSubmit={handleEditSubmit}>
           <label className={styles.editLabel}>
             <div className={styles.editLabelRow}>
-              <span className={styles.editLabelText}>Caption</span>
+              <span className={styles.editLabelText}>{t("edit.caption")}</span>
               <div className={styles.emojiWrap} ref={editEmojiRef}>
                 <button
                   type="button"
                   className={styles.emojiButton}
                   onClick={() => setEditEmojiOpen((prev) => !prev)}
-                  aria-label="Add emoji"
+                  aria-label={t("edit.addEmoji")}
                 >
                   <svg
-                    aria-label="Emoji icon"
+                    aria-label={t("edit.emojiIcon")}
                     fill="currentColor"
                     height="20"
                     role="img"
                     viewBox="0 0 24 24"
                     width="20"
                   >
-                    <title>Emoji icon</title>
+                    <title>{t("edit.emojiIcon")}</title>
                     <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
                   </svg>
                 </button>
@@ -2851,7 +3095,7 @@ function FeedCard({
                 }}
                 rows={4}
                 maxLength={2200}
-                placeholder="Write something..."
+                placeholder={t("edit.placeholder")}
               />
               <span className={styles.charCount}>
                 {editCaption.length}/2200
@@ -2862,11 +3106,11 @@ function FeedCard({
           {mentionOpen ? (
             <div className={styles.mentionDropdown}>
               {mentionLoading ? (
-                <div className={styles.mentionItem}>Searching...</div>
+                <div className={styles.mentionItem}>{t("edit.searching")}</div>
               ) : null}
               {!mentionLoading && mentionSuggestions.length === 0 ? (
                 <div className={styles.mentionItem}>
-                  {mentionError || "No matches"}
+                  {mentionError || t("edit.noMatches")}
                 </div>
               ) : null}
               {mentionSuggestions.map((opt, idx) => {
@@ -2914,7 +3158,7 @@ function FeedCard({
 
           <div className={styles.editField}>
             <div className={styles.editLabelRow}>
-              <span className={styles.editLabelText}>Hashtags</span>
+              <span className={styles.editLabelText}>{t("edit.hashtags")}</span>
             </div>
             <div className={styles.chipRow}>
               {editHashtags.map((tag) => (
@@ -2924,7 +3168,7 @@ function FeedCard({
                     type="button"
                     className={styles.chipRemove}
                     onClick={() => removeHashtag(tag)}
-                    aria-label={`Remove ${tag}`}
+                    aria-label={t("edit.removeHashtag", { tag })}
                   >
                     ×
                   </button>
@@ -2932,7 +3176,7 @@ function FeedCard({
               ))}
               <input
                 className={styles.editInput}
-                placeholder="Add hashtag"
+                placeholder={t("edit.addHashtag")}
                 value={hashtagDraft}
                 onChange={(e) => setHashtagDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -2947,11 +3191,13 @@ function FeedCard({
 
           <div className={styles.editField}>
             <div className={styles.editLabelRow}>
-              <span className={styles.editLabelText}>Location</span>
+              <span className={styles.editLabelText}>
+                {t("edit.location.label")}
+              </span>
             </div>
             <input
               className={styles.editInput}
-              placeholder="Add a place"
+              placeholder={t("edit.location.placeholder")}
               value={locationQuery}
               onChange={(e) => {
                 setEditLocation(e.target.value);
@@ -2965,11 +3211,13 @@ function FeedCard({
             {locationOpen ? (
               <div className={styles.locationDropdown}>
                 {locationLoading ? (
-                  <div className={styles.locationItem}>Searching...</div>
+                  <div className={styles.locationItem}>
+                    {t("edit.searching")}
+                  </div>
                 ) : null}
                 {!locationLoading && locationSuggestions.length === 0 ? (
                   <div className={styles.locationItem}>
-                    {locationError || "No suggestions"}
+                    {locationError || t("edit.location.noSuggestions")}
                   </div>
                 ) : null}
                 {locationSuggestions.map((opt, idx) => {
@@ -2999,9 +3247,11 @@ function FeedCard({
                 onChange={() => setEditAllowComments((prev) => !prev)}
               />
               <div>
-                <p className={styles.switchTitle}>Allow comments</p>
+                <p className={styles.switchTitle}>
+                  {t("edit.allowComments.title")}
+                </p>
                 <p className={styles.switchHint}>
-                  Enable to receive feedback from everyone
+                  {t("edit.allowComments.hint")}
                 </p>
               </div>
             </label>
@@ -3020,13 +3270,15 @@ function FeedCard({
                 }
               />
               <div>
-                <p className={styles.switchTitle}>Allow downloads</p>
+                <p className={styles.switchTitle}>
+                  {t("edit.allowDownloads.title")}
+                </p>
                 <p className={styles.switchHint}>
                   {repostOf
                     ? lockedEditAllowDownloadLoading
-                      ? "Inherited from original post (loading…)"
-                      : "Inherited from the original post (can’t be changed)"
-                    : "Share the original file with people you trust"}
+                      ? t("edit.allowDownloads.inheritedLoading")
+                      : t("edit.allowDownloads.inheritedLocked")
+                    : t("edit.allowDownloads.hint")}
                 </p>
               </div>
             </label>
@@ -3038,10 +3290,8 @@ function FeedCard({
                 onChange={() => setEditHideLikeCount((prev) => !prev)}
               />
               <div>
-                <p className={styles.switchTitle}>Hide like</p>
-                <p className={styles.switchHint}>
-                  Viewers won’t see the number of likes on this post
-                </p>
+                <p className={styles.switchTitle}>{t("edit.hideLike.title")}</p>
+                <p className={styles.switchHint}>{t("edit.hideLike.hint")}</p>
               </div>
             </label>
           </div>
@@ -3060,14 +3310,14 @@ function FeedCard({
               onClick={closeEditModal}
               disabled={editSaving}
             >
-              Cancel
+              {t("edit.cancel")}
             </button>
             <button
               type="submit"
               className={styles.modalPrimary}
               disabled={editSaving}
             >
-              {editSaving ? "Saving..." : "Save changes"}
+              {editSaving ? t("edit.saving") : t("edit.saveChanges")}
             </button>
           </div>
         </form>
@@ -3088,12 +3338,12 @@ function FeedCard({
       >
         <div className={styles.modalHeader}>
           <div>
-            <h3 className={styles.modalTitle}>Edit visibility</h3>
-            <p className={styles.modalBody}>Choose who can see this post.</p>
+            <h3 className={styles.modalTitle}>{t("visibility.title")}</h3>
+            <p className={styles.modalBody}>{t("visibility.description")}</p>
           </div>
           <button
             className={styles.closeBtn}
-            aria-label="Close"
+            aria-label={tCommon("close")}
             onClick={closeVisibilityModal}
           >
             <IconClose size={18} />
@@ -3135,14 +3385,102 @@ function FeedCard({
             onClick={closeVisibilityModal}
             disabled={visibilitySaving}
           >
-            Cancel
+            {t("visibility.cancel")}
           </button>
           <button
             className={styles.modalPrimary}
             onClick={submitVisibilityUpdate}
             disabled={disableVisibilityUpdate}
           >
-            {visibilitySaving ? "Updating..." : "Update visibility"}
+            {visibilitySaving
+              ? t("visibility.updating")
+              : t("visibility.update")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const muteModal = (
+    <div
+      className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+      role="dialog"
+      aria-modal="true"
+      onClick={closeMuteModal}
+    >
+      <div
+        className={`${styles.modalCard} ${styles.modalCardOpen}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={styles.modalHeader}>
+          <div>
+            <h3 className={styles.modalTitle}>Mute notifications</h3>
+            <p className={styles.modalBody}>
+              Choose how long to pause alerts for this post.
+            </p>
+          </div>
+          <button
+            className={styles.closeBtn}
+            aria-label={tCommon("close")}
+            onClick={closeMuteModal}
+          >
+            <IconClose size={18} />
+          </button>
+        </div>
+
+        <div className={styles.muteOptionGrid}>
+          {muteOptions.map((option) => (
+            <button
+              key={option.key}
+              className={`${styles.muteOption} ${
+                muteOption === option.key ? styles.muteOptionActive : ""
+              }`}
+              onClick={() => setMuteOption(option.key)}
+              type="button"
+            >
+              <span className={styles.muteOptionTitle}>{option.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {muteOption === "custom" ? (
+          <div className={styles.muteCustomRow}>
+            <div className={styles.mutePicker}>
+              <label className={styles.editLabel}>Date</label>
+              <DateSelect
+                value={muteCustomDate}
+                onChange={setMuteCustomDate}
+                minDate={new Date()}
+                maxDate={null}
+                placeholder="yyyy-mm-dd"
+              />
+            </div>
+            <div className={styles.mutePicker}>
+              <label className={styles.editLabel}>Time</label>
+              <TimeSelect
+                value={muteCustomTime}
+                onChange={setMuteCustomTime}
+                selectedDate={muteCustomDate}
+                minDateTime={new Date()}
+                disabled={!muteCustomDate}
+                placeholder="hh:mm"
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {muteError ? (
+          <div className={styles.inlineError}>{muteError}</div>
+        ) : null}
+
+        <div className={styles.modalActions}>
+          <button
+            type="button"
+            className={styles.modalPrimary}
+            onClick={handleSavePostMute}
+            disabled={muteSaving}
+          >
+            {muteSaving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
@@ -3160,16 +3498,16 @@ function FeedCard({
             <IconReup size={16} />
           </span>
           <span className={styles.repostText}>
-            Reposted from{" "}
+            {t("repost.banner")}{" "}
             {repostOfAuthorId ? (
               <Link
                 href={`/profile/${repostOfAuthorId}`}
                 className={styles.repostLink}
               >
-                {repostSourceLabel || "original post"}
+                {repostSourceLabel || t("repost.original")}
               </Link>
             ) : (
-              <>{repostSourceLabel || "original post"}</>
+              <>{repostSourceLabel || t("repost.original")}</>
             )}
           </span>
         </div>
@@ -3221,11 +3559,34 @@ function FeedCard({
               ) : null}
             </div>
             <span className={styles.authorSub}>
-              {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}
+              {formatDistanceToNow(new Date(displayAt), { addSuffix: true })}
             </span>
           </div>
         </div>
         <div className={styles.headerActions}>
+          {isMutedForPost ? (
+            <span
+              className={styles.muteBadge}
+              title="Notifications muted"
+              aria-label="Notifications muted"
+            >
+              <svg
+                aria-hidden
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                <line x1="3" y1="3" x2="21" y2="21" />
+              </svg>
+            </span>
+          ) : null}
           <div className={styles.menuWrapper} ref={menuRef}>
             <button
               className={`${styles.actionBtn} ${styles.actionBtnGhost}`}
@@ -3246,7 +3607,7 @@ function FeedCard({
                         openEditModal();
                       }}
                     >
-                      Edit post
+                      {t("menu.editPost")}
                     </button>
                     <button
                       className={styles.menuItem}
@@ -3257,13 +3618,22 @@ function FeedCard({
                         setVisibilityModalOpen(true);
                       }}
                     >
-                      Edit visibility
+                      {t("menu.editVisibility")}
                     </button>
                     <button
                       className={styles.menuItem}
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        if (isMutedForPost) {
+                          handleEnablePostNotifications();
+                        } else {
+                          openMuteModal();
+                        }
+                      }}
                     >
-                      Mute notifications
+                      {isMutedForPost
+                        ? "Turn on notification"
+                        : t("menu.muteNotifications")}
                     </button>
                     <button
                       className={styles.menuItem}
@@ -3285,7 +3655,7 @@ function FeedCard({
                     </button>
                     {repostOf ? (
                       <button className={styles.menuItem} onClick={goToPost}>
-                        Go to post
+                        {t("menu.goToPost")}
                       </button>
                     ) : null}
                     <button
@@ -3295,7 +3665,7 @@ function FeedCard({
                         onCopyLink(id);
                       }}
                     >
-                      Copy link
+                      {t("menu.copyLink")}
                     </button>
                     <button
                       className={`${styles.menuItem} ${styles.menuItemDanger}`}
@@ -3304,14 +3674,14 @@ function FeedCard({
                         onDeleteIntent(id, authorLine);
                       }}
                     >
-                      Delete post
+                      {t("menu.deletePost")}
                     </button>
                   </div>
                 ) : (
                   <div className={styles.menuContent}>
                     {repostOf ? (
                       <button className={styles.menuItem} onClick={goToPost}>
-                        Go to post
+                        {t("menu.goToPost")}
                       </button>
                     ) : null}
                     <button
@@ -3321,7 +3691,7 @@ function FeedCard({
                         onCopyLink(id);
                       }}
                     >
-                      Copy link
+                      {t("menu.copyLink")}
                     </button>
                     {authorOwnerId ? (
                       <button
@@ -3332,7 +3702,9 @@ function FeedCard({
                           onFollow(authorOwnerId, !isFollowing);
                         }}
                       >
-                        {isFollowing ? "Unfollow" : "Follow"}
+                        {isFollowing
+                          ? t("follow.unfollow")
+                          : t("follow.follow")}
                       </button>
                     ) : null}
                     <button
@@ -3342,7 +3714,7 @@ function FeedCard({
                         onSave(id, !saved);
                       }}
                     >
-                      {saved ? "Unsave this post" : "Save this post"}
+                      {saved ? t("menu.unsave") : t("menu.save")}
                     </button>
                     <button
                       className={styles.menuItem}
@@ -3351,7 +3723,7 @@ function FeedCard({
                         onHide(id);
                       }}
                     >
-                      Hide this post
+                      {t("menu.hidePost")}
                     </button>
                     <button
                       className={styles.menuItem}
@@ -3360,7 +3732,7 @@ function FeedCard({
                         onReportIntent(id, authorLine);
                       }}
                     >
-                      Report
+                      {t("menu.report")}
                     </button>
                     <button
                       className={`${styles.menuItem} ${styles.menuItemDanger}`}
@@ -3369,7 +3741,7 @@ function FeedCard({
                         onBlockUser(authorId || author?.id, authorLine);
                       }}
                     >
-                      Block this account
+                      {t("menu.blockAccount")}
                     </button>
                   </div>
                 )}
@@ -3378,7 +3750,7 @@ function FeedCard({
           </div>
           <button
             className={`${styles.actionBtn} ${styles.actionBtnGhost}`}
-            aria-label="Hide post"
+            aria-label={tCommon("hidePost")}
             onClick={() => onHide(id)}
           >
             <IconClose size={22} />
@@ -3402,7 +3774,7 @@ function FeedCard({
               className={styles.seeMore}
               onClick={() => setCollapsed((prev) => !prev)}
             >
-              {collapsed ? "See more" : "Collapse"}
+              {collapsed ? t("content.seeMore") : t("content.collapse")}
             </button>
           )}
         </div>
@@ -3474,7 +3846,7 @@ function FeedCard({
                       onClick={enableSound}
                       aria-pressed={false}
                     >
-                      Tap for sound
+                      {t("media.tapForSound")}
                     </button>
                   ) : null}
                 </>
@@ -3484,7 +3856,7 @@ function FeedCard({
               <img
                 key={`${id}-${mediaIndex}`}
                 src={current.url}
-                alt="media"
+                alt={t("media.alt")}
                 className={styles.mediaVisual}
                 onContextMenu={(e) => e.preventDefault()}
                 onClick={() => setImageViewerUrl(current.url)}
@@ -3496,7 +3868,7 @@ function FeedCard({
             <>
               <button
                 className={`${styles.mediaNavBtn} ${styles.mediaNavLeft}`}
-                aria-label="Previous media"
+                aria-label={t("media.previous")}
                 onClick={() =>
                   setMediaIndex((prev) =>
                     media.length ? (prev - 1 + media.length) % media.length : 0,
@@ -3515,7 +3887,7 @@ function FeedCard({
               </button>
               <button
                 className={`${styles.mediaNavBtn} ${styles.mediaNavRight}`}
-                aria-label="Next media"
+                aria-label={t("media.next")}
                 onClick={() =>
                   setMediaIndex((prev) =>
                     media.length ? (prev + 1) % media.length : 0,
@@ -3543,7 +3915,7 @@ function FeedCard({
       {imageViewerUrl ? (
         <ImageViewerOverlay
           url={imageViewerUrl}
-          alt="Post media"
+          alt={t("media.overlayAlt")}
           onClose={() => setImageViewerUrl(null)}
         />
       ) : null}
@@ -3589,11 +3961,11 @@ function FeedCard({
           onClick={() => onLike(id, !liked)}
         >
           <IconLike size={20} filled={liked} />
-          <span>{liked ? "Liked" : "Like"}</span>
+          <span>{liked ? t("actions.liked") : t("actions.like")}</span>
         </button>
         <button className={styles.actionBtn} onClick={quickOpenPost}>
           <IconComment size={20} />
-          <span>Comment</span>
+          <span>{t("actions.comment")}</span>
         </button>
         <button
           className={`${styles.actionBtn} ${
@@ -3602,14 +3974,14 @@ function FeedCard({
           onClick={() => onSave(id, !saved)}
         >
           <IconSave size={20} filled={saved} />
-          <span>{saved ? "Saved" : "Save"}</span>
+          <span>{saved ? t("actions.saved") : t("actions.save")}</span>
         </button>
         <button
           className={styles.actionBtn}
           onClick={(e) => onShare(id, e.currentTarget.getBoundingClientRect())}
         >
           <IconReup size={20} />
-          <span>Repost</span>
+          <span>{t("actions.repost")}</span>
         </button>
       </div>
 
@@ -3623,6 +3995,12 @@ function FeedCard({
         ? mounted && typeof document !== "undefined"
           ? createPortal(visibilityModal, document.body)
           : visibilityModal
+        : null}
+
+      {muteModalOpen
+        ? mounted && typeof document !== "undefined"
+          ? createPortal(muteModal, document.body)
+          : muteModal
         : null}
     </article>
   );

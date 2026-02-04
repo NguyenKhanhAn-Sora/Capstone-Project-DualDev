@@ -5,8 +5,12 @@ import { JSX, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./notifications-overlay.module.css";
 import {
+  deleteNotification,
   fetchNotifications,
   markNotificationRead,
+  markNotificationUnread,
+  updatePostNotificationMute,
+  type NotificationCategoryKey,
   type NotificationItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
@@ -15,8 +19,10 @@ import {
   emitNotificationRead,
   type NotificationReceivedDetail,
 } from "@/lib/events";
+import { DateSelect } from "@/ui/date-select/date-select";
+import { TimeSelect } from "@/ui/time-select/time-select";
 
-type TabKey = "all" | "likes" | "comments" | "mentions" | "followers";
+type TabKey = "all" | NotificationCategoryKey;
 
 type TabConfig = {
   key: TabKey;
@@ -110,6 +116,16 @@ function IconUser() {
   );
 }
 
+function IconDots() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="19" cy="12" r="1.8" />
+    </svg>
+  );
+}
+
 const TABS: TabConfig[] = [
   {
     key: "all",
@@ -119,14 +135,14 @@ const TABS: TabConfig[] = [
     icon: <IconBell />,
   },
   {
-    key: "likes",
+    key: "like",
     label: "Likes",
     emptyTitle: "Likes on your posts",
     emptyText: "When someone likes your content, you’ll see it here.",
     icon: <IconHeart />,
   },
   {
-    key: "comments",
+    key: "comment",
     label: "Comments",
     emptyTitle: "Comments on your posts",
     emptyText: "When someone comments, you’ll see it here.",
@@ -140,7 +156,7 @@ const TABS: TabConfig[] = [
     icon: <IconTag />,
   },
   {
-    key: "followers",
+    key: "follow",
     label: "Followers",
     emptyTitle: "New followers",
     emptyText: "When someone follows you, you’ll see it here.",
@@ -149,11 +165,11 @@ const TABS: TabConfig[] = [
 ];
 
 const TAB_FILTER: Record<TabKey, Array<NotificationItem["type"]>> = {
-  all: ["post_like", "post_comment", "post_mention", "follow"],
-  likes: ["post_like"],
-  comments: ["post_comment"],
+  all: ["post_like", "post_comment", "post_mention", "follow", "login_alert"],
+  like: ["post_like"],
+  comment: ["post_comment"],
   mentions: ["post_mention"],
-  followers: ["follow"],
+  follow: ["follow"],
 };
 
 function formatRelativeTime(value: string): string {
@@ -174,6 +190,13 @@ function formatRelativeTime(value: string): string {
   if (months < 12) return `${months} months`;
   const years = Math.floor(days / 365);
   return `${years} years`;
+}
+
+function buildLocalDateTimeIso(date: string, time: string) {
+  if (!date || !time) return null;
+  const dt = new Date(`${date}T${time}:00`);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString();
 }
 
 function buildMessage(item: NotificationItem): JSX.Element {
@@ -228,6 +251,9 @@ function buildMessage(item: NotificationItem): JSX.Element {
       </>
     );
   }
+  if (item.type === "login_alert") {
+    return <>You're signing in on a new device</>;
+  }
   return <>New notification</>;
 }
 
@@ -243,6 +269,17 @@ export default function NotificationsOverlay(props: {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [loginAlertItem, setLoginAlertItem] = useState<NotificationItem | null>(
+    null,
+  );
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [muteModalOpen, setMuteModalOpen] = useState(false);
+  const [muteTargetId, setMuteTargetId] = useState<string | null>(null);
+  const [muteOption, setMuteOption] = useState("5m");
+  const [muteCustomDate, setMuteCustomDate] = useState("");
+  const [muteCustomTime, setMuteCustomTime] = useState("");
+  const [muteSaving, setMuteSaving] = useState(false);
+  const [muteError, setMuteError] = useState("");
 
   const activeTab = useMemo(
     () => TABS.find((tab) => tab.key === active) ?? TABS[0],
@@ -254,6 +291,26 @@ export default function NotificationsOverlay(props: {
     if (!allowed.length) return [];
     return items.filter((item) => allowed.includes(item.type));
   }, [items, active]);
+
+  const muteOptions = useMemo(
+    () => [
+      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
+      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
+      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
+      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
+      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
+      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: "Until I turn it back on", ms: null },
+      { key: "custom", label: "Choose date & time", ms: null },
+    ],
+    [],
+  );
+
+  const muteTarget = useMemo(
+    () =>
+      muteTargetId ? items.find((item) => item.id === muteTargetId) : null,
+    [items, muteTargetId],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -330,7 +387,43 @@ export default function NotificationsOverlay(props: {
       );
   }, [open]);
 
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest(`[data-notification-menu-root="${openMenuId}"]`)) {
+        return;
+      }
+      setOpenMenuId(null);
+    };
+
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [openMenuId]);
+
   const handleItemClick = (item: NotificationItem) => {
+    setOpenMenuId(null);
+    if (item.type === "login_alert") {
+      if (!item.readAt) {
+        const token = getStoredAccessToken();
+        if (token) {
+          void markNotificationRead({
+            token,
+            notificationId: item.id,
+          }).catch(() => undefined);
+        }
+        setItems((prev) =>
+          prev.map((entry) =>
+            entry.id === item.id
+              ? { ...entry, readAt: new Date().toISOString() }
+              : entry,
+          ),
+        );
+        emitNotificationRead({ id: item.id });
+      }
+      setLoginAlertItem(item);
+      return;
+    }
     const targetUrl = item.postId
       ? `/post/${item.postId}`
       : item.type === "follow" && item.actor?.id
@@ -358,7 +451,153 @@ export default function NotificationsOverlay(props: {
     router.push(targetUrl);
   };
 
+  const isMutedForItem = (item: NotificationItem) => {
+    if (item.postMutedIndefinitely) return true;
+    if (item.postMutedUntil) {
+      const dt = new Date(item.postMutedUntil);
+      if (!Number.isNaN(dt.getTime()) && dt.getTime() > Date.now()) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const canMuteItem = (item: NotificationItem) =>
+    Boolean(item.postId && item.isOwnPost && !isMutedForItem(item));
+
+  const openMuteModal = (item: NotificationItem) => {
+    if (!item.postId) return;
+    setMuteTargetId(item.id);
+    setMuteError("");
+    setMuteOption("5m");
+    setMuteCustomDate("");
+    setMuteCustomTime("");
+    setMuteModalOpen(true);
+  };
+
+  const closeMuteModal = () => {
+    if (muteSaving) return;
+    setMuteModalOpen(false);
+    setMuteTargetId(null);
+  };
+
+  const handleToggleRead = (item: NotificationItem) => {
+    const token = getStoredAccessToken();
+    if (!token) return;
+    if (item.readAt) {
+      void markNotificationUnread({
+        token,
+        notificationId: item.id,
+      }).catch(() => undefined);
+      setItems((prev) =>
+        prev.map((entry) =>
+          entry.id === item.id ? { ...entry, readAt: null } : entry,
+        ),
+      );
+    } else {
+      void markNotificationRead({
+        token,
+        notificationId: item.id,
+      }).catch(() => undefined);
+      setItems((prev) =>
+        prev.map((entry) =>
+          entry.id === item.id
+            ? { ...entry, readAt: new Date().toISOString() }
+            : entry,
+        ),
+      );
+      emitNotificationRead({ id: item.id });
+    }
+    setOpenMenuId(null);
+  };
+
+  const handleDeleteNotification = (item: NotificationItem) => {
+    const token = getStoredAccessToken();
+    if (!token) return;
+    void deleteNotification({ token, notificationId: item.id }).catch(
+      () => undefined,
+    );
+    setItems((prev) => prev.filter((entry) => entry.id !== item.id));
+    if (loginAlertItem?.id === item.id) {
+      setLoginAlertItem(null);
+    }
+    setOpenMenuId(null);
+  };
+
+  const handleSaveMute = async () => {
+    if (!muteTarget?.postId) return;
+    const token = getStoredAccessToken();
+    if (!token) return;
+    setMuteSaving(true);
+    setMuteError("");
+
+    try {
+      let mutedUntil: string | null = null;
+      let mutedIndefinitely = false;
+      const selected = muteOptions.find((opt) => opt.key === muteOption);
+
+      if (muteOption === "until") {
+        mutedIndefinitely = true;
+      } else if (muteOption === "custom") {
+        const iso = buildLocalDateTimeIso(muteCustomDate, muteCustomTime);
+        if (!iso) {
+          setMuteError("Please select a valid date and time.");
+          setMuteSaving(false);
+          return;
+        }
+        const dt = new Date(iso);
+        if (dt.getTime() <= Date.now()) {
+          setMuteError("Please choose a future time.");
+          setMuteSaving(false);
+          return;
+        }
+        mutedUntil = iso;
+      } else if (selected?.ms) {
+        mutedUntil = new Date(Date.now() + selected.ms).toISOString();
+      } else {
+        mutedIndefinitely = true;
+      }
+
+      const res = await updatePostNotificationMute({
+        token,
+        postId: muteTarget.postId,
+        mutedUntil,
+        mutedIndefinitely,
+      });
+
+      setItems((prev) =>
+        prev.map((entry) =>
+          entry.id === muteTarget.id
+            ? {
+                ...entry,
+                postMutedUntil: res.mutedUntil ?? null,
+                postMutedIndefinitely: res.mutedIndefinitely ?? false,
+              }
+            : entry,
+        ),
+      );
+
+      setMuteModalOpen(false);
+      setMuteTargetId(null);
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Failed to update notifications";
+      setMuteError(message);
+    } finally {
+      setMuteSaving(false);
+    }
+  };
+
   if (!open) return null;
+
+  const resolveLoginDeviceName = (item: NotificationItem) => {
+    if (item.deviceInfo?.trim()) return item.deviceInfo.trim();
+    const parts = [item.browser, item.os].filter(Boolean);
+    if (parts.length) return parts.join(" on ");
+    return item.deviceType ? `${item.deviceType} device` : "Unknown device";
+  };
 
   return (
     <div
@@ -423,7 +662,7 @@ export default function NotificationsOverlay(props: {
                   key={item.id}
                   className={`${styles.listItem} ${
                     item.readAt ? "" : styles.listItemUnread
-                  }`}
+                  } ${openMenuId === item.id ? styles.listItemMenuOpen : ""}`}
                   onClick={() => handleItemClick(item)}
                   role={
                     item.postId || item.type === "follow" ? "button" : undefined
@@ -454,15 +693,223 @@ export default function NotificationsOverlay(props: {
                       {formatRelativeTime(item.activityAt || item.createdAt)}
                     </span>
                   </div>
-                  {!item.readAt ? (
-                    <span className={styles.itemDot} aria-hidden="true" />
-                  ) : null}
+                  <div
+                    className={styles.itemActions}
+                    data-notification-menu-root={item.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setOpenMenuId((prev) =>
+                        prev === item.id ? null : item.id,
+                      );
+                    }}
+                    onMouseDown={(event) => event.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className={`${styles.itemMenuButton} ${
+                        openMenuId === item.id
+                          ? styles.itemMenuButtonVisible
+                          : ""
+                      }`}
+                      aria-haspopup="true"
+                      aria-expanded={openMenuId === item.id}
+                    >
+                      <IconDots />
+                    </button>
+                    {!item.readAt ? (
+                      <span className={styles.itemDot} aria-hidden="true" />
+                    ) : null}
+                    {openMenuId === item.id ? (
+                      <div className={styles.itemMenu} role="menu">
+                        <button
+                          type="button"
+                          className={styles.itemMenuItem}
+                          role="menuitem"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleToggleRead(item);
+                          }}
+                        >
+                          {item.readAt ? "Mark as unread" : "Mark as read"}
+                        </button>
+                        {canMuteItem(item) ? (
+                          <button
+                            type="button"
+                            className={styles.itemMenuItem}
+                            role="menuitem"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openMuteModal(item);
+                              setOpenMenuId(null);
+                            }}
+                          >
+                            {item.postKind === "reel"
+                              ? "Mute this reel"
+                              : "Mute this post"}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className={`${styles.itemMenuItem} ${
+                            styles.itemMenuDanger
+                          }`}
+                          role="menuitem"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteNotification(item);
+                          }}
+                        >
+                          Delete notification
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </div>
       </aside>
+      {loginAlertItem ? (
+        <div className={styles.detailBackdrop}>
+          <div
+            className={styles.detailCard}
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.detailHeader}>
+              <h3 className={styles.detailTitle}>New device sign-in</h3>
+              <button
+                type="button"
+                className={styles.detailClose}
+                onClick={() => setLoginAlertItem(null)}
+                aria-label="Close"
+              >
+                <IconClose />
+              </button>
+            </div>
+            <div className={styles.detailBody}>
+              <div className={styles.detailRow}>
+                <span>Device</span>
+                <span>{resolveLoginDeviceName(loginAlertItem)}</span>
+              </div>
+              <div className={styles.detailRow}>
+                <span>Location</span>
+                <span>
+                  {loginAlertItem.location?.trim()
+                    ? loginAlertItem.location
+                    : "Ho Chi Minh, Vietnam"}
+                </span>
+              </div>
+              <div className={styles.detailRow}>
+                <span>Time</span>
+                <span>
+                  {formatRelativeTime(
+                    loginAlertItem.loginAt || loginAlertItem.createdAt,
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {muteModalOpen && muteTarget ? (
+        <div
+          className={styles.muteBackdrop}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeMuteModal}
+        >
+          <div
+            className={styles.muteCard}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.muteHeader}>
+              <div>
+                <h3 className={styles.muteTitle}>Mute notifications</h3>
+                <p className={styles.muteBody}>
+                  Choose how long to pause alerts for this{" "}
+                  {muteTarget.postKind === "reel" ? "reel" : "post"}.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.muteClose}
+                onClick={closeMuteModal}
+                aria-label="Close"
+                disabled={muteSaving}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.muteOptionGrid}>
+              {muteOptions.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={`${styles.muteOption} ${
+                    muteOption === option.key ? styles.muteOptionActive : ""
+                  }`}
+                  onClick={() => setMuteOption(option.key)}
+                >
+                  <span className={styles.muteOptionTitle}>{option.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {muteOption === "custom" ? (
+              <div className={styles.muteCustomRow}>
+                <div className={styles.mutePicker}>
+                  <label className={styles.muteLabel}>Date</label>
+                  <DateSelect
+                    value={muteCustomDate}
+                    onChange={setMuteCustomDate}
+                    minDate={new Date()}
+                    maxDate={null}
+                    placeholder="yyyy-mm-dd"
+                  />
+                </div>
+                <div className={styles.mutePicker}>
+                  <label className={styles.muteLabel}>Time</label>
+                  <TimeSelect
+                    value={muteCustomTime}
+                    onChange={setMuteCustomTime}
+                    selectedDate={muteCustomDate}
+                    minDateTime={new Date()}
+                    disabled={!muteCustomDate}
+                    placeholder="hh:mm"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {muteError ? (
+              <div className={styles.muteError}>{muteError}</div>
+            ) : null}
+
+            <div className={styles.muteActions}>
+              <button
+                type="button"
+                className={styles.muteSecondary}
+                onClick={closeMuteModal}
+                disabled={muteSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.mutePrimary}
+                onClick={handleSaveMute}
+                disabled={muteSaving}
+              >
+                {muteSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

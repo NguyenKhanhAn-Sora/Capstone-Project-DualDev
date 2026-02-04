@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Patch,
   Post,
@@ -61,5 +62,29 @@ export class NotificationsController {
       throw new UnauthorizedException('Unauthorized');
     }
     return this.notificationsService.markRead(userId, id);
+  }
+
+  @Patch(':id/unread')
+  async markUnread(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('id') id: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.notificationsService.markUnread(userId, id);
+  }
+
+  @Delete(':id')
+  async deleteNotification(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('id') id: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.notificationsService.deleteNotification(userId, id);
   }
 }

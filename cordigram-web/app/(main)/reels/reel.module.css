@@ -142,11 +142,18 @@
   top: 14px;
   right: 14px;
   z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   opacity: 0;
   pointer-events: none;
   transition:
     opacity 160ms ease,
     transform 160ms ease;
+}
+
+.moreMenuButton {
+  position: relative;
 }
 
 .videoShell:hover .moreMenuWrap,
@@ -205,6 +212,18 @@
 .moreMenuItem:hover {
   background: rgba(255, 255, 255, 0.06);
   transform: translateY(-1px);
+}
+
+.muteBadge {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(226, 232, 240, 0.7);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .moreMenuDanger {

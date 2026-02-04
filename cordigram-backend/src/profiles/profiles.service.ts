@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, PipelineStage } from 'mongoose';
@@ -9,6 +10,10 @@ import { Profile } from './profile.schema';
 import { Follow } from '../users/follow.schema';
 import { Post } from '../posts/post.schema';
 import { CompaniesService } from '../companies/companies.service';
+import type {
+  ProfileFieldVisibility,
+  ProfileVisibility,
+} from './profile.schema';
 
 @Injectable()
 export class ProfilesService {
@@ -25,6 +30,18 @@ export class ProfilesService {
 
   private readonly DEFAULT_AVATAR_URL =
     'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
+
+  private readonly DEFAULT_VISIBILITY: ProfileVisibility = {
+    gender: 'public',
+    birthdate: 'public',
+    location: 'public',
+    workplace: 'public',
+    bio: 'public',
+    followers: 'public',
+    following: 'public',
+    about: 'public',
+    profile: 'public',
+  };
 
   private buildAvatarResponse(profile: Profile) {
     return {
@@ -175,6 +192,15 @@ export class ProfilesService {
       birthdate?: string;
       workplaceName?: string;
       workplaceCompanyId?: string;
+      genderVisibility?: ProfileFieldVisibility;
+      birthdateVisibility?: ProfileFieldVisibility;
+      locationVisibility?: ProfileFieldVisibility;
+      workplaceVisibility?: ProfileFieldVisibility;
+      bioVisibility?: ProfileFieldVisibility;
+      followersVisibility?: ProfileFieldVisibility;
+      followingVisibility?: ProfileFieldVisibility;
+      aboutVisibility?: ProfileFieldVisibility;
+      profileVisibility?: ProfileFieldVisibility;
     },
   ): Promise<void> {
     const objectId = this.asObjectId(userId);
@@ -261,6 +287,34 @@ export class ProfilesService {
 
     if (data.birthdate !== undefined) {
       profile.birthdate = data.birthdate ? new Date(data.birthdate) : null;
+    }
+
+    if (
+      data.genderVisibility !== undefined ||
+      data.birthdateVisibility !== undefined ||
+      data.locationVisibility !== undefined ||
+      data.workplaceVisibility !== undefined ||
+      data.bioVisibility !== undefined ||
+      data.followersVisibility !== undefined ||
+      data.followingVisibility !== undefined ||
+      data.aboutVisibility !== undefined ||
+      data.profileVisibility !== undefined
+    ) {
+      const current = {
+        ...this.DEFAULT_VISIBILITY,
+        ...(profile.visibility ?? {}),
+      };
+      profile.visibility = {
+        gender: data.genderVisibility ?? current.gender ?? 'public',
+        birthdate: data.birthdateVisibility ?? current.birthdate ?? 'public',
+        location: data.locationVisibility ?? current.location ?? 'public',
+        workplace: data.workplaceVisibility ?? current.workplace ?? 'public',
+        bio: data.bioVisibility ?? current.bio ?? 'public',
+        followers: data.followersVisibility ?? current.followers ?? 'public',
+        following: data.followingVisibility ?? current.following ?? 'public',
+        about: data.aboutVisibility ?? current.about ?? 'public',
+        profile: data.profileVisibility ?? current.profile ?? 'public',
+      };
     }
 
     await profile.save();
@@ -387,6 +441,7 @@ export class ProfilesService {
     location?: string;
     workplace?: { companyId: string; companyName: string };
     birthdate?: string;
+    visibility?: ProfileVisibility;
     stats: {
       posts: number;
       reels: number;
@@ -426,6 +481,8 @@ export class ProfilesService {
 
     const viewerId = params.viewerId ? this.asObjectId(params.viewerId) : null;
 
+    const isOwner = Boolean(viewerId && ownerId && viewerId.equals(ownerId));
+
     const [
       followersCount,
       followingCount,
@@ -450,6 +507,28 @@ export class ProfilesService {
         : Promise.resolve(null),
     ]);
 
+    const visibility = {
+      ...this.DEFAULT_VISIBILITY,
+      ...(profile.visibility ?? {}),
+    };
+    const canView = (value: ProfileFieldVisibility) => {
+      if (isOwner) return true;
+      if (value === 'public') return true;
+      if (value === 'followers') return Boolean(viewerFollow);
+      return false;
+    };
+
+    const canViewGender = canView(visibility.gender);
+    const canViewBirthdate = canView(visibility.birthdate);
+    const canViewLocation = canView(visibility.location);
+    const canViewWorkplace = canView(visibility.workplace);
+    const canViewBio = canView(visibility.bio);
+    const canViewProfile = canView(visibility.profile);
+
+    if (!canViewProfile) {
+      throw new ForbiddenException('Profile is private');
+    }
+
     return {
       id: profile._id?.toString?.() ?? maybeObjectId?.toString?.() ?? '',
       userId: ownerId.toString(),
@@ -458,18 +537,23 @@ export class ProfilesService {
       avatarUrl: profile.avatarUrl || this.DEFAULT_AVATAR_URL,
       avatarOriginalUrl: profile.avatarOriginalUrl || this.DEFAULT_AVATAR_URL,
       coverUrl: profile.coverUrl || '',
-      bio: profile.bio || '',
-      gender: profile.gender || '',
-      location: profile.location || '',
-      workplace: profile.workplace?.companyId
-        ? {
-            companyId: (profile.workplace.companyId as any).toString(),
-            companyName: profile.workplace.companyName || '',
-          }
-        : { companyId: '', companyName: profile.workplace?.companyName || '' },
-      birthdate: profile.birthdate
-        ? new Date(profile.birthdate).toISOString().slice(0, 10)
+      bio: canViewBio ? profile.bio || '' : '',
+      gender: canViewGender ? profile.gender || '' : '',
+      location: canViewLocation ? profile.location || '' : '',
+      workplace: canViewWorkplace
+        ? profile.workplace?.companyId
+          ? {
+              companyId: (profile.workplace.companyId as any).toString(),
+              companyName: profile.workplace.companyName || '',
+            }
+          : { companyId: '', companyName: profile.workplace?.companyName || '' }
+        : { companyId: '', companyName: '' },
+      birthdate: canViewBirthdate
+        ? profile.birthdate
+          ? new Date(profile.birthdate).toISOString().slice(0, 10)
+          : ''
         : '',
+      visibility,
       stats: {
         posts: postsCount,
         reels: reelsCount,

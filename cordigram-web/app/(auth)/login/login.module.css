@@ -1,4 +1,3 @@
-
 .page {
   min-height: 100vh;
   background: #ffffff;
@@ -683,6 +682,32 @@
   transition:
     border-color 140ms ease,
     box-shadow 140ms ease;
+}
+.overlay-subtitle {
+  margin: 0 0 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #64748b;
+}
+.overlay-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+.overlay-secondary {
+  border: 1px solid #d7e5f2;
+  background: #ffffff;
+  color: #475569;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  flex: 1;
+}
+.overlay-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .overlay-input:focus-visible {

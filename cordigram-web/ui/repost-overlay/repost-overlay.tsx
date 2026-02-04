@@ -3,6 +3,7 @@
 import EmojiPicker from "emoji-picker-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./repost-overlay.module.css";
+import { useTranslations } from "next-intl";
 
 export type RepostTarget = {
   postId: string;
@@ -61,6 +62,8 @@ export default function RepostOverlay({
   quoteCharLimit = 500,
   animationMs = 200,
 }: RepostOverlayProps) {
+  const t = useTranslations("home.repostOverlay");
+  const tCommon = useTranslations("common");
   const [closing, setClosing] = useState(false);
   const [view, setView] = useState<"sheet" | "quote">("sheet");
 
@@ -125,21 +128,21 @@ export default function RepostOverlay({
     () => [
       {
         value: "public" as const,
-        title: "Public",
-        description: "Anyone can view this repost",
+        title: t("visibility.public.title"),
+        description: t("visibility.public.description"),
       },
       {
         value: "followers" as const,
-        title: "Followers",
-        description: "Only followers can view this repost",
+        title: t("visibility.followers.title"),
+        description: t("visibility.followers.description"),
       },
       {
         value: "private" as const,
-        title: "Private",
-        description: "Only you can view this repost",
+        title: t("visibility.private.title"),
+        description: t("visibility.private.description"),
       },
     ],
-    [],
+    [t],
   );
 
   const requestClose = useCallback(() => {
@@ -272,7 +275,7 @@ export default function RepostOverlay({
         setLocationSuggestions([]);
         setLocationOpen(true);
         setLocationHighlight(-1);
-        setLocationError("Không tìm thấy địa điểm phù hợp.");
+        setLocationError(t("location.noMatch"));
       } finally {
         if (!controller.signal.aborted) setLocationLoading(false);
       }
@@ -370,8 +373,8 @@ export default function RepostOverlay({
       const message =
         typeof err === "object" && err && "message" in err
           ? String((err as { message?: string }).message)
-          : "Could not repost";
-      setError(message || "Could not repost");
+          : t("errors.couldNotRepost");
+      setError(message || t("errors.couldNotRepost"));
     } finally {
       setSubmitting(false);
     }
@@ -397,8 +400,8 @@ export default function RepostOverlay({
       const message =
         typeof err === "object" && err && "message" in err
           ? String((err as { message?: string }).message)
-          : "Could not repost";
-      setError(message || "Could not repost");
+          : t("errors.couldNotRepost");
+      setError(message || t("errors.couldNotRepost"));
     } finally {
       setSubmitting(false);
     }
@@ -426,15 +429,18 @@ export default function RepostOverlay({
         >
           <div className={`${styles.modalHeader} ${styles.repostHeader}`}>
             <div>
-              <h3 className={styles.modalTitle}>Quote</h3>
+              <h3 className={styles.modalTitle}>{t("quote.title")}</h3>
               <p className={styles.repostSub}>
-                {`Quoting @${target.label}'s ${target.kind}`}
+                {t("quote.subtitle", {
+                  name: target.label,
+                  kind: t(`kinds.${target.kind}`),
+                })}
               </p>
             </div>
             <button
               className={styles.closeBtn}
               onClick={requestClose}
-              aria-label="Close"
+              aria-label={tCommon("close")}
               type="button"
             >
               ×
@@ -443,23 +449,23 @@ export default function RepostOverlay({
 
           <div className={styles.repostNoteLabel}>
             <div className={styles.captionRow}>
-              <label htmlFor="quoteCaption">Caption</label>
+              <label htmlFor="quoteCaption">{t("quote.caption")}</label>
               <div className={styles.emojiWrap} ref={emojiRef}>
                 <button
                   type="button"
                   className={styles.emojiButton}
                   onClick={() => setEmojiOpen((prev) => !prev)}
-                  aria-label="Add emoji"
+                  aria-label={t("quote.addEmoji")}
                 >
                   <svg
-                    aria-label="Emoji icon"
+                    aria-label={t("quote.emojiIcon")}
                     fill="currentColor"
                     height="20"
                     role="img"
                     viewBox="0 0 24 24"
                     width="20"
                   >
-                    <title>Emoji icon</title>
+                    <title>{t("quote.emojiIcon")}</title>
                     <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
                   </svg>
                 </button>
@@ -485,7 +491,7 @@ export default function RepostOverlay({
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 maxLength={quoteCharLimit}
-                placeholder="Add your thoughts..."
+                placeholder={t("quote.placeholder")}
               />
               <span className={styles.charCount}>
                 {content.length}/{quoteCharLimit}
@@ -495,7 +501,9 @@ export default function RepostOverlay({
 
           <div className={styles.editField}>
             <div className={styles.editLabelRow}>
-              <span className={styles.editLabelText}>Hashtags #</span>
+              <span className={styles.editLabelText}>
+                {t("hashtags.label")}
+              </span>
             </div>
             <div className={styles.chipShell}>
               <div className={styles.chips}>
@@ -505,7 +513,7 @@ export default function RepostOverlay({
                     <button
                       type="button"
                       onClick={() => removeHashtag(tag)}
-                      aria-label={`Remove hashtag ${tag}`}
+                      aria-label={t("hashtags.remove", { tag })}
                     >
                       ×
                     </button>
@@ -514,7 +522,7 @@ export default function RepostOverlay({
                 <input
                   className={styles.chipInput}
                   placeholder={
-                    hashtags.length ? "Add hashtag" : "Example: travel"
+                    hashtags.length ? t("hashtags.add") : t("hashtags.example")
                   }
                   value={hashtagDraft}
                   onChange={(e) =>
@@ -533,12 +541,14 @@ export default function RepostOverlay({
 
           <div className={styles.editField}>
             <div className={styles.editLabelRow}>
-              <span className={styles.editLabelText}>Location</span>
+              <span className={styles.editLabelText}>
+                {t("location.label")}
+              </span>
             </div>
             <div className={styles.locationCombo}>
               <input
                 className={styles.editInput}
-                placeholder="Add a place"
+                placeholder={t("location.placeholder")}
                 value={location}
                 onChange={(e) => onLocationChange(e.target.value)}
                 onFocus={onLocationFocus}
@@ -548,7 +558,9 @@ export default function RepostOverlay({
               {locationOpen ? (
                 <div className={styles.locationDropdown} role="listbox">
                   {locationLoading ? (
-                    <div className={styles.locationItem}>Searching...</div>
+                    <div className={styles.locationItem}>
+                      {t("location.searching")}
+                    </div>
                   ) : null}
                   {!locationLoading && locationError ? (
                     <div className={styles.locationItem}>{locationError}</div>
@@ -557,7 +569,7 @@ export default function RepostOverlay({
                   !locationError &&
                   locationSuggestions.length === 0 ? (
                     <div className={styles.locationItem}>
-                      Không có gợi ý nào.
+                      {t("location.noSuggestions")}
                     </div>
                   ) : null}
                   {!locationLoading
@@ -588,7 +600,9 @@ export default function RepostOverlay({
 
           <div className={styles.editField}>
             <div className={styles.editLabelRow}>
-              <span className={styles.editLabelText}>Visibility</span>
+              <span className={styles.editLabelText}>
+                {t("visibility.label")}
+              </span>
             </div>
             <div className={styles.visibilityList}>
               {visibilityOptions.map((opt) => {
@@ -627,9 +641,11 @@ export default function RepostOverlay({
                 onChange={() => setAllowComments((prev) => !prev)}
               />
               <div>
-                <p className={styles.switchTitle}>Allow comments</p>
+                <p className={styles.switchTitle}>
+                  {t("switch.allowComments.title")}
+                </p>
                 <p className={styles.switchHint}>
-                  People can reply to your quote
+                  {t("switch.allowComments.hint")}
                 </p>
               </div>
             </label>
@@ -641,9 +657,11 @@ export default function RepostOverlay({
                 disabled
               />
               <div>
-                <p className={styles.switchTitle}>Allow downloads</p>
+                <p className={styles.switchTitle}>
+                  {t("switch.allowDownloads.title")}
+                </p>
                 <p className={styles.switchHint}>
-                  Inherited from the original post (can’t be changed)
+                  {t("switch.allowDownloads.hint")}
                 </p>
               </div>
             </label>
@@ -655,10 +673,10 @@ export default function RepostOverlay({
                 onChange={() => setHideLikeCount((prev) => !prev)}
               />
               <div>
-                <p className={styles.switchTitle}>Hide like</p>
-                <p className={styles.switchHint}>
-                  Only you will see like counts on this quote
+                <p className={styles.switchTitle}>
+                  {t("switch.hideLike.title")}
                 </p>
+                <p className={styles.switchHint}>{t("switch.hideLike.hint")}</p>
               </div>
             </label>
           </div>
@@ -672,7 +690,7 @@ export default function RepostOverlay({
               disabled={submitting}
               type="button"
             >
-              Cancel
+              {t("actions.cancel")}
             </button>
             <button
               className={styles.modalPrimary}
@@ -680,7 +698,7 @@ export default function RepostOverlay({
               disabled={submitting}
               type="button"
             >
-              {submitting ? "Sharing..." : "Share quote"}
+              {submitting ? t("actions.sharing") : t("actions.shareQuote")}
             </button>
           </div>
         </div>
@@ -697,9 +715,9 @@ export default function RepostOverlay({
     >
       <div className={styles.repostSheet} onClick={(e) => e.stopPropagation()}>
         <div className={styles.repostSheetHeader}>
-          <p className={styles.repostSheetTitle}>Repost</p>
+          <p className={styles.repostSheetTitle}>{t("sheet.title")}</p>
           <p className={styles.repostSheetSubtitle}>
-            {`@${target.label} · ${target.kind}`}
+            {`@${target.label} · ${t(`kinds.${target.kind}`)}`}
           </p>
         </div>
         <div className={styles.repostSheetList} role="menu">
@@ -709,7 +727,7 @@ export default function RepostOverlay({
             disabled={submitting}
             type="button"
           >
-            {submitting ? "Reposting..." : "Repost"}
+            {submitting ? t("sheet.reposting") : t("sheet.repost")}
           </button>
           <button
             className={styles.repostSheetItem}
@@ -720,7 +738,7 @@ export default function RepostOverlay({
             disabled={submitting}
             type="button"
           >
-            Quote
+            {t("sheet.quote")}
           </button>
           <button
             className={styles.repostSheetItem}
@@ -728,7 +746,7 @@ export default function RepostOverlay({
             disabled={submitting}
             type="button"
           >
-            Hủy
+            {t("actions.cancel")}
           </button>
         </div>
       </div>

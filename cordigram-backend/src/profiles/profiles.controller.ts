@@ -161,6 +161,15 @@ export class ProfilesController {
       birthdate: dto.birthdate,
       workplaceName: dto.workplaceName,
       workplaceCompanyId: dto.workplaceCompanyId,
+      genderVisibility: dto.genderVisibility,
+      birthdateVisibility: dto.birthdateVisibility,
+      locationVisibility: dto.locationVisibility,
+      workplaceVisibility: dto.workplaceVisibility,
+      bioVisibility: dto.bioVisibility,
+      followersVisibility: dto.followersVisibility,
+      followingVisibility: dto.followingVisibility,
+      aboutVisibility: dto.aboutVisibility,
+      profileVisibility: dto.profileVisibility,
     });
 
     return this.profilesService.getProfileDetails({

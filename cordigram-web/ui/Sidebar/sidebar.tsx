@@ -26,6 +26,7 @@ import { useTheme } from "@/component/theme-provider";
 import SearchOverlay from "@/ui/search-overlay/search-overlay";
 import NotificationsOverlay from "@/ui/notifications-overlay/notifications-overlay";
 import { getStoredAccessToken } from "@/lib/auth";
+import { useTranslations } from "next-intl";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NOTIFICATION_SEEN_KEY = "cordigram:notification-seen-at";
@@ -49,22 +50,23 @@ const EyeIcon = ({ open }: { open: boolean }) => (
 );
 
 const navItems = [
-  { label: "Home", href: "/", icon: IconHome },
-  { label: "Search", href: "/search", icon: IconSearch },
-  { label: "Message", href: "/messages", icon: IconMessage },
+  { key: "home", href: "/", icon: IconHome },
+  { key: "search", href: "/search", icon: IconSearch },
+  { key: "message", href: "/messages", icon: IconMessage },
   {
-    label: "Following",
+    key: "following",
     href: "/following",
     icon: IconFollowing,
   },
-  { label: "Explore", href: "/explore", icon: IconCompass },
-  { label: "Notification", href: "/notifications", icon: IconBell },
-  { label: "Create", href: "/create", icon: IconPlus },
-  { label: "Reels", href: "/reels", icon: IconReel },
+  { key: "explore", href: "/explore", icon: IconCompass },
+  { key: "notification", href: "/notifications", icon: IconBell },
+  { key: "create", href: "/create", icon: IconPlus },
+  { key: "reels", href: "/reels", icon: IconReel },
 ];
 
 export default function Sidebar() {
   const router = useRouter();
+  const t = useTranslations("sidebar");
   const [profile, setProfile] = useState<CurrentProfileResponse | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
@@ -332,10 +334,10 @@ export default function Sidebar() {
         </Link>
 
         <nav className={styles.nav}>
-          {navItems.map(({ label, href, icon: Icon, hasAvatar }) =>
-            label === "Search" ? (
+          {navItems.map(({ key, href, icon: Icon, hasAvatar }) =>
+            key === "search" ? (
               <button
-                key={label}
+                key={key}
                 type="button"
                 className={styles.item}
                 onClick={() => setSearchOpen(true)}
@@ -343,11 +345,11 @@ export default function Sidebar() {
                 <span className={styles.icon}>
                   <Icon />
                 </span>
-                <span className={styles.label}>{label}</span>
+                <span className={styles.label}>{t(`nav.${key}`)}</span>
               </button>
-            ) : label === "Notification" ? (
+            ) : key === "notification" ? (
               <button
-                key={label}
+                key={key}
                 type="button"
                 className={styles.item}
                 onClick={() => {
@@ -367,7 +369,7 @@ export default function Sidebar() {
                 <span className={styles.icon}>
                   <Icon />
                 </span>
-                <span className={styles.label}>{label}</span>
+                <span className={styles.label}>{t(`nav.${key}`)}</span>
                 {unreadCount > 0 ? (
                   <span className={styles.badge}>
                     {unreadCount > 99 ? "99+" : unreadCount}
@@ -376,10 +378,10 @@ export default function Sidebar() {
               </button>
             ) : (
               <Link
-                key={label}
+                key={key}
                 href={href}
                 className={styles.item}
-                onClick={label === "Home" ? clearSessionAndGoHome : undefined}
+                onClick={key === "home" ? clearSessionAndGoHome : undefined}
               >
                 <span className={styles.icon}>
                   {hasAvatar ? (
@@ -388,7 +390,7 @@ export default function Sidebar() {
                     <Icon />
                   )}
                 </span>
-                <span className={styles.label}>{label}</span>
+                <span className={styles.label}>{t(`nav.${key}`)}</span>
               </Link>
             ),
           )}
@@ -425,12 +427,12 @@ export default function Sidebar() {
             {menuOpen ? (
               <div className={styles.userMenu}>
                 <MenuItem
-                  label="Profile"
+                  label={t("menu.profile")}
                   icon={<IconProfile />}
                   onClick={handleProfileClick}
                 />
                 <MenuItem
-                  label="Settings"
+                  label={t("menu.settings")}
                   icon={<IconSettings />}
                   onClick={() => {
                     setMenuOpen(false);
@@ -438,13 +440,15 @@ export default function Sidebar() {
                   }}
                 />
                 <MenuItem
-                  label="Saved"
+                  label={t("menu.saved")}
                   icon={<IconSaved />}
                   onClick={handleSavedClick}
                 />
                 <MenuItem
                   label={
-                    theme === "dark" ? "Switch to light" : "Switch to dark"
+                    theme === "dark"
+                      ? t("menu.switchToLight")
+                      : t("menu.switchToDark")
                   }
                   icon={<IconTheme />}
                   onClick={() => {
@@ -453,7 +457,7 @@ export default function Sidebar() {
                   }}
                 />
                 <MenuItem
-                  label="Report a problem"
+                  label={t("menu.reportProblem")}
                   icon={<IconReport />}
                   onClick={() => {
                     setMenuOpen(false);
@@ -461,7 +465,7 @@ export default function Sidebar() {
                   }}
                 />
                 <MenuItem
-                  label="Switch account"
+                  label={t("menu.switchAccount")}
                   icon={<IconSwitchAccount />}
                   onClick={() => {
                     setMenuOpen(false);
@@ -469,7 +473,7 @@ export default function Sidebar() {
                   }}
                 />
                 <MenuItem
-                  label="Log out"
+                  label={t("menu.logout")}
                   icon={<IconLogout />}
                   onClick={handleLogout}
                 />
@@ -545,6 +549,7 @@ function SwitchAccountOverlay({
   onClose,
   onSuccess,
 }: SwitchAccountOverlayProps) {
+  const t = useTranslations("sidebar.switchAccount");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -582,7 +587,7 @@ function SwitchAccountOverlay({
 
     const trimmedEmail = email.trim().toLowerCase();
     if (!emailRegex.test(trimmedEmail)) {
-      setError("Email format is invalid");
+      setError(t("errors.invalidEmail"));
       return;
     }
 
@@ -597,7 +602,7 @@ function SwitchAccountOverlay({
       await onSuccess(result.accessToken);
     } catch (err) {
       const apiErr = err as ApiError | undefined;
-      setError(apiErr?.message || "Login failed. Please try again.");
+      setError(apiErr?.message || t("errors.loginFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -623,7 +628,7 @@ function SwitchAccountOverlay({
             width={48}
             height={48}
           />
-          <h2 className="text-center">Sign in to continue</h2>
+          <h2 className="text-center">{t("title")}</h2>
         </div>
 
         <div className={styles.switchGrid}>
@@ -634,27 +639,27 @@ function SwitchAccountOverlay({
               noValidate
             >
               <label className={styles.switchLabel}>
-                Email address
+                {t("email.label")}
                 <input
                   type="email"
                   name="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter email"
+                  placeholder={t("email.placeholder")}
                   autoComplete="email"
                   className={styles.switchInput}
                 />
               </label>
 
               <label className={styles.switchLabel}>
-                Password
+                {t("password.label")}
                 <div className={styles.passwordField}>
                   <input
                     type={showPassword ? "text" : "password"}
                     name="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
+                    placeholder={t("password.placeholder")}
                     autoComplete="current-password"
                     className={`${styles.switchInput} ${styles.passwordInput}`}
                   />
@@ -663,7 +668,7 @@ function SwitchAccountOverlay({
                     className={styles.passwordToggle}
                     onClick={() => setShowPassword((prev) => !prev)}
                     aria-label={
-                      showPassword ? "Hide password" : "Show password"
+                      showPassword ? t("password.hide") : t("password.show")
                     }
                   >
                     <EyeIcon open={showPassword} />
@@ -682,7 +687,7 @@ function SwitchAccountOverlay({
                 disabled={isDisabled}
                 className={styles.switchSubmit}
               >
-                {submitting ? "Switching..." : "Log in"}
+                {submitting ? t("submit.loading") : t("submit.label")}
               </button>
             </form>
             <button
@@ -717,7 +722,7 @@ function SwitchAccountOverlay({
                   ></path>
                 </svg>
               </span>
-              Continue with Google
+              {t("google")}
             </button>
           </div>
         </div>

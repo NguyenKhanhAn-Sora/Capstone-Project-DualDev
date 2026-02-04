@@ -23,6 +23,8 @@ import {
   getMyVote,
   type Poll,
   type PollResults,
+  fetchDeviceTrustStatus,
+  verifyDeviceTrust,
 } from "@/lib/api";
 import { getLiveKitToken, getDMRoomName } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
@@ -84,7 +86,7 @@ const GiphyMessage = memo(
     if (loading) {
       return (
         <div style={{ padding: "12px", color: "#b5bac1", fontSize: "14px" }}>
-          Đang tải {messageType}...
+          Loading {messageType}...
         </div>
       );
     }
@@ -92,7 +94,7 @@ const GiphyMessage = memo(
     if (!gifData) {
       return (
         <span style={{ color: "#ff6b6b", fontSize: "12px" }}>
-          Không thể tải {messageType}
+          Unable to load {messageType}
         </span>
       );
     }
@@ -114,6 +116,20 @@ const GiphyMessage = memo(
 );
 
 GiphyMessage.displayName = "GiphyMessage";
+
+const PASSKEY_DEVICE_KEY = "cordigramDeviceId";
+
+const getDeviceId = () => {
+  if (typeof window === "undefined") return "";
+  const existing = window.localStorage.getItem(PASSKEY_DEVICE_KEY);
+  if (existing) return existing;
+  const next =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  window.localStorage.setItem(PASSKEY_DEVICE_KEY, next);
+  return next;
+};
 
 // ✅ Move PollMessage component outside to prevent re-creation on every render
 const PollMessage = memo(
@@ -191,8 +207,8 @@ const PollMessage = memo(
         <div className={styles.pollQuestion}>{pollData.question}</div>
         <div className={styles.pollSubtitle}>
           {pollData.allowMultipleAnswers
-            ? "Chọn một hoặc nhiều câu trả lời"
-            : "Chọn một câu trả lời"}
+            ? "Select one or more answers"
+            : "Select one answer"}
         </div>
 
         <div className={styles.pollOptions}>
@@ -235,7 +251,7 @@ const PollMessage = memo(
 
         <div className={styles.pollFooter}>
           <span className={styles.pollStats}>
-            {pollData.uniqueVoters} phiếu • {pollData.hoursLeft}giờ còn lại
+            {pollData.uniqueVoters} votes • {pollData.hoursLeft} hours left
           </span>
           <div className={styles.pollActions}>
             {!showResults && (
@@ -243,7 +259,7 @@ const PollMessage = memo(
                 className={styles.pollActionButton}
                 onClick={() => setShowResults(true)}
               >
-                Hiện kết quả
+                Show results
               </button>
             )}
             {!hasVoted && !showResults && (
@@ -252,12 +268,10 @@ const PollMessage = memo(
                 onClick={handleVote}
                 disabled={selectedOptions.length === 0}
               >
-                Bỏ phiếu
+                Vote
               </button>
             )}
-            {hasVoted && (
-              <span className={styles.pollVoted}>✓ Đã bỏ phiếu</span>
-            )}
+            {hasVoted && <span className={styles.pollVoted}>✓ Voted</span>}
           </div>
         </div>
       </div>
@@ -427,7 +441,7 @@ const MessageItem = memo(
                       opacity="0.6"
                     />
                   </svg>
-                  <span className={styles.readText}>Đã xem</span>
+                  <span className={styles.readText}>Seen</span>
                 </div>
               ) : (
                 <div className={styles.readStatus}>
@@ -448,7 +462,7 @@ const MessageItem = memo(
                       opacity="0.5"
                     />
                   </svg>
-                  <span className={styles.unreadText}>Đã gửi</span>
+                  <span className={styles.unreadText}>Sent</span>
                 </div>
               )}
             </div>
@@ -508,6 +522,12 @@ export default function MessagesPage() {
   const [loadingDirectMessages, setLoadingDirectMessages] = useState(false);
   const [token, setToken] = useState<string>("");
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
+  const [passkeyRequired, setPasskeyRequired] = useState(false);
+  const [passkeyChecking, setPasskeyChecking] = useState(false);
+  const [deviceId, setDeviceId] = useState("");
+  const [passkeyInput, setPasskeyInput] = useState("");
+  const [passkeyError, setPasskeyError] = useState<string | null>(null);
+  const [passkeySubmitting, setPasskeySubmitting] = useState(false);
 
   // Media picker states
   const [showGiphyPicker, setShowGiphyPicker] = useState(false);
@@ -991,6 +1011,55 @@ export default function MessagesPage() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    const id = getDeviceId();
+    setDeviceId(id);
+    setPasskeyChecking(true);
+    fetchDeviceTrustStatus({ token, deviceId: id })
+      .then((res) => {
+        if (res.hasPasskey && !res.trusted) {
+          setPasskeyRequired(true);
+        } else {
+          setPasskeyRequired(false);
+        }
+      })
+      .catch(() => {
+        setPasskeyRequired(false);
+      })
+      .finally(() => setPasskeyChecking(false));
+  }, [token]);
+
+  const handleVerifyPasskeyGate = async () => {
+    setPasskeyError(null);
+    if (!passkeyInput.trim()) {
+      setPasskeyError("Please enter your 6-digit passkey.");
+      return;
+    }
+    if (!/^\d{6}$/.test(passkeyInput)) {
+      setPasskeyError("Passkey must be exactly 6 digits.");
+      return;
+    }
+    if (!token || !deviceId) {
+      setPasskeyError("Session expired. Please sign in again.");
+      return;
+    }
+    setPasskeySubmitting(true);
+    try {
+      await verifyDeviceTrust({ token, deviceId, passkey: passkeyInput });
+      setPasskeyRequired(false);
+      setPasskeyInput("");
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Unable to verify passkey.";
+      setPasskeyError(message || "Unable to verify passkey.");
+    } finally {
+      setPasskeySubmitting(false);
+    }
+  };
 
   const loadCurrentUserProfile = async (token: string) => {
     try {
@@ -1968,9 +2037,7 @@ export default function MessagesPage() {
 
           const loadingMessage: UIMessage = {
             id: tempId,
-            text: isImage
-              ? `📤 Đang tải ảnh lên...`
-              : `📤 Đang tải video lên...`,
+            text: isImage ? `📤 Uploading image...` : `📤 Uploading video...`,
             senderId: currentUserId,
             senderEmail: "",
             senderName: currentUserProfile?.username || "",
@@ -2130,13 +2197,13 @@ export default function MessagesPage() {
     try {
       // Validate
       if (!pollQuestion.trim()) {
-        setError("Vui lòng nhập câu hỏi");
+        setError("Please enter a question");
         return;
       }
 
       const validOptions = pollOptions.filter((opt) => opt.trim());
       if (validOptions.length < 2) {
-        setError("Cần ít nhất 2 câu trả lời");
+        setError("At least 2 answers are required");
         return;
       }
 
@@ -2146,7 +2213,7 @@ export default function MessagesPage() {
       // ✅ FIX: Show loading message
       const loadingMessage: UIMessage = {
         id: `temp-poll-${Date.now()}`,
-        text: `📊 Đang tạo khảo sát...`,
+        text: `📊 Creating poll...`,
         senderId: currentUserId,
         senderEmail: "",
         senderName: currentUserProfile?.username || "",
@@ -2256,6 +2323,42 @@ export default function MessagesPage() {
 
   return (
     <div className={styles.container}>
+      {passkeyRequired ? (
+        <div className={styles.passkeyOverlay} role="dialog" aria-modal>
+          <div className={styles.passkeyCard}>
+            <h2 className={styles.passkeyTitle}>Enter passkey</h2>
+            <p className={styles.passkeyDesc}>
+              To access Messages on this device, please enter your 6-digit
+              passkey.
+            </p>
+            <input
+              className={styles.passkeyInput}
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="••••••"
+              value={passkeyInput}
+              onChange={(e) =>
+                setPasskeyInput(e.target.value.replace(/\D/g, ""))
+              }
+              disabled={passkeySubmitting || passkeyChecking}
+            />
+            {passkeyError ? (
+              <p className={styles.passkeyError}>{passkeyError}</p>
+            ) : null}
+            <div className={styles.passkeyActions}>
+              <button
+                type="button"
+                className={styles.passkeyButton}
+                onClick={handleVerifyPasskeyGate}
+                disabled={passkeySubmitting || passkeyChecking}
+              >
+                {passkeySubmitting ? "Verifying..." : "Verify"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {/* Call Room Overlay - DEPRECATED: Calls now open in new tab */}
       {/* {isInCall && callToken && callServerUrl && (
         <CallRoom
@@ -2809,7 +2912,7 @@ export default function MessagesPage() {
                             {userTyping.username ||
                               selectedDirectMessageFriend.username ||
                               selectedDirectMessageFriend.displayName}{" "}
-                            đang gõ...
+                            is typing...
                           </span>
                           <div className={styles.typingDots}>
                             <span></span>
@@ -2863,7 +2966,7 @@ export default function MessagesPage() {
                             <polyline points="17 8 12 3 7 8"></polyline>
                             <line x1="12" y1="3" x2="12" y2="15"></line>
                           </svg>
-                          <span>Tải Lên Tệp</span>
+                          <span>Upload file</span>
                         </button>
                         <button
                           className={styles.plusMenuItem}
@@ -2883,12 +2986,12 @@ export default function MessagesPage() {
                             <line x1="16" y1="17" x2="8" y2="17"></line>
                             <polyline points="10 9 9 9 8 9"></polyline>
                           </svg>
-                          <span>Tạo khảo sát</span>
+                          <span>Create poll</span>
                         </button>
                         <button
                           className={styles.plusMenuItem}
                           onClick={() => {
-                            console.log("Dùng các Ứng dụng");
+                            console.log("Use apps");
                             setShowPlusMenu(false);
                           }}
                         >
@@ -2905,7 +3008,7 @@ export default function MessagesPage() {
                             <rect x="14" y="14" width="7" height="7"></rect>
                             <rect x="3" y="14" width="7" height="7"></rect>
                           </svg>
-                          <span>Dùng các Ứng dụng</span>
+                          <span>Use apps</span>
                         </button>
                       </div>
                     )}
@@ -2923,7 +3026,7 @@ export default function MessagesPage() {
                   {isUploadingVoice && (
                     <div className={styles.uploadingVoice}>
                       <div className={styles.spinner}></div>
-                      <span>Đang tải lên...</span>
+                      <span>Uploading...</span>
                     </div>
                   )}
 
@@ -3020,7 +3123,7 @@ export default function MessagesPage() {
                         {/* Voice Recording Button */}
                         <button
                           className={styles.mediaButton}
-                          title="Gửi tin nhắn thoại"
+                          title="Send voice message"
                           onClick={() => setIsRecordingVoice(true)}
                           disabled={isRecordingVoice || isUploadingVoice}
                         >
@@ -3525,7 +3628,7 @@ export default function MessagesPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className={styles.pollModalHeader}>
-              <h2>Tạo một khảo sát</h2>
+              <h2>Create a poll</h2>
               <button className={styles.closeButton} onClick={handleCancelPoll}>
                 <svg
                   width="20"
@@ -3544,12 +3647,12 @@ export default function MessagesPage() {
             <div className={styles.pollModalBody}>
               {/* Question */}
               <div className={styles.pollField}>
-                <label className={styles.pollLabel}>Câu hỏi</label>
+                <label className={styles.pollLabel}>Question</label>
                 <div className={styles.pollInputWrapper}>
                   <input
                     type="text"
                     className={styles.pollInput}
-                    placeholder="Câu hỏi bạn muốn đặt ra là gì?"
+                    placeholder="What question do you want to ask?"
                     value={pollQuestion}
                     onChange={(e) => setPollQuestion(e.target.value)}
                     maxLength={300}
@@ -3562,7 +3665,7 @@ export default function MessagesPage() {
 
               {/* Options */}
               <div className={styles.pollField}>
-                <label className={styles.pollLabel}>Câu trả lời</label>
+                <label className={styles.pollLabel}>Answers</label>
                 {pollOptions.map((option, index) => (
                   <div key={index} className={styles.pollOptionRow}>
                     <button className={styles.emojiButton}>
@@ -3583,7 +3686,7 @@ export default function MessagesPage() {
                     <input
                       type="text"
                       className={styles.pollOptionInput}
-                      placeholder="Nhập câu trả lời của bạn"
+                      placeholder="Enter your answer"
                       value={option}
                       onChange={(e) =>
                         handlePollOptionChange(index, e.target.value)
@@ -3613,24 +3716,24 @@ export default function MessagesPage() {
                   className={styles.addOptionButton}
                   onClick={handleAddPollOption}
                 >
-                  + Thêm một câu trả lời khác
+                  + Add another answer
                 </button>
               </div>
 
               {/* Duration */}
               <div className={styles.pollField}>
-                <label className={styles.pollLabel}>Khoảng thời gian</label>
+                <label className={styles.pollLabel}>Duration</label>
                 <select
                   className={styles.pollSelect}
                   value={pollDuration}
                   onChange={(e) => setPollDuration(Number(e.target.value))}
                 >
-                  <option value={1}>1 giờ</option>
-                  <option value={4}>4 giờ</option>
-                  <option value={8}>8 giờ</option>
-                  <option value={24}>24 giờ</option>
-                  <option value={72}>3 ngày</option>
-                  <option value={168}>7 ngày</option>
+                  <option value={1}>1 hour</option>
+                  <option value={4}>4 hours</option>
+                  <option value={8}>8 hours</option>
+                  <option value={24}>24 hours</option>
+                  <option value={72}>3 days</option>
+                  <option value={168}>7 days</option>
                 </select>
               </div>
 
@@ -3642,9 +3745,7 @@ export default function MessagesPage() {
                   checked={pollAllowMultiple}
                   onChange={(e) => setPollAllowMultiple(e.target.checked)}
                 />
-                <label htmlFor="allowMultiple">
-                  Cho phép nhiều câu trả lời
-                </label>
+                <label htmlFor="allowMultiple">Allow multiple answers</label>
               </div>
             </div>
 
@@ -3653,13 +3754,13 @@ export default function MessagesPage() {
                 className={styles.cancelButton}
                 onClick={handleCancelPoll}
               >
-                Bãi đăng
+                Cancel
               </button>
               <button
                 className={styles.submitButton}
                 onClick={handleSubmitPoll}
               >
-                Đăng
+                Post
               </button>
             </div>
           </div>

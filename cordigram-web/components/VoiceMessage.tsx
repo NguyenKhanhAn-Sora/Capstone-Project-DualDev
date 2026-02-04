@@ -115,7 +115,7 @@ export default function VoiceMessage({
             <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm1 16h-2v-2h2v2zm0-4h-2V7h2v7z" />
           </svg>
         </div>
-        <span className={styles.errorText}>Không thể phát</span>
+        <span className={styles.errorText}>Unable to play</span>
       </div>
     );
   }
@@ -129,7 +129,7 @@ export default function VoiceMessage({
         className={styles.playButton}
         onClick={handlePlayPause}
         disabled={isLoading}
-        title={isPlaying ? "Tạm dừng" : "Phát"}
+        title={isPlaying ? "Pause" : "Play"}
       >
         {isLoading ? (
           <div className={styles.loadingSpinner}></div>

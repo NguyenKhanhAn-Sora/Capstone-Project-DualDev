@@ -13,6 +13,9 @@ import { UsersController } from './users.controller';
 import { BlocksService } from './blocks.service';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { OtpModule } from '../otp/otp.module';
+import { Session, SessionSchema } from '../auth/session.schema';
+import { ActivityModule } from '../activity/activity.module';
 
 @Module({
   imports: [
@@ -22,9 +25,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: Block.name, schema: BlockSchema },
       { name: Profile.name, schema: ProfileSchema },
       { name: UserTasteProfile.name, schema: UserTasteProfileSchema },
+      { name: Session.name, schema: SessionSchema },
     ]),
     forwardRef(() => AuthModule),
     NotificationsModule,
+    OtpModule,
+    ActivityModule,
   ],
   controllers: [UsersController],
   providers: [UsersService, BlocksService],

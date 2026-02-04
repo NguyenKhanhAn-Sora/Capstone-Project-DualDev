@@ -654,6 +654,11 @@
   white-space: nowrap;
 }
 
+.aboutValueMuted {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
 @media (max-width: 420px) {
   .aboutRow {
     flex-direction: column;

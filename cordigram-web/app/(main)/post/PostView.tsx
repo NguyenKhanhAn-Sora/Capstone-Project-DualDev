@@ -33,6 +33,7 @@ import {
   unsavePost,
   updatePost,
   updatePostVisibility,
+  updatePostNotificationMute,
   searchProfiles,
   uploadCommentMedia,
   type CommentItem,
@@ -43,6 +44,8 @@ import {
   type ProfileSearchItem,
 } from "@/lib/api";
 import PostLikesOverlay from "@/ui/post-likes-overlay/post-likes-overlay";
+import { DateSelect } from "@/ui/date-select/date-select";
+import { TimeSelect } from "@/ui/time-select/time-select";
 
 function upsertById(list: CommentItem[], incoming: CommentItem): CommentItem[] {
   const idx = list.findIndex((c) => c.id === incoming.id);
@@ -202,6 +205,13 @@ const cleanLocationLabel = (label: string) =>
     .replace(/\s*,\s*$/g, "")
     .replace(/^\s*,\s*/g, "")
     .trim();
+
+const buildLocalDateTimeIso = (date: string, time: string) => {
+  if (!date || !time) return null;
+  const dt = new Date(`${date}T${time}:00`);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString();
+};
 
 const extractMentionsFromCaption = (value: string) => {
   const handles = new Set<string>();
@@ -390,6 +400,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     "public" | "followers" | "private"
   >("public");
   const [visibilityError, setVisibilityError] = useState("");
+  const [muteModalOpen, setMuteModalOpen] = useState(false);
+  const [muteOption, setMuteOption] = useState("5m");
+  const [muteCustomDate, setMuteCustomDate] = useState("");
+  const [muteCustomTime, setMuteCustomTime] = useState("");
+  const [muteSaving, setMuteSaving] = useState(false);
+  const [muteError, setMuteError] = useState("");
   const [mounted, setMounted] = useState(false);
   const visibilityOptions: Array<{
     value: "public" | "followers" | "private";
@@ -412,6 +428,20 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       description: "Only you can view this post",
     },
   ];
+
+  const muteOptions = useMemo(
+    () => [
+      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
+      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
+      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
+      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
+      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
+      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: "Until I turn it back on", ms: null },
+      { key: "custom", label: "Choose date & time", ms: null },
+    ],
+    [],
+  );
 
   useEffect(() => {
     setVisibilitySelected((post?.visibility as any) ?? "public");
@@ -1345,11 +1375,119 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     return Boolean(sameId || sameUsername);
   }, [post, viewer, viewerUserId]);
 
+  const isMutedForPost = useMemo(() => {
+    if (!isAuthor || !post) return false;
+    if (post.notificationsMutedIndefinitely) return true;
+    if (post.notificationsMutedUntil) {
+      const dt = new Date(post.notificationsMutedUntil);
+      if (!Number.isNaN(dt.getTime()) && dt.getTime() > Date.now()) {
+        return true;
+      }
+    }
+    return false;
+  }, [isAuthor, post]);
+
   const showToast = useCallback((message: string, duration = 1600) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage(message);
     toastTimerRef.current = setTimeout(() => setToastMessage(null), duration);
   }, []);
+
+  const openMuteModal = () => {
+    setMuteError("");
+    setMuteOption("5m");
+    setMuteCustomDate("");
+    setMuteCustomTime("");
+    setMuteModalOpen(true);
+  };
+
+  const closeMuteModal = () => {
+    if (muteSaving) return;
+    setMuteModalOpen(false);
+  };
+
+  const handleEnablePostNotifications = async () => {
+    if (!token || !post) return;
+    setMuteSaving(true);
+    setMuteError("");
+    try {
+      const res = await updatePostNotificationMute({
+        token,
+        postId: post.id,
+        enabled: true,
+      });
+      setPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              notificationsMutedUntil: res.mutedUntil ?? null,
+              notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+            }
+          : prev,
+      );
+      setMuteModalOpen(false);
+    } catch (err: any) {
+      setMuteError(err?.message || "Failed to update notifications");
+    } finally {
+      setMuteSaving(false);
+    }
+  };
+
+  const handleSavePostMute = async () => {
+    if (!token || !post) return;
+    setMuteSaving(true);
+    setMuteError("");
+
+    try {
+      let mutedUntil: string | null = null;
+      let mutedIndefinitely = false;
+      const selected = muteOptions.find((opt) => opt.key === muteOption);
+
+      if (muteOption === "until") {
+        mutedIndefinitely = true;
+      } else if (muteOption === "custom") {
+        const iso = buildLocalDateTimeIso(muteCustomDate, muteCustomTime);
+        if (!iso) {
+          setMuteError("Please select a valid date and time.");
+          setMuteSaving(false);
+          return;
+        }
+        const dt = new Date(iso);
+        if (dt.getTime() <= Date.now()) {
+          setMuteError("Please choose a future time.");
+          setMuteSaving(false);
+          return;
+        }
+        mutedUntil = iso;
+      } else if (selected?.ms) {
+        mutedUntil = new Date(Date.now() + selected.ms).toISOString();
+      } else {
+        mutedIndefinitely = true;
+      }
+
+      const res = await updatePostNotificationMute({
+        token,
+        postId: post.id,
+        mutedUntil,
+        mutedIndefinitely,
+      });
+
+      setPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              notificationsMutedUntil: res.mutedUntil ?? null,
+              notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+            }
+          : prev,
+      );
+      setMuteModalOpen(false);
+    } catch (err: any) {
+      setMuteError(err?.message || "Failed to update notifications");
+    } finally {
+      setMuteSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -4069,6 +4207,92 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     </div>
   );
 
+  const muteModal = (
+    <div
+      className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
+      role="dialog"
+      aria-modal="true"
+      onClick={closeMuteModal}
+    >
+      <div
+        className={`${feedStyles.modalCard} ${feedStyles.modalCardOpen}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={feedStyles.modalHeader}>
+          <div>
+            <h3 className={feedStyles.modalTitle}>Mute notifications</h3>
+            <p className={feedStyles.modalBody}>
+              Choose how long to pause alerts for this post.
+            </p>
+          </div>
+          <button
+            className={feedStyles.closeBtn}
+            aria-label="Close"
+            onClick={closeMuteModal}
+          >
+            <IconClose size={18} />
+          </button>
+        </div>
+
+        <div className={feedStyles.muteOptionGrid}>
+          {muteOptions.map((option) => (
+            <button
+              key={option.key}
+              className={`${feedStyles.muteOption} ${
+                muteOption === option.key ? feedStyles.muteOptionActive : ""
+              }`}
+              onClick={() => setMuteOption(option.key)}
+              type="button"
+            >
+              <span className={feedStyles.muteOptionTitle}>{option.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {muteOption === "custom" ? (
+          <div className={feedStyles.muteCustomRow}>
+            <div className={feedStyles.mutePicker}>
+              <label className={feedStyles.editLabel}>Date</label>
+              <DateSelect
+                value={muteCustomDate}
+                onChange={setMuteCustomDate}
+                minDate={new Date()}
+                maxDate={null}
+                placeholder="yyyy-mm-dd"
+              />
+            </div>
+            <div className={feedStyles.mutePicker}>
+              <label className={feedStyles.editLabel}>Time</label>
+              <TimeSelect
+                value={muteCustomTime}
+                onChange={setMuteCustomTime}
+                selectedDate={muteCustomDate}
+                minDateTime={new Date()}
+                disabled={!muteCustomDate}
+                placeholder="hh:mm"
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {muteError ? (
+          <div className={feedStyles.inlineError}>{muteError}</div>
+        ) : null}
+
+        <div className={feedStyles.modalActions}>
+          <button
+            type="button"
+            className={feedStyles.modalPrimary}
+            onClick={handleSavePostMute}
+            disabled={muteSaving}
+          >
+            {muteSaving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   const authorProfileId = post?.authorId || post?.author?.id;
 
   const header = (
@@ -4130,6 +4354,29 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         </div>
       </div>
       <div className={styles.headerActions}>
+        {isMutedForPost ? (
+          <span
+            className={feedStyles.muteBadge}
+            title="Notifications muted"
+            aria-label="Notifications muted"
+          >
+            <svg
+              aria-hidden
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              <line x1="3" y1="3" x2="21" y2="21" />
+            </svg>
+          </span>
+        ) : null}
         <div className={styles.moreMenuWrap} ref={menuRef}>
           <button
             type="button"
@@ -4180,8 +4427,18 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     type="button"
                     className={styles.moreMenuItem}
                     role="menuitem"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      if (isMutedForPost) {
+                        handleEnablePostNotifications();
+                      } else {
+                        openMuteModal();
+                      }
+                    }}
                   >
-                    Mute notifications
+                    {isMutedForPost
+                      ? "Turn on notification"
+                      : "Mute notifications"}
                   </button>
                   <button
                     type="button"
@@ -5219,6 +5476,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         ? mounted && typeof document !== "undefined"
           ? createPortal(visibilityModal, document.body)
           : visibilityModal
+        : null}
+
+      {muteModalOpen
+        ? mounted && typeof document !== "undefined"
+          ? createPortal(muteModal, document.body)
+          : muteModal
         : null}
 
       {reportOpen ? (

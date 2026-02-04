@@ -7,7 +7,8 @@ export type NotificationType =
   | 'post_like'
   | 'post_comment'
   | 'post_mention'
-  | 'follow';
+  | 'follow'
+  | 'login_alert';
 
 @Schema({ timestamps: true })
 export class Notification extends Document {
@@ -40,11 +41,41 @@ export class Notification extends Document {
 
   @Prop({
     type: String,
-    enum: ['post_like', 'post_comment', 'post_mention', 'follow'],
+    enum: [
+      'post_like',
+      'post_comment',
+      'post_mention',
+      'follow',
+      'login_alert',
+    ],
     index: true,
     required: true,
   })
   type: NotificationType;
+
+  @Prop({ type: String, default: '' })
+  deviceInfo?: string;
+
+  @Prop({ type: String, default: '' })
+  deviceType?: string;
+
+  @Prop({ type: String, default: '' })
+  os?: string;
+
+  @Prop({ type: String, default: '' })
+  browser?: string;
+
+  @Prop({ type: String, default: '' })
+  location?: string;
+
+  @Prop({ type: String, default: '' })
+  ip?: string;
+
+  @Prop({ type: String, default: '' })
+  deviceIdHash?: string;
+
+  @Prop({ type: Date, default: null })
+  loginAt?: Date | null;
 
   @Prop({ type: Number, default: 0 })
   likeCount: number;

@@ -21,6 +21,7 @@ type Props = {
   ownerUsername?: string;
   initialTab: FollowersOverlayTab;
   viewerId?: string;
+  onCountsChange?: (delta: { followers?: number; following?: number }) => void;
   onClose: () => void;
 };
 
@@ -61,6 +62,7 @@ export default function FollowersOverlay(props: Props) {
     ownerUsername,
     initialTab,
     viewerId,
+    onCountsChange,
     onClose,
   } = props;
 
@@ -82,9 +84,24 @@ export default function FollowersOverlay(props: Props) {
     error: "",
     loadingMore: false,
   });
+  const [followersSearch, setFollowersSearch] = useState("");
+  const [followingSearch, setFollowingSearch] = useState("");
 
   const state = tab === "followers" ? followers : following;
   const setState = tab === "followers" ? setFollowers : setFollowing;
+  const activeSearch = tab === "followers" ? followersSearch : followingSearch;
+  const setActiveSearch =
+    tab === "followers" ? setFollowersSearch : setFollowingSearch;
+
+  const filteredItems = useMemo(() => {
+    const query = activeSearch.trim().toLowerCase();
+    if (!query) return state.items;
+    return state.items.filter((item) => {
+      const username = item.username?.toLowerCase() ?? "";
+      const displayName = item.displayName?.toLowerCase() ?? "";
+      return username.includes(query) || displayName.includes(query);
+    });
+  }, [activeSearch, state.items]);
 
   const title = useMemo(() => {
     const handle = ownerUsername ? `@${ownerUsername}` : "Profile";
@@ -227,6 +244,10 @@ export default function FollowersOverlay(props: Props) {
     if (viewerId && item.userId === viewerId) return;
 
     const next = !item.isFollowing;
+    const isOwner = Boolean(
+      viewerId && ownerUserId && viewerId === ownerUserId,
+    );
+    const followingDelta = isOwner ? (next ? 1 : -1) : 0;
 
     setFollowers((p) => ({
       ...p,
@@ -240,6 +261,10 @@ export default function FollowersOverlay(props: Props) {
         u.userId === item.userId ? { ...u, isFollowing: next } : u,
       ),
     }));
+
+    if (followingDelta) {
+      onCountsChange?.({ following: followingDelta });
+    }
 
     try {
       if (next) {
@@ -262,6 +287,9 @@ export default function FollowersOverlay(props: Props) {
           u.userId === item.userId ? { ...u, isFollowing: !next } : u,
         ),
       }));
+      if (followingDelta) {
+        onCountsChange?.({ following: -followingDelta });
+      }
     }
   };
 
@@ -308,6 +336,45 @@ export default function FollowersOverlay(props: Props) {
           </button>
         </div>
 
+        <div className={styles.searchWrap}>
+          <span className={styles.searchIcon} aria-hidden>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
+              <circle
+                cx="11"
+                cy="11"
+                r="7"
+                stroke="currentColor"
+                strokeWidth="1.6"
+              />
+              <path
+                d="M16.5 16.5L21 21"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </span>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder={
+              tab === "followers" ? "Search followers" : "Search following"
+            }
+            value={activeSearch}
+            onChange={(event) => setActiveSearch(event.target.value)}
+          />
+          {activeSearch ? (
+            <button
+              type="button"
+              className={styles.searchClear}
+              onClick={() => setActiveSearch("")}
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          ) : null}
+        </div>
+
         <div className={styles.list} ref={scrollRef}>
           {state.loading ? (
             <div className={styles.loading}>Loading…</div>
@@ -316,11 +383,13 @@ export default function FollowersOverlay(props: Props) {
             <div className={styles.error}>{state.error}</div>
           ) : null}
 
-          {!state.loading && !state.error && !state.items.length ? (
-            <div className={styles.loading}>No users yet</div>
+          {!state.loading && !state.error && !filteredItems.length ? (
+            <div className={styles.loading}>
+              {activeSearch ? "No matches found" : "No users yet"}
+            </div>
           ) : null}
 
-          {state.items.map((item) => (
+          {filteredItems.map((item) => (
             <div key={item.userId} className={styles.row}>
               <Link
                 href={toProfileHref(item)}

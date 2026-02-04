@@ -19,6 +19,7 @@ import {
   savePost,
   setPostAllowComments,
   setPostHideLikeCount,
+  updatePostNotificationMute,
   unfollowUser,
   unlikePost,
   unsavePost,
@@ -31,6 +32,8 @@ import styles from "./hashtag.module.css";
 import feedStyles from "../../home-feed.module.css";
 import PostEditOverlay from "@/ui/post-edit-overlay";
 import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
+import { DateSelect } from "@/ui/date-select/date-select";
+import { TimeSelect } from "@/ui/time-select/time-select";
 import RepostOverlay, {
   type QuoteInput,
   type RepostTarget,
@@ -51,9 +54,17 @@ const IconLike = ({ size = 20, filled }: IconProps) => (
     xmlns="http://www.w3.org/2000/svg"
   >
     <path
-      d="M12.1 20.4s-7.2-4-9.6-8.7C.8 7.9 3 4.8 6.3 4.8c2 0 3.6 1.2 4.5 2.5.9-1.3 2.5-2.5 4.5-2.5 3.3 0 5.5 3.1 3.8 6.9-2.4 4.7-9.6 8.7-9.6 8.7Z"
+      d="M6 10h3.2V6.6a2.1 2.1 0 0 1 2.1-2.1c.46 0 .91.16 1.27.45l.22.18c.32.26.51.66.51 1.07V10h3.6a2 2 0 0 1 1.97 2.35l-1 5.3A2.2 2.2 0 0 1 15.43 20H8.2A2.2 2.2 0 0 1 6 17.8Z"
       stroke="currentColor"
       strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M4 10h2v10H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
       strokeLinejoin="round"
       fill={filled ? "currentColor" : "none"}
     />
@@ -70,9 +81,10 @@ const IconComment = ({ size = 20 }: IconProps) => (
     xmlns="http://www.w3.org/2000/svg"
   >
     <path
-      d="M4.7 5.4h14.6c.9 0 1.7.8 1.7 1.7v9.5c0 .9-.8 1.7-1.7 1.7H9.4l-3.8 3.1v-3.1H4.7c-.9 0-1.7-.8-1.7-1.7V7.1c0-.9.8-1.7 1.7-1.7Z"
+      d="M5.5 5.5h13a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H10l-3.6 2.8a.6.6 0 0 1-.96-.48V7.5a2 2 0 0 1 2-2Z"
       stroke="currentColor"
       strokeWidth={1.6}
+      strokeLinecap="round"
       strokeLinejoin="round"
     />
   </svg>
@@ -84,22 +96,15 @@ const IconReup = ({ size = 20 }: IconProps) => (
     width={size}
     height={size}
     viewBox="0 0 24 24"
-    fill="none"
+    fill="var(--color-text-muted)"
     xmlns="http://www.w3.org/2000/svg"
   >
     <path
-      d="M7.5 7.5h9v-3l3.5 3.5L16.5 11v-3h-9a4 4 0 0 0-4 4v.3"
-      stroke="currentColor"
-      strokeWidth={1.6}
+      stroke="none"
+      strokeWidth={1}
       strokeLinecap="round"
       strokeLinejoin="round"
-    />
-    <path
-      d="M16.5 16.5h-9v3L4 16l3.5-3.5v3h9a4 4 0 0 0 4-4v-.3"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"
     />
   </svg>
 );
@@ -348,6 +353,13 @@ const formatCount = (value?: number) => {
   return `${n}`;
 };
 
+const buildLocalDateTimeIso = (date: string, time: string) => {
+  if (!date || !time) return null;
+  const dt = new Date(`${date}T${time}:00`);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString();
+};
+
 export default function HashtagPage() {
   const canRender = useRequireAuth();
   const params = useParams<{ tag?: string }>();
@@ -411,6 +423,23 @@ export default function HashtagPage() {
     setPosts((prev) =>
       prev.map((item) => (item.id === postId ? updater(item) : item)),
     );
+  };
+
+  const updatePostMute = (
+    postId: string,
+    patch: {
+      notificationsMutedUntil?: string | null;
+      notificationsMutedIndefinitely?: boolean;
+    },
+  ) => {
+    updatePost(postId, (item) => ({
+      ...item,
+      notificationsMutedUntil:
+        patch.notificationsMutedUntil ?? item.notificationsMutedUntil,
+      notificationsMutedIndefinitely:
+        patch.notificationsMutedIndefinitely ??
+        item.notificationsMutedIndefinitely,
+    }));
   };
 
   const showToast = (message: string) => {
@@ -884,6 +913,7 @@ export default function HashtagPage() {
                 onToggleComments={onToggleComments}
                 onToggleHideLikeCount={onToggleHideLikeCount}
                 onOpenVisibility={openVisibilityModal}
+                onUpdateMute={updatePostMute}
               />
             ))}
           </div>
@@ -1271,6 +1301,7 @@ function HashtagPostCard({
   onToggleComments,
   onToggleHideLikeCount,
   onOpenVisibility,
+  onUpdateMute,
 }: {
   item: FeedItem;
   liked: boolean;
@@ -1292,6 +1323,13 @@ function HashtagPostCard({
   onOpenVisibility: (
     postId: string,
     current: "public" | "followers" | "private",
+  ) => void;
+  onUpdateMute: (
+    postId: string,
+    patch: {
+      notificationsMutedUntil?: string | null;
+      notificationsMutedIndefinitely?: boolean;
+    },
   ) => void;
 }) {
   const router = useRouter();
@@ -1381,6 +1419,42 @@ function HashtagPostCard({
   const hideLikeToggleLabel = item.hideLikeCount
     ? "Show like counts"
     : "Hide like counts";
+  const [muteModalOpen, setMuteModalOpen] = useState(false);
+  const [muteOption, setMuteOption] = useState("5m");
+  const [muteCustomDate, setMuteCustomDate] = useState("");
+  const [muteCustomTime, setMuteCustomTime] = useState("");
+  const [muteSaving, setMuteSaving] = useState(false);
+  const [muteError, setMuteError] = useState("");
+
+  const muteOptions = useMemo(
+    () => [
+      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
+      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
+      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
+      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
+      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
+      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: "Until I turn it back on", ms: null },
+      { key: "custom", label: "Choose date & time", ms: null },
+    ],
+    [],
+  );
+
+  const isMutedForPost = useMemo(() => {
+    if (!isSelf) return false;
+    if (item.notificationsMutedIndefinitely) return true;
+    if (item.notificationsMutedUntil) {
+      const dt = new Date(item.notificationsMutedUntil);
+      if (!Number.isNaN(dt.getTime()) && dt.getTime() > Date.now()) {
+        return true;
+      }
+    }
+    return false;
+  }, [
+    isSelf,
+    item.notificationsMutedIndefinitely,
+    item.notificationsMutedUntil,
+  ]);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -1398,6 +1472,94 @@ function HashtagPostCard({
       document.removeEventListener("keydown", handleEscape);
     };
   }, []);
+
+  const openMuteModal = () => {
+    setMuteError("");
+    setMuteOption("5m");
+    setMuteCustomDate("");
+    setMuteCustomTime("");
+    setMuteModalOpen(true);
+  };
+
+  const closeMuteModal = () => {
+    if (muteSaving) return;
+    setMuteModalOpen(false);
+  };
+
+  const handleEnablePostNotifications = async () => {
+    const token = getStoredAccessToken();
+    if (!token) return;
+    setMuteSaving(true);
+    setMuteError("");
+    try {
+      const res = await updatePostNotificationMute({
+        token,
+        postId: item.id,
+        enabled: true,
+      });
+      onUpdateMute(item.id, {
+        notificationsMutedUntil: res.mutedUntil ?? null,
+        notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+      });
+      setMuteModalOpen(false);
+    } catch (err: any) {
+      setMuteError(err?.message || "Failed to update notifications");
+    } finally {
+      setMuteSaving(false);
+    }
+  };
+
+  const handleSavePostMute = async () => {
+    const token = getStoredAccessToken();
+    if (!token) return;
+    setMuteSaving(true);
+    setMuteError("");
+
+    try {
+      let mutedUntil: string | null = null;
+      let mutedIndefinitely = false;
+      const selected = muteOptions.find((opt) => opt.key === muteOption);
+
+      if (muteOption === "until") {
+        mutedIndefinitely = true;
+      } else if (muteOption === "custom") {
+        const iso = buildLocalDateTimeIso(muteCustomDate, muteCustomTime);
+        if (!iso) {
+          setMuteError("Please select a valid date and time.");
+          setMuteSaving(false);
+          return;
+        }
+        const dt = new Date(iso);
+        if (dt.getTime() <= Date.now()) {
+          setMuteError("Please choose a future time.");
+          setMuteSaving(false);
+          return;
+        }
+        mutedUntil = iso;
+      } else if (selected?.ms) {
+        mutedUntil = new Date(Date.now() + selected.ms).toISOString();
+      } else {
+        mutedIndefinitely = true;
+      }
+
+      const res = await updatePostNotificationMute({
+        token,
+        postId: item.id,
+        mutedUntil,
+        mutedIndefinitely,
+      });
+
+      onUpdateMute(item.id, {
+        notificationsMutedUntil: res.mutedUntil ?? null,
+        notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+      });
+      setMuteModalOpen(false);
+    } catch (err: any) {
+      setMuteError(err?.message || "Failed to update notifications");
+    } finally {
+      setMuteSaving(false);
+    }
+  };
 
   return (
     <article className={feedStyles.feedCard}>
@@ -1431,6 +1593,29 @@ function HashtagPostCard({
           </div>
         </div>
         <div className={feedStyles.headerActions}>
+          {isMutedForPost ? (
+            <span
+              className={feedStyles.muteBadge}
+              title="Notifications muted"
+              aria-label="Notifications muted"
+            >
+              <svg
+                aria-hidden
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                <line x1="3" y1="3" x2="21" y2="21" />
+              </svg>
+            </span>
+          ) : null}
           <div className={feedStyles.menuWrapper} ref={menuRef}>
             <button
               className={`${feedStyles.actionBtn} ${feedStyles.actionBtnGhost}`}
@@ -1464,9 +1649,18 @@ function HashtagPostCard({
                     </button>
                     <button
                       className={feedStyles.menuItem}
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        if (isMutedForPost) {
+                          handleEnablePostNotifications();
+                        } else {
+                          openMuteModal();
+                        }
+                      }}
                     >
-                      Mute notifications
+                      {isMutedForPost
+                        ? "Turn on notification"
+                        : "Mute notifications"}
                     </button>
                     <button
                       className={feedStyles.menuItem}
@@ -1769,6 +1963,94 @@ function HashtagPostCard({
           <span>{reposted ? "Reposted" : "Repost"}</span>
         </button>
       </div>
+
+      {muteModalOpen ? (
+        <div
+          className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeMuteModal}
+        >
+          <div
+            className={`${feedStyles.modalCard} ${feedStyles.modalCardOpen}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={feedStyles.modalHeader}>
+              <div>
+                <h3 className={feedStyles.modalTitle}>Mute notifications</h3>
+                <p className={feedStyles.modalBody}>
+                  Choose how long to pause alerts for this post.
+                </p>
+              </div>
+              <button
+                className={feedStyles.closeBtn}
+                aria-label="Close"
+                onClick={closeMuteModal}
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <div className={feedStyles.muteOptionGrid}>
+              {muteOptions.map((option) => (
+                <button
+                  key={option.key}
+                  className={`${feedStyles.muteOption} ${
+                    muteOption === option.key ? feedStyles.muteOptionActive : ""
+                  }`}
+                  onClick={() => setMuteOption(option.key)}
+                  type="button"
+                >
+                  <span className={feedStyles.muteOptionTitle}>
+                    {option.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {muteOption === "custom" ? (
+              <div className={feedStyles.muteCustomRow}>
+                <div className={feedStyles.mutePicker}>
+                  <label className={feedStyles.editLabel}>Date</label>
+                  <DateSelect
+                    value={muteCustomDate}
+                    onChange={setMuteCustomDate}
+                    minDate={new Date()}
+                    maxDate={null}
+                    placeholder="yyyy-mm-dd"
+                  />
+                </div>
+                <div className={feedStyles.mutePicker}>
+                  <label className={feedStyles.editLabel}>Time</label>
+                  <TimeSelect
+                    value={muteCustomTime}
+                    onChange={setMuteCustomTime}
+                    selectedDate={muteCustomDate}
+                    minDateTime={new Date()}
+                    disabled={!muteCustomDate}
+                    placeholder="hh:mm"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {muteError ? (
+              <div className={feedStyles.inlineError}>{muteError}</div>
+            ) : null}
+
+            <div className={feedStyles.modalActions}>
+              <button
+                type="button"
+                className={feedStyles.modalPrimary}
+                onClick={handleSavePostMute}
+                disabled={muteSaving}
+              >
+                {muteSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }

@@ -27,13 +27,13 @@ export default function OutgoingCallPopup({
   const getStatusText = () => {
     switch (status) {
       case "calling":
-        return "Đang gọi...";
+        return "Calling...";
       case "rejected":
-        return "Người nhận không liên hệ được";
+        return "Recipient is unavailable";
       case "no-answer":
-        return "Không có phản hồi";
+        return "No answer";
       default:
-        return "Đang gọi...";
+        return "Calling...";
     }
   };
 
@@ -81,7 +81,7 @@ export default function OutgoingCallPopup({
           <button
             onClick={onCancel}
             className={`${styles.button} ${styles.cancelButton}`}
-            aria-label={status === "calling" ? "Hủy cuộc gọi" : "Đóng"}
+            aria-label={status === "calling" ? "Cancel call" : "Close"}
           >
             <svg
               width="28"
@@ -93,7 +93,7 @@ export default function OutgoingCallPopup({
             >
               <path d="M23 1L1 23M1 1l22 22" />
             </svg>
-            <span>{status === "calling" ? "Hủy cuộc gọi" : "Đóng"}</span>
+            <span>{status === "calling" ? "Cancel call" : "Close"}</span>
           </button>
         </div>
       </div>

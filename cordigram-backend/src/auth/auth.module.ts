@@ -37,6 +37,6 @@ import { User, UserSchema } from '../users/user.schema';
   ],
   controllers: [AuthController],
   providers: [AuthService, GoogleStrategy, JwtStrategy, JwtAuthGuard],
-  exports: [JwtAuthGuard, JwtStrategy],
+  exports: [JwtAuthGuard, JwtStrategy, AuthService],
 })
 export class AuthModule {}

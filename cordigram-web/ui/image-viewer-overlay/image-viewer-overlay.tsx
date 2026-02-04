@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./image-viewer-overlay.module.css";
+import { useTranslations } from "next-intl";
 
 export type ImageViewerOverlayProps = {
   url: string;
@@ -12,9 +13,11 @@ export type ImageViewerOverlayProps = {
 
 export default function ImageViewerOverlay({
   url,
-  alt = "Image",
+  alt,
   onClose,
 }: ImageViewerOverlayProps) {
+  const t = useTranslations("home.imageViewer");
+  const resolvedAlt = alt ?? t("alt");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -48,7 +51,7 @@ export default function ImageViewerOverlay({
       <button
         type="button"
         className={styles.close}
-        aria-label="Close image"
+        aria-label={t("close")}
         onClick={(e) => {
           e.stopPropagation();
           onClose();
@@ -60,7 +63,7 @@ export default function ImageViewerOverlay({
         <img
           className={styles.preview}
           src={url}
-          alt={alt}
+          alt={resolvedAlt}
           onContextMenu={(e) => e.preventDefault()}
         />
       </div>

@@ -27,6 +27,8 @@ import { Hashtag } from '../hashtags/hashtag.schema';
 import { UserTasteProfile } from '../explore/user-taste.schema';
 import { PostImpressionEvent } from '../explore/impression-event.schema';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ActivityLogService } from '../activity/activity.service';
+import { PostSchedulerService } from './post-scheduler.service';
 type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
@@ -53,6 +55,8 @@ export class PostsService {
     private readonly cloudinary: CloudinaryService,
     private readonly config: ConfigService,
     private readonly notificationsService: NotificationsService,
+    private readonly activityLogService: ActivityLogService,
+    private readonly postScheduler: PostSchedulerService,
   ) {}
 
   async create(authorId: string, dto: CreatePostDto) {
@@ -147,6 +151,13 @@ export class PostsService {
       stats,
       deletedAt: null,
     });
+
+    if (status === 'scheduled' && scheduledAt) {
+      await this.postScheduler.schedulePostPublish(
+        doc._id.toString(),
+        scheduledAt,
+      );
+    }
 
     await this.upsertHashtags(normalizedHashtags);
 
@@ -349,6 +360,13 @@ export class PostsService {
       stats,
       deletedAt: null,
     });
+
+    if (status === 'scheduled' && scheduledAt) {
+      await this.postScheduler.schedulePostPublish(
+        doc._id.toString(),
+        scheduledAt,
+      );
+    }
 
     await this.upsertHashtags(normalizedHashtags);
 
@@ -566,6 +584,9 @@ export class PostsService {
       status: doc.status,
       scheduledAt: doc.scheduledAt,
       publishedAt: doc.publishedAt,
+      notificationsMutedUntil: doc.notificationsMutedUntil ?? null,
+      notificationsMutedIndefinitely:
+        doc.notificationsMutedIndefinitely ?? false,
       stats: doc.stats,
       spamScore: doc.spamScore,
       qualityScore: doc.qualityScore,
@@ -2084,6 +2105,100 @@ export class PostsService {
     });
   }
 
+  async getHiddenPosts(userId: string, limit = 24) {
+    const viewerObjectId = this.asObjectId(userId, 'userId');
+    const safeLimit = Math.min(Math.max(limit, 1), 60);
+
+    const hides = await this.postInteractionModel
+      .find({ userId: viewerObjectId, type: 'hide' })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit * 4)
+      .lean();
+
+    if (!hides.length) {
+      return [] as Array<
+        ReturnType<typeof this.toResponse> & {
+          hiddenAt?: Date | null;
+        }
+      >;
+    }
+
+    const postIds = Array.from(
+      new Set(
+        hides
+          .map((item) => item.postId)
+          .filter((id): id is Types.ObjectId => Boolean(id)),
+      ),
+    );
+
+    if (!postIds.length) {
+      return [] as Array<
+        ReturnType<typeof this.toResponse> & {
+          hiddenAt?: Date | null;
+        }
+      >;
+    }
+
+    const posts = await this.postModel
+      .find({
+        _id: { $in: postIds },
+        status: 'published',
+        deletedAt: null,
+      })
+      .lean();
+
+    if (!posts.length) {
+      return [] as Array<
+        ReturnType<typeof this.toResponse> & {
+          hiddenAt?: Date | null;
+        }
+      >;
+    }
+
+    const postMap = new Map<string, Post>();
+    posts.forEach((raw) => {
+      const doc = this.postModel.hydrate(raw) as Post;
+      const key = doc._id?.toString?.();
+      if (key) postMap.set(key, doc);
+    });
+
+    const authorIds = Array.from(
+      new Set(
+        posts
+          .map((p) => p.authorId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+
+    const profiles = await this.profileModel
+      .find({ userId: { $in: authorIds } })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+
+    const items: Array<
+      ReturnType<typeof this.toResponse> & {
+        hiddenAt?: Date | null;
+      }
+    > = [];
+
+    for (const hide of hides) {
+      const postId = hide.postId?.toString?.();
+      if (!postId) continue;
+      const post = postMap.get(postId);
+      if (!post) continue;
+      const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
+      items.push({
+        ...this.toResponse(post, profile),
+        hiddenAt: hide.createdAt ?? null,
+      });
+      if (items.length >= safeLimit) break;
+    }
+
+    return items;
+  }
+
   async getSavedReels(userId: string, limit = 24) {
     const viewerObjectId = this.asObjectId(userId, 'userId');
     const safeLimit = Math.min(Math.max(limit, 1), 60);
@@ -2279,6 +2394,15 @@ export class PostsService {
           postKind: post.kind ?? 'post',
         });
       }
+
+      const snapshot = await this.buildPostActivityMeta(postObjectId);
+      await this.activityLogService.log({
+        userId: userObjectId,
+        type: 'post_like',
+        postId: postObjectId,
+        postKind: snapshot.postKind,
+        meta: snapshot.meta,
+      });
     }
     return { liked: true, created: inserted };
   }
@@ -2477,6 +2601,15 @@ export class PostsService {
     );
     if (inserted) {
       await this.bumpCounters(postObjectId, { 'stats.saves': 1 });
+
+      const snapshot = await this.buildPostActivityMeta(postObjectId);
+      await this.activityLogService.log({
+        userId: userObjectId,
+        type: 'save',
+        postId: postObjectId,
+        postKind: snapshot.postKind,
+        meta: snapshot.meta,
+      });
     }
     return { saved: true, created: inserted };
   }
@@ -2535,6 +2668,15 @@ export class PostsService {
 
     if (inserted) {
       await this.bumpCounters(postObjectId, { 'stats.reposts': 1 });
+
+      const snapshot = await this.buildPostActivityMeta(postObjectId);
+      await this.activityLogService.log({
+        userId: userObjectId,
+        type: 'repost',
+        postId: postObjectId,
+        postKind: snapshot.postKind,
+        meta: snapshot.meta,
+      });
     }
 
     return { reposted: true, created: inserted };
@@ -2580,6 +2722,26 @@ export class PostsService {
     return { hidden: true };
   }
 
+  async unhide(userId: string, postId: string) {
+    const { postObjectId, userObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const removed = await this.removeUniqueInteraction(
+      userObjectId,
+      postObjectId,
+      'hide',
+      true,
+    );
+
+    if (removed) {
+      await this.bumpCounters(postObjectId, { 'stats.hides': -1 });
+    }
+
+    return { hidden: false };
+  }
+
   async report(userId: string, postId: string) {
     const { postObjectId, userObjectId } = await this.resolveIds(
       userId,
@@ -2595,6 +2757,15 @@ export class PostsService {
     );
     if (inserted) {
       await this.bumpCounters(postObjectId, { 'stats.reports': 1 });
+
+      const snapshot = await this.buildPostActivityMeta(postObjectId);
+      await this.activityLogService.log({
+        userId: userObjectId,
+        type: 'report_post',
+        postId: postObjectId,
+        postKind: snapshot.postKind,
+        meta: snapshot.meta,
+      });
     }
     return { reported: true };
   }
@@ -2717,6 +2888,104 @@ export class PostsService {
     return { visibility, updated: true };
   }
 
+  async getNotificationMute(userId: string, postId: string) {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId notificationsMutedUntil notificationsMutedIndefinitely')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (!post.authorId || !post.authorId.equals(userObjectId)) {
+      throw new ForbiddenException('Only the author can view this setting');
+    }
+
+    const mutedUntil = post.notificationsMutedUntil
+      ? new Date(post.notificationsMutedUntil).toISOString()
+      : null;
+    const mutedIndefinitely = Boolean(post.notificationsMutedIndefinitely);
+    const enabled = !mutedIndefinitely && !mutedUntil;
+
+    return { enabled, mutedUntil, mutedIndefinitely };
+  }
+
+  async setNotificationMute(
+    userId: string,
+    postId: string,
+    params: {
+      enabled?: boolean;
+      mutedUntil?: string | null;
+      mutedIndefinitely?: boolean;
+    },
+  ) {
+    const { userObjectId, postObjectId } = await this.resolveIds(
+      userId,
+      postId,
+    );
+
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('authorId')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (!post.authorId || !post.authorId.equals(userObjectId)) {
+      throw new ForbiddenException('Only the author can mute notifications');
+    }
+
+    const update: Record<string, unknown> = {};
+
+    if (params.enabled) {
+      update['notificationsMutedUntil'] = null;
+      update['notificationsMutedIndefinitely'] = false;
+      await this.postModel
+        .updateOne({ _id: postObjectId }, { $set: update })
+        .exec();
+      return { enabled: true, mutedUntil: null, mutedIndefinitely: false };
+    }
+
+    let mutedUntil: Date | null = null;
+    let mutedIndefinitely = Boolean(params.mutedIndefinitely);
+
+    if (params.mutedUntil) {
+      mutedUntil = new Date(params.mutedUntil);
+      if (Number.isNaN(mutedUntil.getTime())) {
+        throw new BadRequestException('Invalid mutedUntil value');
+      }
+      if (mutedUntil.getTime() <= Date.now()) {
+        throw new BadRequestException('mutedUntil must be in the future');
+      }
+      mutedIndefinitely = false;
+    }
+
+    if (!mutedUntil && !mutedIndefinitely) {
+      mutedIndefinitely = true;
+    }
+
+    update['notificationsMutedUntil'] = mutedUntil;
+    update['notificationsMutedIndefinitely'] = mutedIndefinitely;
+
+    await this.postModel
+      .updateOne({ _id: postObjectId }, { $set: update })
+      .exec();
+
+    return {
+      enabled: false,
+      mutedUntil: mutedUntil ? mutedUntil.toISOString() : null,
+      mutedIndefinitely,
+    };
+  }
+
   private async assertPostAccessible(
     viewerId: Types.ObjectId,
     postId: Types.ObjectId,
@@ -2736,6 +3005,38 @@ export class PostsService {
 
     await this.blocksService.assertNotBlocked(viewerId, post.authorId);
     return post;
+  }
+
+  private async buildPostActivityMeta(postId: Types.ObjectId) {
+    const post = await this.postModel
+      .findOne({ _id: postId, deletedAt: null })
+      .select('authorId kind content media')
+      .lean();
+
+    if (!post) {
+      return { postKind: 'post' as PostKind, meta: null };
+    }
+
+    const profile = post.authorId
+      ? await this.profileModel
+          .findOne({ userId: post.authorId })
+          .select('displayName username avatarUrl')
+          .lean()
+      : null;
+
+    const caption = typeof post.content === 'string' ? post.content : '';
+
+    return {
+      postKind: post.kind ?? 'post',
+      meta: {
+        postCaption: caption || null,
+        postMediaUrl: post.media?.[0]?.url ?? null,
+        postAuthorId: post.authorId?.toString?.() ?? null,
+        postAuthorDisplayName: profile?.displayName ?? null,
+        postAuthorUsername: profile?.username ?? null,
+        postAuthorAvatarUrl: profile?.avatarUrl ?? null,
+      },
+    };
   }
 
   private scorePost(post: Post, followeeSet: Set<string>, now: Date) {

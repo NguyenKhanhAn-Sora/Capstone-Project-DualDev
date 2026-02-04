@@ -30,6 +30,7 @@ import { AuthenticatedUser } from '../auth/jwt.strategy';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { UpdateVisibilityDto } from './dto/update-visibility.dto';
+import { UpdatePostNotificationMuteDto } from './dto/update-post-notification-mute.dto';
 import { PostsService } from './posts.service';
 
 @Controller('posts')
@@ -114,6 +115,20 @@ export class PostsController {
     }
     const parsedLimit = limit ? Number(limit) : undefined;
     return this.postsService.getSavedPosts(user.userId, parsedLimit ?? 24);
+  }
+
+  @Get('hidden')
+  async hidden(@Req() req: Request, @Query('limit') limit?: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const parsedLimit = limit ? Number(limit) : undefined;
+    const items = await this.postsService.getHiddenPosts(
+      user.userId,
+      parsedLimit ?? 24,
+    );
+    return { items };
   }
 
   @Get('hashtag/:tag')
@@ -348,6 +363,33 @@ export class PostsController {
     return this.postsService.setVisibility(user.userId, postId, dto.visibility);
   }
 
+  @Get(':id/notifications/mute')
+  async getNotificationMute(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.getNotificationMute(user.userId, postId);
+  }
+
+  @Patch(':id/notifications/mute')
+  @HttpCode(200)
+  async updateNotificationMute(
+    @Req() req: Request,
+    @Param('id') postId: string,
+    @Body() dto: UpdatePostNotificationMuteDto,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.setNotificationMute(user.userId, postId, {
+      enabled: dto.enabled,
+      mutedIndefinitely: dto.mutedIndefinitely,
+      mutedUntil: dto.mutedUntil ?? null,
+    });
+  }
+
   @Delete(':id/save')
   async unsave(@Req() req: Request, @Param('id') postId: string) {
     const user = req.user as AuthenticatedUser | undefined;
@@ -392,6 +434,15 @@ export class PostsController {
       throw new UnauthorizedException();
     }
     return this.postsService.hide(user.userId, postId);
+  }
+
+  @Delete(':id/hide')
+  async unhide(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.unhide(user.userId, postId);
   }
 
   @Post(':id/report')

@@ -42,7 +42,8 @@ type DateSelectProps = {
   onChange: (next: string) => void;
   placeholder?: string;
   disabled?: boolean;
-  maxDate?: Date;
+  maxDate?: Date | null;
+  minDate?: Date | null;
   minYear?: number;
 };
 
@@ -63,6 +64,7 @@ export function DateSelect({
   placeholder = "mm/dd/yyyy",
   disabled = false,
   maxDate,
+  minDate,
   minYear = 1900,
 }: DateSelectProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -92,10 +94,19 @@ export function DateSelect({
   }, [yearMenuOpen]);
 
   const maxAllowed = useMemo(() => {
+    if (maxDate === null) return null;
     const dt = maxDate ? new Date(maxDate) : new Date();
     dt.setHours(0, 0, 0, 0);
     return dt;
   }, [maxDate]);
+
+  const minAllowed = useMemo(() => {
+    if (minDate === null) return null;
+    if (!minDate) return null;
+    const dt = new Date(minDate);
+    dt.setHours(0, 0, 0, 0);
+    return dt;
+  }, [minDate]);
 
   const selected = useMemo(() => {
     if (!value) return null;
@@ -110,13 +121,19 @@ export function DateSelect({
     return dt;
   }, [value]);
 
-  const maxYear = maxAllowed.getFullYear();
+  const maxYear = maxAllowed
+    ? maxAllowed.getFullYear()
+    : new Date().getFullYear() + 20;
+  const minYearBound = Math.max(
+    minYear,
+    minAllowed ? minAllowed.getFullYear() : minYear,
+  );
 
   const yearOptions = useMemo(() => {
     const ys: number[] = [];
-    for (let y = maxYear; y >= minYear; y--) ys.push(y);
+    for (let y = maxYear; y >= minYearBound; y--) ys.push(y);
     return ys;
-  }, [minYear, maxYear]);
+  }, [minYearBound, maxYear]);
 
   const computePosition = () => {
     const btn = buttonRef.current;
@@ -162,7 +179,7 @@ export function DateSelect({
     setMonthMenuOpen(false);
     setYearMenuOpen(false);
 
-    const base = selected ?? maxAllowed;
+    const base = selected ?? minAllowed ?? maxAllowed ?? new Date();
     setView(new Date(base.getFullYear(), base.getMonth(), 1));
     computePosition();
 
@@ -207,7 +224,7 @@ export function DateSelect({
       window.removeEventListener("resize", onWindowChange);
       window.removeEventListener("scroll", onWindowChange, true);
     };
-  }, [open, selected, maxAllowed]);
+  }, [open, selected, maxAllowed, minAllowed]);
 
   useEffect(() => {
     if (!monthMenuOpen) return;
@@ -292,6 +309,12 @@ export function DateSelect({
                   className={styles.navButton}
                   aria-label="Previous month"
                   onClick={() => setView((prev) => subMonths(prev, 1))}
+                  disabled={
+                    minAllowed
+                      ? startOfMonth(subMonths(view, 1)) <
+                        startOfMonth(minAllowed)
+                      : false
+                  }
                 >
                   ‹
                 </button>
@@ -323,10 +346,17 @@ export function DateSelect({
                       >
                         {Array.from({ length: 12 }).map((_, idx) => {
                           const maxMonth =
+                            maxAllowed &&
                             view.getFullYear() === maxAllowed.getFullYear()
                               ? maxAllowed.getMonth()
                               : 11;
-                          const disabledMonth = idx > maxMonth;
+                          const minMonth =
+                            minAllowed &&
+                            view.getFullYear() === minAllowed.getFullYear()
+                              ? minAllowed.getMonth()
+                              : 0;
+                          const disabledMonth =
+                            idx > maxMonth || idx < minMonth;
                           const active = idx === view.getMonth();
                           const label = format(new Date(2000, idx, 1), "MMMM");
 
@@ -345,7 +375,10 @@ export function DateSelect({
                                 if (disabledMonth) return;
                                 setView((prev) => {
                                   const nextYear = prev.getFullYear();
-                                  const nextMonth = Math.min(idx, maxMonth);
+                                  const nextMonth = Math.min(
+                                    Math.max(idx, minMonth),
+                                    maxMonth,
+                                  );
                                   return new Date(nextYear, nextMonth, 1);
                                 });
                                 setMonthMenuOpen(false);
@@ -383,6 +416,9 @@ export function DateSelect({
                       >
                         {yearOptions.map((y) => {
                           const active = y === view.getFullYear();
+                          const disabledYear =
+                            (minAllowed && y < minAllowed.getFullYear()) ||
+                            (maxAllowed && y > maxAllowed.getFullYear());
                           return (
                             <button
                               key={y}
@@ -393,18 +429,26 @@ export function DateSelect({
                               }`}
                               role="option"
                               aria-selected={active}
+                              disabled={disabledYear}
                               onClick={() => {
+                                if (disabledYear) return;
                                 const clamped = Math.min(
-                                  Math.max(minYear, y),
+                                  Math.max(minYearBound, y),
                                   maxYear,
                                 );
                                 setView((prev) => {
                                   const maxMonth =
+                                    maxAllowed &&
                                     clamped === maxAllowed.getFullYear()
                                       ? maxAllowed.getMonth()
                                       : 11;
+                                  const minMonth =
+                                    minAllowed &&
+                                    clamped === minAllowed.getFullYear()
+                                      ? minAllowed.getMonth()
+                                      : 0;
                                   const nextMonth = Math.min(
-                                    prev.getMonth(),
+                                    Math.max(prev.getMonth(), minMonth),
                                     maxMonth,
                                   );
                                   return new Date(clamped, nextMonth, 1);
@@ -427,7 +471,10 @@ export function DateSelect({
                   aria-label="Next month"
                   onClick={() => setView((prev) => addMonths(prev, 1))}
                   disabled={
-                    startOfMonth(addMonths(view, 1)) > startOfMonth(maxAllowed)
+                    maxAllowed
+                      ? startOfMonth(addMonths(view, 1)) >
+                        startOfMonth(maxAllowed)
+                      : false
                   }
                 >
                   ›
@@ -450,7 +497,9 @@ export function DateSelect({
                   const inMonth = isSameMonth(day, view);
                   const isSelected = selected && isSameDay(day, selected);
                   const isToday = isSameDay(day, new Date());
-                  const isDisabled = day > maxAllowed;
+                  const isDisabled =
+                    (maxAllowed ? day > maxAllowed : false) ||
+                    (minAllowed ? day < minAllowed : false);
 
                   return (
                     <button
