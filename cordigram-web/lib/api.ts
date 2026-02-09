@@ -49,8 +49,12 @@ export async function apiFetch<T = unknown>(options: FetchOptions): Promise<T> {
   });
 
   if (res.status === 401 && typeof window !== "undefined") {
-    window.localStorage.removeItem("accessToken");
-    window.location.href = "/login";
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    const isLoginRequest = normalizedPath.startsWith("/auth/login");
+    if (!isLoginRequest) {
+      window.localStorage.removeItem("accessToken");
+      window.location.href = "/login";
+    }
   }
 
   if (!res.ok) {
@@ -259,6 +263,8 @@ export type CommentItem = {
   >;
   parentId: string | null;
   rootCommentId: string | null;
+  pinnedAt?: string | null;
+  pinnedBy?: string | null;
   createdAt?: string;
   updatedAt?: string;
   repliesCount?: number;
@@ -662,6 +668,36 @@ export async function updateComment(opts: {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(payload),
+  });
+}
+
+export async function pinComment(opts: {
+  token: string;
+  postId: string;
+  commentId: string;
+}): Promise<{ pinned: boolean }> {
+  const { token, postId, commentId } = opts;
+  return apiFetch<{ pinned: boolean }>({
+    path: `/posts/${postId}/comments/${commentId}/pin`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function unpinComment(opts: {
+  token: string;
+  postId: string;
+  commentId: string;
+}): Promise<{ pinned: boolean }> {
+  const { token, postId, commentId } = opts;
+  return apiFetch<{ pinned: boolean }>({
+    path: `/posts/${postId}/comments/${commentId}/pin`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 }
 
@@ -1162,6 +1198,13 @@ export type PostLikeListResponse = {
   nextCursor: string | null;
 };
 
+export type CommentLikeItem = PostLikeItem;
+
+export type CommentLikeListResponse = {
+  items: CommentLikeItem[];
+  nextCursor: string | null;
+};
+
 export type PeopleSuggestionItem = {
   userId: string;
   username: string;
@@ -1253,6 +1296,27 @@ export async function fetchPostLikes(opts: {
   });
 }
 
+export async function fetchCommentLikes(opts: {
+  token: string;
+  postId: string;
+  commentId: string;
+  limit?: number;
+  cursor?: string;
+}): Promise<CommentLikeListResponse> {
+  const { token, postId, commentId, limit, cursor } = opts;
+  const query = new URLSearchParams();
+  if (limit) query.set("limit", String(limit));
+  if (cursor) query.set("cursor", cursor);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiFetch<CommentLikeListResponse>({
+    path: `/posts/${postId}/comments/${commentId}/likes${suffix}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export type CurrentProfileResponse = {
   userId?: string;
   id: string;
@@ -1296,6 +1360,8 @@ export type NotificationItem = {
   id: string;
   type:
     | "post_like"
+    | "comment_like"
+    | "comment_reply"
     | "post_comment"
     | "post_mention"
     | "follow"
@@ -1307,6 +1373,7 @@ export type NotificationItem = {
     avatarUrl: string;
   };
   postId: string | null;
+  commentId: string | null;
   postKind: "post" | "reel";
   isOwnPost?: boolean;
   postMutedUntil?: string | null;
@@ -1334,6 +1401,10 @@ export type NotificationListResponse = {
 
 export type NotificationUnreadCountResponse = {
   unreadCount: number;
+};
+
+export type NotificationSeenAtResponse = {
+  lastSeenAt: string | null;
 };
 
 export type NotificationReadAllResponse = {
@@ -1577,6 +1648,32 @@ export async function fetchNotificationUnreadCount(opts: {
   return apiFetch<NotificationUnreadCountResponse>({
     path: "/notifications/unread-count",
     method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function fetchNotificationSeenAt(opts: {
+  token: string;
+}): Promise<NotificationSeenAtResponse> {
+  const { token } = opts;
+  return apiFetch<NotificationSeenAtResponse>({
+    path: "/notifications/seen-at",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function updateNotificationSeenAt(opts: {
+  token: string;
+}): Promise<NotificationSeenAtResponse> {
+  const { token } = opts;
+  return apiFetch<NotificationSeenAtResponse>({
+    path: "/notifications/seen-at",
+    method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -1959,6 +2056,7 @@ export type PasswordChangeStatusResponse = {
 
 export type PasskeyStatusResponse = {
   hasPasskey: boolean;
+  enabled: boolean;
 };
 
 export type PasskeyVerifyResponse = {
@@ -1974,6 +2072,11 @@ export type PasskeyConfirmResponse = {
 export type DeviceTrustStatusResponse = {
   trusted: boolean;
   hasPasskey: boolean;
+  enabled: boolean;
+};
+
+export type PasskeyToggleResponse = {
+  enabled: boolean;
 };
 
 export type VerifyDeviceTrustResponse = {
@@ -2434,6 +2537,21 @@ export async function confirmPasskey(opts: {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ currentPasskey, newPasskey }),
+  });
+}
+
+export async function togglePasskey(opts: {
+  token: string;
+  enabled: boolean;
+}): Promise<PasskeyToggleResponse> {
+  const { token, enabled } = opts;
+  return apiFetch<PasskeyToggleResponse>({
+    path: "/users/passkey/toggle",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ enabled }),
   });
 }
 

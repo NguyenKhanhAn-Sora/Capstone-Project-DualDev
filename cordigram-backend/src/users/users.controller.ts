@@ -28,6 +28,7 @@ import { RequestPasskeyOtpDto } from './dto/request-passkey-otp.dto';
 import { VerifyPasskeyOtpDto } from './dto/verify-passkey-otp.dto';
 import { ConfirmPasskeyDto } from './dto/confirm-passkey.dto';
 import { VerifyPasskeyDeviceDto } from './dto/verify-passkey-device.dto';
+import { TogglePasskeyDto } from './dto/toggle-passkey.dto';
 import { LogoutLoginDeviceDto } from './dto/logout-login-device.dto';
 import { RequestTwoFactorOtpDto } from './dto/request-two-factor-otp.dto';
 import { VerifyTwoFactorOtpDto } from './dto/verify-two-factor-otp.dto';
@@ -137,6 +138,21 @@ export class UsersController {
       throw new UnauthorizedException('Unauthorized');
     }
     return this.usersService.getPasskeyStatus(userId);
+  }
+
+  @Post('passkey/toggle')
+  async togglePasskey(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Body() dto: TogglePasskeyDto,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.usersService.setPasskeyEnabled({
+      userId,
+      enabled: dto.enabled,
+    });
   }
 
   @Get('two-factor/status')

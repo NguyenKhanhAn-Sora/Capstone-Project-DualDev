@@ -189,6 +189,13 @@
   gap: 12px;
 }
 
+.rowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .sectionTitleSmall {
   margin: 0 0 4px;
   font-size: 18px;
@@ -1099,6 +1106,13 @@
     transform 0.15s ease,
     box-shadow 0.15s ease,
     filter 0.15s ease;
+}
+
+.secondarySmall {
+  height: 34px;
+  border-radius: 10px;
+  font-size: 12px;
+  padding: 0 12px;
 }
 
 .primary {

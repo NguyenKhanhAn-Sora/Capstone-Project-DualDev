@@ -9,7 +9,14 @@ export const NOTIFICATION_READ_EVENT = "cordigram:notification-read" as const;
 export type NotificationReceivedDetail = {
   notification: {
     id: string;
-    type: "post_like" | "post_comment" | "post_mention" | "follow";
+    type:
+      | "post_like"
+      | "comment_like"
+      | "comment_reply"
+      | "post_comment"
+      | "post_mention"
+      | "follow"
+      | "login_alert";
     actor: {
       id: string;
       displayName: string;
@@ -17,6 +24,7 @@ export type NotificationReceivedDetail = {
       avatarUrl: string;
     };
     postId: string | null;
+    commentId: string | null;
     postKind: "post" | "reel";
     likeCount: number;
     commentCount: number;
@@ -25,6 +33,14 @@ export type NotificationReceivedDetail = {
     readAt: string | null;
     createdAt: string;
     activityAt: string;
+    deviceInfo?: string;
+    deviceType?: string;
+    os?: string;
+    browser?: string;
+    location?: string;
+    ip?: string;
+    deviceIdHash?: string;
+    loginAt?: string | null;
   };
 };
 

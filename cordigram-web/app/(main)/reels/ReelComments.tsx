@@ -14,6 +14,8 @@ import {
   unlikeComment,
   updateComment,
   deleteComment,
+  pinComment,
+  unpinComment,
   reportComment,
   blockUser,
   searchProfiles,
@@ -231,6 +233,56 @@ const IconMoreHorizontal = ({ size = 18 }: { size?: number }) => (
   </svg>
 );
 
+const IconPin = ({ size = 12 }: { size?: number }) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M8 3h8l-1 6 3 3v2H6v-2l3-3-1-6Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M12 14v7"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const IconCrown = ({ size = 12 }: { size?: number }) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M4 9l4 3 4-6 4 6 4-3-2 9H6l-2-9Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M7 20h10"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 export default function ReelComments({
   postId,
   token,
@@ -347,6 +399,58 @@ export default function ReelComments({
   );
   const commentRefs = useRef<Record<string, HTMLElement | null>>({});
   const hasDOM = typeof document !== "undefined";
+
+  const prioritizeRootComments = useCallback(
+    (items: CommentItem[]) => {
+      const pinned: CommentItem[] = [];
+      const mine: CommentItem[] = [];
+      const others: CommentItem[] = [];
+      items.forEach((item) => {
+        if (item.parentId) {
+          others.push(item);
+          return;
+        }
+        if (item.pinnedAt) {
+          pinned.push(item);
+          return;
+        }
+        const authorId = item.author?.id || item.authorId;
+        if (viewerId && authorId && authorId === viewerId) {
+          mine.push(item);
+        } else {
+          others.push(item);
+        }
+      });
+      if (!pinned.length && !mine.length) return items;
+      return [...pinned, ...mine, ...others];
+    },
+    [viewerId],
+  );
+
+  const applyPinnedLocal = useCallback(
+    (targetId: string, pinned: boolean) => {
+      const nowIso = new Date().toISOString();
+      setComments((prev) =>
+        prioritizeRootComments(
+          prev.map((item) => {
+            if (item.parentId) return item;
+            if (item.id === targetId) {
+              return {
+                ...item,
+                pinnedAt: pinned ? nowIso : null,
+                pinnedBy: pinned ? (viewerId ?? null) : null,
+              };
+            }
+            if (pinned) {
+              return { ...item, pinnedAt: null, pinnedBy: null };
+            }
+            return item;
+          }),
+        ),
+      );
+    },
+    [prioritizeRootComments, viewerId],
+  );
 
   const normalizeMentionRefs = useCallback((raw?: CommentItem["mentions"]) => {
     if (!Array.isArray(raw)) return [] as MentionRef[];
@@ -890,6 +994,30 @@ export default function ReelComments({
     const isPostOwner = Boolean(
       viewerId && postAuthorId && viewerId === postAuthorId,
     );
+    const isPostAuthorComment = Boolean(
+      postAuthorId &&
+      (comment.author?.id === postAuthorId ||
+        comment.authorId === postAuthorId),
+    );
+
+    const handleTogglePin = async () => {
+      if (!token || !postId || !isPostOwner || comment.parentId) return;
+      const isPinned = Boolean(comment.pinnedAt);
+      closeCommentMenu();
+      try {
+        if (isPinned) {
+          await unpinComment({ token, postId, commentId: comment.id });
+          applyPinnedLocal(comment.id, false);
+        } else {
+          await pinComment({ token, postId, commentId: comment.id });
+          applyPinnedLocal(comment.id, true);
+        }
+      } catch (err) {
+        setError(
+          (err as { message?: string })?.message || "Failed to update pin",
+        );
+      }
+    };
 
     const toggleRepliesVisibility = () => {
       const nextExpanded = !expanded;
@@ -984,6 +1112,18 @@ export default function ReelComments({
                 <>@{fallbackLabel || "user"}</>
               )}
             </span>
+            {isPostAuthorComment ? (
+              <span className={postStyles.commentAuthorBadge}>
+                <IconCrown size={12} />
+                <span>Author</span>
+              </span>
+            ) : null}
+            {comment.pinnedAt ? (
+              <span className={postStyles.commentPinned}>
+                <IconPin size={12} />
+                <span>Pinned comment</span>
+              </span>
+            ) : null}
           </div>
           {comment.content ? (
             <div className={postStyles.commentText}>
@@ -1112,6 +1252,16 @@ export default function ReelComments({
                             >
                               Edit comment
                             </button>
+                            {isPostOwner && !comment.parentId ? (
+                              <button
+                                className={postStyles.commentMoreItem}
+                                onClick={handleTogglePin}
+                              >
+                                {comment.pinnedAt
+                                  ? "Unpin comment"
+                                  : "Pin comment"}
+                              </button>
+                            ) : null}
                             <button
                               className={`${postStyles.commentMoreItem} ${postStyles.commentDanger}`}
                               onClick={() => handleDeleteComment(comment)}
@@ -1121,6 +1271,16 @@ export default function ReelComments({
                           </>
                         ) : isPostOwner ? (
                           <>
+                            {!comment.parentId ? (
+                              <button
+                                className={postStyles.commentMoreItem}
+                                onClick={handleTogglePin}
+                              >
+                                {comment.pinnedAt
+                                  ? "Unpin comment"
+                                  : "Pin comment"}
+                              </button>
+                            ) : null}
                             <button
                               className={postStyles.commentMoreItem}
                               onClick={() => handleDeleteComment(comment)}
@@ -1219,7 +1379,7 @@ export default function ReelComments({
 
     fetchComments({ token, postId, page: 1, limit: COMMENT_PAGE_SIZE })
       .then((res) => {
-        setComments(res?.items ?? []);
+        setComments(prioritizeRootComments(res?.items ?? []));
         setPage(res?.page ?? 1);
         setHasMore(Boolean(res?.hasMore));
         const baseTotal =
@@ -1230,7 +1390,7 @@ export default function ReelComments({
       })
       .catch((err) => setError(err?.message || "Failed to load comments"))
       .finally(() => setLoading(false));
-  }, [open, postId, token, updateTotal]);
+  }, [open, postId, token, updateTotal, prioritizeRootComments]);
 
   useEffect(() => {
     setTotalCount(initialCount ?? 0);
@@ -1331,7 +1491,9 @@ export default function ReelComments({
         page: page + 1,
         limit: COMMENT_PAGE_SIZE,
       });
-      setComments((prev) => [...prev, ...(res?.items ?? [])]);
+      setComments((prev) =>
+        prioritizeRootComments([...prev, ...(res?.items ?? [])]),
+      );
       setPage(res?.page ?? page + 1);
       setHasMore(Boolean(res?.hasMore));
       const added = res?.items?.length ?? 0;
@@ -1374,31 +1536,34 @@ export default function ReelComments({
     [],
   );
 
-  const mergeLatestComments = useCallback((latest: CommentItem[]) => {
-    setComments((prev) => {
-      const normalize = (items: CommentItem[]) =>
-        items.map((c) => ({ ...c, id: ensureId(c) }));
+  const mergeLatestComments = useCallback(
+    (latest: CommentItem[]) => {
+      setComments((prev) => {
+        const normalize = (items: CommentItem[]) =>
+          items.map((c) => ({ ...c, id: ensureId(c) }));
 
-      const latestNormalized = normalize(latest);
-      const latestMap = new Map(latestNormalized.map((c) => [c.id, c]));
-      const prevNormalized = normalize(prev);
+        const latestNormalized = normalize(latest);
+        const latestMap = new Map(latestNormalized.map((c) => [c.id, c]));
+        const prevNormalized = normalize(prev);
 
-      // Keep order: latest first, then any previous top-level not in latest
-      const mergedLatest = latestNormalized.map((c) => {
-        const prevMatch = prevNormalized.find((p) => p.id === c.id);
-        return prevMatch ? { ...prevMatch, ...c } : c;
-      });
-
-      const trailing = prevNormalized
-        .filter((c) => c.parentId || !latestMap.has(c.id))
-        .map((c) => {
-          const refreshed = latestMap.get(c.id);
-          return refreshed ? { ...c, ...refreshed } : c;
+        // Keep order: latest first, then any previous top-level not in latest
+        const mergedLatest = latestNormalized.map((c) => {
+          const prevMatch = prevNormalized.find((p) => p.id === c.id);
+          return prevMatch ? { ...prevMatch, ...c } : c;
         });
 
-      return [...mergedLatest, ...trailing];
-    });
-  }, []);
+        const trailing = prevNormalized
+          .filter((c) => c.parentId || !latestMap.has(c.id))
+          .map((c) => {
+            const refreshed = latestMap.get(c.id);
+            return refreshed ? { ...c, ...refreshed } : c;
+          });
+
+        return prioritizeRootComments([...mergedLatest, ...trailing]);
+      });
+    },
+    [prioritizeRootComments],
+  );
 
   const loadReplies = useCallback(
     async (parentId: string, nextPage = 1) => {
@@ -1782,7 +1947,7 @@ export default function ReelComments({
       });
       scrollToComment(parentId);
     } else {
-      setComments((prev) => [...prev, optimistic]);
+      setComments((prev) => prioritizeRootComments([...prev, optimistic]));
       scrollToComment(optimistic.id);
     }
 
@@ -1827,7 +1992,9 @@ export default function ReelComments({
         }
       } else {
         setComments((prev) =>
-          prev.map((c) => (c.id === optimistic.id ? saved : c)),
+          prioritizeRootComments(
+            prev.map((c) => (c.id === optimistic.id ? saved : c)),
+          ),
         );
       }
       updateTotal((prev) => prev + 1);

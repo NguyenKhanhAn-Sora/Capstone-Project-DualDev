@@ -23,6 +23,7 @@ export type UserSettings = {
   notifications?: {
     mutedUntil?: Date | null;
     mutedIndefinitely?: boolean;
+    lastSeenAt?: Date | null;
     categories?: {
       follow?: {
         mutedUntil?: Date | null;
@@ -128,6 +129,7 @@ export class User extends Document {
       notifications: {
         mutedUntil: { type: Date, default: null },
         mutedIndefinitely: { type: Boolean, default: false },
+        lastSeenAt: { type: Date, default: null },
         categories: {
           follow: {
             mutedUntil: { type: Date, default: null },
@@ -154,6 +156,7 @@ export class User extends Document {
       notifications: {
         mutedUntil: null,
         mutedIndefinitely: false,
+        lastSeenAt: null,
         categories: {
           follow: { mutedUntil: null, mutedIndefinitely: false },
           comment: { mutedUntil: null, mutedIndefinitely: false },
@@ -204,6 +207,9 @@ export class User extends Document {
 
   @Prop({ type: String, default: null })
   passkey?: string | null;
+
+  @Prop({ type: Boolean, default: true })
+  passkeyEnabled?: boolean;
 
   @Prop({
     type: {

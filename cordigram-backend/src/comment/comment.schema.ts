@@ -69,6 +69,12 @@ export class Comment extends Document {
   @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
 
+  @Prop({ type: Date, default: null, index: true })
+  pinnedAt?: Date | null;
+
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'User', default: null })
+  pinnedBy?: Types.ObjectId | null;
+
   @Prop({ type: Date })
   createdAt?: Date;
 
@@ -80,3 +86,4 @@ export const CommentSchema = SchemaFactory.createForClass(Comment);
 
 CommentSchema.index({ postId: 1, createdAt: -1 });
 CommentSchema.index({ postId: 1, parentId: 1, createdAt: 1 });
+CommentSchema.index({ postId: 1, pinnedAt: -1, createdAt: 1 });

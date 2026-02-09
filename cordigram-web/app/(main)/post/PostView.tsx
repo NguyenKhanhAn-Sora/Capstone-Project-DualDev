@@ -14,7 +14,6 @@ import {
   fetchCurrentProfile,
   fetchPostDetail,
   fetchReelDetail,
-  fetchPostLikes,
   followUser,
   reportComment,
   reportPost,
@@ -34,16 +33,18 @@ import {
   updatePost,
   updatePostVisibility,
   updatePostNotificationMute,
+  pinComment,
+  unpinComment,
   searchProfiles,
   uploadCommentMedia,
   type CommentItem,
   type CommentListResponse,
   type CurrentProfileResponse,
   type FeedItem,
-  type PostLikeItem,
   type ProfileSearchItem,
 } from "@/lib/api";
 import PostLikesOverlay from "@/ui/post-likes-overlay/post-likes-overlay";
+import CommentLikesOverlay from "@/ui/comment-likes-overlay/comment-likes-overlay";
 import { DateSelect } from "@/ui/date-select/date-select";
 import { TimeSelect } from "@/ui/time-select/time-select";
 
@@ -271,6 +272,56 @@ const IconMoreHorizontal = ({ size = 18 }: IconProps) => (
     <circle cx="5" cy="12" r="2" fill="currentColor" />
     <circle cx="12" cy="12" r="2" fill="currentColor" />
     <circle cx="19" cy="12" r="2" fill="currentColor" />
+  </svg>
+);
+
+const IconPin = ({ size = 14 }: IconProps) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M8 3h8l-1 6 3 3v2H6v-2l3-3-1-6Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M12 14v7"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const IconCrown = ({ size = 12 }: IconProps) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M4 9l4 3 4-6 4 6 4-3-2 9H6l-2-9Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M7 20h10"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+    />
   </svg>
 );
 
@@ -1014,19 +1065,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [viewer, setViewer] = useState<CurrentProfileResponse | null>(null);
   const [likesOverlayOpen, setLikesOverlayOpen] = useState(false);
   const [likesOverlayClosing, setLikesOverlayClosing] = useState(false);
-  const [likePeekOpen, setLikePeekOpen] = useState(false);
-  const [likePeekState, setLikePeekState] = useState<{
-    items: PostLikeItem[];
-    nextCursor: string | null;
-    loading: boolean;
-    error: string;
-  }>({
-    items: [],
-    nextCursor: null,
-    loading: false,
-    error: "",
-  });
-  const likePeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [commentLikesOverlayOpen, setCommentLikesOverlayOpen] = useState(false);
+  const [commentLikesOverlayClosing, setCommentLikesOverlayClosing] =
+    useState(false);
+  const [commentLikesOverlayId, setCommentLikesOverlayId] = useState<
+    string | null
+  >(null);
   const [commentText, setCommentText] = useState("");
   const [commentMentions, setCommentMentions] = useState<MentionRef[]>([]);
   const [commentMediaFile, setCommentMediaFile] = useState<File | null>(null);
@@ -1502,6 +1546,40 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       .catch(() => undefined);
   }, [token]);
 
+  const viewerIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (viewer?.userId) ids.add(viewer.userId);
+    if (viewer?.id) ids.add(viewer.id);
+    return ids;
+  }, [viewer]);
+
+  const prioritizeRootComments = useCallback(
+    (items: CommentItem[]) => {
+      if (!viewerIds.size) return items;
+      const pinned: CommentItem[] = [];
+      const prioritized: CommentItem[] = [];
+      const others: CommentItem[] = [];
+      items.forEach((item) => {
+        if (item.parentId) {
+          others.push(item);
+          return;
+        }
+        const authorId = item.author?.id || item.authorId;
+        const isViewerRoot = authorId ? viewerIds.has(authorId) : false;
+        if (item.pinnedAt) {
+          pinned.push(item);
+        } else if (isViewerRoot) {
+          prioritized.push(item);
+        } else {
+          others.push(item);
+        }
+      });
+      if (!pinned.length && !prioritized.length) return items;
+      return [...pinned, ...prioritized, ...others];
+    },
+    [viewerIds],
+  );
+
   useEffect(() => {
     if (!token) return;
     setLoadingPost(true);
@@ -1784,30 +1862,33 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     loadComments(1);
   }, [token, loadComments]);
 
-  const mergeLatestComments = useCallback((latest: CommentItem[]) => {
-    setComments((prev) => {
-      const normalize = (items: CommentItem[]) =>
-        items.map((c) => ({ ...c, id: ensureId(c) }));
+  const mergeLatestComments = useCallback(
+    (latest: CommentItem[]) => {
+      setComments((prev) => {
+        const normalize = (items: CommentItem[]) =>
+          items.map((c) => ({ ...c, id: ensureId(c) }));
 
-      const latestNormalized = normalize(latest);
-      const latestMap = new Map(latestNormalized.map((c) => [c.id, c]));
-      const prevNormalized = normalize(prev);
+        const latestNormalized = normalize(latest);
+        const latestMap = new Map(latestNormalized.map((c) => [c.id, c]));
+        const prevNormalized = normalize(prev);
 
-      const mergedLatest = latestNormalized.map((c) => {
-        const prevMatch = prevNormalized.find((p) => p.id === c.id);
-        return prevMatch ? { ...prevMatch, ...c } : c;
-      });
-
-      const trailing = prevNormalized
-        .filter((c) => c.parentId || !latestMap.has(c.id))
-        .map((c) => {
-          const refreshed = latestMap.get(c.id);
-          return refreshed ? { ...c, ...refreshed } : c;
+        const mergedLatest = latestNormalized.map((c) => {
+          const prevMatch = prevNormalized.find((p) => p.id === c.id);
+          return prevMatch ? { ...prevMatch, ...c } : c;
         });
 
-      return [...mergedLatest, ...trailing];
-    });
-  }, []);
+        const trailing = prevNormalized
+          .filter((c) => c.parentId || !latestMap.has(c.id))
+          .map((c) => {
+            const refreshed = latestMap.get(c.id);
+            return refreshed ? { ...c, ...refreshed } : c;
+          });
+
+        return prioritizeRootComments([...mergedLatest, ...trailing]);
+      });
+    },
+    [prioritizeRootComments],
+  );
 
   useEffect(() => {
     if (!token) return;
@@ -2012,7 +2093,10 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   }, []);
 
   const applyCommentPage = (res: CommentListResponse, append: boolean) => {
-    setComments((prev) => (append ? [...prev, ...res.items] : res.items));
+    setComments((prev) => {
+      const next = append ? [...prev, ...res.items] : res.items;
+      return prioritizeRootComments(next);
+    });
     setCommentsPage(res.page);
     setHasMoreComments(res.hasMore);
   };
@@ -2355,7 +2439,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       });
       scrollToComment(parentId);
     } else {
-      setComments((prev) => [...prev, optimistic]);
+      setComments((prev) => prioritizeRootComments([...prev, optimistic]));
       scrollToComment(optimisticId);
     }
 
@@ -2423,7 +2507,10 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               .map((c) => ({ ...c, id: ensureId(c) })),
             { ...saved, id: saved.id },
           );
-          return { ...prev, [parentId]: { ...state, items } };
+          return {
+            ...prev,
+            [parentId]: { ...state, items },
+          };
         });
 
         const targetRootId = saved.rootCommentId || parentId;
@@ -2436,7 +2523,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           const filtered = prev
             .filter((c) => c.id !== optimisticId)
             .map((c) => ({ ...c, id: ensureId(c) }));
-          return upsertById(filtered, saved);
+          return prioritizeRootComments(upsertById(filtered, saved));
         });
       }
 
@@ -2943,6 +3030,53 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     [postId, token, updateCommentEverywhere],
   );
 
+  const applyPinnedLocal = useCallback(
+    (targetId: string, pinned: boolean) => {
+      const nowIso = new Date().toISOString();
+      setComments((prev) =>
+        prioritizeRootComments(
+          prev.map((item) => {
+            if (item.parentId) return item;
+            if (item.id === targetId) {
+              return {
+                ...item,
+                pinnedAt: pinned ? nowIso : null,
+                pinnedBy: pinned ? (viewerUserId ?? null) : null,
+              };
+            }
+            if (pinned) {
+              return { ...item, pinnedAt: null, pinnedBy: null };
+            }
+            return item;
+          }),
+        ),
+      );
+    },
+    [prioritizeRootComments, viewerUserId],
+  );
+
+  const handleTogglePin = useCallback(
+    async (comment: CommentItem) => {
+      if (!token || !isAuthor || comment.parentId) return;
+      const isPinned = Boolean(comment.pinnedAt);
+      setOpenCommentMenuId(null);
+      try {
+        if (isPinned) {
+          await unpinComment({ token, postId, commentId: comment.id });
+          applyPinnedLocal(comment.id, false);
+          showToast("Comment unpinned");
+        } else {
+          await pinComment({ token, postId, commentId: comment.id });
+          applyPinnedLocal(comment.id, true);
+          showToast("Comment pinned");
+        }
+      } catch (err: any) {
+        showToast(err?.message || "Failed to update pin");
+      }
+    },
+    [applyPinnedLocal, isAuthor, postId, showToast, token],
+  );
+
   const renderComment = (item: CommentItem) => {
     const renderCommentThread = (
       comment: CommentItem,
@@ -2964,6 +3098,17 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         (comment.author?.id === viewerId || comment.authorId === viewerId),
       );
       const commentProfileId = comment.author?.id || comment.authorId;
+      const isPostAuthorComment = Boolean(
+        post?.authorId &&
+        (comment.author?.id === post.authorId ||
+          comment.authorId === post.authorId),
+      );
+      const isPostAuthorUsername = Boolean(
+        post?.authorUsername &&
+        comment.author?.username &&
+        comment.author.username.toLowerCase() ===
+          post.authorUsername.toLowerCase(),
+      );
       const isGiphyMedia = Boolean(
         comment.media?.metadata &&
         (comment.media.metadata as any)?.provider === "giphy",
@@ -3040,6 +3185,18 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                   <>@{comment.author?.username || "User"}</>
                 )}
               </div>
+              {isPostAuthorComment || isPostAuthorUsername ? (
+                <div className={styles.commentAuthorBadge}>
+                  <IconCrown size={12} />
+                  <span>Author</span>
+                </div>
+              ) : null}
+              {comment.pinnedAt ? (
+                <div className={styles.commentPinned}>
+                  <IconPin size={12} />
+                  <span>Pinned comment</span>
+                </div>
+              ) : null}
             </div>
             {comment.content ? (
               <div className={styles.commentText}>
@@ -3103,8 +3260,15 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 className={styles.linkBtn}
                 onClick={() => toggleCommentLike(comment)}
                 aria-pressed={comment.liked}
+                aria-label={comment.liked ? "Unlike comment" : "Like comment"}
               >
                 <IconLike size={14} filled={comment.liked} />
+              </button>
+              <button
+                className={styles.commentCountBtn}
+                onClick={() => openCommentLikesOverlay(comment.id)}
+                aria-label="View comment likes"
+              >
                 <span>{comment.likesCount ?? 0}</span>
               </button>
               <div className={styles.commentMoreWrap} data-comment-menu="true">
@@ -3143,6 +3307,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                           >
                             Edit comment
                           </button>
+                          {isAuthor && !comment.parentId ? (
+                            <button
+                              className={styles.commentMoreItem}
+                              onClick={() => handleTogglePin(comment)}
+                            >
+                              {comment.pinnedAt
+                                ? "Unpin comment"
+                                : "Pin comment"}
+                            </button>
+                          ) : null}
                           <button
                             className={`${styles.commentMoreItem} ${styles.commentDanger}`}
                             onClick={() => openDeleteConfirm(comment)}
@@ -3152,6 +3326,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         </>
                       ) : isAuthor ? (
                         <>
+                          {!comment.parentId ? (
+                            <button
+                              className={styles.commentMoreItem}
+                              onClick={() => handleTogglePin(comment)}
+                            >
+                              {comment.pinnedAt
+                                ? "Unpin comment"
+                                : "Pin comment"}
+                            </button>
+                          ) : null}
                           <button
                             className={`${styles.commentMoreItem}`}
                             onClick={() => openDeleteConfirm(comment)}
@@ -3745,82 +3929,19 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     }, 180);
   };
 
-  const loadLikePeek = async () => {
-    if (!token) {
-      setLikePeekState({
-        items: [],
-        nextCursor: null,
-        loading: false,
-        error: "Sign in to view likes",
-      });
-      return;
-    }
-
-    setLikePeekState((p) => ({ ...p, loading: true, error: "" }));
-    try {
-      const res = await fetchPostLikes({ token, postId, limit: 10 });
-      setLikePeekState({
-        items: res.items ?? [],
-        nextCursor: res.nextCursor ?? null,
-        loading: false,
-        error: "",
-      });
-    } catch (err: any) {
-      setLikePeekState((p) => ({
-        ...p,
-        loading: false,
-        error: err?.message || "Failed to load likes",
-      }));
-    }
+  const openCommentLikesOverlay = (commentId: string) => {
+    setCommentLikesOverlayId(commentId);
+    setCommentLikesOverlayOpen(true);
+    setCommentLikesOverlayClosing(false);
   };
 
-  const handleLikePeekEnter = () => {
-    if (likePeekTimerRef.current) {
-      clearTimeout(likePeekTimerRef.current);
-      likePeekTimerRef.current = null;
-    }
-    setLikePeekOpen(true);
-    if (!likePeekState.items.length && !likePeekState.loading) {
-      void loadLikePeek();
-    }
-  };
-
-  const handleLikePeekLeave = () => {
-    if (likePeekTimerRef.current) {
-      clearTimeout(likePeekTimerRef.current);
-    }
-    likePeekTimerRef.current = setTimeout(() => {
-      setLikePeekOpen(false);
-    }, 140);
-  };
-
-  const toggleLikePeekFollow = async (item: PostLikeItem) => {
-    if (!token) return;
-    const viewerId = viewer?.userId || viewer?.id;
-    if (viewerId && item.userId === viewerId) return;
-
-    const next = !item.isFollowing;
-    setLikePeekState((p) => ({
-      ...p,
-      items: p.items.map((u) =>
-        u.userId === item.userId ? { ...u, isFollowing: next } : u,
-      ),
-    }));
-
-    try {
-      if (next) {
-        await followUser({ token, userId: item.userId });
-      } else {
-        await unfollowUser({ token, userId: item.userId });
-      }
-    } catch (err) {
-      setLikePeekState((p) => ({
-        ...p,
-        items: p.items.map((u) =>
-          u.userId === item.userId ? { ...u, isFollowing: !next } : u,
-        ),
-      }));
-    }
+  const closeCommentLikesOverlay = () => {
+    setCommentLikesOverlayClosing(true);
+    window.setTimeout(() => {
+      setCommentLikesOverlayOpen(false);
+      setCommentLikesOverlayClosing(false);
+      setCommentLikesOverlayId(null);
+    }, 180);
   };
 
   const editModal = (
@@ -4690,11 +4811,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     </div>
                   )}
                   <div className={styles.statsRow}>
-                    <div
-                      className={styles.likePeekWrap}
-                      onMouseEnter={handleLikePeekEnter}
-                      onMouseLeave={handleLikePeekLeave}
-                    >
+                    <div className={styles.statItem}>
                       <button
                         type="button"
                         className={`${styles.statButton} ${
@@ -4704,105 +4821,19 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         aria-label={liked ? "Unlike" : "Like"}
                       >
                         <IconLike size={18} filled={liked} />
-                        {!(hideLikeCount && !isAuthor) ? (
-                          <span>{post.stats?.hearts ?? 0}</span>
-                        ) : null}
                       </button>
-                      {likePeekOpen ? (
-                        <div
-                          className={styles.likePeekPopover}
-                          onMouseEnter={handleLikePeekEnter}
-                          onMouseLeave={handleLikePeekLeave}
+                      {!(hideLikeCount && !isAuthor) ? (
+                        <button
+                          type="button"
+                          className={`${styles.statButton} ${styles.statCountButton}`}
+                          onClick={openLikesOverlay}
+                          aria-label="View likes"
                         >
-                          {likePeekState.loading ? (
-                            <div className={styles.likePeekState}>Loading…</div>
-                          ) : null}
-                          {likePeekState.error && !likePeekState.loading ? (
-                            <div className={styles.likePeekState}>
-                              {likePeekState.error}
-                            </div>
-                          ) : null}
-                          {!likePeekState.loading &&
-                          !likePeekState.error &&
-                          !likePeekState.items.length ? (
-                            <div className={styles.likePeekState}>
-                              No likes yet
-                            </div>
-                          ) : null}
-                          <div className={styles.likePeekList}>
-                            {likePeekState.items.map((item) => (
-                              <div
-                                key={item.userId}
-                                className={styles.likePeekRow}
-                              >
-                                <Link
-                                  href={`/profile/${encodeURIComponent(
-                                    item.userId,
-                                  )}`}
-                                  aria-label={`View ${item.username} profile`}
-                                >
-                                  <img
-                                    className={styles.likePeekAvatar}
-                                    src={
-                                      item.avatarUrl ||
-                                      "https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg"
-                                    }
-                                    alt=""
-                                    loading="lazy"
-                                  />
-                                </Link>
-                                <div className={styles.likePeekIdentity}>
-                                  <Link
-                                    href={`/profile/${encodeURIComponent(
-                                      item.userId,
-                                    )}`}
-                                    className={styles.likePeekName}
-                                  >
-                                    {item.displayName || item.username}
-                                  </Link>
-                                  <div className={styles.likePeekUsername}>
-                                    @{item.username}
-                                  </div>
-                                </div>
-                                <button
-                                  type="button"
-                                  className={`${styles.likePeekFollow} ${
-                                    item.isFollowing
-                                      ? ""
-                                      : styles.likePeekFollowPrimary
-                                  }`}
-                                  onClick={() => toggleLikePeekFollow(item)}
-                                  disabled={Boolean(
-                                    (viewer?.userId || viewer?.id) &&
-                                    item.userId ===
-                                      (viewer?.userId || viewer?.id),
-                                  )}
-                                >
-                                  {(viewer?.userId || viewer?.id) &&
-                                  item.userId === (viewer?.userId || viewer?.id)
-                                    ? "You"
-                                    : item.isFollowing
-                                      ? "Following"
-                                      : "Follow"}
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                          {likePeekState.nextCursor ? (
-                            <button
-                              type="button"
-                              className={styles.likePeekMore}
-                              onClick={() => {
-                                setLikePeekOpen(false);
-                                openLikesOverlay();
-                              }}
-                            >
-                              See more
-                            </button>
-                          ) : null}
-                        </div>
+                          {post.stats?.hearts ?? 0}
+                        </button>
                       ) : null}
                     </div>
+
                     <span className={styles.statItem}>
                       <svg
                         aria-hidden="true"
@@ -5927,6 +5958,17 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           postId={postId}
           viewerId={viewer?.userId || viewer?.id}
           onClose={closeLikesOverlay}
+        />
+      ) : null}
+
+      {postId && commentLikesOverlayId ? (
+        <CommentLikesOverlay
+          open={commentLikesOverlayOpen}
+          closing={commentLikesOverlayClosing}
+          postId={postId}
+          commentId={commentLikesOverlayId}
+          viewerId={viewer?.userId || viewer?.id}
+          onClose={closeCommentLikesOverlay}
         />
       ) : null}
     </div>

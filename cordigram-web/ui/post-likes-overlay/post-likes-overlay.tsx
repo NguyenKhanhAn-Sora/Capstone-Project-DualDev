@@ -60,8 +60,18 @@ export default function PostLikesOverlay(props: Props) {
     error: "",
     loadingMore: false,
   });
+  const [search, setSearch] = useState("");
 
   const title = useMemo(() => "Likes", []);
+  const filteredItems = useMemo(() => {
+    const trimmed = search.trim().toLowerCase();
+    if (!trimmed) return state.items;
+    return state.items.filter((item) => {
+      const display = item.displayName?.toLowerCase() ?? "";
+      const username = item.username?.toLowerCase() ?? "";
+      return display.includes(trimmed) || username.includes(trimmed);
+    });
+  }, [search, state.items]);
 
   useEffect(() => {
     if (!open) return;
@@ -150,6 +160,11 @@ export default function PostLikesOverlay(props: Props) {
 
   useEffect(() => {
     if (!open) return;
+    setSearch("");
+  }, [open, postId]);
+
+  useEffect(() => {
+    if (!open) return;
     const root = scrollRef.current;
     const target = sentinelRef.current;
     if (!root || !target) return;
@@ -207,9 +222,16 @@ export default function PostLikesOverlay(props: Props) {
       aria-modal="true"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
+        e.stopPropagation();
       }}
+      onClick={(e) => e.stopPropagation()}
     >
-      <div className={styles.card} data-closing={closing ? "1" : "0"}>
+      <div
+        className={styles.card}
+        data-closing={closing ? "1" : "0"}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className={styles.header}>
           <div className={styles.title}>{title}</div>
           <button
@@ -222,17 +244,32 @@ export default function PostLikesOverlay(props: Props) {
           </button>
         </div>
 
+        <div className={styles.searchRow}>
+          <input
+            className={styles.searchInput}
+            type="search"
+            placeholder="Search username"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search username"
+          />
+        </div>
+
         <div className={styles.list} ref={scrollRef}>
-          {state.loading ? <div className={styles.loading}>Loading…</div> : null}
+          {state.loading ? (
+            <div className={styles.loading}>Loading…</div>
+          ) : null}
           {state.error && !state.loading ? (
             <div className={styles.error}>{state.error}</div>
           ) : null}
 
-          {!state.loading && !state.error && !state.items.length ? (
-            <div className={styles.loading}>No likes yet</div>
+          {!state.loading && !state.error && !filteredItems.length ? (
+            <div className={styles.loading}>
+              {search.trim() ? "No matching users" : "No likes yet"}
+            </div>
           ) : null}
 
-          {state.items.map((item) => (
+          {filteredItems.map((item) => (
             <div key={item.userId} className={styles.row}>
               <Link
                 href={toProfileHref(item)}

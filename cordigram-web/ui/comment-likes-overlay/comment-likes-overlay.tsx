@@ -2,31 +2,26 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import styles from "./followers-overlay.module.css";
+import styles from "./comment-likes-overlay.module.css";
 import {
-  fetchFollowers,
-  fetchFollowing,
+  fetchCommentLikes,
   followUser,
   unfollowUser,
-  type FollowListItem,
+  type CommentLikeItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
-
-export type FollowersOverlayTab = "followers" | "following";
 
 type Props = {
   open: boolean;
   closing?: boolean;
-  ownerUserId: string;
-  ownerUsername?: string;
-  initialTab: FollowersOverlayTab;
+  postId: string;
+  commentId: string;
   viewerId?: string;
-  onCountsChange?: (delta: { followers?: number; following?: number }) => void;
   onClose: () => void;
 };
 
-type TabState = {
-  items: FollowListItem[];
+type ListState = {
+  items: CommentLikeItem[];
   nextCursor: string | null;
   loading: boolean;
   error: string;
@@ -54,64 +49,30 @@ function toProfileHref(item: { userId: string; username?: string }) {
   return `/profile/${encodeURIComponent(item.userId)}`;
 }
 
-export default function FollowersOverlay(props: Props) {
-  const {
-    open,
-    closing,
-    ownerUserId,
-    ownerUsername,
-    initialTab,
-    viewerId,
-    onCountsChange,
-    onClose,
-  } = props;
-
-  const [tab, setTab] = useState<FollowersOverlayTab>(initialTab);
+export default function CommentLikesOverlay(props: Props) {
+  const { open, closing, postId, commentId, viewerId, onClose } = props;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const [followers, setFollowers] = useState<TabState>({
+  const [state, setState] = useState<ListState>({
     items: [],
     nextCursor: null,
     loading: false,
     error: "",
     loadingMore: false,
   });
-  const [following, setFollowing] = useState<TabState>({
-    items: [],
-    nextCursor: null,
-    loading: false,
-    error: "",
-    loadingMore: false,
-  });
-  const [followersSearch, setFollowersSearch] = useState("");
-  const [followingSearch, setFollowingSearch] = useState("");
+  const [search, setSearch] = useState("");
 
-  const state = tab === "followers" ? followers : following;
-  const setState = tab === "followers" ? setFollowers : setFollowing;
-  const activeSearch = tab === "followers" ? followersSearch : followingSearch;
-  const setActiveSearch =
-    tab === "followers" ? setFollowersSearch : setFollowingSearch;
-
+  const title = useMemo(() => "Likes", []);
   const filteredItems = useMemo(() => {
-    const query = activeSearch.trim().toLowerCase();
-    if (!query) return state.items;
+    const trimmed = search.trim().toLowerCase();
+    if (!trimmed) return state.items;
     return state.items.filter((item) => {
+      const display = item.displayName?.toLowerCase() ?? "";
       const username = item.username?.toLowerCase() ?? "";
-      const displayName = item.displayName?.toLowerCase() ?? "";
-      return username.includes(query) || displayName.includes(query);
+      return display.includes(trimmed) || username.includes(trimmed);
     });
-  }, [activeSearch, state.items]);
-
-  const title = useMemo(() => {
-    const handle = ownerUsername ? `@${ownerUsername}` : "Profile";
-    return handle;
-  }, [ownerUsername]);
-
-  useEffect(() => {
-    if (!open) return;
-    setTab(initialTab);
-  }, [open, initialTab]);
+  }, [search, state.items]);
 
   useEffect(() => {
     if (!open) return;
@@ -122,32 +83,22 @@ export default function FollowersOverlay(props: Props) {
     };
   }, [open]);
 
-  const loadFirstPage = async (which: FollowersOverlayTab) => {
+  const loadFirstPage = async () => {
     const token = getStoredAccessToken();
     if (!token) {
-      const setter = which === "followers" ? setFollowers : setFollowing;
-      setter((p) => ({ ...p, loading: false, error: "Session expired." }));
+      setState((p) => ({ ...p, loading: false, error: "Session expired." }));
       return;
     }
 
-    const setter = which === "followers" ? setFollowers : setFollowing;
-    setter((p) => ({ ...p, loading: true, error: "" }));
-
+    setState((p) => ({ ...p, loading: true, error: "" }));
     try {
-      const res =
-        which === "followers"
-          ? await fetchFollowers({
-              token,
-              userId: ownerUserId,
-              limit: PAGE_SIZE,
-            })
-          : await fetchFollowing({
-              token,
-              userId: ownerUserId,
-              limit: PAGE_SIZE,
-            });
-
-      setter({
+      const res = await fetchCommentLikes({
+        token,
+        postId,
+        commentId,
+        limit: PAGE_SIZE,
+      });
+      setState({
         items: res.items ?? [],
         nextCursor: res.nextCursor ?? null,
         loading: false,
@@ -156,10 +107,10 @@ export default function FollowersOverlay(props: Props) {
       });
     } catch (err: any) {
       console.error(err);
-      setter((p) => ({
+      setState((p) => ({
         ...p,
         loading: false,
-        error: err?.message || "Failed to load list",
+        error: err?.message || "Failed to load likes",
       }));
     }
   };
@@ -179,20 +130,13 @@ export default function FollowersOverlay(props: Props) {
     setState((p) => ({ ...p, loadingMore: true, error: "" }));
 
     try {
-      const res =
-        tab === "followers"
-          ? await fetchFollowers({
-              token,
-              userId: ownerUserId,
-              limit: PAGE_SIZE,
-              cursor,
-            })
-          : await fetchFollowing({
-              token,
-              userId: ownerUserId,
-              limit: PAGE_SIZE,
-              cursor,
-            });
+      const res = await fetchCommentLikes({
+        token,
+        postId,
+        commentId,
+        limit: PAGE_SIZE,
+        cursor,
+      });
 
       setState((p) => ({
         ...p,
@@ -212,11 +156,15 @@ export default function FollowersOverlay(props: Props) {
 
   useEffect(() => {
     if (!open) return;
-    const current = tab === "followers" ? followers : following;
-    if (current.items.length || current.loading) return;
-    loadFirstPage(tab);
+    if (state.items.length || state.loading) return;
+    void loadFirstPage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, tab]);
+  }, [open, postId, commentId]);
+
+  useEffect(() => {
+    if (!open) return;
+    setSearch("");
+  }, [open, postId, commentId]);
 
   useEffect(() => {
     if (!open) return;
@@ -236,35 +184,20 @@ export default function FollowersOverlay(props: Props) {
     observer.observe(target);
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, tab, state.nextCursor, state.loading, state.loadingMore]);
+  }, [open, state.nextCursor, state.loading, state.loadingMore]);
 
-  const toggleFollow = async (item: FollowListItem) => {
+  const toggleFollow = async (item: CommentLikeItem) => {
     const token = getStoredAccessToken();
     if (!token) return;
     if (viewerId && item.userId === viewerId) return;
 
     const next = !item.isFollowing;
-    const isOwner = Boolean(
-      viewerId && ownerUserId && viewerId === ownerUserId,
-    );
-    const followingDelta = isOwner ? (next ? 1 : -1) : 0;
-
-    setFollowers((p) => ({
+    setState((p) => ({
       ...p,
       items: p.items.map((u) =>
         u.userId === item.userId ? { ...u, isFollowing: next } : u,
       ),
     }));
-    setFollowing((p) => ({
-      ...p,
-      items: p.items.map((u) =>
-        u.userId === item.userId ? { ...u, isFollowing: next } : u,
-      ),
-    }));
-
-    if (followingDelta) {
-      onCountsChange?.({ following: followingDelta });
-    }
 
     try {
       if (next) {
@@ -274,22 +207,12 @@ export default function FollowersOverlay(props: Props) {
       }
     } catch (err) {
       console.error(err);
-      // revert
-      setFollowers((p) => ({
+      setState((p) => ({
         ...p,
         items: p.items.map((u) =>
           u.userId === item.userId ? { ...u, isFollowing: !next } : u,
         ),
       }));
-      setFollowing((p) => ({
-        ...p,
-        items: p.items.map((u) =>
-          u.userId === item.userId ? { ...u, isFollowing: !next } : u,
-        ),
-      }));
-      if (followingDelta) {
-        onCountsChange?.({ following: -followingDelta });
-      }
     }
   };
 
@@ -302,13 +225,18 @@ export default function FollowersOverlay(props: Props) {
       aria-modal="true"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
+        e.stopPropagation();
       }}
+      onClick={(e) => e.stopPropagation()}
     >
-      <div className={styles.card} data-closing={closing ? "1" : "0"}>
+      <div
+        className={styles.card}
+        data-closing={closing ? "1" : "0"}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className={styles.header}>
-          <div className={styles.titleWrap}>
-            <div className={styles.title}>{title}</div>
-          </div>
+          <div className={styles.title}>{title}</div>
           <button
             className={styles.close}
             type="button"
@@ -319,43 +247,15 @@ export default function FollowersOverlay(props: Props) {
           </button>
         </div>
 
-        <div className={styles.tabs}>
-          <button
-            type="button"
-            className={`${styles.tab} ${tab === "followers" ? styles.tabActive : ""}`}
-            onClick={() => setTab("followers")}
-          >
-            Followers
-          </button>
-          <button
-            type="button"
-            className={`${styles.tab} ${tab === "following" ? styles.tabActive : ""}`}
-            onClick={() => setTab("following")}
-          >
-            Following
-          </button>
-        </div>
-
-        <div className={styles.searchWrap}>
+        <div className={styles.searchRow}>
           <input
-            type="text"
             className={styles.searchInput}
-            placeholder={
-              tab === "followers" ? "Search followers" : "Search following"
-            }
-            value={activeSearch}
-            onChange={(event) => setActiveSearch(event.target.value)}
+            type="search"
+            placeholder="Search username"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search username"
           />
-          {activeSearch ? (
-            <button
-              type="button"
-              className={styles.searchClear}
-              onClick={() => setActiveSearch("")}
-              aria-label="Clear search"
-            >
-              ×
-            </button>
-          ) : null}
         </div>
 
         <div className={styles.list} ref={scrollRef}>
@@ -365,10 +265,9 @@ export default function FollowersOverlay(props: Props) {
           {state.error && !state.loading ? (
             <div className={styles.error}>{state.error}</div>
           ) : null}
-
           {!state.loading && !state.error && !filteredItems.length ? (
             <div className={styles.loading}>
-              {activeSearch ? "No matches found" : "No users yet"}
+              {search.trim() ? "No matching users" : "No likes yet"}
             </div>
           ) : null}
 
@@ -393,7 +292,9 @@ export default function FollowersOverlay(props: Props) {
               </div>
               <button
                 type="button"
-                className={`${styles.followBtn} ${item.isFollowing ? "" : styles.followBtnPrimary}`}
+                className={`${styles.followBtn} ${
+                  item.isFollowing ? "" : styles.followBtnPrimary
+                }`}
                 onClick={() => toggleFollow(item)}
                 disabled={Boolean(viewerId && item.userId === viewerId)}
               >
@@ -405,11 +306,10 @@ export default function FollowersOverlay(props: Props) {
               </button>
             </div>
           ))}
-
+          <div ref={sentinelRef} />
           {state.loadingMore ? (
             <div className={styles.loading}>Loading more…</div>
           ) : null}
-          <div ref={sentinelRef} className={styles.sentinel} />
         </div>
       </div>
     </div>

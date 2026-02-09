@@ -25,12 +25,14 @@ import {
   ResetPasswordDto,
   VerifyResetOtpDto,
 } from './dto/forgot-password.dto';
+import type { Role } from '../users/user.schema';
 
 interface TokenPayload {
   sub: string;
   email: string;
   type: 'signup' | 'access' | 'two-factor';
   loginMethod?: string;
+  roles?: Role[];
 }
 
 @Injectable()
@@ -54,8 +56,8 @@ export class AuthService {
     });
   }
 
-  createAccessToken(userId: string, email: string): string {
-    const payload: TokenPayload = { sub: userId, email, type: 'access' };
+  createAccessToken(userId: string, email: string, roles?: Role[]): string {
+    const payload: TokenPayload = { sub: userId, email, type: 'access', roles };
     const opts: JwtSignOptions = {
       secret: this.config.jwtSecret,
       expiresIn: this.config.jwtAccessExpiresIn as JwtSignOptions['expiresIn'],
@@ -216,7 +218,7 @@ export class AuthService {
   > {
     const user = await this.usersService.findByEmail(params.email);
     if (!user) {
-      throw new BadRequestException('Email không tồn tại trong hệ thống');
+      throw new BadRequestException('Email does not exist in the system');
     }
 
     if (!user.passwordHash) {
@@ -225,11 +227,11 @@ export class AuthService {
 
     const passwordOk = await bcrypt.compare(params.password, user.passwordHash);
     if (!passwordOk) {
-      throw new UnauthorizedException('Password sai');
+      throw new UnauthorizedException('Incorrect password');
     }
 
     if (user.status !== 'active') {
-      throw new UnauthorizedException('Tài khoản chưa sẵn sàng để đăng nhập');
+      throw new UnauthorizedException('Account is not ready for login');
     }
 
     const deviceId = params.deviceId ?? '';
@@ -280,7 +282,11 @@ export class AuthService {
       }
     }
 
-    const accessToken = this.createAccessToken(user.id, user.email);
+    const accessToken = this.createAccessToken(
+      user.id,
+      user.email,
+      user.roles ?? ['user'],
+    );
     const { deviceType, os, browser } = this.parseUserAgent(params.userAgent);
     const deviceIdHash = this.buildDeviceIdHash({
       deviceId: params.deviceId,
@@ -313,6 +319,96 @@ export class AuthService {
     return { accessToken, refreshToken: refresh.token };
   }
 
+  async adminLogin(params: {
+    email: string;
+    password: string;
+    userAgent?: string;
+    deviceInfo?: string;
+    deviceId?: string;
+    ip?: string;
+  }): Promise<{ accessToken: string; refreshToken: string; roles: Role[] }> {
+    const email = params.email.toLowerCase();
+    const envEmail = this.config.adminEmail;
+    const envPassword = this.config.adminPassword;
+    let user = null as Awaited<
+      ReturnType<typeof this.usersService.findByEmail>
+    > | null;
+
+    if (envEmail && envPassword && email === envEmail) {
+      if (params.password === envPassword) {
+        const saltRounds = this.config.bcryptSaltRounds;
+        const hash = await bcrypt.hash(envPassword, saltRounds);
+        user = await this.usersService.ensureAdminUser({
+          email,
+          passwordHash: hash,
+        });
+      }
+    }
+
+    if (!user) {
+      user = await this.usersService.findByEmail(email);
+      if (!user || !user.passwordHash) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+      if (!user.roles?.includes('admin')) {
+        throw new ForbiddenException('Admin access required');
+      }
+      const passwordOk = await bcrypt.compare(
+        params.password,
+        user.passwordHash,
+      );
+      if (!passwordOk) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+    }
+
+    if (user.status !== 'active') {
+      throw new UnauthorizedException('Account is not active');
+    }
+
+    const accessToken = this.createAccessToken(
+      user.id,
+      user.email,
+      user.roles ?? ['admin'],
+    );
+    const refresh = this.generateRefreshToken();
+    const { deviceType, os, browser } = this.parseUserAgent(params.userAgent);
+    const deviceIdHash = this.buildDeviceIdHash({
+      deviceId: params.deviceId,
+      userAgent: params.userAgent,
+      ip: params.ip,
+    });
+
+    await this.persistRefreshToken({
+      userId: user.id,
+      tokenHash: refresh.hash,
+      expiresAt: refresh.expiresAt,
+      userAgent: params.userAgent,
+      deviceInfo: params.deviceInfo,
+      deviceIdHash,
+      ip: params.ip,
+      loginMethod: 'admin',
+      deviceType,
+      os,
+      browser,
+    });
+
+    await this.usersService.recordLoginDevice({
+      userId: user.id,
+      deviceId: params.deviceId,
+      userAgent: params.userAgent,
+      deviceInfo: params.deviceInfo,
+      ip: params.ip,
+      loginMethod: 'admin',
+    });
+
+    return {
+      accessToken,
+      refreshToken: refresh.token,
+      roles: user.roles ?? ['admin'],
+    };
+  }
+
   async verifyTwoFactorLogin(params: {
     token: string;
     code: string;
@@ -329,7 +425,11 @@ export class AuthService {
     }
     await this.otpService.verifyOtp(user.email, params.code);
 
-    const accessToken = this.createAccessToken(user.id, user.email);
+    const accessToken = this.createAccessToken(
+      user.id,
+      user.email,
+      user.roles ?? ['user'],
+    );
     const { deviceType, os, browser } = this.parseUserAgent(params.userAgent);
     const deviceIdHash = this.buildDeviceIdHash({
       deviceId: params.deviceId,
@@ -437,7 +537,11 @@ export class AuthService {
       return { mode: 'complete-profile', signupToken, needsProfile: true };
     }
 
-    const accessToken = this.createAccessToken(user.id, email);
+    const accessToken = this.createAccessToken(
+      user.id,
+      email,
+      user.roles ?? ['user'],
+    );
     const refresh = this.generateRefreshToken();
     const { deviceType, os, browser } = this.parseUserAgent(params.userAgent);
     const deviceIdHash = this.buildDeviceIdHash({
@@ -525,7 +629,11 @@ export class AuthService {
     });
 
     await this.usersService.completeSignup(user.id);
-    const accessToken = this.createAccessToken(user.id, user.email);
+    const accessToken = this.createAccessToken(
+      user.id,
+      user.email,
+      user.roles ?? ['user'],
+    );
     const refresh = this.generateRefreshToken();
     await this.persistRefreshToken({
       userId: user.id,
@@ -563,7 +671,11 @@ export class AuthService {
 
     await this.sessionModel.deleteOne({ _id: session._id }).exec();
 
-    const accessToken = this.createAccessToken(user.id, user.email);
+    const accessToken = this.createAccessToken(
+      user.id,
+      user.email,
+      user.roles ?? ['user'],
+    );
     const next = this.generateRefreshToken();
     const { deviceType, os, browser } = this.parseUserAgent(params.userAgent);
     const deviceIdHash = this.buildDeviceIdHash({

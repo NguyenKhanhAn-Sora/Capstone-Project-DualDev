@@ -23,6 +23,7 @@ export type NotificationItem = {
   type: NotificationType;
   actor: NotificationActor;
   postId: string | null;
+  commentId: string | null;
   postKind: PostKind;
   isOwnPost?: boolean;
   postMutedUntil?: string | null;
@@ -54,6 +55,7 @@ type NotificationDoc = {
   type: NotificationType;
   actorId?: Types.ObjectId | null;
   postId?: Types.ObjectId | null;
+  commentId?: Types.ObjectId | null;
   postKind?: PostKind;
   deviceInfo?: string;
   deviceType?: string;
@@ -263,6 +265,33 @@ export class NotificationsService {
     return { items };
   }
 
+  async getLastSeenAt(userId: string): Promise<{ lastSeenAt: string | null }> {
+    const user = await this.userModel
+      .findById(userId)
+      .select('settings.notifications.lastSeenAt')
+      .lean()
+      .exec();
+
+    const lastSeenAt = user?.settings?.notifications?.lastSeenAt ?? null;
+    return {
+      lastSeenAt: lastSeenAt ? new Date(lastSeenAt).toISOString() : null,
+    };
+  }
+
+  async setLastSeenAt(
+    userId: string,
+    seenAt = new Date(),
+  ): Promise<{ lastSeenAt: string }> {
+    await this.userModel
+      .updateOne(
+        { _id: userId },
+        { $set: { 'settings.notifications.lastSeenAt': seenAt } },
+      )
+      .exec();
+
+    return { lastSeenAt: seenAt.toISOString() };
+  }
+
   async getUnreadCount(userId: string): Promise<{ unreadCount: number }> {
     const recipientId = new Types.ObjectId(userId);
     const unreadCount = await this.notificationModel.countDocuments({
@@ -400,6 +429,73 @@ export class NotificationsService {
     return response;
   }
 
+  async createCommentLikeNotification(params: {
+    actorId: string;
+    recipientId: string;
+    postId: string;
+    postKind: PostKind;
+    commentId: string;
+  }): Promise<NotificationItem | null> {
+    const { actorId, recipientId, postId, postKind, commentId } = params;
+
+    if (!(await this.canEmitCategoryNotification(recipientId, 'like'))) {
+      return null;
+    }
+
+    const doc = await this.notificationModel
+      .findOneAndUpdate(
+        {
+          recipientId: new Types.ObjectId(recipientId),
+          commentId: new Types.ObjectId(commentId),
+          type: 'comment_like',
+        },
+        {
+          $set: {
+            actorId: new Types.ObjectId(actorId),
+            readAt: null,
+            updatedAt: new Date(),
+          },
+          $inc: { likeCount: 1 },
+          $setOnInsert: {
+            recipientId: new Types.ObjectId(recipientId),
+            commentId: new Types.ObjectId(commentId),
+            postId: new Types.ObjectId(postId),
+            type: 'comment_like',
+            postKind,
+          },
+        },
+        { new: true, upsert: true },
+      )
+      .exec();
+
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(actorId) })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const post = await this.postModel
+      .findById(postId)
+      .select('authorId notificationsMutedUntil notificationsMutedIndefinitely')
+      .lean();
+
+    const response = this.toResponse(doc, profile ?? null, {
+      recipientId,
+      post,
+    });
+    const { unreadCount } = await this.getUnreadCount(recipientId);
+    if (
+      (await this.canEmitNotification(recipientId)) &&
+      (await this.canEmitPostNotification(recipientId, postId))
+    ) {
+      this.gateway.emitToUser(recipientId, 'notification:new', {
+        notification: response,
+        unreadCount,
+      } satisfies NotificationRealtimePayload);
+    }
+
+    return response;
+  }
+
   async createPostCommentNotification(params: {
     actorId: string;
     recipientId: string;
@@ -447,6 +543,73 @@ export class NotificationsService {
       .findById(postId)
       .select('authorId notificationsMutedUntil notificationsMutedIndefinitely')
       .lean();
+    const response = this.toResponse(doc, profile ?? null, {
+      recipientId,
+      post,
+    });
+    const { unreadCount } = await this.getUnreadCount(recipientId);
+    if (
+      (await this.canEmitNotification(recipientId)) &&
+      (await this.canEmitPostNotification(recipientId, postId))
+    ) {
+      this.gateway.emitToUser(recipientId, 'notification:new', {
+        notification: response,
+        unreadCount,
+      } satisfies NotificationRealtimePayload);
+    }
+
+    return response;
+  }
+
+  async createCommentReplyNotification(params: {
+    actorId: string;
+    recipientId: string;
+    postId: string;
+    postKind: PostKind;
+    commentId: string;
+  }): Promise<NotificationItem | null> {
+    const { actorId, recipientId, postId, postKind, commentId } = params;
+
+    if (!(await this.canEmitCategoryNotification(recipientId, 'comment'))) {
+      return null;
+    }
+
+    const doc = await this.notificationModel
+      .findOneAndUpdate(
+        {
+          recipientId: new Types.ObjectId(recipientId),
+          commentId: new Types.ObjectId(commentId),
+          type: 'comment_reply',
+        },
+        {
+          $set: {
+            actorId: new Types.ObjectId(actorId),
+            readAt: null,
+            updatedAt: new Date(),
+          },
+          $inc: { commentCount: 1 },
+          $setOnInsert: {
+            recipientId: new Types.ObjectId(recipientId),
+            commentId: new Types.ObjectId(commentId),
+            postId: new Types.ObjectId(postId),
+            type: 'comment_reply',
+            postKind,
+          },
+        },
+        { new: true, upsert: true },
+      )
+      .exec();
+
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(actorId) })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const post = await this.postModel
+      .findById(postId)
+      .select('authorId notificationsMutedUntil notificationsMutedIndefinitely')
+      .lean();
+
     const response = this.toResponse(doc, profile ?? null, {
       recipientId,
       post,
@@ -677,6 +840,38 @@ export class NotificationsService {
     }
   }
 
+  async decrementCommentLikeNotification(params: {
+    recipientId: string;
+    commentId: string;
+    latestActorId?: string | null;
+  }): Promise<void> {
+    const { recipientId, commentId, latestActorId } = params;
+    const update: Record<string, unknown> = {
+      $inc: { likeCount: -1 },
+    };
+    if (latestActorId) {
+      update.$set = { actorId: new Types.ObjectId(latestActorId) };
+    }
+
+    const doc = await this.notificationModel
+      .findOneAndUpdate(
+        {
+          recipientId: new Types.ObjectId(recipientId),
+          commentId: new Types.ObjectId(commentId),
+          type: 'comment_like',
+        },
+        update,
+        { new: true },
+      )
+      .exec();
+
+    if (!doc) return;
+    const count = typeof doc.likeCount === 'number' ? doc.likeCount : 0;
+    if (count <= 0) {
+      await this.notificationModel.deleteOne({ _id: doc._id }).exec();
+    }
+  }
+
   async decrementPostCommentNotification(params: {
     recipientId: string;
     postId: string;
@@ -762,6 +957,7 @@ export class NotificationsService {
         avatarUrl: profile?.avatarUrl ?? DEFAULT_AVATAR_URL,
       },
       postId: doc.postId ? doc.postId.toString() : null,
+      commentId: doc.commentId ? doc.commentId.toString() : null,
       postKind: doc.postKind ?? 'post',
       isOwnPost: isOwnPost || undefined,
       postMutedUntil,

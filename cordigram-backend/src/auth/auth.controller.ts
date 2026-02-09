@@ -20,6 +20,7 @@ import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { LoginDto } from './dto/login.dto';
+import { AdminLoginDto } from './dto/admin-login.dto';
 import { TwoFactorResendDto, TwoFactorVerifyDto } from './dto/two-factor.dto';
 import { UpsertRecentAccountDto } from './dto/upsert-recent-account.dto';
 import {
@@ -71,6 +72,10 @@ export class AuthController {
   @Post('request-otp')
   async requestOtp(@Body() dto: RequestOtpDto) {
     const email = dto.email.toLowerCase();
+    const adminEmail = this.config.adminEmail;
+    if (adminEmail && email === adminEmail) {
+      throw new BadRequestException('Email is reserved');
+    }
     const existing = await this.usersService.findByEmail(email);
     if (existing) {
       const isCompleted =
@@ -223,6 +228,32 @@ export class AuthController {
     };
     this.setRefreshCookie(res, refreshToken);
     return res.json({ accessToken });
+  }
+
+  @Post('admin/login')
+  async adminLogin(
+    @Body() dto: AdminLoginDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0] ||
+      req.ip ||
+      '';
+    const result = await this.authService.adminLogin({
+      email: dto.email,
+      password: dto.password,
+      userAgent: req.headers['user-agent'],
+      deviceInfo: req.headers['x-device-info'] as string,
+      deviceId: req.headers['x-device-id'] as string,
+      ip,
+    });
+
+    this.setRefreshCookie(res, result.refreshToken);
+    return res.json({
+      accessToken: result.accessToken,
+      roles: result.roles,
+    });
   }
 
   @Post('two-factor/verify')

@@ -120,6 +120,27 @@ export class CommentsController {
     );
   }
 
+  @Get(':commentId/likes')
+  async listLikes(
+    @Req() req: Request,
+    @Param('postId') postId: string,
+    @Param('commentId') commentId: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.commentsService.listCommentLikes({
+      viewerId: user.userId,
+      postId,
+      commentId,
+      limit: limit ? Number(limit) : undefined,
+      cursor: cursor || undefined,
+    });
+  }
+
   @Delete(':commentId')
   async delete(
     @Req() req: Request,
@@ -150,6 +171,34 @@ export class CommentsController {
       postId,
       commentId,
       dto,
+    );
+  }
+
+  @Post(':commentId/pin')
+  async pin(
+    @Req() req: Request,
+    @Param('postId') postId: string,
+    @Param('commentId') commentId: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    return this.commentsService.pinComment(
+      user?.userId ?? '',
+      postId,
+      commentId,
+    );
+  }
+
+  @Delete(':commentId/pin')
+  async unpin(
+    @Req() req: Request,
+    @Param('postId') postId: string,
+    @Param('commentId') commentId: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    return this.commentsService.unpinComment(
+      user?.userId ?? '',
+      postId,
+      commentId,
     );
   }
 }

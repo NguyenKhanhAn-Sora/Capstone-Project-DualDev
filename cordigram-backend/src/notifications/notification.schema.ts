@@ -5,6 +5,8 @@ import type { PostKind } from '../posts/post.schema';
 
 export type NotificationType =
   | 'post_like'
+  | 'comment_like'
+  | 'comment_reply'
   | 'post_comment'
   | 'post_mention'
   | 'follow'
@@ -36,6 +38,14 @@ export class Notification extends Document {
   })
   postId: Types.ObjectId | null;
 
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Comment',
+    index: true,
+    default: null,
+  })
+  commentId: Types.ObjectId | null;
+
   @Prop({ type: String, enum: ['post', 'reel'], default: 'post' })
   postKind: PostKind;
 
@@ -43,6 +53,8 @@ export class Notification extends Document {
     type: String,
     enum: [
       'post_like',
+      'comment_like',
+      'comment_reply',
       'post_comment',
       'post_mention',
       'follow',
@@ -109,7 +121,7 @@ export const NotificationSchema = SchemaFactory.createForClass(Notification);
 NotificationSchema.index({ recipientId: 1, createdAt: -1 });
 NotificationSchema.index({ recipientId: 1, readAt: 1 });
 NotificationSchema.index(
-  { recipientId: 1, postId: 1, type: 1 },
+  { recipientId: 1, postId: 1, commentId: 1, type: 1 },
   {
     unique: true,
     partialFilterExpression: { postId: { $ne: null } },

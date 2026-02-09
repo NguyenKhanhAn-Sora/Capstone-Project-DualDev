@@ -285,6 +285,7 @@ export default function ProfileLayout({
   const [blocking, setBlocking] = useState(false);
   const [blockError, setBlockError] = useState("");
   const [blockedView, setBlockedView] = useState(false);
+  const [privateView, setPrivateView] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportCategory, setReportCategory] = useState<
     UserReportCategory["key"] | null
@@ -395,6 +396,7 @@ export default function ProfileLayout({
       return;
     }
     setBlockedView(false);
+    setPrivateView(false);
     setViewerId(getUserIdFromToken(token));
 
     setLoading(true);
@@ -410,11 +412,16 @@ export default function ProfileLayout({
           typeof err === "object" && err && "message" in err
             ? String((err as { message?: string }).message)
             : "Unable to load profile";
-        const blockedError =
-          maybeStatus === 403 ||
+        const lowered = message.toLowerCase();
+        const isPrivate = maybeStatus === 403 && lowered.includes("private");
+        const isBlocked =
           maybeStatus === 423 ||
-          message.toLowerCase().includes("block");
-        if (blockedError) {
+          lowered.includes("block") ||
+          (maybeStatus === 403 && !isPrivate);
+        if (isPrivate) {
+          setPrivateView(true);
+          setError("");
+        } else if (isBlocked) {
           setBlockedView(true);
           setError("");
         } else {
@@ -1105,6 +1112,24 @@ export default function ProfileLayout({
     );
   }
 
+  function PrivateProfile({ onHome }: { onHome: () => void }) {
+    return (
+      <div className={styles.privateWrap}>
+        <div className={styles.privateIcon} aria-hidden>
+          <IconLock />
+        </div>
+        <div className={styles.privateTitle}>This profile is private</div>
+        <div className={styles.privateText}>
+          The owner has limited access to their profile. Follow requests may be
+          required to view their content.
+        </div>
+        <button type="button" className={styles.privateButton} onClick={onHome}>
+          Go back home
+        </button>
+      </div>
+    );
+  }
+
   const statsOriginalFallback =
     (profile?.stats?.posts ?? 0) + (profile?.stats?.reels ?? 0);
   const displayedPostsCount = authoredCount ?? statsOriginalFallback;
@@ -1147,18 +1172,20 @@ export default function ProfileLayout({
 
   if (!canRender) return null;
 
+  const shouldShowPrivate = privateView || Boolean(profile && !canViewProfile);
+
   return (
     <div className={styles.page}>
       {blockedView ? (
         <BlockedProfile onHome={() => router.push("/")} />
+      ) : shouldShowPrivate ? (
+        <PrivateProfile onHome={() => router.push("/")} />
       ) : (
         <div className={styles.card}>
           {loading ? (
             <ProfileSkeleton />
           ) : error ? (
             <div className={styles.errorBox}>{error}</div>
-          ) : profile && !canViewProfile ? (
-            <div className={styles.errorBox}>This profile is private.</div>
           ) : profile ? (
             <ProfileProvider value={{ profile, viewerId, tabs, prefetchTab }}>
               <div className={styles.header}>
@@ -2096,6 +2123,29 @@ function IconInfo() {
         strokeLinecap="round"
       />
       <circle cx="12" cy="8" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconLock() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+      <rect
+        x="4.5"
+        y="10"
+        width="15"
+        height="10"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M8 10V7.5a4 4 0 0 1 8 0V10"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="15" r="1" fill="currentColor" />
     </svg>
   );
 }

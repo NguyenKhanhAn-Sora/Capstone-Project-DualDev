@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { JSX, useEffect, useMemo, useState } from "react";
+import { JSX, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./notifications-overlay.module.css";
 import {
   deleteNotification,
   fetchNotifications,
+  logoutLoginDevice,
   markNotificationRead,
   markNotificationUnread,
   updatePostNotificationMute,
@@ -165,9 +166,17 @@ const TABS: TabConfig[] = [
 ];
 
 const TAB_FILTER: Record<TabKey, Array<NotificationItem["type"]>> = {
-  all: ["post_like", "post_comment", "post_mention", "follow", "login_alert"],
-  like: ["post_like"],
-  comment: ["post_comment"],
+  all: [
+    "post_like",
+    "comment_like",
+    "comment_reply",
+    "post_comment",
+    "post_mention",
+    "follow",
+    "login_alert",
+  ],
+  like: ["post_like", "comment_like"],
+  comment: ["post_comment", "comment_reply"],
   mentions: ["post_mention"],
   follow: ["follow"],
 };
@@ -190,6 +199,21 @@ function formatRelativeTime(value: string): string {
   if (months < 12) return `${months} months`;
   const years = Math.floor(days / 365);
   return `${years} years`;
+}
+
+function formatExactTime(value: string): string {
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return "";
+  const time = new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(dt);
+  const date = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  }).format(dt);
+  return `${date} · ${time}`;
 }
 
 function buildLocalDateTimeIso(date: string, time: string) {
@@ -229,6 +253,19 @@ function buildMessage(item: NotificationItem): JSX.Element {
       </>
     );
   }
+  if (item.type === "comment_like") {
+    const name = item.actor.username
+      ? `@${item.actor.username}`
+      : item.actor.displayName || "Someone";
+    const othersCount = Math.max(0, (item.likeCount ?? 1) - 1);
+    const othersLabel = othersCount === 1 ? "1 other" : `${othersCount} others`;
+    return (
+      <>
+        <span className={styles.itemName}>{name}</span>
+        {othersCount > 0 ? ` and ${othersLabel}` : ""} liked your comment
+      </>
+    );
+  }
   if (item.type === "post_mention") {
     const name = item.actor.username
       ? `@${item.actor.username}`
@@ -238,6 +275,19 @@ function buildMessage(item: NotificationItem): JSX.Element {
       <>
         <span className={styles.itemName}>{name}</span>
         {` mentioned you in a ${sourceLabel}`}
+      </>
+    );
+  }
+  if (item.type === "comment_reply") {
+    const name = item.actor.username
+      ? `@${item.actor.username}`
+      : item.actor.displayName || "Someone";
+    const othersCount = Math.max(0, (item.commentCount ?? 1) - 1);
+    const othersLabel = othersCount === 1 ? "1 other" : `${othersCount} others`;
+    return (
+      <>
+        <span className={styles.itemName}>{name}</span>
+        {othersCount > 0 ? ` and ${othersLabel}` : ""} replied to your comment
       </>
     );
   }
@@ -272,6 +322,11 @@ export default function NotificationsOverlay(props: {
   const [loginAlertItem, setLoginAlertItem] = useState<NotificationItem | null>(
     null,
   );
+  const [notMeOpen, setNotMeOpen] = useState(false);
+  const [notMeSubmitting, setNotMeSubmitting] = useState(false);
+  const [notMeError, setNotMeError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [muteModalOpen, setMuteModalOpen] = useState(false);
   const [muteTargetId, setMuteTargetId] = useState<string | null>(null);
@@ -400,6 +455,22 @@ export default function NotificationsOverlay(props: {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [openMenuId]);
+
+  useEffect(() => {
+    if (!loginAlertItem) {
+      setNotMeOpen(false);
+      setNotMeError(null);
+      setNotMeSubmitting(false);
+    }
+  }, [loginAlertItem]);
+
+  const showToast = (message: string, duration = 1800) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToastMessage(message);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), duration);
+  };
 
   const handleItemClick = (item: NotificationItem) => {
     setOpenMenuId(null);
@@ -597,6 +668,47 @@ export default function NotificationsOverlay(props: {
     const parts = [item.browser, item.os].filter(Boolean);
     if (parts.length) return parts.join(" on ");
     return item.deviceType ? `${item.deviceType} device` : "Unknown device";
+  };
+
+  const handleConfirmLogin = () => {
+    setLoginAlertItem(null);
+  };
+
+  const handleNotMe = () => {
+    setNotMeError(null);
+    setNotMeOpen(true);
+  };
+
+  const handleLogoutSuspiciousDevice = async () => {
+    if (!loginAlertItem?.deviceIdHash) {
+      setNotMeError("Unable to identify the device for logout.");
+      return;
+    }
+    const token = getStoredAccessToken();
+    if (!token) {
+      setNotMeError("Session expired. Please sign in again.");
+      return;
+    }
+
+    setNotMeSubmitting(true);
+    setNotMeError(null);
+    try {
+      await logoutLoginDevice({
+        token,
+        deviceIdHash: loginAlertItem.deviceIdHash,
+      });
+      showToast("Device signed out");
+      setNotMeOpen(false);
+      setLoginAlertItem(null);
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Unable to log out the device.";
+      setNotMeError(message);
+    } finally {
+      setNotMeSubmitting(false);
+    }
   };
 
   return (
@@ -799,19 +911,95 @@ export default function NotificationsOverlay(props: {
                 <span>
                   {loginAlertItem.location?.trim()
                     ? loginAlertItem.location
-                    : "Ho Chi Minh, Vietnam"}
+                    : "Unknown location"}
                 </span>
               </div>
               <div className={styles.detailRow}>
                 <span>Time</span>
                 <span>
-                  {formatRelativeTime(
+                  {formatExactTime(
                     loginAlertItem.loginAt || loginAlertItem.createdAt,
                   )}
                 </span>
               </div>
             </div>
+            <div className={styles.detailActions}>
+              <button
+                type="button"
+                className={styles.detailSecondary}
+                onClick={handleConfirmLogin}
+              >
+                This was me
+              </button>
+              <button
+                type="button"
+                className={styles.detailDanger}
+                onClick={handleNotMe}
+              >
+                This wasn't me
+              </button>
+            </div>
           </div>
+        </div>
+      ) : null}
+      {loginAlertItem && notMeOpen ? (
+        <div
+          className={styles.notMeBackdrop}
+          onClick={() => (notMeSubmitting ? null : setNotMeOpen(false))}
+        >
+          <div
+            className={styles.notMeCard}
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.notMeHeader}>
+              <h3 className={styles.notMeTitle}>Secure your account</h3>
+              <button
+                type="button"
+                className={styles.notMeClose}
+                onClick={() => (notMeSubmitting ? null : setNotMeOpen(false))}
+                aria-label="Close"
+                disabled={notMeSubmitting}
+              >
+                <IconClose />
+              </button>
+            </div>
+            <p className={styles.notMeBody}>
+              If this wasn't you, log out the device and update your password.
+            </p>
+            {notMeError ? (
+              <div className={styles.notMeError}>{notMeError}</div>
+            ) : null}
+            <div className={styles.notMeActions}>
+              <button
+                type="button"
+                className={styles.notMeSecondary}
+                onClick={handleLogoutSuspiciousDevice}
+                disabled={notMeSubmitting}
+              >
+                {notMeSubmitting ? "Logging out..." : "Logout this device"}
+              </button>
+              <button
+                type="button"
+                className={styles.notMePrimary}
+                onClick={() => {
+                  setNotMeOpen(false);
+                  setLoginAlertItem(null);
+                  showToast("Opening password settings");
+                  router.push("/settings?section=privacy&changePassword=1");
+                }}
+                disabled={notMeSubmitting}
+              >
+                Change your password
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {toastMessage ? (
+        <div className={styles.toast} role="status" aria-live="polite">
+          {toastMessage}
         </div>
       ) : null}
       {muteModalOpen && muteTarget ? (

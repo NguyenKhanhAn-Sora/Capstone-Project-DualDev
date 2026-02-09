@@ -26,6 +26,7 @@ import { DirectMessagesModule } from './direct-messages/direct-messages.module';
 import { PollsModule } from './polls/polls.module';
 import { LivekitModule } from './livekit/livekit.module';
 import { ActivityModule } from './activity/activity.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { ActivityModule } from './activity/activity.module';
     PollsModule,
     LivekitModule,
     ActivityModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

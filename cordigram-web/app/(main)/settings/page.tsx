@@ -18,6 +18,7 @@ import {
   requestPasskeyOtp,
   verifyPasskeyOtp,
   confirmPasskey,
+  togglePasskey,
   fetchCurrentProfile,
   fetchProfileDetail,
   updateMyProfile,
@@ -47,7 +48,7 @@ import {
   type ApiError,
 } from "@/lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { decodeJwt, setStoredAccessToken } from "@/lib/auth";
 import ProfileEditOverlay from "@/ui/profile-edit-overlay/profile-edit-overlay";
 import { useTheme } from "@/component/theme-provider";
@@ -348,6 +349,7 @@ const ActivityIcon = ({ type }: { type: ActivityType }) => {
 export default function SettingsPage() {
   const canRender = useRequireAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
   const tSystem = useTranslations("settings.system");
@@ -413,6 +415,11 @@ export default function SettingsPage() {
   const [hasPasskey, setHasPasskey] = useState(false);
   const [passkeyStatusLoading, setPasskeyStatusLoading] = useState(false);
   const [showCurrentPasskey, setShowCurrentPasskey] = useState(false);
+  const [passkeyEnabled, setPasskeyEnabled] = useState(false);
+  const [passkeyToggleSubmitting, setPasskeyToggleSubmitting] = useState(false);
+  const [passkeyToggleError, setPasskeyToggleError] = useState<string | null>(
+    null,
+  );
   const [currentEmail, setCurrentEmail] = useState<string | null>(null);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
@@ -512,6 +519,17 @@ export default function SettingsPage() {
     hidden: false,
     blocked: false,
   });
+
+  useEffect(() => {
+    const section = searchParams.get("section");
+    const changePassword = searchParams.get("changePassword");
+    if (section && SETTINGS_SECTIONS.some((item) => item.key === section)) {
+      setActiveKey(section);
+    }
+    if (section === "privacy" && changePassword === "1") {
+      setShowChangePassword(true);
+    }
+  }, [searchParams]);
   const [notificationSettings, setNotificationSettings] =
     useState<NotificationSettingsResponse | null>(null);
   const [notificationLoading, setNotificationLoading] = useState(false);
@@ -728,9 +746,15 @@ export default function SettingsPage() {
       setPasskeyStatusLoading(true);
       try {
         const res = await fetchPasskeyStatus({ token });
-        if (active) setHasPasskey(res.hasPasskey);
+        if (active) {
+          setHasPasskey(res.hasPasskey);
+          setPasskeyEnabled(res.hasPasskey ? res.enabled : false);
+        }
       } catch (_err) {
-        if (active) setHasPasskey(false);
+        if (active) {
+          setHasPasskey(false);
+          setPasskeyEnabled(false);
+        }
       } finally {
         if (active) setPasskeyStatusLoading(false);
       }
@@ -884,7 +908,7 @@ export default function SettingsPage() {
       {
         key: "like" as const,
         label: "Likes",
-        description: "When someone likes your posts or reels.",
+        description: "When someone likes your posts, reels, or comments.",
       },
       {
         key: "mentions" as const,
@@ -1722,6 +1746,7 @@ export default function SettingsPage() {
         newPasskey: passkeyNew,
       });
       setHasPasskey(true);
+      setPasskeyEnabled(true);
       setPasskeyCurrent(passkeyNew);
       setPasskeyStep("done");
       setPasskeySuccess("Passkey updated successfully.");
@@ -1733,6 +1758,27 @@ export default function SettingsPage() {
       setPasskeyError(apiErr?.message || "Unable to update passkey.");
     } finally {
       setPasskeySubmitting(false);
+    }
+  };
+
+  const handleTogglePasskey = async () => {
+    setPasskeyToggleError(null);
+    if (!token) {
+      setPasskeyToggleError("You need to sign in to continue.");
+      return;
+    }
+    setPasskeyToggleSubmitting(true);
+    try {
+      const res = await togglePasskey({
+        token,
+        enabled: !passkeyEnabled,
+      });
+      setPasskeyEnabled(res.enabled);
+    } catch (err) {
+      const apiErr = err as ApiError | undefined;
+      setPasskeyToggleError(apiErr?.message || "Unable to update passkey.");
+    } finally {
+      setPasskeyToggleSubmitting(false);
     }
   };
 
@@ -2313,6 +2359,10 @@ export default function SettingsPage() {
                           <p className={styles.hint}>
                             We’ll send a 6-digit OTP to the new email.
                           </p>
+                          <p className={styles.hint}>
+                            After this change, your old email will be removed
+                            and you’ll sign in using the new email only.
+                          </p>
                           {error ? (
                             <p className={styles.error}>{error}</p>
                           ) : null}
@@ -2872,22 +2922,50 @@ export default function SettingsPage() {
                       <p className={styles.sectionDesc}>
                         Use a 6-digit passkey for quick verification.
                       </p>
+                      {hasPasskey ? (
+                        <p className={styles.hint}>
+                          {passkeyEnabled
+                            ? "Status: Enabled"
+                            : "Status: Disabled"}
+                        </p>
+                      ) : null}
                     </div>
                     {!showPasskeyFlow ? (
-                      <button
-                        type="button"
-                        className={styles.primary}
-                        onClick={openPasskeyFlow}
-                        disabled={passkeyStatusLoading}
-                      >
-                        {passkeyStatusLoading
-                          ? "Loading..."
-                          : hasPasskey
-                            ? "Change passkey"
-                            : "Set passkey"}
-                      </button>
+                      <div className={styles.rowActions}>
+                        {hasPasskey ? (
+                          <button
+                            type="button"
+                            className={`${styles.secondary} ${styles.secondarySmall}`}
+                            onClick={handleTogglePasskey}
+                            disabled={
+                              passkeyStatusLoading || passkeyToggleSubmitting
+                            }
+                          >
+                            {passkeyToggleSubmitting
+                              ? "Updating..."
+                              : passkeyEnabled
+                                ? "Disable"
+                                : "Enable"}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className={styles.primary}
+                          onClick={openPasskeyFlow}
+                          disabled={passkeyStatusLoading}
+                        >
+                          {passkeyStatusLoading
+                            ? "Loading..."
+                            : hasPasskey
+                              ? "Change passkey"
+                              : "Set passkey"}
+                        </button>
+                      </div>
                     ) : null}
                   </div>
+                  {passkeyToggleError ? (
+                    <p className={styles.error}>{passkeyToggleError}</p>
+                  ) : null}
 
                   {showPasskeyFlow ? (
                     <>

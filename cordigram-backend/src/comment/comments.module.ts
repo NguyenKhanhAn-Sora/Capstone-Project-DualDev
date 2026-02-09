@@ -7,6 +7,7 @@ import { Comment, CommentSchema } from './comment.schema';
 import { CommentLike, CommentLikeSchema } from './comment-like.schema';
 import { Post, PostSchema } from 'src/posts/post.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
+import { Follow, FollowSchema } from '../users/follow.schema';
 import { CommentsController } from './comments.controller';
 import { CommentsService } from './comments.service';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
@@ -26,6 +27,7 @@ import { ActivityModule } from '../activity/activity.module';
       { name: CommentLike.name, schema: CommentLikeSchema },
       { name: Post.name, schema: PostSchema },
       { name: Profile.name, schema: ProfileSchema },
+      { name: Follow.name, schema: FollowSchema },
     ]),
   ],
   controllers: [CommentsController],

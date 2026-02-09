@@ -14,6 +14,8 @@ import {
   fetchCurrentProfile,
   type CurrentProfileResponse,
   fetchNotifications,
+  fetchNotificationSeenAt,
+  updateNotificationSeenAt,
   type NotificationItem,
 } from "@/lib/api";
 import {
@@ -29,8 +31,6 @@ import { getStoredAccessToken } from "@/lib/auth";
 import { useTranslations } from "next-intl";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const NOTIFICATION_SEEN_KEY = "cordigram:notification-seen-at";
-
 const EyeIcon = ({ open }: { open: boolean }) => (
   <svg
     aria-hidden
@@ -50,18 +50,19 @@ const EyeIcon = ({ open }: { open: boolean }) => (
 );
 
 const navItems = [
-  { key: "home", href: "/", icon: IconHome },
-  { key: "search", href: "/search", icon: IconSearch },
-  { key: "message", href: "/messages", icon: IconMessage },
+  { key: "home", href: "/", icon: IconHome, hasAvatar: false },
+  { key: "search", href: "/search", icon: IconSearch, hasAvatar: false },
+  { key: "message", href: "/messages", icon: IconMessage, hasAvatar: false },
   {
     key: "following",
     href: "/following",
     icon: IconFollowing,
+    hasAvatar: false,
   },
-  { key: "explore", href: "/explore", icon: IconCompass },
-  { key: "notification", href: "/notifications", icon: IconBell },
-  { key: "create", href: "/create", icon: IconPlus },
-  { key: "reels", href: "/reels", icon: IconReel },
+  { key: "explore", href: "/explore", icon: IconCompass, hasAvatar: false },
+  { key: "notification", href: "/notifications", icon: IconBell, hasAvatar: false },
+  { key: "create", href: "/create", icon: IconPlus, hasAvatar: false },
+  { key: "reels", href: "/reels", icon: IconReel, hasAvatar: false },
 ];
 
 export default function Sidebar() {
@@ -75,12 +76,7 @@ export default function Sidebar() {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationClosing, setNotificationClosing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [lastSeenAt, setLastSeenAt] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null;
-    const stored = window.localStorage.getItem(NOTIFICATION_SEEN_KEY);
-    const parsed = stored ? Number(stored) : NaN;
-    return Number.isFinite(parsed) ? parsed : null;
-  });
+  const [lastSeenAt, setLastSeenAt] = useState<number | null>(null);
   const [lastSeenReady, setLastSeenReady] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const notificationOpenRef = useRef(false);
@@ -159,8 +155,35 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setLastSeenReady(true);
-  }, []);
+    let active = true;
+    const token = getStoredAccessToken();
+
+    if (!token) {
+      setLastSeenAt(null);
+      setLastSeenReady(true);
+      return;
+    }
+
+    setLastSeenReady(false);
+    fetchNotificationSeenAt({ token })
+      .then((res) => {
+        if (!active) return;
+        const parsed = res.lastSeenAt
+          ? new Date(res.lastSeenAt).getTime()
+          : NaN;
+        setLastSeenAt(Number.isFinite(parsed) ? parsed : null);
+      })
+      .catch(() => {
+        if (active) setLastSeenAt(null);
+      })
+      .finally(() => {
+        if (active) setLastSeenReady(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [profile?.id, profile?.userId]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -356,14 +379,21 @@ export default function Sidebar() {
                   setNotificationClosing(false);
                   const now = Date.now();
                   setLastSeenAt(now);
-                  if (typeof window !== "undefined") {
-                    window.localStorage.setItem(
-                      NOTIFICATION_SEEN_KEY,
-                      String(now),
-                    );
-                  }
                   setUnreadCount(0);
                   setNotificationOpen(true);
+                  const token = getStoredAccessToken();
+                  if (token) {
+                    updateNotificationSeenAt({ token })
+                      .then((res) => {
+                        const parsed = res.lastSeenAt
+                          ? new Date(res.lastSeenAt).getTime()
+                          : NaN;
+                        if (Number.isFinite(parsed)) {
+                          setLastSeenAt(parsed);
+                        }
+                      })
+                      .catch(() => undefined);
+                  }
                 }}
               >
                 <span className={styles.icon}>

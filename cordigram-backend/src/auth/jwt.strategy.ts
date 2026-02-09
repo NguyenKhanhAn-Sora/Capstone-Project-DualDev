@@ -4,16 +4,19 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '../config/config.service';
 import { UsersService } from '../users/users.service';
 import type { Request } from 'express';
+import type { Role } from '../users/user.schema';
 
 export type AuthenticatedUser = {
   userId: string;
   email: string;
+  roles?: Role[];
 };
 
 export type JwtPayload = {
   sub: string;
   email: string;
   type: 'access' | 'signup';
+  roles?: Role[];
   iat?: number;
   exp?: number;
 };
@@ -49,6 +52,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         throw new UnauthorizedException('Device session revoked');
       }
     }
-    return { userId: payload.sub, email: payload.email };
+    return { userId: payload.sub, email: payload.email, roles: payload.roles };
   }
 }

@@ -817,6 +817,43 @@ export class UsersService {
     });
   }
 
+  async ensureAdminUser(params: {
+    email: string;
+    passwordHash?: string | null;
+  }): Promise<User> {
+    const email = params.email.toLowerCase();
+    const existing = await this.findByEmail(email);
+
+    if (!existing) {
+      return this.userModel.create({
+        email,
+        passwordHash: params.passwordHash ?? null,
+        roles: ['admin'],
+        status: 'active',
+        isVerified: true,
+        signupStage: 'completed',
+        passwordChangedAt: params.passwordHash ? new Date() : null,
+      });
+    }
+
+    const roles = Array.from(new Set([...(existing.roles ?? []), 'admin']));
+    const update: Record<string, unknown> = {
+      roles,
+      status: 'active',
+      isVerified: true,
+      signupStage: 'completed',
+    };
+
+    if (params.passwordHash) {
+      update.passwordHash = params.passwordHash;
+      update.passwordChangedAt = new Date();
+    }
+
+    await this.userModel.updateOne({ _id: existing._id }, { $set: update });
+    const refreshed = await this.findById(existing._id.toString());
+    return refreshed ?? existing;
+  }
+
   async setPassword(userId: string, passwordHash: string): Promise<void> {
     await this.userModel
       .updateOne(
@@ -1064,27 +1101,34 @@ export class UsersService {
     return { lastChangedAt };
   }
 
-  async getPasskeyStatus(userId: string): Promise<{ hasPasskey: boolean }> {
+  async getPasskeyStatus(
+    userId: string,
+  ): Promise<{ hasPasskey: boolean; enabled: boolean }> {
     const user = await this.userModel
       .findById(userId)
-      .select('passkey')
+      .select('passkey passkeyEnabled')
       .lean()
       .exec();
-    return { hasPasskey: Boolean(user?.passkey) };
+    const hasPasskey = Boolean(user?.passkey);
+    const enabled = hasPasskey ? user?.passkeyEnabled !== false : false;
+    return { hasPasskey, enabled };
   }
 
   async getDeviceTrustStatus(params: {
     userId: string;
     deviceId?: string;
-  }): Promise<{ trusted: boolean; hasPasskey: boolean }> {
+  }): Promise<{ trusted: boolean; hasPasskey: boolean; enabled: boolean }> {
     const user = await this.userModel
       .findById(params.userId)
-      .select('passkey trustedDevices')
+      .select('passkey passkeyEnabled trustedDevices')
       .lean()
       .exec();
-    const hasPasskey = Boolean(user?.passkey);
+    const enabled = Boolean(user?.passkey)
+      ? user?.passkeyEnabled !== false
+      : false;
+    const hasPasskey = Boolean(user?.passkey) && enabled;
     if (!params.deviceId) {
-      return { trusted: false, hasPasskey };
+      return { trusted: false, hasPasskey, enabled };
     }
     const deviceIdHash = this.hashDeviceId(params.deviceId);
     const now = new Date();
@@ -1106,7 +1150,7 @@ export class UsersService {
         )
         .exec();
     }
-    return { trusted, hasPasskey };
+    return { trusted, hasPasskey, enabled };
   }
 
   async getLoginDevices(params: {
@@ -1554,7 +1598,7 @@ export class UsersService {
 
     const passwordOk = await bcrypt.compare(params.password, user.passwordHash);
     if (!passwordOk) {
-      throw new UnauthorizedException('Password sai');
+      throw new UnauthorizedException('Incorrect password');
     }
 
     const { code, expiresMs } = await this.otpService.requestOtp(user.email);
@@ -1836,6 +1880,7 @@ export class UsersService {
     }
 
     user.passkey = params.newPasskey;
+    user.passkeyEnabled = true;
     user.passkeyChange = null;
     await user.save();
 
@@ -1850,7 +1895,7 @@ export class UsersService {
   }): Promise<{ trusted: boolean }> {
     const user = await this.userModel
       .findById(params.userId)
-      .select('passkey trustedDevices')
+      .select('passkey passkeyEnabled trustedDevices')
       .exec();
 
     if (!user) {
@@ -1859,6 +1904,10 @@ export class UsersService {
 
     if (!user.passkey) {
       throw new BadRequestException('Passkey is not set.');
+    }
+
+    if (user.passkeyEnabled === false) {
+      throw new BadRequestException('Passkey is disabled.');
     }
 
     if (!this.isPasskeyValid(params.passkey)) {
@@ -1892,6 +1941,32 @@ export class UsersService {
     await user.save();
 
     return { trusted: true };
+  }
+
+  async setPasskeyEnabled(params: {
+    userId: string;
+    enabled: boolean;
+  }): Promise<{ enabled: boolean }> {
+    const user = await this.userModel
+      .findById(params.userId)
+      .select('passkey passkeyEnabled trustedDevices')
+      .exec();
+
+    if (!user) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    if (!user.passkey) {
+      throw new BadRequestException('Passkey is not set.');
+    }
+
+    user.passkeyEnabled = params.enabled;
+    if (!params.enabled) {
+      user.trustedDevices = [];
+    }
+    await user.save();
+
+    return { enabled: params.enabled };
   }
 
   async verifyChangeEmailCurrentOtp(params: {

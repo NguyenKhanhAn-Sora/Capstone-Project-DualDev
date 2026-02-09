@@ -138,4 +138,12 @@ export class ConfigService {
   get livekitUrl(): string {
     return this.require('NEXT_PUBLIC_LIVEKIT_URL');
   }
+
+  get adminEmail(): string | null {
+    return process.env.ADMIN_EMAIL?.toLowerCase().trim() ?? null;
+  }
+
+  get adminPassword(): string | null {
+    return process.env.ADMIN_PASSWORD ?? null;
+  }
 }

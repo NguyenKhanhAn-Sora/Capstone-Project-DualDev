@@ -43,6 +43,24 @@ export class NotificationsController {
     return this.notificationsService.getUnreadCount(userId);
   }
 
+  @Get('seen-at')
+  async getSeenAt(@Req() req: Request & { user?: AuthenticatedUser }) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.notificationsService.getLastSeenAt(userId);
+  }
+
+  @Post('seen-at')
+  async updateSeenAt(@Req() req: Request & { user?: AuthenticatedUser }) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.notificationsService.setLastSeenAt(userId);
+  }
+
   @Post('read-all')
   async markAllRead(@Req() req: Request & { user?: AuthenticatedUser }) {
     const userId = req.user?.userId;
