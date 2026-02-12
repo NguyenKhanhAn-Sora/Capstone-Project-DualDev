@@ -512,6 +512,7 @@ export default function MessagesPage() {
   const [serverName, setServerName] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const processedCallsRef = useRef<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [friends, setFriends] = useState<serversApi.Friend[]>([]);
   const [selectedDirectMessageFriend, setSelectedDirectMessageFriend] =
@@ -691,6 +692,10 @@ export default function MessagesPage() {
         incomingCall.callerInfo.displayName,
       );
 
+      // Mark this call as processed
+      processedCallsRef.current.add(incomingCall.from);
+      console.log("✅ [ACCEPT] Marked call as processed");
+
       // Get room name
       const { roomName } = await getDMRoomName(incomingCall.from, token);
       console.log("📞 [ACCEPT] Room name:", roomName);
@@ -710,9 +715,17 @@ export default function MessagesPage() {
 
       // Close popup
       setIncomingCall(null);
+
+      // Clear processed call after 10 seconds to allow new calls from same user
+      setTimeout(() => {
+        processedCallsRef.current.delete(incomingCall.from);
+        console.log("🔄 [CLEANUP] Cleared processed call from", incomingCall.from);
+      }, 10000);
     } catch (error) {
       console.error("❌ [ACCEPT] Failed to accept call:", error);
       setError("Failed to accept call");
+      // Remove from processed on error
+      processedCallsRef.current.delete(incomingCall.from);
     }
   }, [incomingCall, token, currentUserProfile, answerCall]);
 
@@ -724,8 +737,19 @@ export default function MessagesPage() {
       "📞 [REJECT] Rejecting call from:",
       incomingCall.callerInfo.displayName,
     );
+
+    // Mark this call as processed
+    processedCallsRef.current.add(incomingCall.from);
+    console.log("✅ [REJECT] Marked call as processed");
+
     rejectCall(incomingCall.from);
     setIncomingCall(null);
+
+    // Clear processed call after 5 seconds
+    setTimeout(() => {
+      processedCallsRef.current.delete(incomingCall.from);
+      console.log("🔄 [CLEANUP] Cleared processed call from", incomingCall.from);
+    }, 5000);
   }, [incomingCall, rejectCall]);
 
   // ✅ Cancel outgoing call
@@ -770,6 +794,28 @@ export default function MessagesPage() {
 
     // Incoming call notification
     if (callEvent.from && callEvent.callerInfo) {
+      // Create unique call ID
+      const callId = `${callEvent.from}-${callEvent.type}-${Date.now()}`;
+
+      // Check if this call was already processed (accepted/rejected)
+      if (processedCallsRef.current.has(callEvent.from)) {
+        console.log(
+          "📞 [SKIP] Call from",
+          callEvent.callerInfo.displayName,
+          "already processed",
+        );
+        return;
+      }
+
+      // Check if we already have an incoming call from this user
+      if (incomingCall && incomingCall.from === callEvent.from) {
+        console.log(
+          "📞 [SKIP] Already have incoming call from",
+          callEvent.callerInfo.displayName,
+        );
+        return;
+      }
+
       console.log(
         "📞 [INCOMING] Received call from:",
         callEvent.callerInfo.displayName,
@@ -790,7 +836,7 @@ export default function MessagesPage() {
       openCallTab();
       return;
     }
-  }, [callEvent, outgoingCall, openCallTab]);
+  }, [callEvent, outgoingCall, openCallTab, incomingCall]);
 
   // ✅ Handle call-ended event (when caller cancels while receiver has incoming popup)
   useEffect(() => {
@@ -1071,6 +1117,27 @@ export default function MessagesPage() {
     }
   };
 
+  const loadFollowing = async () => {
+    try {
+      const followingList = await serversApi.getFollowing();
+      setFriends(followingList);
+    } catch (err) {
+      console.error("Failed to load following", err);
+      setFriends([]);
+    }
+  };
+
+  const loadAvailableUsers = useCallback(async () => {
+    try {
+      const usersList = await getAvailableUsers({ token });
+      setFriends(usersList);
+    } catch (err) {
+      console.error("Failed to load available users", err);
+      // Fallback to loading following if available users endpoint is not ready
+      loadFollowing();
+    }
+  }, [token]);
+
   // Debug: Log current user profile when it changes
   useEffect(() => {
     if (currentUserProfile) {
@@ -1108,11 +1175,11 @@ export default function MessagesPage() {
         isRead: msg.isRead || false,
         messageType: msg.type || "text",
         giphyId: msg.giphyId || undefined,
-        voiceUrl: msg.voiceUrl || undefined,
-        voiceDuration: msg.voiceDuration || undefined,
+        voiceUrl: msg.voiceUrl ?? undefined,
+        voiceDuration: msg.voiceDuration ?? undefined,
       };
 
-      // ✅ Replace optimistic message with real message from server
+      //  Replace optimistic message with real message from server
       setConversations((prev) => {
         const newMap = new Map(prev);
         const currentMessages = newMap.get(friendId) || [];
@@ -1182,9 +1249,29 @@ export default function MessagesPage() {
         isRead: msg.isRead || false,
         messageType: msg.type || "text",
         giphyId: msg.giphyId || undefined,
-        voiceUrl: msg.voiceUrl || undefined,
-        voiceDuration: msg.voiceDuration || undefined,
+        voiceUrl: msg.voiceUrl ?? undefined,
+        voiceDuration: msg.voiceDuration ?? undefined,
       };
+
+      console.log("📨 [RECEIVE-DEBUG] Created UIMessage:", {
+        id: uiMessage.id,
+        messageType: uiMessage.messageType,
+        voiceUrl: uiMessage.voiceUrl,
+        voiceDuration: uiMessage.voiceDuration,
+        rawMsgType: msg.type,
+        rawVoiceUrl: msg.voiceUrl,
+        rawVoiceDuration: msg.voiceDuration,
+      });
+
+      // ✅ Check if sender is in friends list
+      const isSenderInFriendsList = friends.some((f) => f._id === friendId);
+      if (!isSenderInFriendsList) {
+        console.log(
+          "🔄 [RECEIVE] Sender not in friends list, reloading friends...",
+        );
+        // Reload friends list to include the new conversation partner
+        loadAvailableUsers();
+      }
 
       // ✅ Add incoming message to conversations Map
       setConversations((prev) => {
@@ -1243,7 +1330,13 @@ export default function MessagesPage() {
         });
       }
     }
-  }, [newMessage, selectedDirectMessageFriend, currentUserId]);
+  }, [
+    newMessage,
+    selectedDirectMessageFriend,
+    currentUserId,
+    friends,
+    loadAvailableUsers,
+  ]);
 
   // Load messages when channel changes
   useEffect(() => {
@@ -1335,27 +1428,6 @@ export default function MessagesPage() {
       console.error("Failed to load friends", err);
       // Set empty array if friends API is not available
       setFriends([]);
-    }
-  };
-
-  const loadFollowing = async () => {
-    try {
-      const followingList = await serversApi.getFollowing();
-      setFriends(followingList);
-    } catch (err) {
-      console.error("Failed to load following", err);
-      setFriends([]);
-    }
-  };
-
-  const loadAvailableUsers = async () => {
-    try {
-      const usersList = await getAvailableUsers({ token });
-      setFriends(usersList);
-    } catch (err) {
-      console.error("Failed to load available users", err);
-      // Fallback to loading following if available users endpoint is not ready
-      loadFollowing();
     }
   };
 
@@ -1497,8 +1569,8 @@ export default function MessagesPage() {
         isRead: msg.isRead || false, // Load initial read status
         messageType: msg.type || "text", // Type of message content
         giphyId: msg.giphyId || undefined, // Giphy ID if it's a GIF/sticker
-        voiceUrl: msg.voiceUrl || undefined, // Voice message URL
-        voiceDuration: msg.voiceDuration || undefined, // Voice message duration
+        voiceUrl: msg.voiceUrl ?? undefined, // Voice message URL
+        voiceDuration: msg.voiceDuration ?? undefined, // Voice message duration
       }));
 
       console.log(
@@ -1737,6 +1809,7 @@ export default function MessagesPage() {
   const handleVoiceRecordComplete = async (
     audioBlob: Blob,
     duration: number,
+    metadata?: { mimeType: string; fileExtension: string },
   ) => {
     if (!selectedDirectMessageFriend) return;
 
@@ -1744,33 +1817,38 @@ export default function MessagesPage() {
 
     try {
       console.log("🎤 [VOICE-UPLOAD] Starting upload, duration:", duration);
+      console.log("🎤 [VOICE-UPLOAD] Metadata:", metadata);
       setIsRecordingVoice(false);
       setIsUploadingVoice(true);
 
-      // Upload audio file to Cloudinary
-      // Convert blob to File
-      const audioFile = new File([audioBlob], "voice-message.webm", {
-        type: "audio/webm",
+      // Upload audio file to Cloudinary with correct extension and type
+      const fileName = metadata?.fileExtension 
+        ? `voice-message.${metadata.fileExtension}`
+        : "voice-message.m4a";
+      const mimeType = metadata?.mimeType || "audio/mp4";
+      
+      const audioFile = new File([audioBlob], fileName, {
+        type: mimeType,
       });
-      console.log(
-        "🎤 [VOICE-UPLOAD] Audio file created:",
-        audioFile.size,
-        "bytes",
-      );
+      console.log("🎤 [VOICE-UPLOAD] Audio file created:", {
+        name: audioFile.name,
+        type: audioFile.type,
+        size: audioFile.size,
+      });
 
+      console.log("🎤 [VOICE-UPLOAD] Uploading to Cloudinary...");
       const uploadResponse = await uploadMedia({ token, file: audioFile });
       console.log("🎤 [VOICE-UPLOAD] Upload response:", uploadResponse);
 
-      if (!uploadResponse || !uploadResponse.url) {
+      if (!uploadResponse || (!uploadResponse.secureUrl && !uploadResponse.url)) {
         throw new Error("Failed to upload voice message");
       }
 
-      console.log(
-        "✅ [VOICE-UPLOAD] Upload successful, URL:",
-        uploadResponse.url,
-      );
+      // Prefer secureUrl (https) over url (http) to avoid mixed content issues
+      const voiceUrl = uploadResponse.secureUrl || uploadResponse.url;
+      console.log("✅ [VOICE-UPLOAD] Upload successful, URL:", voiceUrl);
 
-      // Create optimistic message
+      // Create optimistic message with transformed URL
       const optimisticMessage: UIMessage = {
         id: `temp-${Date.now()}-${Math.random()}`,
         text: "Voice message",
@@ -1783,7 +1861,7 @@ export default function MessagesPage() {
         type: "direct",
         isRead: false,
         messageType: "voice",
-        voiceUrl: uploadResponse.url,
+        voiceUrl: voiceUrl,
         voiceDuration: duration,
       };
 
@@ -1811,12 +1889,71 @@ export default function MessagesPage() {
         voiceDuration: duration,
       });
 
-      await sendDirectMessage(friendId, {
+      const response = await sendDirectMessage(friendId, {
         token,
         content: "Voice message",
         type: "voice",
-        voiceUrl: uploadResponse.url,
+        voiceUrl: voiceUrl,
         voiceDuration: duration,
+      });
+
+      console.log("✅ [VOICE-SEND] Response from backend:", response);
+      console.log("🎤 [VOICE-SEND-DEBUG] Response fields:", {
+        _id: response._id,
+        type: response.type,
+        voiceUrl: response.voiceUrl,
+        voiceDuration: response.voiceDuration,
+        content: response.content,
+      });
+
+      // Replace optimistic message with real message from server
+      setConversations((prev) => {
+        const newMap = new Map(prev);
+        const currentMessages = newMap.get(friendId) || [];
+
+        // Find optimistic message
+        const optimisticIndex = currentMessages.findIndex(
+          (m) => m.id === optimisticMessage.id,
+        );
+
+        if (optimisticIndex !== -1) {
+          console.log(
+            "✅ [VOICE-SEND] Replacing optimistic message with server response",
+          );
+
+          const realMessage: UIMessage = {
+            id: response._id,
+            text: response.content,
+            senderId: response.senderId._id,
+            senderEmail: response.senderId.email,
+            senderName: response.senderId.username || response.senderId.email,
+            senderAvatar: response.senderId.avatar,
+            timestamp: new Date(response.createdAt),
+            isFromCurrentUser: true,
+            type: "direct",
+            isRead: response.isRead || false,
+            messageType: response.type || "voice",
+            voiceUrl: response.voiceUrl ?? voiceUrl,
+            voiceDuration: response.voiceDuration ?? duration,
+          };
+
+          console.log("🎤 [VOICE-SEND-DEBUG] Created realMessage:", {
+            id: realMessage.id,
+            messageType: realMessage.messageType,
+            voiceUrl: realMessage.voiceUrl,
+            voiceDuration: realMessage.voiceDuration,
+          });
+
+          const updated = [...currentMessages];
+          updated[optimisticIndex] = realMessage;
+          newMap.set(friendId, updated);
+        } else {
+          console.warn(
+            "⚠️ [VOICE-SEND] Optimistic message not found, adding response",
+          );
+        }
+
+        return newMap;
       });
 
       console.log("✅ [VOICE-SEND] Sent to backend successfully");
@@ -1865,9 +2002,22 @@ export default function MessagesPage() {
     (message: UIMessage) => {
       const { text, messageType, giphyId, voiceUrl, voiceDuration } = message;
 
+      // Debug log for all messages
+      if (messageType === "voice" || voiceUrl) {
+        console.log("🎤 [RENDER-DEBUG] Voice message check:", {
+          messageType,
+          voiceUrl,
+          voiceDuration,
+          hasVoiceUrl: !!voiceUrl,
+          hasVoiceDuration: !!voiceDuration,
+          voiceDurationType: typeof voiceDuration,
+          voiceDurationValue: voiceDuration,
+        });
+      }
+
       // Check if message is Voice Message
-      if (messageType === "voice" && voiceUrl && voiceDuration) {
-        console.log(" [VOICE] Rendering voice message:", {
+      if (messageType === "voice" && voiceUrl && voiceDuration != null) {
+        console.log("✅ [VOICE] Rendering voice message:", {
           voiceUrl,
           voiceDuration,
           messageType,

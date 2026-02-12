@@ -29,35 +29,124 @@ export default function VoiceMessage({
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    console.log("🎤 [VOICE-COMPONENT] useEffect loading audio:", voiceUrl);
-    // Create audio element
-    const audio = new Audio(voiceUrl);
-    audioRef.current = audio;
+    // isCancelled prevents state updates after cleanup (fixes React StrictMode double-mount)
+    let isCancelled = false;
+    let objectUrl: string | null = null;
+    let audio: HTMLAudioElement | null = null;
 
-    audio.addEventListener("loadeddata", () => {
-      setIsLoading(false);
-    });
+    // Reset state on each effect run
+    setError(false);
+    setIsLoading(true);
 
-    audio.addEventListener("error", () => {
+    console.log("🎤 [VOICE] useEffect triggered, URL:", voiceUrl);
+
+    if (!voiceUrl || voiceUrl.trim() === "") {
+      console.error("❌ [VOICE] Empty or invalid voice URL");
       setIsLoading(false);
       setError(true);
-      console.error("Failed to load voice message");
-    });
+      return;
+    }
 
-    audio.addEventListener("ended", () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
+    // Ensure HTTPS for Cloudinary URLs (avoids mixed content blocking)
+    const safeUrl = voiceUrl.startsWith("http://res.cloudinary.com")
+      ? voiceUrl.replace("http://", "https://")
+      : voiceUrl;
+
+    if (safeUrl !== voiceUrl) {
+      console.log("🎤 [VOICE] Upgraded to HTTPS:", safeUrl);
+    }
+
+    const loadAudio = async () => {
+      try {
+        let audioSrc = safeUrl;
+
+        // For Cloudinary URLs, fetch as blob to guarantee correct MIME type
+        if (safeUrl.includes("cloudinary.com")) {
+          console.log("🎤 [VOICE] Fetching Cloudinary audio as blob from:", safeUrl);
+
+          const response = await fetch(safeUrl);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          if (isCancelled) return;
+
+          const blob = await response.blob();
+          console.log("🎤 [VOICE] Blob loaded:", blob.size, "bytes, type:", blob.type);
+
+          if (isCancelled) return;
+
+          // Create object URL from blob - browser gets correct MIME from blob
+          objectUrl = URL.createObjectURL(blob);
+          audioSrc = objectUrl;
+          console.log("🎤 [VOICE] Object URL created from blob");
+        }
+
+        if (isCancelled) return;
+
+        // Create Audio element ONLY after we have the source ready
+        audio = new Audio();
+        audioRef.current = audio;
+
+        // Add event listeners BEFORE setting src
+        audio.addEventListener("loadeddata", () => {
+          if (!isCancelled) {
+            console.log("✅ [VOICE] Audio loaded successfully");
+            setIsLoading(false);
+          }
+        });
+
+        audio.addEventListener("error", () => {
+          // Ignore errors if cancelled or if src is empty (cleanup triggered this)
+          if (isCancelled) return;
+          if (!audio || !audio.src || audio.src === "" || audio.src === window.location.href) {
+            console.log("🎤 [VOICE] Ignoring error on empty src (likely cleanup)");
+            return;
+          }
+          console.error("❌ [VOICE] Audio playback error, code:", audio.error?.code, "msg:", audio.error?.message);
+          setIsLoading(false);
+          setError(true);
+        });
+
+        audio.addEventListener("ended", () => {
+          if (!isCancelled) {
+            setIsPlaying(false);
+            setCurrentTime(0);
+            if (progressIntervalRef.current) {
+              clearInterval(progressIntervalRef.current);
+            }
+          }
+        });
+
+        // Set src and load - src is guaranteed to be valid at this point
+        audio.src = audioSrc;
+        audio.load();
+        console.log("🎤 [VOICE] Audio.src set and load() called");
+      } catch (err) {
+        if (!isCancelled) {
+          console.error("❌ [VOICE] Failed to load audio:", err);
+          setIsLoading(false);
+          setError(true);
+        }
       }
-    });
+    };
+
+    loadAudio();
 
     return () => {
+      isCancelled = true;
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
       }
-      audio.pause();
-      audio.src = "";
+      if (audio) {
+        audio.pause();
+        // Remove src without triggering error (isCancelled = true handles it)
+        audio.removeAttribute("src");
+        audio.load();
+      }
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
     };
   }, [voiceUrl]);
 

@@ -701,7 +701,12 @@ export class PostsService {
   }
 
   private async uploadSingle(authorId: string, file: UploadedFile) {
-    const resourceType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+    // Cloudinary uses 'video' resource type for both video and audio files
+    let resourceType: 'image' | 'video' | 'raw' = 'image';
+    if (file.mimetype.startsWith('video/') || file.mimetype.startsWith('audio/')) {
+      resourceType = 'video';
+    }
+    
     const folder = this.buildUploadFolder(authorId);
 
     const upload = await this.cloudinary.uploadBuffer({

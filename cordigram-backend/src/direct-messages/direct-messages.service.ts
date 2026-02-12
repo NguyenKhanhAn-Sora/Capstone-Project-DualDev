@@ -36,8 +36,8 @@ export class DirectMessagesService {
       content: createDirectMessageDto.content,
       type: createDirectMessageDto.type || 'text',
       giphyId: createDirectMessageDto.giphyId || null,
-      voiceUrl: createDirectMessageDto.voiceUrl || null,
-      voiceDuration: createDirectMessageDto.voiceDuration || null,
+      voiceUrl: createDirectMessageDto.voiceUrl ?? null,
+      voiceDuration: createDirectMessageDto.voiceDuration ?? null,
       attachments: createDirectMessageDto.attachments || [],
     });
 
