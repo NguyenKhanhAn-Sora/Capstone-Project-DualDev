@@ -1,12 +1,35 @@
 "use client";
 
 import React, { useState, useEffect, useRef, memo, useCallback } from "react";
-import dynamic from 'next/dynamic';
+import dynamic from "next/dynamic";
 import styles from "./messages.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { useDirectMessages, type DirectMessage } from "@/hooks/use-direct-messages";
+import {
+  useDirectMessages,
+  type DirectMessage,
+} from "@/hooks/use-direct-messages";
 import * as serversApi from "@/lib/servers-api";
-import { sendDirectMessage, getDirectMessages, getAvailableUsers, fetchCurrentProfile, uploadMedia, uploadMediaBatch, type UploadMediaResponse, createPoll, getPollResults, votePoll, getMyVote, type Poll, type PollResults } from "@/lib/api";
+import {
+  sendDirectMessage,
+  getDirectMessages,
+  getAvailableUsers,
+  fetchCurrentProfile,
+  uploadMedia,
+  uploadMediaBatch,
+  type UploadMediaResponse,
+  createPoll,
+  getPollResults,
+  votePoll,
+  getMyVote,
+  type Poll,
+  type PollResults,
+  fetchDeviceTrustStatus,
+  verifyDeviceTrust,
+  addMessageReaction,
+  pinDirectMessage,
+  reportDirectMessage,
+  deleteDirectMessage,
+} from "@/lib/api";
 import { getLiveKitToken, getDMRoomName } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
 import OutgoingCallPopup from "@/components/OutgoingCallPopup";
@@ -14,14 +37,26 @@ import GiphyPicker from "@/components/GiphyPicker";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import VoiceMessage from "@/components/VoiceMessage";
 import { getGifById, type GiphyGif } from "@/lib/giphy-api";
+import QuickReactionBar from "@/components/QuickReactionBar";
+import EmojiReactionPicker from "@/components/EmojiReactionPicker";
+import MessageReactions from "@/components/MessageReactions";
+import MessageActionsMenu from "@/components/MessageActionsMenu";
+import ReportMessageDialog from "@/components/ReportMessageDialog";
+import ReplyMessagePreview from "@/components/ReplyMessagePreview";
+import DeleteMessageDialog from "@/components/DeleteMessageDialog";
 
 // Dynamic import CallRoom to avoid SSR issues with LiveKit
-const CallRoom = dynamic(() => import('@/components/CallRoom'), { ssr: false });
-
+const CallRoom = dynamic(() => import("@/components/CallRoom"), { ssr: false });
 
 interface BackendServer extends serversApi.Server {
   textChannels?: serversApi.Channel[];
   voiceChannels?: serversApi.Channel[];
+}
+
+interface MessageReaction {
+  emoji: string; 
+  userIds: string[]; 
+  count: number; 
 }
 
 interface UIMessage {
@@ -33,334 +68,531 @@ interface UIMessage {
   senderAvatar?: string;
   timestamp: Date;
   isFromCurrentUser: boolean;
-  type: 'server' | 'direct'; // Thêm field để phân biệt loại chat
+  type: "server" | "direct"; // Thêm field để phân biệt loại chat
   isRead?: boolean; // Trạng thái đã đọc
-  messageType?: 'text' | 'gif' | 'sticker' | 'voice'; // Loại nội dung message
+  messageType?: "text" | "gif" | "sticker" | "voice"; // Loại nội dung message
   giphyId?: string; // ID của GIF/Sticker từ Giphy
   voiceUrl?: string; // URL của voice message
   voiceDuration?: number; // Duration của voice message (seconds)
+  reactions?: MessageReaction[]; // Reactions của message
+  isPinned?: boolean; // Whether the message is pinned
+  replyTo?: string; // ID of the message being replied to
 }
 
 // GiphyMessage component for rendering GIF/Sticker
-const GiphyMessage = memo(({ giphyId, messageType }: { giphyId: string; messageType: 'gif' | 'sticker' }) => {
-  const [gifData, setGifData] = useState<GiphyGif | null>(null);
-  const [loading, setLoading] = useState(true);
+const GiphyMessage = memo(
+  ({
+    giphyId,
+    messageType,
+  }: {
+    giphyId: string;
+    messageType: "gif" | "sticker";
+  }) => {
+    const [gifData, setGifData] = useState<GiphyGif | null>(null);
+    const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    getGifById(giphyId)
-      .then(data => {
-        setGifData(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to load Giphy content:', err);
-        setLoading(false);
-      });
-  }, [giphyId]);
+    useEffect(() => {
+      getGifById(giphyId)
+        .then((data) => {
+          setGifData(data);
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error("Failed to load Giphy content:", err);
+          setLoading(false);
+        });
+    }, [giphyId]);
 
-  if (loading) {
+    if (loading) {
+      return (
+        <div style={{ padding: "12px", color: "#b5bac1", fontSize: "14px" }}>
+          Loading {messageType}...
+        </div>
+      );
+    }
+
+    if (!gifData) {
+      return (
+        <span style={{ color: "#ff6b6b", fontSize: "12px" }}>
+          Unable to load {messageType}
+        </span>
+      );
+    }
+
     return (
-      <div style={{ padding: '12px', color: '#b5bac1', fontSize: '14px' }}>
-        Đang tải {messageType}...
-      </div>
+      <img
+        src={gifData.images.downsized.url}
+        alt={gifData.title}
+        style={{
+          maxWidth: messageType === "sticker" ? "200px" : "300px",
+          maxHeight: messageType === "sticker" ? "200px" : "300px",
+          borderRadius: "8px",
+          display: "block",
+        }}
+        loading="lazy"
+      />
     );
-  }
+  },
+);
 
-  if (!gifData) {
-    return (
-      <span style={{ color: '#ff6b6b', fontSize: '12px' }}>
-        Không thể tải {messageType}
-      </span>
-    );
-  }
+GiphyMessage.displayName = "GiphyMessage";
 
-  return (
-    <img 
-      src={gifData.images.downsized.url}
-      alt={gifData.title}
-      style={{
-        maxWidth: messageType === 'sticker' ? '200px' : '300px',
-        maxHeight: messageType === 'sticker' ? '200px' : '300px',
-        borderRadius: '8px',
-        display: 'block',
-      }}
-      loading="lazy"
-    />
-  );
-});
+const PASSKEY_DEVICE_KEY = "cordigramDeviceId";
 
-GiphyMessage.displayName = 'GiphyMessage';
+const getDeviceId = () => {
+  if (typeof window === "undefined") return "";
+  const existing = window.localStorage.getItem(PASSKEY_DEVICE_KEY);
+  if (existing) return existing;
+  const next =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  window.localStorage.setItem(PASSKEY_DEVICE_KEY, next);
+  return next;
+};
 
 // ✅ Move PollMessage component outside to prevent re-creation on every render
-const PollMessage = memo(({ pollId, token, onError }: { pollId: string; token: string; onError: (msg: string) => void }) => {
-  const [pollData, setPollData] = useState<PollResults | null>(null);
-  const [selectedOptions, setSelectedOptions] = useState<number[]>([]);
-  const [hasVoted, setHasVoted] = useState(false);
-  const [showResults, setShowResults] = useState(false);
+const PollMessage = memo(
+  ({
+    pollId,
+    token,
+    onError,
+  }: {
+    pollId: string;
+    token: string;
+    onError: (msg: string) => void;
+  }) => {
+    const [pollData, setPollData] = useState<PollResults | null>(null);
+    const [selectedOptions, setSelectedOptions] = useState<number[]>([]);
+    const [hasVoted, setHasVoted] = useState(false);
+    const [showResults, setShowResults] = useState(false);
 
-  const loadPoll = useCallback(async () => {
-    try {
-      const [results, myVote] = await Promise.all([
-        getPollResults({ token, pollId }),
-        getMyVote({ token, pollId }),
-      ]);
-      setPollData(results);
-      if (myVote && myVote.length > 0) {
-        setSelectedOptions(myVote);
+    const loadPoll = useCallback(async () => {
+      try {
+        const [results, myVote] = await Promise.all([
+          getPollResults({ token, pollId }),
+          getMyVote({ token, pollId }),
+        ]);
+        setPollData(results);
+        if (myVote && myVote.length > 0) {
+          setSelectedOptions(myVote);
+          setHasVoted(true);
+          setShowResults(true);
+        }
+      } catch (error) {
+        console.error("Failed to load poll:", error);
+      }
+    }, [token, pollId]);
+
+    useEffect(() => {
+      loadPoll();
+    }, [loadPoll]);
+
+    const handleOptionToggle = useCallback(
+      (index: number) => {
+        if (hasVoted || !pollData) return;
+
+        if (pollData.allowMultipleAnswers) {
+          setSelectedOptions((prev) =>
+            prev.includes(index)
+              ? prev.filter((i) => i !== index)
+              : [...prev, index],
+          );
+        } else {
+          setSelectedOptions([index]);
+        }
+      },
+      [hasVoted, pollData],
+    );
+
+    const handleVote = useCallback(async () => {
+      if (!pollData || selectedOptions.length === 0) return;
+
+      try {
+        await votePoll({ token, pollId, optionIndexes: selectedOptions });
         setHasVoted(true);
         setShowResults(true);
+        await loadPoll();
+      } catch (error: any) {
+        onError(error?.message || "Failed to vote");
       }
-    } catch (error) {
-      console.error("Failed to load poll:", error);
+    }, [pollData, selectedOptions, token, pollId, loadPoll, onError]);
+
+    if (!pollData) {
+      return <div className={styles.pollMessage}>Loading poll...</div>;
     }
-  }, [token, pollId]);
 
-  useEffect(() => {
-    loadPoll();
-  }, [loadPoll]);
+    return (
+      <div className={styles.pollMessage}>
+        <div className={styles.pollQuestion}>{pollData.question}</div>
+        <div className={styles.pollSubtitle}>
+          {pollData.allowMultipleAnswers
+            ? "Select one or more answers"
+            : "Select one answer"}
+        </div>
 
-  const handleOptionToggle = useCallback((index: number) => {
-    if (hasVoted || !pollData) return;
-
-    if (pollData.allowMultipleAnswers) {
-      setSelectedOptions((prev) =>
-        prev.includes(index)
-          ? prev.filter((i) => i !== index)
-          : [...prev, index]
-      );
-    } else {
-      setSelectedOptions([index]);
-    }
-  }, [hasVoted, pollData]);
-
-  const handleVote = useCallback(async () => {
-    if (!pollData || selectedOptions.length === 0) return;
-
-    try {
-      await votePoll({ token, pollId, optionIndexes: selectedOptions });
-      setHasVoted(true);
-      setShowResults(true);
-      await loadPoll();
-    } catch (error: any) {
-      onError(error?.message || "Failed to vote");
-    }
-  }, [pollData, selectedOptions, token, pollId, loadPoll, onError]);
-
-  if (!pollData) {
-    return <div className={styles.pollMessage}>Loading poll...</div>;
-  }
-
-  return (
-    <div className={styles.pollMessage}>
-      <div className={styles.pollQuestion}>{pollData.question}</div>
-      <div className={styles.pollSubtitle}>
-        {pollData.allowMultipleAnswers
-          ? "Chọn một hoặc nhiều câu trả lời"
-          : "Chọn một câu trả lời"}
-      </div>
-
-      <div className={styles.pollOptions}>
-        {pollData.options.map((option, index) => (
-          <div key={index} className={styles.pollOptionItem}>
-            {!showResults ? (
-              <>
-                <input
-                  type={pollData.allowMultipleAnswers ? "checkbox" : "radio"}
-                  id={`poll-${pollId}-option-${index}`}
-                  checked={selectedOptions.includes(index)}
-                  onChange={() => handleOptionToggle(index)}
-                  disabled={hasVoted}
-                />
-                <label htmlFor={`poll-${pollId}-option-${index}`}>
-                  {option}
-                </label>
-              </>
-            ) : (
-              <div className={styles.pollResultBar}>
-                <div className={styles.pollResultLabel}>
-                  <span>{option}</span>
-                  <span className={styles.pollResultPercentage}>
-                    {pollData.results[index].percentage}%
-                  </span>
-                </div>
-                <div className={styles.pollResultProgress}>
-                  <div
-                    className={styles.pollResultFill}
-                    style={{ width: `${pollData.results[index].percentage}%` }}
+        <div className={styles.pollOptions}>
+          {pollData.options.map((option, index) => (
+            <div key={index} className={styles.pollOptionItem}>
+              {!showResults ? (
+                <>
+                  <input
+                    type={pollData.allowMultipleAnswers ? "checkbox" : "radio"}
+                    id={`poll-${pollId}-option-${index}`}
+                    checked={selectedOptions.includes(index)}
+                    onChange={() => handleOptionToggle(index)}
+                    disabled={hasVoted}
                   />
+                  <label htmlFor={`poll-${pollId}-option-${index}`}>
+                    {option}
+                  </label>
+                </>
+              ) : (
+                <div className={styles.pollResultBar}>
+                  <div className={styles.pollResultLabel}>
+                    <span>{option}</span>
+                    <span className={styles.pollResultPercentage}>
+                      {pollData.results[index].percentage}%
+                    </span>
+                  </div>
+                  <div className={styles.pollResultProgress}>
+                    <div
+                      className={styles.pollResultFill}
+                      style={{
+                        width: `${pollData.results[index].percentage}%`,
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+              )}
+            </div>
+          ))}
+        </div>
 
-      <div className={styles.pollFooter}>
-        <span className={styles.pollStats}>
-          {pollData.uniqueVoters} phiếu • {pollData.hoursLeft}giờ còn lại
-        </span>
-        <div className={styles.pollActions}>
-          {!showResults && (
-            <button className={styles.pollActionButton} onClick={() => setShowResults(true)}>
-              Hiện kết quả
-            </button>
-          )}
-          {!hasVoted && !showResults && (
-            <button
-              className={`${styles.pollActionButton} ${styles.pollVoteButton}`}
-              onClick={handleVote}
-              disabled={selectedOptions.length === 0}
-            >
-              Bỏ phiếu
-            </button>
-          )}
-          {hasVoted && (
-            <span className={styles.pollVoted}>✓ Đã bỏ phiếu</span>
-          )}
+        <div className={styles.pollFooter}>
+          <span className={styles.pollStats}>
+            {pollData.uniqueVoters} votes • {pollData.hoursLeft} hours left
+          </span>
+          <div className={styles.pollActions}>
+            {!showResults && (
+              <button
+                className={styles.pollActionButton}
+                onClick={() => setShowResults(true)}
+              >
+                Show results
+              </button>
+            )}
+            {!hasVoted && !showResults && (
+              <button
+                className={`${styles.pollActionButton} ${styles.pollVoteButton}`}
+                onClick={handleVote}
+                disabled={selectedOptions.length === 0}
+              >
+                Vote
+              </button>
+            )}
+            {hasVoted && <span className={styles.pollVoted}>✓ Voted</span>}
+          </div>
         </div>
       </div>
-    </div>
-  );
-});
+    );
+  },
+);
 
-PollMessage.displayName = 'PollMessage';
+PollMessage.displayName = "PollMessage";
 
 // Custom comparison function for memo - only re-render if message content or read status changed
 function areMessagesEqual(
-  prevProps: { message: UIMessage; renderMessageContent: (message: UIMessage) => React.ReactNode; onVisible?: (messageId: string, isVisible: boolean) => void },
-  nextProps: { message: UIMessage; renderMessageContent: (message: UIMessage) => React.ReactNode; onVisible?: (messageId: string, isVisible: boolean) => void }
+  prevProps: {
+    message: UIMessage;
+    renderMessageContent: (message: UIMessage) => React.ReactNode;
+    onVisible?: (messageId: string, isVisible: boolean) => void;
+  },
+  nextProps: {
+    message: UIMessage;
+    renderMessageContent: (message: UIMessage) => React.ReactNode;
+    onVisible?: (messageId: string, isVisible: boolean) => void;
+  },
 ) {
   // Re-render if message ID changed (different message)
   if (prevProps.message.id !== nextProps.message.id) return false;
-  
+
   // Re-render if read status changed (THIS IS KEY!)
   if (prevProps.message.isRead !== nextProps.message.isRead) {
-    console.log('🔄 Message read status changed, re-rendering:', nextProps.message.id, 'isRead:', nextProps.message.isRead);
+    console.log(
+      "🔄 Message read status changed, re-rendering:",
+      nextProps.message.id,
+      "isRead:",
+      nextProps.message.isRead,
+    );
     return false;
   }
-  
+
   // Re-render if text content changed
   if (prevProps.message.text !== nextProps.message.text) return false;
-  
+
   // Re-render if messageType or giphyId changed
-  if (prevProps.message.messageType !== nextProps.message.messageType) return false;
+  if (prevProps.message.messageType !== nextProps.message.messageType)
+    return false;
   if (prevProps.message.giphyId !== nextProps.message.giphyId) return false;
-  
+
   // Don't re-render if only timestamp changed
   return true;
 }
 
 // ✅ Memoized MessageItem component with Intersection Observer for read receipts
-const MessageItem = memo(({ 
-  message, 
-  renderMessageContent,
-  onVisible 
-}: { 
-  message: UIMessage; 
-  renderMessageContent: (message: UIMessage) => React.ReactNode;
-  onVisible?: (messageId: string, isVisible: boolean) => void;
-}) => {
-  const messageRef = useRef<HTMLDivElement>(null);
+const MessageItem = memo(
+  ({
+    message,
+    renderMessageContent,
+    onVisible,
+    currentUserId,
+    onReaction,
+    onReply,
+    onPin,
+    onReport,
+    onDelete,
+  }: {
+    message: UIMessage;
+    renderMessageContent: (message: UIMessage) => React.ReactNode;
+    onVisible?: (messageId: string, isVisible: boolean) => void;
+    currentUserId?: string;
+    onReaction?: (messageId: string, emoji: string) => void;
+    onReply?: (message: UIMessage) => void;
+    onPin?: (messageId: string) => void;
+    onReport?: (messageId: string) => void;
+    onDelete?: (messageId: string) => void;
+  }) => {
+    const messageRef = useRef<HTMLDivElement>(null);
+    const [isHovered, setIsHovered] = useState(false);
+    const [showQuickReactions, setShowQuickReactions] = useState(false);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [showActionsMenu, setShowActionsMenu] = useState(false);
 
-  // ✅ Setup Intersection Observer to detect when message is visible
-  useEffect(() => {
-    if (!messageRef.current || !onVisible || message.isFromCurrentUser || message.isRead) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          // Message is considered visible if at least 50% of it is in viewport
-          const isVisible = entry.isIntersecting && entry.intersectionRatio >= 0.5;
-          if (isVisible) {
-            console.log('📍 Message entered viewport (50%+):', message.id);
-          }
-          onVisible(message.id, isVisible);
-        });
-      },
-      {
-        threshold: [0, 0.5, 1], // Trigger at 0%, 50%, and 100% visibility
-        rootMargin: '0px',
+    // ✅ Setup Intersection Observer to detect when message is visible
+    useEffect(() => {
+      if (
+        !messageRef.current ||
+        !onVisible ||
+        message.isFromCurrentUser ||
+        message.isRead
+      ) {
+        return;
       }
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            // Message is considered visible if at least 50% of it is in viewport
+            const isVisible =
+              entry.isIntersecting && entry.intersectionRatio >= 0.5;
+            if (isVisible) {
+              console.log("📍 Message entered viewport (50%+):", message.id);
+            }
+            onVisible(message.id, isVisible);
+          });
+        },
+        {
+          threshold: [0, 0.5, 1], // Trigger at 0%, 50%, and 100% visibility
+          rootMargin: "0px",
+        },
+      );
+
+      observer.observe(messageRef.current);
+
+      return () => {
+        observer.disconnect();
+      };
+    }, [message.id, message.isFromCurrentUser, message.isRead, onVisible]);
+
+    return (
+      <div
+        ref={messageRef}
+        className={`${styles.messageGroup} ${
+          message.isFromCurrentUser ? styles.sent : styles.received
+        }`}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => {
+          setIsHovered(false);
+          setShowQuickReactions(false);
+        }}
+        style={{ position: "relative" }}
+      >
+        {/* Avatar */}
+        <div className={styles.messageAvatar}>
+          {isValidAvatarUrl(message.senderAvatar) ? (
+            <img
+              src={message.senderAvatar}
+              alt={message.senderName || "User"}
+            />
+          ) : (
+            <div className={styles.avatarPlaceholder}>
+              {(message.senderName || message.senderEmail || "?")
+                .charAt(0)
+                .toUpperCase()}
+            </div>
+          )}
+        </div>
+
+        <div className={styles.messageContent}>
+          {/* Name and timestamp */}
+          <div className={styles.messageHeader}>
+            <span className={styles.messageSenderName}>
+              {message.senderName || message.senderEmail || "Unknown"}
+            </span>
+            <span className={styles.messageTime}>
+              {formatMessageTime(message.timestamp)}
+            </span>
+          </div>
+
+          {/* Message bubble */}
+          <div
+            className={`${styles.messageBubble} ${
+              message.isFromCurrentUser ? styles.sent : styles.received
+            }`}
+          >
+            {renderMessageContent(message)}
+          </div>
+
+          {/* Message Reactions */}
+          {message.reactions && message.reactions.length > 0 && (
+            <MessageReactions
+              reactions={message.reactions}
+              currentUserId={currentUserId || ""}
+              onReactionClick={(emoji) => onReaction?.(message.id, emoji)}
+              onAddClick={() => setShowEmojiPicker(true)}
+            />
+          )}
+
+          {/* ✅ Read receipt indicator - only show for sent messages */}
+          {message.isFromCurrentUser && message.type === "direct" && (
+            <div className={styles.readReceipt}>
+              {message.isRead ? (
+                <div className={styles.readStatus}>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    className={styles.readIcon}
+                  >
+                    {/* Double checkmark for read */}
+                    <path
+                      d="M2 8.5L5.5 12L14 3.5"
+                      stroke="#4a9eff"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M5 8.5L8.5 12L14 6.5"
+                      stroke="#4a9eff"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      opacity="0.6"
+                    />
+                  </svg>
+                  <span className={styles.readText}>Seen</span>
+                </div>
+              ) : (
+                <div className={styles.readStatus}>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    className={styles.unreadIcon}
+                  >
+                    {/* Single checkmark for sent but not read */}
+                    <path
+                      d="M2 8.5L5.5 12L14 3.5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      opacity="0.5"
+                    />
+                  </svg>
+                  <span className={styles.unreadText}>Sent</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Quick Reaction Bar on Hover */}
+        {isHovered && (
+          <QuickReactionBar
+            onReactionSelect={(emoji) => onReaction?.(message.id, emoji)}
+            onMoreClick={() => setShowEmojiPicker(true)}
+            onReplyClick={() => onReply?.(message)}
+            onMenuClick={() => setShowActionsMenu(true)}
+            position={{
+              top: message.isFromCurrentUser ? -45 : -45,
+              right: message.isFromCurrentUser ? 10 : undefined,
+              left: message.isFromCurrentUser ? undefined : 50,
+            }}
+          />
+        )}
+
+        {/* Emoji Reaction Picker */}
+        {showEmojiPicker && (
+          <EmojiReactionPicker
+            onSelect={(emoji) => {
+              onReaction?.(message.id, emoji);
+              setShowEmojiPicker(false);
+            }}
+            onClose={() => setShowEmojiPicker(false)}
+            position={{
+              top: message.isFromCurrentUser ? 50 : 50,
+              right: message.isFromCurrentUser ? 10 : undefined,
+              left: message.isFromCurrentUser ? undefined : 50,
+            }}
+          />
+        )}
+
+        {/* Message Actions Menu */}
+        {showActionsMenu && (
+          <MessageActionsMenu
+            onRemove={
+              message.isFromCurrentUser
+                ? () => {
+                    onDelete?.(message.id);
+                  }
+                : undefined
+            }
+            onPin={() => {
+              onPin?.(message.id);
+              setShowActionsMenu(false);
+            }}
+            onReport={
+              !message.isFromCurrentUser
+                ? () => {
+                    onReport?.(message.id);
+                    setShowActionsMenu(false);
+                  }
+                : undefined
+            }
+            onClose={() => setShowActionsMenu(false)}
+            position={{
+              top: 50,
+              right: message.isFromCurrentUser ? 10 : undefined,
+              left: message.isFromCurrentUser ? undefined : 50,
+            }}
+            isOwnMessage={message.isFromCurrentUser}
+            isPinned={message.isPinned || false}
+          />
+        )}
+      </div>
     );
+  },
+  areMessagesEqual,
+); // ✅ Use custom comparison
 
-    observer.observe(messageRef.current);
+MessageItem.displayName = "MessageItem";
 
-    return () => {
-      observer.disconnect();
-    };
-  }, [message.id, message.isFromCurrentUser, message.isRead, onVisible]);
-
-  return (
-    <div
-      ref={messageRef}
-      className={`${styles.messageGroup} ${
-        message.isFromCurrentUser ? styles.sent : styles.received
-      }`}
-    >
-      {/* Avatar */}
-      <div className={styles.messageAvatar}>
-        {isValidAvatarUrl(message.senderAvatar) ? (
-          <img src={message.senderAvatar} alt={message.senderName || "User"} />
-        ) : (
-          <div className={styles.avatarPlaceholder}>
-            {(message.senderName || message.senderEmail || "?").charAt(0).toUpperCase()}
-          </div>
-        )}
-      </div>
-      
-      <div className={styles.messageContent}>
-        {/* Name and timestamp */}
-        <div className={styles.messageHeader}>
-          <span className={styles.messageSenderName}>
-            {message.senderName || message.senderEmail || "Unknown"}
-          </span>
-          <span className={styles.messageTime}>
-            {formatMessageTime(message.timestamp)}
-          </span>
-        </div>
-        
-        {/* Message bubble */}
-        <div
-          className={`${styles.messageBubble} ${
-            message.isFromCurrentUser ? styles.sent : styles.received
-          }`}
-        >
-          {renderMessageContent(message)}
-        </div>
-
-        {/* ✅ Read receipt indicator - only show for sent messages */}
-        {message.isFromCurrentUser && message.type === 'direct' && (
-          <div className={styles.readReceipt}>
-            {message.isRead ? (
-              <div className={styles.readStatus}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={styles.readIcon}>
-                  {/* Double checkmark for read */}
-                  <path d="M2 8.5L5.5 12L14 3.5" stroke="#4a9eff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M5 8.5L8.5 12L14 6.5" stroke="#4a9eff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.6"/>
-                </svg>
-                <span className={styles.readText}>Đã xem</span>
-              </div>
-            ) : (
-              <div className={styles.readStatus}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={styles.unreadIcon}>
-                  {/* Single checkmark for sent but not read */}
-                  <path d="M2 8.5L5.5 12L14 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"/>
-                </svg>
-                <span className={styles.unreadText}>Đã gửi</span>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}, areMessagesEqual); // ✅ Use custom comparison
-
-MessageItem.displayName = 'MessageItem';
-
-// ✅ Extracted formatTime to avoid re-creating on every render  
+// ✅ Extracted formatTime to avoid re-creating on every render
 function formatMessageTime(date: Date) {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -379,7 +611,7 @@ function formatMessageTime(date: Date) {
 // ✅ Helper function to check if avatar URL is valid
 function isValidAvatarUrl(url: string | undefined): boolean {
   if (!url) return false;
-  return url.startsWith('http://') || url.startsWith('https://');
+  return url.startsWith("http://") || url.startsWith("https://");
 }
 
 export default function MessagesPage() {
@@ -396,34 +628,63 @@ export default function MessagesPage() {
   const [serverName, setServerName] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const processedCallsRef = useRef<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [friends, setFriends] = useState<serversApi.Friend[]>([]);
-  const [selectedDirectMessageFriend, setSelectedDirectMessageFriend] = useState<serversApi.Friend | null>(null);
-  const [conversations, setConversations] = useState<Map<string, UIMessage[]>>(new Map());
+  const [selectedDirectMessageFriend, setSelectedDirectMessageFriend] =
+    useState<serversApi.Friend | null>(null);
+  const [conversations, setConversations] = useState<Map<string, UIMessage[]>>(
+    new Map(),
+  );
   const [loadingDirectMessages, setLoadingDirectMessages] = useState(false);
   const [token, setToken] = useState<string>("");
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
-  
+  const [passkeyRequired, setPasskeyRequired] = useState(false);
+  const [passkeyChecking, setPasskeyChecking] = useState(false);
+  const [deviceId, setDeviceId] = useState("");
+  const [passkeyInput, setPasskeyInput] = useState("");
+  const [passkeyError, setPasskeyError] = useState<string | null>(null);
+  const [passkeySubmitting, setPasskeySubmitting] = useState(false);
+
   // Media picker states
   const [showGiphyPicker, setShowGiphyPicker] = useState(false);
-  const [giphyPickerMode, setGiphyPickerMode] = useState<'gif' | 'sticker'>('gif');
+  const [giphyPickerMode, setGiphyPickerMode] = useState<"gif" | "sticker">(
+    "gif",
+  );
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [gifSearchQuery, setGifSearchQuery] = useState("");
   const [gifs, setGifs] = useState<any[]>([]);
-  
+
   // Voice recording states
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [isUploadingVoice, setIsUploadingVoice] = useState(false);
-  
+
   // Poll states
   const [showCreatePollModal, setShowCreatePollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState(["", ""]);
   const [pollDuration, setPollDuration] = useState(24);
   const [pollAllowMultiple, setPollAllowMultiple] = useState(false);
-  
+
+  // Message reactions and actions states
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  const [showReactionPicker, setShowReactionPicker] = useState<{
+    messageId: string;
+    position: { top?: number; bottom?: number; left?: number; right?: number };
+  } | null>(null);
+  const [showActionsMenu, setShowActionsMenu] = useState<{
+    messageId: string;
+    position: { top?: number; bottom?: number; left?: number; right?: number };
+    isOwnMessage: boolean;
+    isPinned: boolean;
+  } | null>(null);
+  const [showReportDialog, setShowReportDialog] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<UIMessage | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
   // Call states
   const [isInCall, setIsInCall] = useState(false);
   const [callToken, setCallToken] = useState<string>("");
@@ -431,14 +692,14 @@ export default function MessagesPage() {
   const [isAudioOnly, setIsAudioOnly] = useState(false);
   const [incomingCall, setIncomingCall] = useState<{
     from: string;
-    type: 'audio' | 'video';
+    type: "audio" | "video";
     callerInfo: {
       userId: string;
       username: string;
       displayName: string;
       avatar?: string;
     };
-    status?: 'incoming' | 'cancelled'; // ✅ Added status for when caller cancels
+    status?: "incoming" | "cancelled"; // ✅ Added status for when caller cancels
   } | null>(null);
   const [outgoingCall, setOutgoingCall] = useState<{
     to: string;
@@ -447,11 +708,11 @@ export default function MessagesPage() {
       username: string;
       avatarUrl?: string;
     };
-    type: 'audio' | 'video';
-    status: 'calling' | 'rejected' | 'no-answer';
+    type: "audio" | "video";
+    status: "calling" | "rejected" | "no-answer";
     roomName?: string;
   } | null>(null);
-  
+
   // Typing indicator
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isTypingRef = useRef(false); // ✅ Track typing state
@@ -470,10 +731,12 @@ export default function MessagesPage() {
     markAsRead,
     callEvent,
     callEnded, // ✅ Added to handle when caller cancels
+    messageDeleted,
     initiateCall,
     answerCall,
     rejectCall,
     endCall,
+    emitDeleteMessage,
   } = useDirectMessages({
     userId: currentUserId,
     token,
@@ -492,101 +755,150 @@ export default function MessagesPage() {
   }, [selectedDirectMessageFriend, notifyTyping]);
 
   // ✅ Call handlers - Show outgoing popup first
-  const handleStartCall = useCallback(async (isVideo: boolean) => {
-    if (!selectedDirectMessageFriend || !token || !currentUserProfile) {
-      console.error('Cannot start call: missing friend, token, or profile');
-      return;
-    }
+  const handleStartCall = useCallback(
+    async (isVideo: boolean) => {
+      if (!selectedDirectMessageFriend || !token || !currentUserProfile) {
+        console.error("Cannot start call: missing friend, token, or profile");
+        return;
+      }
 
-    try {
-      console.log('📞 [CALL] Starting', isVideo ? 'video' : 'audio', 'call with', selectedDirectMessageFriend.displayName);
-      
-      // Get room name first
-      const { roomName } = await getDMRoomName(selectedDirectMessageFriend._id, token);
-      console.log('📞 [CALL] Room name:', roomName);
-      
-      // Show outgoing call popup
-      setOutgoingCall({
-        to: selectedDirectMessageFriend._id,
-        toUser: {
-          displayName: selectedDirectMessageFriend.displayName || selectedDirectMessageFriend.username,
-          username: selectedDirectMessageFriend.username,
-          avatarUrl: selectedDirectMessageFriend.avatarUrl,
-        },
-        type: isVideo ? 'video' : 'audio',
-        status: 'calling',
-        roomName,
-      });
-      
-      // Notify receiver via socket
-      initiateCall(selectedDirectMessageFriend._id, isVideo ? 'video' : 'audio');
-      console.log('✅ [CALL] Call notification sent, waiting for answer...');
-    } catch (error) {
-      console.error('❌ [CALL] Failed to start call:', error);
-      setError('Failed to start call');
-    }
-  }, [selectedDirectMessageFriend, token, currentUserProfile, initiateCall]);
+      try {
+        console.log(
+          "📞 [CALL] Starting",
+          isVideo ? "video" : "audio",
+          "call with",
+          selectedDirectMessageFriend.displayName,
+        );
+
+        // Get room name first
+        const { roomName } = await getDMRoomName(
+          selectedDirectMessageFriend._id,
+          token,
+        );
+        console.log("📞 [CALL] Room name:", roomName);
+
+        // Show outgoing call popup
+        setOutgoingCall({
+          to: selectedDirectMessageFriend._id,
+          toUser: {
+            displayName:
+              selectedDirectMessageFriend.displayName ||
+              selectedDirectMessageFriend.username,
+            username: selectedDirectMessageFriend.username,
+            avatarUrl: selectedDirectMessageFriend.avatarUrl,
+          },
+          type: isVideo ? "video" : "audio",
+          status: "calling",
+          roomName,
+        });
+
+        // Notify receiver via socket
+        initiateCall(
+          selectedDirectMessageFriend._id,
+          isVideo ? "video" : "audio",
+        );
+        console.log("✅ [CALL] Call notification sent, waiting for answer...");
+      } catch (error) {
+        console.error("❌ [CALL] Failed to start call:", error);
+        setError("Failed to start call");
+      }
+    },
+    [selectedDirectMessageFriend, token, currentUserProfile, initiateCall],
+  );
 
   const handleEndCall = useCallback(() => {
-    console.log('📞 [CALL] Ending call');
+    console.log("📞 [CALL] Ending call");
     setIsInCall(false);
-    setCallToken('');
-    setCallServerUrl('');
+    setCallToken("");
+    setCallServerUrl("");
     setIsAudioOnly(false);
   }, []);
 
   // ✅ Accept incoming call - notify caller and open tabs for both
   const handleAcceptCall = useCallback(async () => {
     if (!incomingCall || !token || !currentUserProfile) {
-      console.error('Cannot accept call: missing data');
+      console.error("Cannot accept call: missing data");
       return;
     }
 
     try {
-      console.log('📞 [ACCEPT] Accepting call from:', incomingCall.callerInfo.displayName);
-      
+      console.log(
+        "📞 [ACCEPT] Accepting call from:",
+        incomingCall.callerInfo.displayName,
+      );
+
+      // Mark this call as processed
+      processedCallsRef.current.add(incomingCall.from);
+      console.log("✅ [ACCEPT] Marked call as processed");
+
       // Get room name
       const { roomName } = await getDMRoomName(incomingCall.from, token);
-      console.log('📞 [ACCEPT] Room name:', roomName);
-      
+      console.log("📞 [ACCEPT] Room name:", roomName);
+
       // Notify caller that call was answered (this will open tab on caller's side)
       answerCall(incomingCall.from, { roomName });
-      console.log('✅ [ACCEPT] Call answer notification sent to caller');
-      
+      console.log("✅ [ACCEPT] Call answer notification sent to caller");
+
       // Open call in new tab for receiver (this user)
-      const participantName = currentUserProfile.username || currentUserProfile.displayName || 'User';
-      const isAudioOnly = incomingCall.type === 'audio';
+      const participantName =
+        currentUserProfile.username || currentUserProfile.displayName || "User";
+      const isAudioOnly = incomingCall.type === "audio";
       const callUrl = `/call?roomName=${encodeURIComponent(roomName)}&participantName=${encodeURIComponent(participantName)}&audioOnly=${isAudioOnly}`;
-      
-      window.open(callUrl, '_blank', 'noopener,noreferrer');
-      console.log('✅ [ACCEPT] Call window opened for receiver (not host)');
-      
+
+      window.open(callUrl, "_blank", "noopener,noreferrer");
+      console.log("✅ [ACCEPT] Call window opened for receiver (not host)");
+
       // Close popup
       setIncomingCall(null);
+
+      // Clear processed call after 10 seconds to allow new calls from same user
+      setTimeout(() => {
+        processedCallsRef.current.delete(incomingCall.from);
+        console.log("🔄 [CLEANUP] Cleared processed call from", incomingCall.from);
+      }, 10000);
     } catch (error) {
-      console.error('❌ [ACCEPT] Failed to accept call:', error);
-      setError('Failed to accept call');
+      console.error("❌ [ACCEPT] Failed to accept call:", error);
+      setError("Failed to accept call");
+      // Remove from processed on error
+      processedCallsRef.current.delete(incomingCall.from);
     }
   }, [incomingCall, token, currentUserProfile, answerCall]);
 
   // ✅ Reject incoming call
   const handleRejectCall = useCallback(() => {
     if (!incomingCall) return;
-    
-    console.log('📞 [REJECT] Rejecting call from:', incomingCall.callerInfo.displayName);
+
+    console.log(
+      "📞 [REJECT] Rejecting call from:",
+      incomingCall.callerInfo.displayName,
+    );
+
+    // Mark this call as processed
+    processedCallsRef.current.add(incomingCall.from);
+    console.log("✅ [REJECT] Marked call as processed");
+
     rejectCall(incomingCall.from);
     setIncomingCall(null);
+
+    // Clear processed call after 5 seconds
+    setTimeout(() => {
+      processedCallsRef.current.delete(incomingCall.from);
+      console.log("🔄 [CLEANUP] Cleared processed call from", incomingCall.from);
+    }, 5000);
   }, [incomingCall, rejectCall]);
 
   // ✅ Cancel outgoing call
   const handleCancelCall = useCallback(() => {
     if (!outgoingCall) return;
-    
-    console.log('📞 [CANCEL] Canceling outgoing call to:', outgoingCall.toUser.displayName);
-    
+
+    console.log(
+      "📞 [CANCEL] Canceling outgoing call to:",
+      outgoingCall.toUser.displayName,
+    );
+
     // Notify receiver that call was cancelled
     endCall(outgoingCall.to);
-    
+
     // Close popup
     setOutgoingCall(null);
   }, [outgoingCall, endCall]);
@@ -596,17 +908,18 @@ export default function MessagesPage() {
     if (!outgoingCall || !currentUserProfile) return;
 
     try {
-      const participantName = currentUserProfile.username || currentUserProfile.displayName || 'User';
-      const isAudioOnly = outgoingCall.type === 'audio';
+      const participantName =
+        currentUserProfile.username || currentUserProfile.displayName || "User";
+      const isAudioOnly = outgoingCall.type === "audio";
       const callUrl = `/call?roomName=${encodeURIComponent(outgoingCall.roomName!)}&participantName=${encodeURIComponent(participantName)}&audioOnly=${isAudioOnly}`;
-      
-      window.open(callUrl, '_blank', 'noopener,noreferrer');
-      console.log('✅ [CALLER] Call window opened after acceptance (as host)');
-      
+
+      window.open(callUrl, "_blank", "noopener,noreferrer");
+      console.log("✅ [CALLER] Call window opened after acceptance (as host)");
+
       // Close outgoing popup
       setOutgoingCall(null);
     } catch (error) {
-      console.error('❌ [CALLER] Failed to open call window:', error);
+      console.error("❌ [CALLER] Failed to open call window:", error);
     }
   }, [outgoingCall, currentUserProfile]);
 
@@ -616,45 +929,79 @@ export default function MessagesPage() {
 
     // Incoming call notification
     if (callEvent.from && callEvent.callerInfo) {
-      console.log('📞 [INCOMING] Received call from:', callEvent.callerInfo.displayName);
-      console.log('📞 [INCOMING-DEBUG] CallerInfo data:', callEvent.callerInfo);
+      // Create unique call ID
+      const callId = `${callEvent.from}-${callEvent.type}-${Date.now()}`;
+
+      // Check if this call was already processed (accepted/rejected)
+      if (processedCallsRef.current.has(callEvent.from)) {
+        console.log(
+          "📞 [SKIP] Call from",
+          callEvent.callerInfo.displayName,
+          "already processed",
+        );
+        return;
+      }
+
+      // Check if we already have an incoming call from this user
+      if (incomingCall && incomingCall.from === callEvent.from) {
+        console.log(
+          "📞 [SKIP] Already have incoming call from",
+          callEvent.callerInfo.displayName,
+        );
+        return;
+      }
+
+      console.log(
+        "📞 [INCOMING] Received call from:",
+        callEvent.callerInfo.displayName,
+      );
+      console.log("📞 [INCOMING-DEBUG] CallerInfo data:", callEvent.callerInfo);
       setIncomingCall({
         from: callEvent.from,
-        type: callEvent.type || 'audio',
+        type: callEvent.type || "audio",
         callerInfo: callEvent.callerInfo,
-        status: 'incoming',
+        status: "incoming",
       });
       return;
     }
 
     // Call answered - open tab for caller
     if (callEvent.sdpOffer && outgoingCall) {
-      console.log('📞 [ANSWER] Call was answered, opening call window...');
+      console.log("📞 [ANSWER] Call was answered, opening call window...");
       openCallTab();
       return;
     }
-  }, [callEvent, outgoingCall, openCallTab]);
+  }, [callEvent, outgoingCall, openCallTab, incomingCall]);
 
   // ✅ Handle call-ended event (when caller cancels while receiver has incoming popup)
   useEffect(() => {
     if (!callEnded) return;
 
-    console.log('📞 [CALL-ENDED] Received call-ended event from:', callEnded.from);
+    console.log(
+      "📞 [CALL-ENDED] Received call-ended event from:",
+      callEnded.from,
+    );
 
     // If receiver has incoming call popup open, update it to show "cancelled"
     // ✅ Use callback to avoid dependency on incomingCall state
-    setIncomingCall(prev => {
+    setIncomingCall((prev) => {
       if (prev && prev.from === callEnded.from) {
-        console.log('📞 [CALL-ENDED] Updating incoming call to cancelled status');
-        return { ...prev, status: 'cancelled' };
+        console.log(
+          "📞 [CALL-ENDED] Updating incoming call to cancelled status",
+        );
+        return { ...prev, status: "cancelled" };
       }
       return prev;
     });
-    
+
     // Auto-close after 3 seconds if call was cancelled
     const timer = setTimeout(() => {
-      setIncomingCall(prev => {
-        if (prev && prev.from === callEnded.from && prev.status === 'cancelled') {
+      setIncomingCall((prev) => {
+        if (
+          prev &&
+          prev.from === callEnded.from &&
+          prev.status === "cancelled"
+        ) {
           return null;
         }
         return prev;
@@ -667,23 +1014,27 @@ export default function MessagesPage() {
   // ✅ Listen for call-rejected event
   useEffect(() => {
     if (!callEvent) return;
-    
+
     // Check if this is a call-rejected event
-    if (callEvent.type === undefined && callEvent.sdpOffer === undefined && callEvent.callerInfo === undefined) {
-      console.log('📞 [REJECTED] Call was rejected');
-      
+    if (
+      callEvent.type === undefined &&
+      callEvent.sdpOffer === undefined &&
+      callEvent.callerInfo === undefined
+    ) {
+      console.log("📞 [REJECTED] Call was rejected");
+
       // ✅ Use callback to avoid dependency on outgoingCall state
-      setOutgoingCall(prev => {
-        if (prev && prev.status !== 'rejected') {
-          return { ...prev, status: 'rejected' };
+      setOutgoingCall((prev) => {
+        if (prev && prev.status !== "rejected") {
+          return { ...prev, status: "rejected" };
         }
         return prev;
       });
-      
+
       // Auto-close popup after 3 seconds
       const timer = setTimeout(() => {
-        setOutgoingCall(prev => {
-          if (prev && prev.status === 'rejected') {
+        setOutgoingCall((prev) => {
+          if (prev && prev.status === "rejected") {
             return null;
           }
           return prev;
@@ -696,20 +1047,33 @@ export default function MessagesPage() {
 
   // ✅ Handle messages read event - update UI when messages are read
   useEffect(() => {
-    if (messagesRead && messagesRead.messageIds && messagesRead.messageIds.length > 0) {
-      console.log('📖 [FRONTEND] Messages marked as read by:', messagesRead.byUserId);
-      console.log('📖 [FRONTEND] Message IDs to update:', messagesRead.messageIds);
-      
+    if (
+      messagesRead &&
+      messagesRead.messageIds &&
+      messagesRead.messageIds.length > 0
+    ) {
+      console.log(
+        "📖 [FRONTEND] Messages marked as read by:",
+        messagesRead.byUserId,
+      );
+      console.log(
+        "📖 [FRONTEND] Message IDs to update:",
+        messagesRead.messageIds,
+      );
+
       // ✅ ONLY update conversations Map (used for DM rendering)
       // This prevents duplicate key errors by maintaining a single source of truth
-      setConversations(prev => {
+      setConversations((prev) => {
         const newMap = new Map(prev);
         let updateCount = 0;
-        
+
         newMap.forEach((msgs, friendId) => {
-          const updated = msgs.map(msg => {
+          const updated = msgs.map((msg) => {
             if (messagesRead.messageIds.includes(msg.id)) {
-              console.log('✅ [FRONTEND] Updating message to isRead=true:', msg.id);
+              console.log(
+                "✅ [FRONTEND] Updating message to isRead=true:",
+                msg.id,
+              );
               updateCount++;
               return { ...msg, isRead: true };
             }
@@ -717,8 +1081,10 @@ export default function MessagesPage() {
           });
           newMap.set(friendId, updated);
         });
-        
-        console.log(`📊 [FRONTEND] Updated ${updateCount} messages across ${newMap.size} conversations`);
+
+        console.log(
+          `📊 [FRONTEND] Updated ${updateCount} messages across ${newMap.size} conversations`,
+        );
         return newMap;
       });
     }
@@ -729,70 +1095,83 @@ export default function MessagesPage() {
   const markAsReadTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // ✅ Intersection Observer callback to detect visible messages
-  const handleMessageVisible = useCallback((messageId: string, isVisible: boolean) => {
-    if (!selectedDirectMessageFriend || !markAsRead) return;
+  const handleMessageVisible = useCallback(
+    (messageId: string, isVisible: boolean) => {
+      if (!selectedDirectMessageFriend || !markAsRead) return;
 
-    // Check message in conversations (since we're using that for DM rendering)
-    const conversationMessages = conversations.get(selectedDirectMessageFriend._id) || [];
-    const message = conversationMessages.find(m => m.id === messageId);
-    
-    if (!message || message.isFromCurrentUser || message.isRead) {
-      // Skip if already marked or if it's our own message
-      return;
-    }
+      // Check message in conversations (since we're using that for DM rendering)
+      const conversationMessages =
+        conversations.get(selectedDirectMessageFriend._id) || [];
+      const message = conversationMessages.find((m) => m.id === messageId);
 
-    if (isVisible) {
-      // Message is visible - start timer to mark as read after 2 seconds
-      if (!markAsReadTimersRef.current.has(messageId)) {
-        console.log('👁️ Message visible, starting 2s timer:', messageId);
-        
-        const timer = setTimeout(() => {
-          console.log('✅ Timer complete! Marking message as read:', messageId);
-          console.log('📤 Sending mark-as-read event to:', selectedDirectMessageFriend._id);
-          
-          // Mark as read via WebSocket
-          markAsRead([messageId], selectedDirectMessageFriend._id);
-          
-          // ✅ OPTIMISTIC UPDATE: Only update the conversations Map (used for DM rendering)
-          // Don't update messages array to avoid duplicate renders
-          setConversations(prev => {
-            const newMap = new Map(prev);
-            const msgs = newMap.get(selectedDirectMessageFriend._id) || [];
-            newMap.set(
-              selectedDirectMessageFriend._id,
-              msgs.map(m => m.id === messageId ? { ...m, isRead: true } : m)
+      if (!message || message.isFromCurrentUser || message.isRead) {
+        // Skip if already marked or if it's our own message
+        return;
+      }
+
+      if (isVisible) {
+        // Message is visible - start timer to mark as read after 2 seconds
+        if (!markAsReadTimersRef.current.has(messageId)) {
+          console.log("👁️ Message visible, starting 2s timer:", messageId);
+
+          const timer = setTimeout(() => {
+            console.log(
+              "✅ Timer complete! Marking message as read:",
+              messageId,
             );
-            return newMap;
-          });
-          
-          visibleMessagesRef.current.add(messageId);
+            console.log(
+              "📤 Sending mark-as-read event to:",
+              selectedDirectMessageFriend._id,
+            );
+
+            // Mark as read via WebSocket
+            markAsRead([messageId], selectedDirectMessageFriend._id);
+
+            // ✅ OPTIMISTIC UPDATE: Only update the conversations Map (used for DM rendering)
+            // Don't update messages array to avoid duplicate renders
+            setConversations((prev) => {
+              const newMap = new Map(prev);
+              const msgs = newMap.get(selectedDirectMessageFriend._id) || [];
+              newMap.set(
+                selectedDirectMessageFriend._id,
+                msgs.map((m) =>
+                  m.id === messageId ? { ...m, isRead: true } : m,
+                ),
+              );
+              return newMap;
+            });
+
+            visibleMessagesRef.current.add(messageId);
+            markAsReadTimersRef.current.delete(messageId);
+          }, 2000); // 2 seconds of visibility required
+
+          markAsReadTimersRef.current.set(messageId, timer);
+        }
+      } else {
+        // Message is no longer visible - cancel timer
+        const timer = markAsReadTimersRef.current.get(messageId);
+        if (timer) {
+          console.log("👁️ Message hidden, canceling timer:", messageId);
+          clearTimeout(timer);
           markAsReadTimersRef.current.delete(messageId);
-        }, 2000); // 2 seconds of visibility required
-        
-        markAsReadTimersRef.current.set(messageId, timer);
+        }
       }
-    } else {
-      // Message is no longer visible - cancel timer
-      const timer = markAsReadTimersRef.current.get(messageId);
-      if (timer) {
-        console.log('👁️ Message hidden, canceling timer:', messageId);
-        clearTimeout(timer);
-        markAsReadTimersRef.current.delete(messageId);
-      }
-    }
-  }, [selectedDirectMessageFriend, conversations, markAsRead]);
+    },
+    [selectedDirectMessageFriend, conversations, markAsRead],
+  );
 
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
-      markAsReadTimersRef.current.forEach(timer => clearTimeout(timer));
+      markAsReadTimersRef.current.forEach((timer) => clearTimeout(timer));
       markAsReadTimersRef.current.clear();
     };
   }, []);
 
   // Load servers on mount
   useEffect(() => {
-    const authToken = localStorage.getItem("accessToken") || localStorage.getItem("token");
+    const authToken =
+      localStorage.getItem("accessToken") || localStorage.getItem("token");
     if (authToken) {
       setToken(authToken);
       try {
@@ -814,6 +1193,55 @@ export default function MessagesPage() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!token) return;
+    const id = getDeviceId();
+    setDeviceId(id);
+    setPasskeyChecking(true);
+    fetchDeviceTrustStatus({ token, deviceId: id })
+      .then((res) => {
+        if (res.hasPasskey && !res.trusted) {
+          setPasskeyRequired(true);
+        } else {
+          setPasskeyRequired(false);
+        }
+      })
+      .catch(() => {
+        setPasskeyRequired(false);
+      })
+      .finally(() => setPasskeyChecking(false));
+  }, [token]);
+
+  const handleVerifyPasskeyGate = async () => {
+    setPasskeyError(null);
+    if (!passkeyInput.trim()) {
+      setPasskeyError("Please enter your 6-digit passkey.");
+      return;
+    }
+    if (!/^\d{6}$/.test(passkeyInput)) {
+      setPasskeyError("Passkey must be exactly 6 digits.");
+      return;
+    }
+    if (!token || !deviceId) {
+      setPasskeyError("Session expired. Please sign in again.");
+      return;
+    }
+    setPasskeySubmitting(true);
+    try {
+      await verifyDeviceTrust({ token, deviceId, passkey: passkeyInput });
+      setPasskeyRequired(false);
+      setPasskeyInput("");
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Unable to verify passkey.";
+      setPasskeyError(message || "Unable to verify passkey.");
+    } finally {
+      setPasskeySubmitting(false);
+    }
+  };
+
   const loadCurrentUserProfile = async (token: string) => {
     try {
       const profile = await fetchCurrentProfile({ token });
@@ -823,6 +1251,27 @@ export default function MessagesPage() {
       console.error("❌ Failed to load current user profile", err);
     }
   };
+
+  const loadFollowing = async () => {
+    try {
+      const followingList = await serversApi.getFollowing();
+      setFriends(followingList);
+    } catch (err) {
+      console.error("Failed to load following", err);
+      setFriends([]);
+    }
+  };
+
+  const loadAvailableUsers = useCallback(async () => {
+    try {
+      const usersList = await getAvailableUsers({ token });
+      setFriends(usersList);
+    } catch (err) {
+      console.error("Failed to load available users", err);
+      // Fallback to loading following if available users endpoint is not ready
+      loadFollowing();
+    }
+  }, [token]);
 
   // Debug: Log current user profile when it changes
   useEffect(() => {
@@ -842,12 +1291,12 @@ export default function MessagesPage() {
   // ✅ Handle message-sent event (sender confirmation)
   useEffect(() => {
     if (messageSent) {
-      console.log('📤 [SENT] Message sent confirmation received:', messageSent);
+      console.log("📤 [SENT] Message sent confirmation received:", messageSent);
       const msg = messageSent as any;
       const friendId = msg.receiverId._id; // For sent messages, friend is always the receiver
-      console.log('📤 [SENT] Friend ID:', friendId);
-      console.log('📤 [SENT] Current user ID:', currentUserId);
-      
+      console.log("📤 [SENT] Friend ID:", friendId);
+      console.log("📤 [SENT] Current user ID:", currentUserId);
+
       const uiMessage: UIMessage = {
         id: msg._id,
         text: msg.content,
@@ -857,39 +1306,45 @@ export default function MessagesPage() {
         senderAvatar: msg.senderId.avatar,
         timestamp: new Date(msg.createdAt),
         isFromCurrentUser: true, // Always true for sent messages
-        type: 'direct',
+        type: "direct",
         isRead: msg.isRead || false,
-        messageType: msg.type || 'text',
+        messageType: msg.type || "text",
         giphyId: msg.giphyId || undefined,
-        voiceUrl: msg.voiceUrl || undefined,
-        voiceDuration: msg.voiceDuration || undefined,
+        voiceUrl: msg.voiceUrl ?? undefined,
+        voiceDuration: msg.voiceDuration ?? undefined,
       };
-      
-      // ✅ Replace optimistic message with real message from server
+
+      //  Replace optimistic message with real message from server
       setConversations((prev) => {
         const newMap = new Map(prev);
         const currentMessages = newMap.get(friendId) || [];
-        console.log('📤 [SENT] Current messages count for friend:', currentMessages.length);
-        
+        console.log(
+          "📤 [SENT] Current messages count for friend:",
+          currentMessages.length,
+        );
+
         // Find and replace temporary message
         const existingIndex = currentMessages.findIndex(
-          m => m.id.startsWith('temp-') && m.text === msg.content
+          (m) => m.id.startsWith("temp-") && m.text === msg.content,
         );
-        
+
         if (existingIndex !== -1) {
-          console.log('✅ [SENT] Replacing optimistic message at index:', existingIndex);
+          console.log(
+            "✅ [SENT] Replacing optimistic message at index:",
+            existingIndex,
+          );
           const updated = [...currentMessages];
           updated[existingIndex] = uiMessage;
           newMap.set(friendId, updated);
-          console.log('✅ [SENT] Updated messages count:', updated.length);
+          console.log("✅ [SENT] Updated messages count:", updated.length);
         } else {
           // Fallback: add if not found (shouldn't happen)
-          console.warn('⚠️ [SENT] Optimistic message not found, adding anyway');
+          console.warn("⚠️ [SENT] Optimistic message not found, adding anyway");
           const updated = [...currentMessages, uiMessage];
           newMap.set(friendId, updated);
-          console.log('⚠️ [SENT] Added message, new count:', updated.length);
+          console.log("⚠️ [SENT] Added message, new count:", updated.length);
         }
-        
+
         return newMap;
       });
     }
@@ -898,15 +1353,24 @@ export default function MessagesPage() {
   // ✅ Handle new-message event (incoming messages from others)
   useEffect(() => {
     if (newMessage) {
-      console.log('📨 [RECEIVE] New incoming message received:', newMessage);
+      console.log("📨 [RECEIVE] New incoming message received:", newMessage);
       const msg = newMessage.message as any;
       const friendId = msg.senderId._id; // For incoming messages, friend is always the sender
-      console.log('📨 [RECEIVE] Friend ID (sender):', friendId);
-      console.log('📨 [RECEIVE] Current user ID:', currentUserId);
-      console.log('📨 [RECEIVE] Message from current user?', msg.senderId._id === currentUserId);
-      console.log('📨 [RECEIVE] Currently viewing friend?', selectedDirectMessageFriend?._id);
-      console.log('📨 [RECEIVE] Is viewing this conversation?', selectedDirectMessageFriend?._id === friendId);
-      
+      console.log("📨 [RECEIVE] Friend ID (sender):", friendId);
+      console.log("📨 [RECEIVE] Current user ID:", currentUserId);
+      console.log(
+        "📨 [RECEIVE] Message from current user?",
+        msg.senderId._id === currentUserId,
+      );
+      console.log(
+        "📨 [RECEIVE] Currently viewing friend?",
+        selectedDirectMessageFriend?._id,
+      );
+      console.log(
+        "📨 [RECEIVE] Is viewing this conversation?",
+        selectedDirectMessageFriend?._id === friendId,
+      );
+
       const uiMessage: UIMessage = {
         id: msg._id,
         text: msg.content,
@@ -916,57 +1380,126 @@ export default function MessagesPage() {
         senderAvatar: msg.senderId.avatar,
         timestamp: new Date(msg.createdAt),
         isFromCurrentUser: false, // Always false for incoming messages
-        type: 'direct',
+        type: "direct",
         isRead: msg.isRead || false,
-        messageType: msg.type || 'text',
+        messageType: msg.type || "text",
         giphyId: msg.giphyId || undefined,
-        voiceUrl: msg.voiceUrl || undefined,
-        voiceDuration: msg.voiceDuration || undefined,
+        voiceUrl: msg.voiceUrl ?? undefined,
+        voiceDuration: msg.voiceDuration ?? undefined,
       };
-      
+
+      console.log("📨 [RECEIVE-DEBUG] Created UIMessage:", {
+        id: uiMessage.id,
+        messageType: uiMessage.messageType,
+        voiceUrl: uiMessage.voiceUrl,
+        voiceDuration: uiMessage.voiceDuration,
+        rawMsgType: msg.type,
+        rawVoiceUrl: msg.voiceUrl,
+        rawVoiceDuration: msg.voiceDuration,
+      });
+
+      // ✅ Check if sender is in friends list
+      const isSenderInFriendsList = friends.some((f) => f._id === friendId);
+      if (!isSenderInFriendsList) {
+        console.log(
+          "🔄 [RECEIVE] Sender not in friends list, reloading friends...",
+        );
+        // Reload friends list to include the new conversation partner
+        loadAvailableUsers();
+      }
+
       // ✅ Add incoming message to conversations Map
       setConversations((prev) => {
         const newMap = new Map(prev);
         const currentMessages = newMap.get(friendId) || [];
-        console.log('📨 [RECEIVE] Current messages count for friend:', currentMessages.length);
-        console.log('📨 [RECEIVE] All conversations:', Array.from(newMap.keys()));
-        console.log('📨 [RECEIVE] Has conversation for this friend?', prev.has(friendId));
-        
-        // ⚠️ CRITICAL FIX: If we don't have conversation loaded yet, 
+        console.log(
+          "📨 [RECEIVE] Current messages count for friend:",
+          currentMessages.length,
+        );
+        console.log(
+          "📨 [RECEIVE] All conversations:",
+          Array.from(newMap.keys()),
+        );
+        console.log(
+          "📨 [RECEIVE] Has conversation for this friend?",
+          prev.has(friendId),
+        );
+
+        // ⚠️ CRITICAL FIX: If we don't have conversation loaded yet,
         // DON'T create empty conversation! Just add this single message.
         // When user opens the chat, loadDirectMessages will load the full history.
         if (!prev.has(friendId)) {
-          console.log('⚠️ [RECEIVE] Conversation not loaded yet!');
-          console.log('⚠️ [RECEIVE] Adding single message, full history will load when chat opens');
+          console.log("⚠️ [RECEIVE] Conversation not loaded yet!");
+          console.log(
+            "⚠️ [RECEIVE] Adding single message, full history will load when chat opens",
+          );
         }
-        
+
         // Check for duplicates
-        const isDuplicate = currentMessages.some(m => m.id === msg._id);
+        const isDuplicate = currentMessages.some((m) => m.id === msg._id);
         if (!isDuplicate) {
-          console.log('✅ [RECEIVE] Adding new incoming message');
+          console.log("✅ [RECEIVE] Adding new incoming message");
           const updated = [...currentMessages, uiMessage];
           newMap.set(friendId, updated);
-          console.log('✅ [RECEIVE] Updated messages count:', updated.length);
+          console.log("✅ [RECEIVE] Updated messages count:", updated.length);
         } else {
-          console.log('⚠️ [RECEIVE] Duplicate message detected, skipping');
+          console.log("⚠️ [RECEIVE] Duplicate message detected, skipping");
           newMap.set(friendId, currentMessages);
         }
-        
+
         return newMap;
       });
-      
+
       // Auto-scroll to bottom if viewing this conversation (instant for incoming messages)
-      if (selectedDirectMessageFriend && friendId === selectedDirectMessageFriend._id) {
+      if (
+        selectedDirectMessageFriend &&
+        friendId === selectedDirectMessageFriend._id
+      ) {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             if (messagesContainerRef.current) {
-              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+              messagesContainerRef.current.scrollTop =
+                messagesContainerRef.current.scrollHeight;
             }
           });
         });
       }
     }
-  }, [newMessage, selectedDirectMessageFriend, currentUserId]);
+  }, [
+    newMessage,
+    selectedDirectMessageFriend,
+    currentUserId,
+    friends,
+    loadAvailableUsers,
+  ]);
+
+  // ✅ Handle message-deleted event
+  useEffect(() => {
+    if (messageDeleted) {
+      console.log("🗑️ [DELETE] Message deleted event received:", messageDeleted);
+      
+      // Remove message from all conversations
+      setConversations((prev) => {
+        const newMap = new Map(prev);
+        
+        // Iterate through all conversations
+        for (const [friendId, messages] of newMap.entries()) {
+          const updatedMessages = messages.filter(
+            (msg) => msg.id !== messageDeleted.messageId
+          );
+          
+          if (updatedMessages.length !== messages.length) {
+            newMap.set(friendId, updatedMessages);
+            console.log(
+              `🗑️ [DELETE] Removed message from conversation with ${friendId}`
+            );
+          }
+        }
+        
+        return newMap;
+      });
+    }
+  }, [messageDeleted]);
 
   // Load messages when channel changes
   useEffect(() => {
@@ -983,7 +1516,8 @@ export default function MessagesPage() {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            messagesContainerRef.current.scrollTop =
+              messagesContainerRef.current.scrollHeight;
           }
         });
       });
@@ -993,18 +1527,21 @@ export default function MessagesPage() {
   // Auto scroll for DM conversations when they change - INSTANT scroll
   useEffect(() => {
     if (selectedDirectMessageFriend) {
-      const currentMessages = conversations.get(selectedDirectMessageFriend._id);
+      const currentMessages = conversations.get(
+        selectedDirectMessageFriend._id,
+      );
       if (currentMessages && currentMessages.length > 0) {
         // Scroll IMMEDIATELY after render, no animation
         const scrollToBottom = () => {
           if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            messagesContainerRef.current.scrollTop =
+              messagesContainerRef.current.scrollHeight;
           }
         };
-        
+
         // Execute immediately
         scrollToBottom();
-        
+
         // And again after paint to ensure it sticks
         requestAnimationFrame(() => {
           scrollToBottom();
@@ -1018,7 +1555,6 @@ export default function MessagesPage() {
     try {
       setLoading(true);
       const serversList = await serversApi.getMyServers();
-      
       // Organize channels by type for each server
       const serversWithChannels: BackendServer[] = await Promise.all(
         serversList.map(async (server) => {
@@ -1030,7 +1566,7 @@ export default function MessagesPage() {
             textChannels,
             voiceChannels,
           };
-        })
+        }),
       );
 
       setServers(serversWithChannels);
@@ -1057,32 +1593,10 @@ export default function MessagesPage() {
     }
   };
 
-  const loadFollowing = async () => {
-    try {
-      const followingList = await serversApi.getFollowing();
-      setFriends(followingList);
-    } catch (err) {
-      console.error("Failed to load following", err);
-      setFriends([]);
-    }
-  };
-
-  const loadAvailableUsers = async () => {
-    try {
-      const usersList = await getAvailableUsers({ token });
-      setFriends(usersList);
-    } catch (err) {
-      console.error("Failed to load available users", err);
-      // Fallback to loading following if available users endpoint is not ready
-      loadFollowing();
-    }
-  };
-
   const loadChannels = async (serverId: string) => {
     try {
       const channels = await serversApi.getChannels(serverId, "text");
       setTextChannels(channels);
-      
       // Auto-select first text channel
       if (channels.length > 0) {
         setSelectedChannel(channels[0]._id);
@@ -1096,18 +1610,27 @@ export default function MessagesPage() {
   const loadMessages = async (channelId: string) => {
     try {
       const backendMessages = await serversApi.getMessages(channelId, 50, 0);
-      
+
       const uiMessages: UIMessage[] = backendMessages.map((msg) => ({
         id: msg._id,
         text: msg.content,
-        senderId: typeof msg.senderId === "string" ? msg.senderId : msg.senderId._id,
+        senderId:
+          typeof msg.senderId === "string" ? msg.senderId : msg.senderId._id,
         senderEmail: typeof msg.senderId === "string" ? "" : msg.senderId.email,
-        senderName: typeof msg.senderId === "string" ? "" : ((msg.senderId as any).username || msg.senderId.email),
-        senderAvatar: typeof msg.senderId === "string" ? undefined : (msg.senderId as any).avatar,
+        senderName:
+          typeof msg.senderId === "string"
+            ? ""
+            : (msg.senderId as any).username || msg.senderId.email,
+        senderAvatar:
+          typeof msg.senderId === "string"
+            ? undefined
+            : (msg.senderId as any).avatar,
         timestamp: new Date(msg.createdAt),
-        isFromCurrentUser: 
-          (typeof msg.senderId === "string" ? msg.senderId : msg.senderId._id) === currentUserId,
-        type: 'server', // Phân biệt là message từ server/channel
+        isFromCurrentUser:
+          (typeof msg.senderId === "string"
+            ? msg.senderId
+            : msg.senderId._id) === currentUserId,
+        type: "server", // Phân biệt là message từ server/channel
       }));
 
       setMessages(uiMessages);
@@ -1123,41 +1646,77 @@ export default function MessagesPage() {
   // Track which conversations have been fully loaded from API
   const fullyLoadedConversationsRef = useRef<Set<string>>(new Set());
 
-  const loadDirectMessages = async (friendId: string, forceReload: boolean = false) => {
-    console.log('📥 [LOAD] Loading messages for friend:', friendId, 'forceReload:', forceReload);
-    console.log('📥 [LOAD] Current conversations:', Array.from(conversations.keys()));
-    console.log('📥 [LOAD] Already has conversation?', conversations.has(friendId));
-    console.log('📥 [LOAD] Fully loaded?', fullyLoadedConversationsRef.current.has(friendId));
-    console.log('📥 [LOAD] Currently loading?', loadingConversationsRef.current.has(friendId));
-    
+  const loadDirectMessages = async (
+    friendId: string,
+    forceReload: boolean = false,
+  ) => {
+    console.log(
+      "📥 [LOAD] Loading messages for friend:",
+      friendId,
+      "forceReload:",
+      forceReload,
+    );
+    console.log(
+      "📥 [LOAD] Current conversations:",
+      Array.from(conversations.keys()),
+    );
+    console.log(
+      "📥 [LOAD] Already has conversation?",
+      conversations.has(friendId),
+    );
+    console.log(
+      "📥 [LOAD] Fully loaded?",
+      fullyLoadedConversationsRef.current.has(friendId),
+    );
+    console.log(
+      "📥 [LOAD] Currently loading?",
+      loadingConversationsRef.current.has(friendId),
+    );
+
     // Check if we already have FULLY loaded messages for this conversation
     if (fullyLoadedConversationsRef.current.has(friendId) && !forceReload) {
       const existingMessages = conversations.get(friendId) || [];
-      console.log('📥 [LOAD] Conversation fully loaded from API, message count:', existingMessages.length);
+      console.log(
+        "📥 [LOAD] Conversation fully loaded from API, message count:",
+        existingMessages.length,
+      );
       return; // Already fully loaded from API
     }
 
     // If conversation exists but wasn't fully loaded (e.g., from WebSocket only)
-    if (conversations.has(friendId) && !fullyLoadedConversationsRef.current.has(friendId)) {
+    if (
+      conversations.has(friendId) &&
+      !fullyLoadedConversationsRef.current.has(friendId)
+    ) {
       const existingMessages = conversations.get(friendId) || [];
-      console.log('⚠️ [LOAD] Conversation exists but not fully loaded!');
-      console.log('⚠️ [LOAD] Current message count:', existingMessages.length);
-      console.log('⚠️ [LOAD] This might be from WebSocket only, loading full history from API...');
+      console.log("⚠️ [LOAD] Conversation exists but not fully loaded!");
+      console.log("⚠️ [LOAD] Current message count:", existingMessages.length);
+      console.log(
+        "⚠️ [LOAD] This might be from WebSocket only, loading full history from API...",
+      );
     }
 
     // Check if already loading this conversation
     if (loadingConversationsRef.current.has(friendId)) {
-      console.log('📥 [LOAD] Already loading this conversation, skipping duplicate request');
+      console.log(
+        "📥 [LOAD] Already loading this conversation, skipping duplicate request",
+      );
       return;
     }
 
     try {
       loadingConversationsRef.current.add(friendId);
       setLoadingDirectMessages(true);
-      console.log('📥 [LOAD] Fetching full message history from API...');
-      const backendMessages = await getDirectMessages(friendId, { token, limit: 50 });
-      console.log('📥 [LOAD] Received messages from API:', backendMessages.length);
-      
+      console.log("📥 [LOAD] Fetching full message history from API...");
+      const backendMessages = await getDirectMessages(friendId, {
+        token,
+        limit: 50,
+      });
+      console.log(
+        "📥 [LOAD] Received messages from API:",
+        backendMessages.length,
+      );
+
       const uiMessages: UIMessage[] = backendMessages.map((msg: any) => ({
         id: msg._id,
         text: msg.content,
@@ -1167,49 +1726,63 @@ export default function MessagesPage() {
         senderAvatar: msg.senderId.avatar,
         timestamp: new Date(msg.createdAt),
         isFromCurrentUser: msg.senderId._id === currentUserId,
-        type: 'direct', // Phân biệt là message từ direct message
+        type: "direct", // Phân biệt là message từ direct message
         isRead: msg.isRead || false, // Load initial read status
-        messageType: msg.type || 'text', // Type of message content
+        messageType: msg.type || "text", // Type of message content
         giphyId: msg.giphyId || undefined, // Giphy ID if it's a GIF/sticker
-        voiceUrl: msg.voiceUrl || undefined, // Voice message URL
-        voiceDuration: msg.voiceDuration || undefined, // Voice message duration
+        voiceUrl: msg.voiceUrl ?? undefined, // Voice message URL
+        voiceDuration: msg.voiceDuration ?? undefined, // Voice message duration
       }));
 
-      console.log('📥 [LOAD] Setting conversation with', uiMessages.length, 'messages from API');
-      setConversations(prev => {
+      console.log(
+        "📥 [LOAD] Setting conversation with",
+        uiMessages.length,
+        "messages from API",
+      );
+      setConversations((prev) => {
         const newMap = new Map(prev);
         const existingMessages = newMap.get(friendId) || [];
-        
+
         // ✅ CRITICAL FIX: Always replace with API data (full history)
         // But merge any very recent messages that might have arrived via WebSocket
-        console.log('📥 [LOAD] Merging API messages with existing WebSocket messages');
-        console.log('📥 [LOAD] API messages:', uiMessages.length);
-        console.log('📥 [LOAD] Existing messages:', existingMessages.length);
-        
+        console.log(
+          "📥 [LOAD] Merging API messages with existing WebSocket messages",
+        );
+        console.log("📥 [LOAD] API messages:", uiMessages.length);
+        console.log("📥 [LOAD] Existing messages:", existingMessages.length);
+
         // Create a map of API messages by ID for quick lookup
-        const apiMessageIds = new Set(uiMessages.map(m => m.id));
-        
+        const apiMessageIds = new Set(uiMessages.map((m) => m.id));
+
         // Find WebSocket messages that aren't in API response (very recent)
-        const recentWebSocketMessages = existingMessages.filter(m => !apiMessageIds.has(m.id));
-        console.log('📥 [LOAD] Recent WebSocket-only messages:', recentWebSocketMessages.length);
-        
+        const recentWebSocketMessages = existingMessages.filter(
+          (m) => !apiMessageIds.has(m.id),
+        );
+        console.log(
+          "📥 [LOAD] Recent WebSocket-only messages:",
+          recentWebSocketMessages.length,
+        );
+
         // Merge: API messages + recent WebSocket messages
         const mergedMessages = [...uiMessages, ...recentWebSocketMessages];
-        console.log('📥 [LOAD] Final merged message count:', mergedMessages.length);
-        
+        console.log(
+          "📥 [LOAD] Final merged message count:",
+          mergedMessages.length,
+        );
+
         newMap.set(friendId, mergedMessages);
         return newMap;
       });
-      
+
       // Mark as fully loaded
       fullyLoadedConversationsRef.current.add(friendId);
-      console.log('✅ [LOAD] Marked conversation as fully loaded from API');
-      
+      console.log("✅ [LOAD] Marked conversation as fully loaded from API");
+
       setError(null);
     } catch (err) {
       console.error("❌ [LOAD] Failed to load direct messages:", err);
       setError("Failed to load direct messages");
-      setConversations(prev => {
+      setConversations((prev) => {
         const newMap = new Map(prev);
         if (!newMap.has(friendId)) {
           newMap.set(friendId, []);
@@ -1228,13 +1801,162 @@ export default function MessagesPage() {
     setSelectedServer(null);
     setSelectedChannel(null);
     shouldAutoScrollRef.current = true; // ✅ Enable auto-scroll when switching conversations
-    
     // Pre-scroll to bottom BEFORE loading (prevents visual jump)
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = 0; // Reset first
     }
-    
     await loadDirectMessages(friend._id);
+  };
+
+  // Handler for adding/removing reactions
+  const handleReaction = async (messageId: string, emoji: string) => {
+    try {
+      await addMessageReaction(messageId, emoji, { token });
+
+      // Update local state
+      if (selectedDirectMessageFriend) {
+        const friendId = selectedDirectMessageFriend._id;
+        const currentMessages = conversations.get(friendId) || [];
+        const updatedMessages = currentMessages.map((msg) => {
+          if (msg.id === messageId) {
+            const reactions = msg.reactions || [];
+            const existingReaction = reactions.find(
+              (r) => r.userIds.includes(currentUserId) && r.emoji === emoji
+            );
+
+            if (existingReaction) {
+              // Remove reaction
+              return {
+                ...msg,
+                reactions: reactions
+                  .map((r) => ({
+                    ...r,
+                    userIds: r.userIds.filter((id) => id !== currentUserId),
+                    count: r.count - 1,
+                  }))
+                  .filter((r) => r.count > 0),
+              };
+            } else {
+              // Add reaction
+              const emojiReaction = reactions.find((r) => r.emoji === emoji);
+              if (emojiReaction) {
+                return {
+                  ...msg,
+                  reactions: reactions.map((r) =>
+                    r.emoji === emoji
+                      ? {
+                          ...r,
+                          userIds: [...r.userIds, currentUserId],
+                          count: r.count + 1,
+                        }
+                      : r
+                  ),
+                };
+              } else {
+                return {
+                  ...msg,
+                  reactions: [
+                    ...reactions,
+                    { emoji, userIds: [currentUserId], count: 1 },
+                  ],
+                };
+              }
+            }
+          }
+          return msg;
+        });
+        setConversations(new Map(conversations.set(friendId, updatedMessages)));
+      }
+
+      // Socket will be notified via backend gateway
+    } catch (error) {
+      console.error("Failed to add reaction:", error);
+    }
+  };
+
+  // Handler for pinning messages
+  const handlePinMessage = async (messageId: string) => {
+    try {
+      await pinDirectMessage(messageId, { token });
+
+      // Update local state
+      if (selectedDirectMessageFriend) {
+        const friendId = selectedDirectMessageFriend._id;
+        const currentMessages = conversations.get(friendId) || [];
+        const updatedMessages = currentMessages.map((msg) =>
+          msg.id === messageId ? { ...msg, isPinned: !msg.isPinned } : msg
+        );
+        setConversations(new Map(conversations.set(friendId, updatedMessages)));
+      }
+
+      // Socket will be notified via backend gateway
+    } catch (error) {
+      console.error("Failed to pin message:", error);
+    }
+  };
+
+  // Handler for reporting messages
+  const handleReportMessage = async (
+    messageId: string,
+    reason: string,
+    description?: string
+  ) => {
+    try {
+      await reportDirectMessage(messageId, reason, description, { token });
+      alert("Tin nhắn đã được báo cáo. Cảm ơn bạn!");
+      setShowReportDialog(null);
+
+      // Socket will be notified via backend gateway
+    } catch (error: any) {
+      console.error("Failed to report message:", error);
+      alert(error?.message || "Không thể báo cáo tin nhắn");
+    }
+  };
+
+  // Handler for deleting messages
+  const handleDeleteMessage = async (
+    messageId: string,
+    deleteType: "for-everyone" | "for-me"
+  ) => {
+    try {
+      const result = await deleteDirectMessage(messageId, deleteType, { token });
+
+      // Update local state
+      if (selectedDirectMessageFriend) {
+        const friendId = selectedDirectMessageFriend._id;
+        const currentMessages = conversations.get(friendId) || [];
+        const updatedMessages = currentMessages.filter(
+          (msg) => msg.id !== messageId
+        );
+        setConversations(new Map(conversations.set(friendId, updatedMessages)));
+
+        // Emit socket event to notify receiver (for real-time update)
+        if (emitDeleteMessage) {
+          emitDeleteMessage(messageId, deleteType, friendId);
+        }
+      }
+
+      // Show success toast
+      if (deleteType === "for-everyone") {
+        setToastMessage("Đã thu hồi tin nhắn với mọi người");
+      } else {
+        setToastMessage("Bạn đã xóa một tin nhắn");
+      }
+
+      // Hide toast after 3 seconds
+      setTimeout(() => setToastMessage(null), 3000);
+
+      // Close dialog
+      setShowDeleteDialog(null);
+    } catch (error) {
+      console.error("Failed to delete message:", error);
+      alert("Không thể gỡ tin nhắn");
+    }
+  };
+
+  // Handler for replying to a message
+  const handleReplyToMessage = (message: UIMessage) => {
+    setReplyingTo(message);
   };
 
   const handleSendMessage = async () => {
@@ -1250,21 +1972,37 @@ export default function MessagesPage() {
       // ✅ Enable auto-scroll for new message
       shouldAutoScrollRef.current = true;
 
-      const newMessage = await serversApi.createMessage(selectedChannel, content);
-      
+      const newMessage = await serversApi.createMessage(
+        selectedChannel,
+        content,
+      );
+
       const uiMessage: UIMessage = {
         id: newMessage._id,
         text: newMessage.content,
-        senderId: typeof newMessage.senderId === "string" ? newMessage.senderId : newMessage.senderId._id,
-        senderEmail: typeof newMessage.senderId === "string" ? "" : newMessage.senderId.email,
-        senderName: typeof newMessage.senderId === "string" ? (currentUserProfile?.username || "") : ((newMessage.senderId as any).username || newMessage.senderId.email),
-        senderAvatar: typeof newMessage.senderId === "string" ? currentUserProfile?.avatar : (newMessage.senderId as any).avatar,
+        senderId:
+          typeof newMessage.senderId === "string"
+            ? newMessage.senderId
+            : newMessage.senderId._id,
+        senderEmail:
+          typeof newMessage.senderId === "string"
+            ? ""
+            : newMessage.senderId.email,
+        senderName:
+          typeof newMessage.senderId === "string"
+            ? currentUserProfile?.username || ""
+            : (newMessage.senderId as any).username ||
+              newMessage.senderId.email,
+        senderAvatar:
+          typeof newMessage.senderId === "string"
+            ? currentUserProfile?.avatar
+            : (newMessage.senderId as any).avatar,
         timestamp: new Date(newMessage.createdAt),
         isFromCurrentUser: true,
-        type: 'server',
+        type: "server",
       };
 
-      setMessages(prev => [...prev, uiMessage]);
+      setMessages((prev) => [...prev, uiMessage]);
     } catch (err) {
       console.error("Failed to send message", err);
       setError("Failed to send message");
@@ -1302,9 +2040,9 @@ export default function MessagesPage() {
         senderAvatar: currentUserProfile?.avatar,
         timestamp: new Date(),
         isFromCurrentUser: true,
-        type: 'direct',
+        type: "direct",
         isRead: false, // Not read yet
-        messageType: 'text',
+        messageType: "text",
       };
 
       // ✅ Enable auto-scroll for new message
@@ -1312,16 +2050,22 @@ export default function MessagesPage() {
 
       // ✅ OPTIMISTIC UPDATE: Only update conversations Map (single source of truth for DMs)
       // DON'T update messages array to avoid duplicate key errors
-      setConversations(prev => {
+      setConversations((prev) => {
         const newMap = new Map(prev);
         const currentMessages = newMap.get(friendId) || [];
         newMap.set(friendId, [...currentMessages, optimisticMessage]);
         return newMap;
       });
 
-      // Send via WebSocket (response will replace optimistic message)
-      emitSendMessage(friendId, messageContent, []);
-      
+      // Send via API to support replyTo
+      await sendDirectMessage(friendId, {
+        token,
+        content: messageContent,
+        replyTo: replyingTo?.id,
+      });
+
+      // Clear reply preview
+      setReplyingTo(null);
     } catch (err) {
       console.error("Failed to send direct message", err);
       setError("Failed to send direct message");
@@ -1329,7 +2073,7 @@ export default function MessagesPage() {
   };
 
   // Handle sending GIF or Sticker
-  const handleSendGiphy = async (gif: GiphyGif, type: 'gif' | 'sticker') => {
+  const handleSendGiphy = async (gif: GiphyGif, type: "gif" | "sticker") => {
     if (!selectedDirectMessageFriend) return;
 
     const friendId = selectedDirectMessageFriend._id;
@@ -1348,7 +2092,7 @@ export default function MessagesPage() {
         senderAvatar: currentUserProfile?.avatar,
         timestamp: new Date(),
         isFromCurrentUser: true,
-        type: 'direct',
+        type: "direct",
         isRead: false,
         messageType: type,
         giphyId: gif.id,
@@ -1358,7 +2102,7 @@ export default function MessagesPage() {
       shouldAutoScrollRef.current = true;
 
       // ✅ OPTIMISTIC UPDATE
-      setConversations(prev => {
+      setConversations((prev) => {
         const newMap = new Map(prev);
         const currentMessages = newMap.get(friendId) || [];
         newMap.set(friendId, [...currentMessages, optimisticMessage]);
@@ -1371,8 +2115,11 @@ export default function MessagesPage() {
         content: gif.title || `Sent a ${type}`,
         type,
         giphyId: gif.id,
+        replyTo: replyingTo?.id,
       });
 
+      // Clear reply preview
+      setReplyingTo(null);
     } catch (err) {
       console.error(`Failed to send ${type}:`, err);
       setError(`Failed to send ${type}`);
@@ -1380,48 +2127,66 @@ export default function MessagesPage() {
   };
 
   // Handle voice recording complete
-  const handleVoiceRecordComplete = async (audioBlob: Blob, duration: number) => {
+  const handleVoiceRecordComplete = async (
+    audioBlob: Blob,
+    duration: number,
+    metadata?: { mimeType: string; fileExtension: string },
+  ) => {
     if (!selectedDirectMessageFriend) return;
 
     const friendId = selectedDirectMessageFriend._id;
 
     try {
-      console.log('🎤 [VOICE-UPLOAD] Starting upload, duration:', duration);
+      console.log("🎤 [VOICE-UPLOAD] Starting upload, duration:", duration);
+      console.log("🎤 [VOICE-UPLOAD] Metadata:", metadata);
       setIsRecordingVoice(false);
       setIsUploadingVoice(true);
 
-      // Upload audio file to Cloudinary
-      // Convert blob to File
-      const audioFile = new File([audioBlob], 'voice-message.webm', { type: 'audio/webm' });
-      console.log('🎤 [VOICE-UPLOAD] Audio file created:', audioFile.size, 'bytes');
-
-      const uploadResponse = await uploadMedia({ token, file: audioFile });
-      console.log('🎤 [VOICE-UPLOAD] Upload response:', uploadResponse);
+      // Upload audio file to Cloudinary with correct extension and type
+      const fileName = metadata?.fileExtension 
+        ? `voice-message.${metadata.fileExtension}`
+        : "voice-message.m4a";
+      const mimeType = metadata?.mimeType || "audio/mp4";
       
-      if (!uploadResponse || !uploadResponse.url) {
-        throw new Error('Failed to upload voice message');
+      const audioFile = new File([audioBlob], fileName, {
+        type: mimeType,
+      });
+      console.log("🎤 [VOICE-UPLOAD] Audio file created:", {
+        name: audioFile.name,
+        type: audioFile.type,
+        size: audioFile.size,
+      });
+
+      console.log("🎤 [VOICE-UPLOAD] Uploading to Cloudinary...");
+      const uploadResponse = await uploadMedia({ token, file: audioFile });
+      console.log("🎤 [VOICE-UPLOAD] Upload response:", uploadResponse);
+
+      if (!uploadResponse || (!uploadResponse.secureUrl && !uploadResponse.url)) {
+        throw new Error("Failed to upload voice message");
       }
 
-      console.log('✅ [VOICE-UPLOAD] Upload successful, URL:', uploadResponse.url);
+      // Prefer secureUrl (https) over url (http) to avoid mixed content issues
+      const voiceUrl = uploadResponse.secureUrl || uploadResponse.url;
+      console.log("✅ [VOICE-UPLOAD] Upload successful, URL:", voiceUrl);
 
-      // Create optimistic message
+      // Create optimistic message with transformed URL
       const optimisticMessage: UIMessage = {
         id: `temp-${Date.now()}-${Math.random()}`,
-        text: 'Voice message',
+        text: "Voice message",
         senderId: currentUserId,
         senderEmail: "",
         senderName: currentUserProfile?.username || "",
         senderAvatar: currentUserProfile?.avatar,
         timestamp: new Date(),
         isFromCurrentUser: true,
-        type: 'direct',
+        type: "direct",
         isRead: false,
-        messageType: 'voice',
-        voiceUrl: uploadResponse.url,
+        messageType: "voice",
+        voiceUrl: voiceUrl,
         voiceDuration: duration,
       };
 
-      console.log('🎤 [VOICE-OPTIMISTIC] Created optimistic message:', {
+      console.log("🎤 [VOICE-OPTIMISTIC] Created optimistic message:", {
         messageType: optimisticMessage.messageType,
         voiceUrl: optimisticMessage.voiceUrl,
         voiceDuration: optimisticMessage.voiceDuration,
@@ -1431,7 +2196,7 @@ export default function MessagesPage() {
       shouldAutoScrollRef.current = true;
 
       // OPTIMISTIC UPDATE
-      setConversations(prev => {
+      setConversations((prev) => {
         const newMap = new Map(prev);
         const currentMessages = newMap.get(friendId) || [];
         newMap.set(friendId, [...currentMessages, optimisticMessage]);
@@ -1439,25 +2204,88 @@ export default function MessagesPage() {
       });
 
       // Send to API
-      console.log('🎤 [VOICE-SEND] Sending to backend:', {
-        type: 'voice',
-        voiceUrl: uploadResponse.url,
-        voiceDuration: duration,
-      });
-      
-      await sendDirectMessage(friendId, {
-        token,
-        content: 'Voice message',
-        type: 'voice',
+      console.log("🎤 [VOICE-SEND] Sending to backend:", {
+        type: "voice",
         voiceUrl: uploadResponse.url,
         voiceDuration: duration,
       });
 
-      console.log('✅ [VOICE-SEND] Sent to backend successfully');
+      const response = await sendDirectMessage(friendId, {
+        token,
+        content: "Voice message",
+        type: "voice",
+        voiceUrl: voiceUrl,
+        voiceDuration: duration,
+        replyTo: replyingTo?.id,
+      });
+
+      // Clear reply preview
+      setReplyingTo(null);
+
+      console.log("✅ [VOICE-SEND] Response from backend:", response);
+      console.log("🎤 [VOICE-SEND-DEBUG] Response fields:", {
+        _id: response._id,
+        type: response.type,
+        voiceUrl: response.voiceUrl,
+        voiceDuration: response.voiceDuration,
+        content: response.content,
+      });
+
+      // Replace optimistic message with real message from server
+      setConversations((prev) => {
+        const newMap = new Map(prev);
+        const currentMessages = newMap.get(friendId) || [];
+
+        // Find optimistic message
+        const optimisticIndex = currentMessages.findIndex(
+          (m) => m.id === optimisticMessage.id,
+        );
+
+        if (optimisticIndex !== -1) {
+          console.log(
+            "✅ [VOICE-SEND] Replacing optimistic message with server response",
+          );
+
+          const realMessage: UIMessage = {
+            id: response._id,
+            text: response.content,
+            senderId: response.senderId._id,
+            senderEmail: response.senderId.email,
+            senderName: response.senderId.username || response.senderId.email,
+            senderAvatar: response.senderId.avatar,
+            timestamp: new Date(response.createdAt),
+            isFromCurrentUser: true,
+            type: "direct",
+            isRead: response.isRead || false,
+            messageType: response.type || "voice",
+            voiceUrl: response.voiceUrl ?? voiceUrl,
+            voiceDuration: response.voiceDuration ?? duration,
+          };
+
+          console.log("🎤 [VOICE-SEND-DEBUG] Created realMessage:", {
+            id: realMessage.id,
+            messageType: realMessage.messageType,
+            voiceUrl: realMessage.voiceUrl,
+            voiceDuration: realMessage.voiceDuration,
+          });
+
+          const updated = [...currentMessages];
+          updated[optimisticIndex] = realMessage;
+          newMap.set(friendId, updated);
+        } else {
+          console.warn(
+            "⚠️ [VOICE-SEND] Optimistic message not found, adding response",
+          );
+        }
+
+        return newMap;
+      });
+
+      console.log("✅ [VOICE-SEND] Sent to backend successfully");
       setIsUploadingVoice(false);
     } catch (err) {
-      console.error('Failed to send voice message:', err);
-      setError('Failed to send voice message');
+      console.error("Failed to send voice message:", err);
+      setError("Failed to send voice message");
       setIsUploadingVoice(false);
       setIsRecordingVoice(false);
     }
@@ -1473,11 +2301,15 @@ export default function MessagesPage() {
 
     try {
       const newServer = await serversApi.createServer(serverName);
-      
+
       const serverWithChannels: BackendServer = {
         ...newServer,
-        textChannels: (newServer.channels as serversApi.Channel[]).filter((c) => c.type === "text"),
-        voiceChannels: (newServer.channels as serversApi.Channel[]).filter((c) => c.type === "voice"),
+        textChannels: (newServer.channels as serversApi.Channel[]).filter(
+          (c) => c.type === "text",
+        ),
+        voiceChannels: (newServer.channels as serversApi.Channel[]).filter(
+          (c) => c.type === "voice",
+        ),
       };
 
       setServers([...servers, serverWithChannels]);
@@ -1490,102 +2322,122 @@ export default function MessagesPage() {
     }
   };
 
-
   // ✅ Memoized render function to prevent unnecessary re-renders
-  const renderMessageContent = useCallback((message: UIMessage) => {
-    const { text, messageType, giphyId, voiceUrl, voiceDuration } = message;
+  const renderMessageContent = useCallback(
+    (message: UIMessage) => {
+      const { text, messageType, giphyId, voiceUrl, voiceDuration } = message;
 
-    // Check if message is Voice Message
-    if (messageType === 'voice' && voiceUrl && voiceDuration) {
-      console.log(' [VOICE] Rendering voice message:', { voiceUrl, voiceDuration, messageType });
-      return (
-        <VoiceMessage 
-          voiceUrl={voiceUrl} 
-          duration={voiceDuration}
-          isFromCurrentUser={message.isFromCurrentUser}
-        />
-      );
-    }
+      // Debug log for all messages
+      if (messageType === "voice" || voiceUrl) {
+        console.log("🎤 [RENDER-DEBUG] Voice message check:", {
+          messageType,
+          voiceUrl,
+          voiceDuration,
+          hasVoiceUrl: !!voiceUrl,
+          hasVoiceDuration: !!voiceDuration,
+          voiceDurationType: typeof voiceDuration,
+          voiceDurationValue: voiceDuration,
+        });
+      }
 
-    // Check if message is GIF or Sticker from Giphy
-    if ((messageType === 'gif' || messageType === 'sticker') && giphyId) {
-      return (
-        <div className={styles.mediaMessage}>
-          <GiphyMessage giphyId={giphyId} messageType={messageType} />
-        </div>
-      );
-    }
-
-    // Check if message contains poll
-    const pollMatch = text.match(/📊 \[Poll\]: ([a-f0-9]+)/);
-    if (pollMatch) {
-      const pollId = pollMatch[1];
-      return <PollMessage pollId={pollId} token={token} onError={setError} />;
-    }
-
-    // Check if message contains media
-    const imageMatch = text.match(/📷 \[Image\]: (https?:\/\/[^\s]+)/);
-    const videoMatch = text.match(/🎬 \[Video\]: (https?:\/\/[^\s]+)/);
-    const gifMatch = text.match(/(https?:\/\/[^\s]+\.gif)/i);
-
-    if (imageMatch) {
-      const imageUrl = imageMatch[1];
-      return (
-        <div className={styles.mediaMessage}>
-          <img 
-            src={imageUrl} 
-            alt="Shared image" 
-            className={styles.messageImage}
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.nextElementSibling?.classList.remove(styles.hidden);
-            }}
+      // Check if message is Voice Message (allow missing voiceDuration for older messages)
+      if (messageType === "voice" && voiceUrl) {
+        return (
+          <VoiceMessage
+            voiceUrl={voiceUrl}
+            duration={voiceDuration ?? 0}
+            isFromCurrentUser={message.isFromCurrentUser}
           />
-          <span className={styles.hidden} style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-            Failed to load image
-          </span>
-        </div>
-      );
-    }
+        );
+      }
 
-    if (videoMatch) {
-      const videoUrl = videoMatch[1];
-      return (
-        <div className={styles.mediaMessage}>
-          <video 
-            src={videoUrl} 
-            controls 
-            className={styles.messageVideo}
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.nextElementSibling?.classList.remove(styles.hidden);
-            }}
-          >
-            Your browser does not support video playback.
-          </video>
-          <span className={styles.hidden} style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-            Failed to load video
-          </span>
-        </div>
-      );
-    }
+      // Check if message is GIF or Sticker from Giphy
+      if ((messageType === "gif" || messageType === "sticker") && giphyId) {
+        return (
+          <div className={styles.mediaMessage}>
+            <GiphyMessage giphyId={giphyId} messageType={messageType} />
+          </div>
+        );
+      }
 
-    if (gifMatch) {
-      const gifUrl = gifMatch[1];
-      return (
-        <div className={styles.mediaMessage}>
-          <img 
-            src={gifUrl} 
-            alt="GIF" 
-            className={styles.messageGif}
-          />
-        </div>
-      );
-    }
+      // Check if message contains poll
+      const pollMatch = text.match(/📊 \[Poll\]: ([a-f0-9]+)/);
+      if (pollMatch) {
+        const pollId = pollMatch[1];
+        return <PollMessage pollId={pollId} token={token} onError={setError} />;
+      }
 
-    // Regular text message
-    return <span>{text}</span>;
-  }, [token]);
+      // Check if message contains media
+      const imageMatch = text.match(/📷 \[Image\]: (https?:\/\/[^\s]+)/);
+      const videoMatch = text.match(/🎬 \[Video\]: (https?:\/\/[^\s]+)/);
+      const gifMatch = text.match(/(https?:\/\/[^\s]+\.gif)/i);
+
+      if (imageMatch) {
+        const imageUrl = imageMatch[1];
+        return (
+          <div className={styles.mediaMessage}>
+            <img
+              src={imageUrl}
+              alt="Shared image"
+              className={styles.messageImage}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                e.currentTarget.nextElementSibling?.classList.remove(
+                  styles.hidden,
+                );
+              }}
+            />
+            <span
+              className={styles.hidden}
+              style={{ fontSize: "12px", color: "var(--color-text-muted)" }}
+            >
+              Failed to load image
+            </span>
+          </div>
+        );
+      }
+
+      if (videoMatch) {
+        const videoUrl = videoMatch[1];
+        return (
+          <div className={styles.mediaMessage}>
+            <video
+              src={videoUrl}
+              controls
+              className={styles.messageVideo}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                e.currentTarget.nextElementSibling?.classList.remove(
+                  styles.hidden,
+                );
+              }}
+            >
+              Your browser does not support video playback.
+            </video>
+            <span
+              className={styles.hidden}
+              style={{ fontSize: "12px", color: "var(--color-text-muted)" }}
+            >
+              Failed to load video
+            </span>
+          </div>
+        );
+      }
+
+      if (gifMatch) {
+        const gifUrl = gifMatch[1];
+        return (
+          <div className={styles.mediaMessage}>
+            <img src={gifUrl} alt="GIF" className={styles.messageGif} />
+          </div>
+        );
+      }
+
+      // Regular text message
+      return <span>{text}</span>;
+    },
+    [token],
+  );
 
   // Handle emoji selection
   const handleEmojiClick = (emojiData: any) => {
@@ -1599,10 +2451,10 @@ export default function MessagesPage() {
       setGifs([]);
       return;
     }
-    
+
     try {
       const response = await fetch(
-        `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=20`
+        `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=20`,
       );
       const data = await response.json();
       setGifs(data.results || []);
@@ -1632,11 +2484,11 @@ export default function MessagesPage() {
       if (files.length === 0) return;
 
       setShowPlusMenu(false);
-      
+
       try {
         // Validate video duration (max 3 minutes = 180 seconds)
         for (const file of files) {
-          if (file.type.startsWith('video/')) {
+          if (file.type.startsWith("video/")) {
             const duration = await getVideoDuration(file);
             if (duration > 180) {
               setError("Video must be 3 minutes or less");
@@ -1649,35 +2501,38 @@ export default function MessagesPage() {
         const loadingMessages: UIMessage[] = [];
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          const isImage = file.type.startsWith('image/');
-          const isVideo = file.type.startsWith('video/');
+          const isImage = file.type.startsWith("image/");
+          const isVideo = file.type.startsWith("video/");
           const tempId = `temp-upload-${Date.now()}-${i}`;
-          
+
           const loadingMessage: UIMessage = {
             id: tempId,
-            text: isImage ? `📤 Đang tải ảnh lên...` : `📤 Đang tải video lên...`,
+            text: isImage ? `📤 Uploading image...` : `📤 Uploading video...`,
             senderId: currentUserId,
             senderEmail: "",
             senderName: currentUserProfile?.username || "",
             senderAvatar: currentUserProfile?.avatar,
             timestamp: new Date(),
             isFromCurrentUser: true,
-            type: selectedDirectMessageFriend ? 'direct' : 'server',
+            type: selectedDirectMessageFriend ? "direct" : "server",
           };
-          
+
           loadingMessages.push(loadingMessage);
-          
+
           // Add to UI immediately
           if (selectedDirectMessageFriend) {
-            setMessages(prev => [...prev, loadingMessage]);
-            setConversations(prev => {
+            setMessages((prev) => [...prev, loadingMessage]);
+            setConversations((prev) => {
               const newMap = new Map(prev);
               const current = newMap.get(selectedDirectMessageFriend._id) || [];
-              newMap.set(selectedDirectMessageFriend._id, [...current, loadingMessage]);
+              newMap.set(selectedDirectMessageFriend._id, [
+                ...current,
+                loadingMessage,
+              ]);
               return newMap;
             });
           } else if (selectedChannel) {
-            setMessages(prev => [...prev, loadingMessage]);
+            setMessages((prev) => [...prev, loadingMessage]);
           }
         }
 
@@ -1685,7 +2540,8 @@ export default function MessagesPage() {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             if (messagesContainerRef.current) {
-              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+              messagesContainerRef.current.scrollTop =
+                messagesContainerRef.current.scrollHeight;
             }
           });
         });
@@ -1703,9 +2559,9 @@ export default function MessagesPage() {
         for (let i = 0; i < uploadResults.length; i++) {
           const media = uploadResults[i];
           const loadingMsgId = loadingMessages[i].id;
-          const isImage = media.resourceType === 'image';
-          const isVideo = media.resourceType === 'video';
-          
+          const isImage = media.resourceType === "image";
+          const isVideo = media.resourceType === "video";
+
           let mediaMessage: string;
           if (isImage) {
             mediaMessage = `📷 [Image]: ${media.url}`;
@@ -1725,24 +2581,33 @@ export default function MessagesPage() {
             senderAvatar: currentUserProfile?.avatar,
             timestamp: new Date(),
             isFromCurrentUser: true,
-            type: selectedDirectMessageFriend ? 'direct' : 'server',
+            type: selectedDirectMessageFriend ? "direct" : "server",
           };
 
           // Replace loading message with actual content
           if (selectedDirectMessageFriend) {
-            setMessages(prev => prev.map(m => m.id === loadingMsgId ? finalMessage : m));
-            setConversations(prev => {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === loadingMsgId ? finalMessage : m)),
+            );
+            setConversations((prev) => {
               const newMap = new Map(prev);
               const current = newMap.get(selectedDirectMessageFriend._id) || [];
-              newMap.set(selectedDirectMessageFriend._id, current.map(m => m.id === loadingMsgId ? finalMessage : m));
+              newMap.set(
+                selectedDirectMessageFriend._id,
+                current.map((m) => (m.id === loadingMsgId ? finalMessage : m)),
+              );
               return newMap;
             });
-            
+
             // Send via WebSocket
-            emitSendMessage(selectedDirectMessageFriend._id, mediaMessage, [media.url]);
+            emitSendMessage(selectedDirectMessageFriend._id, mediaMessage, [
+              media.url,
+            ]);
           } else if (selectedChannel) {
-            setMessages(prev => prev.map(m => m.id === loadingMsgId ? finalMessage : m));
-            
+            setMessages((prev) =>
+              prev.map((m) => (m.id === loadingMsgId ? finalMessage : m)),
+            );
+
             // Send via API for channel message
             await serversApi.createMessage(selectedChannel, mediaMessage);
           }
@@ -1760,18 +2625,18 @@ export default function MessagesPage() {
   // Get video duration helper
   const getVideoDuration = (file: File): Promise<number> => {
     return new Promise((resolve, reject) => {
-      const video = document.createElement('video');
-      video.preload = 'metadata';
-      
+      const video = document.createElement("video");
+      video.preload = "metadata";
+
       video.onloadedmetadata = () => {
         window.URL.revokeObjectURL(video.src);
         resolve(video.duration);
       };
-      
+
       video.onerror = () => {
-        reject(new Error('Failed to load video'));
+        reject(new Error("Failed to load video"));
       };
-      
+
       video.src = URL.createObjectURL(file);
     });
   };
@@ -1802,13 +2667,13 @@ export default function MessagesPage() {
     try {
       // Validate
       if (!pollQuestion.trim()) {
-        setError("Vui lòng nhập câu hỏi");
+        setError("Please enter a question");
         return;
       }
-      
-      const validOptions = pollOptions.filter(opt => opt.trim());
+
+      const validOptions = pollOptions.filter((opt) => opt.trim());
       if (validOptions.length < 2) {
-        setError("Cần ít nhất 2 câu trả lời");
+        setError("At least 2 answers are required");
         return;
       }
 
@@ -1818,33 +2683,37 @@ export default function MessagesPage() {
       // ✅ FIX: Show loading message
       const loadingMessage: UIMessage = {
         id: `temp-poll-${Date.now()}`,
-        text: `📊 Đang tạo khảo sát...`,
+        text: `📊 Creating poll...`,
         senderId: currentUserId,
         senderEmail: "",
         senderName: currentUserProfile?.username || "",
         senderAvatar: currentUserProfile?.avatar,
         timestamp: new Date(),
         isFromCurrentUser: true,
-        type: selectedDirectMessageFriend ? 'direct' : 'server',
+        type: selectedDirectMessageFriend ? "direct" : "server",
       };
 
       if (selectedDirectMessageFriend) {
-        setMessages(prev => [...prev, loadingMessage]);
-        setConversations(prev => {
+        setMessages((prev) => [...prev, loadingMessage]);
+        setConversations((prev) => {
           const newMap = new Map(prev);
           const current = newMap.get(selectedDirectMessageFriend._id) || [];
-          newMap.set(selectedDirectMessageFriend._id, [...current, loadingMessage]);
+          newMap.set(selectedDirectMessageFriend._id, [
+            ...current,
+            loadingMessage,
+          ]);
           return newMap;
         });
       } else if (selectedChannel) {
-        setMessages(prev => [...prev, loadingMessage]);
+        setMessages((prev) => [...prev, loadingMessage]);
       }
 
       // Auto-scroll (instant for polls)
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            messagesContainerRef.current.scrollTop =
+              messagesContainerRef.current.scrollHeight;
           }
         });
       });
@@ -1860,7 +2729,6 @@ export default function MessagesPage() {
 
       // Send poll as message
       const pollMessage = `📊 [Poll]: ${poll._id}`;
-      
       // ✅ FIX: Replace loading message with actual poll
       const finalMessage: UIMessage = {
         id: `temp-${Date.now()}`,
@@ -1871,20 +2739,27 @@ export default function MessagesPage() {
         senderAvatar: currentUserProfile?.avatar,
         timestamp: new Date(),
         isFromCurrentUser: true,
-        type: selectedDirectMessageFriend ? 'direct' : 'server',
+        type: selectedDirectMessageFriend ? "direct" : "server",
       };
 
       if (selectedDirectMessageFriend) {
-        setMessages(prev => prev.map(m => m.id === loadingMessage.id ? finalMessage : m));
-        setConversations(prev => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === loadingMessage.id ? finalMessage : m)),
+        );
+        setConversations((prev) => {
           const newMap = new Map(prev);
           const current = newMap.get(selectedDirectMessageFriend._id) || [];
-          newMap.set(selectedDirectMessageFriend._id, current.map(m => m.id === loadingMessage.id ? finalMessage : m));
+          newMap.set(
+            selectedDirectMessageFriend._id,
+            current.map((m) => (m.id === loadingMessage.id ? finalMessage : m)),
+          );
           return newMap;
         });
         emitSendMessage(selectedDirectMessageFriend._id, pollMessage, []);
       } else if (selectedChannel) {
-        setMessages(prev => prev.map(m => m.id === loadingMessage.id ? finalMessage : m));
+        setMessages((prev) =>
+          prev.map((m) => (m.id === loadingMessage.id ? finalMessage : m)),
+        );
         await serversApi.createMessage(selectedChannel, pollMessage);
       }
 
@@ -1893,7 +2768,6 @@ export default function MessagesPage() {
       setPollOptions(["", ""]);
       setPollDuration(24);
       setPollAllowMultiple(false);
-      
       console.log("✅ Poll created:", poll);
     } catch (error: any) {
       console.error("❌ Failed to create poll:", error);
@@ -1917,6 +2791,42 @@ export default function MessagesPage() {
 
   return (
     <div className={styles.container}>
+      {passkeyRequired ? (
+        <div className={styles.passkeyOverlay} role="dialog" aria-modal>
+          <div className={styles.passkeyCard}>
+            <h2 className={styles.passkeyTitle}>Enter passkey</h2>
+            <p className={styles.passkeyDesc}>
+              To access Messages on this device, please enter your 6-digit
+              passkey.
+            </p>
+            <input
+              className={styles.passkeyInput}
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="••••••"
+              value={passkeyInput}
+              onChange={(e) =>
+                setPasskeyInput(e.target.value.replace(/\D/g, ""))
+              }
+              disabled={passkeySubmitting || passkeyChecking}
+            />
+            {passkeyError ? (
+              <p className={styles.passkeyError}>{passkeyError}</p>
+            ) : null}
+            <div className={styles.passkeyActions}>
+              <button
+                type="button"
+                className={styles.passkeyButton}
+                onClick={handleVerifyPasskeyGate}
+                disabled={passkeySubmitting || passkeyChecking}
+              >
+                {passkeySubmitting ? "Verifying..." : "Verify"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {/* Call Room Overlay - DEPRECATED: Calls now open in new tab */}
       {/* {isInCall && callToken && callServerUrl && (
         <CallRoom
@@ -1930,9 +2840,9 @@ export default function MessagesPage() {
 
       {/* Left Sidebar - Logo & Create Group */}
       <div className={styles.leftSidebar}>
-        <img 
-          src="/logo.png" 
-          alt="Cordigram" 
+        <img
+          src="/logo.png"
+          alt="Cordigram"
           className={styles.logoImage}
           onClick={() => {
             setSelectedServer(null);
@@ -1940,19 +2850,34 @@ export default function MessagesPage() {
           }}
           style={{ cursor: "pointer" }}
         />
-        
-        <button 
-          className={styles.createBtn} 
+
+        <button
+          className={styles.createBtn}
           title="Create Server"
           onClick={() => setShowCreateServerModal(true)}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M12 5v14M5 12h14"></path>
           </svg>
         </button>
 
         {/* Servers List */}
-        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+          }}
+        >
           {servers.map((server) => (
             <button
               key={server._id}
@@ -1961,7 +2886,10 @@ export default function MessagesPage() {
               title={server.name}
               style={{
                 opacity: selectedServer === server._id ? 1 : 0.6,
-                background: selectedServer === server._id ? "var(--color-primary)" : "transparent",
+                background:
+                  selectedServer === server._id
+                    ? "var(--color-primary)"
+                    : "transparent",
               }}
             >
               {server.name.charAt(0).toUpperCase()}
@@ -1971,7 +2899,14 @@ export default function MessagesPage() {
 
         <div className={styles.sidebarFooter}>
           <button className={styles.settingsBtn} title="Settings">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6m-16.78 7.78l4.24-4.24m3.08-3.08l4.24-4.24"></path>
             </svg>
@@ -1999,7 +2934,14 @@ export default function MessagesPage() {
                 {/* Menu Items */}
                 <div className={styles.menuItems}>
                   <button className={styles.menuItem}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                       <circle cx="9" cy="7" r="4"></circle>
                       <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -2008,19 +2950,40 @@ export default function MessagesPage() {
                     <span>Friends</span>
                   </button>
                   <button className={styles.menuItem}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <path d="M12 5v14M5 12h14"></path>
                     </svg>
                     <span>Add Friend</span>
                   </button>
                   <button className={styles.menuItem}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <path d="M9 11H7.82a2 2 0 0 0-1.82 1.18l-2 5A2 2 0 0 0 3 19h4m0 0a6 6 0 0 0 12 0m4-7h-1.17a2 2 0 0 1-1.82-1.18l-2-5A2 2 0 0 0 13 5h-4"></path>
                     </svg>
                     <span>Mission</span>
                   </button>
                   <button className={styles.menuItem}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <circle cx="9" cy="21" r="1"></circle>
                       <circle cx="20" cy="21" r="1"></circle>
                       <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
@@ -2031,35 +2994,64 @@ export default function MessagesPage() {
 
                 {/* Direct Messages Section */}
                 <div className={styles.directMessagesSection}>
-                  <h3 className={styles.directMessagesTitle}>DIRECT MESSAGES</h3>
-                  
+                  <h3 className={styles.directMessagesTitle}>
+                    DIRECT MESSAGES
+                  </h3>
+
                   {/* Friends List */}
                   <div className={styles.friendsList}>
                     {friends && friends.length > 0 ? (
                       friends.map((friend) => {
-                        const initial = friend.displayName?.charAt(0)?.toUpperCase() || friend.username?.charAt(0)?.toUpperCase() || "U";
+                        const initial =
+                          friend.displayName?.charAt(0)?.toUpperCase() ||
+                          friend.username?.charAt(0)?.toUpperCase() ||
+                          "U";
                         const hue = Math.floor(Math.random() * 360);
                         return (
-                          <div 
-                            key={friend._id} 
-                            className={`${styles.friendItem} ${selectedDirectMessageFriend?._id === friend._id ? styles.active : ''}`}
-                            onClick={() => handleSelectDirectMessageFriend(friend)}
-                            style={{ cursor: 'pointer' }}
+                          <div
+                            key={friend._id}
+                            className={`${styles.friendItem} ${selectedDirectMessageFriend?._id === friend._id ? styles.active : ""}`}
+                            onClick={() =>
+                              handleSelectDirectMessageFriend(friend)
+                            }
+                            style={{ cursor: "pointer" }}
                           >
-                            <div className={styles.friendAvatar} style={{ backgroundImage: isValidAvatarUrl(friend.avatarUrl) ? `url(${friend.avatarUrl})` : `linear-gradient(${hue}deg, hsl(${hue}, 70%, 60%), hsl(${hue + 60}, 70%, 60%))`, backgroundSize: "cover", backgroundPosition: "center" }}>
-                              {!isValidAvatarUrl(friend.avatarUrl) && <span>{initial}</span>}
+                            <div
+                              className={styles.friendAvatar}
+                              style={{
+                                backgroundImage: isValidAvatarUrl(
+                                  friend.avatarUrl,
+                                )
+                                  ? `url(${friend.avatarUrl})`
+                                  : `linear-gradient(${hue}deg, hsl(${hue}, 70%, 60%), hsl(${hue + 60}, 70%, 60%))`,
+                                backgroundSize: "cover",
+                                backgroundPosition: "center",
+                              }}
+                            >
+                              {!isValidAvatarUrl(friend.avatarUrl) && (
+                                <span>{initial}</span>
+                              )}
                             </div>
                             <div className={styles.friendInfo}>
-                              <p className={styles.friendName}>{friend.displayName || friend.username}</p>
-                              <p className={styles.friendStatus}>{friend.email}</p>
+                              <p className={styles.friendName}>
+                                {friend.displayName || friend.username}
+                              </p>
+                              <p className={styles.friendStatus}>
+                                {friend.email}
+                              </p>
                             </div>
                           </div>
                         );
                       })
                     ) : (
-                      <div style={{ padding: "20px 16px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "14px" }}>
-                        
-                      </div>
+                      <div
+                        style={{
+                          padding: "20px 16px",
+                          textAlign: "center",
+                          color: "var(--color-text-muted)",
+                          fontSize: "14px",
+                        }}
+                      ></div>
                     )}
                   </div>
                 </div>
@@ -2068,22 +3060,36 @@ export default function MessagesPage() {
                 <div className={styles.voiceControls}>
                   {/* User Info */}
                   <div className={styles.userInfoSection}>
-                    <div 
+                    <div
                       className={styles.userAvatar}
                       style={{
-                        backgroundImage: isValidAvatarUrl(currentUserProfile?.avatarUrl) ? `url(${currentUserProfile.avatarUrl})` : undefined,
+                        backgroundImage: isValidAvatarUrl(
+                          currentUserProfile?.avatarUrl,
+                        )
+                          ? `url(${currentUserProfile.avatarUrl})`
+                          : undefined,
                         backgroundSize: "cover",
-                        backgroundPosition: "center"
+                        backgroundPosition: "center",
                       }}
                     >
                       {!isValidAvatarUrl(currentUserProfile?.avatarUrl) && (
-                        <span>{currentUserProfile?.displayName?.charAt(0)?.toUpperCase() || currentUserProfile?.username?.charAt(0)?.toUpperCase() || "U"}</span>
+                        <span>
+                          {currentUserProfile?.displayName
+                            ?.charAt(0)
+                            ?.toUpperCase() ||
+                            currentUserProfile?.username
+                              ?.charAt(0)
+                              ?.toUpperCase() ||
+                            "U"}
+                        </span>
                       )}
                       <div className={styles.onlineStatus}></div>
                     </div>
                     <div className={styles.userTextInfo}>
                       <div className={styles.userDisplayName}>
-                        {currentUserProfile?.displayName || currentUserProfile?.username || "User"}
+                        {currentUserProfile?.displayName ||
+                          currentUserProfile?.username ||
+                          "User"}
                       </div>
                       <div className={styles.userUsername}>
                         {currentUserProfile?.username || ""}
@@ -2093,16 +3099,36 @@ export default function MessagesPage() {
 
                   {/* Voice Controls */}
                   <div className={styles.voiceButtons}>
-                    <button className={styles.voiceButton} title="Toggle Microphone">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <button
+                      className={styles.voiceButton}
+                      title="Toggle Microphone"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                         <line x1="12" y1="19" x2="12" y2="23"></line>
                         <line x1="8" y1="23" x2="16" y2="23"></line>
                       </svg>
                     </button>
-                    <button className={styles.voiceButton} title="Toggle Speaker">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <button
+                      className={styles.voiceButton}
+                      title="Toggle Speaker"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                         <path d="M15.54 8.46a7 7 0 0 1 0 9.9"></path>
                         <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
@@ -2124,13 +3150,28 @@ export default function MessagesPage() {
                       }`}
                       onClick={() => setSelectedChannel(channel._id)}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
-                        <span style={{ fontSize: "18px" }}>#{channel.name}</span>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          width: "100%",
+                        }}
+                      >
+                        <span style={{ fontSize: "18px" }}>
+                          #{channel.name}
+                        </span>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div style={{ padding: "12px 16px", fontSize: "12px", color: "var(--color-text-muted)" }}>
+                  <div
+                    style={{
+                      padding: "12px 16px",
+                      fontSize: "12px",
+                      color: "var(--color-text-muted)",
+                    }}
+                  >
                     No text channels
                   </div>
                 )}
@@ -2143,47 +3184,76 @@ export default function MessagesPage() {
         <div className={styles.rightContent}>
           {/* Chat Area */}
           <div className={styles.chatArea}>
-            {(selectedChannel && currentServer) || selectedDirectMessageFriend ? (
+            {(selectedChannel && currentServer) ||
+            selectedDirectMessageFriend ? (
               <>
                 {/* Chat Header */}
                 <div className={styles.chatHeader}>
                   <div className={styles.chatHeaderLeft}>
                     <h2 className={styles.chatHeaderTitle}>
-                      {selectedDirectMessageFriend 
-                        ? selectedDirectMessageFriend.displayName || selectedDirectMessageFriend.username
-                        : '#' + (textChannels.find((c) => c._id === selectedChannel)?.name || "channel")
-                      }
+                      {selectedDirectMessageFriend
+                        ? selectedDirectMessageFriend.displayName ||
+                          selectedDirectMessageFriend.username
+                        : "#" +
+                          (textChannels.find((c) => c._id === selectedChannel)
+                            ?.name || "channel")}
                     </h2>
                   </div>
                   <div className={styles.chatHeaderActions}>
                     {/* Only show call buttons for DM conversations */}
                     {selectedDirectMessageFriend && (
                       <>
-                        <button 
-                          className={styles.chatIconBtn} 
+                        <button
+                          className={styles.chatIconBtn}
                           title="Voice Call"
                           onClick={() => handleStartCall(false)}
                           disabled={isInCall}
                         >
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
                             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                           </svg>
                         </button>
-                        <button 
-                          className={styles.chatIconBtn} 
+                        <button
+                          className={styles.chatIconBtn}
                           title="Video Call"
                           onClick={() => handleStartCall(true)}
                           disabled={isInCall}
                         >
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
                             <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                            <rect
+                              x="1"
+                              y="5"
+                              width="15"
+                              height="14"
+                              rx="2"
+                              ry="2"
+                            ></rect>
                           </svg>
                         </button>
                       </>
                     )}
                     <button className={styles.chatIconBtn} title="More options">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
                         <circle cx="12" cy="5" r="2"></circle>
                         <circle cx="12" cy="12" r="2"></circle>
                         <circle cx="12" cy="19" r="2"></circle>
@@ -2192,93 +3262,175 @@ export default function MessagesPage() {
                   </div>
                 </div>
                 {/* Messages Container */}
-                <div 
+                <div
                   ref={messagesContainerRef}
                   className={styles.messagesContainer}
                   onScroll={(e) => {
                     const container = e.currentTarget;
-                    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+                    const isNearBottom =
+                      container.scrollHeight -
+                        container.scrollTop -
+                        container.clientHeight <
+                      100;
                     shouldAutoScrollRef.current = isNearBottom;
                   }}
                 >
                   {selectedDirectMessageFriend ? (
                     loadingDirectMessages ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-muted)' }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          height: "100%",
+                          color: "var(--color-text-muted)",
+                        }}
+                      >
                         <p>Loading messages...</p>
                       </div>
-                    ) : (conversations.get(selectedDirectMessageFriend._id) || []).length === 0 ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-muted)' }}>
+                    ) : (
+                        conversations.get(selectedDirectMessageFriend._id) || []
+                      ).length === 0 ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          height: "100%",
+                          color: "var(--color-text-muted)",
+                        }}
+                      >
                         <p>No messages yet. Start the conversation!</p>
                       </div>
                     ) : (
-                      (conversations.get(selectedDirectMessageFriend._id) || []).map((message) => (
-                        <MessageItem 
-                          key={message.id} 
-                          message={message} 
+                      (
+                        conversations.get(selectedDirectMessageFriend._id) || []
+                      ).map((message) => (
+                        <MessageItem
+                          key={message.id}
+                          message={message}
                           renderMessageContent={renderMessageContent}
                           onVisible={handleMessageVisible}
+                          currentUserId={currentUserId}
+                          onReaction={handleReaction}
+                          onReply={handleReplyToMessage}
+                          onPin={handlePinMessage}
+                          onReport={(msgId) => setShowReportDialog(msgId)}
+                          onDelete={(msgId) => setShowDeleteDialog(msgId)}
                         />
                       ))
                     )
                   ) : loading ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-muted)' }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        height: "100%",
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
                       <p>Loading messages...</p>
                     </div>
                   ) : messages.length === 0 ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-muted)' }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        height: "100%",
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
                       <p>No messages yet. Start the conversation!</p>
                     </div>
                   ) : (
                     messages.map((message) => (
-                      <MessageItem 
-                        key={message.id} 
-                        message={message} 
+                      <MessageItem
+                        key={message.id}
+                        message={message}
                         renderMessageContent={renderMessageContent}
                         onVisible={handleMessageVisible}
+                        currentUserId={currentUserId}
+                        onReaction={handleReaction}
+                        onReply={handleReplyToMessage}
+                        onPin={handlePinMessage}
+                        onReport={(msgId) => setShowReportDialog(msgId)}
+                        onDelete={(msgId) => setShowDeleteDialog(msgId)}
                       />
                     ))
                   )}
-                  
+
                   {/* ✅ Typing Indicator */}
-                  {selectedDirectMessageFriend && userTyping && 
-                    userTyping.fromUserId === selectedDirectMessageFriend._id && 
+                  {selectedDirectMessageFriend &&
+                    userTyping &&
+                    userTyping.fromUserId === selectedDirectMessageFriend._id &&
                     userTyping.isTyping && (
-                    <div className={styles.typingIndicator}>
-                      <div className={styles.typingAvatar}>
-                        {isValidAvatarUrl(selectedDirectMessageFriend.avatarUrl) ? (
-                          <img src={selectedDirectMessageFriend.avatarUrl} alt={selectedDirectMessageFriend.username} />
-                        ) : (
-                          <div className={styles.avatarPlaceholder}>
-                            {(selectedDirectMessageFriend.username || selectedDirectMessageFriend.displayName || "?").charAt(0).toUpperCase()}
+                      <div className={styles.typingIndicator}>
+                        <div className={styles.typingAvatar}>
+                          {isValidAvatarUrl(
+                            selectedDirectMessageFriend.avatarUrl,
+                          ) ? (
+                            <img
+                              src={selectedDirectMessageFriend.avatarUrl}
+                              alt={selectedDirectMessageFriend.username}
+                            />
+                          ) : (
+                            <div className={styles.avatarPlaceholder}>
+                              {(
+                                selectedDirectMessageFriend.username ||
+                                selectedDirectMessageFriend.displayName ||
+                                "?"
+                              )
+                                .charAt(0)
+                                .toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className={styles.typingBubble}>
+                          <span className={styles.typingText}>
+                            {userTyping.username ||
+                              selectedDirectMessageFriend.username ||
+                              selectedDirectMessageFriend.displayName}{" "}
+                            is typing...
+                          </span>
+                          <div className={styles.typingDots}>
+                            <span></span>
+                            <span></span>
+                            <span></span>
                           </div>
-                        )}
-                      </div>
-                      <div className={styles.typingBubble}>
-                        <span className={styles.typingText}>
-                          {userTyping.username || selectedDirectMessageFriend.username || selectedDirectMessageFriend.displayName} đang gõ...
-                        </span>
-                        <div className={styles.typingDots}>
-                          <span></span>
-                          <span></span>
-                          <span></span>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  
+                    )}
+
                   <div ref={messagesEndRef} />
                 </div>
+
+                {/* Reply Preview */}
+                {replyingTo && (
+                  <ReplyMessagePreview
+                    message={replyingTo}
+                    onClose={() => setReplyingTo(null)}
+                  />
+                )}
 
                 {/* Input Area */}
                 <div className={styles.inputArea}>
                   {/* Plus Menu Button */}
-                  <div style={{ position: 'relative' }}>
-                    <button 
-                      className={styles.plusButton} 
+                  <div style={{ position: "relative" }}>
+                    <button
+                      className={styles.plusButton}
                       title="More options"
                       onClick={() => setShowPlusMenu(!showPlusMenu)}
                     >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <path d="M12 5v14M5 12h14"></path>
                       </svg>
                     </button>
@@ -2286,44 +3438,65 @@ export default function MessagesPage() {
                     {/* Plus Menu Popup */}
                     {showPlusMenu && (
                       <div className={styles.plusMenuPopup}>
-                        <button 
+                        <button
                           className={styles.plusMenuItem}
                           onClick={handleFileUpload}
                         >
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="17 8 12 3 7 8"></polyline>
                             <line x1="12" y1="3" x2="12" y2="15"></line>
                           </svg>
-                          <span>Tải Lên Tệp</span>
+                          <span>Upload file</span>
                         </button>
-                        <button 
+                        <button
                           className={styles.plusMenuItem}
                           onClick={handleCreatePoll}
                         >
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                             <polyline points="14 2 14 8 20 8"></polyline>
                             <line x1="16" y1="13" x2="8" y2="13"></line>
                             <line x1="16" y1="17" x2="8" y2="17"></line>
                             <polyline points="10 9 9 9 8 9"></polyline>
                           </svg>
-                          <span>Tạo khảo sát</span>
+                          <span>Create poll</span>
                         </button>
-                        <button 
+                        <button
                           className={styles.plusMenuItem}
                           onClick={() => {
-                            console.log("Dùng các Ứng dụng");
+                            console.log("Use apps");
                             setShowPlusMenu(false);
                           }}
                         >
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
                             <rect x="3" y="3" width="7" height="7"></rect>
                             <rect x="14" y="3" width="7" height="7"></rect>
                             <rect x="14" y="14" width="7" height="7"></rect>
                             <rect x="3" y="14" width="7" height="7"></rect>
                           </svg>
-                          <span>Dùng các Ứng dụng</span>
+                          <span>Use apps</span>
                         </button>
                       </div>
                     )}
@@ -2341,7 +3514,7 @@ export default function MessagesPage() {
                   {isUploadingVoice && (
                     <div className={styles.uploadingVoice}>
                       <div className={styles.spinner}></div>
-                      <span>Đang tải lên...</span>
+                      <span>Uploading...</span>
                     </div>
                   )}
 
@@ -2354,162 +3527,355 @@ export default function MessagesPage() {
                           className={styles.messageInput}
                           placeholder="Message..."
                           value={messageText}
-                      onChange={(e) => {
-                        const newValue = e.target.value;
-                        setMessageText(newValue);
-                        
-                        // ✅ Optimized Typing indicator logic - only for direct messages
-                        if (selectedDirectMessageFriend && notifyTyping && newValue.length > 0) {
-                          // Only notify once when starting to type
-                          if (!isTypingRef.current) {
-                            isTypingRef.current = true;
-                            notifyTyping(selectedDirectMessageFriend._id, true);
-                          }
-                          
-                          // Clear previous timeout
-                          if (typingTimeoutRef.current) {
-                            clearTimeout(typingTimeoutRef.current);
-                          }
-                          
-                          // Set timeout to stop typing after 2 seconds of inactivity
-                          typingTimeoutRef.current = setTimeout(() => {
-                            if (isTypingRef.current) {
+                          onChange={(e) => {
+                            const newValue = e.target.value;
+                            setMessageText(newValue);
+
+                            // ✅ Optimized Typing indicator logic - only for direct messages
+                            if (
+                              selectedDirectMessageFriend &&
+                              notifyTyping &&
+                              newValue.length > 0
+                            ) {
+                              // Only notify once when starting to type
+                              if (!isTypingRef.current) {
+                                isTypingRef.current = true;
+                                notifyTyping(
+                                  selectedDirectMessageFriend._id,
+                                  true,
+                                );
+                              }
+
+                              // Clear previous timeout
+                              if (typingTimeoutRef.current) {
+                                clearTimeout(typingTimeoutRef.current);
+                              }
+
+                              // Set timeout to stop typing after 2 seconds of inactivity
+                              typingTimeoutRef.current = setTimeout(() => {
+                                if (isTypingRef.current) {
+                                  isTypingRef.current = false;
+                                  notifyTyping(
+                                    selectedDirectMessageFriend._id,
+                                    false,
+                                  );
+                                }
+                              }, 2000);
+                            } else if (
+                              selectedDirectMessageFriend &&
+                              notifyTyping &&
+                              newValue.length === 0 &&
+                              isTypingRef.current
+                            ) {
+                              // Stop typing immediately when input is cleared
                               isTypingRef.current = false;
-                              notifyTyping(selectedDirectMessageFriend._id, false);
+                              notifyTyping(
+                                selectedDirectMessageFriend._id,
+                                false,
+                              );
+                              if (typingTimeoutRef.current) {
+                                clearTimeout(typingTimeoutRef.current);
+                              }
                             }
-                          }, 2000);
-                        } else if (selectedDirectMessageFriend && notifyTyping && newValue.length === 0 && isTypingRef.current) {
-                          // Stop typing immediately when input is cleared
-                          isTypingRef.current = false;
-                          notifyTyping(selectedDirectMessageFriend._id, false);
-                          if (typingTimeoutRef.current) {
-                            clearTimeout(typingTimeoutRef.current);
-                          }
-                        }
-                      }}
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          
-                          // ✅ Stop typing when sending message
-                          if (selectedDirectMessageFriend && notifyTyping && isTypingRef.current) {
-                            isTypingRef.current = false;
-                            notifyTyping(selectedDirectMessageFriend._id, false);
-                            if (typingTimeoutRef.current) {
-                              clearTimeout(typingTimeoutRef.current);
+                          }}
+                          onKeyPress={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+
+                              // ✅ Stop typing when sending message
+                              if (
+                                selectedDirectMessageFriend &&
+                                notifyTyping &&
+                                isTypingRef.current
+                              ) {
+                                isTypingRef.current = false;
+                                notifyTyping(
+                                  selectedDirectMessageFriend._id,
+                                  false,
+                                );
+                                if (typingTimeoutRef.current) {
+                                  clearTimeout(typingTimeoutRef.current);
+                                }
+                              }
+
+                              selectedDirectMessageFriend
+                                ? handleSendDirectMessage()
+                                : handleSendMessage();
                             }
-                          }
-                          
-                          selectedDirectMessageFriend ? handleSendDirectMessage() : handleSendMessage();
-                        }
-                      }}
-                    />
+                          }}
+                        />
                       </div>
 
                       {/* Media Buttons */}
                       <div className={styles.mediaButtons}>
-                    {/* Voice Recording Button */}
-                    <button 
-                      className={styles.mediaButton} 
-                      title="Gửi tin nhắn thoại"
-                      onClick={() => setIsRecordingVoice(true)}
-                      disabled={isRecordingVoice || isUploadingVoice}
-                    >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                        <line x1="12" y1="19" x2="12" y2="23"></line>
-                        <line x1="8" y1="23" x2="16" y2="23"></line>
-                      </svg>
-                    </button>
+                        {/* Voice Recording Button */}
+                        <button
+                          className={styles.mediaButton}
+                          title="Send voice message"
+                          onClick={() => setIsRecordingVoice(true)}
+                          disabled={isRecordingVoice || isUploadingVoice}
+                        >
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                            <line x1="12" y1="19" x2="12" y2="23"></line>
+                            <line x1="8" y1="23" x2="16" y2="23"></line>
+                          </svg>
+                        </button>
 
-                    {/* GIF Button */}
-                    <button 
-                      className={styles.mediaButton} 
-                      title="Send GIF"
-                      onClick={() => {
-                        setGiphyPickerMode('gif');
-                        setShowGiphyPicker(true);
-                        setShowEmojiPicker(false);
-                      }}
-                    >
-                      <span style={{ fontSize: '14px', fontWeight: 'bold' }}>GIF</span>
-                    </button>
+                        {/* GIF Button */}
+                        <button
+                          className={styles.mediaButton}
+                          title="Send GIF"
+                          onClick={() => {
+                            setGiphyPickerMode("gif");
+                            setShowGiphyPicker(true);
+                            setShowEmojiPicker(false);
+                          }}
+                        >
+                          <span
+                            style={{ fontSize: "14px", fontWeight: "bold" }}
+                          >
+                            GIF
+                          </span>
+                        </button>
 
-                    {/* Sticker Button */}
-                    <button 
-                      className={styles.mediaButton} 
-                      title="Send sticker"
-                      onClick={() => {
-                        setGiphyPickerMode('sticker');
-                        setShowGiphyPicker(true);
-                        setShowEmojiPicker(false);
-                      }}
-                    >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        {/* Paper/Note background */}
-                        <rect x="3" y="2" width="18" height="20" rx="2" ry="2"></rect>
-                        <line x1="7" y1="6" x2="17" y2="6"></line>
-                        {/* Smiley face */}
-                        <circle cx="9" cy="11" r="1" fill="currentColor"></circle>
-                        <circle cx="15" cy="11" r="1" fill="currentColor"></circle>
-                        <path d="M9 14.5c0.5 1 1.5 1.5 3 1.5s2.5-0.5 3-1.5" strokeLinecap="round"></path>
-                      </svg>
-                    </button>
+                        {/* Sticker Button */}
+                        <button
+                          className={styles.mediaButton}
+                          title="Send sticker"
+                          onClick={() => {
+                            setGiphyPickerMode("sticker");
+                            setShowGiphyPicker(true);
+                            setShowEmojiPicker(false);
+                          }}
+                        >
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            {/* Paper/Note background */}
+                            <rect
+                              x="3"
+                              y="2"
+                              width="18"
+                              height="20"
+                              rx="2"
+                              ry="2"
+                            ></rect>
+                            <line x1="7" y1="6" x2="17" y2="6"></line>
+                            {/* Smiley face */}
+                            <circle
+                              cx="9"
+                              cy="11"
+                              r="1"
+                              fill="currentColor"
+                            ></circle>
+                            <circle
+                              cx="15"
+                              cy="11"
+                              r="1"
+                              fill="currentColor"
+                            ></circle>
+                            <path
+                              d="M9 14.5c0.5 1 1.5 1.5 3 1.5s2.5-0.5 3-1.5"
+                              strokeLinecap="round"
+                            ></path>
+                          </svg>
+                        </button>
 
-                    {/* Emoji Picker */}
-                    <div style={{ position: 'relative' }}>
-                      <button 
-                        className={styles.mediaButton} 
-                        title="Send emoji"
-                        onClick={() => {
-                          setShowEmojiPicker(!showEmojiPicker);
-                          setShowGifPicker(false);
-                        }}
+                        {/* Emoji Picker */}
+                        <div style={{ position: "relative" }}>
+                          <button
+                            className={styles.mediaButton}
+                            title="Send emoji"
+                            onClick={() => {
+                              setShowEmojiPicker(!showEmojiPicker);
+                              setShowGifPicker(false);
+                            }}
+                          >
+                            <svg
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                              <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                              <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                            </svg>
+                          </button>
+
+                          {showEmojiPicker && (
+                            <div className={styles.emojiPickerWrapper}>
+                              <div className={styles.emojiPickerContent}>
+                                {/* Simple emoji grid - will be replaced with emoji-picker-react once installed */}
+                                <div className={styles.emojiGrid}>
+                                  {[
+                                    "😀",
+                                    "😃",
+                                    "😄",
+                                    "😁",
+                                    "😆",
+                                    "😅",
+                                    "🤣",
+                                    "😂",
+                                    "🙂",
+                                    "🙃",
+                                    "😉",
+                                    "😊",
+                                    "😇",
+                                    "🥰",
+                                    "😍",
+                                    "🤩",
+                                    "😘",
+                                    "😗",
+                                    "😚",
+                                    "😙",
+                                    "🥲",
+                                    "😋",
+                                    "😛",
+                                    "😜",
+                                    "🤪",
+                                    "😝",
+                                    "🤑",
+                                    "🤗",
+                                    "🤭",
+                                    "🤫",
+                                    "🤔",
+                                    "🤐",
+                                    "🤨",
+                                    "😐",
+                                    "😑",
+                                    "😶",
+                                    "😏",
+                                    "😒",
+                                    "🙄",
+                                    "😬",
+                                    "🤥",
+                                    "😌",
+                                    "😔",
+                                    "😪",
+                                    "🤤",
+                                    "😴",
+                                    "😷",
+                                    "🤒",
+                                    "🤕",
+                                    "🤢",
+                                    "🤮",
+                                    "🤧",
+                                    "🥵",
+                                    "🥶",
+                                    "🥴",
+                                    "😵",
+                                    "🤯",
+                                    "🤠",
+                                    "🥳",
+                                    "🥸",
+                                    "😎",
+                                    "🤓",
+                                    "🧐",
+                                    "😕",
+                                    "😟",
+                                    "🙁",
+                                    "☹️",
+                                    "😮",
+                                    "😯",
+                                    "😲",
+                                    "😳",
+                                    "🥺",
+                                    "😦",
+                                    "😧",
+                                    "😨",
+                                    "😰",
+                                    "😥",
+                                    "😢",
+                                    "😭",
+                                    "😱",
+                                    "😖",
+                                    "😣",
+                                    "😞",
+                                    "😓",
+                                    "😩",
+                                    "😫",
+                                    "🥱",
+                                    "😤",
+                                    "😡",
+                                    "😠",
+                                    "🤬",
+                                    "👍",
+                                    "👎",
+                                    "👏",
+                                    "🙏",
+                                    "❤️",
+                                    "💔",
+                                    "💕",
+                                    "💖",
+                                    "💗",
+                                    "💓",
+                                    "💞",
+                                    "💘",
+                                    "💝",
+                                    "🔥",
+                                    "✨",
+                                    "🎉",
+                                    "🎊",
+                                    "🎈",
+                                  ].map((emoji) => (
+                                    <button
+                                      key={emoji}
+                                      className={styles.emojiButton}
+                                      onClick={() => {
+                                        setMessageText((prev) => prev + emoji);
+                                        setShowEmojiPicker(false);
+                                      }}
+                                    >
+                                      {emoji}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        className={styles.sendButton}
+                        onClick={
+                          selectedDirectMessageFriend
+                            ? handleSendDirectMessage
+                            : handleSendMessage
+                        }
+                        disabled={!messageText.trim()}
+                        title="Send message"
                       >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10"></circle>
-                          <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-                          <line x1="9" y1="9" x2="9.01" y2="9"></line>
-                          <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M16.6915026,12.4744748 L3.50612381,13.2599618 C3.19218622,13.2599618 3.03521743,13.4170592 3.03521743,13.5741566 L1.15159189,20.0151496 C0.8376543,20.8006365 0.99,21.89 1.77946707,22.52 C2.41,22.99 3.50612381,23.1 4.13399899,22.8429026 L21.714504,14.0454487 C22.6563168,13.5741566 23.1272231,12.6315722 22.9702544,11.6889879 L4.13399899,1.16346272 C3.34915502,0.9 2.40734225,0.9 1.77946707,1.4071521 C0.994623095,2.0605983 0.837654326,3.0031827 1.15159189,3.7886696 L3.03521743,10.2296625 C3.03521743,10.3867599 3.19218622,10.5438573 3.50612381,10.5438573 L16.6915026,11.3293442 C16.6915026,11.3293442 17.1624089,11.3293442 17.1624089,10.8580521 L17.1624089,12.4744748 C17.1624089,12.4744748 17.1624089,12.9457669 16.6915026,12.4744748 Z"></path>
                         </svg>
                       </button>
-
-                      {showEmojiPicker && (
-                        <div className={styles.emojiPickerWrapper}>
-                          <div className={styles.emojiPickerContent}>
-                            {/* Simple emoji grid - will be replaced with emoji-picker-react once installed */}
-                            <div className={styles.emojiGrid}>
-                              {['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '👍', '👎', '👏', '🙏', '❤️', '💔', '💕', '💖', '💗', '💓', '💞', '💘', '💝', '🔥', '✨', '🎉', '🎊', '🎈'].map((emoji) => (
-                                <button
-                                  key={emoji}
-                                  className={styles.emojiButton}  
-                                  onClick={() => {
-                                    setMessageText((prev) => prev + emoji);
-                                    setShowEmojiPicker(false);
-                                  }}
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      </div>
-                    </div>
-
-                    <button
-                      className={styles.sendButton}
-                      onClick={selectedDirectMessageFriend ? handleSendDirectMessage : handleSendMessage}
-                      disabled={!messageText.trim()}
-                      title="Send message"
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M16.6915026,12.4744748 L3.50612381,13.2599618 C3.19218622,13.2599618 3.03521743,13.4170592 3.03521743,13.5741566 L1.15159189,20.0151496 C0.8376543,20.8006365 0.99,21.89 1.77946707,22.52 C2.41,22.99 3.50612381,23.1 4.13399899,22.8429026 L21.714504,14.0454487 C22.6563168,13.5741566 23.1272231,12.6315722 22.9702544,11.6889879 L4.13399899,1.16346272 C3.34915502,0.9 2.40734225,0.9 1.77946707,1.4071521 C0.994623095,2.0605983 0.837654326,3.0031827 1.15159189,3.7886696 L3.03521743,10.2296625 C3.03521743,10.3867599 3.19218622,10.5438573 3.50612381,10.5438573 L16.6915026,11.3293442 C16.6915026,11.3293442 17.1624089,11.3293442 17.1624089,10.8580521 L17.1624089,12.4744748 C17.1624089,12.4744748 17.1624089,12.9457669 16.6915026,12.4744748 Z"></path>
-                      </svg>
-                    </button>
-                  </>
+                    </>
                   )}
                 </div>
               </>
@@ -2517,7 +3883,9 @@ export default function MessagesPage() {
               <div className={styles.emptyState}>
                 <div className={styles.emptyIcon}>💬</div>
                 <p className={styles.emptyText}>
-                  {loading ? "Loading..." : "Select a server and channel to start messaging"}
+                  {loading
+                    ? "Loading..."
+                    : "Select a server and channel to start messaging"}
                 </p>
               </div>
             )}
@@ -2531,51 +3899,94 @@ export default function MessagesPage() {
                   <h3 className={styles.activeNowTitle}>Profile</h3>
                 </div>
                 <div className={styles.activeNowContainer}>
-                  <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-                    {/* Avatar */}
-                    <div style={{
-                      width: "80px",
-                      height: "80px",
-                      borderRadius: "50%",
-                      backgroundImage: isValidAvatarUrl(selectedDirectMessageFriend.avatarUrl) ? `url(${selectedDirectMessageFriend.avatarUrl})` : `linear-gradient(135deg, #667eea 0%, #764ba2 100%)`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                      margin: "0 auto",
+                  <div
+                    style={{
+                      padding: "16px",
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      fontSize: "32px",
-                      fontWeight: "600"
-                    }}>
-                      {!isValidAvatarUrl(selectedDirectMessageFriend.avatarUrl) && (
-                        <span>{(selectedDirectMessageFriend.displayName || selectedDirectMessageFriend.username)?.charAt(0)?.toUpperCase()}</span>
+                      flexDirection: "column",
+                      gap: "12px",
+                    }}
+                  >
+                    {/* Avatar */}
+                    <div
+                      style={{
+                        width: "80px",
+                        height: "80px",
+                        borderRadius: "50%",
+                        backgroundImage: isValidAvatarUrl(
+                          selectedDirectMessageFriend.avatarUrl,
+                        )
+                          ? `url(${selectedDirectMessageFriend.avatarUrl})`
+                          : `linear-gradient(135deg, #667eea 0%, #764ba2 100%)`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        margin: "0 auto",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "white",
+                        fontSize: "32px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      {!isValidAvatarUrl(
+                        selectedDirectMessageFriend.avatarUrl,
+                      ) && (
+                        <span>
+                          {(
+                            selectedDirectMessageFriend.displayName ||
+                            selectedDirectMessageFriend.username
+                          )
+                            ?.charAt(0)
+                            ?.toUpperCase()}
+                        </span>
                       )}
                     </div>
-                    
+
                     {/* Name & Email */}
                     <div style={{ textAlign: "center" }}>
-                      <p style={{ margin: "0 0 4px 0", fontWeight: "600", fontSize: "16px" }}>
-                        {selectedDirectMessageFriend.displayName || selectedDirectMessageFriend.username}
+                      <p
+                        style={{
+                          margin: "0 0 4px 0",
+                          fontWeight: "600",
+                          fontSize: "16px",
+                        }}
+                      >
+                        {selectedDirectMessageFriend.displayName ||
+                          selectedDirectMessageFriend.username}
                       </p>
-                      <p style={{ margin: "0", fontSize: "12px", color: "var(--color-text-muted)" }}>
+                      <p
+                        style={{
+                          margin: "0",
+                          fontSize: "12px",
+                          color: "var(--color-text-muted)",
+                        }}
+                      >
                         @{selectedDirectMessageFriend.username}
                       </p>
-                      <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "var(--color-text-muted)" }}>
+                      <p
+                        style={{
+                          margin: "4px 0 0 0",
+                          fontSize: "12px",
+                          color: "var(--color-text-muted)",
+                        }}
+                      >
                         {selectedDirectMessageFriend.email}
                       </p>
                     </div>
 
                     {/* Bio */}
                     {selectedDirectMessageFriend.bio && (
-                      <div style={{ 
-                        padding: "8px 12px", 
-                        background: "var(--color-bg)", 
-                        borderRadius: "6px",
-                        fontSize: "12px",
-                        color: "var(--color-text-muted)",
-                        lineHeight: "1.4"
-                      }}>
+                      <div
+                        style={{
+                          padding: "8px 12px",
+                          background: "var(--color-bg)",
+                          borderRadius: "6px",
+                          fontSize: "12px",
+                          color: "var(--color-text-muted)",
+                          lineHeight: "1.4",
+                        }}
+                      >
                         {selectedDirectMessageFriend.bio}
                       </div>
                     )}
@@ -2589,7 +4000,13 @@ export default function MessagesPage() {
                 </div>
                 <div className={styles.activeNowContainer}>
                   <div style={{ padding: "20px", textAlign: "center" }}>
-                    <p style={{ color: "var(--color-text-muted)", margin: 0, fontSize: "14px" }}>
+                    <p
+                      style={{
+                        color: "var(--color-text-muted)",
+                        margin: 0,
+                        fontSize: "14px",
+                      }}
+                    >
                       It's quiet for now...
                     </p>
                   </div>
@@ -2602,25 +4019,29 @@ export default function MessagesPage() {
 
       {/* Create Server Modal */}
       {showCreateServerModal && (
-        <div style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: "rgba(0, 0, 0, 0.5)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 1000,
-        }}>
-          <div style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: "8px",
-            padding: "24px",
-            minWidth: "400px",
-          }}>
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "8px",
+              padding: "24px",
+              minWidth: "400px",
+            }}
+          >
             <h2 style={{ marginTop: 0 }}>Create New Server</h2>
             <input
               type="text"
@@ -2643,7 +4064,13 @@ export default function MessagesPage() {
                 }
               }}
             />
-            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                justifyContent: "flex-end",
+              }}
+            >
               <button
                 onClick={() => {
                   setShowCreateServerModal(false);
@@ -2665,7 +4092,9 @@ export default function MessagesPage() {
                 disabled={!serverName.trim()}
                 style={{
                   padding: "8px 16px",
-                  background: serverName.trim() ? "var(--color-primary)" : "var(--color-border)",
+                  background: serverName.trim()
+                    ? "var(--color-primary)"
+                    : "var(--color-border)",
                   border: "none",
                   borderRadius: "4px",
                   cursor: serverName.trim() ? "pointer" : "not-allowed",
@@ -2682,11 +4111,21 @@ export default function MessagesPage() {
       {/* Create Poll Modal */}
       {showCreatePollModal && (
         <div className={styles.modalOverlay} onClick={handleCancelPoll}>
-          <div className={styles.createPollModal} onClick={(e) => e.stopPropagation()}>
+          <div
+            className={styles.createPollModal}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className={styles.pollModalHeader}>
-              <h2>Tạo một khảo sát</h2>
+              <h2>Create a poll</h2>
               <button className={styles.closeButton} onClick={handleCancelPoll}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
@@ -2696,27 +4135,36 @@ export default function MessagesPage() {
             <div className={styles.pollModalBody}>
               {/* Question */}
               <div className={styles.pollField}>
-                <label className={styles.pollLabel}>Câu hỏi</label>
+                <label className={styles.pollLabel}>Question</label>
                 <div className={styles.pollInputWrapper}>
                   <input
                     type="text"
                     className={styles.pollInput}
-                    placeholder="Câu hỏi bạn muốn đặt ra là gì?"
+                    placeholder="What question do you want to ask?"
                     value={pollQuestion}
                     onChange={(e) => setPollQuestion(e.target.value)}
                     maxLength={300}
                   />
-                  <span className={styles.charCounter}>{pollQuestion.length} / 300</span>
+                  <span className={styles.charCounter}>
+                    {pollQuestion.length} / 300
+                  </span>
                 </div>
               </div>
 
               {/* Options */}
               <div className={styles.pollField}>
-                <label className={styles.pollLabel}>Câu trả lời</label>
+                <label className={styles.pollLabel}>Answers</label>
                 {pollOptions.map((option, index) => (
                   <div key={index} className={styles.pollOptionRow}>
                     <button className={styles.emojiButton}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <circle cx="12" cy="12" r="10"></circle>
                         <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
                         <line x1="9" y1="9" x2="9.01" y2="9"></line>
@@ -2726,16 +4174,25 @@ export default function MessagesPage() {
                     <input
                       type="text"
                       className={styles.pollOptionInput}
-                      placeholder="Nhập câu trả lời của bạn"
+                      placeholder="Enter your answer"
                       value={option}
-                      onChange={(e) => handlePollOptionChange(index, e.target.value)}
+                      onChange={(e) =>
+                        handlePollOptionChange(index, e.target.value)
+                      }
                     />
                     {pollOptions.length > 2 && (
-                      <button 
+                      <button
                         className={styles.deleteOptionButton}
                         onClick={() => handleRemovePollOption(index)}
                       >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
                           <polyline points="3 6 5 6 21 6"></polyline>
                           <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                         </svg>
@@ -2743,25 +4200,28 @@ export default function MessagesPage() {
                     )}
                   </div>
                 ))}
-                <button className={styles.addOptionButton} onClick={handleAddPollOption}>
-                  + Thêm một câu trả lời khác
+                <button
+                  className={styles.addOptionButton}
+                  onClick={handleAddPollOption}
+                >
+                  + Add another answer
                 </button>
               </div>
 
               {/* Duration */}
               <div className={styles.pollField}>
-                <label className={styles.pollLabel}>Khoảng thời gian</label>
-                <select 
+                <label className={styles.pollLabel}>Duration</label>
+                <select
                   className={styles.pollSelect}
                   value={pollDuration}
                   onChange={(e) => setPollDuration(Number(e.target.value))}
                 >
-                  <option value={1}>1 giờ</option>
-                  <option value={4}>4 giờ</option>
-                  <option value={8}>8 giờ</option>
-                  <option value={24}>24 giờ</option>
-                  <option value={72}>3 ngày</option>
-                  <option value={168}>7 ngày</option>
+                  <option value={1}>1 hour</option>
+                  <option value={4}>4 hours</option>
+                  <option value={8}>8 hours</option>
+                  <option value={24}>24 hours</option>
+                  <option value={72}>3 days</option>
+                  <option value={168}>7 days</option>
                 </select>
               </div>
 
@@ -2773,16 +4233,22 @@ export default function MessagesPage() {
                   checked={pollAllowMultiple}
                   onChange={(e) => setPollAllowMultiple(e.target.checked)}
                 />
-                <label htmlFor="allowMultiple">Cho phép nhiều câu trả lời</label>
+                <label htmlFor="allowMultiple">Allow multiple answers</label>
               </div>
             </div>
 
             <div className={styles.pollModalFooter}>
-              <button className={styles.cancelButton} onClick={handleCancelPoll}>
-                Bãi đăng
+              <button
+                className={styles.cancelButton}
+                onClick={handleCancelPoll}
+              >
+                Cancel
               </button>
-              <button className={styles.submitButton} onClick={handleSubmitPoll}>
-                Đăng
+              <button
+                className={styles.submitButton}
+                onClick={handleSubmitPoll}
+              >
+                Post
               </button>
             </div>
           </div>
@@ -2790,16 +4256,18 @@ export default function MessagesPage() {
       )}
 
       {error && (
-        <div style={{
-          position: "fixed",
-          bottom: "20px",
-          left: "20px",
-          background: "#ff6b6b",
-          color: "white",
-          padding: "12px 16px",
-          borderRadius: "4px",
-          zIndex: 1001,
-        }}>
+        <div
+          style={{
+            position: "fixed",
+            bottom: "20px",
+            left: "20px",
+            background: "#ff6b6b",
+            color: "white",
+            padding: "12px 16px",
+            borderRadius: "4px",
+            zIndex: 1001,
+          }}
+        >
           {error}
         </div>
       )}
@@ -2807,8 +4275,15 @@ export default function MessagesPage() {
       {/* Incoming Call Popup */}
       {incomingCall && (
         <IncomingCallPopup
-          callerName={incomingCall.callerInfo.displayName || incomingCall.callerInfo.username}
-          callerAvatar={isValidAvatarUrl(incomingCall.callerInfo.avatar) ? incomingCall.callerInfo.avatar : undefined}
+          callerName={
+            incomingCall.callerInfo.displayName ||
+            incomingCall.callerInfo.username
+          }
+          callerAvatar={
+            isValidAvatarUrl(incomingCall.callerInfo.avatar)
+              ? incomingCall.callerInfo.avatar
+              : undefined
+          }
           callType={incomingCall.type}
           onAccept={handleAcceptCall}
           onReject={handleRejectCall}
@@ -2819,8 +4294,14 @@ export default function MessagesPage() {
       {/* Outgoing Call Popup */}
       {outgoingCall && (
         <OutgoingCallPopup
-          receiverName={outgoingCall.toUser.displayName || outgoingCall.toUser.username}
-          receiverAvatar={isValidAvatarUrl(outgoingCall.toUser.avatarUrl) ? outgoingCall.toUser.avatarUrl : undefined}
+          receiverName={
+            outgoingCall.toUser.displayName || outgoingCall.toUser.username
+          }
+          receiverAvatar={
+            isValidAvatarUrl(outgoingCall.toUser.avatarUrl)
+              ? outgoingCall.toUser.avatarUrl
+              : undefined
+          }
           callType={outgoingCall.type}
           onCancel={handleCancelCall}
           status={outgoingCall.status}
@@ -2834,6 +4315,49 @@ export default function MessagesPage() {
           onClose={() => setShowGiphyPicker(false)}
           initialTab={giphyPickerMode}
         />
+      )}
+
+      {/* Report Message Dialog */}
+      {showReportDialog && (
+        <ReportMessageDialog
+          onSubmit={(reason, description) =>
+            handleReportMessage(showReportDialog, reason, description)
+          }
+          onClose={() => setShowReportDialog(null)}
+        />
+      )}
+
+      {/* Delete Message Dialog */}
+      {showDeleteDialog && (
+        <DeleteMessageDialog
+          onConfirm={(deleteType) =>
+            handleDeleteMessage(showDeleteDialog, deleteType)
+          }
+          onClose={() => setShowDeleteDialog(null)}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "#2b2d31",
+            color: "#dbdee1",
+            padding: "12px 24px",
+            borderRadius: "8px",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
+            zIndex: 3000,
+            animation: "slideUpFade 0.3s ease",
+            fontSize: "14px",
+            fontWeight: 500,
+          }}
+        >
+          {toastMessage}
+        </div>
       )}
     </div>
   );

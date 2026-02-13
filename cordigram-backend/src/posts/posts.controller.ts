@@ -30,6 +30,7 @@ import { AuthenticatedUser } from '../auth/jwt.strategy';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { UpdateVisibilityDto } from './dto/update-visibility.dto';
+import { UpdatePostNotificationMuteDto } from './dto/update-post-notification-mute.dto';
 import { PostsService } from './posts.service';
 
 @Controller('posts')
@@ -69,13 +70,41 @@ export class PostsController {
   }
 
   @Get('feed')
-  async feed(@Req() req: Request, @Query('limit') limit?: string) {
+  async feed(
+    @Req() req: Request,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+    @Query('scope') scope?: string,
+    @Query('kinds') kinds?: string,
+  ) {
     const user = req.user as AuthenticatedUser | undefined;
     if (!user) {
       throw new UnauthorizedException();
     }
     const parsedLimit = limit ? Number(limit) : undefined;
-    return this.postsService.getFeed(user.userId, parsedLimit ?? 20);
+
+    const parsedKinds = kinds
+      ? kinds
+          .split(',')
+          .map((k) => k.trim())
+          .filter((k) => k === 'post' || k === 'reel')
+      : undefined;
+
+    if (scope === 'following') {
+      return this.postsService.getFollowingFeed(
+        user.userId,
+        parsedLimit ?? 20,
+        (parsedKinds as any) ?? undefined,
+        page ? Number(page) : undefined,
+      );
+    }
+
+    return this.postsService.getFeed(
+      user.userId,
+      parsedLimit ?? 20,
+      (parsedKinds as any) ?? undefined,
+      page ? Number(page) : undefined,
+    );
   }
 
   @Get('saved')
@@ -86,6 +115,60 @@ export class PostsController {
     }
     const parsedLimit = limit ? Number(limit) : undefined;
     return this.postsService.getSavedPosts(user.userId, parsedLimit ?? 24);
+  }
+
+  @Get('hidden')
+  async hidden(@Req() req: Request, @Query('limit') limit?: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const parsedLimit = limit ? Number(limit) : undefined;
+    const items = await this.postsService.getHiddenPosts(
+      user.userId,
+      parsedLimit ?? 24,
+    );
+    return { items };
+  }
+
+  @Get('hashtag/:tag')
+  async listByHashtag(
+    @Req() req: Request,
+    @Param('tag') tag: string,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.postsService.getPostsByHashtag({
+      viewerId: user.userId,
+      tag,
+      limit: parsedLimit,
+      page: page ? Number(page) : undefined,
+    });
+  }
+
+  @Get('hashtag/:tag/reels')
+  async listReelsByHashtag(
+    @Req() req: Request,
+    @Param('tag') tag: string,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.postsService.getReelsByHashtag({
+      viewerId: user.userId,
+      tag,
+      limit: parsedLimit,
+      page: page ? Number(page) : undefined,
+    });
   }
 
   @Get('user/:id')
@@ -141,7 +224,9 @@ export class PostsController {
       !file.mimetype.startsWith('video/') &&
       !file.mimetype.startsWith('audio/')
     ) {
-      throw new BadRequestException('Only image, video, or audio files are allowed');
+      throw new BadRequestException(
+        'Only image, video, or audio files are allowed',
+      );
     }
     return this.postsService.uploadMedia(user.userId, file);
   }
@@ -171,11 +256,14 @@ export class PostsController {
     const invalid = files.find(
       (file) =>
         !file.mimetype.startsWith('image/') &&
-        !file.mimetype.startsWith('video/'),
+        !file.mimetype.startsWith('video/') &&
+        !file.mimetype.startsWith('audio/'),
     );
 
     if (invalid) {
-      throw new BadRequestException('Only image or video files are allowed');
+      throw new BadRequestException(
+        'Only image, video, or audio files are allowed',
+      );
     }
 
     return this.postsService.uploadMediaBatch(user.userId, files);
@@ -197,6 +285,25 @@ export class PostsController {
       throw new UnauthorizedException();
     }
     return this.postsService.unlike(user.userId, postId);
+  }
+
+  @Get(':id/likes')
+  async listLikes(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('id') postId: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.listPostLikes({
+      viewerId: user.userId,
+      postId,
+      limit: limit ? Number(limit) : undefined,
+      cursor: cursor || undefined,
+    });
   }
 
   @Post(':id/save')
@@ -262,6 +369,33 @@ export class PostsController {
     return this.postsService.setVisibility(user.userId, postId, dto.visibility);
   }
 
+  @Get(':id/notifications/mute')
+  async getNotificationMute(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.getNotificationMute(user.userId, postId);
+  }
+
+  @Patch(':id/notifications/mute')
+  @HttpCode(200)
+  async updateNotificationMute(
+    @Req() req: Request,
+    @Param('id') postId: string,
+    @Body() dto: UpdatePostNotificationMuteDto,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.setNotificationMute(user.userId, postId, {
+      enabled: dto.enabled,
+      mutedIndefinitely: dto.mutedIndefinitely,
+      mutedUntil: dto.mutedUntil ?? null,
+    });
+  }
+
   @Delete(':id/save')
   async unsave(@Req() req: Request, @Param('id') postId: string) {
     const user = req.user as AuthenticatedUser | undefined;
@@ -306,6 +440,15 @@ export class PostsController {
       throw new UnauthorizedException();
     }
     return this.postsService.hide(user.userId, postId);
+  }
+
+  @Delete(':id/hide')
+  async unhide(@Req() req: Request, @Param('id') postId: string) {
+    const user = req.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return this.postsService.unhide(user.userId, postId);
   }
 
   @Post(':id/report')

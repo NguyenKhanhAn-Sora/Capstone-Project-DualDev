@@ -1,0 +1,384 @@
+{
+  "settings": {
+    "system": {
+      "title": "Hệ thống",
+      "description": "Chọn ngôn ngữ và giao diện hiển thị.",
+      "language": {
+        "title": "Ngôn ngữ",
+        "description": "Chọn ngôn ngữ hiển thị ưa thích.",
+        "options": {
+          "en": "Tiếng Anh",
+          "vi": "Tiếng Việt"
+        }
+      },
+      "theme": {
+        "title": "Giao diện",
+        "description": "Chuyển giữa chế độ sáng và tối.",
+        "options": {
+          "light": "Sáng",
+          "dark": "Tối"
+        }
+      }
+    }
+  },
+  "sidebar": {
+    "nav": {
+      "home": "Trang chủ",
+      "search": "Tìm kiếm",
+      "message": "Tin nhắn",
+      "following": "Đang theo dõi",
+      "explore": "Khám phá",
+      "notification": "Thông báo",
+      "create": "Tạo",
+      "reels": "Reels"
+    },
+    "menu": {
+      "profile": "Hồ sơ",
+      "settings": "Cài đặt",
+      "saved": "Đã lưu",
+      "switchToLight": "Chuyển sang sáng",
+      "switchToDark": "Chuyển sang tối",
+      "reportProblem": "Báo lỗi",
+      "switchAccount": "Chuyển tài khoản",
+      "logout": "Đăng xuất"
+    },
+    "switchAccount": {
+      "title": "Đăng nhập để tiếp tục",
+      "email": {
+        "label": "Địa chỉ email",
+        "placeholder": "Nhập email"
+      },
+      "password": {
+        "label": "Mật khẩu",
+        "placeholder": "Nhập mật khẩu",
+        "show": "Hiện mật khẩu",
+        "hide": "Ẩn mật khẩu"
+      },
+      "submit": {
+        "label": "Đăng nhập",
+        "loading": "Đang chuyển..."
+      },
+      "google": "Tiếp tục với Google",
+      "errors": {
+        "invalidEmail": "Email không hợp lệ",
+        "loginFailed": "Đăng nhập thất bại. Vui lòng thử lại."
+      }
+    }
+  },
+  "common": {
+    "close": "Đóng",
+    "hidePost": "Ẩn bài viết"
+  },
+  "home": {
+    "feed": {
+      "signInToView": "Đăng nhập để xem bảng tin",
+      "unableToLoad": "Không thể tải bảng tin",
+      "loadMore": "Tải thêm",
+      "suggestionsAria": "Gợi ý"
+    },
+    "toast": {
+      "signInToRepost": "Đăng nhập để đăng lại",
+      "reposted": "Đã đăng lại",
+      "repostedWithQuote": "Đã đăng lại kèm trích dẫn",
+      "commentsOn": "Đã bật bình luận",
+      "commentsOff": "Đã tắt bình luận",
+      "commentsUpdateFailed": "Cập nhật bình luận thất bại",
+      "likeCountHidden": "Đã ẩn lượt thích",
+      "likeCountVisible": "Đã hiển thị lượt thích",
+      "likeCountUpdateFailed": "Cập nhật hiển thị lượt thích thất bại",
+      "linkCopied": "Đã sao chép liên kết",
+      "linkCopyFailed": "Sao chép liên kết thất bại",
+      "signInToDelete": "Vui lòng đăng nhập để xóa bài viết",
+      "deletedPost": "Đã xóa bài viết",
+      "deleteFailed": "Xóa bài viết thất bại",
+      "reportSubmitted": "Đã gửi báo cáo",
+      "reportSubmitFailed": "Không thể gửi báo cáo",
+      "actionFailed": "Thao tác thất bại",
+      "blockFailed": "Chặn thất bại"
+    },
+    "delete": {
+      "title": "Xóa bài viết này?",
+      "body": "Bài viết của {name} sẽ bị xóa cho mọi người. Hành động này không thể hoàn tác.",
+      "cancel": "Hủy",
+      "confirm": "Xóa",
+      "deleting": "Đang xóa..."
+    },
+    "block": {
+      "title": "Chặn tài khoản này?",
+      "body": "Bạn sắp chặn {name}. Họ sẽ không thể tương tác với bạn nữa.",
+      "cancel": "Hủy",
+      "confirm": "Chặn",
+      "blocking": "Đang chặn...",
+      "thisUser": "người dùng này"
+    },
+    "report": {
+      "title": "Báo cáo bài viết",
+      "description": "Đang báo cáo bài viết của @{name}. Vui lòng chọn lý do phù hợp nhất.",
+      "selectReason": "Chọn lý do cụ thể",
+      "pickCategory": "Hãy chọn danh mục trước.",
+      "cancel": "Hủy",
+      "submit": "Gửi báo cáo",
+      "submitting": "Đang gửi...",
+      "notes": {
+        "label": "Ghi chú thêm (không bắt buộc)",
+        "placeholder": "Thêm ngữ cảnh nếu cần..."
+      },
+      "groups": {
+        "abuse": {
+          "label": "Quấy rối / Thù ghét",
+          "reasons": {
+            "harassment": "Nhắm mục tiêu cá nhân để quấy rối",
+            "hateSpeech": "Ngôn từ thù ghét hoặc phân biệt đối xử",
+            "offensiveDiscrimination": "Tấn công nhóm dễ bị tổn thương"
+          }
+        },
+        "violence": {
+          "label": "Bạo lực / Đe dọa",
+          "reasons": {
+            "violenceThreats": "Đe dọa hoặc cổ xúy bạo lực",
+            "graphicViolence": "Hình ảnh bạo lực đồ họa",
+            "extremism": "Cực đoan hoặc khủng bố",
+            "selfHarm": "Tự hại hoặc tự tử"
+          }
+        },
+        "sensitive": {
+          "label": "Nội dung nhạy cảm",
+          "reasons": {
+            "nudity": "Khỏa thân hoặc nội dung người lớn",
+            "minorNudity": "Rủi ro an toàn cho trẻ vị thành niên",
+            "sexualSolicitation": "Gạ gẫm tình dục"
+          }
+        },
+        "misinfo": {
+          "label": "Giả mạo / Thông tin sai lệch",
+          "reasons": {
+            "fakeNews": "Thông tin sai lệch hoặc gây hiểu nhầm",
+            "impersonation": "Mạo danh cá nhân hoặc tổ chức"
+          }
+        },
+        "spam": {
+          "label": "Spam / Lừa đảo",
+          "reasons": {
+            "spam": "Spam hoặc nội dung không liên quan",
+            "financialScam": "Lừa đảo tài chính",
+            "unsolicitedAds": "Quảng cáo không mong muốn"
+          }
+        },
+        "ip": {
+          "label": "Sở hữu trí tuệ",
+          "reasons": {
+            "copyright": "Vi phạm bản quyền",
+            "trademark": "Vi phạm nhãn hiệu",
+            "brandImpersonation": "Mạo danh thương hiệu"
+          }
+        },
+        "illegal": {
+          "label": "Hoạt động trái pháp luật",
+          "reasons": {
+            "contraband": "Hàng cấm",
+            "illegalTransaction": "Giao dịch trái phép"
+          }
+        },
+        "privacy": {
+          "label": "Xâm phạm quyền riêng tư",
+          "reasons": {
+            "doxxing": "Tiết lộ thông tin cá nhân",
+            "nonconsensualIntimate": "Nội dung nhạy cảm không đồng thuận"
+          }
+        },
+        "other": {
+          "label": "Khác",
+          "reasons": {
+            "other": "Lý do khác"
+          }
+        }
+      }
+    },
+    "visibility": {
+      "title": "Chỉnh sửa quyền xem",
+      "description": "Chọn ai có thể xem bài viết này.",
+      "cancel": "Hủy",
+      "update": "Cập nhật quyền xem",
+      "updating": "Đang cập nhật...",
+      "signIn": "Vui lòng đăng nhập",
+      "updateFailed": "Cập nhật quyền xem thất bại",
+      "options": {
+        "public": {
+          "title": "Công khai",
+          "description": "Bất kỳ ai cũng có thể xem bài viết này"
+        },
+        "followers": {
+          "title": "Bạn bè / Đang theo dõi",
+          "description": "Chỉ người theo dõi mới xem được"
+        },
+        "private": {
+          "title": "Riêng tư",
+          "description": "Chỉ bạn mới xem được"
+        }
+      }
+    },
+    "edit": {
+      "title": "Chỉnh sửa bài viết",
+      "caption": "Nội dung",
+      "addEmoji": "Thêm biểu tượng",
+      "emojiIcon": "Biểu tượng cảm xúc",
+      "placeholder": "Viết gì đó...",
+      "searching": "Đang tìm...",
+      "noMatches": "Không có kết quả",
+      "hashtags": "Hashtag",
+      "addHashtag": "Thêm hashtag",
+      "removeHashtag": "Xóa {tag}",
+      "location": {
+        "label": "Vị trí",
+        "placeholder": "Thêm địa điểm",
+        "noSuggestions": "Không có gợi ý",
+        "noSuggestionsError": "Không có gợi ý, hãy thử từ khóa khác."
+      },
+      "allowComments": {
+        "title": "Cho phép bình luận",
+        "hint": "Cho phép mọi người phản hồi"
+      },
+      "allowDownloads": {
+        "title": "Cho phép tải xuống",
+        "hint": "Chia sẻ tệp gốc với người bạn tin tưởng",
+        "inheritedLoading": "Kế thừa từ bài gốc (đang tải…)",
+        "inheritedLocked": "Kế thừa từ bài gốc (không thể thay đổi)"
+      },
+      "hideLike": {
+        "title": "Ẩn lượt thích",
+        "hint": "Người xem sẽ không thấy số lượt thích"
+      },
+      "cancel": "Hủy",
+      "saveChanges": "Lưu thay đổi",
+      "saving": "Đang lưu...",
+      "signInToEdit": "Vui lòng đăng nhập để chỉnh sửa bài viết",
+      "updated": "Đã cập nhật bài viết",
+      "updateFailed": "Cập nhật bài viết thất bại"
+    },
+    "mention": {
+      "signIn": "Đăng nhập để gắn thẻ người dùng",
+      "userNotFound": "Không tìm thấy người dùng"
+    },
+    "menu": {
+      "editPost": "Chỉnh sửa bài viết",
+      "editVisibility": "Chỉnh sửa quyền xem",
+      "muteNotifications": "Tắt thông báo",
+      "turnOffComments": "Tắt bình luận",
+      "turnOnComments": "Bật bình luận",
+      "showLike": "Hiện lượt thích",
+      "hideLike": "Ẩn lượt thích",
+      "goToPost": "Đi tới bài viết",
+      "copyLink": "Sao chép liên kết",
+      "deletePost": "Xóa bài viết",
+      "unfollow": "Bỏ theo dõi",
+      "follow": "Theo dõi",
+      "save": "Lưu bài viết",
+      "unsave": "Bỏ lưu bài viết",
+      "hidePost": "Ẩn bài viết này",
+      "report": "Báo cáo",
+      "blockAccount": "Chặn tài khoản này"
+    },
+    "follow": {
+      "following": "Đang theo dõi",
+      "follow": "Theo dõi",
+      "unfollow": "Bỏ theo dõi"
+    },
+    "repost": {
+      "banner": "Đăng lại từ",
+      "original": "bài viết gốc"
+    },
+    "content": {
+      "seeMore": "Xem thêm",
+      "collapse": "Thu gọn"
+    },
+    "media": {
+      "tapForSound": "Chạm để bật âm thanh",
+      "previous": "Phương tiện trước",
+      "next": "Phương tiện tiếp",
+      "alt": "Phương tiện",
+      "overlayAlt": "Phương tiện bài viết"
+    },
+    "actions": {
+      "liked": "Đã thích",
+      "like": "Thích",
+      "comment": "Bình luận",
+      "saved": "Đã lưu",
+      "save": "Lưu",
+      "repost": "Đăng lại"
+    },
+    "repostOverlay": {
+      "visibility": {
+        "public": {
+          "title": "Công khai",
+          "description": "Bất kỳ ai cũng có thể xem lần đăng lại này"
+        },
+        "followers": {
+          "title": "Người theo dõi",
+          "description": "Chỉ người theo dõi có thể xem lần đăng lại này"
+        },
+        "private": {
+          "title": "Riêng tư",
+          "description": "Chỉ bạn có thể xem lần đăng lại này"
+        },
+        "label": "Quyền xem"
+      },
+      "errors": {
+        "couldNotRepost": "Không thể đăng lại"
+      },
+      "quote": {
+        "title": "Trích dẫn",
+        "subtitle": "Đang trích dẫn @{name} · {kind}",
+        "caption": "Nội dung",
+        "addEmoji": "Thêm biểu tượng",
+        "emojiIcon": "Biểu tượng cảm xúc",
+        "placeholder": "Thêm suy nghĩ của bạn..."
+      },
+      "hashtags": {
+        "label": "Hashtag #",
+        "remove": "Xóa hashtag {tag}",
+        "add": "Thêm hashtag",
+        "example": "Ví dụ: travel"
+      },
+      "location": {
+        "label": "Vị trí",
+        "placeholder": "Thêm địa điểm",
+        "searching": "Đang tìm...",
+        "noSuggestions": "Không có gợi ý",
+        "noMatch": "Không tìm thấy địa điểm phù hợp."
+      },
+      "switch": {
+        "allowComments": {
+          "title": "Cho phép bình luận",
+          "hint": "Mọi người có thể phản hồi trích dẫn của bạn"
+        },
+        "allowDownloads": {
+          "title": "Cho phép tải xuống",
+          "hint": "Kế thừa từ bài gốc (không thể thay đổi)"
+        },
+        "hideLike": {
+          "title": "Ẩn lượt thích",
+          "hint": "Chỉ bạn mới thấy số lượt thích của trích dẫn này"
+        }
+      },
+      "actions": {
+        "cancel": "Hủy",
+        "sharing": "Đang chia sẻ...",
+        "shareQuote": "Chia sẻ trích dẫn"
+      },
+      "sheet": {
+        "title": "Đăng lại",
+        "reposting": "Đang đăng lại...",
+        "repost": "Đăng lại",
+        "quote": "Trích dẫn"
+      },
+      "kinds": {
+        "post": "bài viết",
+        "reel": "reel"
+      }
+    },
+    "imageViewer": {
+      "close": "Đóng ảnh",
+      "alt": "Hình ảnh"
+    }
+  }
+}

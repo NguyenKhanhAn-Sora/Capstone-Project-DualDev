@@ -11,8 +11,10 @@ import {
   fetchCurrentProfile,
   fetchUserSettings,
   getApiBaseUrl,
+  resendTwoFactorLoginOtp,
   removeRecentAccount,
   RecentAccountResponse,
+  verifyTwoFactorLogin,
 } from "@/lib/api";
 import { useRedirectIfAuthed } from "@/hooks/use-require-auth";
 import {
@@ -24,6 +26,7 @@ import {
 } from "@/lib/auth";
 
 const RECENT_ACCOUNTS_KEY = "recentAccounts";
+const MAX_RECENT_ACCOUNTS = 6;
 
 type RecentAccount = {
   email: string;
@@ -63,7 +66,7 @@ export default function LoginPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [recentAccounts, setRecentAccounts] = useState<RecentAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<RecentAccount | null>(
-    null
+    null,
   );
   const [modalPassword, setModalPassword] = useState("");
   const [showModalPassword, setShowModalPassword] = useState(false);
@@ -73,8 +76,26 @@ export default function LoginPage() {
   const [clearingAll, setClearingAll] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState<RecentAccount | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [twoFactorToken, setTwoFactorToken] = useState<string | null>(null);
+  const [twoFactorOtp, setTwoFactorOtp] = useState("");
+  const [twoFactorError, setTwoFactorError] = useState<string | null>(null);
+  const [twoFactorSubmitting, setTwoFactorSubmitting] = useState(false);
+  const [twoFactorCooldown, setTwoFactorCooldown] = useState(0);
+  const [twoFactorExpiresSec, setTwoFactorExpiresSec] = useState<number | null>(
+    null,
+  );
+  const [twoFactorEmail, setTwoFactorEmail] = useState<string | null>(null);
 
   const canRender = useRedirectIfAuthed();
+
+  useEffect(() => {
+    if (twoFactorCooldown <= 0) return;
+    const id = setInterval(
+      () => setTwoFactorCooldown((s) => Math.max(0, s - 1)),
+      1000,
+    );
+    return () => clearInterval(id);
+  }, [twoFactorCooldown]);
 
   useEffect(() => {
     let skipRestore = false;
@@ -138,13 +159,118 @@ export default function LoginPage() {
     };
   }, [router]);
 
+  const overlayOpen =
+    !!selectedAccount || !!confirmEmail || confirmAll || !!twoFactorToken;
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!overlayOpen) return;
+
+    const body = document.body;
+    const prevOverflow = body.style.overflow;
+    const prevPaddingRight = body.style.paddingRight;
+
+    const scrollbarWidth =
+      typeof window !== "undefined"
+        ? window.innerWidth - document.documentElement.clientWidth
+        : 0;
+
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      body.style.overflow = prevOverflow;
+      body.style.paddingRight = prevPaddingRight;
+    };
+  }, [overlayOpen]);
+
   const handleGoogleLogin = () => {
+    if (typeof document !== "undefined") {
+      const deviceId =
+        window.localStorage.getItem("cordigramDeviceId") ??
+        ("randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+      window.localStorage.setItem("cordigramDeviceId", deviceId);
+      document.cookie = `device_id=${deviceId}; path=/; max-age=31536000; samesite=lax`;
+    }
     window.location.href = `${getApiBaseUrl()}/auth/google`;
   };
 
+  const handleVerifyTwoFactor = async (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    if (!twoFactorToken) return;
+    if (!twoFactorOtp.trim()) {
+      setTwoFactorError("Please enter the OTP.");
+      return;
+    }
+    setTwoFactorSubmitting(true);
+    setTwoFactorError(null);
+    try {
+      const result = await verifyTwoFactorLogin({
+        token: twoFactorToken,
+        code: twoFactorOtp.trim(),
+        trustDevice: true,
+      });
+      setStoredAccessToken(result.accessToken);
+      await syncThemeFromServer(result.accessToken);
+      if (twoFactorEmail) {
+        try {
+          const profile = await fetchCurrentProfile({
+            token: result.accessToken,
+          });
+          upsertRecentAccount({
+            email: twoFactorEmail,
+            username: profile.username,
+            displayName: profile.displayName,
+            avatarUrl: profile.avatarUrl,
+            lastUsed: Date.now(),
+          });
+        } catch (_err) {
+          upsertRecentAccount({
+            email: twoFactorEmail,
+            lastUsed: Date.now(),
+          });
+        }
+      }
+      setTwoFactorToken(null);
+      router.replace("/");
+    } catch (err) {
+      const apiErr = err as ApiError | undefined;
+      setTwoFactorError(apiErr?.message || "Invalid or expired OTP.");
+    } finally {
+      setTwoFactorSubmitting(false);
+    }
+  };
+
+  const handleResendTwoFactor = async () => {
+    if (!twoFactorToken) return;
+    setTwoFactorSubmitting(true);
+    setTwoFactorError(null);
+    try {
+      const res = await resendTwoFactorLoginOtp({ token: twoFactorToken });
+      setTwoFactorExpiresSec(res.expiresSec);
+      setTwoFactorCooldown(60);
+    } catch (err) {
+      const apiErr = err as ApiError | undefined;
+      const retryAfter = (apiErr?.data as { retryAfterSec?: number } | null)
+        ?.retryAfterSec;
+      if (retryAfter) {
+        setTwoFactorCooldown(retryAfter);
+        setTwoFactorError(`OTP was just sent. Try again in ${retryAfter}s.`);
+        return;
+      }
+      setTwoFactorError(apiErr?.message || "Unable to resend OTP.");
+    } finally {
+      setTwoFactorSubmitting(false);
+    }
+  };
+
   const isDisabled = useMemo(
-    () => !email.trim() || !password.trim() || loading || checkingSession,
-    [email, password, loading, checkingSession]
+    () => !email.trim() || loading || checkingSession,
+    [email, loading, checkingSession],
   );
 
   const saveRecentAccounts = (items: RecentAccount[]) => {
@@ -180,14 +306,14 @@ export default function LoginPage() {
 
     setRecentAccounts((prev) => {
       const filtered = prev.filter((item) => item.email !== normalized.email);
-      const next = [normalized, ...filtered].slice(0, 5);
+      const next = [normalized, ...filtered].slice(0, MAX_RECENT_ACCOUNTS);
       saveRecentAccounts(next);
       return next;
     });
   };
 
   const normalizeRecentAccountsFromServer = (
-    items: RecentAccountResponse[] | undefined
+    items: RecentAccountResponse[] | undefined,
   ): RecentAccount[] => {
     const mapped = (items ?? []).map((item) => ({
       email: item.email.trim().toLowerCase(),
@@ -200,7 +326,7 @@ export default function LoginPage() {
     return mapped
       .filter((item) => emailRegex.test(item.email))
       .sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0))
-      .slice(0, 5);
+      .slice(0, MAX_RECENT_ACCOUNTS);
   };
 
   const applyServerRecentAccounts = (payload?: {
@@ -208,7 +334,7 @@ export default function LoginPage() {
   }) => {
     if (!payload?.recentAccounts) return;
     const normalized = normalizeRecentAccountsFromServer(
-      payload.recentAccounts
+      payload.recentAccounts,
     );
     setRecentAccounts(normalized);
     saveRecentAccounts(normalized);
@@ -247,21 +373,66 @@ export default function LoginPage() {
     event.preventDefault();
     if (!selectedAccount) return;
     setModalError(null);
+
+    const trimmedModalPassword = modalPassword.trim();
+    if (!trimmedModalPassword) {
+      setModalError("Invalid sign-in method");
+      return;
+    }
+
     setModalSubmitting(true);
 
     const trimmedEmail = selectedAccount.email.toLowerCase();
 
     try {
-      const result = await apiFetch<{ accessToken: string }>({
+      const deviceId =
+        typeof window !== "undefined"
+          ? (window.localStorage.getItem("cordigramDeviceId") ??
+            ("randomUUID" in crypto
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(16).slice(2)}`))
+          : null;
+      if (deviceId && typeof window !== "undefined") {
+        window.localStorage.setItem("cordigramDeviceId", deviceId);
+      }
+      const result = await apiFetch<
+        | { accessToken: string }
+        | {
+            requiresTwoFactor: true;
+            twoFactorToken: string;
+            expiresSec: number;
+          }
+      >({
         path: "/auth/login",
         method: "POST",
-        body: JSON.stringify({ email: trimmedEmail, password: modalPassword }),
+        body: JSON.stringify({
+          email: trimmedEmail,
+          password: trimmedModalPassword,
+          loginMethod: "recent",
+        }),
         credentials: "include",
         headers:
           typeof navigator !== "undefined"
-            ? { "x-device-info": navigator.userAgent }
+            ? {
+                "x-device-info": navigator.userAgent,
+                ...(deviceId ? { "x-device-id": deviceId } : {}),
+                "x-login-method": "recent",
+              }
             : undefined,
       });
+
+      if ("requiresTwoFactor" in result && result.requiresTwoFactor) {
+        setTwoFactorToken(result.twoFactorToken);
+        setTwoFactorExpiresSec(result.expiresSec);
+        setTwoFactorCooldown(60);
+        setTwoFactorEmail(trimmedEmail);
+        setTwoFactorOtp("");
+        setSelectedAccount(null);
+        setModalPassword("");
+        setModalError(null);
+        setModalSubmitting(false);
+        return;
+      }
 
       setStoredAccessToken(result.accessToken);
 
@@ -301,18 +472,59 @@ export default function LoginPage() {
       return;
     }
 
+    const trimmedPassword = password.trim();
+    if (!trimmedPassword) {
+      setError("Invalid sign-in method");
+      return;
+    }
+
     setLoading(true);
     try {
-      const result = await apiFetch<{ accessToken: string }>({
+      const deviceId =
+        typeof window !== "undefined"
+          ? (window.localStorage.getItem("cordigramDeviceId") ??
+            ("randomUUID" in crypto
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(16).slice(2)}`))
+          : null;
+      if (deviceId && typeof window !== "undefined") {
+        window.localStorage.setItem("cordigramDeviceId", deviceId);
+      }
+      const result = await apiFetch<
+        | { accessToken: string }
+        | {
+            requiresTwoFactor: true;
+            twoFactorToken: string;
+            expiresSec: number;
+          }
+      >({
         path: "/auth/login",
         method: "POST",
-        body: JSON.stringify({ email: trimmedEmail, password }),
+        body: JSON.stringify({
+          email: trimmedEmail,
+          password: trimmedPassword,
+          loginMethod: "password",
+        }),
         credentials: "include",
         headers:
           typeof navigator !== "undefined"
-            ? { "x-device-info": navigator.userAgent }
+            ? {
+                "x-device-info": navigator.userAgent,
+                ...(deviceId ? { "x-device-id": deviceId } : {}),
+                "x-login-method": "password",
+              }
             : undefined,
       });
+
+      if ("requiresTwoFactor" in result && result.requiresTwoFactor) {
+        setTwoFactorToken(result.twoFactorToken);
+        setTwoFactorExpiresSec(result.expiresSec);
+        setTwoFactorCooldown(60);
+        setTwoFactorEmail(trimmedEmail);
+        setTwoFactorOtp("");
+        setLoading(false);
+        return;
+      }
 
       if (typeof window !== "undefined") {
         setStoredAccessToken(result.accessToken);
@@ -402,7 +614,7 @@ export default function LoginPage() {
 
   const handleCardKeyDown = (
     event: KeyboardEvent<HTMLDivElement>,
-    account: RecentAccount
+    account: RecentAccount,
   ) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -557,14 +769,13 @@ export default function LoginPage() {
               <h1 className="text-[32px] font-semibold leading-[1.2] text-slate-900 text-center">
                 Login
               </h1>
-
               <form
-                className="mt-[30px] space-y-[20px]"
+                className="mt-[30px] space-y-5"
                 onSubmit={handleSubmit}
                 noValidate
               >
-                <div className="space-y-[6px]">
-                  <label className="block text-[13px] font-semibold leading-[1.5] text-slate-700">
+                <div className="space-y-1.5">
+                  <label className="block text-[13px] font-semibold leading-normal text-slate-700">
                     Email address
                   </label>
                   <input
@@ -578,8 +789,8 @@ export default function LoginPage() {
                   />
                 </div>
 
-                <div className="space-y-[6px]">
-                  <label className="block text-[13px] font-semibold leading-[1.5] text-slate-700">
+                <div className="space-y-1.5">
+                  <label className="block text-[13px] font-semibold leading-normal text-slate-700">
                     Password
                   </label>
                   <div
@@ -589,7 +800,10 @@ export default function LoginPage() {
                       type={showPassword ? "text" : "password"}
                       name="password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setError(null);
+                      }}
                       placeholder="Enter your password"
                       autoComplete="current-password"
                       className={`h-11 w-full max-w-[360px] rounded-[10px] border border-[#d7e5f2] bg-white pl-3 pr-11 text-[14px] font-medium text-slate-900 placeholder:text-slate-400 shadow-sm transition focus:outline-none focus-visible:border-[#559AC2] focus-visible:ring-4 focus-visible:ring-[#9AACEF]/45 ${styles.passwordInput}`}
@@ -618,7 +832,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={isDisabled}
-                  className={`${styles["primary-button"]} mt-[12px] h-11 w-full max-w-[360px] rounded-[10px] text-[13px] font-semibold leading-[1.5] shadow-sm focus:outline-none focus-visible:ring-4 focus-visible:ring-[#9AACEF]/55 disabled:cursor-not-allowed disabled:opacity-60`}
+                  className={`${styles["primary-button"]} mt-3 h-11 w-full max-w-[360px] rounded-[10px] text-[13px] font-semibold leading-normal shadow-sm focus:outline-none focus-visible:ring-4 focus-visible:ring-[#9AACEF]/55 disabled:cursor-not-allowed disabled:opacity-60`}
                 >
                   {loading ? "Logging in..." : "Log in"}
                 </button>
@@ -631,7 +845,7 @@ export default function LoginPage() {
                   Forgot password?
                 </button>
 
-                <div className=" max-w-[360px] text-center text-[14px] font-medium leading-[1.5] text-slate-700">
+                <div className=" max-w-[360px] text-center text-[14px] font-medium leading-normal text-slate-700">
                   Don't have an account?{" "}
                   <Link
                     href="/signup"
@@ -744,7 +958,10 @@ export default function LoginPage() {
                   autoFocus
                   placeholder="Enter your password"
                   value={modalPassword}
-                  onChange={(e) => setModalPassword(e.target.value)}
+                  onChange={(e) => {
+                    setModalPassword(e.target.value);
+                    setModalError(null);
+                  }}
                   className={`${styles["overlay-input"]} ${styles.passwordInput}`}
                   autoComplete="current-password"
                 />
@@ -766,7 +983,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 className={styles["overlay-button"]}
-                disabled={!modalPassword.trim() || modalSubmitting}
+                disabled={modalSubmitting}
               >
                 {modalSubmitting ? "Logging in..." : "Log in"}
               </button>
@@ -838,6 +1055,71 @@ export default function LoginPage() {
                 {clearingAll ? "Deleting..." : "Delete all"}
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {twoFactorToken ? (
+        <div className={styles["overlay"]}>
+          <div className={styles["overlay-card"]}>
+            <button
+              type="button"
+              className={styles["overlay-close"]}
+              onClick={() => {
+                setTwoFactorToken(null);
+                setTwoFactorOtp("");
+                setTwoFactorError(null);
+              }}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <p className={styles["overlay-name"]}>Two-factor verification</p>
+            <p className={styles["overlay-subtitle"]}>
+              Enter the 6-digit code sent to your email.
+            </p>
+
+            <form
+              className={styles["overlay-form"]}
+              onSubmit={handleVerifyTwoFactor}
+            >
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="------"
+                value={twoFactorOtp}
+                onChange={(e) => {
+                  setTwoFactorOtp(e.target.value.replace(/\D/g, ""));
+                  setTwoFactorError(null);
+                }}
+                className={styles["overlay-input"]}
+              />
+
+              {twoFactorError ? (
+                <p className={styles["overlay-error"]}>{twoFactorError}</p>
+              ) : null}
+
+              <div className={styles["overlay-actions"]}>
+                <button
+                  type="button"
+                  className={styles["overlay-secondary"]}
+                  onClick={handleResendTwoFactor}
+                  disabled={twoFactorSubmitting || twoFactorCooldown > 0}
+                >
+                  {twoFactorCooldown > 0
+                    ? `Resend (${twoFactorCooldown}s)`
+                    : "Resend OTP"}
+                </button>
+                <button
+                  type="submit"
+                  className={styles["overlay-button"]}
+                  disabled={twoFactorSubmitting}
+                >
+                  {twoFactorSubmitting ? "Verifying..." : "Continue"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}

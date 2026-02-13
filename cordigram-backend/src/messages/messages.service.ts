@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Message } from './message.schema';
@@ -84,9 +88,7 @@ export class MessagesService {
 
     // Check if user is sender
     if (message.senderId.toString() !== userId) {
-      throw new ForbiddenException(
-        'You can only edit your own messages',
-      );
+      throw new ForbiddenException('You can only edit your own messages');
     }
 
     message.content = content;
@@ -105,9 +107,7 @@ export class MessagesService {
 
     // Check if user is sender
     if (message.senderId.toString() !== userId) {
-      throw new ForbiddenException(
-        'You can only delete your own messages',
-      );
+      throw new ForbiddenException('You can only delete your own messages');
     }
 
     message.isDeleted = true;

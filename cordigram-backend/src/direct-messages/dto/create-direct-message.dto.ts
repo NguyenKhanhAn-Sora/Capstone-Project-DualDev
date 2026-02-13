@@ -1,4 +1,10 @@
-import { IsString, IsArray, IsOptional, IsEnum, IsNumber } from 'class-validator';
+import {
+  IsString,
+  IsArray,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+} from 'class-validator';
 
 export class CreateDirectMessageDto {
   @IsString()
@@ -23,6 +29,10 @@ export class CreateDirectMessageDto {
   @IsArray()
   @IsOptional()
   attachments?: string[];
+
+  @IsString()
+  @IsOptional()
+  replyTo?: string;
 }
 
 export class UpdateDirectMessageDto {
@@ -34,4 +44,19 @@ export class UpdateDirectMessageDto {
 export class MarkAsReadDto {
   @IsArray()
   messageIds: string[];
+}
+
+export class ReportMessageDto {
+  @IsString()
+  reason: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
+
+export class DeleteMessageDto {
+  @IsString()
+  @IsOptional()
+  deleteType?: 'for-everyone' | 'for-me';
 }

@@ -121,6 +121,24 @@ export class BlocksService {
     return { blockedIds, blockedByIds };
   }
 
+  async listBlockedUsers(userId: string | Types.ObjectId, limit = 50) {
+    const viewerId = this.asObjectId(userId, 'userId');
+    const safeLimit = Math.min(Math.max(limit, 1), 200);
+    const blocks = await this.blockModel
+      .find({ blockerId: viewerId })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit)
+      .lean()
+      .exec();
+
+    return blocks
+      .map((doc) => ({
+        blockedId: doc.blockedId?.toString?.(),
+        blockedAt: (doc as { createdAt?: Date | null }).createdAt ?? null,
+      }))
+      .filter((item) => Boolean(item.blockedId));
+  }
+
   async assertNotBlocked(viewerId: Types.ObjectId, ownerId: Types.ObjectId) {
     const blocked = await this.isBlockedEither(viewerId, ownerId);
     if (blocked) {

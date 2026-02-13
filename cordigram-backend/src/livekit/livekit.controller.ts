@@ -14,7 +14,7 @@ export class LivekitController {
     @CurrentUser() user: any,
   ) {
     const { roomName, participantName } = body;
-    
+
     if (!roomName || !participantName) {
       return { error: 'roomName and participantName are required' };
     }
@@ -37,12 +37,15 @@ export class LivekitController {
     @CurrentUser() user: any,
   ) {
     const { friendId } = body;
-    
+
     if (!friendId) {
       return { error: 'friendId is required' };
     }
 
-    const roomName = this.livekitService.generateRoomName(user.userId, friendId);
+    const roomName = this.livekitService.generateRoomName(
+      user.userId,
+      friendId,
+    );
 
     return { roomName };
   }

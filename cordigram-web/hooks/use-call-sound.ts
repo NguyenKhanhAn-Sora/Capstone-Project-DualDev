@@ -1,14 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Hook to manage call sounds (ringtone/dialing tone)
- * 
+ *
  * @param soundType - 'incoming' for ringtone (receiver), 'outgoing' for dialing tone (caller)
  * @param shouldPlay - Whether to play the sound
  */
 export function useCallSound(
-  soundType: 'incoming' | 'outgoing',
-  shouldPlay: boolean
+  soundType: "incoming" | "outgoing",
+  shouldPlay: boolean,
 ) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioError, setAudioError] = useState<boolean>(false);
@@ -22,14 +22,15 @@ export function useCallSound(
       audioRef.current = new Audio();
       audioRef.current.loop = true;
       audioRef.current.volume = 0.5;
-      
+
       // Set src immediately
-      const audioSrc = soundType === 'incoming' 
-        ? '/sounds/incoming-call.mp3'
-        : '/sounds/outgoing-call.mp3';
-      
+      const audioSrc =
+        soundType === "incoming"
+          ? "/sounds/incoming-call.mp3"
+          : "/sounds/outgoing-call.mp3";
+
       audioRef.current.src = audioSrc;
-      
+
       // Handle errors gracefully
       audioRef.current.onerror = () => {
         console.warn(`⚠️ [Sound] ${soundType} audio file not found`);
@@ -42,11 +43,11 @@ export function useCallSound(
     // Play/pause control
     if (shouldPlay && !audioError) {
       const playPromise = audio.play();
-      
+
       if (playPromise !== undefined) {
-        playPromise.catch(error => {
+        playPromise.catch((error) => {
           // Silently handle autoplay and abort errors (normal behavior)
-          if (error.name === 'NotAllowedError' || error.name === 'AbortError') {
+          if (error.name === "NotAllowedError" || error.name === "AbortError") {
             // Autoplay blocked or interrupted - ignore
           } else {
             // Real error
@@ -83,7 +84,7 @@ export function useCallSound(
       if (audioRef.current) {
         try {
           audioRef.current.pause();
-          audioRef.current.src = '';
+          audioRef.current.src = "";
           audioRef.current = null;
         } catch (e) {
           // Ignore cleanup errors

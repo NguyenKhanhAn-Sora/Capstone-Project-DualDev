@@ -72,38 +72,44 @@
 
 .videoTileWrapper {
   position: relative;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  background: #1a1a1a;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  border: 3px solid transparent;
-  transition: all 0.3s ease;
+  background: #0f0f0f;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.videoTileWrapper:hover {
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Speaking indicator - glowing border */
 .videoTileWrapper.speaking {
-  border-color: #43b581;
-  box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.3),
-    0 0 20px rgba(67, 181, 129, 0.6),
-    inset 0 0 20px rgba(67, 181, 129, 0.1);
+  border-color: #22c55e;
+  border-width: 3px;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.4),
+    0 0 24px rgba(34, 197, 94, 0.6),
+    inset 0 0 20px rgba(34, 197, 94, 0.08);
   animation: speakingGlow 1.5s ease-in-out infinite;
 }
 
 @keyframes speakingGlow {
-  0%, 100% {
-    border-color: #43b581;
-    box-shadow: 
-      0 4px 12px rgba(0, 0, 0, 0.3),
-      0 0 20px rgba(67, 181, 129, 0.6),
-      inset 0 0 20px rgba(67, 181, 129, 0.1);
+  0%,
+  100% {
+    border-color: #22c55e;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.4),
+      0 0 24px rgba(34, 197, 94, 0.6),
+      inset 0 0 20px rgba(34, 197, 94, 0.08);
   }
   50% {
     border-color: #4ade80;
-    box-shadow: 
-      0 4px 12px rgba(0, 0, 0, 0.3),
-      0 0 30px rgba(74, 222, 128, 0.8),
-      inset 0 0 30px rgba(74, 222, 128, 0.2);
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.4),
+      0 0 32px rgba(74, 222, 128, 0.8),
+      inset 0 0 24px rgba(74, 222, 128, 0.12);
   }
 }
 
@@ -168,36 +174,51 @@
 /* Participant Info Overlay */
 .participantInfo {
   position: absolute;
-  bottom: 12px;
-  left: 12px;
-  right: 12px;
-  display: flex;
+  bottom: 100px;
+  left: 16px;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(10px);
-  border-radius: 8px;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
   z-index: 10;
+  transition: all 0.3s ease;
+  max-width: fit-content;
+}
+
+.participantInfo:hover {
+  background: rgba(0, 0, 0, 0.75);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 .participantName {
   font-size: 14px;
   font-weight: 600;
   color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .micOn {
-  color: #43b581;
+  color: #22c55e;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .micOff {
-  color: #ed4245;
+  color: #ef4444;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 /* Responsive */
@@ -224,14 +245,22 @@
   }
 
   .participantInfo {
-    bottom: 8px;
-    left: 8px;
-    right: 8px;
-    padding: 6px 10px;
+    bottom: 90px;
+    left: 10px;
+    padding: 6px 12px;
+    gap: 6px;
   }
 
   .participantName {
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    max-width: 150px;
+  }
+
+  .micOn svg,
+  .micOff svg {
+    width: 12px;
+    height: 12px;
   }
 }
 
@@ -301,15 +330,22 @@
 
 .speaking {
   animation: speakingPulse 1s infinite;
-  box-shadow: 0 0 0 4px rgba(67, 181, 129, 0.4), 0 0 0 8px rgba(67, 181, 129, 0.2);
+  box-shadow:
+    0 0 0 4px rgba(67, 181, 129, 0.4),
+    0 0 0 8px rgba(67, 181, 129, 0.2);
 }
 
 @keyframes speakingPulse {
-  0%, 100% {
-    box-shadow: 0 0 0 4px rgba(67, 181, 129, 0.4), 0 0 0 8px rgba(67, 181, 129, 0.2);
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px rgba(67, 181, 129, 0.4),
+      0 0 0 8px rgba(67, 181, 129, 0.2);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(67, 181, 129, 0.6), 0 0 0 16px rgba(67, 181, 129, 0.3);
+    box-shadow:
+      0 0 0 8px rgba(67, 181, 129, 0.6),
+      0 0 0 16px rgba(67, 181, 129, 0.3);
   }
 }
 
@@ -328,7 +364,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -342,8 +379,13 @@
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 24px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+  padding: 28px 24px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.85) 0%,
+    rgba(0, 0, 0, 0.6) 50%,
+    transparent 100%
+  );
   display: flex;
   justify-content: center;
   align-items: center;
@@ -357,29 +399,48 @@
 }
 
 .controlButton {
-  width: 56px;
-  height: 56px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.controlButton::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.1) 0%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.controlButton:hover::before {
+  opacity: 1;
 }
 
 .controlButton:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
 }
 
 .controlButton:active {
-  transform: scale(0.95);
+  transform: scale(0.92) translateY(-1px);
 }
 
 .controlButton svg {
@@ -387,12 +448,24 @@
   height: 24px;
 }
 
+.controlButtonOn {
+  background: rgba(34, 197, 94, 0.9);
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
+}
+
+.controlButtonOn:hover {
+  background: rgba(34, 197, 94, 1);
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.6);
+}
+
 .controlButtonOff {
   background: rgba(239, 68, 68, 0.9);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
 }
 
 .controlButtonOff:hover {
   background: rgba(239, 68, 68, 1);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6);
 }
 
 .controlButtonActive {

@@ -1,4 +1,10 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  MinLength,
+  Matches,
+} from 'class-validator';
 
 export class LoginDto {
   @IsEmail()
@@ -7,4 +13,9 @@ export class LoginDto {
   @IsString()
   @MinLength(8)
   password: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(password|recent)$/)
+  loginMethod?: 'password' | 'recent';
 }

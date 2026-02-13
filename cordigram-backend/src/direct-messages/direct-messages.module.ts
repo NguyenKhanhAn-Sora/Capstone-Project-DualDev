@@ -7,7 +7,8 @@ import { DirectMessagesGateway } from './direct-messages.gateway';
 import { DirectMessage, DirectMessageSchema } from './direct-message.schema';
 import { User, UserSchema } from '../users/user.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
-import { Follow, FollowSchema } from '../follows/follow.schema';
+import { Follow, FollowSchema } from '../users/follow.schema';
+import { MessageReport, MessageReportSchema } from './message-report.schema';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { Follow, FollowSchema } from '../follows/follow.schema';
       { name: User.name, schema: UserSchema },
       { name: Profile.name, schema: ProfileSchema },
       { name: Follow.name, schema: FollowSchema },
+      { name: MessageReport.name, schema: MessageReportSchema },
     ]),
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your_secret_key',

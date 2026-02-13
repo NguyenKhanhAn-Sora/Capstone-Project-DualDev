@@ -1,16 +1,16 @@
 // Call types and interfaces
 export enum CallType {
-  AUDIO = 'audio',
-  VIDEO = 'video',
+  AUDIO = "audio",
+  VIDEO = "video",
 }
 
 export enum CallStatus {
-  PENDING = 'pending',
-  RINGING = 'ringing',
-  ACCEPTED = 'accepted',
-  REJECTED = 'rejected',
-  ENDED = 'ended',
-  MISSED = 'missed',
+  PENDING = "pending",
+  RINGING = "ringing",
+  ACCEPTED = "accepted",
+  REJECTED = "rejected",
+  ENDED = "ended",
+  MISSED = "missed",
 }
 
 export interface CallOffer {

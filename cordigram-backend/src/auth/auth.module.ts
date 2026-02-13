@@ -18,7 +18,7 @@ import { User, UserSchema } from '../users/user.schema';
 
 @Module({
   imports: [
-    PassportModule,
+    PassportModule.register({ session: false }),
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => ({
         secret: configService.jwtSecret,
@@ -35,6 +35,6 @@ import { User, UserSchema } from '../users/user.schema';
   ],
   providers: [AuthService, JwtStrategy, GoogleStrategy, JwtAuthGuard],
   controllers: [AuthController],
-  exports: [AuthService, JwtAuthGuard],
+  exports: [AuthService, JwtAuthGuard, JwtStrategy],
 })
 export class AuthModule {}

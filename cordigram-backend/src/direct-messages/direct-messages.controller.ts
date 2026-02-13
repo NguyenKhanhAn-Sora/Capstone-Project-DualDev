@@ -1,6 +1,21 @@
-import { Controller, Get, Post, Body, Param, Delete, Patch, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { DirectMessagesService } from './direct-messages.service';
-import { CreateDirectMessageDto, MarkAsReadDto } from './dto/create-direct-message.dto';
+import {
+  CreateDirectMessageDto,
+  MarkAsReadDto,
+  ReportMessageDto,
+  DeleteMessageDto,
+} from './dto/create-direct-message.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 
@@ -22,7 +37,9 @@ export class DirectMessagesController {
     );
 
     // Populate sender and receiver info
-    return this.directMessagesService.getDirectMessageById(message._id.toString());
+    return this.directMessagesService.getDirectMessageById(
+      message._id.toString(),
+    );
   }
 
   @Get('conversation/:userId')
@@ -81,16 +98,26 @@ export class DirectMessagesController {
       updateDirectMessageDto,
     );
 
-    return this.directMessagesService.getDirectMessageById(message._id.toString());
+    return this.directMessagesService.getDirectMessageById(
+      message._id.toString(),
+    );
   }
 
   @Delete(':messageId')
   async deleteDirectMessage(
     @Param('messageId') messageId: string,
+    @Body() deleteDto: DeleteMessageDto,
     @CurrentUser() user: any,
   ) {
-    await this.directMessagesService.deleteDirectMessage(messageId, user.userId);
-    return { deleted: true };
+    const result = await this.directMessagesService.deleteDirectMessage(
+      messageId,
+      user.userId,
+      deleteDto.deleteType || 'for-me',
+    );
+    return {
+      deleted: true,
+      ...result,
+    };
   }
 
   @Post(':messageId/reaction/:emoji')
@@ -105,11 +132,49 @@ export class DirectMessagesController {
       user.userId,
     );
 
-    return this.directMessagesService.getDirectMessageById(message._id.toString());
+    return this.directMessagesService.getDirectMessageById(
+      message._id.toString(),
+    );
   }
 
   @Get('available-users/list')
   async getAvailableUsers(@CurrentUser() user: any) {
     return this.directMessagesService.getAvailableUsers(user.userId);
+  }
+
+  @Post(':messageId/pin')
+  async pinMessage(
+    @Param('messageId') messageId: string,
+    @CurrentUser() user: any,
+  ) {
+    const message = await this.directMessagesService.pinMessage(
+      messageId,
+      user.userId,
+    );
+
+    return this.directMessagesService.getDirectMessageById(
+      message._id.toString(),
+    );
+  }
+
+  @Post(':messageId/report')
+  async reportMessage(
+    @Param('messageId') messageId: string,
+    @Body() reportDto: ReportMessageDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.directMessagesService.reportMessage(
+      messageId,
+      user.userId,
+      reportDto,
+    );
+  }
+
+  @Get('pinned/:userId')
+  async getPinnedMessages(
+    @Param('userId') userId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.directMessagesService.getPinnedMessages(user.userId, userId);
   }
 }

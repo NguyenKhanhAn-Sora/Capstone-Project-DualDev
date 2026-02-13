@@ -1,24 +1,28 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import styles from './GiphyPicker.module.css';
-import { 
-  searchGifs, 
-  getTrendingGifs, 
-  searchStickers, 
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import styles from "./GiphyPicker.module.css";
+import {
+  searchGifs,
+  getTrendingGifs,
+  searchStickers,
   getTrendingStickers,
-  type GiphyGif 
-} from '@/lib/giphy-api';
+  type GiphyGif,
+} from "@/lib/giphy-api";
 
 interface GiphyPickerProps {
-  onSelect: (gif: GiphyGif, type: 'gif' | 'sticker') => void;
+  onSelect: (gif: GiphyGif, type: "gif" | "sticker") => void;
   onClose: () => void;
-  initialTab?: 'gif' | 'sticker';
+  initialTab?: "gif" | "sticker";
 }
 
-export default function GiphyPicker({ onSelect, onClose, initialTab = 'gif' }: GiphyPickerProps) {
-  const [activeTab, setActiveTab] = useState<'gif' | 'sticker'>(initialTab);
-  const [searchQuery, setSearchQuery] = useState('');
+export default function GiphyPicker({
+  onSelect,
+  onClose,
+  initialTab = "gif",
+}: GiphyPickerProps) {
+  const [activeTab, setActiveTab] = useState<"gif" | "sticker">(initialTab);
+  const [searchQuery, setSearchQuery] = useState("");
   const [gifs, setGifs] = useState<GiphyGif[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,51 +42,59 @@ export default function GiphyPicker({ onSelect, onClose, initialTab = 'gif' }: G
   // Close on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+      if (
+        pickerRef.current &&
+        !pickerRef.current.contains(event.target as Node)
+      ) {
         onClose();
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
 
   const loadTrending = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = activeTab === 'gif' 
-        ? await getTrendingGifs(30)
-        : await getTrendingStickers(30);
+      const response =
+        activeTab === "gif"
+          ? await getTrendingGifs(30)
+          : await getTrendingStickers(30);
       setGifs(response.data);
     } catch (err) {
-      console.error('Failed to load trending:', err);
-      setError('Không thể tải nội dung phổ biến');
+      console.error("Failed to load trending:", err);
+      setError("Unable to load trending content");
     } finally {
       setLoading(false);
     }
   }, [activeTab]);
 
-  const handleSearch = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      loadTrending();
-      return;
-    }
+  const handleSearch = useCallback(
+    async (query: string) => {
+      if (!query.trim()) {
+        loadTrending();
+        return;
+      }
 
-    setLoading(true);
-    setError(null);
-    try {
-      const response = activeTab === 'gif'
-        ? await searchGifs(query, 30)
-        : await searchStickers(query, 30);
-      setGifs(response.data);
-    } catch (err) {
-      console.error('Failed to search:', err);
-      setError('Không thể tìm kiếm');
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, loadTrending]);
+      setLoading(true);
+      setError(null);
+      try {
+        const response =
+          activeTab === "gif"
+            ? await searchGifs(query, 30)
+            : await searchStickers(query, 30);
+        setGifs(response.data);
+      } catch (err) {
+        console.error("Failed to search:", err);
+        setError("Unable to search");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [activeTab, loadTrending],
+  );
 
   // Debounce search
   useEffect(() => {
@@ -93,9 +105,9 @@ export default function GiphyPicker({ onSelect, onClose, initialTab = 'gif' }: G
     return () => clearTimeout(timer);
   }, [searchQuery, handleSearch]);
 
-  const handleTabChange = (tab: 'gif' | 'sticker') => {
+  const handleTabChange = (tab: "gif" | "sticker") => {
     setActiveTab(tab);
-    setSearchQuery('');
+    setSearchQuery("");
   };
 
   const handleGifClick = (gif: GiphyGif) => {
@@ -110,14 +122,14 @@ export default function GiphyPicker({ onSelect, onClose, initialTab = 'gif' }: G
         <div className={styles.header}>
           <div className={styles.tabs}>
             <button
-              className={`${styles.tab} ${activeTab === 'gif' ? styles.tabActive : ''}`}
-              onClick={() => handleTabChange('gif')}
+              className={`${styles.tab} ${activeTab === "gif" ? styles.tabActive : ""}`}
+              onClick={() => handleTabChange("gif")}
             >
               🎬 GIF
             </button>
             <button
-              className={`${styles.tab} ${activeTab === 'sticker' ? styles.tabActive : ''}`}
-              onClick={() => handleTabChange('sticker')}
+              className={`${styles.tab} ${activeTab === "sticker" ? styles.tabActive : ""}`}
+              onClick={() => handleTabChange("sticker")}
             >
               😊 Sticker
             </button>
@@ -133,7 +145,7 @@ export default function GiphyPicker({ onSelect, onClose, initialTab = 'gif' }: G
             ref={searchInputRef}
             type="text"
             className={styles.searchInput}
-            placeholder={`Tìm ${activeTab === 'gif' ? 'GIF' : 'sticker'}...`}
+            placeholder={`Search ${activeTab === "gif" ? "GIFs" : "stickers"}...`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -144,20 +156,20 @@ export default function GiphyPicker({ onSelect, onClose, initialTab = 'gif' }: G
           {loading && (
             <div className={styles.loading}>
               <div className={styles.spinner}></div>
-              <p>Đang tải...</p>
+              <p>Loading...</p>
             </div>
           )}
 
           {error && (
             <div className={styles.error}>
               <p>{error}</p>
-              <button onClick={loadTrending}>Thử lại</button>
+              <button onClick={loadTrending}>Try again</button>
             </div>
           )}
 
           {!loading && !error && gifs.length === 0 && (
             <div className={styles.empty}>
-              <p>Không tìm thấy kết quả</p>
+              <p>No results found</p>
             </div>
           )}
 
@@ -183,8 +195,8 @@ export default function GiphyPicker({ onSelect, onClose, initialTab = 'gif' }: G
         {/* Footer */}
         <div className={styles.footer}>
           <span>Powered by</span>
-          <img 
-            src="https://developers.giphy.com/branch/master/static/attribution-mark-1a9925c1.png" 
+          <img
+            src="https://developers.giphy.com/branch/master/static/attribution-mark-1a9925c1.png"
             alt="Giphy"
             className={styles.giphyLogo}
           />

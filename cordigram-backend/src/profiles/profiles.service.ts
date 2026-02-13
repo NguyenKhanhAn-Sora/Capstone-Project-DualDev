@@ -2,12 +2,18 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, PipelineStage } from 'mongoose';
 import { Profile } from './profile.schema';
 import { Follow } from '../users/follow.schema';
 import { Post } from '../posts/post.schema';
+import { CompaniesService } from '../companies/companies.service';
+import type {
+  ProfileFieldVisibility,
+  ProfileVisibility,
+} from './profile.schema';
 
 @Injectable()
 export class ProfilesService {
@@ -15,6 +21,7 @@ export class ProfilesService {
     @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
+    private readonly companiesService: CompaniesService,
   ) {}
 
   private escapeRegex(input: string): string {
@@ -23,6 +30,27 @@ export class ProfilesService {
 
   private readonly DEFAULT_AVATAR_URL =
     'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
+
+  private readonly DEFAULT_VISIBILITY: ProfileVisibility = {
+    gender: 'public',
+    birthdate: 'public',
+    location: 'public',
+    workplace: 'public',
+    bio: 'public',
+    followers: 'public',
+    following: 'public',
+    about: 'public',
+    profile: 'public',
+  };
+
+  private buildAvatarResponse(profile: Profile) {
+    return {
+      avatarUrl: profile.avatarUrl || this.DEFAULT_AVATAR_URL,
+      avatarOriginalUrl: profile.avatarOriginalUrl || this.DEFAULT_AVATAR_URL,
+      avatarPublicId: profile.avatarPublicId || '',
+      avatarOriginalPublicId: profile.avatarOriginalPublicId || '',
+    };
+  }
 
   private asObjectId(input: string | Types.ObjectId): Types.ObjectId | null {
     if (input instanceof Types.ObjectId) return input;
@@ -38,6 +66,7 @@ export class ProfilesService {
     avatarOriginalUrl?: string;
     avatarPublicId?: string;
     avatarOriginalPublicId?: string;
+    gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say' | '';
     coverUrl?: string;
     bio?: string;
     location?: string;
@@ -69,6 +98,7 @@ export class ProfilesService {
       profile.coverUrl = data.coverUrl ?? profile.coverUrl;
       profile.bio = data.bio ?? profile.bio;
       profile.location = data.location ?? profile.location;
+      profile.gender = data.gender ?? profile.gender;
       profile.links = data.links ?? profile.links;
       profile.birthdate = data.birthdate ?? profile.birthdate;
       await profile.save();
@@ -86,6 +116,7 @@ export class ProfilesService {
       coverUrl: data.coverUrl ?? '',
       bio: data.bio ?? '',
       location: data.location ?? '',
+      gender: data.gender ?? '',
       links: data.links ?? {},
       birthdate: data.birthdate ?? null,
     });
@@ -120,6 +151,195 @@ export class ProfilesService {
     }
 
     return this.profileModel.findOne({ userId: objectId }).exec();
+  }
+
+  async updateAvatarForUser(params: {
+    userId: string;
+    avatarUrl: string;
+    avatarOriginalUrl: string;
+    avatarPublicId: string;
+    avatarOriginalPublicId: string;
+  }): Promise<{
+    avatarUrl: string;
+    avatarOriginalUrl: string;
+    avatarPublicId: string;
+    avatarOriginalPublicId: string;
+  }> {
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(params.userId) })
+      .exec();
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    profile.avatarUrl = params.avatarUrl;
+    profile.avatarOriginalUrl = params.avatarOriginalUrl;
+    profile.avatarPublicId = params.avatarPublicId;
+    profile.avatarOriginalPublicId = params.avatarOriginalPublicId;
+    await profile.save();
+
+    return this.buildAvatarResponse(profile);
+  }
+
+  async updateForUserId(
+    userId: string,
+    data: {
+      displayName?: string;
+      username?: string;
+      bio?: string;
+      location?: string;
+      gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
+      birthdate?: string;
+      workplaceName?: string;
+      workplaceCompanyId?: string;
+      genderVisibility?: ProfileFieldVisibility;
+      birthdateVisibility?: ProfileFieldVisibility;
+      locationVisibility?: ProfileFieldVisibility;
+      workplaceVisibility?: ProfileFieldVisibility;
+      bioVisibility?: ProfileFieldVisibility;
+      followersVisibility?: ProfileFieldVisibility;
+      followingVisibility?: ProfileFieldVisibility;
+      aboutVisibility?: ProfileFieldVisibility;
+      profileVisibility?: ProfileFieldVisibility;
+    },
+  ): Promise<void> {
+    const objectId = this.asObjectId(userId);
+    if (!objectId) {
+      throw new BadRequestException('Invalid user id');
+    }
+
+    const profile = await this.profileModel
+      .findOne({ userId: objectId })
+      .exec();
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    if (data.username !== undefined) {
+      const normalized = data.username.toLowerCase();
+      const available = await this.isUsernameAvailable(normalized, userId);
+      if (!available) {
+        throw new BadRequestException('Username already taken');
+      }
+      profile.username = normalized;
+    }
+
+    if (data.displayName !== undefined) {
+      profile.displayName = data.displayName.trim();
+    }
+
+    if (data.bio !== undefined) {
+      // Preserve user-entered formatting (newlines/spaces). Normalize line endings.
+      profile.bio = data.bio.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    }
+
+    if (data.location !== undefined) {
+      profile.location = data.location.trim();
+    }
+
+    if (
+      data.workplaceName !== undefined ||
+      data.workplaceCompanyId !== undefined
+    ) {
+      const prevCompanyId = profile.workplace?.companyId ?? null;
+      const requestedName = (data.workplaceName ?? '').trim();
+      const requestedCompanyId = (data.workplaceCompanyId ?? '').trim();
+
+      if (!requestedName && !requestedCompanyId) {
+        profile.workplace = { companyId: null, companyName: '' };
+        if (prevCompanyId) {
+          await this.companiesService.incrementMemberCount(prevCompanyId, -1);
+        }
+      } else {
+        const company = requestedCompanyId
+          ? await this.companiesService.findById(requestedCompanyId)
+          : await this.companiesService.ensureCompanyByName(requestedName);
+
+        if (!company) {
+          throw new BadRequestException('workplace is invalid');
+        }
+
+        const nextCompanyId = company._id as Types.ObjectId;
+        profile.workplace = {
+          companyId: nextCompanyId,
+          companyName: company.name,
+        };
+
+        const prevIdStr = prevCompanyId?.toString?.() ?? '';
+        const nextIdStr = nextCompanyId?.toString?.() ?? '';
+        if (
+          prevCompanyId &&
+          prevIdStr &&
+          nextIdStr &&
+          prevIdStr !== nextIdStr
+        ) {
+          await this.companiesService.incrementMemberCount(prevCompanyId, -1);
+        }
+        if (nextCompanyId && nextIdStr && prevIdStr !== nextIdStr) {
+          await this.companiesService.incrementMemberCount(nextCompanyId, 1);
+        }
+      }
+    }
+
+    if (data.gender !== undefined) {
+      profile.gender = (data.gender as any) ?? '';
+    }
+
+    if (data.birthdate !== undefined) {
+      profile.birthdate = data.birthdate ? new Date(data.birthdate) : null;
+    }
+
+    if (
+      data.genderVisibility !== undefined ||
+      data.birthdateVisibility !== undefined ||
+      data.locationVisibility !== undefined ||
+      data.workplaceVisibility !== undefined ||
+      data.bioVisibility !== undefined ||
+      data.followersVisibility !== undefined ||
+      data.followingVisibility !== undefined ||
+      data.aboutVisibility !== undefined ||
+      data.profileVisibility !== undefined
+    ) {
+      const current = {
+        ...this.DEFAULT_VISIBILITY,
+        ...(profile.visibility ?? {}),
+      };
+      profile.visibility = {
+        gender: data.genderVisibility ?? current.gender ?? 'public',
+        birthdate: data.birthdateVisibility ?? current.birthdate ?? 'public',
+        location: data.locationVisibility ?? current.location ?? 'public',
+        workplace: data.workplaceVisibility ?? current.workplace ?? 'public',
+        bio: data.bioVisibility ?? current.bio ?? 'public',
+        followers: data.followersVisibility ?? current.followers ?? 'public',
+        following: data.followingVisibility ?? current.following ?? 'public',
+        about: data.aboutVisibility ?? current.about ?? 'public',
+        profile: data.profileVisibility ?? current.profile ?? 'public',
+      };
+    }
+
+    await profile.save();
+  }
+
+  async resetAvatarForUser(userId: string): Promise<{
+    avatarUrl: string;
+    avatarOriginalUrl: string;
+    avatarPublicId: string;
+    avatarOriginalPublicId: string;
+  }> {
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(userId) })
+      .exec();
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    profile.avatarUrl = this.DEFAULT_AVATAR_URL;
+    profile.avatarOriginalUrl = this.DEFAULT_AVATAR_URL;
+    profile.avatarPublicId = '';
+    profile.avatarOriginalPublicId = '';
+    await profile.save();
+
+    return this.buildAvatarResponse(profile);
   }
 
   async searchProfiles(params: {
@@ -214,9 +434,14 @@ export class ProfilesService {
     displayName: string;
     username: string;
     avatarUrl: string;
+    avatarOriginalUrl: string;
     coverUrl?: string;
     bio?: string;
+    gender?: string;
     location?: string;
+    workplace?: { companyId: string; companyName: string };
+    birthdate?: string;
+    visibility?: ProfileVisibility;
     stats: {
       posts: number;
       reels: number;
@@ -256,6 +481,8 @@ export class ProfilesService {
 
     const viewerId = params.viewerId ? this.asObjectId(params.viewerId) : null;
 
+    const isOwner = Boolean(viewerId && ownerId && viewerId.equals(ownerId));
+
     const [
       followersCount,
       followingCount,
@@ -280,15 +507,53 @@ export class ProfilesService {
         : Promise.resolve(null),
     ]);
 
+    const visibility = {
+      ...this.DEFAULT_VISIBILITY,
+      ...(profile.visibility ?? {}),
+    };
+    const canView = (value: ProfileFieldVisibility) => {
+      if (isOwner) return true;
+      if (value === 'public') return true;
+      if (value === 'followers') return Boolean(viewerFollow);
+      return false;
+    };
+
+    const canViewGender = canView(visibility.gender);
+    const canViewBirthdate = canView(visibility.birthdate);
+    const canViewLocation = canView(visibility.location);
+    const canViewWorkplace = canView(visibility.workplace);
+    const canViewBio = canView(visibility.bio);
+    const canViewProfile = canView(visibility.profile);
+
+    if (!canViewProfile) {
+      throw new ForbiddenException('Profile is private');
+    }
+
     return {
       id: profile._id?.toString?.() ?? maybeObjectId?.toString?.() ?? '',
       userId: ownerId.toString(),
       displayName: profile.displayName,
       username: profile.username,
       avatarUrl: profile.avatarUrl || this.DEFAULT_AVATAR_URL,
+      avatarOriginalUrl: profile.avatarOriginalUrl || this.DEFAULT_AVATAR_URL,
       coverUrl: profile.coverUrl || '',
-      bio: profile.bio || '',
-      location: profile.location || '',
+      bio: canViewBio ? profile.bio || '' : '',
+      gender: canViewGender ? profile.gender || '' : '',
+      location: canViewLocation ? profile.location || '' : '',
+      workplace: canViewWorkplace
+        ? profile.workplace?.companyId
+          ? {
+              companyId: (profile.workplace.companyId as any).toString(),
+              companyName: profile.workplace.companyName || '',
+            }
+          : { companyId: '', companyName: profile.workplace?.companyName || '' }
+        : { companyId: '', companyName: '' },
+      birthdate: canViewBirthdate
+        ? profile.birthdate
+          ? new Date(profile.birthdate).toISOString().slice(0, 10)
+          : ''
+        : '',
+      visibility,
       stats: {
         posts: postsCount,
         reels: reelsCount,

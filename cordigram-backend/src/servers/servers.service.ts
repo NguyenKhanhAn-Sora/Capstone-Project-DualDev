@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Server } from './server.schema';
@@ -129,9 +134,7 @@ export class ServersService {
 
     // Check if user is owner
     if (server.ownerId.toString() !== userId) {
-      throw new ForbiddenException(
-        'Only server owner can delete the server',
-      );
+      throw new ForbiddenException('Only server owner can delete the server');
     }
 
     // Delete all channels in server

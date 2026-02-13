@@ -2,12 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { ConfigService } from './config/config.service';
+import cookieParser from 'cookie-parser';
 
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
+  app.use(cookieParser());
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -21,7 +23,13 @@ async function bootstrap() {
     origin: [config.frontendUrl, 'http://localhost:3000'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-device-info'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-device-info',
+      'x-device-id',
+      'x-login-method',
+    ],
   });
 
   await app.listen(config.port, () => {

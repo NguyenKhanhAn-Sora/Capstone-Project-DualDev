@@ -5,6 +5,7 @@ import Image from "next/image";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { io, type Socket } from "socket.io-client";
 import styles from "./sidebar.module.css";
 import {
   apiFetch,
@@ -12,8 +13,22 @@ import {
   type ApiError,
   fetchCurrentProfile,
   type CurrentProfileResponse,
+  fetchNotifications,
+  fetchNotificationSeenAt,
+  updateNotificationSeenAt,
+  type NotificationItem,
 } from "@/lib/api";
+import {
+  CURRENT_PROFILE_UPDATED_EVENT,
+  emitNotificationReceived,
+  NOTIFICATION_READ_EVENT,
+  type NotificationReadDetail,
+} from "@/lib/events";
 import { useTheme } from "@/component/theme-provider";
+import SearchOverlay from "@/ui/search-overlay/search-overlay";
+import NotificationsOverlay from "@/ui/notifications-overlay/notifications-overlay";
+import { getStoredAccessToken } from "@/lib/auth";
+import { useTranslations } from "next-intl";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -36,27 +51,37 @@ const EyeIcon = ({ open }: { open: boolean }) => (
 );
 
 const navItems = [
-  { label: "Home", href: "/", icon: IconHome },
-  { label: "Search", href: "/search", icon: IconSearch },
-  { label: "Message", href: "/messages", icon: IconMessage },
+  { key: "home", href: "/", icon: IconHome, hasAvatar: false },
+  { key: "search", href: "/search", icon: IconSearch, hasAvatar: false },
+  { key: "message", href: "/messages", icon: IconMessage, hasAvatar: false },
   {
-    label: "Following",
+    key: "following",
     href: "/following",
     icon: IconFollowing,
-    hasAvatar: true,
+    hasAvatar: false,
   },
-  { label: "Explore", href: "/explore", icon: IconCompass },
-  { label: "Notification", href: "/notifications", icon: IconBell },
-  { label: "Create", href: "/create", icon: IconPlus },
-  { label: "Reels", href: "/reels", icon: IconReel },
+  { key: "explore", href: "/explore", icon: IconCompass, hasAvatar: false },
+  { key: "notification", href: "/notifications", icon: IconBell, hasAvatar: false },
+  { key: "create", href: "/create", icon: IconPlus, hasAvatar: false },
+  { key: "reels", href: "/reels", icon: IconReel, hasAvatar: false },
 ];
 
 export default function Sidebar() {
   const router = useRouter();
+  const t = useTranslations("sidebar");
   const [profile, setProfile] = useState<CurrentProfileResponse | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchClosing, setSearchClosing] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationClosing, setNotificationClosing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [lastSeenAt, setLastSeenAt] = useState<number | null>(null);
+  const [lastSeenReady, setLastSeenReady] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const notificationOpenRef = useRef(false);
+  const socketRef = useRef<Socket | null>(null);
   const { theme, toggleTheme } = useTheme();
   const clearSessionAndGoHome = useCallback(
     (event?: React.MouseEvent<HTMLAnchorElement>) => {
@@ -76,7 +101,7 @@ export default function Sidebar() {
 
       router.push("/");
     },
-    [router]
+    [router],
   );
 
   useEffect(() => {
@@ -109,12 +134,57 @@ export default function Sidebar() {
       }
     };
 
+    const onProfileUpdated = () => {
+      loadProfile();
+    };
+
     window.addEventListener("storage", onStorage);
+    window.addEventListener(CURRENT_PROFILE_UPDATED_EVENT, onProfileUpdated);
     return () => {
       active = false;
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener(
+        CURRENT_PROFILE_UPDATED_EVENT,
+        onProfileUpdated,
+      );
     };
   }, []);
+
+  useEffect(() => {
+    notificationOpenRef.current = notificationOpen;
+  }, [notificationOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let active = true;
+    const token = getStoredAccessToken();
+
+    if (!token) {
+      setLastSeenAt(null);
+      setLastSeenReady(true);
+      return;
+    }
+
+    setLastSeenReady(false);
+    fetchNotificationSeenAt({ token })
+      .then((res) => {
+        if (!active) return;
+        const parsed = res.lastSeenAt
+          ? new Date(res.lastSeenAt).getTime()
+          : NaN;
+        setLastSeenAt(Number.isFinite(parsed) ? parsed : null);
+      })
+      .catch(() => {
+        if (active) setLastSeenAt(null);
+      })
+      .finally(() => {
+        if (active) setLastSeenReady(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [profile?.id, profile?.userId]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -130,6 +200,81 @@ export default function Sidebar() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [menuOpen]);
+
+  const connectNotifications = useCallback(
+    (token: string) => {
+      socketRef.current?.disconnect();
+
+      const socket = io(`${getApiBaseUrl()}/notifications`, {
+        auth: { token },
+        transports: ["websocket"],
+      });
+
+      socket.on(
+        "notification:new",
+        (payload: { notification: NotificationItem; unreadCount?: number }) => {
+          if (!payload?.notification) return;
+          emitNotificationReceived({ notification: payload.notification });
+
+          const createdAt = new Date(payload.notification.createdAt).getTime();
+          const cutoff = lastSeenAt ?? 0;
+          if (createdAt > cutoff) {
+            setUnreadCount((prev) => prev + 1);
+          }
+        },
+      );
+
+      socketRef.current = socket;
+    },
+    [lastSeenAt],
+  );
+
+  useEffect(() => {
+    if (!lastSeenReady) return;
+    const token = getStoredAccessToken();
+    if (!token) {
+      setUnreadCount(0);
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+      return;
+    }
+
+    fetchNotifications({ token, limit: 50 })
+      .then((res) => {
+        const cutoff = lastSeenAt ?? 0;
+        const count = (res.items ?? []).filter((item) => {
+          const created = new Date(item.createdAt).getTime();
+          return created > cutoff;
+        }).length;
+        setUnreadCount(count);
+      })
+      .catch(() => setUnreadCount(0));
+
+    connectNotifications(token);
+
+    return () => {
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
+  }, [
+    connectNotifications,
+    profile?.id,
+    profile?.userId,
+    lastSeenAt,
+    lastSeenReady,
+  ]);
+
+  useEffect(() => {
+    const handleRead = (event: Event) => {
+      const detail = (event as CustomEvent<NotificationReadDetail>).detail;
+      if (!detail?.id) return;
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    };
+
+    window.addEventListener(NOTIFICATION_READ_EVENT, handleRead);
+    return () =>
+      window.removeEventListener(NOTIFICATION_READ_EVENT, handleRead);
+  }, []);
 
   const avatarLetter = useMemo(() => {
     const source = profile?.displayName || profile?.username || "";
@@ -194,7 +339,7 @@ export default function Sidebar() {
       setSwitchAccountOpen(false);
       router.replace("/");
     },
-    [router]
+    [router],
   );
 
   return (
@@ -207,29 +352,80 @@ export default function Sidebar() {
             width={52}
             height={52}
             className={styles.logo}
+            style={{ width: "auto", height: "auto" }}
             priority
           />
           <span className={styles.brandName}>CORDIGRAM</span>
         </Link>
 
         <nav className={styles.nav}>
-          {navItems.map(({ label, href, icon: Icon, hasAvatar }) => (
-            <Link
-              key={label}
-              href={href}
-              className={styles.item}
-              onClick={label === "Home" ? clearSessionAndGoHome : undefined}
-            >
-              <span className={styles.icon}>
-                {hasAvatar ? (
-                  <div className={styles.avatarFallback}>S</div>
-                ) : (
+          {navItems.map(({ key, href, icon: Icon, hasAvatar }) =>
+            key === "search" ? (
+              <button
+                key={key}
+                type="button"
+                className={styles.item}
+                onClick={() => setSearchOpen(true)}
+              >
+                <span className={styles.icon}>
                   <Icon />
-                )}
-              </span>
-              <span className={styles.label}>{label}</span>
-            </Link>
-          ))}
+                </span>
+                <span className={styles.label}>{t(`nav.${key}`)}</span>
+              </button>
+            ) : key === "notification" ? (
+              <button
+                key={key}
+                type="button"
+                className={styles.item}
+                onClick={() => {
+                  setNotificationClosing(false);
+                  const now = Date.now();
+                  setLastSeenAt(now);
+                  setUnreadCount(0);
+                  setNotificationOpen(true);
+                  const token = getStoredAccessToken();
+                  if (token) {
+                    updateNotificationSeenAt({ token })
+                      .then((res) => {
+                        const parsed = res.lastSeenAt
+                          ? new Date(res.lastSeenAt).getTime()
+                          : NaN;
+                        if (Number.isFinite(parsed)) {
+                          setLastSeenAt(parsed);
+                        }
+                      })
+                      .catch(() => undefined);
+                  }
+                }}
+              >
+                <span className={styles.icon}>
+                  <Icon />
+                </span>
+                <span className={styles.label}>{t(`nav.${key}`)}</span>
+                {unreadCount > 0 ? (
+                  <span className={styles.badge}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                ) : null}
+              </button>
+            ) : (
+              <Link
+                key={key}
+                href={href}
+                className={styles.item}
+                onClick={key === "home" ? clearSessionAndGoHome : undefined}
+              >
+                <span className={styles.icon}>
+                  {hasAvatar ? (
+                    <div className={styles.avatarFallback}>S</div>
+                  ) : (
+                    <Icon />
+                  )}
+                </span>
+                <span className={styles.label}>{t(`nav.${key}`)}</span>
+              </Link>
+            ),
+          )}
         </nav>
 
         {profile ? (
@@ -263,19 +459,28 @@ export default function Sidebar() {
             {menuOpen ? (
               <div className={styles.userMenu}>
                 <MenuItem
-                  label="Profile"
+                  label={t("menu.profile")}
                   icon={<IconProfile />}
                   onClick={handleProfileClick}
                 />
-                <MenuItem label="Settings" icon={<IconSettings />} />
                 <MenuItem
-                  label="Saved"
+                  label={t("menu.settings")}
+                  icon={<IconSettings />}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    router.push("/settings");
+                  }}
+                />
+                <MenuItem
+                  label={t("menu.saved")}
                   icon={<IconSaved />}
                   onClick={handleSavedClick}
                 />
                 <MenuItem
                   label={
-                    theme === "dark" ? "Switch to light" : "Switch to dark"
+                    theme === "dark"
+                      ? t("menu.switchToLight")
+                      : t("menu.switchToDark")
                   }
                   icon={<IconTheme />}
                   onClick={() => {
@@ -284,7 +489,7 @@ export default function Sidebar() {
                   }}
                 />
                 <MenuItem
-                  label="Report a problem"
+                  label={t("menu.reportProblem")}
                   icon={<IconReport />}
                   onClick={() => {
                     setMenuOpen(false);
@@ -292,7 +497,7 @@ export default function Sidebar() {
                   }}
                 />
                 <MenuItem
-                  label="Switch account"
+                  label={t("menu.switchAccount")}
                   icon={<IconSwitchAccount />}
                   onClick={() => {
                     setMenuOpen(false);
@@ -300,7 +505,7 @@ export default function Sidebar() {
                   }}
                 />
                 <MenuItem
-                  label="Log out"
+                  label={t("menu.logout")}
                   icon={<IconLogout />}
                   onClick={handleLogout}
                 />
@@ -309,6 +514,30 @@ export default function Sidebar() {
           </div>
         ) : null}
       </aside>
+
+      <SearchOverlay
+        open={searchOpen}
+        closing={searchClosing}
+        onClose={() => {
+          setSearchClosing(true);
+          window.setTimeout(() => {
+            setSearchOpen(false);
+            setSearchClosing(false);
+          }, 180);
+        }}
+      />
+
+      <NotificationsOverlay
+        open={notificationOpen}
+        closing={notificationClosing}
+        onClose={() => {
+          setNotificationClosing(true);
+          window.setTimeout(() => {
+            setNotificationOpen(false);
+            setNotificationClosing(false);
+          }, 180);
+        }}
+      />
 
       <SwitchAccountOverlay
         open={switchAccountOpen}
@@ -352,6 +581,7 @@ function SwitchAccountOverlay({
   onClose,
   onSuccess,
 }: SwitchAccountOverlayProps) {
+  const t = useTranslations("sidebar.switchAccount");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -389,7 +619,7 @@ function SwitchAccountOverlay({
 
     const trimmedEmail = email.trim().toLowerCase();
     if (!emailRegex.test(trimmedEmail)) {
-      setError("Email format is invalid");
+      setError(t("errors.invalidEmail"));
       return;
     }
 
@@ -404,7 +634,7 @@ function SwitchAccountOverlay({
       await onSuccess(result.accessToken);
     } catch (err) {
       const apiErr = err as ApiError | undefined;
-      setError(apiErr?.message || "Login failed. Please try again.");
+      setError(apiErr?.message || t("errors.loginFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -419,7 +649,7 @@ function SwitchAccountOverlay({
           className={styles.closeButton}
           onClick={onClose}
         >
-          Ã—
+          ×
         </button>
 
         <div className={`${styles.switchHeader}`}>
@@ -429,8 +659,9 @@ function SwitchAccountOverlay({
             alt="Logo"
             width={48}
             height={48}
+            style={{ width: "auto", height: "auto" }}
           />
-          <h2 className="text-center">Sign in to continue</h2>
+          <h2 className="text-center">{t("title")}</h2>
         </div>
 
         <div className={styles.switchGrid}>
@@ -441,27 +672,27 @@ function SwitchAccountOverlay({
               noValidate
             >
               <label className={styles.switchLabel}>
-                Email address
+                {t("email.label")}
                 <input
                   type="email"
                   name="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter email"
+                  placeholder={t("email.placeholder")}
                   autoComplete="email"
                   className={styles.switchInput}
                 />
               </label>
 
               <label className={styles.switchLabel}>
-                Password
+                {t("password.label")}
                 <div className={styles.passwordField}>
                   <input
                     type={showPassword ? "text" : "password"}
                     name="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
+                    placeholder={t("password.placeholder")}
                     autoComplete="current-password"
                     className={`${styles.switchInput} ${styles.passwordInput}`}
                   />
@@ -470,7 +701,7 @@ function SwitchAccountOverlay({
                     className={styles.passwordToggle}
                     onClick={() => setShowPassword((prev) => !prev)}
                     aria-label={
-                      showPassword ? "Hide password" : "Show password"
+                      showPassword ? t("password.hide") : t("password.show")
                     }
                   >
                     <EyeIcon open={showPassword} />
@@ -489,7 +720,7 @@ function SwitchAccountOverlay({
                 disabled={isDisabled}
                 className={styles.switchSubmit}
               >
-                {submitting ? "Switching..." : "Log in"}
+                {submitting ? t("submit.loading") : t("submit.label")}
               </button>
             </form>
             <button
@@ -524,7 +755,7 @@ function SwitchAccountOverlay({
                   ></path>
                 </svg>
               </span>
-              Continue with Google
+              {t("google")}
             </button>
           </div>
         </div>
@@ -583,7 +814,7 @@ function IconFollowing() {
       strokeWidth="2"
     >
       <circle cx="9" cy="8" r="4" />
-      <path d="M17 11v6M14 14h6" />
+      <path d="M14.2 15.2l1.4 1.4 3-3" strokeLinecap="round" />
       <path d="M3 19c.8-2.5 3-4 6-4" />
     </svg>
   );

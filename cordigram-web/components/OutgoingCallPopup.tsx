@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { useCallSound } from '@/hooks/use-call-sound';
-import styles from './OutgoingCallPopup.module.css';
+import React from "react";
+import { useCallSound } from "@/hooks/use-call-sound";
+import styles from "./OutgoingCallPopup.module.css";
 
 interface OutgoingCallPopupProps {
   receiverName: string;
   receiverAvatar?: string;
-  callType: 'audio' | 'video';
+  callType: "audio" | "video";
   onCancel: () => void;
-  status: 'calling' | 'rejected' | 'no-answer';
+  status: "calling" | "rejected" | "no-answer";
 }
 
 export default function OutgoingCallPopup({
@@ -19,45 +19,52 @@ export default function OutgoingCallPopup({
   onCancel,
   status,
 }: OutgoingCallPopupProps) {
-  const callTypeText = callType === 'video' ? 'Video' : 'Voice';
-  
+  const callTypeText = callType === "video" ? "Video" : "Voice";
+
   // ✅ Play outgoing call dialing tone (only when status is 'calling')
-  useCallSound('outgoing', status === 'calling');
-  
+  useCallSound("outgoing", status === "calling");
+
   const getStatusText = () => {
     switch (status) {
-      case 'calling':
-        return 'Đang gọi...';
-      case 'rejected':
-        return 'Người nhận không liên hệ được';
-      case 'no-answer':
-        return 'Không có phản hồi';
+      case "calling":
+        return "Calling...";
+      case "rejected":
+        return "Recipient is unavailable";
+      case "no-answer":
+        return "No answer";
       default:
-        return 'Đang gọi...';
+        return "Calling...";
     }
   };
 
   const getStatusColor = () => {
-    return status === 'calling' ? '#43b581' : '#ed4245';
+    return status === "calling" ? "#43b581" : "#ed4245";
   };
-  
+
   return (
     <div className={styles.overlay}>
       <div className={styles.popup}>
         {/* Avatar */}
         <div className={styles.avatarWrapper}>
           {receiverAvatar ? (
-            <img src={receiverAvatar} alt={receiverName} className={styles.avatar} />
+            <img
+              src={receiverAvatar}
+              alt={receiverName}
+              className={styles.avatar}
+            />
           ) : (
             <div className={styles.avatarPlaceholder}>
               {receiverName.charAt(0).toUpperCase()}
             </div>
           )}
           {/* Pulsing animation only when calling */}
-          {status === 'calling' && (
+          {status === "calling" && (
             <>
               <div className={styles.pulseRing}></div>
-              <div className={styles.pulseRing} style={{ animationDelay: '1s' }}></div>
+              <div
+                className={styles.pulseRing}
+                style={{ animationDelay: "1s" }}
+              ></div>
             </>
           )}
         </div>
@@ -65,10 +72,7 @@ export default function OutgoingCallPopup({
         {/* Receiver info */}
         <h2 className={styles.receiverName}>{receiverName}</h2>
         <p className={styles.callType}>{callTypeText} call</p>
-        <p 
-          className={styles.statusText}
-          style={{ color: getStatusColor() }}
-        >
+        <p className={styles.statusText} style={{ color: getStatusColor() }}>
           {getStatusText()}
         </p>
 
@@ -77,12 +81,19 @@ export default function OutgoingCallPopup({
           <button
             onClick={onCancel}
             className={`${styles.button} ${styles.cancelButton}`}
-            aria-label={status === 'calling' ? 'Hủy cuộc gọi' : 'Đóng'}
+            aria-label={status === "calling" ? "Cancel call" : "Close"}
           >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M23 1L1 23M1 1l22 22" />
             </svg>
-            <span>{status === 'calling' ? 'Hủy cuộc gọi' : 'Đóng'}</span>
+            <span>{status === "calling" ? "Cancel call" : "Close"}</span>
           </button>
         </div>
       </div>

@@ -1,11 +1,10 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../../profile.module.css";
-import { fetchSavedItems, type FeedItem } from "@/lib/api";
-import { getStoredAccessToken } from "@/lib/auth";
+import type { FeedItem } from "@/lib/api";
 import { useProfileContext } from "../profile-context";
 
 const formatCount = (value?: number) => {
@@ -35,43 +34,34 @@ const IconView = () => (
 
 export default function ProfileSavedPage() {
   const router = useRouter();
-  const { profile, viewerId } = useProfileContext();
-  const [items, setItems] = useState<FeedItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>("");
+  const { profile, viewerId, tabs, prefetchTab } = useProfileContext();
+  const tab = tabs?.saved;
 
   const isOwner = useMemo(
     () => Boolean(profile && viewerId && profile.userId === viewerId),
-    [profile, viewerId]
+    [profile, viewerId],
   );
 
   useEffect(() => {
     if (!isOwner) return;
-    const token = getStoredAccessToken();
-    if (!token) return;
-    setLoading(true);
-    setError("");
-    fetchSavedItems({ token, limit: 60 })
-      .then((data) =>
-        setItems(
-          data
-            .slice()
-            .sort(
-              (a, b) =>
-                (b.createdAt ? new Date(b.createdAt).getTime() : 0) -
-                (a.createdAt ? new Date(a.createdAt).getTime() : 0)
-            )
-        )
-      )
-      .catch((err: unknown) => {
-        const message =
-          typeof err === "object" && err && "message" in err
-            ? String((err as { message?: string }).message)
-            : "Unable to load saved";
-        setError(message || "Unable to load saved");
-      })
-      .finally(() => setLoading(false));
-  }, [isOwner]);
+    prefetchTab?.("saved");
+  }, [isOwner, prefetchTab]);
+
+  const error = tab?.error ?? "";
+  const items = tab?.items ?? [];
+  const showSkeleton = !!(
+    tab &&
+    (tab.loading || (!tab.loaded && !tab.error)) &&
+    items.length === 0
+  );
+  const showEmpty = !!(
+    tab &&
+    tab.loaded &&
+    !tab.loading &&
+    !error &&
+    items.length === 0
+  );
+  const suppressGrid = Boolean(error) && items.length === 0 && !showSkeleton;
 
   if (!isOwner) {
     return (
@@ -82,11 +72,15 @@ export default function ProfileSavedPage() {
   return (
     <>
       {error ? <div className={styles.errorBox}>{error}</div> : null}
-      <SavedGrid
-        items={items}
-        loading={loading}
-        onSelect={(path) => router.push(path)}
-      />
+      {suppressGrid ? null : showEmpty ? (
+        <div className={styles.errorBox}>No saved yet.</div>
+      ) : (
+        <SavedGrid
+          items={items}
+          loading={showSkeleton}
+          onSelect={(path) => router.push(path)}
+        />
+      )}
     </>
   );
 }
@@ -100,6 +94,16 @@ function SavedGrid({
   loading: boolean;
   onSelect: (path: string) => void;
 }) {
+  const resolveTargetPath = (item: FeedItem) => {
+    const kind = (item as any)?.repostKind || item.kind;
+    const isReel = kind === "reel" || item.media?.[0]?.type === "video";
+    if (isReel) {
+      const originId = (item as any)?.repostOf as string | undefined;
+      const query = originId ? `?single=1&origin=${originId}` : "?single=1";
+      return `/reels/${item.id}${query}`;
+    }
+    return `/post/${item.id}`;
+  };
   const handleEnter = (e: React.MouseEvent<HTMLVideoElement>) => {
     const el = e.currentTarget;
     el.currentTime = 0;
@@ -131,8 +135,7 @@ function SavedGrid({
       {items.map((item) => {
         const media = item.media?.[0];
         if (!media) return null;
-        const targetPath =
-          item.kind === "reel" ? `/reels/${item.id}` : `/post/${item.id}`;
+        const targetPath = resolveTargetPath(item);
         return (
           <button
             key={item.id}

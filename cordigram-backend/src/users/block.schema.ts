@@ -22,3 +22,4 @@ export class Block extends Document {
 
 export const BlockSchema = SchemaFactory.createForClass(Block);
 BlockSchema.index({ blockerId: 1, blockedId: 1 }, { unique: true });
+BlockSchema.index({ blockedId: 1 });

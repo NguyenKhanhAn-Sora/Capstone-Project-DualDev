@@ -38,11 +38,7 @@ export class MessagesController {
     @Query('limit') limit: number = 50,
     @Query('skip') skip: number = 0,
   ) {
-    return this.messagesService.getMessagesByChannelId(
-      channelId,
-      limit,
-      skip,
-    );
+    return this.messagesService.getMessagesByChannelId(channelId, limit, skip);
   }
 
   @Get(':id')
@@ -64,10 +60,7 @@ export class MessagesController {
   }
 
   @Delete(':id')
-  async deleteMessage(
-    @Param('id') messageId: string,
-    @Request() req: any,
-  ) {
+  async deleteMessage(@Param('id') messageId: string, @Request() req: any) {
     await this.messagesService.deleteMessage(messageId, req.user.userId);
     return { message: 'Message deleted successfully' };
   }

@@ -2,11 +2,24 @@
 
 import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
-import type { ProfileDetailResponse } from "@/lib/api";
+import type { FeedItem, ProfileDetailResponse } from "@/lib/api";
+
+export type ProfileTabKey = "posts" | "reels" | "repost" | "saved";
+
+export type ProfileTabState = {
+  items: FeedItem[];
+  loading: boolean;
+  loaded: boolean;
+  error: string;
+};
+
+export type ProfileTabsState = Record<ProfileTabKey, ProfileTabState>;
 
 type ProfileContextValue = {
   profile: ProfileDetailResponse;
   viewerId?: string;
+  tabs?: ProfileTabsState;
+  prefetchTab?: (key: ProfileTabKey) => void;
 };
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);

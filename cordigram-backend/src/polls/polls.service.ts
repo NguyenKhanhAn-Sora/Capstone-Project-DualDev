@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Poll, PollDocument } from './poll.schema';
@@ -6,9 +10,7 @@ import { CreatePollDto, VotePollDto } from './dto/create-poll.dto';
 
 @Injectable()
 export class PollsService {
-  constructor(
-    @InjectModel(Poll.name) private pollModel: Model<PollDocument>,
-  ) {}
+  constructor(@InjectModel(Poll.name) private pollModel: Model<PollDocument>) {}
 
   async create(userId: string, dto: CreatePollDto): Promise<Poll> {
     const durationHours = dto.durationHours || 24;
@@ -66,15 +68,15 @@ export class PollsService {
 
     // Check if multiple answers allowed
     if (!poll.allowMultipleAnswers && dto.optionIndexes.length > 1) {
-      throw new BadRequestException('This poll does not allow multiple answers');
+      throw new BadRequestException(
+        'This poll does not allow multiple answers',
+      );
     }
 
     const userObjectId = new Types.ObjectId(userId);
 
     // Remove existing votes from this user
-    poll.votes = poll.votes.filter(
-      (vote) => vote.userId.toString() !== userId,
-    );
+    poll.votes = poll.votes.filter((vote) => vote.userId.toString() !== userId);
 
     // Add new votes
     for (const optionIndex of dto.optionIndexes) {
@@ -94,11 +96,15 @@ export class PollsService {
     const poll = await this.findById(pollId);
 
     const totalVotes = poll.votes.length;
-    const uniqueVoters = new Set(poll.votes.map((v) => v.userId.toString())).size;
+    const uniqueVoters = new Set(poll.votes.map((v) => v.userId.toString()))
+      .size;
 
     const results = poll.options.map((option, index) => {
-      const voteCount = poll.votes.filter((v) => v.optionIndex === index).length;
-      const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+      const voteCount = poll.votes.filter(
+        (v) => v.optionIndex === index,
+      ).length;
+      const percentage =
+        totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
 
       return {
         option,

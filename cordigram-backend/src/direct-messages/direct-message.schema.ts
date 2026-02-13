@@ -14,7 +14,11 @@ export class DirectMessage extends Document {
   @Prop({ type: String, required: true })
   content: string;
 
-  @Prop({ type: String, enum: ['text', 'gif', 'sticker', 'voice'], default: 'text' })
+  @Prop({
+    type: String,
+    enum: ['text', 'gif', 'sticker', 'voice'],
+    default: 'text',
+  })
   type: MessageType;
 
   @Prop({ type: String, default: null })
@@ -43,6 +47,18 @@ export class DirectMessage extends Document {
     emoji: string;
   }>;
 
+  @Prop({ type: Types.ObjectId, ref: 'DirectMessage', default: null })
+  replyTo: Types.ObjectId | null;
+
+  @Prop({ type: Boolean, default: false })
+  isPinned: boolean;
+
+  @Prop({ type: Date, default: null })
+  pinnedAt: Date | null;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  pinnedBy: Types.ObjectId | null;
+
   @Prop({ type: Boolean, default: false })
   isEdited: boolean;
 
@@ -57,6 +73,9 @@ export class DirectMessage extends Document {
 
   @Prop({ type: Boolean, default: false })
   isDeleted: boolean;
+
+  @Prop({ type: [Types.ObjectId], default: [] })
+  deletedFor: Types.ObjectId[];
 
   @Prop({ type: Date, default: Date.now })
   createdAt: Date;

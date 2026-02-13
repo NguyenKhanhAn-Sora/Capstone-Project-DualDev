@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import EmojiPicker from "emoji-picker-react";
 import styles from "./create.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { DateSelect } from "@/ui/date-select/date-select";
+import { TimeSelect } from "@/ui/time-select/time-select";
 import {
   createPost,
   createReel,
@@ -39,6 +41,7 @@ const audienceOptions = [
 ];
 
 const REEL_MAX_DURATION_SECONDS = 90;
+const REEL_MAX_BYTES = 50 * 1024 * 1024; // 50MB hard cap
 const MAX_MEDIA_ITEMS = 10;
 
 type Step = "select" | "details";
@@ -74,6 +77,38 @@ const normalizeHashtag = (value: string) =>
     .replace(/\s+/g, "")
     .replace(/[^a-zA-Z0-9_]/g, "")
     .toLowerCase();
+
+const formatLocalDate = (value: Date) => {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatLocalTime = (value: Date) => {
+  const hours = String(value.getHours()).padStart(2, "0");
+  const minutes = String(value.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+};
+
+const splitSchedule = (value: string) => {
+  if (!value) return { date: "", time: "" };
+  const [date, time = ""] = value.split("T");
+  return { date, time: time.slice(0, 5) };
+};
+
+const buildSchedule = (date: string, time: string) =>
+  date && time ? `${date}T${time}` : "";
+
+const clampTimeForDate = (date: string, time: string) => {
+  if (!date) return time;
+  const now = new Date();
+  const today = formatLocalDate(now);
+  if (date !== today) return time;
+  const minTime = formatLocalTime(now);
+  if (!time || time < minTime) return minTime;
+  return time;
+};
 
 const cleanLocationLabel = (label: string) =>
   label
@@ -127,7 +162,7 @@ export default function CreatePostPage() {
   const [error, setError] = useState<string>("");
   const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
-    null
+    null,
   );
   const [hashtagDraft, setHashtagDraft] = useState("");
   const [mentionDraft, setMentionDraft] = useState("");
@@ -170,15 +205,22 @@ export default function CreatePostPage() {
 
   const canAddMore = useMemo(
     () => (mode === "post" ? mediaItems.length < MAX_MEDIA_ITEMS : false),
-    [mode, mediaItems.length]
+    [mode, mediaItems.length],
   );
 
   const selectedAudience = useMemo(
     () =>
       audienceOptions.find((option) => option.value === form.audience) ||
       audienceOptions[0],
-    [form.audience]
+    [form.audience],
   );
+
+  const scheduleParts = useMemo(
+    () => splitSchedule(form.scheduledAt),
+    [form.scheduledAt],
+  );
+  const scheduledDate = scheduleParts.date;
+  const scheduledTime = scheduleParts.time;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -188,17 +230,9 @@ export default function CreatePostPage() {
       }
     };
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowEmojiPicker(false);
-      }
-    };
-
     document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
@@ -293,10 +327,14 @@ export default function CreatePostPage() {
         setError("Reels require a video file.");
         return;
       }
+      if (videoFile.size > REEL_MAX_BYTES) {
+        setError("Reel file must be 50MB or smaller.");
+        return;
+      }
       const duration = await readVideoDuration(videoFile);
       if (duration !== null && duration > REEL_MAX_DURATION_SECONDS) {
         setError(
-          `Reel video must be ${REEL_MAX_DURATION_SECONDS}s or shorter.`
+          `Reel video must be ${REEL_MAX_DURATION_SECONDS}s or shorter.`,
         );
         return;
       }
@@ -364,7 +402,7 @@ export default function CreatePostPage() {
   const openFileDialog = () => fileInputRef.current?.click();
 
   const handleCaptionChange = (
-    event: React.ChangeEvent<HTMLTextAreaElement>
+    event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
     const value = event.target.value;
     const caret = event.target.selectionStart ?? value.length;
@@ -393,7 +431,7 @@ export default function CreatePostPage() {
       e.preventDefault();
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
-        prev + 1 < mentionSuggestions.length ? prev + 1 : 0
+        prev + 1 < mentionSuggestions.length ? prev + 1 : 0,
       );
       return;
     }
@@ -401,7 +439,7 @@ export default function CreatePostPage() {
       e.preventDefault();
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1,
       );
       return;
     }
@@ -463,7 +501,7 @@ export default function CreatePostPage() {
 
     if (!mediaItems.length) {
       setSubmitError(
-        "Please choose at least one photo or video before publishing."
+        "Please choose at least one photo or video before publishing.",
       );
       return;
     }
@@ -476,7 +514,7 @@ export default function CreatePostPage() {
       }
       if (reel.duration !== null && reel.duration > REEL_MAX_DURATION_SECONDS) {
         setSubmitError(
-          `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`
+          `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`,
         );
         return;
       }
@@ -492,7 +530,7 @@ export default function CreatePostPage() {
     }
 
     const normalizedHashtags = Array.from(
-      new Set((form.hashtags || []).map((t) => normalizeHashtag(t.toString())))
+      new Set((form.hashtags || []).map((t) => normalizeHashtag(t.toString()))),
     ).filter(Boolean);
 
     const normalizedMentions = Array.from(
@@ -500,10 +538,10 @@ export default function CreatePostPage() {
         [
           ...extractMentionsFromCaption(form.caption || ""),
           ...(form.mentions || []).map((t) =>
-            t.toString().trim().replace(/^@/, "").toLowerCase()
+            t.toString().trim().replace(/^@/, "").toLowerCase(),
           ),
-        ].filter(Boolean)
-      )
+        ].filter(Boolean),
+      ),
     );
 
     const scheduledAtIso =
@@ -535,8 +573,8 @@ export default function CreatePostPage() {
           typeof upload.duration === "number"
             ? upload.duration
             : typeof upload.duration === "string"
-            ? Number(upload.duration)
-            : null;
+              ? Number(upload.duration)
+              : null;
 
         const finalDuration =
           typeof uploadDurationRaw === "number" &&
@@ -551,7 +589,7 @@ export default function CreatePostPage() {
           setSubmitError(
             finalDuration === null
               ? "Missing video duration. Please re-upload your reel."
-              : `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`
+              : `Video exceeds ${REEL_MAX_DURATION_SECONDS}s. Please trim it.`,
           );
           setSubmitting(false);
           return;
@@ -630,7 +668,7 @@ export default function CreatePostPage() {
     const resolveAddress = async (
       latitude: number,
       longitude: number,
-      fallback: string
+      fallback: string,
     ) => {
       try {
         const url = new URL("https://nominatim.openstreetmap.org/reverse");
@@ -669,7 +707,7 @@ export default function CreatePostPage() {
 
     const handleError = (
       err: GeolocationPositionError,
-      isFallback: boolean
+      isFallback: boolean,
     ) => {
       const shouldRetry =
         !isFallback &&
@@ -680,7 +718,7 @@ export default function CreatePostPage() {
           handleSuccess,
           (err2) => handleError(err2, true),
           // --------------------------------
-          highOptions
+          highOptions,
         );
         return;
       }
@@ -689,17 +727,17 @@ export default function CreatePostPage() {
         err.code === err.PERMISSION_DENIED
           ? "You denied location access. Please allow it to autofill your place."
           : err.code === err.POSITION_UNAVAILABLE
-          ? "We couldnâ€™t get a location fix. Try again or check GPS/Wiâ€‘Fi."
-          : err.code === err.TIMEOUT
-          ? "Location request took too long. Please retry."
-          : "Could not fetch your location.";
+            ? "We couldn’t get a location fix. Try again or check GPS/Wi‑Fi."
+            : err.code === err.TIMEOUT
+              ? "Location request took too long. Please retry."
+              : "Could not fetch your location.";
       setGeoStatus(err.code === err.PERMISSION_DENIED ? "denied" : "error");
     };
 
     navigator.geolocation.getCurrentPosition(
       handleSuccess,
       (err) => handleError(err, false),
-      highOptions
+      highOptions,
     );
   };
 
@@ -707,7 +745,7 @@ export default function CreatePostPage() {
     key: keyof Pick<
       FormState,
       "allowComments" | "allowDownload" | "hideLikeCount"
-    >
+    >,
   ) => {
     setForm((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -736,7 +774,7 @@ export default function CreatePostPage() {
       mentions: prev.mentions.filter((t) => t !== handle),
       caption: prev.caption.replace(
         new RegExp(`@${escaped}(?![a-zA-Z0-9_.])`, "gi"),
-        ""
+        "",
       ),
     }));
   };
@@ -758,7 +796,7 @@ export default function CreatePostPage() {
       e.preventDefault();
       setLocationOpen(true);
       setLocationHighlight((prev) =>
-        prev + 1 < locationSuggestions.length ? prev + 1 : 0
+        prev + 1 < locationSuggestions.length ? prev + 1 : 0,
       );
     }
     if (e.key === "ArrowUp") {
@@ -766,7 +804,7 @@ export default function CreatePostPage() {
       e.preventDefault();
       setLocationOpen(true);
       setLocationHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1,
       );
     }
     if (e.key === "Escape") {
@@ -1064,8 +1102,8 @@ export default function CreatePostPage() {
               </h2>
               <p className={styles.dropText}>
                 {mode === "reel"
-                  ? "MP4 / MOV, vertical preferred (9:16), max 90s."
-                  : "Supports .jpg, .png, .mp4, .mov. Up to 10 items."}
+                  ? "MP4 / MOV, vertical preferred (9:16), max 90s, up to 50MB."
+                  : "Supports .jpg, .png, .mp4, .mov."}
               </p>
               <div className={styles.actions}>
                 <button
@@ -1179,7 +1217,7 @@ export default function CreatePostPage() {
                         onClick={() => removeMedia(index)}
                         aria-label={`Remove ${item.file.name}`}
                       >
-                        Ã—
+                        ×
                       </button>
                       {item.kind === "video" ? (
                         <video
@@ -1202,7 +1240,7 @@ export default function CreatePostPage() {
                       )}
                       {mode === "post" ? (
                         <p className={styles.previewMeta}>
-                          {item.file.name} Â·{" "}
+                          {item.file.name} ·{" "}
                           {(item.file.size / 1024 / 1024).toFixed(1)} MB
                         </p>
                       ) : null}
@@ -1259,7 +1297,6 @@ export default function CreatePostPage() {
                       <EmojiPicker
                         onEmojiClick={(emojiData) => {
                           insertEmoji(emojiData.emoji || "");
-                          setShowEmojiPicker(false);
                         }}
                         searchDisabled={false}
                         skinTonesDisabled={false}
@@ -1296,7 +1333,7 @@ export default function CreatePostPage() {
                   <div className={styles.mentionSuggestions}>
                     {mentionLoading && (
                       <div className={styles.mentionSuggestionMuted}>
-                        Äang tÃ¬m ngÆ°á»i dÃ¹ng...
+                        Searching users...
                       </div>
                     )}
                     {!mentionLoading &&
@@ -1346,7 +1383,7 @@ export default function CreatePostPage() {
                 )}
               </div>
               <p className={styles.helper}>
-                GÃµ @ Ä‘á»ƒ tag báº¡n bÃ¨ trá»±c tiáº¿p trong caption.
+                Type @ to tag friends directly in the caption.
               </p>
               {form.mentions.length > 0 && (
                 <div className={styles.chipShell}>
@@ -1359,7 +1396,7 @@ export default function CreatePostPage() {
                           onClick={() => removeMention(handle)}
                           aria-label={`Remove tag ${handle}`}
                         >
-                          Ã—
+                          ×
                         </button>
                       </span>
                     ))}
@@ -1381,7 +1418,7 @@ export default function CreatePostPage() {
                           onClick={() => removeHashtag(tag)}
                           aria-label={`Remove hashtag ${tag}`}
                         >
-                          Ã—
+                          ×
                         </button>
                       </span>
                     ))}
@@ -1429,7 +1466,7 @@ export default function CreatePostPage() {
                     <div className={styles.locationSuggestions}>
                       {locationLoading && (
                         <div className={styles.locationSuggestionMuted}>
-                          Äang tÃ¬m kiáº¿m...
+                          Searching...
                         </div>
                       )}
                       {!locationLoading && locationSuggestions.length === 0 && (
@@ -1566,7 +1603,7 @@ export default function CreatePostPage() {
                 <div>
                   <p className={styles.switchTitle}>Hide like</p>
                   <p className={styles.switchHint}>
-                    Viewers wonâ€™t see the number of likes on this post
+                    Viewers won’t see the number of likes on this post
                   </p>
                 </div>
               </label>
@@ -1594,7 +1631,20 @@ export default function CreatePostPage() {
                     value="schedule"
                     checked={form.publishMode === "schedule"}
                     onChange={() =>
-                      setForm((prev) => ({ ...prev, publishMode: "schedule" }))
+                      setForm((prev) => {
+                        const now = new Date();
+                        const parts = splitSchedule(prev.scheduledAt);
+                        const nextDate = parts.date || formatLocalDate(now);
+                        const nextTime = clampTimeForDate(
+                          nextDate,
+                          parts.time || formatLocalTime(now),
+                        );
+                        return {
+                          ...prev,
+                          publishMode: "schedule",
+                          scheduledAt: buildSchedule(nextDate, nextTime),
+                        };
+                      })
                     }
                   />
                   <span>Schedule</span>
@@ -1605,19 +1655,73 @@ export default function CreatePostPage() {
               </div>
 
               {form.publishMode === "schedule" && (
-                <div className={styles.inputShell}>
-                  <input
-                    type="datetime-local"
-                    value={form.scheduledAt}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        scheduledAt: e.target.value,
-                      }))
-                    }
-                    onKeyDown={onScheduleKeyDown}
-                    min={new Date().toISOString().slice(0, 16)}
-                  />
+                <div className={styles.schedulerCard}>
+                  <div className={styles.schedulerHeader}>
+                    <div>
+                      <p className={styles.schedulerLabel}>Schedule</p>
+                      <p className={styles.schedulerTitle}>
+                        Choose date and time
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className={styles.schedulerGrid}>
+                    <div className={styles.schedulerField}>
+                      <label className={styles.schedulerFieldLabel}>Date</label>
+                      <DateSelect
+                        value={scheduledDate}
+                        minDate={new Date()}
+                        maxDate={null}
+                        minYear={new Date().getFullYear()}
+                        placeholder="mm/dd/yyyy"
+                        onChange={(next) => {
+                          if (!next) {
+                            setForm((prev) => ({
+                              ...prev,
+                              scheduledAt: "",
+                            }));
+                            return;
+                          }
+                          setForm((prev) => {
+                            const parts = splitSchedule(prev.scheduledAt);
+                            const nextTime = clampTimeForDate(
+                              next,
+                              parts.time || formatLocalTime(new Date()),
+                            );
+                            return {
+                              ...prev,
+                              scheduledAt: buildSchedule(next, nextTime),
+                            };
+                          });
+                        }}
+                      />
+                    </div>
+
+                    <div className={styles.schedulerField}>
+                      <label className={styles.schedulerFieldLabel}>Time</label>
+                      <TimeSelect
+                        value={scheduledTime}
+                        selectedDate={scheduledDate}
+                        minDateTime={new Date()}
+                        disabled={!scheduledDate}
+                        onChange={(next) => {
+                          setForm((prev) => {
+                            const parts = splitSchedule(prev.scheduledAt);
+                            if (!parts.date) return prev;
+                            const nextTime = clampTimeForDate(parts.date, next);
+                            return {
+                              ...prev,
+                              scheduledAt: buildSchedule(parts.date, nextTime),
+                            };
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <p className={styles.schedulerHint}>
+                    You can only select dates and times from now onward.
+                  </p>
                 </div>
               )}
             </div>

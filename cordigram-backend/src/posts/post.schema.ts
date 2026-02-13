@@ -55,7 +55,7 @@ export class Post extends Document {
   media: Media[];
 
   @Prop({ type: Number, default: null })
-  videoDurationSec?: number | null;
+  primaryVideoDurationMs?: number | null;
 
   @Prop({
     type: [String],
@@ -122,6 +122,12 @@ export class Post extends Document {
   @Prop({ type: Date, default: null })
   publishedAt?: Date | null;
 
+  @Prop({ type: Date, default: null })
+  notificationsMutedUntil?: Date | null;
+
+  @Prop({ type: Boolean, default: false })
+  notificationsMutedIndefinitely?: boolean;
+
   @Prop({
     type: {
       hearts: { type: Number, default: 0 },
@@ -173,4 +179,15 @@ PostSchema.index({ mentions: 1 });
 PostSchema.index({ repostOf: 1 });
 PostSchema.index({ visibility: 1, createdAt: -1 });
 PostSchema.index({ kind: 1, createdAt: -1 });
+PostSchema.index({ primaryVideoDurationMs: 1 });
 PostSchema.index({ topics: 1, createdAt: -1 });
+
+// Full-text search (used by /search/posts)
+PostSchema.index(
+  { content: 'text', hashtags: 'text', topics: 'text' },
+  {
+    name: 'PostTextIndex',
+    weights: { content: 10, hashtags: 5, topics: 2 },
+    default_language: 'none',
+  },
+);

@@ -22,7 +22,9 @@ import { Profile } from '../profiles/profile.schema';
   },
 })
 @Injectable()
-export class DirectMessagesGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class DirectMessagesGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer() server: Server;
 
   private connectedUsers = new Map<string, string>(); // userId -> socketId
@@ -80,7 +82,8 @@ export class DirectMessagesGateway implements OnGatewayConnection, OnGatewayDisc
   @SubscribeMessage('send-message')
   async handleSendMessage(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: { receiverId: string; content: string; attachments?: string[] },
+    @MessageBody()
+    data: { receiverId: string; content: string; attachments?: string[] },
   ) {
     try {
       const senderId = socket.data.userId;
@@ -95,13 +98,17 @@ export class DirectMessagesGateway implements OnGatewayConnection, OnGatewayDisc
         },
       );
 
-      const populatedMessage = await this.directMessagesService.getDirectMessageById(
-        message._id.toString(),
-      );
+      const populatedMessage =
+        await this.directMessagesService.getDirectMessageById(
+          message._id.toString(),
+        );
 
       console.log('Message saved:', populatedMessage);
       console.log('Receiver ID:', data.receiverId);
-      console.log('All connected users:', Array.from(this.connectedUsers.keys()));
+      console.log(
+        'All connected users:',
+        Array.from(this.connectedUsers.keys()),
+      );
 
       // Send to receiver
       const receiverSocket = this.connectedUsers.get(data.receiverId);
@@ -142,11 +149,11 @@ export class DirectMessagesGateway implements OnGatewayConnection, OnGatewayDisc
       if (receiverSocket) {
         // ✅ Debug: Log userId
         console.log('🔍 Typing - userId:', userId);
-        
+
         // ✅ Import Types from mongoose and convert userId to ObjectId
         const { Types } = require('mongoose');
         const userObjectId = new Types.ObjectId(userId);
-        
+
         // Get sender's profile to send username
         const senderProfile = await this.profileModel
           .findOne({ userId: userObjectId })
@@ -156,8 +163,9 @@ export class DirectMessagesGateway implements OnGatewayConnection, OnGatewayDisc
 
         console.log('🔍 Typing - senderProfile:', senderProfile);
 
-        const username = senderProfile?.username || senderProfile?.displayName || 'Unknown';
-        
+        const username =
+          senderProfile?.username || senderProfile?.displayName || 'Unknown';
+
         console.log('🔍 Typing - username to send:', username);
 
         this.server.to(receiverSocket).emit('user-typing', {
@@ -196,7 +204,8 @@ export class DirectMessagesGateway implements OnGatewayConnection, OnGatewayDisc
   @SubscribeMessage('add-reaction')
   async handleAddReaction(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: { messageId: string; emoji: string; receiverId: string },
+    @MessageBody()
+    data: { messageId: string; emoji: string; receiverId: string },
   ) {
     try {
       const userId = socket.data.userId;
@@ -216,8 +225,127 @@ export class DirectMessagesGateway implements OnGatewayConnection, OnGatewayDisc
           reactions: message.reactions,
         });
       }
+
+      // Also emit back to sender
+      socket.emit('reaction-updated', {
+        messageId: data.messageId,
+        reactions: message.reactions,
+      });
     } catch (error) {
       console.error('Error adding reaction:', error);
+    }
+  }
+
+  @SubscribeMessage('pin-message')
+  async handlePinMessage(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody()
+    data: { messageId: string; receiverId: string },
+  ) {
+    try {
+      const userId = socket.data.userId;
+      const message = await this.directMessagesService.pinMessage(
+        data.messageId,
+        userId,
+      );
+
+      // Notify both users about the pin
+      const receiverSocket = this.connectedUsers.get(data.receiverId);
+      const pinData = {
+        messageId: data.messageId,
+        isPinned: message.isPinned,
+        pinnedAt: message.pinnedAt,
+        pinnedBy: message.pinnedBy,
+      };
+
+      if (receiverSocket) {
+        this.server.to(receiverSocket).emit('message-pinned', pinData);
+      }
+
+      // Also emit back to sender
+      socket.emit('message-pinned', pinData);
+    } catch (error) {
+      console.error('Error pinning message:', error);
+    }
+  }
+
+  @SubscribeMessage('report-message')
+  async handleReportMessage(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody()
+    data: { messageId: string; reason: string; description?: string },
+  ) {
+    try {
+      const userId = socket.data.userId;
+      const report = await this.directMessagesService.reportMessage(
+        data.messageId,
+        userId,
+        {
+          reason: data.reason,
+          description: data.description,
+        },
+      );
+
+      // Emit confirmation back to sender
+      socket.emit('message-reported', {
+        messageId: data.messageId,
+        reportId: report._id,
+        status: 'success',
+      });
+    } catch (error) {
+      console.error('Error reporting message:', error);
+      socket.emit('message-reported', {
+        messageId: data.messageId,
+        status: 'error',
+        error: error.message,
+      });
+    }
+  }
+
+  @SubscribeMessage('delete-message')
+  async handleDeleteMessage(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody()
+    data: {
+      messageId: string;
+      deleteType: 'for-everyone' | 'for-me';
+      receiverId: string;
+    },
+  ) {
+    try {
+      const userId = socket.data.userId;
+      const result = await this.directMessagesService.deleteDirectMessage(
+        data.messageId,
+        userId,
+        data.deleteType,
+      );
+
+      // If deleted for everyone, notify the receiver
+      if (data.deleteType === 'for-everyone') {
+        const receiverSocket = this.connectedUsers.get(data.receiverId);
+        if (receiverSocket) {
+          this.server.to(receiverSocket).emit('message-deleted', {
+            messageId: data.messageId,
+            deleteType: 'for-everyone',
+            deletedAt: result.deletedAt,
+          });
+        }
+      }
+
+      // Emit confirmation back to sender
+      socket.emit('message-deleted', {
+        messageId: data.messageId,
+        deleteType: data.deleteType,
+        deletedAt: result.deletedAt,
+        status: 'success',
+      });
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      socket.emit('message-deleted', {
+        messageId: data.messageId,
+        status: 'error',
+        error: error.message,
+      });
     }
   }
 
@@ -234,13 +362,25 @@ export class DirectMessagesGateway implements OnGatewayConnection, OnGatewayDisc
       // Get sender's profile for username and avatar
       const { Types } = require('mongoose');
       const senderObjectId = new Types.ObjectId(senderId);
-      
-      console.log('📞 [CALL] User', senderId, 'initiating', data.type, 'call to', data.receiverId);
+
+      console.log(
+        '📞 [CALL] User',
+        senderId,
+        'initiating',
+        data.type,
+        'call to',
+        data.receiverId,
+      );
       console.log('📞 [CALL-DEBUG] Looking up profile for userId:', senderId);
-      console.log('📞 [CALL-DEBUG] ObjectId created:', senderObjectId.toString());
-      
-      const senderProfile = await this.profileModel.findOne({ userId: senderObjectId });
-      
+      console.log(
+        '📞 [CALL-DEBUG] ObjectId created:',
+        senderObjectId.toString(),
+      );
+
+      const senderProfile = await this.profileModel.findOne({
+        userId: senderObjectId,
+      });
+
       console.log('📞 [CALL-DEBUG] Profile query completed');
       console.log('📞 [CALL-DEBUG] Sender profile found:', {
         _id: senderProfile?._id?.toString(),
@@ -254,12 +394,17 @@ export class DirectMessagesGateway implements OnGatewayConnection, OnGatewayDisc
 
       const callerInfo = {
         userId: senderId,
-        username: senderProfile?.username || senderProfile?.displayName || 'User',
-        displayName: senderProfile?.displayName || senderProfile?.username || 'User',
+        username:
+          senderProfile?.username || senderProfile?.displayName || 'User',
+        displayName:
+          senderProfile?.displayName || senderProfile?.username || 'User',
         avatar: senderProfile?.avatarUrl || null,
       };
 
-      console.log('📞 [CALL-DEBUG] CallerInfo constructed:', JSON.stringify(callerInfo, null, 2));
+      console.log(
+        '📞 [CALL-DEBUG] CallerInfo constructed:',
+        JSON.stringify(callerInfo, null, 2),
+      );
 
       if (receiverSocket) {
         const payload = {
@@ -267,16 +412,31 @@ export class DirectMessagesGateway implements OnGatewayConnection, OnGatewayDisc
           type: data.type,
           callerInfo,
         };
-        
-        console.log('📞 [CALL-DEBUG] Emitting call-incoming event with payload:', JSON.stringify(payload, null, 2));
-        
+
+        console.log(
+          '📞 [CALL-DEBUG] Emitting call-incoming event with payload:',
+          JSON.stringify(payload, null, 2),
+        );
+
         this.server.to(receiverSocket).emit('call-incoming', payload);
-        
-        console.log('✅ [CALL] Call notification sent to receiver socket:', receiverSocket);
-        console.log('✅ [CALL] CallerInfo.displayName sent:', callerInfo.displayName);
+
+        console.log(
+          '✅ [CALL] Call notification sent to receiver socket:',
+          receiverSocket,
+        );
+        console.log(
+          '✅ [CALL] CallerInfo.displayName sent:',
+          callerInfo.displayName,
+        );
       } else {
-        console.log('⚠️ [CALL] Receiver not online - receiverId:', data.receiverId);
-        console.log('⚠️ [CALL] Connected users:', Array.from(this.connectedUsers.keys()));
+        console.log(
+          '⚠️ [CALL] Receiver not online - receiverId:',
+          data.receiverId,
+        );
+        console.log(
+          '⚠️ [CALL] Connected users:',
+          Array.from(this.connectedUsers.keys()),
+        );
       }
     } catch (error) {
       console.error('❌ [CALL] Error initiating call:', error);
@@ -338,13 +498,21 @@ export class DirectMessagesGateway implements OnGatewayConnection, OnGatewayDisc
     const userId = socket.data.userId;
     const peerSocket = this.connectedUsers.get(data.peerId);
 
-    console.log('📞 [CALL-END] User', userId, 'ending/canceling call with', data.peerId);
+    console.log(
+      '📞 [CALL-END] User',
+      userId,
+      'ending/canceling call with',
+      data.peerId,
+    );
 
     if (peerSocket) {
       this.server.to(peerSocket).emit('call-ended', {
         from: userId,
       });
-      console.log('✅ [CALL-END] Call cancellation notification sent to', data.peerId);
+      console.log(
+        '✅ [CALL-END] Call cancellation notification sent to',
+        data.peerId,
+      );
     } else {
       console.log('⚠️ [CALL-END] Peer not online');
     }

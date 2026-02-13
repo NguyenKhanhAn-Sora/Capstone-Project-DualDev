@@ -1,14 +1,25 @@
-const API_BASE_URL = 'http://localhost:9999';
+import { decodeJwt } from "./auth";
+
+const API_BASE_URL = "http://localhost:9999";
 
 function getToken(): string {
-  return localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
+  return (
+    localStorage.getItem("accessToken") || localStorage.getItem("token") || ""
+  );
 }
 
 function getHeaders() {
   return {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     Authorization: `Bearer ${getToken()}`,
   };
+}
+
+function getCurrentUserId(): string | null {
+  const token = getToken();
+  if (!token) return null;
+  const payload = decodeJwt(token) as { userId?: string; sub?: string } | null;
+  return payload?.userId ?? payload?.sub ?? null;
 }
 
 export interface Server {
@@ -19,7 +30,7 @@ export interface Server {
   ownerId: string;
   members: Array<{
     userId: string;
-    role: 'owner' | 'moderator' | 'member';
+    role: "owner" | "moderator" | "member";
     joinedAt: string;
   }>;
   channels: Channel[];
@@ -32,7 +43,7 @@ export interface Server {
 export interface Channel {
   _id: string;
   name: string;
-  type: 'text' | 'voice';
+  type: "text" | "voice";
   description?: string;
   serverId: string;
   createdBy: string;
@@ -79,13 +90,13 @@ export async function createServer(
   avatarUrl?: string,
 ): Promise<Server> {
   const response = await fetch(`${API_BASE_URL}/servers`, {
-    method: 'POST',
+    method: "POST",
     headers: getHeaders(),
     body: JSON.stringify({ name, description, avatarUrl }),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to create server');
+    throw new Error("Failed to create server");
   }
 
   return response.json();
@@ -98,8 +109,8 @@ export async function getMyServers(): Promise<Server[]> {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    console.error('API Error:', response.status, errorData);
-    throw new Error(errorData.message || 'Failed to fetch servers');
+    console.error("API Error:", response.status, errorData);
+    throw new Error(errorData.message || "Failed to fetch servers");
   }
 
   return response.json();
@@ -111,7 +122,7 @@ export async function getServer(serverId: string): Promise<Server> {
   });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch server');
+    throw new Error("Failed to fetch server");
   }
 
   return response.json();
@@ -124,13 +135,13 @@ export async function updateServer(
   avatarUrl?: string,
 ): Promise<Server> {
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     headers: getHeaders(),
     body: JSON.stringify({ name, description, avatarUrl }),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to update server');
+    throw new Error("Failed to update server");
   }
 
   return response.json();
@@ -138,12 +149,12 @@ export async function updateServer(
 
 export async function deleteServer(serverId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}`, {
-    method: 'DELETE',
+    method: "DELETE",
     headers: getHeaders(),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to delete server');
+    throw new Error("Failed to delete server");
   }
 }
 
@@ -151,17 +162,17 @@ export async function deleteServer(serverId: string): Promise<void> {
 export async function createChannel(
   serverId: string,
   name: string,
-  type: 'text' | 'voice',
+  type: "text" | "voice",
   description?: string,
 ): Promise<Channel> {
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}/channels`, {
-    method: 'POST',
+    method: "POST",
     headers: getHeaders(),
     body: JSON.stringify({ name, type, description }),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to create channel');
+    throw new Error("Failed to create channel");
   }
 
   return response.json();
@@ -169,11 +180,11 @@ export async function createChannel(
 
 export async function getChannels(
   serverId: string,
-  type?: 'text' | 'voice',
+  type?: "text" | "voice",
 ): Promise<Channel[]> {
   const url = new URL(`${API_BASE_URL}/servers/${serverId}/channels`);
   if (type) {
-    url.searchParams.append('type', type);
+    url.searchParams.append("type", type);
   }
 
   const response = await fetch(url.toString(), {
@@ -181,7 +192,7 @@ export async function getChannels(
   });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch channels');
+    throw new Error("Failed to fetch channels");
   }
 
   return response.json();
@@ -199,7 +210,7 @@ export async function getChannel(
   );
 
   if (!response.ok) {
-    throw new Error('Failed to fetch channel');
+    throw new Error("Failed to fetch channel");
   }
 
   return response.json();
@@ -214,14 +225,14 @@ export async function updateChannel(
   const response = await fetch(
     `${API_BASE_URL}/servers/${serverId}/channels/${channelId}`,
     {
-      method: 'PATCH',
+      method: "PATCH",
       headers: getHeaders(),
       body: JSON.stringify({ name, description }),
     },
   );
 
   if (!response.ok) {
-    throw new Error('Failed to update channel');
+    throw new Error("Failed to update channel");
   }
 
   return response.json();
@@ -234,13 +245,13 @@ export async function deleteChannel(
   const response = await fetch(
     `${API_BASE_URL}/servers/${serverId}/channels/${channelId}`,
     {
-      method: 'DELETE',
+      method: "DELETE",
       headers: getHeaders(),
     },
   );
 
   if (!response.ok) {
-    throw new Error('Failed to delete channel');
+    throw new Error("Failed to delete channel");
   }
 }
 
@@ -250,14 +261,17 @@ export async function createMessage(
   content: string,
   attachments?: string[],
 ): Promise<Message> {
-  const response = await fetch(`${API_BASE_URL}/channels/${channelId}/messages`, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify({ content, attachments }),
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/channels/${channelId}/messages`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ content, attachments }),
+    },
+  );
 
   if (!response.ok) {
-    throw new Error('Failed to create message');
+    throw new Error("Failed to create message");
   }
 
   return response.json();
@@ -269,15 +283,15 @@ export async function getMessages(
   skip: number = 0,
 ): Promise<Message[]> {
   const url = new URL(`${API_BASE_URL}/channels/${channelId}/messages`);
-  url.searchParams.append('limit', limit.toString());
-  url.searchParams.append('skip', skip.toString());
+  url.searchParams.append("limit", limit.toString());
+  url.searchParams.append("skip", skip.toString());
 
   const response = await fetch(url.toString(), {
     headers: getHeaders(),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch messages');
+    throw new Error("Failed to fetch messages");
   }
 
   return response.json();
@@ -291,14 +305,14 @@ export async function updateMessage(
   const response = await fetch(
     `${API_BASE_URL}/channels/${channelId}/messages/${messageId}`,
     {
-      method: 'PATCH',
+      method: "PATCH",
       headers: getHeaders(),
       body: JSON.stringify({ content }),
     },
   );
 
   if (!response.ok) {
-    throw new Error('Failed to update message');
+    throw new Error("Failed to update message");
   }
 
   return response.json();
@@ -311,13 +325,13 @@ export async function deleteMessage(
   const response = await fetch(
     `${API_BASE_URL}/channels/${channelId}/messages/${messageId}`,
     {
-      method: 'DELETE',
+      method: "DELETE",
       headers: getHeaders(),
     },
   );
 
   if (!response.ok) {
-    throw new Error('Failed to delete message');
+    throw new Error("Failed to delete message");
   }
 }
 
@@ -329,13 +343,13 @@ export async function addMessageReaction(
   const response = await fetch(
     `${API_BASE_URL}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
     {
-      method: 'POST',
+      method: "POST",
       headers: getHeaders(),
     },
   );
 
   if (!response.ok) {
-    throw new Error('Failed to add reaction');
+    throw new Error("Failed to add reaction");
   }
 
   return response.json();
@@ -344,7 +358,9 @@ export async function addMessageReaction(
 // Friends/Followers
 export async function getMyFollowers(): Promise<Friend[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/profiles/followers`, {
+    const userId = getCurrentUserId();
+    if (!userId) return [];
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/followers`, {
       headers: getHeaders(),
     });
 
@@ -352,9 +368,24 @@ export async function getMyFollowers(): Promise<Friend[]> {
       return [];
     }
 
-    return response.json();
+    const payload = await response.json();
+    if (Array.isArray(payload)) return payload as Friend[];
+    const items = (payload?.items ?? []) as Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+    }>;
+    return items.map((item) => ({
+      _id: item.userId,
+      displayName: item.displayName,
+      username: item.username,
+      avatarUrl: item.avatarUrl,
+      email: "",
+      bio: "",
+    }));
   } catch (err) {
-    console.error('Failed to fetch followers', err);
+    console.error("Failed to fetch followers", err);
     return [];
   }
 }
@@ -362,7 +393,9 @@ export async function getMyFollowers(): Promise<Friend[]> {
 // Get following list
 export async function getFollowing(): Promise<Friend[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/follows/following`, {
+    const userId = getCurrentUserId();
+    if (!userId) return [];
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/following`, {
       headers: getHeaders(),
     });
 
@@ -370,43 +403,61 @@ export async function getFollowing(): Promise<Friend[]> {
       return [];
     }
 
-    return response.json();
+    const payload = await response.json();
+    if (Array.isArray(payload)) return payload as Friend[];
+    const items = (payload?.items ?? []) as Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+    }>;
+    return items.map((item) => ({
+      _id: item.userId,
+      displayName: item.displayName,
+      username: item.username,
+      avatarUrl: item.avatarUrl,
+      email: "",
+      bio: "",
+    }));
   } catch (err) {
-    console.error('Failed to fetch following', err);
+    console.error("Failed to fetch following", err);
     return [];
   }
 }
 
 // Follow a user
 export async function followUser(userId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/follows/${userId}`, {
-    method: 'POST',
+  const response = await fetch(`${API_BASE_URL}/users/${userId}/follow`, {
+    method: "POST",
     headers: getHeaders(),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to follow user');
+    throw new Error("Failed to follow user");
   }
 }
 
 // Unfollow a user
 export async function unfollowUser(userId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/follows/${userId}`, {
-    method: 'DELETE',
+  const response = await fetch(`${API_BASE_URL}/users/${userId}/follow`, {
+    method: "DELETE",
     headers: getHeaders(),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to unfollow user');
+    throw new Error("Failed to unfollow user");
   }
 }
 
 // Check if following a user
 export async function isFollowing(userId: string): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE_URL}/follows/check/${userId}`, {
-      headers: getHeaders(),
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/users/${userId}/is-following`,
+      {
+        headers: getHeaders(),
+      },
+    );
 
     if (!response.ok) {
       return false;
@@ -415,8 +466,7 @@ export async function isFollowing(userId: string): Promise<boolean> {
     const data = await response.json();
     return data.isFollowing;
   } catch (err) {
-    console.error('Failed to check following status', err);
+    console.error("Failed to check following status", err);
     return false;
   }
 }
-

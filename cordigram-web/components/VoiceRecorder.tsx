@@ -1,23 +1,27 @@
-'use client';
+"use client";
 
-import React, { useState, useRef, useEffect } from 'react';
-import styles from './VoiceRecorder.module.css';
+import React, { useState, useRef, useEffect } from "react";
+import styles from "./VoiceRecorder.module.css";
 
 interface VoiceRecorderProps {
   onRecordComplete: (audioBlob: Blob, duration: number) => void;
   onCancel: () => void;
 }
 
-export default function VoiceRecorder({ onRecordComplete, onCancel }: VoiceRecorderProps) {
+export default function VoiceRecorder({
+  onRecordComplete,
+  onCancel,
+}: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const pausedTimeRef = useRef<number>(0);
+  const recordingTimeRef = useRef<number>(0);
 
   // Start recording on mount
   useEffect(() => {
@@ -31,13 +35,30 @@ export default function VoiceRecorder({ onRecordComplete, onCancel }: VoiceRecor
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Try MP4 first (best browser support), fallback to WebM, then OGG
+      let mimeType = "audio/mp4";
+      let fileExtension = "m4a";
       
-      // Use webm format (widely supported)
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
-        ? 'audio/webm'
-        : MediaRecorder.isTypeSupported('audio/ogg')
-        ? 'audio/ogg'
-        : 'audio/mp4';
+      if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        mimeType = "audio/mp4";
+        fileExtension = "m4a";
+        console.log("🎤 [RECORDER] Using MP4 format");
+      } else if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        mimeType = "audio/webm;codecs=opus";
+        fileExtension = "webm";
+        console.log("🎤 [RECORDER] Using WebM with Opus codec");
+      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+        mimeType = "audio/webm";
+        fileExtension = "webm";
+        console.log("🎤 [RECORDER] Using WebM format");
+      } else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
+        mimeType = "audio/ogg;codecs=opus";
+        fileExtension = "ogg";
+        console.log("🎤 [RECORDER] Using OGG with Opus codec");
+      } else {
+        console.warn("⚠️ [RECORDER] No preferred format supported, using default");
+      }
 
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
@@ -51,31 +72,42 @@ export default function VoiceRecorder({ onRecordComplete, onCancel }: VoiceRecor
 
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        const duration = Math.floor(recordingTime / 1000);
-        onRecordComplete(audioBlob, duration);
+        console.log("🎤 [RECORDER] Recording stopped, blob size:", audioBlob.size);
+        console.log("🎤 [RECORDER] MIME type:", mimeType);
+        console.log("🎤 [RECORDER] Extension:", fileExtension);
         
+        // Use ref to get the latest recording time (avoids stale closure)
+        const duration = Math.max(1, Math.floor(recordingTimeRef.current / 1000));
+        console.log("🎤 [RECORDER] Duration (seconds):", duration, "from ref:", recordingTimeRef.current);
+        // Pass both blob and metadata
+        (onRecordComplete as any)(audioBlob, duration, { mimeType, fileExtension });
+
         // Stop all tracks
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
       };
 
       mediaRecorder.start();
       setIsRecording(true);
       startTimeRef.current = Date.now();
-      
+
       // Start timer
       timerRef.current = setInterval(() => {
-        setRecordingTime(Date.now() - startTimeRef.current + pausedTimeRef.current);
+        const newTime = Date.now() - startTimeRef.current + pausedTimeRef.current;
+        recordingTimeRef.current = newTime;
+        setRecordingTime(newTime);
       }, 100);
-
     } catch (error) {
-      console.error('Failed to access microphone:', error);
-      alert('Không thể truy cập microphone. Vui lòng cho phép quyền truy cập.');
+      console.error("Failed to access microphone:", error);
+      alert("Unable to access the microphone. Please allow microphone access.");
       onCancel();
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       if (timerRef.current) {
@@ -92,7 +124,9 @@ export default function VoiceRecorder({ onRecordComplete, onCancel }: VoiceRecor
       mediaRecorderRef.current.resume();
       startTimeRef.current = Date.now();
       timerRef.current = setInterval(() => {
-        setRecordingTime(Date.now() - startTimeRef.current + pausedTimeRef.current);
+        const newTime = Date.now() - startTimeRef.current + pausedTimeRef.current;
+        recordingTimeRef.current = newTime;
+        setRecordingTime(newTime);
       }, 100);
       setIsPaused(false);
     } else {
@@ -119,19 +153,26 @@ export default function VoiceRecorder({ onRecordComplete, onCancel }: VoiceRecor
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
   return (
     <div className={styles.voiceRecorder}>
       <div className={styles.recorderContent}>
         {/* Cancel Button */}
-        <button 
+        <button
           className={styles.cancelButton}
           onClick={handleCancel}
-          title="Hủy"
+          title="Cancel"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
@@ -139,23 +180,31 @@ export default function VoiceRecorder({ onRecordComplete, onCancel }: VoiceRecor
 
         {/* Waveform Animation */}
         <div className={styles.waveformContainer}>
-          <div className={`${styles.waveBar} ${!isPaused ? styles.animating : ''}`}></div>
-          <div className={`${styles.waveBar} ${!isPaused ? styles.animating : ''}`}></div>
-          <div className={`${styles.waveBar} ${!isPaused ? styles.animating : ''}`}></div>
-          <div className={`${styles.waveBar} ${!isPaused ? styles.animating : ''}`}></div>
-          <div className={`${styles.waveBar} ${!isPaused ? styles.animating : ''}`}></div>
+          <div
+            className={`${styles.waveBar} ${!isPaused ? styles.animating : ""}`}
+          ></div>
+          <div
+            className={`${styles.waveBar} ${!isPaused ? styles.animating : ""}`}
+          ></div>
+          <div
+            className={`${styles.waveBar} ${!isPaused ? styles.animating : ""}`}
+          ></div>
+          <div
+            className={`${styles.waveBar} ${!isPaused ? styles.animating : ""}`}
+          ></div>
+          <div
+            className={`${styles.waveBar} ${!isPaused ? styles.animating : ""}`}
+          ></div>
         </div>
 
         {/* Timer */}
-        <div className={styles.timer}>
-          {formatTime(recordingTime)}
-        </div>
+        <div className={styles.timer}>{formatTime(recordingTime)}</div>
 
         {/* Pause/Resume Button */}
         <button
           className={styles.pauseButton}
           onClick={handlePauseResume}
-          title={isPaused ? "Tiếp tục" : "Tạm dừng"}
+          title={isPaused ? "Resume" : "Pause"}
         >
           {isPaused ? (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -174,9 +223,16 @@ export default function VoiceRecorder({ onRecordComplete, onCancel }: VoiceRecor
           className={styles.sendButton}
           onClick={handleSend}
           disabled={recordingTime < 1000}
-          title="Gửi"
+          title="Send"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M16.6915026,12.4744748 L3.50612381,13.2599618 C3.19218622,13.2599618 3.03521743,13.4170592 3.03521743,13.5741566 L1.15159189,20.0151496 C0.8376543,20.8006365 0.99,21.89 1.77946707,22.52 C2.41,22.99 3.50612381,23.1 4.13399899,22.8429026 L21.714504,14.0454487 C22.6563168,13.5741566 23.1272231,12.6315722 22.9702544,11.6889879 L4.13399899,1.16346272 C3.34915502,0.9 2.40734225,0.9 1.77946707,1.4071521 C0.994623095,2.0605983 0.837654326,3.0031827 1.15159189,3.7886696 L3.03521743,10.2296625 C3.03521743,10.3867599 3.19218622,10.5438573 3.50612381,10.5438573 L16.6915026,11.3293442 C16.6915026,11.3293442 17.1624089,11.3293442 17.1624089,10.8580521 L17.1624089,12.4744748 C17.1624089,12.4744748 17.1624089,12.9457669 16.6915026,12.4744748 Z"></path>
           </svg>
         </button>
@@ -186,13 +242,13 @@ export default function VoiceRecorder({ onRecordComplete, onCancel }: VoiceRecor
       {isRecording && !isPaused && (
         <div className={styles.recordingIndicator}>
           <div className={styles.recordingDot}></div>
-          <span>Đang ghi âm...</span>
+          <span>Recording...</span>
         </div>
       )}
 
       {isPaused && (
         <div className={styles.pausedIndicator}>
-          <span>Đã tạm dừng</span>
+          <span>Paused</span>
         </div>
       )}
     </div>

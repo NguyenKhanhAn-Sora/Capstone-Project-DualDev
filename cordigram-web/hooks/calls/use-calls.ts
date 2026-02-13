@@ -1,18 +1,21 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useCallback, useState } from 'react';
-import { 
-  CallType, 
-  CallStatus, 
-  CallOffer, 
-  CallAnswer, 
+import { useEffect, useRef, useCallback, useState } from "react";
+import {
+  CallType,
+  CallStatus,
+  CallOffer,
+  CallAnswer,
   IceCandidate,
   CallNotification,
   CallState,
-  CallEndSignal
-} from '@/lib/calls/call-types';
-import { PEER_CONNECTION_CONFIG, MEDIA_CONSTRAINTS } from '@/lib/calls/webrtc-config';
-import { useDirectMessages } from '../use-direct-messages';
+  CallEndSignal,
+} from "@/lib/calls/call-types";
+import {
+  PEER_CONNECTION_CONFIG,
+  MEDIA_CONSTRAINTS,
+} from "@/lib/calls/webrtc-config";
+import { useDirectMessages } from "../use-direct-messages";
 
 type UseDirectMessagesReturn = ReturnType<typeof useDirectMessages>;
 
@@ -39,7 +42,9 @@ export const useCalls = ({ userId, token }: UseCallsOptions) => {
 
   const [isConnected, setIsConnected] = useState(false);
   const [callState, setCallState] = useState<CallState | null>(null);
-  const [incomingCall, setIncomingCall] = useState<CallNotification | null>(null);
+  const [incomingCall, setIncomingCall] = useState<CallNotification | null>(
+    null,
+  );
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
@@ -55,7 +60,7 @@ export const useCalls = ({ userId, token }: UseCallsOptions) => {
     if (callEvent?.from && !callState) {
       setIncomingCall({
         callId: `call-${Date.now()}`,
-        type: callEvent.type === 'video' ? CallType.VIDEO : CallType.AUDIO,
+        type: callEvent.type === "video" ? CallType.VIDEO : CallType.AUDIO,
         from: {
           userId: callEvent.from,
           username: callEvent.from,
@@ -69,23 +74,24 @@ export const useCalls = ({ userId, token }: UseCallsOptions) => {
   // Handle call ended
   useEffect(() => {
     if (callEnded) {
-      hangUp(); 
+      hangUp();
     }
   }, [callEnded]);
 
   // Get local media stream
   const getLocalStream = useCallback(async (type: CallType) => {
     try {
-      const constraints = type === CallType.VIDEO 
-        ? MEDIA_CONSTRAINTS.AUDIO_VIDEO 
-        : MEDIA_CONSTRAINTS.AUDIO_ONLY;
+      const constraints =
+        type === CallType.VIDEO
+          ? MEDIA_CONSTRAINTS.AUDIO_VIDEO
+          : MEDIA_CONSTRAINTS.AUDIO_ONLY;
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       setLocalStream(stream);
       localStreamRef.current = stream;
       return stream;
     } catch (error) {
-      console.error('Error accessing media devices:', error);
+      console.error("Error accessing media devices:", error);
       throw error;
     }
   }, []);
@@ -96,14 +102,14 @@ export const useCalls = ({ userId, token }: UseCallsOptions) => {
 
     // Add local stream tracks to peer connection
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => {
+      localStreamRef.current.getTracks().forEach((track) => {
         peerConnection.addTrack(track, localStreamRef.current!);
       });
     }
 
     // Handle remote stream
     peerConnection.ontrack = (event) => {
-      console.log('Received remote track:', event.track.kind);
+      console.log("Received remote track:", event.track.kind);
       if (!remoteStreamRef.current) {
         remoteStreamRef.current = new MediaStream();
         setRemoteStream(remoteStreamRef.current);
@@ -120,8 +126,11 @@ export const useCalls = ({ userId, token }: UseCallsOptions) => {
 
     // Handle connection state changes
     peerConnection.onconnectionstatechange = () => {
-      console.log('Connection state:', peerConnection.connectionState);
-      if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
+      console.log("Connection state:", peerConnection.connectionState);
+      if (
+        peerConnection.connectionState === "failed" ||
+        peerConnection.connectionState === "disconnected"
+      ) {
         hangUp();
       }
     };
@@ -131,130 +140,147 @@ export const useCalls = ({ userId, token }: UseCallsOptions) => {
   }, [callState, sendIceCandidate]);
 
   // Handle receive offer
-  const handleReceiveOffer = useCallback(async (offerData: CallOffer) => {
-    try {
-      if (!peerConnectionRef.current) {
-        createPeerConnection();
+  const handleReceiveOffer = useCallback(
+    async (offerData: CallOffer) => {
+      try {
+        if (!peerConnectionRef.current) {
+          createPeerConnection();
+        }
+
+        const peerConnection = peerConnectionRef.current!;
+        await peerConnection.setRemoteDescription(
+          new RTCSessionDescription(offerData.offer),
+        );
+
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+      } catch (error) {
+        console.error("Error handling offer:", error);
       }
-
-      const peerConnection = peerConnectionRef.current!;
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(offerData.offer));
-
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-    } catch (error) {
-      console.error('Error handling offer:', error);
-    }
-  }, [createPeerConnection]);
+    },
+    [createPeerConnection],
+  );
 
   // Handle receive answer
   const handleReceiveAnswer = useCallback(async (answerData: CallAnswer) => {
     try {
       if (peerConnectionRef.current) {
         await peerConnectionRef.current.setRemoteDescription(
-          new RTCSessionDescription(answerData.answer)
+          new RTCSessionDescription(answerData.answer),
         );
       }
     } catch (error) {
-      console.error('Error handling answer:', error);
+      console.error("Error handling answer:", error);
     }
   }, []);
 
   // Handle receive ICE candidate
-  const handleReceiveIceCandidate = useCallback(async (iceData: IceCandidate) => {
-    try {
-      if (peerConnectionRef.current && iceData.candidate) {
-        await peerConnectionRef.current.addIceCandidate(
-          new RTCIceCandidate(iceData.candidate)
-        );
+  const handleReceiveIceCandidate = useCallback(
+    async (iceData: IceCandidate) => {
+      try {
+        if (peerConnectionRef.current && iceData.candidate) {
+          await peerConnectionRef.current.addIceCandidate(
+            new RTCIceCandidate(iceData.candidate),
+          );
+        }
+      } catch (error) {
+        console.error("Error adding ICE candidate:", error);
       }
-    } catch (error) {
-      console.error('Error adding ICE candidate:', error);
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Initiate call
-  const initiateNewCall = useCallback(async (recipientId: string, type: CallType) => {
-    try {
-      // Get local stream
-      await getLocalStream(type);
+  const initiateNewCall = useCallback(
+    async (recipientId: string, type: CallType) => {
+      try {
+        // Get local stream
+        await getLocalStream(type);
 
-      // Create peer connection
-      createPeerConnection();
+        // Create peer connection
+        createPeerConnection();
 
-      // Create offer
-      const peerConnection = peerConnectionRef.current!;
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
+        // Create offer
+        const peerConnection = peerConnectionRef.current!;
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
 
-      // Create call state
-      const callId = `call-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const newCallState: CallState = {
-        callId,
-        type,
-        status: CallStatus.RINGING,
-        from: userId,
-        to: recipientId,
-        startTime: Date.now(),
-      };
-      setCallState(newCallState);
+        // Create call state
+        const callId = `call-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newCallState: CallState = {
+          callId,
+          type,
+          status: CallStatus.RINGING,
+          from: userId,
+          to: recipientId,
+          startTime: Date.now(),
+        };
+        setCallState(newCallState);
 
-      // Send offer via direct messages
-      initiateCall(recipientId, type === CallType.VIDEO ? 'video' : 'audio');
-    } catch (error) {
-      console.error('Error initiating call:', error);
-      setCallState(null);
-      throw error;
-    }
-  }, [userId, getLocalStream, createPeerConnection, initiateCall]);
+        // Send offer via direct messages
+        initiateCall(recipientId, type === CallType.VIDEO ? "video" : "audio");
+      } catch (error) {
+        console.error("Error initiating call:", error);
+        setCallState(null);
+        throw error;
+      }
+    },
+    [userId, getLocalStream, createPeerConnection, initiateCall],
+  );
 
   // Answer incoming call
-  const answerIncomingCall = useCallback(async (type: CallType) => {
-    try {
-      if (!incomingCall) return;
+  const answerIncomingCall = useCallback(
+    async (type: CallType) => {
+      try {
+        if (!incomingCall) return;
 
-      // Get local stream
-      await getLocalStream(type);
+        // Get local stream
+        await getLocalStream(type);
 
-      // Create peer connection
-      createPeerConnection();
+        // Create peer connection
+        createPeerConnection();
 
-      // Update call state
-      const newCallState: CallState = {
-        callId: incomingCall.callId,
-        type,
-        status: CallStatus.ACCEPTED,
-        from: incomingCall.from.userId,
-        to: userId,
-        startTime: Date.now(),
-      };
-      setCallState(newCallState);
+        // Update call state
+        const newCallState: CallState = {
+          callId: incomingCall.callId,
+          type,
+          status: CallStatus.ACCEPTED,
+          from: incomingCall.from.userId,
+          to: userId,
+          startTime: Date.now(),
+        };
+        setCallState(newCallState);
 
-      // Create answer
-      const peerConnection = peerConnectionRef.current!;
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
+        // Create answer
+        const peerConnection = peerConnectionRef.current!;
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
 
-      // Notify acceptance
-      answerCall(incomingCall.from.userId, answer);
-      setIncomingCall(null);
-    } catch (error) {
-      console.error('Error answering call:', error);
-      throw error;
-    }
-  }, [userId, incomingCall, getLocalStream, createPeerConnection, answerCall]);
+        // Notify acceptance
+        answerCall(incomingCall.from.userId, answer);
+        setIncomingCall(null);
+      } catch (error) {
+        console.error("Error answering call:", error);
+        throw error;
+      }
+    },
+    [userId, incomingCall, getLocalStream, createPeerConnection, answerCall],
+  );
 
   // Reject incoming call
-  const rejectIncomingCall = useCallback(async (reason?: string) => {
-    try {
-      if (!incomingCall) return;
+  const rejectIncomingCall = useCallback(
+    async (reason?: string) => {
+      try {
+        if (!incomingCall) return;
 
-      rejectCall(incomingCall.from.userId);
-      setIncomingCall(null);
-    } catch (error) {
-      console.error('Error rejecting call:', error);
-    }
-  }, [incomingCall, rejectCall]);
+        rejectCall(incomingCall.from.userId);
+        setIncomingCall(null);
+      } catch (error) {
+        console.error("Error rejecting call:", error);
+      }
+    },
+    [incomingCall, rejectCall],
+  );
 
   // Hang up call
   const hangUp = useCallback(() => {
@@ -270,14 +296,14 @@ export const useCalls = ({ userId, token }: UseCallsOptions) => {
 
     // Stop local stream
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
       setLocalStream(null);
     }
 
     // Clear remote stream
     if (remoteStreamRef.current) {
-      remoteStreamRef.current.getTracks().forEach(track => track.stop());
+      remoteStreamRef.current.getTracks().forEach((track) => track.stop());
       remoteStreamRef.current = null;
       setRemoteStream(null);
     }
@@ -288,7 +314,7 @@ export const useCalls = ({ userId, token }: UseCallsOptions) => {
   // Toggle audio
   const toggleAudio = useCallback((enabled: boolean) => {
     if (localStreamRef.current) {
-      localStreamRef.current.getAudioTracks().forEach(track => {
+      localStreamRef.current.getAudioTracks().forEach((track) => {
         track.enabled = enabled;
       });
     }
@@ -297,7 +323,7 @@ export const useCalls = ({ userId, token }: UseCallsOptions) => {
   // Toggle video
   const toggleVideo = useCallback((enabled: boolean) => {
     if (localStreamRef.current) {
-      localStreamRef.current.getVideoTracks().forEach(track => {
+      localStreamRef.current.getVideoTracks().forEach((track) => {
         track.enabled = enabled;
       });
     }

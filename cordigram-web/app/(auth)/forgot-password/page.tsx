@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
 
   const canSendEmail = useMemo(
     () => !!email.trim() && !loading,
-    [email, loading]
+    [email, loading],
   );
 
   const canVerifyOtp = useMemo(() => !!otp.trim() && !loading, [otp, loading]);
@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
       newPassword === confirmPassword &&
       newPassword.length >= 8 &&
       !loading,
-    [newPassword, confirmPassword, loading]
+    [newPassword, confirmPassword, loading],
   );
 
   const handleSendEmail = async (event: FormEvent) => {
@@ -74,7 +74,7 @@ export default function ForgotPasswordPage() {
       setMessage("OTP sent. Please check your inbox.");
     } catch (err) {
       const apiErr = err as { message?: string };
-      setError(apiErr?.message || "Không gửi được OTP, thử lại.");
+      setError(apiErr?.message || "Unable to send OTP, please try again.");
     } finally {
       setLoading(false);
     }
@@ -92,7 +92,7 @@ export default function ForgotPasswordPage() {
       setMessage("OTP verified. Set your new password.");
     } catch (err) {
       const apiErr = err as { message?: string };
-      setError(apiErr?.message || "OTP không hợp lệ, thử lại.");
+      setError(apiErr?.message || "Invalid OTP, please try again.");
     } finally {
       setLoading(false);
     }
@@ -124,7 +124,7 @@ export default function ForgotPasswordPage() {
         });
         setStoredAccessToken(loginRes.accessToken);
 
-        // đồng bộ recent account để màn login hiển thị đúng
+        // Sync recent account so login screen displays correctly
         try {
           const profile = await fetchCurrentProfile({
             token: loginRes.accessToken,
@@ -151,7 +151,7 @@ export default function ForgotPasswordPage() {
             ].slice(0, 5);
             window.localStorage.setItem(
               RECENT_ACCOUNTS_KEY,
-              JSON.stringify(next)
+              JSON.stringify(next),
             );
           }
         } catch (_err) {

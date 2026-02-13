@@ -1,11 +1,10 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../../profile.module.css";
-import { fetchUserReels, type FeedItem } from "@/lib/api";
-import { getStoredAccessToken } from "@/lib/auth";
+import type { FeedItem } from "@/lib/api";
 import { useProfileContext } from "../profile-context";
 
 const formatCount = (value?: number) => {
@@ -35,36 +34,41 @@ const IconView = () => (
 
 export default function ProfileReelsPage() {
   const router = useRouter();
-  const { profile } = useProfileContext();
-  const [reels, setReels] = useState<FeedItem[]>([]);
-  const [reelsLoading, setReelsLoading] = useState(false);
-  const [error, setError] = useState<string>("");
+  const { tabs, prefetchTab } = useProfileContext();
+  const tab = tabs?.reels;
 
   useEffect(() => {
-    const token = getStoredAccessToken();
-    if (!token || !profile) return;
-    setReelsLoading(true);
-    setError("");
-    fetchUserReels({ token, userId: profile.userId, limit: 30 })
-      .then((items) => setReels(items))
-      .catch((err: unknown) => {
-        const message =
-          typeof err === "object" && err && "message" in err
-            ? String((err as { message?: string }).message)
-            : "Unable to load reels";
-        setError(message || "Unable to load reels");
-      })
-      .finally(() => setReelsLoading(false));
-  }, [profile]);
+    prefetchTab?.("reels");
+  }, [prefetchTab]);
+
+  const error = tab?.error ?? "";
+  const items = tab?.items ?? [];
+  const showSkeleton = !!(
+    tab &&
+    (tab.loading || (!tab.loaded && !tab.error)) &&
+    items.length === 0
+  );
+  const showEmpty = !!(
+    tab &&
+    tab.loaded &&
+    !tab.loading &&
+    !error &&
+    items.length === 0
+  );
+  const suppressGrid = Boolean(error) && items.length === 0 && !showSkeleton;
 
   return (
     <>
       {error ? <div className={styles.errorBox}>{error}</div> : null}
-      <ReelGrid
-        items={reels}
-        loading={reelsLoading}
-        onSelect={(id) => router.push(`/reels/${id}`)}
-      />
+      {suppressGrid ? null : showEmpty ? (
+        <div className={styles.errorBox}>No reels yet.</div>
+      ) : (
+        <ReelGrid
+          items={items}
+          loading={showSkeleton}
+          onSelect={(path) => router.push(path)}
+        />
+      )}
     </>
   );
 }
@@ -76,8 +80,15 @@ function ReelGrid({
 }: {
   items: FeedItem[];
   loading: boolean;
-  onSelect: (id: string) => void;
+  onSelect: (path: string) => void;
 }) {
+  const resolveTargetPath = (item: FeedItem) => {
+    const targetId = (item as any)?.repostOf || item.id;
+    const kind = (item as any)?.repostKind || item.kind;
+    const isReel = kind === "reel" || item.media?.[0]?.type === "video";
+    return isReel ? `/reels/${targetId}?single=1` : `/post/${targetId}`;
+  };
+
   const handleEnter = (e: React.MouseEvent<HTMLVideoElement>) => {
     const el = e.currentTarget;
     el.currentTime = 0;
@@ -100,17 +111,22 @@ function ReelGrid({
     );
   }
 
+  if (!items.length) {
+    return <div className={styles.errorBox}>No reels yet.</div>;
+  }
+
   return (
     <div className={styles.grid}>
       {items.map((item) => {
         const media = item.media?.[0];
         if (!media) return null;
+        const targetPath = resolveTargetPath(item);
         return (
           <button
             key={item.id}
             type="button"
             className={styles.tile}
-            onClick={() => onSelect(item.id)}
+            onClick={() => onSelect(targetPath)}
           >
             <video
               className={styles.tileMedia}

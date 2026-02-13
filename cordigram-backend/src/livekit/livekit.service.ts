@@ -17,7 +17,11 @@ export class LivekitService {
   /**
    * Generate LiveKit access token for a user to join a room
    */
-  async generateToken(roomName: string, participantName: string, participantId: string): Promise<string> {
+  async generateToken(
+    roomName: string,
+    participantName: string,
+    participantId: string,
+  ): Promise<string> {
     const at = new AccessToken(this.livekitApiKey, this.livekitApiSecret, {
       identity: participantId,
       name: participantName,

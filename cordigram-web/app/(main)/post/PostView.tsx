@@ -13,6 +13,7 @@ import {
   fetchComments,
   fetchCurrentProfile,
   fetchPostDetail,
+  fetchReelDetail,
   followUser,
   reportComment,
   reportPost,
@@ -31,13 +32,21 @@ import {
   unsavePost,
   updatePost,
   updatePostVisibility,
+  updatePostNotificationMute,
+  pinComment,
+  unpinComment,
   searchProfiles,
+  uploadCommentMedia,
   type CommentItem,
   type CommentListResponse,
   type CurrentProfileResponse,
   type FeedItem,
   type ProfileSearchItem,
 } from "@/lib/api";
+import PostLikesOverlay from "@/ui/post-likes-overlay/post-likes-overlay";
+import CommentLikesOverlay from "@/ui/comment-likes-overlay/comment-likes-overlay";
+import { DateSelect } from "@/ui/date-select/date-select";
+import { TimeSelect } from "@/ui/time-select/time-select";
 
 function upsertById(list: CommentItem[], incoming: CommentItem): CommentItem[] {
   const idx = list.findIndex((c) => c.id === incoming.id);
@@ -80,6 +89,11 @@ type ReportCategory = {
   label: string;
   accent: string;
   reasons: Array<{ key: string; label: string }>;
+};
+
+type MentionRef = {
+  userId?: string;
+  username?: string;
 };
 
 const REPORT_GROUPS: ReportCategory[] = [
@@ -193,6 +207,13 @@ const cleanLocationLabel = (label: string) =>
     .replace(/^\s*,\s*/g, "")
     .trim();
 
+const buildLocalDateTimeIso = (date: string, time: string) => {
+  if (!date || !time) return null;
+  const dt = new Date(`${date}T${time}:00`);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString();
+};
+
 const extractMentionsFromCaption = (value: string) => {
   const handles = new Set<string>();
   const regex = /@([a-zA-Z0-9_.]{1,30})/g;
@@ -254,6 +275,56 @@ const IconMoreHorizontal = ({ size = 18 }: IconProps) => (
   </svg>
 );
 
+const IconPin = ({ size = 14 }: IconProps) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M8 3h8l-1 6 3 3v2H6v-2l3-3-1-6Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M12 14v7"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const IconCrown = ({ size = 12 }: IconProps) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M4 9l4 3 4-6 4 6 4-3-2 9H6l-2-9Z"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M7 20h10"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 const IconClose = ({ size = 18 }: IconProps) => (
   <svg
     aria-hidden
@@ -276,6 +347,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
   const [post, setPost] = useState<FeedItem | null>(null);
+  const [captionMentionMap, setCaptionMentionMap] = useState<
+    Record<string, string>
+  >({});
   const [followingAuthor, setFollowingAuthor] = useState(false);
   const [postError, setPostError] = useState<string>("");
   const [loadingPost, setLoadingPost] = useState(true);
@@ -309,12 +383,14 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [reportCommentClosing, setReportCommentClosing] = useState(false);
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(
     null
+    null,
   );
   const [reportCommentCategory, setReportCommentCategory] = useState<
     ReportCategory["key"] | null
   >(null);
   const [reportCommentReason, setReportCommentReason] = useState<string | null>(
     null
+    null,
   );
   const [reportCommentNote, setReportCommentNote] = useState("");
   const [reportCommentSubmitting, setReportCommentSubmitting] = useState(false);
@@ -362,6 +438,11 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [locationHighlight, setLocationHighlight] = useState(-1);
   const [editAllowComments, setEditAllowComments] = useState(true);
   const [editAllowDownload, setEditAllowDownload] = useState(false);
+  const [lockedEditAllowDownload, setLockedEditAllowDownload] = useState<
+    boolean | null
+  >(null);
+  const [lockedEditAllowDownloadLoading, setLockedEditAllowDownloadLoading] =
+    useState(false);
   const [editHideLikeCount, setEditHideLikeCount] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
@@ -372,6 +453,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     "public" | "followers" | "private"
   >("public");
   const [visibilityError, setVisibilityError] = useState("");
+  const [muteModalOpen, setMuteModalOpen] = useState(false);
+  const [muteOption, setMuteOption] = useState("5m");
+  const [muteCustomDate, setMuteCustomDate] = useState("");
+  const [muteCustomTime, setMuteCustomTime] = useState("");
+  const [muteSaving, setMuteSaving] = useState(false);
+  const [muteError, setMuteError] = useState("");
   const [mounted, setMounted] = useState(false);
   const visibilityOptions: Array<{
     value: "public" | "followers" | "private";
@@ -394,6 +481,20 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       description: "Only you can view this post",
     },
   ];
+
+  const muteOptions = useMemo(
+    () => [
+      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
+      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
+      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
+      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
+      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
+      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: "Until I turn it back on", ms: null },
+      { key: "custom", label: "Choose date & time", ms: null },
+    ],
+    [],
+  );
 
   useEffect(() => {
     setVisibilitySelected((post?.visibility as any) ?? "public");
@@ -430,6 +531,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       Boolean(
         (current as any)?.allowDownload ?? (current as any)?.allowDownloads
       )
+        (current as any)?.allowDownload ?? (current as any)?.allowDownloads,
+      ),
     );
     setEditHideLikeCount(Boolean(current?.hideLikeCount));
     setEditError("");
@@ -574,6 +677,46 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     };
   }, [editOpen, locationQuery]);
 
+  useEffect(() => {
+    if (!editOpen) {
+      setLockedEditAllowDownload(null);
+      setLockedEditAllowDownloadLoading(false);
+      return;
+    }
+    if (!token || !post?.repostOf) {
+      setLockedEditAllowDownload(null);
+      setLockedEditAllowDownloadLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLockedEditAllowDownloadLoading(true);
+    (async () => {
+      try {
+        const originalId = String(post.repostOf);
+        let original: FeedItem | null = null;
+        try {
+          original = await fetchPostDetail({ token, postId: originalId });
+        } catch {
+          original = await fetchReelDetail({ token, reelId: originalId });
+        }
+        if (cancelled) return;
+        const next = Boolean(original?.allowDownload);
+        setLockedEditAllowDownload(next);
+        setEditAllowDownload(next);
+      } catch {
+        if (cancelled) return;
+        setLockedEditAllowDownload(null);
+      } finally {
+        if (!cancelled) setLockedEditAllowDownloadLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editOpen, post?.id, post?.repostOf, token]);
+
   const updateCommentEverywhere = useCallback(
     (id: string, updater: (comment: CommentItem) => CommentItem) => {
       setComments((prev) => prev.map((c) => (c.id === id ? updater(c) : c)));
@@ -590,6 +733,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       });
     },
     []
+    [],
   );
 
   const removeCommentsByAuthor = useCallback((authorId: string) => {
@@ -612,6 +756,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       const collectIds = (
         all: CommentItem[],
         replies: Record<string, ReplyState>
+        replies: Record<string, ReplyState>,
       ) => {
         const ids = new Set<string>([targetId]);
         let frontier = [targetId];
@@ -659,6 +804,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       });
     },
     [comments, replyState]
+    [comments, replyState],
   );
 
   const openEditModal = () => {
@@ -673,6 +819,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const handleCaptionChange = (
     event: React.ChangeEvent<HTMLTextAreaElement>
+    event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
     const value = event.target.value;
     const caret = event.target.selectionStart ?? value.length;
@@ -723,6 +870,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
         prev + 1 < mentionSuggestions.length ? prev + 1 : 0
+        prev + 1 < mentionSuggestions.length ? prev + 1 : 0,
       );
       return;
     }
@@ -731,6 +879,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
         prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1,
       );
       return;
     }
@@ -813,6 +962,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       e.preventDefault();
       setLocationHighlight((prev) =>
         prev + 1 < locationSuggestions.length ? prev + 1 : 0
+        prev + 1 < locationSuggestions.length ? prev + 1 : 0,
       );
       return;
     }
@@ -820,6 +970,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       e.preventDefault();
       setLocationHighlight((prev) =>
         prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1,
       );
       return;
     }
@@ -842,6 +993,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
     const normalizedHashtags = Array.from(
       new Set(editHashtags.map((t) => normalizeHashtag(t.toString())))
+      new Set(editHashtags.map((t) => normalizeHashtag(t.toString()))),
     ).filter(Boolean);
 
     const normalizedMentions = Array.from(
@@ -853,11 +1005,17 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           ),
         ].filter(Boolean)
       )
+            t.toString().trim().replace(/^@/, "").toLowerCase(),
+          ),
+        ].filter(Boolean),
+      ),
     );
 
     const trimmedLocation = editLocation.trim();
 
     const payload = {
+    const isRepost = Boolean(post?.repostOf);
+    const payload: any = {
       content: editCaption || "",
       hashtags: normalizedHashtags,
       mentions: normalizedMentions,
@@ -866,6 +1024,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       allowDownload: editAllowDownload,
       hideLikeCount: editHideLikeCount,
     } as const;
+      hideLikeCount: editHideLikeCount,
+    };
+
+    if (!isRepost) {
+      payload.allowDownload = editAllowDownload;
+    }
 
     try {
       setEditSaving(true);
@@ -914,6 +1078,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       });
       setPost((prev) =>
         prev ? { ...prev, visibility: res.visibility } : prev
+        prev ? { ...prev, visibility: res.visibility } : prev,
       );
       setVisibilityModalOpen(false);
     } catch (err: any) {
@@ -928,10 +1093,43 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   };
 
   const [viewer, setViewer] = useState<CurrentProfileResponse | null>(null);
+  const [likesOverlayOpen, setLikesOverlayOpen] = useState(false);
+  const [likesOverlayClosing, setLikesOverlayClosing] = useState(false);
+  const [commentLikesOverlayOpen, setCommentLikesOverlayOpen] = useState(false);
+  const [commentLikesOverlayClosing, setCommentLikesOverlayClosing] =
+    useState(false);
+  const [commentLikesOverlayId, setCommentLikesOverlayId] = useState<
+    string | null
+  >(null);
   const [commentText, setCommentText] = useState("");
+  const [commentMentions, setCommentMentions] = useState<MentionRef[]>([]);
+  const [commentMediaFile, setCommentMediaFile] = useState<File | null>(null);
+  const [commentMediaExternal, setCommentMediaExternal] = useState<
+    CommentItem["media"] | null
+  >(null);
+  const [commentMediaPreview, setCommentMediaPreview] = useState<string | null>(
+    null,
+  );
+  const [commentMediaError, setCommentMediaError] = useState("");
+  const [commentMediaUploading, setCommentMediaUploading] = useState(false);
+  const [commentMentionDraft, setCommentMentionDraft] = useState("");
+  const [commentMentionSuggestions, setCommentMentionSuggestions] = useState<
+    ProfileSearchItem[]
+  >([]);
+  const [commentMentionOpen, setCommentMentionOpen] = useState(false);
+  const [commentMentionLoading, setCommentMentionLoading] = useState(false);
+  const [commentMentionError, setCommentMentionError] = useState("");
+  const [commentMentionHighlight, setCommentMentionHighlight] = useState(-1);
+  const [commentActiveMentionRange, setCommentActiveMentionRange] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const commentMediaInputRef = useRef<HTMLInputElement | null>(null);
   const emojiRef = useRef<HTMLDivElement | null>(null);
+  const stickerRef = useRef<HTMLDivElement | null>(null);
+  const gifRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const commentRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -940,6 +1138,222 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [openCommentMenuId, setOpenCommentMenuId] = useState<string | null>(
     null
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [stickerQuery, setStickerQuery] = useState("");
+  const [stickerLoading, setStickerLoading] = useState(false);
+  const [stickerError, setStickerError] = useState("");
+  const [stickerResults, setStickerResults] = useState<
+    Array<{
+      id: string;
+      url: string;
+      preview: string;
+      width?: number;
+      height?: number;
+    }>
+  >([]);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifQuery, setGifQuery] = useState("");
+  const [gifLoading, setGifLoading] = useState(false);
+  const [gifError, setGifError] = useState("");
+  const [gifResults, setGifResults] = useState<
+    Array<{
+      id: string;
+      url: string;
+      preview: string;
+      width?: number;
+      height?: number;
+    }>
+  >([]);
+  const [commentImageViewerUrl, setCommentImageViewerUrl] = useState<
+    string | null
+  >(null);
+
+  const clearCommentMedia = useCallback(() => {
+    setCommentMediaFile(null);
+    setCommentMediaExternal(null);
+    setCommentMediaError("");
+    setCommentMediaPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    if (commentMediaInputRef.current) {
+      commentMediaInputRef.current.value = "";
+    }
+  }, []);
+
+  const clearStickerSelection = useCallback(() => {
+    setCommentMediaExternal(null);
+  }, []);
+
+  const resetCommentMentionState = useCallback(() => {
+    setCommentMentionDraft("");
+    setCommentMentionSuggestions([]);
+    setCommentMentionOpen(false);
+    setCommentMentionLoading(false);
+    setCommentMentionError("");
+    setCommentMentionHighlight(-1);
+    setCommentActiveMentionRange(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (commentMediaPreview) {
+        URL.revokeObjectURL(commentMediaPreview);
+      }
+    };
+  }, [commentMediaPreview]);
+
+  const giphyApiKey =
+    typeof window !== "undefined"
+      ? (process.env.NEXT_PUBLIC_GIPHY_API_KEY as string | undefined)
+      : undefined;
+
+  const fetchStickers = useCallback(
+    async (query?: string) => {
+      if (!giphyApiKey) {
+        setStickerError("Missing GIPHY API key");
+        return;
+      }
+      setStickerLoading(true);
+      setStickerError("");
+      try {
+        const endpoint = query?.trim() ? "search" : "trending";
+        const params = new URLSearchParams({
+          api_key: giphyApiKey,
+          limit: "24",
+          rating: "pg",
+        });
+        if (query?.trim()) params.set("q", query.trim());
+        const res = await fetch(
+          `https://api.giphy.com/v1/stickers/${endpoint}?${params.toString()}`,
+        );
+        if (!res.ok) throw new Error("Failed to load stickers");
+        const data = await res.json();
+        const results = Array.isArray(data?.data) ? data.data : [];
+        const mapped = results
+          .map((item: any) => {
+            const images = item?.images || {};
+            const primary =
+              images.fixed_height_small ||
+              images.preview_gif ||
+              images.original;
+            if (!primary?.url) return null;
+            return {
+              id: item?.id?.toString?.() ?? primary.url,
+              url: primary.url as string,
+              preview:
+                images.fixed_height_small_still?.url ||
+                images.preview_gif?.url ||
+                primary.url,
+              width: Number(primary.width) || undefined,
+              height: Number(primary.height) || undefined,
+            };
+          })
+          .filter(Boolean);
+        setStickerResults(mapped);
+      } catch (err: any) {
+        setStickerError(err?.message || "Failed to load stickers");
+      } finally {
+        setStickerLoading(false);
+      }
+    },
+    [giphyApiKey],
+  );
+
+  const fetchGifs = useCallback(
+    async (query?: string) => {
+      if (!giphyApiKey) {
+        setGifError("Missing GIPHY API key");
+        return;
+      }
+      setGifLoading(true);
+      setGifError("");
+      try {
+        const endpoint = query?.trim() ? "search" : "trending";
+        const params = new URLSearchParams({
+          api_key: giphyApiKey,
+          limit: "24",
+          rating: "pg",
+        });
+        if (query?.trim()) params.set("q", query.trim());
+        const res = await fetch(
+          `https://api.giphy.com/v1/gifs/${endpoint}?${params.toString()}`,
+        );
+        if (!res.ok) throw new Error("Failed to load GIFs");
+        const data = await res.json();
+        const results = Array.isArray(data?.data) ? data.data : [];
+        const mapped = results
+          .map((item: any) => {
+            const images = item?.images || {};
+            const primary =
+              images.fixed_height_small ||
+              images.preview_gif ||
+              images.original;
+            if (!primary?.url) return null;
+            return {
+              id: item?.id?.toString?.() ?? primary.url,
+              url: primary.url as string,
+              preview:
+                images.fixed_height_small_still?.url ||
+                images.preview_gif?.url ||
+                primary.url,
+              width: Number(primary.width) || undefined,
+              height: Number(primary.height) || undefined,
+            };
+          })
+          .filter(Boolean);
+        setGifResults(mapped);
+      } catch (err: any) {
+        setGifError(err?.message || "Failed to load GIFs");
+      } finally {
+        setGifLoading(false);
+      }
+    },
+    [giphyApiKey],
+  );
+
+  useEffect(() => {
+    if (!showStickerPicker) return;
+    fetchStickers(stickerQuery);
+  }, [fetchStickers, showStickerPicker, stickerQuery]);
+
+  useEffect(() => {
+    if (!showGifPicker) return;
+    fetchGifs(gifQuery);
+  }, [fetchGifs, showGifPicker, gifQuery]);
+
+  const normalizeMentionRefs = useCallback((raw?: CommentItem["mentions"]) => {
+    if (!Array.isArray(raw)) return [] as MentionRef[];
+    const seen = new Set<string>();
+    const result: MentionRef[] = [];
+    raw.forEach((m) => {
+      if (typeof m === "string") {
+        const username = m.trim().replace(/^@/, "").toLowerCase();
+        if (!username) return;
+        if (seen.has(username)) return;
+        seen.add(username);
+        result.push({ username });
+        return;
+      }
+      if (m && typeof m === "object") {
+        const username = (m as any).username?.toString?.().trim?.();
+        const userId = (m as any).userId?.toString?.();
+        const key = (username || userId || "").toLowerCase();
+        if (!key) return;
+        if (seen.has(key)) return;
+        seen.add(key);
+        result.push({
+          username: username ? username.toLowerCase() : undefined,
+          userId,
+        });
+      }
+    });
+    return result.slice(0, 20);
+  }, []);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [openCommentMenuId, setOpenCommentMenuId] = useState<string | null>(
+    null,
   );
 
   const [mediaIndex, setMediaIndex] = useState(0);
@@ -973,11 +1387,13 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const selectedReportGroup = useMemo(
     () => REPORT_GROUPS.find((g) => g.key === reportCategory),
     [reportCategory]
+    [reportCategory],
   );
 
   const selectedReportCommentGroup = useMemo(
     () => REPORT_GROUPS.find((g) => g.key === reportCommentCategory),
     [reportCommentCategory]
+    [reportCommentCategory],
   );
 
   const persistResume = useCallback(() => {
@@ -997,9 +1413,24 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       sessionStorage.setItem(
         `postVideoResume:${post.id}`,
         JSON.stringify(payload)
+        JSON.stringify(payload),
       );
     } catch {}
   }, [mediaIndex, post, soundOn]);
+
+  const goToAuthorProfile = useCallback(() => {
+    setShowMoreMenu(false);
+    const targetId = post?.authorId || post?.authorUsername;
+    if (!targetId) return;
+    const href = `/profile/${targetId}`;
+    if (typeof window !== "undefined") {
+      window.location.href = href;
+    } else {
+      router.push(href);
+    }
+  }, [post?.authorId, post?.authorUsername, router]);
+
+  const canonicalPostId = post?.repostOf || postId;
 
   const goToPostPage = useCallback(() => {
     setShowMoreMenu(false);
@@ -1007,10 +1438,13 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
     if (typeof window !== "undefined") {
       window.location.href = `/post/${postId}`;
-    } else {
       router.push(`/post/${postId}`);
-    }
   }, [persistResume, postId, router]);
+      window.location.href = `/post/${canonicalPostId}`;
+    } else {
+      router.push(`/post/${canonicalPostId}`);
+    }
+  }, [persistResume, canonicalPostId, router]);
 
   const viewerUserId = viewer?.userId ?? viewer?.id;
 
@@ -1025,11 +1459,119 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     return Boolean(sameId || sameUsername);
   }, [post, viewer, viewerUserId]);
 
+  const isMutedForPost = useMemo(() => {
+    if (!isAuthor || !post) return false;
+    if (post.notificationsMutedIndefinitely) return true;
+    if (post.notificationsMutedUntil) {
+      const dt = new Date(post.notificationsMutedUntil);
+      if (!Number.isNaN(dt.getTime()) && dt.getTime() > Date.now()) {
+        return true;
+      }
+    }
+    return false;
+  }, [isAuthor, post]);
+
   const showToast = useCallback((message: string, duration = 1600) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage(message);
     toastTimerRef.current = setTimeout(() => setToastMessage(null), duration);
   }, []);
+
+  const openMuteModal = () => {
+    setMuteError("");
+    setMuteOption("5m");
+    setMuteCustomDate("");
+    setMuteCustomTime("");
+    setMuteModalOpen(true);
+  };
+
+  const closeMuteModal = () => {
+    if (muteSaving) return;
+    setMuteModalOpen(false);
+  };
+
+  const handleEnablePostNotifications = async () => {
+    if (!token || !post) return;
+    setMuteSaving(true);
+    setMuteError("");
+    try {
+      const res = await updatePostNotificationMute({
+        token,
+        postId: post.id,
+        enabled: true,
+      });
+      setPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              notificationsMutedUntil: res.mutedUntil ?? null,
+              notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+            }
+          : prev,
+      );
+      setMuteModalOpen(false);
+    } catch (err: any) {
+      setMuteError(err?.message || "Failed to update notifications");
+    } finally {
+      setMuteSaving(false);
+    }
+  };
+
+  const handleSavePostMute = async () => {
+    if (!token || !post) return;
+    setMuteSaving(true);
+    setMuteError("");
+
+    try {
+      let mutedUntil: string | null = null;
+      let mutedIndefinitely = false;
+      const selected = muteOptions.find((opt) => opt.key === muteOption);
+
+      if (muteOption === "until") {
+        mutedIndefinitely = true;
+      } else if (muteOption === "custom") {
+        const iso = buildLocalDateTimeIso(muteCustomDate, muteCustomTime);
+        if (!iso) {
+          setMuteError("Please select a valid date and time.");
+          setMuteSaving(false);
+          return;
+        }
+        const dt = new Date(iso);
+        if (dt.getTime() <= Date.now()) {
+          setMuteError("Please choose a future time.");
+          setMuteSaving(false);
+          return;
+        }
+        mutedUntil = iso;
+      } else if (selected?.ms) {
+        mutedUntil = new Date(Date.now() + selected.ms).toISOString();
+      } else {
+        mutedIndefinitely = true;
+      }
+
+      const res = await updatePostNotificationMute({
+        token,
+        postId: post.id,
+        mutedUntil,
+        mutedIndefinitely,
+      });
+
+      setPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              notificationsMutedUntil: res.mutedUntil ?? null,
+              notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+            }
+          : prev,
+      );
+      setMuteModalOpen(false);
+    } catch (err: any) {
+      setMuteError(err?.message || "Failed to update notifications");
+    } finally {
+      setMuteSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1044,6 +1586,40 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       .catch(() => undefined);
   }, [token]);
 
+  const viewerIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (viewer?.userId) ids.add(viewer.userId);
+    if (viewer?.id) ids.add(viewer.id);
+    return ids;
+  }, [viewer]);
+
+  const prioritizeRootComments = useCallback(
+    (items: CommentItem[]) => {
+      if (!viewerIds.size) return items;
+      const pinned: CommentItem[] = [];
+      const prioritized: CommentItem[] = [];
+      const others: CommentItem[] = [];
+      items.forEach((item) => {
+        if (item.parentId) {
+          others.push(item);
+          return;
+        }
+        const authorId = item.author?.id || item.authorId;
+        const isViewerRoot = authorId ? viewerIds.has(authorId) : false;
+        if (item.pinnedAt) {
+          pinned.push(item);
+        } else if (isViewerRoot) {
+          prioritized.push(item);
+        } else {
+          others.push(item);
+        }
+      });
+      if (!pinned.length && !prioritized.length) return items;
+      return [...pinned, ...prioritized, ...others];
+    },
+    [viewerIds],
+  );
+
   useEffect(() => {
     if (!token) return;
     setLoadingPost(true);
@@ -1053,12 +1629,14 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         setPost(data);
         const flagsFollowing = Boolean(
           (data as any)?.flags?.following ?? (data as any)?.following
+          (data as any)?.flags?.following ?? (data as any)?.following,
         );
         setFollowingAuthor(flagsFollowing);
         setMediaIndex(0);
         setLiked(Boolean((data as any).liked));
         const initialSaved = Boolean(
           (data as any)?.flags?.saved ?? (data as any)?.saved
+          (data as any)?.flags?.saved ?? (data as any)?.saved,
         );
         setSaved(initialSaved);
       })
@@ -1146,6 +1724,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     setOpenCommentMenuId(null);
     setEditingCommentId(comment.id);
     setCommentText(comment.content || "");
+    setCommentMentions(normalizeMentionRefs(comment.mentions));
+    clearCommentMedia();
+    if (comment.media) {
+      setCommentMediaExternal({
+        type: comment.media.type,
+        url: comment.media.url,
+        metadata: comment.media.metadata ?? null,
+      });
+    }
+    resetCommentMentionState();
     setReplyTarget(null);
     requestAnimationFrame(() => {
       const el = commentInputRef.current;
@@ -1160,6 +1748,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     if (deleteSubmitting) return;
     setEditingCommentId(null);
     setCommentText("");
+    setCommentMentions([]);
+    clearCommentMedia();
+    resetCommentMentionState();
   };
 
   const closeDeleteConfirm = () => {
@@ -1194,10 +1785,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 comments: Math.max(
                   0,
                   (prev.stats?.comments ?? 0) - removedCount
+          : prev
+                  (prev.stats?.comments ?? 0) - removedCount,
                 ),
               },
             }
-          : prev
+          : prev,
       );
 
       showToast("Comment deleted");
@@ -1274,6 +1867,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 flags: (latest as any).flags ?? (prev as any).flags,
               }
             : latest
+            : latest,
         );
       } catch {}
     };
@@ -1306,6 +1900,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       }
     },
     [postId, token]
+    [postId, token],
   );
 
   useEffect(() => {
@@ -1314,29 +1909,35 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   }, [token, loadComments]);
 
   const mergeLatestComments = useCallback((latest: CommentItem[]) => {
-    setComments((prev) => {
-      const normalize = (items: CommentItem[]) =>
-        items.map((c) => ({ ...c, id: ensureId(c) }));
+      return [...mergedLatest, ...trailing];
+  }, []);
+  const mergeLatestComments = useCallback(
+    (latest: CommentItem[]) => {
+      setComments((prev) => {
+        const normalize = (items: CommentItem[]) =>
+          items.map((c) => ({ ...c, id: ensureId(c) }));
 
-      const latestNormalized = normalize(latest);
-      const latestMap = new Map(latestNormalized.map((c) => [c.id, c]));
-      const prevNormalized = normalize(prev);
+        const latestNormalized = normalize(latest);
+        const latestMap = new Map(latestNormalized.map((c) => [c.id, c]));
+        const prevNormalized = normalize(prev);
 
-      const mergedLatest = latestNormalized.map((c) => {
-        const prevMatch = prevNormalized.find((p) => p.id === c.id);
-        return prevMatch ? { ...prevMatch, ...c } : c;
-      });
-
-      const trailing = prevNormalized
-        .filter((c) => c.parentId || !latestMap.has(c.id))
-        .map((c) => {
-          const refreshed = latestMap.get(c.id);
-          return refreshed ? { ...c, ...refreshed } : c;
+        const mergedLatest = latestNormalized.map((c) => {
+          const prevMatch = prevNormalized.find((p) => p.id === c.id);
+          return prevMatch ? { ...prevMatch, ...c } : c;
         });
 
-      return [...mergedLatest, ...trailing];
-    });
-  }, []);
+        const trailing = prevNormalized
+          .filter((c) => c.parentId || !latestMap.has(c.id))
+          .map((c) => {
+            const refreshed = latestMap.get(c.id);
+            return refreshed ? { ...c, ...refreshed } : c;
+          });
+
+        return prioritizeRootComments([...mergedLatest, ...trailing]);
+      });
+    },
+    [prioritizeRootComments],
+  );
 
   useEffect(() => {
     if (!token) return;
@@ -1369,6 +1970,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             loading: false,
             expanded: true,
           }
+          },
         );
       };
 
@@ -1435,6 +2037,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             /* ignore per-thread errors */
           }
         })
+        }),
       );
     };
 
@@ -1483,6 +2086,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       if (emojiRef.current && target && !emojiRef.current.contains(target)) {
         setShowEmojiPicker(false);
       }
+      if (
+        stickerRef.current &&
+        target &&
+        !stickerRef.current.contains(target)
+      ) {
+        setShowStickerPicker(false);
+      }
+      if (gifRef.current && target && !gifRef.current.contains(target)) {
+        setShowGifPicker(false);
+      }
       if (menuRef.current && target && !menuRef.current.contains(target)) {
         setShowMoreMenu(false);
       }
@@ -1494,6 +2107,10 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       if (event.key === "Escape") {
         setShowEmojiPicker(false);
         setShowMoreMenu(false);
+        setShowMoreMenu(false);
+        setShowStickerPicker(false);
+        setShowGifPicker(false);
+        setCommentImageViewerUrl(null);
         setOpenCommentMenuId(null);
       }
     };
@@ -1530,6 +2147,10 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const applyCommentPage = (res: CommentListResponse, append: boolean) => {
     setComments((prev) => (append ? [...prev, ...res.items] : res.items));
+    setComments((prev) => {
+      const next = append ? [...prev, ...res.items] : res.items;
+      return prioritizeRootComments(next);
+    });
     setCommentsPage(res.page);
     setHasMoreComments(res.hasMore);
   };
@@ -1629,9 +2250,237 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         setCommentsError(err?.message || "Failed to update comment");
       } finally {
         setSubmitting(false);
+    [postId, token],
+  );
+
+  const handleCommentChange = (
+    event: React.ChangeEvent<HTMLTextAreaElement>,
+  ) => {
+    const value = event.target.value;
+    const caret = event.target.selectionStart ?? value.length;
+    setCommentText(value);
+
+    const active = findActiveMention(value, caret);
+    if (active) {
+      setCommentActiveMentionRange({ start: active.start, end: active.end });
+      setCommentMentionDraft(active.handle);
+      setCommentMentionOpen(true);
+      setCommentMentionError("");
+      setCommentMentionHighlight(0);
+    } else {
+      setCommentActiveMentionRange(null);
+      setCommentMentionDraft("");
+      setCommentMentionSuggestions([]);
+      setCommentMentionOpen(false);
+      setCommentMentionHighlight(-1);
+      setCommentMentionError("");
+    }
+  };
+
+  const handleCommentMediaChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      setCommentMediaError("Only image or video files are allowed");
+      if (commentMediaInputRef.current) {
+        commentMediaInputRef.current.value = "";
       }
       return;
     }
+
+    setCommentMediaError("");
+    clearStickerSelection();
+    setCommentMediaFile(file);
+    setCommentMediaPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  };
+
+  const selectSticker = (sticker: { id: string; url: string }) => {
+    setCommentMediaError("");
+    setCommentMediaFile(null);
+    setCommentMediaPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    if (commentMediaInputRef.current) {
+      commentMediaInputRef.current.value = "";
+    }
+    setCommentMediaExternal({
+      type: "image",
+      url: sticker.url,
+      metadata: { provider: "giphy", id: sticker.id },
+    });
+    setShowStickerPicker(false);
+  };
+
+  const selectGif = (gif: { id: string; url: string }) => {
+    setCommentMediaError("");
+    setCommentMediaFile(null);
+    setCommentMediaPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    if (commentMediaInputRef.current) {
+      commentMediaInputRef.current.value = "";
+    }
+    setCommentMediaExternal({
+      type: "image",
+      url: gif.url,
+      metadata: { provider: "giphy", id: gif.id, kind: "gif" },
+    });
+    setShowGifPicker(false);
+  };
+
+  const selectCommentMention = (opt: ProfileSearchItem) => {
+    const handle = opt.username.toLowerCase();
+    const value = commentText || "";
+    const range = commentActiveMentionRange ?? {
+      start: value.length,
+      end: value.length,
+    };
+    const before = value.slice(0, range.start);
+    const after = value.slice(range.end);
+    const insertion = `@${handle}`;
+    const needsSpaceAfter = after.startsWith(" ") || after === "" ? "" : " ";
+    const next = `${before}${insertion}${needsSpaceAfter}${after}`;
+
+    const nextMentions = (() => {
+      const exists = commentMentions.some(
+        (m) =>
+          (m.userId && m.userId === (opt.userId || opt.id)) ||
+          (m.username && m.username.toLowerCase() === handle),
+      );
+      if (exists) return commentMentions;
+      return [
+        ...commentMentions,
+        {
+          userId: opt.userId || opt.id,
+          username: handle,
+        },
+      ].slice(0, 20);
+    })();
+
+    setCommentText(next);
+    setCommentMentions(nextMentions);
+    resetCommentMentionState();
+
+    setTimeout(() => {
+      const el = commentInputRef.current;
+      if (!el) return;
+      const caret = range.start + insertion.length + (needsSpaceAfter ? 1 : 0);
+      el.focus?.();
+      el.setSelectionRange?.(caret, caret);
+    }, 0);
+  };
+
+  const handleSubmit = async () => {
+    if (!token) return;
+    if (commentsLocked) return;
+    if (submitting || commentMediaUploading) return;
+    const content = commentText.trim();
+    const hasMedia = Boolean(commentMediaFile || commentMediaExternal);
+    if (!content && !hasMedia) return;
+
+    const handlesFromContent = extractMentionsFromCaption(content).map((h) =>
+      h.trim().replace(/^@/, "").toLowerCase(),
+    );
+
+    const mentionMap = new Map<string, MentionRef>();
+    commentMentions.forEach((m) => {
+      const username = m.username?.toLowerCase?.();
+      if (!username) return;
+      mentionMap.set(username, {
+        username,
+        userId: m.userId,
+      });
+    });
+
+    handlesFromContent.forEach((handle) => {
+      const existing = mentionMap.get(handle) ?? {};
+      mentionMap.set(handle, {
+        username: handle,
+        userId: existing.userId,
+      });
+    });
+
+    const normalizedMentions = Array.from(mentionMap.values()).slice(0, 20);
+
+    let uploadedMedia: CommentItem["media"] | null = null;
+    if (commentMediaExternal) {
+      uploadedMedia = commentMediaExternal;
+    }
+    if (!uploadedMedia && commentMediaFile) {
+      setCommentMediaUploading(true);
+      try {
+        const upload = await uploadCommentMedia({
+          token,
+          postId,
+          file: commentMediaFile,
+        });
+        const uploadedUrl = upload.secureUrl || upload.url;
+        uploadedMedia = {
+          type: commentMediaFile.type.startsWith("video/") ? "video" : "image",
+          url: uploadedUrl,
+          metadata: {
+            publicId: upload.publicId,
+            folder: upload.folder,
+            bytes: upload.bytes,
+            resourceType: upload.resourceType,
+            format: upload.format,
+            width: upload.width,
+            height: upload.height,
+            duration: upload.duration,
+          },
+        };
+      } catch (err: any) {
+        setCommentsError(err?.message || "Failed to upload media");
+        setSubmitting(false);
+        setCommentMediaUploading(false);
+        return;
+      } finally {
+        setCommentMediaUploading(false);
+      }
+    }
+
+    if (editingCommentId) {
+      setSubmitting(true);
+      try {
+        const updated = await updateComment({
+          token,
+          postId,
+          commentId: editingCommentId,
+          content,
+          mentions: normalizedMentions,
+          media: uploadedMedia,
+        });
+
+        updateCommentEverywhere(editingCommentId, (c) => ({
+          ...c,
+          content: updated.content,
+          mentions: updated.mentions,
+          media: updated.media ?? uploadedMedia ?? null,
+          updatedAt: updated.updatedAt ?? c.updatedAt,
+        }));
+
+        showToast("Comment updated");
+        setCommentText("");
+        setCommentMentions([]);
+        clearCommentMedia();
+        resetCommentMentionState();
+        setEditingCommentId(null);
+      } catch (err: any) {
+        setCommentsError(err?.message || "Failed to update comment");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    setSubmitting(true);
 
     const parentId = replyTarget?.id ?? null;
     const optimisticId = `tmp-${Date.now()}`;
@@ -1639,11 +2488,13 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       id: optimisticId,
       postId,
       content,
+      media: uploadedMedia,
       parentId,
       rootCommentId: parentId,
       likesCount: 0,
       liked: false,
       authorId: viewerUserId,
+      mentions: normalizedMentions,
       author: viewer
         ? {
             id: viewerUserId ?? viewer.id,
@@ -1675,6 +2526,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       scrollToComment(parentId);
     } else {
       setComments((prev) => [...prev, optimistic]);
+      setComments((prev) => prioritizeRootComments([...prev, optimistic]));
       scrollToComment(optimisticId);
     }
 
@@ -1687,6 +2539,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         postId,
         content,
         parentId: parentId ?? undefined,
+        mentions: normalizedMentions,
+        media: uploadedMedia,
       });
 
       const incrementRepliesCount = (targetId: string | null | undefined) => {
@@ -1703,6 +2557,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 }
               : comment
           )
+              : comment,
+          ),
         );
 
         setReplyState((prev) => {
@@ -1718,9 +2574,11 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                           : 1,
                     }
                   : comment
+            })
+                  : comment,
               );
               return [key, { ...state, items }];
-            })
+            }),
           );
           return next;
         });
@@ -1742,6 +2600,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             { ...saved, id: saved.id }
           );
           return { ...prev, [parentId]: { ...state, items } };
+            { ...saved, id: saved.id },
+          );
+          return {
+            ...prev,
+            [parentId]: { ...state, items },
+          };
         });
 
         const targetRootId = saved.rootCommentId || parentId;
@@ -1755,6 +2619,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             .filter((c) => c.id !== optimisticId)
             .map((c) => ({ ...c, id: ensureId(c) }));
           return upsertById(filtered, saved);
+          return prioritizeRootComments(upsertById(filtered, saved));
         });
       }
 
@@ -1769,6 +2634,11 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             }
           : prev
       );
+          : prev,
+      );
+      setCommentMentions([]);
+      clearCommentMedia();
+      resetCommentMentionState();
     } catch (err: any) {
       const rawMsg = err?.message || "Failed to comment";
       const friendlyMissingParent =
@@ -1785,6 +2655,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         friendlyMissingParent
           ? `Comment of ${parentLabel} not available`
           : rawMsg
+          : rawMsg,
       );
       if (parentId) {
         setReplyState((prev) => {
@@ -1938,11 +2809,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const allowDownloads = Boolean(
     (post as any)?.allowDownloads ??
-      (post as any)?.allowDownload ??
-      (post as any)?.flags?.allowDownloads ??
-      (post as any)?.flags?.allowDownload ??
-      (post as any)?.permissions?.allowDownloads ??
       (post as any)?.permissions?.allowDownload
+    (post as any)?.allowDownload ??
+    (post as any)?.flags?.allowDownloads ??
+    (post as any)?.flags?.allowDownload ??
+    (post as any)?.permissions?.allowDownloads ??
+    (post as any)?.permissions?.allowDownload,
   );
 
   const handleDownloadCurrentMedia = async () => {
@@ -2146,6 +3018,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   }, [post, mediaIndex]);
 
   useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!commentImageViewerUrl) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [commentImageViewerUrl]);
+
+  useEffect(() => {
     return () => {
       persistResume();
     };
@@ -2191,6 +3073,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         className={`${styles.mediaVisual} ${transitionClass}`}
         src={currentMedia.url}
         alt="Post media"
+        onContextMenu={(e) => e.preventDefault()}
       />
     );
   };
@@ -2232,6 +3115,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             typeof res.likesCount === "number"
               ? res.likesCount
               : c.likesCount ?? 0,
+              : (c.likesCount ?? 0),
         }));
       } catch (err) {
         updateCommentEverywhere(targetId, (c) => ({
@@ -2245,12 +3129,65 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       }
     },
     [postId, token, updateCommentEverywhere]
+          (err as { message?: string })?.message || "Failed to like comment",
+        );
+      }
+    },
+    [postId, token, updateCommentEverywhere],
+  );
+
+  const applyPinnedLocal = useCallback(
+    (targetId: string, pinned: boolean) => {
+      const nowIso = new Date().toISOString();
+      setComments((prev) =>
+        prioritizeRootComments(
+          prev.map((item) => {
+            if (item.parentId) return item;
+            if (item.id === targetId) {
+              return {
+                ...item,
+                pinnedAt: pinned ? nowIso : null,
+                pinnedBy: pinned ? (viewerUserId ?? null) : null,
+              };
+            }
+            if (pinned) {
+              return { ...item, pinnedAt: null, pinnedBy: null };
+            }
+            return item;
+          }),
+        ),
+      );
+    },
+    [prioritizeRootComments, viewerUserId],
+  );
+
+  const handleTogglePin = useCallback(
+    async (comment: CommentItem) => {
+      if (!token || !isAuthor || comment.parentId) return;
+      const isPinned = Boolean(comment.pinnedAt);
+      setOpenCommentMenuId(null);
+      try {
+        if (isPinned) {
+          await unpinComment({ token, postId, commentId: comment.id });
+          applyPinnedLocal(comment.id, false);
+          showToast("Comment unpinned");
+        } else {
+          await pinComment({ token, postId, commentId: comment.id });
+          applyPinnedLocal(comment.id, true);
+          showToast("Comment pinned");
+        }
+      } catch (err: any) {
+        showToast(err?.message || "Failed to update pin");
+      }
+    },
+    [applyPinnedLocal, isAuthor, postId, showToast, token],
   );
 
   const renderComment = (item: CommentItem) => {
     const renderCommentThread = (
       comment: CommentItem,
       depth = 0
+      depth = 0,
     ): JSX.Element => {
       const replies = replyState[comment.id]?.items ?? [];
       const hasMore = replyState[comment.id]?.hasMore ?? false;
@@ -2268,6 +3205,24 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           (comment.author?.id === viewerId || comment.authorId === viewerId)
       );
       const commentProfileId = comment.author?.id || comment.authorId;
+        (comment.author?.id === viewerId || comment.authorId === viewerId),
+      );
+      const commentProfileId = comment.author?.id || comment.authorId;
+      const isPostAuthorComment = Boolean(
+        post?.authorId &&
+        (comment.author?.id === post.authorId ||
+          comment.authorId === post.authorId),
+      );
+      const isPostAuthorUsername = Boolean(
+        post?.authorUsername &&
+        comment.author?.username &&
+        comment.author.username.toLowerCase() ===
+          post.authorUsername.toLowerCase(),
+      );
+      const isGiphyMedia = Boolean(
+        comment.media?.metadata &&
+        (comment.media.metadata as any)?.provider === "giphy",
+      );
 
       const toggleRepliesVisibility = () => {
         const nextExpanded = !expanded;
@@ -2342,6 +3297,56 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               </div>
             </div>
             <div className={styles.commentText}>{comment.content}</div>
+              {isPostAuthorComment || isPostAuthorUsername ? (
+                <div className={styles.commentAuthorBadge}>
+                  <IconCrown size={12} />
+                  <span>Author</span>
+                </div>
+              ) : null}
+              {comment.pinnedAt ? (
+                <div className={styles.commentPinned}>
+                  <IconPin size={12} />
+                  <span>Pinned comment</span>
+                </div>
+              ) : null}
+            </div>
+            {comment.content ? (
+              <div className={styles.commentText}>
+                {renderCommentContent(comment)}
+              </div>
+            ) : null}
+            {comment.media ? (
+              <div
+                className={`${styles.commentMedia} ${
+                  isGiphyMedia ? styles.commentMediaCompact : ""
+                }`}
+              >
+                {comment.media.type === "video" ? (
+                  <video
+                    className={styles.commentMediaVideo}
+                    src={comment.media.url}
+                    controls
+                    controlsList="nodownload noremoteplayback"
+                    onContextMenu={(e) => e.preventDefault()}
+                    preload="metadata"
+                  />
+                ) : (
+                  <img
+                    className={`${styles.commentMediaImage} ${
+                      isGiphyMedia ? styles.commentMediaImageCompact : ""
+                    }`}
+                    src={comment.media.url}
+                    alt="Comment attachment"
+                    loading="lazy"
+                    onContextMenu={(e) => e.preventDefault()}
+                    onClick={() => {
+                      if (isGiphyMedia) return;
+                      setCommentImageViewerUrl(comment.media?.url || null);
+                    }}
+                  />
+                )}
+              </div>
+            ) : null}
             <div className={styles.commentActions}>
               <div className={styles.commentMeta}>
                 {comment.createdAt
@@ -2367,8 +3372,15 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 className={styles.linkBtn}
                 onClick={() => toggleCommentLike(comment)}
                 aria-pressed={comment.liked}
+                aria-label={comment.liked ? "Unlike comment" : "Like comment"}
               >
                 <IconLike size={14} filled={comment.liked} />
+              </button>
+              <button
+                className={styles.commentCountBtn}
+                onClick={() => openCommentLikesOverlay(comment.id)}
+                aria-label="View comment likes"
+              >
                 <span>{comment.likesCount ?? 0}</span>
               </button>
               <div className={styles.commentMoreWrap} data-comment-menu="true">
@@ -2379,6 +3391,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     e.stopPropagation();
                     setOpenCommentMenuId((prev) =>
                       prev === comment.id ? null : comment.id
+                      prev === comment.id ? null : comment.id,
                     );
                   }}
                 >
@@ -2407,6 +3420,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                           >
                             Edit comment
                           </button>
+                          {isAuthor && !comment.parentId ? (
+                            <button
+                              className={styles.commentMoreItem}
+                              onClick={() => handleTogglePin(comment)}
+                            >
+                              {comment.pinnedAt
+                                ? "Unpin comment"
+                                : "Pin comment"}
+                            </button>
+                          ) : null}
                           <button
                             className={`${styles.commentMoreItem} ${styles.commentDanger}`}
                             onClick={() => openDeleteConfirm(comment)}
@@ -2416,6 +3439,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         </>
                       ) : isAuthor ? (
                         <>
+                          {!comment.parentId ? (
+                            <button
+                              className={styles.commentMoreItem}
+                              onClick={() => handleTogglePin(comment)}
+                            >
+                              {comment.pinnedAt
+                                ? "Unpin comment"
+                                : "Pin comment"}
+                            </button>
+                          ) : null}
                           <button
                             className={`${styles.commentMoreItem}`}
                             onClick={() => openDeleteConfirm(comment)}
@@ -2434,6 +3467,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                               openBlockUserModal(
                                 comment.author?.id,
                                 comment.author?.username || "this account"
+                                comment.author?.username || "this account",
                               )
                             }
                           >
@@ -2454,6 +3488,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                               openBlockUserModal(
                                 comment.author?.id,
                                 comment.author?.username || "this account"
+                                comment.author?.username || "this account",
                               )
                             }
                           >
@@ -2475,8 +3510,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 {loading
                   ? "Loading..."
                   : expanded
-                  ? "Hide replies"
-                  : `View replies${replyCountLabel}`}
+                    ? "Hide replies"
+                    : `View replies${replyCountLabel}`}
               </button>
             ) : null}
             {expanded && replies.length ? (
@@ -2489,6 +3524,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       loadReplies(
                         comment.id,
                         (replyState[comment.id]?.page ?? 1) + 1
+                        (replyState[comment.id]?.page ?? 1) + 1,
                       )
                     }
                     disabled={loading}
@@ -2523,6 +3559,68 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     }
   };
 
+  const renderCommentContent = (comment: CommentItem) => {
+    const content = comment.content || "";
+    const mentionMap = new Map<string, { userId?: string }>();
+    (comment.mentions ?? []).forEach((m) => {
+      if (typeof m === "string") {
+        const username = m.toLowerCase();
+        mentionMap.set(username, {});
+        return;
+      }
+      const username = (m as any).username?.toString?.().toLowerCase?.();
+      const userId = (m as any).userId?.toString?.();
+      if (username) {
+        mentionMap.set(username, { userId });
+      }
+    });
+    const parts: JSX.Element[] = [];
+    const regex = /@([a-zA-Z0-9_.]{1,30})/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(content))) {
+      const start = match.index;
+      if (start > lastIndex) {
+        parts.push(
+          <span key={`text-${comment.id}-${start}`}>
+            {content.slice(lastIndex, start)}
+          </span>,
+        );
+      }
+
+      const handle = match[1];
+      const lower = handle.toLowerCase();
+      const meta = mentionMap.get(lower);
+      const hasId = Boolean(meta?.userId);
+      const isKnown = hasId;
+
+      parts.push(
+        isKnown ? (
+          <Link
+            key={`mention-${comment.id}-${start}`}
+            href={`/profile/${meta?.userId}`}
+            className={feedStyles.mentionLink}
+          >
+            @{handle}
+          </Link>
+        ) : (
+          <span key={`mention-${comment.id}-${start}`}>@{handle}</span>
+        ),
+      );
+
+      lastIndex = start + match[0].length;
+    }
+
+    if (lastIndex < content.length) {
+      parts.push(
+        <span key={`text-${comment.id}-tail`}>{content.slice(lastIndex)}</span>,
+      );
+    }
+
+    return parts.length ? parts : content;
+  };
+
   const toEmojiChar = (emojiData: { emoji?: string; unified?: string }) => {
     if (emojiData.emoji) return emojiData.emoji;
     if (emojiData.unified) {
@@ -2535,6 +3633,11 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   };
 
   const hideLikeCount = Boolean((post as any)?.hideLikeCount);
+  const commentPreviewUrl = commentMediaPreview || commentMediaExternal?.url;
+  const commentPreviewIsVideo = Boolean(
+    commentMediaFile?.type.startsWith("video/") ||
+    commentMediaExternal?.type === "video",
+  );
   const commentsLocked = Boolean(post && post.allowComments === false);
   const commentsToggleLabel =
     post?.allowComments === false ? "Turn on comments" : "Turn off comments";
@@ -2543,11 +3646,219 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     visibilitySaving ||
     visibilitySelected === ((post?.visibility as any) ?? "public");
 
+  const mentionLookupKey = useMemo(() => {
+    if (!post?.mentions?.length) return "";
+    return post.mentions
+      .map((m) => m.toString().trim().replace(/^@/, "").toLowerCase())
+      .filter(Boolean)
+      .sort()
+      .join("|");
+  }, [post?.mentions]);
+
+  useEffect(() => {
+    if (!mentionLookupKey) {
+      setCaptionMentionMap({});
+      return;
+    }
+
+    const baseMap: Record<string, string> = {};
+    if (viewer?.username && viewerUserId) {
+      baseMap[viewer.username.toLowerCase()] = String(viewerUserId);
+    }
+
+    if (!token) {
+      setCaptionMentionMap(baseMap);
+      return;
+    }
+
+    let cancelled = false;
+    const handles = mentionLookupKey.split("|").filter(Boolean).slice(0, 20);
+
+    setCaptionMentionMap(baseMap);
+
+    (async () => {
+      const results = await Promise.all(
+        handles.map(async (handle) => {
+          try {
+            const res = await searchProfiles({
+              token,
+              query: handle,
+              limit: 5,
+            });
+            const exact = res.items.find(
+              (item) => item.username?.toLowerCase() === handle,
+            );
+            const id = exact?.userId || exact?.id;
+            return id ? [handle, String(id)] : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      if (cancelled) return;
+      const nextMap: Record<string, string> = { ...baseMap };
+      results.forEach((entry) => {
+        if (!entry) return;
+        nextMap[entry[0]] = entry[1];
+      });
+      setCaptionMentionMap(nextMap);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mentionLookupKey, token]);
+
+  useEffect(() => {
+    if (!viewer?.username || !viewerUserId) return;
+    const key = viewer.username.toLowerCase();
+    const value = String(viewerUserId);
+    setCaptionMentionMap((prev) => {
+      if (prev[key] === value) return prev;
+      return { ...prev, [key]: value };
+    });
+  }, [viewer?.username, viewerUserId]);
+
+  const captionNodes = useMemo(() => {
+    if (!post?.content) return null;
+    const content = post.content;
+    const parts: Array<string | JSX.Element> = [];
+    const normalizedMentions = new Set(
+      (post.mentions || []).map((m) => m.toLowerCase()),
+    );
+    const normalizedHashtags = new Set(
+      (post.hashtags || []).map((tag) => tag.toLowerCase()),
+    );
+    const pushText = (text: string, keyBase: string) => {
+      const chunks = text.split("\n");
+      chunks.forEach((chunk, idx) => {
+        if (idx > 0) parts.push(<br key={`${keyBase}-br-${idx}`} />);
+        if (chunk) parts.push(chunk);
+      });
+    };
+
+    const regex = /(@[a-zA-Z0-9_.]+|#[a-zA-Z0-9_]+)/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(content))) {
+      const start = match.index;
+      if (start > lastIndex) {
+        pushText(content.slice(lastIndex, start), `text-${start}`);
+      }
+      const token = match[0];
+      if (token.startsWith("@")) {
+        const handle = token.slice(1);
+        const handleKey = handle.toLowerCase();
+        const canLink =
+          normalizedMentions.size === 0 || normalizedMentions.has(handleKey);
+        const targetId = captionMentionMap[handleKey];
+        if (canLink && targetId) {
+          parts.push(
+            <a
+              key={`${handle}-${start}`}
+              href={`/profile/${encodeURIComponent(targetId)}`}
+              className={feedStyles.mentionLink}
+            >
+              {token}
+            </a>,
+          );
+        } else {
+          pushText(token, `text-${start}-plain`);
+        }
+      } else {
+        const tag = token.replace(/^#/, "");
+        const canLink =
+          normalizedHashtags.size === 0 ||
+          normalizedHashtags.has(tag.toLowerCase());
+        if (canLink) {
+          parts.push(
+            <a
+              key={`${tag}-${start}`}
+              href={`/hashtag/${encodeURIComponent(tag)}`}
+              className={feedStyles.hashtagLink}
+            >
+              {token}
+            </a>,
+          );
+        } else {
+          pushText(token, `text-${start}-plain`);
+        }
+      }
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < content.length) {
+      pushText(content.slice(lastIndex), `text-tail-${lastIndex}`);
+    }
+    return parts;
+  }, [post?.content, post?.mentions, post?.hashtags, captionMentionMap]);
+
+  useEffect(() => {
+    if (commentsLocked) {
+      resetCommentMentionState();
+      return;
+    }
+
+    const cleaned = commentMentionDraft.trim().replace(/^@/, "");
+    if (!cleaned) {
+      setCommentMentionSuggestions([]);
+      setCommentMentionOpen(false);
+      setCommentMentionHighlight(-1);
+      setCommentMentionError("");
+      setCommentMentionLoading(false);
+      return;
+    }
+
+    if (!token) {
+      setCommentMentionSuggestions([]);
+      setCommentMentionOpen(false);
+      setCommentMentionHighlight(-1);
+      setCommentMentionError("Sign in to mention users");
+      setCommentMentionLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setCommentMentionLoading(true);
+      setCommentMentionError("");
+      try {
+        const res = await searchProfiles({
+          token,
+          query: cleaned,
+          limit: 8,
+        });
+        if (cancelled) return;
+        setCommentMentionSuggestions(res.items);
+        setCommentMentionOpen(res.items.length > 0);
+        setCommentMentionHighlight(res.items.length ? 0 : -1);
+        if (!res.items.length) {
+          setCommentMentionError("User not found");
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setCommentMentionSuggestions([]);
+        setCommentMentionOpen(false);
+        setCommentMentionHighlight(-1);
+        setCommentMentionError("User not found");
+      } finally {
+        if (!cancelled) setCommentMentionLoading(false);
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [commentMentionDraft, token, commentsLocked, resetCommentMentionState]);
+
   useEffect(() => {
     if (commentsLocked) {
       setCommentsError("");
       setReplyTarget(null);
       setShowEmojiPicker(false);
+      setCommentMentions([]);
+      resetCommentMentionState();
     }
   }, [commentsLocked]);
 
@@ -2576,10 +3887,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               hearts: Math.max(
                 0,
                 (prev.stats?.hearts ?? 0) + (nextLiked ? 1 : -1)
+        : prev
+                (prev.stats?.hearts ?? 0) + (nextLiked ? 1 : -1),
               ),
             },
           }
-        : prev
+        : prev,
     );
     try {
       if (nextLiked) {
@@ -2599,10 +3912,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 hearts: Math.max(
                   0,
                   (prev.stats?.hearts ?? 0) + (nextLiked ? -1 : 1)
+          : prev
+                  (prev.stats?.hearts ?? 0) + (nextLiked ? -1 : 1),
                 ),
               },
             }
-          : prev
+          : prev,
       );
     }
   };
@@ -2621,10 +3936,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               saves: Math.max(
                 0,
                 (prev.stats?.saves ?? 0) + (nextSaved ? 1 : -1)
+        : prev
+                (prev.stats?.saves ?? 0) + (nextSaved ? 1 : -1),
               ),
             },
           }
-        : prev
+        : prev,
     );
     try {
       if (nextSaved) {
@@ -2646,10 +3963,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 saves: Math.max(
                   0,
                   (prev.stats?.saves ?? 0) + (nextSaved ? -1 : 1)
+          : prev
+                  (prev.stats?.saves ?? 0) + (nextSaved ? -1 : 1),
                 ),
               },
             }
-          : prev
+          : prev,
       );
       showToast("Failed to update save");
     }
@@ -2671,6 +3990,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     } catch (err) {
       setPost((prev) =>
         prev ? { ...prev, allowComments: currentAllowed } : prev
+        prev ? { ...prev, allowComments: currentAllowed } : prev,
       );
       showToast("Failed to update comments");
     }
@@ -2692,6 +4012,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     } catch (err) {
       setPost((prev) =>
         prev ? { ...prev, hideLikeCount: currentHidden } : prev
+        prev ? { ...prev, hideLikeCount: currentHidden } : prev,
       );
       showToast("Failed to update like count visibility");
     }
@@ -2717,8 +4038,37 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         prev
           ? { ...prev, flags: { ...(prev as any).flags, following: !next } }
           : prev
+          : prev,
       );
     }
+  };
+
+  const openLikesOverlay = () => {
+    setLikesOverlayOpen(true);
+    setLikesOverlayClosing(false);
+  };
+
+  const closeLikesOverlay = () => {
+    setLikesOverlayClosing(true);
+    window.setTimeout(() => {
+      setLikesOverlayOpen(false);
+      setLikesOverlayClosing(false);
+    }, 180);
+  };
+
+  const openCommentLikesOverlay = (commentId: string) => {
+    setCommentLikesOverlayId(commentId);
+    setCommentLikesOverlayOpen(true);
+    setCommentLikesOverlayClosing(false);
+  };
+
+  const closeCommentLikesOverlay = () => {
+    setCommentLikesOverlayClosing(true);
+    window.setTimeout(() => {
+      setCommentLikesOverlayOpen(false);
+      setCommentLikesOverlayClosing(false);
+      setCommentLikesOverlayId(null);
+    }, 180);
   };
 
   const editModal = (
@@ -2965,11 +4315,27 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 type="checkbox"
                 checked={editAllowDownload}
                 onChange={() => setEditAllowDownload((prev) => !prev)}
+                checked={
+                  post?.repostOf
+                    ? Boolean(lockedEditAllowDownload ?? editAllowDownload)
+                    : editAllowDownload
+                }
+                disabled={Boolean(post?.repostOf)}
+                onChange={
+                  post?.repostOf
+                    ? undefined
+                    : () => setEditAllowDownload((prev) => !prev)
+                }
               />
               <div>
                 <p className={feedStyles.switchTitle}>Allow downloads</p>
                 <p className={feedStyles.switchHint}>
                   Share the original file with people you trust
+                  {post?.repostOf
+                    ? lockedEditAllowDownloadLoading
+                      ? "Inherited from original post (loading…)"
+                      : "Inherited from the original post (can’t be changed)"
+                    : "Share the original file with people you trust"}
                 </p>
               </div>
             </label>
@@ -3096,6 +4462,92 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     </div>
   );
 
+  const muteModal = (
+    <div
+      className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
+      role="dialog"
+      aria-modal="true"
+      onClick={closeMuteModal}
+    >
+      <div
+        className={`${feedStyles.modalCard} ${feedStyles.modalCardOpen}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={feedStyles.modalHeader}>
+          <div>
+            <h3 className={feedStyles.modalTitle}>Mute notifications</h3>
+            <p className={feedStyles.modalBody}>
+              Choose how long to pause alerts for this post.
+            </p>
+          </div>
+          <button
+            className={feedStyles.closeBtn}
+            aria-label="Close"
+            onClick={closeMuteModal}
+          >
+            <IconClose size={18} />
+          </button>
+        </div>
+
+        <div className={feedStyles.muteOptionGrid}>
+          {muteOptions.map((option) => (
+            <button
+              key={option.key}
+              className={`${feedStyles.muteOption} ${
+                muteOption === option.key ? feedStyles.muteOptionActive : ""
+              }`}
+              onClick={() => setMuteOption(option.key)}
+              type="button"
+            >
+              <span className={feedStyles.muteOptionTitle}>{option.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {muteOption === "custom" ? (
+          <div className={feedStyles.muteCustomRow}>
+            <div className={feedStyles.mutePicker}>
+              <label className={feedStyles.editLabel}>Date</label>
+              <DateSelect
+                value={muteCustomDate}
+                onChange={setMuteCustomDate}
+                minDate={new Date()}
+                maxDate={null}
+                placeholder="yyyy-mm-dd"
+              />
+            </div>
+            <div className={feedStyles.mutePicker}>
+              <label className={feedStyles.editLabel}>Time</label>
+              <TimeSelect
+                value={muteCustomTime}
+                onChange={setMuteCustomTime}
+                selectedDate={muteCustomDate}
+                minDateTime={new Date()}
+                disabled={!muteCustomDate}
+                placeholder="hh:mm"
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {muteError ? (
+          <div className={feedStyles.inlineError}>{muteError}</div>
+        ) : null}
+
+        <div className={feedStyles.modalActions}>
+          <button
+            type="button"
+            className={feedStyles.modalPrimary}
+            onClick={handleSavePostMute}
+            disabled={muteSaving}
+          >
+            {muteSaving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   const authorProfileId = post?.authorId || post?.author?.id;
 
   const header = (
@@ -3157,6 +4609,29 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         </div>
       </div>
       <div className={styles.headerActions}>
+        {isMutedForPost ? (
+          <span
+            className={feedStyles.muteBadge}
+            title="Notifications muted"
+            aria-label="Notifications muted"
+          >
+            <svg
+              aria-hidden
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              <line x1="3" y1="3" x2="21" y2="21" />
+            </svg>
+          </span>
+        ) : null}
         <div className={styles.moreMenuWrap} ref={menuRef}>
           <button
             type="button"
@@ -3209,6 +4684,18 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     role="menuitem"
                   >
                     Mute notifications
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      if (isMutedForPost) {
+                        handleEnablePostNotifications();
+                      } else {
+                        openMuteModal();
+                      }
+                    }}
+                  >
+                    {isMutedForPost
+                      ? "Turn on notification"
+                      : "Mute notifications"}
                   </button>
                   <button
                     type="button"
@@ -3226,14 +4713,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                   >
                     {hideLikeToggleLabel}
                   </button>
-                  <button
-                    type="button"
-                    className={styles.moreMenuItem}
-                    role="menuitem"
-                    onClick={goToPostPage}
-                  >
-                    Go to post
-                  </button>
+                  {post?.repostOf ? (
+                    <button
+                      type="button"
+                      className={styles.moreMenuItem}
+                      role="menuitem"
+                      onClick={goToPostPage}
+                    >
+                      Go to post
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className={styles.moreMenuItem}
@@ -3299,14 +4788,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     Report
                   </button>
                   <div className={styles.moreMenuDivider} />
-                  <button
-                    type="button"
-                    className={styles.moreMenuItem}
-                    role="menuitem"
-                    onClick={goToPostPage}
-                  >
-                    Go to post
-                  </button>
+                  {post?.repostOf ? (
+                    <button
+                      type="button"
+                      className={styles.moreMenuItem}
+                      role="menuitem"
+                      onClick={goToPostPage}
+                    >
+                      Go to post
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className={styles.moreMenuItem}
@@ -3320,6 +4811,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     className={styles.moreMenuItem}
                     role="menuitem"
                     onClick={() => setShowMoreMenu(false)}
+                    onClick={goToAuthorProfile}
                   >
                     Go to this account
                   </button>
@@ -3358,6 +4850,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                         setMediaDirection("prev");
                         setMediaIndex(
                           (prev) => (prev - 1 + media.length) % media.length
+                          (prev) => (prev - 1 + media.length) % media.length,
                         );
                       }}
                       aria-label="Previous media"
@@ -3410,6 +4903,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     }`}
                   >
                     {post.content}
+                    {captionNodes || post.content}
                   </div>
                   {captionCanExpand ? (
                     <button
@@ -3419,6 +4913,120 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       {captionCollapsed ? "See more" : "Collapse"}
                     </button>
                   ) : null}
+
+                  {(post.location || (post.hashtags?.length || 0) > 0) && (
+                    <div className={feedStyles.contentBlock}>
+                      {post.location ? (
+                        <div className={feedStyles.metaRow}>
+                          <a
+                            className={`${feedStyles.metaLabel} ${
+                              feedStyles.metaLink
+                            }`}
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                              post.location,
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {post.location}
+                          </a>
+                        </div>
+                      ) : null}
+                      {post.hashtags?.length ? (
+                        <div className={feedStyles.tags}>
+                          {post.hashtags.map((tag) => (
+                            <a
+                              key={tag}
+                              href={`/hashtag/${encodeURIComponent(tag)}`}
+                              className={`${feedStyles.tag} ${
+                                feedStyles.tagLink
+                              }`}
+                            >
+                              #{tag}
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                  <div className={styles.statsRow}>
+                    <div className={styles.statItem}>
+                      <button
+                        type="button"
+                        className={`${styles.statButton} ${
+                          liked ? styles.statButtonActive : ""
+                        }`}
+                        onClick={toggleLike}
+                        aria-label={liked ? "Unlike" : "Like"}
+                      >
+                        <IconLike size={18} filled={liked} />
+                      </button>
+                      {!(hideLikeCount && !isAuthor) ? (
+                        <button
+                          type="button"
+                          className={`${styles.statButton} ${styles.statCountButton}`}
+                          onClick={openLikesOverlay}
+                          aria-label="View likes"
+                        >
+                          {post.stats?.hearts ?? 0}
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <span className={styles.statItem}>
+                      <svg
+                        aria-hidden="true"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M5.5 5.5h13a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H10l-3.6 2.8a.6.6 0 0 1-.96-.48V7.5a2 2 0 0 1 2-2Z"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        ></path>
+                      </svg>
+                      <span>{post.stats?.comments ?? 0}</span>
+                    </span>
+                    <span className={styles.statItem}>
+                      <svg
+                        aria-hidden="true"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M2.8 12.4C4.5 8.7 7.7 6.2 12 6.2s7.5 2.5 9.2 6.2c-1.7 3.7-4.9 6.2-9.2 6.2s-7.5-2.5-9.2-6.2Z"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        ></path>
+                        <path
+                          d="M12 15.4a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8Z"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        ></path>
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="1.2"
+                          fill="currentColor"
+                        ></circle>
+                      </svg>{" "}
+                      <span>
+                        {post.stats?.views ?? post.stats?.impressions ?? 0}
+                      </span>
+                    </span>
+                  </div>
 
                   <div className={styles.commentsSection}>
                     <div className={styles.commentsHeader}>Comments</div>
@@ -3617,6 +5225,504 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     >
                       {submitting ? "Posting..." : "Post"}
                     </button>
+                  <div className={styles.commentComposer}>
+                    <div className={styles.commentComposerRow}>
+                      <div className={styles.composerInput}>
+                        <textarea
+                          ref={commentInputRef}
+                          className={styles.input}
+                          placeholder={
+                            commentsLocked
+                              ? "Comments are turned off"
+                              : "Add a comment..."
+                          }
+                          value={commentText}
+                          onChange={handleCommentChange}
+                          onKeyDown={(e) => {
+                            if (commentMentionOpen) {
+                              if (e.key === "ArrowDown") {
+                                e.preventDefault();
+                                if (!commentMentionSuggestions.length) return;
+                                setCommentMentionHighlight((prev) =>
+                                  prev + 1 < commentMentionSuggestions.length
+                                    ? prev + 1
+                                    : 0,
+                                );
+                                return;
+                              }
+                              if (e.key === "ArrowUp") {
+                                e.preventDefault();
+                                if (!commentMentionSuggestions.length) return;
+                                setCommentMentionHighlight((prev) =>
+                                  prev - 1 >= 0
+                                    ? prev - 1
+                                    : commentMentionSuggestions.length - 1,
+                                );
+                                return;
+                              }
+                              if (e.key === "Enter") {
+                                if (
+                                  commentMentionSuggestions.length &&
+                                  commentMentionHighlight >= 0
+                                ) {
+                                  e.preventDefault();
+                                  const opt =
+                                    commentMentionSuggestions[
+                                      commentMentionHighlight
+                                    ];
+                                  if (opt) selectCommentMention(opt);
+                                  return;
+                                }
+                              }
+                              if (e.key === "Escape") {
+                                resetCommentMentionState();
+                                return;
+                              }
+                            }
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              if (
+                                !submitting &&
+                                !commentsLocked &&
+                                (commentText.trim() ||
+                                  commentMediaFile ||
+                                  commentMediaExternal)
+                              ) {
+                                handleSubmit();
+                              }
+                            }
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              resetCommentMentionState();
+                            }, 120);
+                          }}
+                          rows={3}
+                          disabled={commentsLocked}
+                        />
+                        {commentMentionOpen ? (
+                          <div className={styles.mentionDropdownWrap}>
+                            <div className={feedStyles.mentionDropdown}>
+                              {commentMentionLoading ? (
+                                <div className={feedStyles.mentionItem}>
+                                  Searching...
+                                </div>
+                              ) : null}
+                              {!commentMentionLoading &&
+                              commentMentionSuggestions.length === 0 ? (
+                                <div className={feedStyles.mentionItem}>
+                                  {commentMentionError || "No matches"}
+                                </div>
+                              ) : null}
+                              {commentMentionSuggestions.map((opt, idx) => {
+                                const active = idx === commentMentionHighlight;
+                                const avatarInitials = (
+                                  opt.displayName ||
+                                  opt.username ||
+                                  "?"
+                                )
+                                  .slice(0, 2)
+                                  .toUpperCase();
+                                return (
+                                  <button
+                                    type="button"
+                                    key={opt.id || opt.username}
+                                    className={`${feedStyles.mentionItem} ${
+                                      active ? feedStyles.mentionItemActive : ""
+                                    }`}
+                                    onMouseDown={(evt) => evt.preventDefault()}
+                                    onClick={() => selectCommentMention(opt)}
+                                  >
+                                    <span
+                                      className={feedStyles.mentionAvatar}
+                                      aria-hidden
+                                    >
+                                      {opt.avatarUrl ? (
+                                        <img
+                                          src={opt.avatarUrl}
+                                          alt={opt.displayName || opt.username}
+                                          className={
+                                            feedStyles.mentionAvatarImg
+                                          }
+                                        />
+                                      ) : (
+                                        <span
+                                          className={
+                                            feedStyles.mentionAvatarFallback
+                                          }
+                                        >
+                                          {avatarInitials}
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span className={feedStyles.mentionCopy}>
+                                      <span
+                                        className={feedStyles.mentionHandle}
+                                      >
+                                        @{opt.username}
+                                      </span>
+                                      {opt.displayName ? (
+                                        <span
+                                          className={feedStyles.mentionName}
+                                        >
+                                          {opt.displayName}
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className={styles.composerFooter}>
+                        <div className={styles.composerActions}>
+                          <div className={styles.emojiWrap} ref={emojiRef}>
+                            <button
+                              type="button"
+                              className={styles.emojiButton}
+                              onClick={() =>
+                                !commentsLocked &&
+                                setShowEmojiPicker((prev) => !prev)
+                              }
+                              aria-label="Add emoji"
+                              disabled={commentsLocked}
+                            >
+                              <svg
+                                aria-label="Emoji icon"
+                                fill="currentColor"
+                                height="20"
+                                role="img"
+                                viewBox="0 0 24 24"
+                                width="20"
+                              >
+                                <title>Emoji icon</title>
+                                <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
+                              </svg>
+                            </button>
+                            {showEmojiPicker ? (
+                              <div className={styles.emojiPopover}>
+                                <EmojiPicker
+                                  onEmojiClick={(emojiData) => {
+                                    insertEmoji(toEmojiChar(emojiData));
+                                  }}
+                                  searchDisabled={false}
+                                  skinTonesDisabled={false}
+                                  lazyLoadEmojis
+                                />
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className={styles.mediaWrap}>
+                            <button
+                              type="button"
+                              className={styles.mediaButton}
+                              onClick={() =>
+                                commentMediaInputRef.current?.click()
+                              }
+                              aria-label="Attach photo or video"
+                              disabled={commentsLocked || submitting}
+                            >
+                              <svg
+                                aria-hidden
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5Z"
+                                  stroke="currentColor"
+                                  strokeWidth="1.6"
+                                />
+                                <path
+                                  d="M8 10.5 10.5 8l2.5 3 2-2.5 3 4"
+                                  stroke="currentColor"
+                                  strokeWidth="1.6"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                                <circle
+                                  cx="9"
+                                  cy="7"
+                                  r="1"
+                                  fill="currentColor"
+                                />
+                              </svg>
+                            </button>
+                            <input
+                              ref={commentMediaInputRef}
+                              type="file"
+                              accept="image/*,video/*"
+                              onChange={handleCommentMediaChange}
+                              hidden
+                            />
+                          </div>
+                          <div className={styles.stickerWrap} ref={gifRef}>
+                            <button
+                              type="button"
+                              className={styles.stickerButton}
+                              onClick={() => setShowGifPicker((prev) => !prev)}
+                              aria-label="Add GIF"
+                              disabled={commentsLocked || submitting}
+                            >
+                              <svg
+                                aria-hidden
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <rect
+                                  x="4"
+                                  y="5"
+                                  width="16"
+                                  height="14"
+                                  rx="3"
+                                  stroke="currentColor"
+                                  strokeWidth="1.6"
+                                />
+                                <path
+                                  d="M8 12c0-1.66 1.34-3 3-3h5"
+                                  stroke="currentColor"
+                                  strokeWidth="1.6"
+                                  strokeLinecap="round"
+                                />
+                                <path
+                                  d="M8 12c0 1.66 1.34 3 3 3h5"
+                                  stroke="currentColor"
+                                  strokeWidth="1.6"
+                                  strokeLinecap="round"
+                                />
+                                <path
+                                  d="M16 9v6"
+                                  stroke="currentColor"
+                                  strokeWidth="1.6"
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                            </button>
+                            {showGifPicker ? (
+                              <div className={styles.stickerPopover}>
+                                <div className={styles.stickerSearch}>
+                                  <input
+                                    className={styles.stickerSearchInput}
+                                    placeholder="Search GIFs"
+                                    value={gifQuery}
+                                    onChange={(e) =>
+                                      setGifQuery(e.target.value)
+                                    }
+                                  />
+                                  <button
+                                    type="button"
+                                    className={styles.stickerSearchBtn}
+                                    onClick={() => fetchGifs(gifQuery)}
+                                    disabled={gifLoading}
+                                  >
+                                    Search
+                                  </button>
+                                </div>
+                                {gifLoading ? (
+                                  <div className={styles.stickerHint}>
+                                    Loading GIFs...
+                                  </div>
+                                ) : null}
+                                {gifError ? (
+                                  <div className={styles.stickerHint}>
+                                    {gifError}
+                                  </div>
+                                ) : null}
+                                <div className={styles.stickerGrid}>
+                                  {gifResults.map((gif) => (
+                                    <button
+                                      key={gif.id}
+                                      type="button"
+                                      className={styles.stickerTile}
+                                      onClick={() => selectGif(gif)}
+                                    >
+                                      <img
+                                        src={gif.preview}
+                                        alt="GIF"
+                                        loading="lazy"
+                                      />
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className={styles.stickerWrap} ref={stickerRef}>
+                            <button
+                              type="button"
+                              className={styles.stickerButton}
+                              onClick={() =>
+                                setShowStickerPicker((prev) => !prev)
+                              }
+                              aria-label="Add sticker"
+                              disabled={commentsLocked || submitting}
+                            >
+                              <svg
+                                aria-hidden
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <rect
+                                  x="4"
+                                  y="4"
+                                  width="16"
+                                  height="16"
+                                  rx="4"
+                                  stroke="currentColor"
+                                  strokeWidth="1.6"
+                                />
+                                <circle
+                                  cx="10"
+                                  cy="11"
+                                  r="1"
+                                  fill="currentColor"
+                                />
+                                <circle
+                                  cx="14"
+                                  cy="11"
+                                  r="1"
+                                  fill="currentColor"
+                                />
+                                <path
+                                  d="M9 15c1.2 1 4.8 1 6 0"
+                                  stroke="currentColor"
+                                  strokeWidth="1.6"
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                            </button>
+                            {showStickerPicker ? (
+                              <div className={styles.stickerPopover}>
+                                <div className={styles.stickerSearch}>
+                                  <input
+                                    className={styles.stickerSearchInput}
+                                    placeholder="Search stickers"
+                                    value={stickerQuery}
+                                    onChange={(e) =>
+                                      setStickerQuery(e.target.value)
+                                    }
+                                  />
+                                  <button
+                                    type="button"
+                                    className={styles.stickerSearchBtn}
+                                    onClick={() => fetchStickers(stickerQuery)}
+                                    disabled={stickerLoading}
+                                  >
+                                    Search
+                                  </button>
+                                </div>
+                                {stickerLoading ? (
+                                  <div className={styles.stickerHint}>
+                                    Loading stickers...
+                                  </div>
+                                ) : null}
+                                {stickerError ? (
+                                  <div className={styles.stickerHint}>
+                                    {stickerError}
+                                  </div>
+                                ) : null}
+                                <div className={styles.stickerGrid}>
+                                  {stickerResults.map((sticker) => (
+                                    <button
+                                      key={sticker.id}
+                                      type="button"
+                                      className={styles.stickerTile}
+                                      onClick={() => selectSticker(sticker)}
+                                    >
+                                      <img
+                                        src={sticker.preview}
+                                        alt="Sticker"
+                                        loading="lazy"
+                                      />
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                        <button
+                          className={styles.composerSubmit}
+                          onClick={handleSubmit}
+                          aria-label={submitting ? "Posting" : "Post"}
+                          disabled={
+                            commentsLocked ||
+                            submitting ||
+                            commentMediaUploading ||
+                            (!commentText.trim() &&
+                              !commentMediaFile &&
+                              !commentMediaExternal)
+                          }
+                        >
+                          <svg
+                            aria-hidden
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M4 12l16-7-4.8 14-4.2-5.2L4 12Z"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinejoin="round"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d="M10.5 13.8 20 5"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    {commentPreviewUrl ? (
+                      <div className={styles.commentMediaPreview}>
+                        {commentPreviewIsVideo ? (
+                          <video
+                            className={styles.commentMediaPreviewVideo}
+                            src={commentPreviewUrl}
+                            controls
+                            controlsList="nodownload noremoteplayback"
+                            onContextMenu={(e) => e.preventDefault()}
+                            muted
+                          />
+                        ) : (
+                          <img
+                            className={styles.commentMediaPreviewImage}
+                            src={commentPreviewUrl}
+                            alt="Selected media"
+                            onContextMenu={(e) => e.preventDefault()}
+                          />
+                        )}
+                        <button
+                          type="button"
+                          className={styles.commentMediaRemove}
+                          onClick={clearCommentMedia}
+                          aria-label="Remove attachment"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : null}
+                    {commentMediaError ? (
+                      <div className={styles.commentMediaError}>
+                        {commentMediaError}
+                      </div>
+                    ) : null}
                   </div>
                 </>
               )}
@@ -3637,6 +5743,38 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         </div>
       ) : null}
 
+      {commentImageViewerUrl ? (
+        <div
+          className={styles.commentImageOverlay}
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setCommentImageViewerUrl(null)}
+        >
+          <button
+            type="button"
+            className={styles.commentImageClose}
+            aria-label="Close image"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCommentImageViewerUrl(null);
+            }}
+          >
+            ×
+          </button>
+          <div
+            className={styles.commentImageFigure}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              className={styles.commentImagePreview}
+              src={commentImageViewerUrl}
+              alt="Comment image"
+              onContextMenu={(e) => e.preventDefault()}
+            />
+          </div>
+        </div>
+      ) : null}
+
       {editOpen
         ? mounted && typeof document !== "undefined"
           ? createPortal(editModal, document.body)
@@ -3647,6 +5785,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         ? mounted && typeof document !== "undefined"
           ? createPortal(visibilityModal, document.body)
           : visibilityModal
+        : null}
+
+      {muteModalOpen
+        ? mounted && typeof document !== "undefined"
+          ? createPortal(muteModal, document.body)
+          : muteModal
         : null}
 
       {reportOpen ? (
@@ -3704,6 +5848,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                           group.reasons.length === 1
                             ? group.reasons[0].key
                             : null
+                            : null,
                         );
                       }}
                     >
@@ -3847,6 +5992,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                           group.reasons.length === 1
                             ? group.reasons[0].key
                             : null
+                            : null,
                         );
                       }}
                     >
@@ -4083,6 +6229,27 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {postId ? (
+        <PostLikesOverlay
+          open={likesOverlayOpen}
+          closing={likesOverlayClosing}
+          postId={postId}
+          viewerId={viewer?.userId || viewer?.id}
+          onClose={closeLikesOverlay}
+        />
+      ) : null}
+
+      {postId && commentLikesOverlayId ? (
+        <CommentLikesOverlay
+          open={commentLikesOverlayOpen}
+          closing={commentLikesOverlayClosing}
+          postId={postId}
+          commentId={commentLikesOverlayId}
+          viewerId={viewer?.userId || viewer?.id}
+          onClose={closeCommentLikesOverlay}
+        />
       ) : null}
     </div>
   );

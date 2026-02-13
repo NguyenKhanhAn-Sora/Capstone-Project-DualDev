@@ -4,7 +4,7 @@ export function decodeJwt(token: string): { exp?: number } | null {
   try {
     const payload = token.split(".")[1];
     const json = JSON.parse(
-      atob(payload.replace(/-/g, "+").replace(/_/g, "/"))
+      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
     );
     return json;
   } catch (_err) {
@@ -36,19 +36,27 @@ export function clearStoredAccessToken(): void {
 }
 
 export async function refreshSession(): Promise<string> {
+  const deviceId =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("cordigramDeviceId")
+      : null;
   try {
     const res = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
       method: "POST",
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
+        ...(deviceId
+          ? { "x-device-id": deviceId, "x-login-method": "refresh" }
+          : { "x-login-method": "refresh" }),
       },
     });
 
     if (!res.ok) {
-      // Clear stored token on refresh failure
       clearStoredAccessToken();
-      throw new Error(`Failed to refresh session: ${res.status} ${res.statusText}`);
+      throw new Error(
+        `Failed to refresh session: ${res.status} ${res.statusText}`,
+      );
     }
 
     const text = await res.text();
@@ -58,7 +66,9 @@ export async function refreshSession(): Promise<string> {
 
     if (!payload.accessToken) {
       clearStoredAccessToken();
-      throw new Error(payload.message || "Cannot refresh session - no access token");
+      throw new Error(
+        payload.message || "Cannot refresh session - no access token",
+      );
     }
 
     setStoredAccessToken(payload.accessToken);

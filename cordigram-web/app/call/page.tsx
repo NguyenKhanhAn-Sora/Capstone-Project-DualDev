@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
-import { getStoredAccessToken } from '@/lib/auth';
-import { getLiveKitToken } from '@/lib/livekit-api';
-import styles from './call.module.css';
+import { useEffect, useState, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import { getStoredAccessToken } from "@/lib/auth";
+import { getLiveKitToken } from "@/lib/livekit-api";
+import styles from "./call.module.css";
 
-const CallRoom = dynamic(() => import('@/components/CallRoom'), {
+const CallRoom = dynamic(() => import("@/components/CallRoom"), {
   ssr: false,
 });
 
@@ -15,19 +15,19 @@ export default function CallPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const roomName = searchParams.get('roomName');
-  const participantName = searchParams.get('participantName');
-  const isAudioOnly = searchParams.get('audioOnly') === 'true';
+  const roomName = searchParams.get("roomName");
+  const participantName = searchParams.get("participantName");
+  const isAudioOnly = searchParams.get("audioOnly") === "true";
 
-  const [callToken, setCallToken] = useState<string>('');
-  const [callServerUrl, setCallServerUrl] = useState<string>('');
+  const [callToken, setCallToken] = useState<string>("");
+  const [callServerUrl, setCallServerUrl] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const initCall = async () => {
       if (!roomName || !participantName) {
-        setError('Missing call parameters');
+        setError("Missing call parameters");
         setLoading(false);
         return;
       }
@@ -35,27 +35,27 @@ export default function CallPage() {
       try {
         const token = getStoredAccessToken();
         if (!token) {
-          setError('Not authenticated');
+          setError("Not authenticated");
           setLoading(false);
           return;
         }
 
-        console.log('📞 [CALL PAGE] Initializing call for room:', roomName);
+        console.log("📞 [CALL PAGE] Initializing call for room:", roomName);
 
         const { token: livekitToken, url } = await getLiveKitToken(
           roomName,
           participantName,
-          token
+          token,
         );
 
-        console.log('✅ [CALL PAGE] Got LiveKit credentials');
+        console.log("✅ [CALL PAGE] Got LiveKit credentials");
 
         setCallToken(livekitToken);
         setCallServerUrl(url);
         setLoading(false);
       } catch (err) {
-        console.error('❌ [CALL PAGE] Failed to init call:', err);
-        setError('Failed to initialize call');
+        console.error("❌ [CALL PAGE] Failed to init call:", err);
+        setError("Failed to initialize call");
         setLoading(false);
       }
     };
@@ -64,13 +64,13 @@ export default function CallPage() {
   }, [roomName, participantName]);
 
   const handleDisconnect = useCallback(() => {
-    console.log('📞 [CALL PAGE] User left call, closing window');
+    console.log("📞 [CALL PAGE] User left call, closing window");
     // Close the tab/window
     window.close();
-    
+
     // If window.close() doesn't work (some browsers block it), redirect
     setTimeout(() => {
-      router.push('/messages');
+      router.push("/messages");
     }, 100);
   }, [router]);
 
@@ -106,7 +106,7 @@ export default function CallPage() {
         token={callToken}
         serverUrl={callServerUrl}
         onDisconnect={handleDisconnect}
-        participantName={participantName || 'User'}
+        participantName={participantName || "User"}
         isAudioOnly={isAudioOnly}
       />
     </div>

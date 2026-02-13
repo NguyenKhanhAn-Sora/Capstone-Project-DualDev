@@ -1,4 +1,10 @@
-import { IsString, IsEnum, IsOptional, MinLength, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateChannelDto {
   @IsString()

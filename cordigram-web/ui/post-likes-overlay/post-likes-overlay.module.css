@@ -1,0 +1,331 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 6, 14, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 16px;
+}
+
+.card {
+  width: min(520px, 100%);
+  max-height: min(76vh, 620px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  transition:
+    transform 180ms ease,
+    opacity 180ms ease;
+}
+
+.card[data-closing="1"] {
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+}
+
+:global([data-theme="dark"]) .card {
+  background: rgba(13, 19, 34, 0.94);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.searchRow {
+  padding: 12px 14px 0px;
+}
+
+:global([data-theme="dark"]) .searchRow {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+.searchInput {
+  width: 100%;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 0 12px;
+  font-size: 14px;
+  color: var(--color-title-primary);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: rgba(109, 220, 255, 0.7);
+  box-shadow: 0 0 0 3px rgba(109, 220, 255, 0.18);
+}
+
+:global([data-theme="dark"]) .header {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+.title {
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--color-title-primary);
+}
+
+.close {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 10px;
+}
+
+.close:hover {
+  background: rgba(109, 220, 255, 0.12);
+  color: var(--color-title-primary);
+}
+
+.list {
+  padding: 10px;
+  overflow: auto;
+  flex: 1;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.row:hover {
+  background: rgba(109, 220, 255, 0.08);
+}
+
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+:global([data-theme="dark"]) .avatar {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.displayName {
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--color-title-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.username {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.followBtn {
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 800;
+  font-size: 12px;
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-title-primary);
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+:global([data-theme="light"]) .followBtn {
+  background: var(--color-surface-muted);
+}
+
+.followBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--color-primary);
+}
+
+.followBtnPrimary {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: linear-gradient(120deg, #6ddcff, #7f9bff);
+  color: #0a0f1c;
+}
+
+:global([data-theme="light"]) .followBtnPrimary {
+  border-color: var(--color-border);
+}
+
+.followBtnPrimary:hover:not(:disabled) {
+  filter: brightness(1.02);
+}
+
+.loading {
+  padding: 14px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.error {
+  padding: 10px 14px;
+  color: #f87171;
+  font-weight: 600;
+}
+
+.sentinel {
+  height: 1px;
+}
+
+.userRow {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.userRow:hover {
+  background: rgba(109, 220, 255, 0.08);
+}
+
+.userAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  display: block;
+}
+
+.userAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+:global([data-theme="dark"]) .userAvatar {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.displayName {
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--color-title-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.username {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.followButton {
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 800;
+  font-size: 12px;
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-title-primary);
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+:global([data-theme="light"]) .followButton {
+  background: var(--color-surface-muted);
+}
+
+.followButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--color-primary);
+}
+
+.followingButton {
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 800;
+  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(120deg, #6ddcff, #7f9bff);
+  color: #0a0f1c;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+:global([data-theme="light"]) .followingButton {
+  border-color: var(--color-border);
+}
+
+.followingButton:hover:not(:disabled) {
+  filter: brightness(1.02);
+}
+
+.youLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.loadingMore,
+.empty {
+  padding: 14px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}

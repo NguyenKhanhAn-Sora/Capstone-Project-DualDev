@@ -5,7 +5,11 @@ import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import styles from "./home-feed.module.css";
+import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
+import RepostOverlay, {
+  type QuoteInput,
+  type RepostTarget,
+} from "@/ui/repost-overlay/repost-overlay";
 import {
   fetchFeed,
   hidePost,
@@ -18,6 +22,7 @@ import {
   createReel,
   setPostAllowComments,
   setPostHideLikeCount,
+  updatePostNotificationMute,
   deletePost,
   fetchPostDetail,
   reportPost,
@@ -27,13 +32,22 @@ import {
   unfollowUser,
   updatePostVisibility,
   updatePost,
+  fetchCurrentProfile,
   searchProfiles,
+  searchPosts,
   type ProfileSearchItem,
   type FeedItem,
+  type CurrentProfileResponse,
 } from "@/lib/api";
+import { DateSelect } from "@/ui/date-select/date-select";
+import { TimeSelect } from "@/ui/time-select/time-select";
+import PeopleYouMayKnow from "@/ui/people-you-may-know/people-you-may-know";
 import { formatDistanceToNow } from "date-fns";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useScrollRestoration } from "@/hooks/use-scroll-restoration";
+import { useTranslations } from "next-intl";
+import styles from "./home-feed.module.css";
+
 type LocalFlags = {
   liked?: boolean;
   saved?: boolean;
@@ -44,8 +58,17 @@ type PostViewState = {
   flags: LocalFlags;
 };
 
+const isRepostOfReel = (item: FeedItem): boolean => {
+  const duration = (item as any)?.durationSeconds as number | undefined;
+  const mediaIsVideo = item.media?.some((m) => m?.type === "video");
+  return Boolean(
+    item.repostOf &&
+    (item.kind === "reel" || typeof duration === "number" || mediaIsVideo),
+  );
+};
+
 const onlyPostItems = (items: FeedItem[]): FeedItem[] =>
-  items.filter((item) => item.kind === "post");
+  items.filter((item) => item.kind === "post" && !isRepostOfReel(item));
 
 const onlyPostViews = (items: PostViewState[]): PostViewState[] =>
   items.filter((item) => item.item?.kind === "post");
@@ -53,6 +76,8 @@ const onlyPostViews = (items: PostViewState[]): PostViewState[] =>
 type FeedRemotePatch = Partial<FeedItem> & {
   liked?: boolean;
   saved?: boolean;
+  notificationsMutedUntil?: string | null;
+  notificationsMutedIndefinitely?: boolean;
 };
 
 const getUserIdFromToken = (token: string | null): string | undefined => {
@@ -74,9 +99,10 @@ const VIEW_DEBOUNCE_MS = 800;
 const VIEW_DWELL_MS = 2000;
 const VIEW_COOLDOWN_MS = 300000;
 const REPORT_ANIMATION_MS = 200;
-const FEED_POLL_MS = 7000;
+const FEED_POLL_MS = 4000;
 const FEED_CACHE_KEY = "feedCache:v1";
 const FEED_CACHE_INTENT_KEY = "feedCache:intent";
+const QUOTE_CHAR_LIMIT = 500;
 
 const normalizeHashtag = (value: string) =>
   value
@@ -96,6 +122,20 @@ const cleanLocationLabel = (label: string) =>
     .replace(/^\s*,\s*/g, "")
     .trim();
 
+const formatLocalDate = (value: Date) => {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const buildLocalDateTimeIso = (date: string, time: string) => {
+  if (!date || !time) return null;
+  const dt = new Date(`${date}T${time}:00`);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString();
+};
+
 const extractMentionsFromCaption = (value: string) => {
   const handles = new Set<string>();
   const regex = /@([a-zA-Z0-9_.]{1,30})/g;
@@ -114,6 +154,9 @@ const findActiveMention = (value: string, caret: number) => {
   const start = caret - handle.length - 1;
   return { handle, start, end: caret };
 };
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
 
 type IconProps = { size?: number; filled?: boolean };
 
@@ -278,99 +321,34 @@ type ReportCategory = {
   reasons: Array<{ key: string; label: string }>;
 };
 
-const REPORT_GROUPS: ReportCategory[] = [
-  {
-    key: "abuse",
-    label: "Harassment / Hate speech",
-    accent: "#f59e0b",
-    reasons: [
-      { key: "harassment", label: "Targets an individual to harass" },
-      { key: "hate_speech", label: "Hate speech or discrimination" },
-      { key: "offensive_discrimination", label: "Attacks vulnerable groups" },
-    ],
-  },
-  {
-    key: "violence",
-    label: "Violence / Threats",
-    accent: "#ef4444",
-    reasons: [
-      { key: "violence_threats", label: "Threatens or promotes violence" },
-      { key: "graphic_violence", label: "Graphic violent imagery" },
-      { key: "extremism", label: "Extremism or terrorism" },
-      { key: "self_harm", label: "Self-harm or suicide" },
-    ],
-  },
-  {
-    key: "sensitive",
-    label: "Sensitive content",
-    accent: "#a855f7",
-    reasons: [
-      { key: "nudity", label: "Nudity or adult content" },
-      { key: "minor_nudity", label: "Minor safety risk" },
-      { key: "sexual_solicitation", label: "Sexual solicitation" },
-    ],
-  },
-  {
-    key: "misinfo",
-    label: "Impersonation / Misinformation",
-    accent: "#22c55e",
-    reasons: [
-      { key: "fake_news", label: "False or misleading information" },
-      { key: "impersonation", label: "Impersonation of a person or org" },
-    ],
-  },
-  {
-    key: "spam",
-    label: "Spam / Scam",
-    accent: "#14b8a6",
-    reasons: [
-      { key: "spam", label: "Spam or irrelevant content" },
-      { key: "financial_scam", label: "Financial scam" },
-      { key: "unsolicited_ads", label: "Unwanted advertising" },
-    ],
-  },
-  {
-    key: "ip",
-    label: "Intellectual property",
-    accent: "#3b82f6",
-    reasons: [
-      { key: "copyright", label: "Copyright infringement" },
-      { key: "trademark", label: "Trademark violation" },
-      { key: "brand_impersonation", label: "Brand impersonation" },
-    ],
-  },
-  {
-    key: "illegal",
-    label: "Illegal activity",
-    accent: "#f97316",
-    reasons: [
-      { key: "contraband", label: "Contraband" },
-      { key: "illegal_transaction", label: "Illegal transaction" },
-    ],
-  },
-  {
-    key: "privacy",
-    label: "Privacy violation",
-    accent: "#06b6d4",
-    reasons: [
-      { key: "doxxing", label: "Doxxing private information" },
-      {
-        key: "nonconsensual_intimate",
-        label: "Non-consensual intimate content",
-      },
-    ],
-  },
-  {
-    key: "other",
-    label: "Other",
-    accent: "#94a3b8",
-    reasons: [{ key: "other", label: "Other reason" }],
-  },
-];
-
-export default function HomePage() {
+export default function HomePage({
+  scopeOverride,
+  kindsOverride,
+  searchQueryOverride,
+  headerSlot,
+  pageSizeOverride,
+  maxItems,
+  embedded,
+  hideSidebar,
+  hideLoadMore,
+  cardClassName,
+}: {
+  scopeOverride?: "all" | "following";
+  kindsOverride?: Array<"post" | "reel">;
+  searchQueryOverride?: string;
+  headerSlot?: React.ReactNode;
+  pageSizeOverride?: number;
+  maxItems?: number;
+  embedded?: boolean;
+  hideSidebar?: boolean;
+  hideLoadMore?: boolean;
+  cardClassName?: string;
+} = {}) {
   const canRender = useRequireAuth();
+  const t = useTranslations("home");
+  const tCommon = useTranslations("common");
   const pathname = usePathname();
+  const pageSize = pageSizeOverride ?? PAGE_SIZE;
   const [items, setItems] = useState<PostViewState[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(false);
@@ -400,16 +378,7 @@ export default function HomePage() {
   } | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  const [repostTarget, setRepostTarget] = useState<{
-    postId: string;
-    label: string;
-    kind: "post" | "reel";
-  } | null>(null);
-  const [repostMode, setRepostMode] = useState<"quote" | "repost" | null>(null);
-  const [repostNote, setRepostNote] = useState("");
-  const [repostSubmitting, setRepostSubmitting] = useState(false);
-  const [repostError, setRepostError] = useState("");
-  const [repostClosing, setRepostClosing] = useState(false);
+  const [repostTarget, setRepostTarget] = useState<RepostTarget | null>(null);
   const reportHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const repostHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -417,12 +386,209 @@ export default function HomePage() {
   const [viewerId, setViewerId] = useState<string | undefined>(() =>
     typeof window === "undefined"
       ? undefined
-      : getUserIdFromToken(localStorage.getItem("accessToken"))
+      : getUserIdFromToken(localStorage.getItem("accessToken")),
   );
+  const [viewerProfile, setViewerProfile] =
+    useState<CurrentProfileResponse | null>(null);
   const viewTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
-    new Map()
+    new Map(),
   );
+  const viewCooldownRef = useRef<Map<string, number>>(new Map());
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const autoLoadLockRef = useRef(false);
+
+  const feedCacheKey = useMemo(() => {
+    const searchKey = (searchQueryOverride ?? "").trim();
+    if (searchKey) {
+      return `${FEED_CACHE_KEY}:search:${searchKey}`;
+    }
+    const scope = scopeOverride ?? "all";
+    return scope === "following"
+      ? `${FEED_CACHE_KEY}:following`
+      : FEED_CACHE_KEY;
+  }, [scopeOverride, searchQueryOverride]);
+
+  const isSearchMode = Boolean((searchQueryOverride ?? "").trim());
+  const visibleItems = useMemo(
+    () => (maxItems ? items.slice(0, maxItems) : items),
+    [items, maxItems],
+  );
+  const showLoadMore = !hideLoadMore && !maxItems;
+  const autoLoadEnabled = showLoadMore;
+  const showSidebar = !embedded && !hideSidebar;
+
+  const reportGroups = useMemo<ReportCategory[]>(
+    () => [
+      {
+        key: "abuse",
+        label: t("report.groups.abuse.label"),
+        accent: "#f59e0b",
+        reasons: [
+          {
+            key: "harassment",
+            label: t("report.groups.abuse.reasons.harassment"),
+          },
+          {
+            key: "hate_speech",
+            label: t("report.groups.abuse.reasons.hateSpeech"),
+          },
+          {
+            key: "offensive_discrimination",
+            label: t("report.groups.abuse.reasons.offensiveDiscrimination"),
+          },
+        ],
+      },
+      {
+        key: "violence",
+        label: t("report.groups.violence.label"),
+        accent: "#ef4444",
+        reasons: [
+          {
+            key: "violence_threats",
+            label: t("report.groups.violence.reasons.violenceThreats"),
+          },
+          {
+            key: "graphic_violence",
+            label: t("report.groups.violence.reasons.graphicViolence"),
+          },
+          {
+            key: "extremism",
+            label: t("report.groups.violence.reasons.extremism"),
+          },
+          {
+            key: "self_harm",
+            label: t("report.groups.violence.reasons.selfHarm"),
+          },
+        ],
+      },
+      {
+        key: "sensitive",
+        label: t("report.groups.sensitive.label"),
+        accent: "#a855f7",
+        reasons: [
+          {
+            key: "nudity",
+            label: t("report.groups.sensitive.reasons.nudity"),
+          },
+          {
+            key: "minor_nudity",
+            label: t("report.groups.sensitive.reasons.minorNudity"),
+          },
+          {
+            key: "sexual_solicitation",
+            label: t("report.groups.sensitive.reasons.sexualSolicitation"),
+          },
+        ],
+      },
+      {
+        key: "misinfo",
+        label: t("report.groups.misinfo.label"),
+        accent: "#22c55e",
+        reasons: [
+          {
+            key: "fake_news",
+            label: t("report.groups.misinfo.reasons.fakeNews"),
+          },
+          {
+            key: "impersonation",
+            label: t("report.groups.misinfo.reasons.impersonation"),
+          },
+        ],
+      },
+      {
+        key: "spam",
+        label: t("report.groups.spam.label"),
+        accent: "#14b8a6",
+        reasons: [
+          {
+            key: "spam",
+            label: t("report.groups.spam.reasons.spam"),
+          },
+          {
+            key: "financial_scam",
+            label: t("report.groups.spam.reasons.financialScam"),
+          },
+          {
+            key: "unsolicited_ads",
+            label: t("report.groups.spam.reasons.unsolicitedAds"),
+          },
+        ],
+      },
+      {
+        key: "ip",
+        label: t("report.groups.ip.label"),
+        accent: "#3b82f6",
+        reasons: [
+          {
+            key: "copyright",
+            label: t("report.groups.ip.reasons.copyright"),
+          },
+          {
+            key: "trademark",
+            label: t("report.groups.ip.reasons.trademark"),
+          },
+          {
+            key: "brand_impersonation",
+            label: t("report.groups.ip.reasons.brandImpersonation"),
+          },
+        ],
+      },
+      {
+        key: "illegal",
+        label: t("report.groups.illegal.label"),
+        accent: "#f97316",
+        reasons: [
+          {
+            key: "contraband",
+            label: t("report.groups.illegal.reasons.contraband"),
+          },
+          {
+            key: "illegal_transaction",
+            label: t("report.groups.illegal.reasons.illegalTransaction"),
+          },
+        ],
+      },
+      {
+        key: "privacy",
+        label: t("report.groups.privacy.label"),
+        accent: "#06b6d4",
+        reasons: [
+          {
+            key: "doxxing",
+            label: t("report.groups.privacy.reasons.doxxing"),
+          },
+          {
+            key: "nonconsensual_intimate",
+            label: t("report.groups.privacy.reasons.nonconsensualIntimate"),
+          },
+        ],
+      },
+      {
+        key: "other",
+        label: t("report.groups.other.label"),
+        accent: "#94a3b8",
+        reasons: [
+          {
+            key: "other",
+            label: t("report.groups.other.reasons.other"),
+          },
+        ],
+      },
+    ],
+    [t],
+  );
+
+  const repostHeartsByOriginalId = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const entry of visibleItems) {
+      const repostOf = entry.item?.repostOf;
+      if (!repostOf) continue;
+      const hearts = entry.item?.stats?.hearts ?? 0;
+      totals.set(repostOf, (totals.get(repostOf) ?? 0) + hearts);
+    }
+    return totals;
+  }, [visibleItems]);
+
   const getScrollTarget = useCallback(() => {
     if (typeof document === "undefined") return null;
     const el = document.querySelector<HTMLElement>("[data-scroll-root]");
@@ -435,16 +601,34 @@ export default function HomePage() {
     return localStorage.getItem("accessToken");
   }, []);
 
+  useEffect(() => {
+    if (!token) {
+      setViewerProfile(null);
+      return;
+    }
+    fetchCurrentProfile({ token })
+      .then(setViewerProfile)
+      .catch(() => setViewerProfile(null));
+  }, [token]);
+
   useScrollRestoration(
     "feed-scroll",
     initialized && !loading,
     getScrollTarget,
-    pathname === "/"
+    pathname === "/",
   );
 
   const selectedReportGroup = useMemo(
-    () => REPORT_GROUPS.find((g) => g.key === reportCategory),
-    [reportCategory]
+    () => reportGroups.find((g) => g.key === reportCategory),
+    [reportCategory, reportGroups],
+  );
+
+  const resolveOriginalPostId = useCallback(
+    (postId: string) => {
+      const target = items.find((p) => p.item.id === postId)?.item;
+      return target?.repostOf || postId;
+    },
+    [items],
   );
 
   const persistFeedCache = useCallback(
@@ -461,23 +645,23 @@ export default function HomePage() {
       };
       try {
         sessionStorage.setItem(
-          FEED_CACHE_KEY,
+          feedCacheKey,
           JSON.stringify({
             items: data.items,
             page: data.page,
             hasMore: data.hasMore,
             viewerId,
             ts: Date.now(),
-          })
+          }),
         );
       } catch {}
     },
-    [hasMore, items, page, viewerId]
+    [feedCacheKey, hasMore, items, page, viewerId],
   );
 
   const tryHydrateFromCache = useCallback(() => {
     if (typeof window === "undefined") return false;
-    const raw = sessionStorage.getItem(FEED_CACHE_KEY);
+    const raw = sessionStorage.getItem(feedCacheKey);
     if (!raw) return false;
     try {
       const cached = JSON.parse(raw) as {
@@ -502,7 +686,7 @@ export default function HomePage() {
     } catch {
       return false;
     }
-  }, [viewerId]);
+  }, [feedCacheKey, viewerId]);
 
   const showToast = useCallback((message: string, duration = 1600) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -525,15 +709,33 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!initialized) return;
+    if (isSearchMode) return;
     persistFeedCache();
-  }, [initialized, items, page, hasMore, persistFeedCache]);
+  }, [initialized, isSearchMode, items, page, hasMore, persistFeedCache]);
 
   const syncStats = useCallback(async () => {
     if (!token) return;
     try {
-      const limit = page * PAGE_SIZE;
-      const data = await fetchFeed({ token, limit });
-      const posts = onlyPostItems(data);
+      const limit = page * pageSize;
+      const searchKey = (searchQueryOverride ?? "").trim();
+      const data = searchKey
+        ? ((
+            await searchPosts({
+              token,
+              query: searchKey,
+              limit,
+              page: 1,
+              kinds: kindsOverride ?? ["post"],
+              sort: "trending",
+            })
+          )?.items ?? [])
+        : await fetchFeed({
+            token,
+            limit,
+            scope: scopeOverride,
+            kinds: kindsOverride,
+          });
+      const posts = onlyPostItems(Array.isArray(data) ? data : []);
       const map = new Map(posts.map((item) => [item.id, item]));
       setItems((prev) =>
         prev.map((p) => {
@@ -548,63 +750,167 @@ export default function HomePage() {
               saved: updated.saved ?? p.flags.saved,
             },
           };
-        })
+        }),
       );
     } catch {}
-  }, [page, token]);
+  }, [
+    kindsOverride,
+    page,
+    pageSize,
+    scopeOverride,
+    searchQueryOverride,
+    token,
+  ]);
 
-  const load = async (nextPage: number) => {
-    if (!token) {
-      setError("Sign in to view the feed");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const limit = nextPage * PAGE_SIZE;
-      const data = await fetchFeed({ token, limit });
-      const posts = onlyPostItems(data);
-      setHasMore(data.length >= limit);
-      const mapped = posts.map((item) => ({
-        item,
-        flags: {
-          liked: item.liked,
-          saved: item.saved,
-          following:
-            (item as unknown as { following?: boolean }).following ?? false,
-        },
-      }));
-      setItems(mapped);
-      persistFeedCache({
-        items: mapped,
-        page: nextPage,
-        hasMore: data.length >= limit,
-      });
-      setPage(nextPage);
-    } catch (err) {
-      const msg =
-        typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Unable to load feed"
-          : "Unable to load feed";
-      setError(msg);
-    } finally {
-      setInitialized(true);
-      setLoading(false);
-    }
-  };
+  const load = useCallback(
+    async (nextPage: number) => {
+      if (!token) {
+        setError(t("feed.signInToView"));
+        return;
+      }
+      setLoading(true);
+      setError("");
+      try {
+        const limit = nextPage * pageSize;
+        const searchKey = (searchQueryOverride ?? "").trim();
+        const data = searchKey
+          ? await searchPosts({
+              token,
+              query: searchKey,
+              limit: pageSize,
+              page: nextPage,
+              kinds: kindsOverride ?? ["post"],
+              sort: "trending",
+            })
+          : await fetchFeed({
+              token,
+              limit,
+              scope: scopeOverride,
+              kinds: kindsOverride,
+            });
+
+        const rawItems = Array.isArray(data) ? data : data.items;
+        const posts = onlyPostItems(rawItems);
+        const nextHasMore = Array.isArray(data)
+          ? rawItems.length >= limit
+          : Boolean(data.hasMore);
+        setHasMore(nextHasMore);
+        const mapped = posts.map((item) => ({
+          item,
+          flags: {
+            liked: item.liked,
+            saved: item.saved,
+            following:
+              (item as unknown as { following?: boolean }).following ?? false,
+          },
+        }));
+        setItems(mapped);
+        if (!searchKey) {
+          persistFeedCache({
+            items: mapped,
+            page: nextPage,
+            hasMore: nextHasMore,
+          });
+        }
+        setPage(nextPage);
+      } catch (err) {
+        const msg =
+          typeof err === "object" && err && "message" in err
+            ? (err as { message?: string }).message || t("feed.unableToLoad")
+            : t("feed.unableToLoad");
+        setError(msg);
+      } finally {
+        setInitialized(true);
+        setLoading(false);
+      }
+    },
+    [
+      kindsOverride,
+      pageSize,
+      persistFeedCache,
+      scopeOverride,
+      searchQueryOverride,
+      t,
+      token,
+    ],
+  );
+
+  const loadRef = useRef(load);
+
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
+
+  const handleLoadMore = useCallback(() => {
+    if (loading || !hasMore) return;
+    void load(page + 1);
+  }, [hasMore, load, loading, page]);
+
+  useEffect(() => {
+    if (!loading) autoLoadLockRef.current = false;
+  }, [loading]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!autoLoadEnabled) return;
+    const anchor = loadMoreRef.current;
+    if (!anchor) return;
+    if (!hasMore) return;
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const rootEl = getScrollTarget();
+    const isScrollableRoot = (el: HTMLElement) =>
+      el.scrollHeight > el.clientHeight + 2;
+
+    const root =
+      rootEl &&
+      typeof document !== "undefined" &&
+      rootEl !== (document.scrollingElement as HTMLElement | null) &&
+      isScrollableRoot(rootEl)
+        ? rootEl
+        : null;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isVisible = entries.some((entry) => entry.isIntersecting);
+        if (!isVisible) return;
+        if (autoLoadLockRef.current) return;
+        if (loading || !hasMore) return;
+        autoLoadLockRef.current = true;
+        handleLoadMore();
+      },
+      {
+        root,
+        rootMargin: "800px 0px",
+        threshold: 0,
+      },
+    );
+
+    observer.observe(anchor);
+    return () => observer.disconnect();
+  }, [
+    autoLoadEnabled,
+    getScrollTarget,
+    handleLoadMore,
+    hasMore,
+    loading,
+    items.length,
+  ]);
 
   useEffect(() => {
     if (!canRender) return;
+    if (isSearchMode) {
+      void loadRef.current(1);
+      return;
+    }
     const shouldHydrate = sessionStorage.getItem(FEED_CACHE_INTENT_KEY);
     if (shouldHydrate && tryHydrateFromCache()) return;
     if (tryHydrateFromCache()) return;
-    load(1);
-  }, [canRender, tryHydrateFromCache]);
+    void loadRef.current(1);
+  }, [canRender, isSearchMode, tryHydrateFromCache]);
 
   const onLike = async (postId: string, liked: boolean) => {
     if (!token) return;
-    const targetItem = items.find((p) => p.item.id === postId)?.item;
-    const targetId = targetItem?.repostOf || postId;
     setItems((prev) =>
       prev.map((p) =>
         p.item.id === postId
@@ -616,20 +922,20 @@ export default function HomePage() {
                   ...p.item.stats,
                   hearts: Math.max(
                     0,
-                    (p.item.stats.hearts ?? 0) + (liked ? 1 : -1)
+                    (p.item.stats.hearts ?? 0) + (liked ? 1 : -1),
                   ),
                 },
               },
               flags: { ...p.flags, liked },
             }
-          : p
-      )
+          : p,
+      ),
     );
     try {
       if (liked) {
-        await likePost({ token, postId: targetId });
+        await likePost({ token, postId });
       } else {
-        await unlikePost({ token, postId: targetId });
+        await unlikePost({ token, postId });
       }
       void syncStats();
     } catch {
@@ -644,14 +950,14 @@ export default function HomePage() {
                     ...p.item.stats,
                     hearts: Math.max(
                       0,
-                      (p.item.stats.hearts ?? 0) + (liked ? -1 : 1)
+                      (p.item.stats.hearts ?? 0) + (liked ? -1 : 1),
                     ),
                   },
                 },
                 flags: { ...p.flags, liked: !liked },
               }
-            : p
-        )
+            : p,
+        ),
       );
     }
   };
@@ -670,13 +976,13 @@ export default function HomePage() {
                   ...p.item.stats,
                   saves: Math.max(
                     0,
-                    (p.item.stats.saves ?? 0) + (saved ? 1 : -1)
+                    (p.item.stats.saves ?? 0) + (saved ? 1 : -1),
                   ),
                 },
               },
             }
-          : p
-      )
+          : p,
+      ),
     );
     try {
       if (saved) {
@@ -697,13 +1003,13 @@ export default function HomePage() {
                     ...p.item.stats,
                     saves: Math.max(
                       0,
-                      (p.item.stats.saves ?? 0) + (saved ? -1 : 1)
+                      (p.item.stats.saves ?? 0) + (saved ? -1 : 1),
                     ),
                   },
                 },
               }
-            : p
-        )
+            : p,
+        ),
       );
     }
   };
@@ -711,88 +1017,101 @@ export default function HomePage() {
   const onRepostIntent = (
     postId: string,
     label: string,
-    kind: "post" | "reel"
+    kind: "post" | "reel",
+    originalAllowDownload: boolean,
+    anchor?: DOMRect | null,
   ) => {
     if (!token) {
-      showToast("Sign in to repost");
+      showToast(t("toast.signInToRepost"));
       return;
     }
-    if (repostHideTimerRef.current) clearTimeout(repostHideTimerRef.current);
-    setRepostClosing(false);
-    setRepostTarget({ postId, label, kind });
-    setRepostMode(null);
-    setRepostNote("");
-    setRepostError("");
-    setRepostSubmitting(false);
+    setRepostTarget({ postId, label, kind, originalAllowDownload });
   };
 
-  const closeRepostModal = () => {
-    if (repostHideTimerRef.current) clearTimeout(repostHideTimerRef.current);
-    setRepostClosing(true);
-    repostHideTimerRef.current = setTimeout(() => {
-      setRepostTarget(null);
-      setRepostMode(null);
-      setRepostNote("");
-      setRepostError("");
-      setRepostSubmitting(false);
-      setRepostClosing(false);
-    }, REPORT_ANIMATION_MS);
-  };
+  const incrementRepostStat = useCallback((postId: string) => {
+    setItems((prev) =>
+      prev.map((p) => {
+        if (p.item.id !== postId) return p;
+        const currentShares = p.item.stats.reposts ?? p.item.stats.shares ?? 0;
+        const nextShares = currentShares + 1;
+        return {
+          ...p,
+          item: {
+            ...p.item,
+            stats: {
+              ...p.item.stats,
+              shares: nextShares,
+              reposts: nextShares,
+            },
+          },
+          flags: { ...p.flags, reposted: true },
+        };
+      }),
+    );
+  }, []);
 
-  const submitRepost = async () => {
-    if (!token || !repostTarget || !repostMode) {
-      setRepostError("Choose an option to continue");
-      return;
-    }
-    setRepostSubmitting(true);
-    setRepostError("");
-    try {
-      if (repostMode === "repost") {
-        await repostPost({ token, postId: repostTarget.postId });
-        setItems((prev) =>
-          prev.map((p) =>
-            p.item.id === repostTarget.postId
-              ? {
-                  ...p,
-                  item: {
-                    ...p.item,
-                    stats: {
-                      ...p.item.stats,
-                      shares: (p.item.stats.shares ?? 0) + 1,
-                    },
-                  },
-                  flags: { ...p.flags, reposted: true },
-                }
-              : p
-          )
-        );
-        showToast("Reposted");
-        closeRepostModal();
+  const handleQuickRepost = useCallback(
+    async (target: RepostTarget) => {
+      if (!token) {
+        showToast(t("toast.signInToRepost"));
         return;
       }
+      const originalId = resolveOriginalPostId(target.postId);
+      const targetId = target.postId;
+      await createPost({ token, payload: { repostOf: originalId } });
+      incrementRepostStat(originalId);
+      if (originalId !== targetId) {
+        incrementRepostStat(targetId);
+        try {
+          await repostPost({ token, postId: targetId });
+        } catch {}
+      }
+      showToast(t("toast.reposted"));
+    },
+    [incrementRepostStat, resolveOriginalPostId, showToast, t, token],
+  );
 
-      const note = repostNote.trim();
+  const handleShareQuote = useCallback(
+    async (target: RepostTarget, input: QuoteInput) => {
+      if (!token) {
+        showToast(t("toast.signInToRepost"));
+        return;
+      }
+      const originalId = resolveOriginalPostId(target.postId);
+      const targetId = target.postId;
+
+      const note = input.content.trim();
+      const mentions = extractMentionsFromCaption(note);
       const payload = {
-        repostOf: repostTarget.postId,
+        repostOf: originalId,
         content: note || undefined,
+        hashtags: input.hashtags.length ? input.hashtags : undefined,
+        location: input.location.trim() || undefined,
+        allowComments: input.allowComments,
+        allowDownload: Boolean(target.originalAllowDownload),
+        hideLikeCount: input.hideLikeCount,
+        visibility: input.visibility,
+        mentions: mentions.length ? mentions : undefined,
       };
-      const created =
-        repostTarget.kind === "reel"
-          ? await createReel({ token, payload: payload as any })
-          : await createPost({ token, payload });
-      setItems((prev) => [{ item: created, flags: {} }, ...prev]);
-      showToast("Reposted with quote");
-      closeRepostModal();
-    } catch (err) {
-      const message =
-        typeof err === "object" && err && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Could not repost";
-      setRepostError(message || "Could not repost");
-    } finally {
-      setRepostSubmitting(false);
-    }
-  };
+
+      if (target.kind === "reel") {
+        await createReel({ token, payload: payload as any });
+      } else {
+        await createPost({ token, payload });
+      }
+
+      incrementRepostStat(originalId);
+      if (originalId !== targetId) {
+        incrementRepostStat(targetId);
+        try {
+          await repostPost({ token, postId: targetId });
+        } catch {}
+      }
+
+      showToast(t("toast.repostedWithQuote"));
+    },
+    [incrementRepostStat, resolveOriginalPostId, showToast, t, token],
+  );
 
   const onHide = async (postId: string) => {
     if (!token) return;
@@ -806,46 +1125,50 @@ export default function HomePage() {
     if (!token) return;
     setItems((prev) =>
       prev.map((p) =>
-        p.item.id === postId ? { ...p, item: { ...p.item, allowComments } } : p
-      )
+        p.item.id === postId ? { ...p, item: { ...p.item, allowComments } } : p,
+      ),
     );
     try {
       await setPostAllowComments({ token, postId, allowComments });
-      showToast(allowComments ? "Comments turned on" : "Comments turned off");
+      showToast(allowComments ? t("toast.commentsOn") : t("toast.commentsOff"));
     } catch {
       setItems((prev) =>
         prev.map((p) =>
           p.item.id === postId
             ? { ...p, item: { ...p.item, allowComments: !allowComments } }
-            : p
-        )
+            : p,
+        ),
       );
-      showToast("Failed to update comments");
+      showToast(t("toast.commentsUpdateFailed"));
     }
   };
 
   const onToggleHideLikeCount = async (
     postId: string,
-    hideLikeCount: boolean
+    hideLikeCount: boolean,
   ) => {
     if (!token) return;
     setItems((prev) =>
       prev.map((p) =>
-        p.item.id === postId ? { ...p, item: { ...p.item, hideLikeCount } } : p
-      )
+        p.item.id === postId ? { ...p, item: { ...p.item, hideLikeCount } } : p,
+      ),
     );
     try {
       await setPostHideLikeCount({ token, postId, hideLikeCount });
-      showToast(hideLikeCount ? "Like count hidden" : "Like count visible");
+      showToast(
+        hideLikeCount
+          ? t("toast.likeCountHidden")
+          : t("toast.likeCountVisible"),
+      );
     } catch {
       setItems((prev) =>
         prev.map((p) =>
           p.item.id === postId
             ? { ...p, item: { ...p.item, hideLikeCount: !hideLikeCount } }
-            : p
-        )
+            : p,
+        ),
       );
-      showToast("Failed to update like count visibility");
+      showToast(t("toast.likeCountUpdateFailed"));
     }
   };
 
@@ -867,6 +1190,12 @@ export default function HomePage() {
                   visibility: patch.visibility ?? p.item.visibility,
                   allowComments: patch.allowComments ?? p.item.allowComments,
                   hideLikeCount: patch.hideLikeCount ?? p.item.hideLikeCount,
+                  notificationsMutedUntil:
+                    patch.notificationsMutedUntil ??
+                    p.item.notificationsMutedUntil,
+                  notificationsMutedIndefinitely:
+                    patch.notificationsMutedIndefinitely ??
+                    p.item.notificationsMutedIndefinitely,
                   stats: patch.stats ?? p.item.stats,
                 },
                 flags: {
@@ -875,11 +1204,11 @@ export default function HomePage() {
                   saved: patch.saved ?? p.flags.saved,
                 },
               }
-            : p
-        )
+            : p,
+        ),
       );
     },
-    []
+    [],
   );
 
   const onCopyLink = useCallback(
@@ -900,17 +1229,17 @@ export default function HomePage() {
           document.execCommand("copy");
           document.body.removeChild(textarea);
         }
-        showToast("Link copied to clipboard");
+        showToast(t("toast.linkCopied"));
       } catch {
-        showToast("Failed to copy link");
+        showToast(t("toast.linkCopyFailed"));
       }
     },
-    [showToast]
+    [showToast, t],
   );
 
   const onDeleteIntent = (postId: string, label: string) => {
     if (!token) {
-      showToast("Please sign in to delete posts");
+      showToast(t("toast.signInToDelete"));
       return;
     }
     setDeleteTarget({ postId, label });
@@ -925,7 +1254,7 @@ export default function HomePage() {
 
   const confirmDelete = async () => {
     if (!token || !deleteTarget) {
-      setDeleteError("Please sign in to delete posts");
+      setDeleteError(t("toast.signInToDelete"));
       return;
     }
     setDeleteSubmitting(true);
@@ -938,12 +1267,12 @@ export default function HomePage() {
         return next;
       });
       setDeleteTarget(null);
-      showToast("Deleted post");
+      showToast(t("toast.deletedPost"));
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Failed to delete post"
-          : "Failed to delete post";
+          ? (err as { message?: string }).message || t("toast.deleteFailed")
+          : t("toast.deleteFailed");
       setDeleteError(message);
     } finally {
       setDeleteSubmitting(false);
@@ -989,12 +1318,13 @@ export default function HomePage() {
         note: reportNote.trim() || undefined,
       });
       closeReportModal();
-      showToast("Report submitted");
+      showToast(t("toast.reportSubmitted"));
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Could not submit report"
-          : "Could not submit report";
+          ? (err as { message?: string }).message ||
+            t("toast.reportSubmitFailed")
+          : t("toast.reportSubmitFailed");
       setReportError(message);
     } finally {
       setReportSubmitting(false);
@@ -1007,8 +1337,8 @@ export default function HomePage() {
       prev.map((p) =>
         p.item.authorId === authorId
           ? { ...p, flags: { ...p.flags, following: nextFollow } }
-          : p
-      )
+          : p,
+      ),
     );
     try {
       if (nextFollow) {
@@ -1021,20 +1351,20 @@ export default function HomePage() {
         prev.map((p) =>
           p.item.authorId === authorId
             ? { ...p, flags: { ...p.flags, following: !nextFollow } }
-            : p
-        )
+            : p,
+        ),
       );
       const message =
         typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Action failed"
-          : "Action failed";
+          ? (err as { message?: string }).message || t("toast.actionFailed")
+          : t("toast.actionFailed");
       setError(message);
     }
   };
 
   const onBlockIntent = (userId?: string, label?: string) => {
     if (!token || !userId) return;
-    setBlockTarget({ userId, label: label || "this user" });
+    setBlockTarget({ userId, label: label || t("block.thisUser") });
   };
 
   const confirmBlock = async () => {
@@ -1044,15 +1374,15 @@ export default function HomePage() {
       await blockUser({ token, userId: blockTarget.userId });
       setItems((prev) =>
         prev.filter(
-          (p) => p.item.authorId && p.item.authorId !== blockTarget.userId
-        )
+          (p) => p.item.authorId && p.item.authorId !== blockTarget.userId,
+        ),
       );
       setBlockTarget(undefined);
     } catch (err) {
       const message =
         typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Block failed"
-          : "Block failed";
+          ? (err as { message?: string }).message || t("toast.blockFailed")
+          : t("toast.blockFailed");
       setError(message);
     } finally {
       setBlocking(false);
@@ -1063,61 +1393,43 @@ export default function HomePage() {
     if (!token) return;
     const targetItem = items.find((p) => p.item.id === postId)?.item;
     const targetId = targetItem?.repostOf || postId;
-    const existing = viewTimers.current.get(postId);
-    if (existing) clearTimeout(existing);
-    const timer = setTimeout(() => {
-      viewPost({ token, postId: targetId, durationMs }).catch(() => undefined);
-    }, VIEW_DEBOUNCE_MS);
-    viewTimers.current.set(postId, timer);
+    const now = Date.now();
+    const last = viewCooldownRef.current.get(targetId) ?? 0;
+    if (now - last < VIEW_COOLDOWN_MS) return;
+    const handler = () => {
+      viewPost({ token, postId: targetId, durationMs })
+        .then(() => {
+          viewCooldownRef.current.set(targetId, Date.now());
+        })
+        .catch(() => undefined);
+    };
+    const timeout = setTimeout(handler, 0);
+    viewTimers.current.set(targetId, timeout);
   };
-
-  const handleLoadMore = useCallback(() => {
-    if (!hasMore || loading) return;
-    load(page + 1);
-  }, [hasMore, loading, page]);
-
-  useEffect(() => {
-    const el = loadMoreRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            handleLoadMore();
-          }
-        });
-      },
-      { root: null, rootMargin: "200px 0px", threshold: 0 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [handleLoadMore]);
-
   if (!canRender) return null;
 
   return (
-    <div className={styles.page}>
-      <div className={styles.centerColumn}>
-        {error && <div className={styles.errorBox}>{error}</div>}
-
-        {!items.length && !loading && (
-          <div className={styles.empty}>No posts yet.</div>
-        )}
-
-        {items.map(({ item, flags }) => (
+    <div className={embedded ? undefined : styles.page}>
+      <div className={embedded ? styles.embedded : styles.centerColumn}>
+        {headerSlot}
+        {visibleItems.map(({ item, flags }) => (
           <FeedCard
             key={item.id}
             data={item}
             liked={Boolean(flags.liked)}
             saved={Boolean(flags.saved)}
             flags={flags}
+            repostHeartsBoost={repostHeartsByOriginalId.get(item.id) ?? 0}
+            cardClassName={cardClassName}
             onLike={onLike}
             onSave={onSave}
-            onShare={(id) =>
+            onShare={(id, anchor) =>
               onRepostIntent(
                 id,
                 item.authorUsername || item.author?.username || "this user",
-                item.kind
+                item.kind,
+                Boolean(item.allowDownload),
+                anchor,
               )
             }
             onHide={onHide}
@@ -1129,6 +1441,7 @@ export default function HomePage() {
             onView={onView}
             onBlockUser={onBlockIntent}
             viewerId={viewerId}
+            viewerUsername={viewerProfile?.username}
             onFollow={onFollow}
             token={token}
             onRemoteUpdate={onRemoteUpdate}
@@ -1138,12 +1451,23 @@ export default function HomePage() {
 
         {loading && <SkeletonList count={3} />}
         <div ref={loadMoreRef} style={{ height: 1 }} aria-hidden />
-        {hasMore && !loading && (
+        {showLoadMore && hasMore && !loading && (
           <button className={styles.loadMore} onClick={handleLoadMore}>
-            Load more
+            {t("feed.loadMore")}
           </button>
         )}
       </div>
+
+      {showSidebar ? (
+        <aside
+          className={styles.rightColumn}
+          aria-label={t("feed.suggestionsAria")}
+        >
+          <div className={styles.rightStack}>
+            <PeopleYouMayKnow token={token} />
+          </div>
+        </aside>
+      ) : null}
 
       {deleteTarget ? (
         <div
@@ -1156,9 +1480,9 @@ export default function HomePage() {
             className={styles.modalCard}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className={styles.modalTitle}>Delete this post?</h3>
+            <h3 className={styles.modalTitle}>{t("delete.title")}</h3>
             <p className={styles.modalBody}>
-              {`${deleteTarget.label}'s post will be removed for everyone. This action cannot be undone.`}
+              {t("delete.body", { name: deleteTarget.label })}
             </p>
             {deleteError ? (
               <div className={styles.inlineError}>{deleteError}</div>
@@ -1169,14 +1493,14 @@ export default function HomePage() {
                 onClick={closeDeleteModal}
                 disabled={deleteSubmitting}
               >
-                Cancel
+                {t("delete.cancel")}
               </button>
               <button
                 className={styles.modalDanger}
                 onClick={confirmDelete}
                 disabled={deleteSubmitting}
               >
-                {deleteSubmitting ? "Deleting..." : "Delete"}
+                {deleteSubmitting ? t("delete.deleting") : t("delete.confirm")}
               </button>
             </div>
           </div>
@@ -1186,9 +1510,9 @@ export default function HomePage() {
       {blockTarget ? (
         <div className={styles.modalOverlay} role="dialog" aria-modal="true">
           <div className={styles.modalCard}>
-            <h3 className={styles.modalTitle}>Block this account?</h3>
+            <h3 className={styles.modalTitle}>{t("block.title")}</h3>
             <p className={styles.modalBody}>
-              {`You are about to block ${blockTarget.label}. They will no longer be able to interact with you.`}
+              {t("block.body", { name: blockTarget.label })}
             </p>
             <div className={styles.modalActions}>
               <button
@@ -1196,14 +1520,14 @@ export default function HomePage() {
                 onClick={() => setBlockTarget(undefined)}
                 disabled={blocking}
               >
-                Cancel
+                {t("block.cancel")}
               </button>
               <button
                 className={styles.modalDanger}
                 onClick={confirmBlock}
                 disabled={blocking}
               >
-                {blocking ? "Blocking..." : "Block"}
+                {blocking ? t("block.blocking") : t("block.confirm")}
               </button>
             </div>
           </div>
@@ -1225,14 +1549,14 @@ export default function HomePage() {
           >
             <div className={styles.modalHeader}>
               <div>
-                <h3 className={styles.modalTitle}>Report this post</h3>
+                <h3 className={styles.modalTitle}>{t("report.title")}</h3>
                 <p className={styles.modalBody}>
-                  {`Reporting @${reportTarget.label} post. Please pick the most accurate reason.`}
+                  {t("report.description", { name: reportTarget.label })}
                 </p>
               </div>
               <button
                 className={styles.closeBtn}
-                aria-label="Close"
+                aria-label={tCommon("close")}
                 onClick={closeReportModal}
               >
                 <IconClose size={24} />
@@ -1241,7 +1565,7 @@ export default function HomePage() {
 
             <div className={styles.reportGrid}>
               <div className={styles.categoryGrid}>
-                {REPORT_GROUPS.map((group) => {
+                {reportGroups.map((group) => {
                   const isActive = reportCategory === group.key;
                   return (
                     <button
@@ -1260,7 +1584,7 @@ export default function HomePage() {
                         setReportReason(
                           group.reasons.length === 1
                             ? group.reasons[0].key
-                            : null
+                            : null,
                         );
                       }}
                     >
@@ -1278,7 +1602,7 @@ export default function HomePage() {
 
               <div className={styles.reasonPanel}>
                 <div className={styles.reasonHeader}>
-                  Select a specific reason
+                  {t("report.selectReason")}
                 </div>
                 {selectedReportGroup ? (
                   <div className={styles.reasonList}>
@@ -1307,15 +1631,15 @@ export default function HomePage() {
                   </div>
                 ) : (
                   <div className={styles.reasonPlaceholder}>
-                    Pick a category first.
+                    {t("report.pickCategory")}
                   </div>
                 )}
 
                 <label className={styles.noteLabel}>
-                  Additional notes (optional)
+                  {t("report.notes.label")}
                   <textarea
                     className={styles.noteInput}
-                    placeholder="Add brief context if needed..."
+                    placeholder={t("report.notes.placeholder")}
                     value={reportNote}
                     onChange={(e) => setReportNote(e.target.value)}
                     maxLength={500}
@@ -1333,138 +1657,28 @@ export default function HomePage() {
                 onClick={closeReportModal}
                 disabled={reportSubmitting}
               >
-                Cancel
+                {t("report.cancel")}
               </button>
               <button
                 className={styles.modalPrimary}
                 disabled={!reportReason || reportSubmitting}
                 onClick={submitReport}
               >
-                {reportSubmitting ? "Submitting..." : "Submit report"}
+                {reportSubmitting ? t("report.submitting") : t("report.submit")}
               </button>
             </div>
           </div>
         </div>
       ) : null}
 
-      {repostTarget ? (
-        <div
-          className={`${styles.modalOverlay} ${
-            repostClosing ? styles.modalOverlayClosing : styles.modalOverlayOpen
-          }`}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeRepostModal}
-        >
-          <div
-            className={`${styles.modalCard} ${styles.repostCard} ${
-              repostClosing ? styles.modalCardClosing : styles.modalCardOpen
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.modalHeader}>
-              <div>
-                <h3 className={styles.modalTitle}>Repost</h3>
-                <p className={styles.modalBody}>
-                  {`Choose how to share @${repostTarget.label}'s ${repostTarget.kind}.`}
-                </p>
-              </div>
-              <button
-                className={styles.closeBtn}
-                onClick={closeRepostModal}
-                aria-label="Close"
-              >
-                <IconClose size={18} />
-              </button>
-            </div>
-
-            <div className={styles.repostGrid}>
-              <button
-                type="button"
-                className={`${styles.repostOption} ${
-                  repostMode === "repost" ? styles.repostOptionActive : ""
-                }`}
-                onClick={() => setRepostMode("repost")}
-              >
-                <span className={styles.repostTitle}>
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="20"
-                    height="20"
-                    fill="currentColor"
-                  >
-                    <path d="M23.615 15.485a.75.75 0 0 1-.75.75h-2.25a.75.75 0 0 1-.75-.75 2.25 2.25 0 0 0-2.25-2.25h-5.46l3.47 3.47a.75.75 0 0 1-1.06 1.06l-4.75-4.75a.75.75 0 0 1 0-1.06l4.75-4.75a.75.75 0 0 1 1.06 1.06l-3.47 3.47h5.46a3.75 3.75 0 0 1 3.75 3.750 0 1 3.75 3.75ZM6.135 15.485h5.46a.75.75 0 0 1 0 1.5h-5.46a3.75 3.75 0 0 1-3.75-3.75 3.75 3.75 0 0 1 3.75-3.75h2.25a.75.75 0 0 1 .75.75v5.25a.75.75 0 0 1-1.28.53l-2.25-2.25a.75.75 0 0 1 1.06-1.06l.97.97v-3.44h-1.5a2.25 2.25 0 0 0-2.25 2.25 2.25 2.25 0 0 0 2.25 2.25Z"></path>
-                  </svg>
-                  Repost only
-                </span>
-                <span className={styles.repostDesc}>
-                  Share the original post without a caption. Likes/Views will be
-                  credited to the original post.
-                </span>
-              </button>
-              <button
-                type="button"
-                className={`${styles.repostOption} ${
-                  repostMode === "quote" ? styles.repostOptionActive : ""
-                }`}
-                onClick={() => setRepostMode("quote")}
-              >
-                <span className={styles.repostTitle}>
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="20"
-                    height="20"
-                    fill="currentColor"
-                  >
-                    <path d="M4.5 7.5a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-9a3 3 0 0 1-3-3v-9Z" opacity="0.1"></path>
-                    <path d="M15.75 2.25H8.25a5.25 5.25 0 0 0-5.25 5.25v8.25a5.25 5.25 0 0 0 5.25 5.25h7.5a5.25 5.25 0 0 0 5.25-5.25V7.5a5.25 5.25 0 0 0-5.25-5.25Zm3.75 13.5a3.75 3.75 0 0 1-3.75 3.75H8.25a3.75 3.75 0 0 1-3.75-3.75V7.5a3.75 3.75 0 0 1 3.75-3.75h7.5a3.75 3.75 0 0 1 3.75 3.75v8.25Z"></path>
-                    <path d="M10.28 11.47a.75.75 0 0 0-1.06-1.06l-1.5 1.5a.75.75 0 0 0 0 1.06l1.5 1.5a.75.75 0 0 0 1.06-1.06l-.97-.97h4.09l-.97.97a.75.75 0 0 0 1.06 1.06l1.5-1.5a.75.75 0 0 0 0-1.06l-1.5-1.5a.75.75 0 0 0-1.06 1.06l.97.97H9.31l.97-.97Z"></path>
-                  </svg>
-                  Quote
-                </span>
-                <span className={styles.repostDesc}>
-                  Add your own caption; comments belong to the quote, but
-                  likes/views still count for the original post.
-                </span>
-              </button>
-            </div>
-
-            {repostMode === "quote" ? (
-              <label className={styles.repostNoteLabel}>
-                Caption (optional)
-                <textarea
-                  className={styles.repostTextarea}
-                  value={repostNote}
-                  onChange={(e) => setRepostNote(e.target.value)}
-                  maxLength={500}
-                  placeholder="Add a few thoughts..."
-                />
-              </label>
-            ) : null}
-
-            {repostError ? (
-              <div className={styles.inlineError}>{repostError}</div>
-            ) : null}
-
-            <div className={styles.modalActions}>
-              <button
-                className={styles.modalSecondary}
-                onClick={closeRepostModal}
-                disabled={repostSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className={styles.modalPrimary}
-                onClick={submitRepost}
-                disabled={!repostMode || repostSubmitting}
-              >
-                {repostSubmitting ? "Sharing..." : "Share"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <RepostOverlay
+        target={repostTarget}
+        onRequestClose={() => setRepostTarget(null)}
+        onQuickRepost={handleQuickRepost}
+        onShareQuote={handleShareQuote}
+        quoteCharLimit={QUOTE_CHAR_LIMIT}
+        animationMs={REPORT_ANIMATION_MS}
+      />
 
       {toastMessage ? <div className={styles.toast}>{toastMessage}</div> : null}
     </div>
@@ -1476,6 +1690,8 @@ function FeedCard({
   liked,
   saved,
   flags,
+  repostHeartsBoost,
+  cardClassName,
   onLike,
   onSave,
   onShare,
@@ -1488,6 +1704,7 @@ function FeedCard({
   onView,
   onBlockUser,
   viewerId,
+  viewerUsername,
   onFollow,
   token,
   onRemoteUpdate,
@@ -1497,9 +1714,11 @@ function FeedCard({
   liked: boolean;
   saved: boolean;
   flags: LocalFlags;
+  repostHeartsBoost?: number;
+  cardClassName?: string;
   onLike: (postId: string, liked: boolean) => void;
   onSave: (postId: string, saved: boolean) => void;
-  onShare: (postId: string) => void;
+  onShare: (postId: string, anchor?: DOMRect | null) => void;
   onHide: (postId: string) => void;
   onToggleComments: (postId: string, allowComments: boolean) => void;
   onToggleHideLikeCount: (postId: string, hideLikeCount: boolean) => void;
@@ -1509,11 +1728,14 @@ function FeedCard({
   onView: (postId: string, durationMs?: number) => void;
   onBlockUser: (userId?: string, label?: string) => void | Promise<void>;
   viewerId?: string;
+  viewerUsername?: string;
   onFollow: (authorId: string, nextFollow: boolean) => void;
   token: string | null;
   onRemoteUpdate: (postId: string, patch: FeedRemotePatch) => void;
   onPersistFeedCache?: () => void;
 }) {
+  const t = useTranslations("home");
+  const tCommon = useTranslations("common");
   const {
     id,
     authorId,
@@ -1523,6 +1745,7 @@ function FeedCard({
     author,
     content,
     createdAt,
+    publishedAt,
     media,
     stats,
     mentions,
@@ -1533,7 +1756,44 @@ function FeedCard({
     allowComments,
     allowDownload,
     hideLikeCount,
+    repostOf,
+    repostOfAuthorId,
+    repostOfAuthorUsername,
+    repostOfAuthorDisplayName,
+    repostOfAuthorAvatarUrl,
+    notificationsMutedUntil,
+    notificationsMutedIndefinitely,
   } = data;
+
+  const displayAt = publishedAt || createdAt;
+
+  const mediaKey = useMemo(() => {
+    if (!Array.isArray(media) || media.length === 0) return "";
+    return media
+      .map((item) => `${item?.type ?? ""}:${item?.url ?? ""}`)
+      .join("|");
+  }, [media]);
+
+  const hashtagsKey = Array.isArray(hashtags) ? hashtags.join("\u0001") : "";
+  const mentionsKey = Array.isArray(mentions) ? mentions.join("\u0001") : "";
+  const stableHashtags = useMemo(
+    () => (Array.isArray(hashtags) ? hashtags : []),
+    // Depend on contents, not reference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hashtagsKey],
+  );
+  const stableMentions = useMemo(
+    () => (Array.isArray(mentions) ? mentions : []),
+    // Depend on contents, not reference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mentionsKey],
+  );
+  const [captionMentionMap, setCaptionMentionMap] = useState<
+    Record<string, string>
+  >({});
+  const locationKey =
+    typeof location === "string" ? location : (location as any)?.label;
+  const stableLocation = typeof locationKey === "string" ? locationKey : "";
 
   const displayName = authorDisplayName || author?.displayName;
   const username = authorUsername || author?.username;
@@ -1543,6 +1803,74 @@ function FeedCard({
   const lastViewAt = useRef<number>(0);
   const router = useRouter();
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const mentionLookupKey = useMemo(() => {
+    const handles = new Set<string>();
+    stableMentions.forEach((m) => {
+      const handle = m.toString().trim().replace(/^@/, "").toLowerCase();
+      if (handle) handles.add(handle);
+    });
+    extractMentionsFromCaption(content || "").forEach((h) => handles.add(h));
+    if (!handles.size) return "";
+    return Array.from(handles).sort().join("|");
+  }, [mentionsKey, content]);
+
+  useEffect(() => {
+    if (!mentionLookupKey) {
+      setCaptionMentionMap({});
+      return;
+    }
+    if (!token) {
+      setCaptionMentionMap({});
+      return;
+    }
+
+    let cancelled = false;
+    const handles = mentionLookupKey.split("|").filter(Boolean).slice(0, 20);
+
+    (async () => {
+      const results = await Promise.all(
+        handles.map(async (handle) => {
+          try {
+            const res = await searchProfiles({
+              token,
+              query: handle,
+              limit: 5,
+            });
+            const exact = res.items.find(
+              (item) => item.username?.toLowerCase() === handle,
+            );
+            const id = exact?.userId || exact?.id;
+            return id ? [handle, String(id)] : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      if (cancelled) return;
+      const nextMap: Record<string, string> = {};
+      results.forEach((entry) => {
+        if (!entry) return;
+        nextMap[entry[0]] = entry[1];
+      });
+      setCaptionMentionMap(nextMap);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mentionLookupKey, token]);
+
+  useEffect(() => {
+    if (!viewerUsername || !viewerId) return;
+    const key = viewerUsername.toLowerCase();
+    const value = String(viewerId);
+    setCaptionMentionMap((prev) => {
+      if (prev[key] === value) return prev;
+      return { ...prev, [key]: value };
+    });
+  }, [viewerUsername, viewerId]);
 
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
@@ -1588,7 +1916,7 @@ function FeedCard({
           }
         });
       },
-      { threshold: 0.5 }
+      { threshold: 0.5 },
     );
     observer.observe(el);
     return () => {
@@ -1618,7 +1946,7 @@ function FeedCard({
           }
         });
       },
-      { threshold: 0.25 }
+      { threshold: 0.25 },
     );
 
     observer.observe(el);
@@ -1670,8 +1998,13 @@ function FeedCard({
   const [locationHighlight, setLocationHighlight] = useState(-1);
   const [editAllowComments, setEditAllowComments] = useState(allowComments);
   const [editAllowDownload, setEditAllowDownload] = useState(
-    allowDownload ?? false
+    allowDownload ?? false,
   );
+  const [lockedEditAllowDownload, setLockedEditAllowDownload] = useState<
+    boolean | null
+  >(null);
+  const [lockedEditAllowDownloadLoading, setLockedEditAllowDownloadLoading] =
+    useState(false);
   const [editHideLikeCount, setEditHideLikeCount] = useState(hideLikeCount);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
@@ -1682,6 +2015,12 @@ function FeedCard({
   >(visibility ?? "public");
   const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [visibilityError, setVisibilityError] = useState<string>("");
+  const [muteModalOpen, setMuteModalOpen] = useState(false);
+  const [muteOption, setMuteOption] = useState("5m");
+  const [muteCustomDate, setMuteCustomDate] = useState("");
+  const [muteCustomTime, setMuteCustomTime] = useState("");
+  const [muteError, setMuteError] = useState<string>("");
+  const [muteSaving, setMuteSaving] = useState(false);
   const visibilityOptions: Array<{
     value: "public" | "followers" | "private";
     title: string;
@@ -1689,20 +2028,34 @@ function FeedCard({
   }> = [
     {
       value: "public",
-      title: "Public",
-      description: "Anyone can view this post",
+      title: t("visibility.options.public.title"),
+      description: t("visibility.options.public.description"),
     },
     {
       value: "followers",
-      title: "Friends / Following",
-      description: "Only followers can view this post",
+      title: t("visibility.options.followers.title"),
+      description: t("visibility.options.followers.description"),
     },
     {
       value: "private",
-      title: "Private",
-      description: "Only you can view this post",
+      title: t("visibility.options.private.title"),
+      description: t("visibility.options.private.description"),
     },
   ];
+
+  const muteOptions = useMemo(
+    () => [
+      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
+      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
+      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
+      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
+      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
+      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: "Until I turn it back on", ms: null },
+      { key: "custom", label: "Choose date & time", ms: null },
+    ],
+    [],
+  );
 
   useEffect(() => {
     setVisibilitySelected(visibility ?? "public");
@@ -1714,9 +2067,9 @@ function FeedCard({
 
   const resetEditState = useCallback(() => {
     setEditCaption(content || "");
-    setEditHashtags(hashtags || []);
+    setEditHashtags(stableHashtags);
     setHashtagDraft("");
-    setEditMentions(mentions || []);
+    setEditMentions(stableMentions);
     setMentionDraft("");
     setMentionSuggestions([]);
     setMentionOpen(false);
@@ -1724,8 +2077,8 @@ function FeedCard({
     setMentionError("");
     setMentionHighlight(-1);
     setActiveMentionRange(null);
-    setEditLocation(location || "");
-    setLocationQuery(location || "");
+    setEditLocation(stableLocation || "");
+    setLocationQuery(stableLocation || "");
     setLocationSuggestions([]);
     setLocationOpen(false);
     setLocationLoading(false);
@@ -1740,15 +2093,37 @@ function FeedCard({
     allowComments,
     allowDownload,
     content,
-    hashtags,
     hideLikeCount,
-    location,
-    mentions,
+    stableHashtags,
+    stableLocation,
+    stableMentions,
   ]);
 
+  const resetKey = useMemo(
+    () =>
+      `${id}\u0001${content ?? ""}\u0001${allowComments ? 1 : 0}\u0001${
+        allowDownload ? 1 : 0
+      }\u0001${hideLikeCount ? 1 : 0}\u0001${hashtagsKey}\u0001${mentionsKey}\u0001${
+        stableLocation
+      }`,
+    [
+      id,
+      content,
+      allowComments,
+      allowDownload,
+      hideLikeCount,
+      hashtagsKey,
+      mentionsKey,
+      stableLocation,
+    ],
+  );
+
   useEffect(() => {
+    // Reset local edit UI only when switching to a different post or its core
+    // editable fields change. Use a stable key to avoid dependency churn.
     resetEditState();
-  }, [resetEditState, id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1787,7 +2162,7 @@ function FeedCard({
   };
 
   const handleCaptionChange = (
-    event: React.ChangeEvent<HTMLTextAreaElement>
+    event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
     const value = event.target.value;
     const caret = event.target.selectionStart ?? value.length;
@@ -1837,7 +2212,7 @@ function FeedCard({
       e.preventDefault();
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
-        prev + 1 < mentionSuggestions.length ? prev + 1 : 0
+        prev + 1 < mentionSuggestions.length ? prev + 1 : 0,
       );
       return;
     }
@@ -1845,7 +2220,7 @@ function FeedCard({
       e.preventDefault();
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1,
       );
       return;
     }
@@ -1878,7 +2253,7 @@ function FeedCard({
       setMentionSuggestions([]);
       setMentionOpen(false);
       setMentionHighlight(-1);
-      setMentionError("Sign in to mention users");
+      setMentionError(t("mention.signIn"));
       return;
     }
 
@@ -1897,14 +2272,14 @@ function FeedCard({
         setMentionOpen(res.items.length > 0);
         setMentionHighlight(res.items.length ? 0 : -1);
         if (!res.items.length) {
-          setMentionError("User not found");
+          setMentionError(t("mention.userNotFound"));
         }
       } catch (err) {
         if (cancelled) return;
         setMentionSuggestions([]);
         setMentionOpen(false);
         setMentionHighlight(-1);
-        setMentionError("User not found");
+        setMentionError(t("mention.userNotFound"));
       } finally {
         if (!cancelled) setMentionLoading(false);
       }
@@ -2011,7 +2386,7 @@ function FeedCard({
         setLocationSuggestions([]);
         setLocationOpen(false);
         setLocationHighlight(-1);
-        setLocationError("No suggestions found, try different keywords.");
+        setLocationError(t("edit.location.noSuggestionsError"));
       } finally {
         if (!controller.signal.aborted) setLocationLoading(false);
       }
@@ -2022,6 +2397,43 @@ function FeedCard({
       clearTimeout(timer);
     };
   }, [editOpen, locationQuery]);
+
+  useEffect(() => {
+    if (!editOpen) {
+      setLockedEditAllowDownload(null);
+      setLockedEditAllowDownloadLoading(false);
+      return;
+    }
+    if (!token || !repostOf) {
+      setLockedEditAllowDownload(null);
+      setLockedEditAllowDownloadLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLockedEditAllowDownloadLoading(true);
+    (async () => {
+      try {
+        const original = await fetchPostDetail({
+          token,
+          postId: String(repostOf),
+        });
+        if (cancelled) return;
+        const next = Boolean(original?.allowDownload);
+        setLockedEditAllowDownload(next);
+        setEditAllowDownload(next);
+      } catch {
+        if (cancelled) return;
+        setLockedEditAllowDownload(null);
+      } finally {
+        if (!cancelled) setLockedEditAllowDownloadLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editOpen, repostOf, token]);
 
   const pickLocation = (label: string) => {
     setEditLocation(label);
@@ -2037,14 +2449,14 @@ function FeedCard({
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setLocationHighlight((prev) =>
-        prev + 1 < locationSuggestions.length ? prev + 1 : 0
+        prev + 1 < locationSuggestions.length ? prev + 1 : 0,
       );
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
       setLocationHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1,
       );
       return;
     }
@@ -2061,12 +2473,12 @@ function FeedCard({
     setEditSuccess("");
 
     if (!token) {
-      setEditError("Please sign in to edit posts");
+      setEditError(t("edit.signInToEdit"));
       return;
     }
 
     const normalizedHashtags = Array.from(
-      new Set(editHashtags.map((t) => normalizeHashtag(t.toString())))
+      new Set(editHashtags.map((t) => normalizeHashtag(t.toString()))),
     ).filter(Boolean);
 
     const normalizedMentions = Array.from(
@@ -2074,41 +2486,46 @@ function FeedCard({
         [
           ...extractMentionsFromCaption(editCaption || ""),
           ...editMentions.map((t) =>
-            t.toString().trim().replace(/^@/, "").toLowerCase()
+            t.toString().trim().replace(/^@/, "").toLowerCase(),
           ),
-        ].filter(Boolean)
-      )
+        ].filter(Boolean),
+      ),
     );
 
     const trimmedLocation = editLocation.trim();
 
-    const payload = {
+    const isRepost = Boolean(repostOf);
+    const payload: any = {
       content: editCaption || "",
       hashtags: normalizedHashtags,
       mentions: normalizedMentions,
       location: trimmedLocation || undefined,
       allowComments: editAllowComments,
-      allowDownload: editAllowDownload,
       hideLikeCount: editHideLikeCount,
-    } as const;
+    };
+
+    if (!isRepost) {
+      payload.allowDownload = editAllowDownload;
+    }
 
     try {
       setEditSaving(true);
       const updated = await updatePost({ token, postId: id, payload });
       onRemoteUpdate(id, updated);
-      setEditSuccess("Post updated");
+      setEditSuccess(t("edit.updated"));
       setEditOpen(false);
     } catch (err: any) {
       const message =
         (err && typeof err === "object" && "message" in err
           ? (err as { message?: string }).message
-          : null) || "Failed to update post";
+          : null) || t("edit.updateFailed");
       setEditError(message);
     } finally {
       setEditSaving(false);
     }
   };
   const [mediaIndex, setMediaIndex] = useState(0);
+  const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [soundOn, setSoundOn] = useState(false);
   const lastTimeRef = useRef(0);
@@ -2135,6 +2552,8 @@ function FeedCard({
     } catch {}
   }, [id, mediaIndex, soundOn]);
 
+  const targetPostId = repostOf || id;
+
   const goToPost = useCallback(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem(FEED_CACHE_INTENT_KEY, "1");
@@ -2144,11 +2563,11 @@ function FeedCard({
     persistResume();
 
     if (typeof window !== "undefined") {
-      window.location.href = `/post/${id}`;
+      window.location.href = `/post/${targetPostId}`;
     } else {
-      router.push(`/post/${id}`);
+      router.push(`/post/${targetPostId}`);
     }
-  }, [id, router, persistResume, onPersistFeedCache]);
+  }, [targetPostId, router, persistResume, onPersistFeedCache]);
 
   const quickOpenPost = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -2192,7 +2611,7 @@ function FeedCard({
     }
     setMediaIndex((prev) => (prev >= mediaCount ? 0 : prev));
     setSoundOn(false);
-  }, [media]);
+  }, [mediaKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2220,7 +2639,7 @@ function FeedCard({
       resumeAppliedRef.current = true;
     } catch {}
     sessionStorage.removeItem(key);
-  }, [id, media]);
+  }, [id, mediaKey]);
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -2237,7 +2656,7 @@ function FeedCard({
       const safe = Number.isFinite(duration)
         ? Math.min(
             Math.max(resumeTimeRef.current, 0),
-            Math.max(duration - 0.2, 0)
+            Math.max(duration - 0.2, 0),
           )
         : Math.max(resumeTimeRef.current, 0);
       try {
@@ -2277,7 +2696,7 @@ function FeedCard({
       observer.disconnect();
       videoEl.pause();
     };
-  }, [mediaIndex, media]);
+  }, [mediaIndex, mediaKey]);
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -2322,7 +2741,10 @@ function FeedCard({
     if (!content) return null;
     const parts: Array<string | JSX.Element> = [];
     const normalizedMentions = new Set(
-      (mentions || []).map((m) => m.toLowerCase())
+      (stableMentions || []).map((m) => m.toLowerCase()),
+    );
+    const normalizedHashtags = new Set(
+      (stableHashtags || []).map((tag) => tag.toLowerCase()),
     );
     const pushText = (text: string, keyBase: string) => {
       const chunks = text.split("\n");
@@ -2334,7 +2756,7 @@ function FeedCard({
       });
     };
 
-    const regex = /@([a-zA-Z0-9_.]+)/g;
+    const regex = /(@[a-zA-Z0-9_.]+|#[a-zA-Z0-9_]+)/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = regex.exec(content))) {
@@ -2342,23 +2764,52 @@ function FeedCard({
       if (start > lastIndex) {
         pushText(content.slice(lastIndex, start), `text-${start}`);
       }
-      const handle = match[1];
-      const display = `@${handle}`;
-      const canLink =
-        normalizedMentions.size === 0 ||
-        normalizedMentions.has(handle.toLowerCase());
-      if (canLink) {
-        parts.push(
-          <a
-            key={`${handle}-${start}`}
-            href={`/profiles/${handle}`}
-            className={styles.mentionLink}
-          >
-            {display}
-          </a>
-        );
-      } else {
-        pushText(display, `text-${start}-plain`);
+      const token = match[0];
+      if (token.startsWith("@")) {
+        const handle = token.slice(1);
+        const display = `@${handle}`;
+        const handleKey = handle.toLowerCase();
+        const canLink =
+          normalizedMentions.size === 0 || normalizedMentions.has(handleKey);
+        const selfId =
+          viewerUsername &&
+          viewerId &&
+          viewerUsername.toLowerCase() === handleKey
+            ? String(viewerId)
+            : undefined;
+        const targetId = captionMentionMap[handleKey] || selfId;
+        if (canLink && targetId) {
+          parts.push(
+            <a
+              key={`${handle}-${start}`}
+              href={`/profile/${encodeURIComponent(targetId)}`}
+              className={styles.mentionLink}
+            >
+              {display}
+            </a>,
+          );
+        } else {
+          pushText(display, `text-${start}-plain`);
+        }
+      } else if (token.startsWith("#")) {
+        const tag = token.slice(1);
+        const display = `#${tag}`;
+        const canLink =
+          normalizedHashtags.size === 0 ||
+          normalizedHashtags.has(tag.toLowerCase());
+        if (canLink) {
+          parts.push(
+            <a
+              key={`${tag}-${start}`}
+              href={`/hashtag/${encodeURIComponent(tag)}`}
+              className={styles.hashtagLink}
+            >
+              {display}
+            </a>,
+          );
+        } else {
+          pushText(display, `text-${start}-plain`);
+        }
       }
       lastIndex = regex.lastIndex;
     }
@@ -2366,21 +2817,33 @@ function FeedCard({
       pushText(content.slice(lastIndex), `text-tail-${lastIndex}`);
     }
     return parts;
-  }, [content, mentions]);
+  }, [content, mentionsKey, hashtagsKey, captionMentionMap]);
+
+  const captionMeasureKey = useMemo(
+    () => `${content}\u0001${mentionsKey}\u0001${hashtagsKey}`,
+    [content, mentionsKey, hashtagsKey],
+  );
+  const lastCaptionMeasureKeyRef = useRef<string>("");
 
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
-    const measure = () => {
-      const lineHeight = parseFloat(getComputedStyle(el).lineHeight || "0");
-      if (!lineHeight) return;
-      const lines = el.scrollHeight / lineHeight;
-      const shouldCollapse = lines > 3.2;
-      setCanExpand(shouldCollapse);
-      setCollapsed((prev) => (shouldCollapse ? true : false));
-    };
-    measure();
-  }, [content, captionNodes]);
+
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight || "0");
+    if (!lineHeight) return;
+    const lines = el.scrollHeight / lineHeight;
+    const shouldCollapse = lines > 3.2;
+
+    setCanExpand((prev) => (prev === shouldCollapse ? prev : shouldCollapse));
+
+    if (!shouldCollapse) {
+      setCollapsed((prev) => (prev === false ? prev : false));
+    } else if (lastCaptionMeasureKeyRef.current !== captionMeasureKey) {
+      setCollapsed((prev) => (prev === true ? prev : true));
+    }
+
+    lastCaptionMeasureKeyRef.current = captionMeasureKey;
+  }, [captionMeasureKey]);
 
   const authorLine = useMemo(() => {
     if (displayName) return displayName;
@@ -2392,24 +2855,45 @@ function FeedCard({
   const authorOwnerId = authorId || author?.id;
   const isSelf = Boolean(viewerId && authorOwnerId === viewerId);
   const shouldHideLikeStat = Boolean(hideLikeCount) && !isSelf;
+  const displayHearts =
+    (stats.hearts ?? 0) + (repostOf ? 0 : (repostHeartsBoost ?? 0));
   const isFollowing = Boolean(flags?.following);
   const initialFollowingRef = useRef(isFollowing);
   const followToggledRef = useRef(false);
+  const repostSourceLabel =
+    repostOfAuthorDisplayName ||
+    (repostOfAuthorUsername ? `@${repostOfAuthorUsername}` : null);
   const commentsToggleLabel = allowComments
-    ? "Turn off comments"
-    : "Turn on comments";
-  const hideLikeToggleLabel = hideLikeCount ? "Show like" : "Hide like";
+    ? t("menu.turnOffComments")
+    : t("menu.turnOnComments");
+  const hideLikeToggleLabel = hideLikeCount
+    ? t("menu.showLike")
+    : t("menu.hideLike");
   const showInlineFollow =
     !isSelf &&
     Boolean(authorOwnerId) &&
     (!initialFollowingRef.current || followToggledRef.current || !isFollowing);
+
+  const shareCount = stats.reposts ?? stats.shares ?? 0;
+
+  const isMutedForPost = useMemo(() => {
+    if (!isSelf) return false;
+    if (notificationsMutedIndefinitely) return true;
+    if (notificationsMutedUntil) {
+      const dt = new Date(notificationsMutedUntil);
+      if (!Number.isNaN(dt.getTime()) && dt.getTime() > Date.now()) {
+        return true;
+      }
+    }
+    return false;
+  }, [isSelf, notificationsMutedIndefinitely, notificationsMutedUntil]);
 
   const disableVisibilityUpdate =
     visibilitySaving || visibilitySelected === (visibility ?? "public");
 
   const submitVisibilityUpdate = async () => {
     if (!token) {
-      setVisibilityError("Please sign in");
+      setVisibilityError(t("visibility.signIn"));
       return;
     }
     if (disableVisibilityUpdate) return;
@@ -2426,7 +2910,7 @@ function FeedCard({
       onRemoteUpdate(id, { visibility: visibilitySelected });
       setVisibilityModalOpen(false);
     } catch (err: any) {
-      setVisibilityError(err?.message || "Failed to update visibility");
+      setVisibilityError(err?.message || t("visibility.updateFailed"));
     } finally {
       setVisibilitySaving(false);
     }
@@ -2435,6 +2919,101 @@ function FeedCard({
   const closeVisibilityModal = () => {
     if (visibilitySaving) return;
     setVisibilityModalOpen(false);
+  };
+
+  const openMuteModal = () => {
+    setMuteError("");
+    setMuteOption("5m");
+    setMuteCustomDate("");
+    setMuteCustomTime("");
+    setMuteModalOpen(true);
+  };
+
+  const closeMuteModal = () => {
+    if (muteSaving) return;
+    setMuteModalOpen(false);
+  };
+
+  const handleEnablePostNotifications = async () => {
+    if (!token) {
+      setMuteError(t("visibility.signIn"));
+      return;
+    }
+    setMuteSaving(true);
+    setMuteError("");
+    try {
+      const res = await updatePostNotificationMute({
+        token,
+        postId: id,
+        enabled: true,
+      });
+      onRemoteUpdate(id, {
+        notificationsMutedUntil: res.mutedUntil ?? null,
+        notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+      });
+      setMuteModalOpen(false);
+    } catch (err: any) {
+      setMuteError(err?.message || t("visibility.updateFailed"));
+    } finally {
+      setMuteSaving(false);
+    }
+  };
+
+  const handleSavePostMute = async () => {
+    if (!token) {
+      setMuteError(t("visibility.signIn"));
+      return;
+    }
+
+    setMuteSaving(true);
+    setMuteError("");
+
+    try {
+      let mutedUntil: string | null = null;
+      let mutedIndefinitely = false;
+
+      const selected = muteOptions.find((opt) => opt.key === muteOption);
+
+      if (muteOption === "until") {
+        mutedIndefinitely = true;
+      } else if (muteOption === "custom") {
+        const iso = buildLocalDateTimeIso(muteCustomDate, muteCustomTime);
+        if (!iso) {
+          setMuteError("Please select a valid date and time.");
+          setMuteSaving(false);
+          return;
+        }
+        const dt = new Date(iso);
+        if (dt.getTime() <= Date.now()) {
+          setMuteError("Please choose a future time.");
+          setMuteSaving(false);
+          return;
+        }
+        mutedUntil = iso;
+      } else if (selected?.ms) {
+        mutedUntil = new Date(Date.now() + selected.ms).toISOString();
+      } else {
+        mutedIndefinitely = true;
+      }
+
+      const res = await updatePostNotificationMute({
+        token,
+        postId: id,
+        mutedUntil,
+        mutedIndefinitely,
+      });
+
+      onRemoteUpdate(id, {
+        notificationsMutedUntil: res.mutedUntil ?? null,
+        notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+      });
+
+      setMuteModalOpen(false);
+    } catch (err: any) {
+      setMuteError(err?.message || t("visibility.updateFailed"));
+    } finally {
+      setMuteSaving(false);
+    }
   };
 
   const editModal = (
@@ -2450,11 +3029,11 @@ function FeedCard({
       >
         <div className={styles.modalHeader}>
           <div>
-            <h3 className={styles.modalTitle}>Edit post</h3>
+            <h3 className={styles.modalTitle}>{t("edit.title")}</h3>
           </div>
           <button
             className={styles.closeBtn}
-            aria-label="Close"
+            aria-label={tCommon("close")}
             onClick={closeEditModal}
             type="button"
           >
@@ -2465,23 +3044,23 @@ function FeedCard({
         <form className={styles.editForm} onSubmit={handleEditSubmit}>
           <label className={styles.editLabel}>
             <div className={styles.editLabelRow}>
-              <span className={styles.editLabelText}>Caption</span>
+              <span className={styles.editLabelText}>{t("edit.caption")}</span>
               <div className={styles.emojiWrap} ref={editEmojiRef}>
                 <button
                   type="button"
                   className={styles.emojiButton}
                   onClick={() => setEditEmojiOpen((prev) => !prev)}
-                  aria-label="Add emoji"
+                  aria-label={t("edit.addEmoji")}
                 >
                   <svg
-                    aria-label="Emoji icon"
+                    aria-label={t("edit.emojiIcon")}
                     fill="currentColor"
                     height="20"
                     role="img"
                     viewBox="0 0 24 24"
                     width="20"
                   >
-                    <title>Emoji icon</title>
+                    <title>{t("edit.emojiIcon")}</title>
                     <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
                   </svg>
                 </button>
@@ -2518,7 +3097,7 @@ function FeedCard({
                 }}
                 rows={4}
                 maxLength={2200}
-                placeholder="Write something..."
+                placeholder={t("edit.placeholder")}
               />
               <span className={styles.charCount}>
                 {editCaption.length}/2200
@@ -2529,11 +3108,11 @@ function FeedCard({
           {mentionOpen ? (
             <div className={styles.mentionDropdown}>
               {mentionLoading ? (
-                <div className={styles.mentionItem}>Searching...</div>
+                <div className={styles.mentionItem}>{t("edit.searching")}</div>
               ) : null}
               {!mentionLoading && mentionSuggestions.length === 0 ? (
                 <div className={styles.mentionItem}>
-                  {mentionError || "No matches"}
+                  {mentionError || t("edit.noMatches")}
                 </div>
               ) : null}
               {mentionSuggestions.map((opt, idx) => {
@@ -2581,7 +3160,7 @@ function FeedCard({
 
           <div className={styles.editField}>
             <div className={styles.editLabelRow}>
-              <span className={styles.editLabelText}>Hashtags</span>
+              <span className={styles.editLabelText}>{t("edit.hashtags")}</span>
             </div>
             <div className={styles.chipRow}>
               {editHashtags.map((tag) => (
@@ -2591,15 +3170,15 @@ function FeedCard({
                     type="button"
                     className={styles.chipRemove}
                     onClick={() => removeHashtag(tag)}
-                    aria-label={`Remove ${tag}`}
+                    aria-label={t("edit.removeHashtag", { tag })}
                   >
-                    Ã—
+                    ×
                   </button>
                 </span>
               ))}
               <input
                 className={styles.editInput}
-                placeholder="Add hashtag"
+                placeholder={t("edit.addHashtag")}
                 value={hashtagDraft}
                 onChange={(e) => setHashtagDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -2614,11 +3193,13 @@ function FeedCard({
 
           <div className={styles.editField}>
             <div className={styles.editLabelRow}>
-              <span className={styles.editLabelText}>Location</span>
+              <span className={styles.editLabelText}>
+                {t("edit.location.label")}
+              </span>
             </div>
             <input
               className={styles.editInput}
-              placeholder="Add a place"
+              placeholder={t("edit.location.placeholder")}
               value={locationQuery}
               onChange={(e) => {
                 setEditLocation(e.target.value);
@@ -2632,11 +3213,13 @@ function FeedCard({
             {locationOpen ? (
               <div className={styles.locationDropdown}>
                 {locationLoading ? (
-                  <div className={styles.locationItem}>Searching...</div>
+                  <div className={styles.locationItem}>
+                    {t("edit.searching")}
+                  </div>
                 ) : null}
                 {!locationLoading && locationSuggestions.length === 0 ? (
                   <div className={styles.locationItem}>
-                    {locationError || "No suggestions"}
+                    {locationError || t("edit.location.noSuggestions")}
                   </div>
                 ) : null}
                 {locationSuggestions.map((opt, idx) => {
@@ -2666,9 +3249,11 @@ function FeedCard({
                 onChange={() => setEditAllowComments((prev) => !prev)}
               />
               <div>
-                <p className={styles.switchTitle}>Allow comments</p>
+                <p className={styles.switchTitle}>
+                  {t("edit.allowComments.title")}
+                </p>
                 <p className={styles.switchHint}>
-                  Enable to receive feedback from everyone
+                  {t("edit.allowComments.hint")}
                 </p>
               </div>
             </label>
@@ -2676,13 +3261,26 @@ function FeedCard({
             <label className={styles.switchRow}>
               <input
                 type="checkbox"
-                checked={editAllowDownload}
-                onChange={() => setEditAllowDownload((prev) => !prev)}
+                checked={
+                  repostOf
+                    ? Boolean(lockedEditAllowDownload ?? editAllowDownload)
+                    : editAllowDownload
+                }
+                disabled={Boolean(repostOf)}
+                onChange={
+                  repostOf ? undefined : () => setEditAllowDownload((p) => !p)
+                }
               />
               <div>
-                <p className={styles.switchTitle}>Allow downloads</p>
+                <p className={styles.switchTitle}>
+                  {t("edit.allowDownloads.title")}
+                </p>
                 <p className={styles.switchHint}>
-                  Share the original file with people you trust
+                  {repostOf
+                    ? lockedEditAllowDownloadLoading
+                      ? t("edit.allowDownloads.inheritedLoading")
+                      : t("edit.allowDownloads.inheritedLocked")
+                    : t("edit.allowDownloads.hint")}
                 </p>
               </div>
             </label>
@@ -2694,10 +3292,8 @@ function FeedCard({
                 onChange={() => setEditHideLikeCount((prev) => !prev)}
               />
               <div>
-                <p className={styles.switchTitle}>Hide like</p>
-                <p className={styles.switchHint}>
-                  Viewers wonâ€™t see the number of likes on this post
-                </p>
+                <p className={styles.switchTitle}>{t("edit.hideLike.title")}</p>
+                <p className={styles.switchHint}>{t("edit.hideLike.hint")}</p>
               </div>
             </label>
           </div>
@@ -2716,14 +3312,14 @@ function FeedCard({
               onClick={closeEditModal}
               disabled={editSaving}
             >
-              Cancel
+              {t("edit.cancel")}
             </button>
             <button
               type="submit"
               className={styles.modalPrimary}
               disabled={editSaving}
             >
-              {editSaving ? "Saving..." : "Save changes"}
+              {editSaving ? t("edit.saving") : t("edit.saveChanges")}
             </button>
           </div>
         </form>
@@ -2744,12 +3340,12 @@ function FeedCard({
       >
         <div className={styles.modalHeader}>
           <div>
-            <h3 className={styles.modalTitle}>Edit visibility</h3>
-            <p className={styles.modalBody}>Choose who can see this post.</p>
+            <h3 className={styles.modalTitle}>{t("visibility.title")}</h3>
+            <p className={styles.modalBody}>{t("visibility.description")}</p>
           </div>
           <button
             className={styles.closeBtn}
-            aria-label="Close"
+            aria-label={tCommon("close")}
             onClick={closeVisibilityModal}
           >
             <IconClose size={18} />
@@ -2768,7 +3364,7 @@ function FeedCard({
                 onClick={() => setVisibilitySelected(opt.value)}
               >
                 <span className={styles.visibilityRadio}>
-                  {active ? "âœ“" : ""}
+                  {active ? "✓" : ""}
                 </span>
                 <span className={styles.visibilityCopy}>
                   <span className={styles.visibilityTitle}>{opt.title}</span>
@@ -2791,14 +3387,102 @@ function FeedCard({
             onClick={closeVisibilityModal}
             disabled={visibilitySaving}
           >
-            Cancel
+            {t("visibility.cancel")}
           </button>
           <button
             className={styles.modalPrimary}
             onClick={submitVisibilityUpdate}
             disabled={disableVisibilityUpdate}
           >
-            {visibilitySaving ? "Updating..." : "Update visibility"}
+            {visibilitySaving
+              ? t("visibility.updating")
+              : t("visibility.update")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const muteModal = (
+    <div
+      className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+      role="dialog"
+      aria-modal="true"
+      onClick={closeMuteModal}
+    >
+      <div
+        className={`${styles.modalCard} ${styles.modalCardOpen}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={styles.modalHeader}>
+          <div>
+            <h3 className={styles.modalTitle}>Mute notifications</h3>
+            <p className={styles.modalBody}>
+              Choose how long to pause alerts for this post.
+            </p>
+          </div>
+          <button
+            className={styles.closeBtn}
+            aria-label={tCommon("close")}
+            onClick={closeMuteModal}
+          >
+            <IconClose size={18} />
+          </button>
+        </div>
+
+        <div className={styles.muteOptionGrid}>
+          {muteOptions.map((option) => (
+            <button
+              key={option.key}
+              className={`${styles.muteOption} ${
+                muteOption === option.key ? styles.muteOptionActive : ""
+              }`}
+              onClick={() => setMuteOption(option.key)}
+              type="button"
+            >
+              <span className={styles.muteOptionTitle}>{option.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {muteOption === "custom" ? (
+          <div className={styles.muteCustomRow}>
+            <div className={styles.mutePicker}>
+              <label className={styles.editLabel}>Date</label>
+              <DateSelect
+                value={muteCustomDate}
+                onChange={setMuteCustomDate}
+                minDate={new Date()}
+                maxDate={null}
+                placeholder="yyyy-mm-dd"
+              />
+            </div>
+            <div className={styles.mutePicker}>
+              <label className={styles.editLabel}>Time</label>
+              <TimeSelect
+                value={muteCustomTime}
+                onChange={setMuteCustomTime}
+                selectedDate={muteCustomDate}
+                minDateTime={new Date()}
+                disabled={!muteCustomDate}
+                placeholder="hh:mm"
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {muteError ? (
+          <div className={styles.inlineError}>{muteError}</div>
+        ) : null}
+
+        <div className={styles.modalActions}>
+          <button
+            type="button"
+            className={styles.modalPrimary}
+            onClick={handleSavePostMute}
+            disabled={muteSaving}
+          >
+            {muteSaving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
@@ -2806,7 +3490,30 @@ function FeedCard({
   );
 
   return (
-    <article className={styles.feedCard} ref={cardRef}>
+    <article
+      className={`${styles.feedCard} ${cardClassName ?? ""}`}
+      ref={cardRef}
+    >
+      {repostOf ? (
+        <div className={styles.repostBanner}>
+          <span className={styles.repostIcon}>
+            <IconReup size={16} />
+          </span>
+          <span className={styles.repostText}>
+            {t("repost.banner")}{" "}
+            {repostOfAuthorId ? (
+              <Link
+                href={`/profile/${repostOfAuthorId}`}
+                className={styles.repostLink}
+              >
+                {repostSourceLabel || t("repost.original")}
+              </Link>
+            ) : (
+              <>{repostSourceLabel || t("repost.original")}</>
+            )}
+          </span>
+        </div>
+      ) : null}
       <header className={styles.feedHeader}>
         <div className={styles.author}>
           {avatarUrl ? (
@@ -2835,7 +3542,7 @@ function FeedCard({
                 <>
                   <span aria-hidden="true" className={`${styles.followBtn}`}>
                     {" "}
-                    Â·{" "}
+                    ·{" "}
                   </span>
                   <button
                     className={`${styles.followBtn} ${
@@ -2854,11 +3561,34 @@ function FeedCard({
               ) : null}
             </div>
             <span className={styles.authorSub}>
-              {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}
+              {formatDistanceToNow(new Date(displayAt), { addSuffix: true })}
             </span>
           </div>
         </div>
         <div className={styles.headerActions}>
+          {isMutedForPost ? (
+            <span
+              className={styles.muteBadge}
+              title="Notifications muted"
+              aria-label="Notifications muted"
+            >
+              <svg
+                aria-hidden
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                <line x1="3" y1="3" x2="21" y2="21" />
+              </svg>
+            </span>
+          ) : null}
           <div className={styles.menuWrapper} ref={menuRef}>
             <button
               className={`${styles.actionBtn} ${styles.actionBtnGhost}`}
@@ -2879,7 +3609,7 @@ function FeedCard({
                         openEditModal();
                       }}
                     >
-                      Edit post
+                      {t("menu.editPost")}
                     </button>
                     <button
                       className={styles.menuItem}
@@ -2890,13 +3620,22 @@ function FeedCard({
                         setVisibilityModalOpen(true);
                       }}
                     >
-                      Edit visibility
+                      {t("menu.editVisibility")}
                     </button>
                     <button
                       className={styles.menuItem}
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        if (isMutedForPost) {
+                          handleEnablePostNotifications();
+                        } else {
+                          openMuteModal();
+                        }
+                      }}
                     >
-                      Mute notifications
+                      {isMutedForPost
+                        ? "Turn on notification"
+                        : t("menu.muteNotifications")}
                     </button>
                     <button
                       className={styles.menuItem}
@@ -2916,9 +3655,11 @@ function FeedCard({
                     >
                       {hideLikeToggleLabel}
                     </button>
-                    <button className={styles.menuItem} onClick={goToPost}>
-                      Go to post
-                    </button>
+                    {repostOf ? (
+                      <button className={styles.menuItem} onClick={goToPost}>
+                        {t("menu.goToPost")}
+                      </button>
+                    ) : null}
                     <button
                       className={styles.menuItem}
                       onClick={() => {
@@ -2926,7 +3667,7 @@ function FeedCard({
                         onCopyLink(id);
                       }}
                     >
-                      Copy link
+                      {t("menu.copyLink")}
                     </button>
                     <button
                       className={`${styles.menuItem} ${styles.menuItemDanger}`}
@@ -2935,14 +3676,16 @@ function FeedCard({
                         onDeleteIntent(id, authorLine);
                       }}
                     >
-                      Delete post
+                      {t("menu.deletePost")}
                     </button>
                   </div>
                 ) : (
                   <div className={styles.menuContent}>
-                    <button className={styles.menuItem} onClick={goToPost}>
-                      Go to post
-                    </button>
+                    {repostOf ? (
+                      <button className={styles.menuItem} onClick={goToPost}>
+                        {t("menu.goToPost")}
+                      </button>
+                    ) : null}
                     <button
                       className={styles.menuItem}
                       onClick={() => {
@@ -2950,7 +3693,7 @@ function FeedCard({
                         onCopyLink(id);
                       }}
                     >
-                      Copy link
+                      {t("menu.copyLink")}
                     </button>
                     {authorOwnerId ? (
                       <button
@@ -2961,7 +3704,9 @@ function FeedCard({
                           onFollow(authorOwnerId, !isFollowing);
                         }}
                       >
-                        {isFollowing ? "Unfollow" : "Follow"}
+                        {isFollowing
+                          ? t("follow.unfollow")
+                          : t("follow.follow")}
                       </button>
                     ) : null}
                     <button
@@ -2971,7 +3716,7 @@ function FeedCard({
                         onSave(id, !saved);
                       }}
                     >
-                      {saved ? "Unsave this post" : "Save this post"}
+                      {saved ? t("menu.unsave") : t("menu.save")}
                     </button>
                     <button
                       className={styles.menuItem}
@@ -2980,7 +3725,7 @@ function FeedCard({
                         onHide(id);
                       }}
                     >
-                      Hide this post
+                      {t("menu.hidePost")}
                     </button>
                     <button
                       className={styles.menuItem}
@@ -2989,7 +3734,7 @@ function FeedCard({
                         onReportIntent(id, authorLine);
                       }}
                     >
-                      Report
+                      {t("menu.report")}
                     </button>
                     <button
                       className={`${styles.menuItem} ${styles.menuItemDanger}`}
@@ -2998,7 +3743,7 @@ function FeedCard({
                         onBlockUser(authorId || author?.id, authorLine);
                       }}
                     >
-                      Block this account
+                      {t("menu.blockAccount")}
                     </button>
                   </div>
                 )}
@@ -3007,7 +3752,7 @@ function FeedCard({
           </div>
           <button
             className={`${styles.actionBtn} ${styles.actionBtnGhost}`}
-            aria-label="Hide post"
+            aria-label={tCommon("hidePost")}
             onClick={() => onHide(id)}
           >
             <IconClose size={22} />
@@ -3031,7 +3776,7 @@ function FeedCard({
               className={styles.seeMore}
               onClick={() => setCollapsed((prev) => !prev)}
             >
-              {collapsed ? "See more" : "Collapse"}
+              {collapsed ? t("content.seeMore") : t("content.collapse")}
             </button>
           )}
         </div>
@@ -3042,15 +3787,28 @@ function FeedCard({
         <div className={styles.contentBlock}>
           {location && (
             <div className={styles.metaRow}>
-              <span className={styles.metaLabel}>{location}</span>
+              <a
+                className={`${styles.metaLabel} ${styles.metaLink}`}
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  location,
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {location}
+              </a>
             </div>
           )}
           {Boolean((hashtags?.length || 0) + (topics?.length || 0)) && (
             <div className={styles.tags}>
               {hashtags?.map((tag) => (
-                <span key={tag} className={styles.tag}>
+                <a
+                  key={tag}
+                  href={`/hashtag/${encodeURIComponent(tag)}`}
+                  className={`${styles.tag} ${styles.tagLink}`}
+                >
                   #{tag}
-                </span>
+                </a>
               ))}
               {topics?.map((tag) => (
                 <span key={tag} className={styles.tag}>
@@ -3090,7 +3848,7 @@ function FeedCard({
                       onClick={enableSound}
                       aria-pressed={false}
                     >
-                      Tap for sound
+                      {t("media.tapForSound")}
                     </button>
                   ) : null}
                 </>
@@ -3100,8 +3858,10 @@ function FeedCard({
               <img
                 key={`${id}-${mediaIndex}`}
                 src={current.url}
-                alt="media"
+                alt={t("media.alt")}
                 className={styles.mediaVisual}
+                onContextMenu={(e) => e.preventDefault()}
+                onClick={() => setImageViewerUrl(current.url)}
               />
             );
           })()}
@@ -3110,10 +3870,10 @@ function FeedCard({
             <>
               <button
                 className={`${styles.mediaNavBtn} ${styles.mediaNavLeft}`}
-                aria-label="Previous media"
+                aria-label={t("media.previous")}
                 onClick={() =>
                   setMediaIndex((prev) =>
-                    media.length ? (prev - 1 + media.length) % media.length : 0
+                    media.length ? (prev - 1 + media.length) % media.length : 0,
                   )
                 }
               >
@@ -3129,10 +3889,10 @@ function FeedCard({
               </button>
               <button
                 className={`${styles.mediaNavBtn} ${styles.mediaNavRight}`}
-                aria-label="Next media"
+                aria-label={t("media.next")}
                 onClick={() =>
                   setMediaIndex((prev) =>
-                    media.length ? (prev + 1) % media.length : 0
+                    media.length ? (prev + 1) % media.length : 0,
                   )
                 }
               >
@@ -3154,6 +3914,14 @@ function FeedCard({
         </div>
       ) : null}
 
+      {imageViewerUrl ? (
+        <ImageViewerOverlay
+          url={imageViewerUrl}
+          alt={t("media.overlayAlt")}
+          onClose={() => setImageViewerUrl(null)}
+        />
+      ) : null}
+
       <div className={styles.statRow}>
         <div>
           {!shouldHideLikeStat ? (
@@ -3161,7 +3929,7 @@ function FeedCard({
               <span className={styles.statIcon}>
                 <IconLike size={18} />
               </span>
-              <span>{stats.hearts ?? 0}</span>
+              <span>{displayHearts}</span>
             </div>
           ) : null}
           <div className={styles.statItem}>
@@ -3182,7 +3950,7 @@ function FeedCard({
             <span className={styles.statIcon}>
               <IconReup size={18} />
             </span>
-            <span>{stats.shares ?? 0}</span>
+            <span>{shareCount}</span>
           </div>
         </div>
       </div>
@@ -3195,11 +3963,11 @@ function FeedCard({
           onClick={() => onLike(id, !liked)}
         >
           <IconLike size={20} filled={liked} />
-          <span>{liked ? "Liked" : "Like"}</span>
+          <span>{liked ? t("actions.liked") : t("actions.like")}</span>
         </button>
         <button className={styles.actionBtn} onClick={quickOpenPost}>
           <IconComment size={20} />
-          <span>Comment</span>
+          <span>{t("actions.comment")}</span>
         </button>
         <button
           className={`${styles.actionBtn} ${
@@ -3208,11 +3976,14 @@ function FeedCard({
           onClick={() => onSave(id, !saved)}
         >
           <IconSave size={20} filled={saved} />
-          <span>{saved ? "Saved" : "Save"}</span>
+          <span>{saved ? t("actions.saved") : t("actions.save")}</span>
         </button>
-        <button className={styles.actionBtn} onClick={() => onShare(id)}>
+        <button
+          className={styles.actionBtn}
+          onClick={(e) => onShare(id, e.currentTarget.getBoundingClientRect())}
+        >
           <IconReup size={20} />
-          <span>Repost</span>
+          <span>{t("actions.repost")}</span>
         </button>
       </div>
 
@@ -3226,6 +3997,12 @@ function FeedCard({
         ? mounted && typeof document !== "undefined"
           ? createPortal(visibilityModal, document.body)
           : visibilityModal
+        : null}
+
+      {muteModalOpen
+        ? mounted && typeof document !== "undefined"
+          ? createPortal(muteModal, document.body)
+          : muteModal
         : null}
     </article>
   );

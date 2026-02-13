@@ -24,10 +24,7 @@ export class ServersController {
     @Body() createServerDto: CreateServerDto,
     @Request() req: any,
   ) {
-    return this.serversService.createServer(
-      createServerDto,
-      req.user.userId,
-    );
+    return this.serversService.createServer(createServerDto, req.user.userId);
   }
 
   @Get()
@@ -54,10 +51,7 @@ export class ServersController {
   }
 
   @Delete(':id')
-  async deleteServer(
-    @Param('id') serverId: string,
-    @Request() req: any,
-  ) {
+  async deleteServer(@Param('id') serverId: string, @Request() req: any) {
     await this.serversService.deleteServer(serverId, req.user.userId);
     return { message: 'Server deleted successfully' };
   }

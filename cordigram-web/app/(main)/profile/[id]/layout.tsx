@@ -1,20 +1,46 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import styles from "../profile.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
+import ProfileEditOverlay from "@/ui/profile-edit-overlay/profile-edit-overlay";
+import FollowersOverlay, {
+  type FollowersOverlayTab,
+} from "@/ui/followers-overlay/followers-overlay";
 import {
   fetchProfileDetail,
   blockUser,
   followUser,
   reportUser,
   unfollowUser,
+  fetchUserPosts,
+  fetchUserReels,
+  fetchSavedItems,
+  type FeedItem,
   type ProfileDetailResponse,
+  resetProfileAvatar,
+  uploadProfileAvatar,
+  type FollowListItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
-import { ProfileProvider } from "./profile-context";
+import { emitCurrentProfileUpdated } from "@/lib/events";
+import {
+  ProfileProvider,
+  type ProfileTabKey,
+  type ProfileTabState,
+  type ProfileTabsState,
+} from "./profile-context";
+import Cropper, { Area } from "react-easy-crop";
 
 const compactFormatter = new Intl.NumberFormat("en", {
   notation: "compact",
@@ -25,6 +51,46 @@ const formatCount = (value?: number) =>
   compactFormatter.format(Math.max(0, value ?? 0));
 
 const isValidProfileId = (value: string) => /^[a-f0-9]{24}$/i.test(value);
+
+const getVisibilityStatus = (
+  visibility?: "public" | "followers" | "private",
+): "Private" | "Followers only" | "" => {
+  if (visibility === "private") return "Private";
+  if (visibility === "followers") return "Followers only";
+  return "";
+};
+
+const getFieldDisplay = (
+  value: string,
+  visibility?: "public" | "followers" | "private",
+): { text: string; muted: boolean } => {
+  const trimmed = value?.trim?.() ?? "";
+  if (trimmed) return { text: trimmed, muted: false };
+  const status = getVisibilityStatus(visibility);
+  if (status) return { text: status, muted: true };
+  return { text: "—", muted: true };
+};
+
+const canViewByVisibility = (
+  visibility: "public" | "followers" | "private" | undefined,
+  isOwner: boolean,
+  isFollower: boolean,
+) => {
+  if (isOwner) return true;
+  if (!visibility || visibility === "public") return true;
+  if (visibility === "followers") return isFollower;
+  return false;
+};
+
+const getVisibilityRestrictionMessage = (
+  visibility: "public" | "followers" | "private" | undefined,
+  fallback: string,
+) => {
+  if (visibility === "private") return `This ${fallback} is private.`;
+  if (visibility === "followers")
+    return `This ${fallback} is visible to followers only.`;
+  return "";
+};
 
 const getUserIdFromToken = (token: string | null): string | undefined => {
   if (!token) return undefined;
@@ -112,6 +178,85 @@ const USER_REPORT_GROUPS: UserReportCategory[] = [
 ];
 
 const REPORT_MODAL_MS = 200;
+const DEFAULT_AVATAR_URL =
+  "https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg";
+
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = (err) => reject(err);
+    img.src = src;
+  });
+}
+
+async function getCroppedBlob(
+  imageSrc: string,
+  croppedAreaPixels: Area,
+): Promise<Blob> {
+  const image = await loadImage(imageSrc);
+  const canvas = document.createElement("canvas");
+  canvas.width = croppedAreaPixels.width;
+  canvas.height = croppedAreaPixels.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas not supported");
+  }
+
+  ctx.drawImage(
+    image,
+    croppedAreaPixels.x,
+    croppedAreaPixels.y,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+    0,
+    0,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+  );
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Failed to crop image"));
+          return;
+        }
+        resolve(blob);
+      },
+      "image/jpeg",
+      0.9,
+    );
+  });
+}
+
+async function getCroppedDataUrl(
+  imageSrc: string,
+  croppedAreaPixels: Area,
+): Promise<string> {
+  const image = await loadImage(imageSrc);
+  const canvas = document.createElement("canvas");
+  canvas.width = croppedAreaPixels.width;
+  canvas.height = croppedAreaPixels.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas not supported");
+  }
+
+  ctx.drawImage(
+    image,
+    croppedAreaPixels.x,
+    croppedAreaPixels.y,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+    0,
+    0,
+    croppedAreaPixels.width,
+    croppedAreaPixels.height,
+  );
+
+  return canvas.toDataURL("image/jpeg", 0.9);
+}
 
 export default function ProfileLayout({
   children,
@@ -140,6 +285,7 @@ export default function ProfileLayout({
   const [blocking, setBlocking] = useState(false);
   const [blockError, setBlockError] = useState("");
   const [blockedView, setBlockedView] = useState(false);
+  const [privateView, setPrivateView] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportCategory, setReportCategory] = useState<
     UserReportCategory["key"] | null
@@ -149,11 +295,92 @@ export default function ProfileLayout({
   const [reportError, setReportError] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportClosing, setReportClosing] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [aboutClosing, setAboutClosing] = useState(false);
+  const [followersOpen, setFollowersOpen] = useState(false);
+  const [followersClosing, setFollowersClosing] = useState(false);
+  const [followersTab, setFollowersTab] =
+    useState<FollowersOverlayTab>("followers");
+  const [authoredCount, setAuthoredCount] = useState<number | null>(null);
   const reportHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aboutHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const followersHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [avatarViewerUrl, setAvatarViewerUrl] = useState<string | null>(null);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const bioRef = useRef<HTMLParagraphElement | null>(null);
+  const [bioCollapsed, setBioCollapsed] = useState(true);
+  const [bioCanExpand, setBioCanExpand] = useState(false);
+  const [avatarConfirmOpen, setAvatarConfirmOpen] = useState(false);
+  const [avatarCropOpen, setAvatarCropOpen] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarThumb, setAvatarThumb] = useState<string | null>(null);
+  const [crop, setCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [avatarSubmitting, setAvatarSubmitting] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const selectedReportGroup = useMemo(
     () => USER_REPORT_GROUPS.find((g) => g.key === reportCategory),
-    [reportCategory]
+    [reportCategory],
   );
+  const isOwner = profile && viewerId && profile.userId === viewerId;
+  const isFollower = Boolean(profile?.isFollowing);
+  const canViewProfile = profile
+    ? canViewByVisibility(
+        profile.visibility?.profile,
+        Boolean(isOwner),
+        isFollower,
+      )
+    : true;
+  const canViewAbout = profile
+    ? canViewByVisibility(
+        profile.visibility?.about,
+        Boolean(isOwner),
+        isFollower,
+      )
+    : false;
+  const canViewFollowers = profile
+    ? canViewByVisibility(
+        profile.visibility?.followers,
+        Boolean(isOwner),
+        isFollower,
+      )
+    : false;
+  const canViewFollowing = profile
+    ? canViewByVisibility(
+        profile.visibility?.following,
+        Boolean(isOwner),
+        isFollower,
+      )
+    : false;
+
+  const createEmptyTab = useCallback((): ProfileTabState => {
+    return { items: [], loading: false, loaded: false, error: "" };
+  }, []);
+
+  const [tabs, setTabs] = useState<ProfileTabsState>(() => ({
+    posts: { items: [], loading: false, loaded: false, error: "" },
+    reels: { items: [], loading: false, loaded: false, error: "" },
+    repost: { items: [], loading: false, loaded: false, error: "" },
+    saved: { items: [], loading: false, loaded: false, error: "" },
+  }));
+
+  const tabsRef = useRef<ProfileTabsState>(tabs);
+  useEffect(() => {
+    tabsRef.current = tabs;
+  }, [tabs]);
+
+  useEffect(() => {
+    setTabs({
+      posts: createEmptyTab(),
+      reels: createEmptyTab(),
+      repost: createEmptyTab(),
+      saved: createEmptyTab(),
+    });
+  }, [createEmptyTab, profileId]);
 
   useEffect(() => {
     if (!canRender) return;
@@ -169,6 +396,7 @@ export default function ProfileLayout({
       return;
     }
     setBlockedView(false);
+    setPrivateView(false);
     setViewerId(getUserIdFromToken(token));
 
     setLoading(true);
@@ -184,11 +412,16 @@ export default function ProfileLayout({
           typeof err === "object" && err && "message" in err
             ? String((err as { message?: string }).message)
             : "Unable to load profile";
-        const blockedError =
-          maybeStatus === 403 ||
+        const lowered = message.toLowerCase();
+        const isPrivate = maybeStatus === 403 && lowered.includes("private");
+        const isBlocked =
           maybeStatus === 423 ||
-          message.toLowerCase().includes("block");
-        if (blockedError) {
+          lowered.includes("block") ||
+          (maybeStatus === 403 && !isPrivate);
+        if (isPrivate) {
+          setPrivateView(true);
+          setError("");
+        } else if (isBlocked) {
           setBlockedView(true);
           setError("");
         } else {
@@ -197,6 +430,177 @@ export default function ProfileLayout({
       })
       .finally(() => setLoading(false));
   }, [canRender, profileId]);
+
+  useEffect(() => {
+    const el = bioRef.current;
+    if (!el) return;
+
+    // Reset first so we measure the full height (unclamped).
+    setBioCanExpand(false);
+    setBioCollapsed(true);
+
+    const raf = requestAnimationFrame(() => {
+      const node = bioRef.current;
+      if (!node) return;
+      const lineHeight = parseFloat(getComputedStyle(node).lineHeight || "0");
+      if (!lineHeight) return;
+      const lines = node.scrollHeight / lineHeight;
+      const shouldCollapse = lines > 5.2;
+      setBioCanExpand(shouldCollapse);
+      setBioCollapsed(shouldCollapse);
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [profile?.bio]);
+
+  const prefetchTab = useCallback(
+    async (key: ProfileTabKey) => {
+      const token = getStoredAccessToken();
+      const ownerId = profile?.userId;
+      if (!token || !ownerId) return;
+      if (
+        key === "saved" &&
+        !(profile && viewerId && profile.userId === viewerId)
+      ) {
+        return;
+      }
+
+      const currentSnapshot = tabsRef.current[key];
+      if (!currentSnapshot || currentSnapshot.loading || currentSnapshot.loaded)
+        return;
+
+      setTabs((prev) => {
+        const current = prev[key];
+        if (!current || current.loading || current.loaded) return prev;
+        return {
+          ...prev,
+          [key]: { ...current, loading: true, error: "" },
+        };
+      });
+
+      const setSuccess = (items: FeedItem[]) => {
+        setTabs((prev) => {
+          const current = prev[key];
+          return {
+            ...prev,
+            [key]: {
+              ...current,
+              items,
+              loaded: true,
+              loading: false,
+              error: "",
+            },
+          };
+        });
+      };
+
+      const setFailure = (message: string) => {
+        setTabs((prev) => {
+          const current = prev[key];
+          return {
+            ...prev,
+            [key]: {
+              ...current,
+              loading: false,
+              loaded: true,
+              error: message || "Unable to load", // loaded=true to avoid refetch loops
+            },
+          };
+        });
+      };
+
+      try {
+        if (key === "posts") {
+          const items = await fetchUserPosts({
+            token,
+            userId: ownerId,
+            limit: 30,
+          });
+          setSuccess(
+            (items || []).filter((item) => item && !(item as any)?.repostOf),
+          );
+          return;
+        }
+        if (key === "reels") {
+          const items = await fetchUserReels({
+            token,
+            userId: ownerId,
+            limit: 30,
+          });
+          setSuccess(items || []);
+          return;
+        }
+        if (key === "repost") {
+          const [posts, reels] = await Promise.all([
+            fetchUserPosts({ token, userId: ownerId, limit: 60 }),
+            fetchUserReels({ token, userId: ownerId, limit: 60 }),
+          ]);
+          const combined = [...(posts || []), ...(reels || [])];
+          const deduped = new Map<string, FeedItem>();
+          combined.forEach((item) => {
+            if (!item) return;
+            if (!deduped.has(item.id)) deduped.set(item.id, item);
+          });
+          const reposts = Array.from(deduped.values()).filter((item) =>
+            Boolean((item as any)?.repostOf),
+          );
+          reposts.sort((a, b) => {
+            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+          });
+          setSuccess(reposts);
+          return;
+        }
+        if (key === "saved") {
+          const data = await fetchSavedItems({ token, limit: 60 });
+          const sorted = (data || [])
+            .slice()
+            .sort(
+              (a, b) =>
+                (b.createdAt ? new Date(b.createdAt).getTime() : 0) -
+                (a.createdAt ? new Date(a.createdAt).getTime() : 0),
+            );
+          setSuccess(sorted);
+          return;
+        }
+      } catch (err: unknown) {
+        const message =
+          typeof err === "object" && err && "message" in err
+            ? String((err as { message?: string }).message)
+            : "Unable to load";
+        setFailure(message);
+      }
+    },
+    [profile?.userId, viewerId, profile],
+  );
+
+  useEffect(() => {
+    if (!profile?.userId) return;
+    // Prefetch in the background so tab switches don't flash skeleton grids.
+    void prefetchTab("posts");
+    void prefetchTab("reels");
+    void prefetchTab("repost");
+    if (isOwner) void prefetchTab("saved");
+  }, [profile?.userId, isOwner, prefetchTab]);
+
+  useEffect(() => {
+    const token = getStoredAccessToken();
+    const ownerId = profile?.userId;
+    if (!token || !ownerId) return;
+    setAuthoredCount(null);
+    Promise.all([
+      fetchUserPosts({ token, userId: ownerId, limit: 200 }),
+      fetchUserReels({ token, userId: ownerId, limit: 200 }),
+    ])
+      .then(([posts, reels]) => {
+        const originals = [...(posts || []), ...(reels || [])].filter(
+          (item) => !item?.repostOf,
+        );
+        setAuthoredCount(originals.length);
+      })
+      .catch(() => setAuthoredCount(null));
+  }, [profile?.userId]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -225,8 +629,79 @@ export default function ProfileLayout({
       if (reportHideTimer.current) {
         clearTimeout(reportHideTimer.current);
       }
+      if (aboutHideTimer.current) {
+        clearTimeout(aboutHideTimer.current);
+      }
+      if (followersHideTimer.current) {
+        clearTimeout(followersHideTimer.current);
+      }
     };
   }, []);
+
+  const closeAboutModal = () => {
+    if (aboutHideTimer.current) {
+      clearTimeout(aboutHideTimer.current);
+    }
+    setAboutClosing(true);
+    aboutHideTimer.current = setTimeout(() => {
+      setAboutOpen(false);
+      setAboutClosing(false);
+    }, REPORT_MODAL_MS);
+  };
+
+  useEffect(() => {
+    if (!aboutOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeAboutModal();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [aboutOpen]);
+
+  const closeFollowersModal = () => {
+    if (followersHideTimer.current) {
+      clearTimeout(followersHideTimer.current);
+    }
+    setFollowersClosing(true);
+    followersHideTimer.current = setTimeout(() => {
+      setFollowersOpen(false);
+      setFollowersClosing(false);
+    }, REPORT_MODAL_MS);
+  };
+
+  useEffect(() => {
+    if (!followersOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeFollowersModal();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [followersOpen]);
+
+  useEffect(() => {
+    if (!avatarPreview || !croppedAreaPixels) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const dataUrl = await getCroppedDataUrl(
+          avatarPreview,
+          croppedAreaPixels,
+        );
+        if (!cancelled) setAvatarThumb(dataUrl);
+      } catch (_err) {
+        if (!cancelled) setAvatarThumb(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [avatarPreview, croppedAreaPixels]);
 
   const handleFollowToggle = async () => {
     if (!profile || followLoading) return;
@@ -253,11 +728,11 @@ export default function ProfileLayout({
                 ...prev.stats,
                 followers: Math.max(
                   0,
-                  prev.stats.followers + (nextFollow ? 1 : -1)
+                  prev.stats.followers + (nextFollow ? 1 : -1),
                 ),
               },
             }
-          : prev
+          : prev,
       );
     } catch (err) {
       const message =
@@ -269,6 +744,25 @@ export default function ProfileLayout({
       setFollowLoading(false);
     }
   };
+
+  const handleOverlayCountsChange = useCallback(
+    (delta: { followers?: number; following?: number }) => {
+      setProfile((prev) => {
+        if (!prev) return prev;
+        const nextFollowers = prev.stats.followers + (delta.followers ?? 0);
+        const nextFollowing = prev.stats.following + (delta.following ?? 0);
+        return {
+          ...prev,
+          stats: {
+            ...prev.stats,
+            followers: Math.max(0, nextFollowers),
+            following: Math.max(0, nextFollowing),
+          },
+        };
+      });
+    },
+    [],
+  );
 
   const handleSettings = () => {
     router.push("/settings");
@@ -329,7 +823,7 @@ export default function ProfileLayout({
     setBlockError("");
     try {
       await blockUser({ token, userId: profile.userId });
-      showToast(`Đã chặn @${profile.username}`);
+      showToast(`Blocked @${profile.username}`);
       setBlockOpen(false);
       setBlockedView(true);
       setProfile(null);
@@ -338,7 +832,7 @@ export default function ProfileLayout({
       const message =
         typeof err === "object" && err && "message" in err
           ? String((err as { message?: string }).message)
-          : "Không thể chặn người dùng";
+          : "Unable to block user";
       setBlockError(message);
       showToast(message);
     } finally {
@@ -361,7 +855,7 @@ export default function ProfileLayout({
       return;
     }
     if (viewerId && profile.userId === viewerId) {
-      showToast("Bạn không thể báo cáo chính mình");
+      showToast("You cannot report yourself");
       setMenuOpen(false);
       return;
     }
@@ -426,6 +920,19 @@ export default function ProfileLayout({
 
   const handleMenuSelect = (key: string) => {
     switch (key) {
+      case "about":
+        setMenuOpen(false);
+        if (!canViewAbout) {
+          const message = getVisibilityRestrictionMessage(
+            profile?.visibility?.about,
+            "about section",
+          );
+          showToast(message || "About section is not available.");
+          break;
+        }
+        setAboutOpen(true);
+        setAboutClosing(false);
+        break;
       case "block":
         openBlockModal();
         break;
@@ -438,6 +945,153 @@ export default function ProfileLayout({
       default:
         setMenuOpen(false);
         break;
+    }
+  };
+
+  const resetAvatarSelection = () => {
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setAvatarThumb(null);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
+  };
+
+  const openAvatarMenu = () => {
+    if (!isOwner) return;
+    setAvatarError("");
+    setAvatarMenuOpen(true);
+  };
+
+  const closeAvatarMenu = () => {
+    setAvatarMenuOpen(false);
+  };
+
+  const openAvatarCrop = () => {
+    setAvatarError("");
+    setAvatarCropOpen(true);
+  };
+
+  const closeAvatarCrop = () => {
+    if (avatarSubmitting) return;
+    setAvatarCropOpen(false);
+    resetAvatarSelection();
+  };
+
+  const openAvatarConfirm = () => {
+    setAvatarError("");
+    setAvatarConfirmOpen(true);
+  };
+
+  const closeAvatarConfirm = () => {
+    if (avatarSubmitting) return;
+    setAvatarConfirmOpen(false);
+  };
+
+  const handleAvatarUploadSelect = () => {
+    setAvatarMenuOpen(false);
+    avatarInputRef.current?.click();
+  };
+
+  const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setAvatarPreview(result);
+        openAvatarCrop();
+      }
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+
+  const handleSubmitAvatar = async () => {
+    if (avatarSubmitting) return;
+    const token = getStoredAccessToken();
+    if (!token) {
+      setAvatarError("Session expired. Please sign in again.");
+      return;
+    }
+    if (!avatarFile || !avatarPreview || !croppedAreaPixels) {
+      setAvatarError("Please select an image to upload");
+      return;
+    }
+
+    setAvatarSubmitting(true);
+    setAvatarError("");
+    try {
+      const croppedBlob = await getCroppedBlob(
+        avatarPreview,
+        croppedAreaPixels,
+      );
+      const form = new FormData();
+      form.append("original", avatarFile, avatarFile.name);
+      form.append(
+        "cropped",
+        new File([croppedBlob], `avatar-cropped-${Date.now()}.jpg`, {
+          type: "image/jpeg",
+        }),
+      );
+
+      const res = await uploadProfileAvatar({ token, form });
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              avatarUrl: res.avatarUrl,
+              avatarOriginalUrl: res.avatarOriginalUrl,
+            }
+          : prev,
+      );
+      emitCurrentProfileUpdated();
+      showToast("Avatar updated");
+      closeAvatarCrop();
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Unable to update avatar";
+      setAvatarError(message || "Unable to update avatar");
+    } finally {
+      setAvatarSubmitting(false);
+    }
+  };
+
+  const handleConfirmRemoveAvatar = async () => {
+    if (avatarSubmitting) return;
+    const token = getStoredAccessToken();
+    if (!token) {
+      setAvatarError("Session expired. Please sign in again.");
+      return;
+    }
+    setAvatarSubmitting(true);
+    setAvatarError("");
+    try {
+      const res = await resetProfileAvatar({ token });
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              avatarUrl: res.avatarUrl || DEFAULT_AVATAR_URL,
+              avatarOriginalUrl: res.avatarOriginalUrl,
+            }
+          : prev,
+      );
+      emitCurrentProfileUpdated();
+      showToast("Avatar removed");
+      closeAvatarConfirm();
+    } catch (err) {
+      const message =
+        typeof err === "object" && err && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Unable to remove avatar";
+      setAvatarError(message || "Unable to remove avatar");
+    } finally {
+      setAvatarSubmitting(false);
     }
   };
 
@@ -458,7 +1112,27 @@ export default function ProfileLayout({
     );
   }
 
-  const isOwner = profile && viewerId && profile.userId === viewerId;
+  function PrivateProfile({ onHome }: { onHome: () => void }) {
+    return (
+      <div className={styles.privateWrap}>
+        <div className={styles.privateIcon} aria-hidden>
+          <IconLock />
+        </div>
+        <div className={styles.privateTitle}>This profile is private</div>
+        <div className={styles.privateText}>
+          The owner has limited access to their profile. Follow requests may be
+          required to view their content.
+        </div>
+        <button type="button" className={styles.privateButton} onClick={onHome}>
+          Go back home
+        </button>
+      </div>
+    );
+  }
+
+  const statsOriginalFallback =
+    (profile?.stats?.posts ?? 0) + (profile?.stats?.reels ?? 0);
+  const displayedPostsCount = authoredCount ?? statsOriginalFallback;
 
   const navItems = isOwner
     ? [
@@ -482,6 +1156,7 @@ export default function ProfileLayout({
       ];
 
   const menuItems = [
+    { key: "about", label: "About this user" },
     { key: "block", label: "Block this user" },
     { key: "report", label: "Report" },
     { key: "copy-link", label: "Copy link" },
@@ -497,10 +1172,14 @@ export default function ProfileLayout({
 
   if (!canRender) return null;
 
+  const shouldShowPrivate = privateView || Boolean(profile && !canViewProfile);
+
   return (
     <div className={styles.page}>
       {blockedView ? (
         <BlockedProfile onHome={() => router.push("/")} />
+      ) : shouldShowPrivate ? (
+        <PrivateProfile onHome={() => router.push("/")} />
       ) : (
         <div className={styles.card}>
           {loading ? (
@@ -508,41 +1187,97 @@ export default function ProfileLayout({
           ) : error ? (
             <div className={styles.errorBox}>{error}</div>
           ) : profile ? (
-            <ProfileProvider value={{ profile, viewerId }}>
+            <ProfileProvider value={{ profile, viewerId, tabs, prefetchTab }}>
               <div className={styles.header}>
-                <div className={styles.avatarRing}>
-                  <img
-                    src={profile.avatarUrl}
-                    alt={`${profile.displayName} avatar`}
-                    className={styles.avatarImg}
-                    loading="lazy"
-                  />
-                </div>
+                {isOwner ? (
+                  <button
+                    type="button"
+                    className={`${styles.avatarRing} ${styles.avatarRingButton}`}
+                    onClick={openAvatarMenu}
+                    aria-label="Change avatar"
+                  >
+                    <img
+                      src={profile.avatarUrl || DEFAULT_AVATAR_URL}
+                      alt={`${profile.displayName} avatar`}
+                      className={styles.avatarImg}
+                      loading="lazy"
+                    />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.avatarRing}
+                    aria-label="View avatar"
+                    onClick={() =>
+                      setAvatarViewerUrl(
+                        profile.avatarOriginalUrl ||
+                          profile.avatarUrl ||
+                          DEFAULT_AVATAR_URL,
+                      )
+                    }
+                  >
+                    <img
+                      src={profile.avatarUrl || DEFAULT_AVATAR_URL}
+                      alt={`${profile.displayName} avatar`}
+                      className={styles.avatarImg}
+                      loading="lazy"
+                    />
+                  </button>
+                )}
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className={styles.avatarFileInput}
+                  onChange={handleAvatarFileChange}
+                />
                 <div>
                   <div className={styles.identity}>
                     <h1 className={styles.displayName}>
                       {profile.displayName}
                     </h1>
-                    <p className={styles.username}>@{profile.username}</p>
-                    {profile.bio ? (
-                      <p className={styles.bio}>{profile.bio}</p>
-                    ) : null}
-                    {profile.location ? (
-                      <p className={styles.location}>{profile.location}</p>
-                    ) : null}
+                    <div className={styles.username}>@{profile.username}</div>
                   </div>
                   <div className={styles.statsRow}>
                     <StatCard
                       label="Posts"
-                      value={formatCount(profile.stats.totalPosts)}
+                      value={formatCount(displayedPostsCount)}
                     />
                     <StatCard
                       label="Followers"
                       value={formatCount(profile.stats.followers)}
+                      onClick={() => {
+                        if (!canViewFollowers) {
+                          const message = getVisibilityRestrictionMessage(
+                            profile.visibility?.followers,
+                            "followers list",
+                          );
+                          showToast(
+                            message || "Followers list is not available.",
+                          );
+                          return;
+                        }
+                        setFollowersTab("followers");
+                        setFollowersOpen(true);
+                      }}
                     />
                     <StatCard
                       label="Following"
                       value={formatCount(profile.stats.following)}
+                      onClick={() => {
+                        if (!canViewFollowing) {
+                          const message = getVisibilityRestrictionMessage(
+                            profile.visibility?.following,
+                            "following list",
+                          );
+                          showToast(
+                            message || "Following list is not available.",
+                          );
+                          return;
+                        }
+                        setFollowersTab("following");
+                        setFollowersOpen(true);
+                      }}
                     />
                   </div>
                   <div
@@ -552,7 +1287,11 @@ export default function ProfileLayout({
                   >
                     {isOwner ? (
                       <>
-                        <button className={styles.primaryButton} type="button">
+                        <button
+                          className={styles.primaryButton}
+                          type="button"
+                          onClick={() => setEditProfileOpen(true)}
+                        >
                           Edit profile
                         </button>
                         <button
@@ -587,8 +1326,8 @@ export default function ProfileLayout({
                           {followLoading
                             ? "Updating..."
                             : profile.isFollowing
-                            ? "Following"
-                            : "Follow"}
+                              ? "Following"
+                              : "Follow"}
                         </button>
                         <button
                           className={styles.secondaryButton}
@@ -626,6 +1365,27 @@ export default function ProfileLayout({
                   </div>
                 </div>
               </div>
+              {profile.bio ? (
+                <div className={`${styles.bioSection} ml-[188px]`}>
+                  <p
+                    ref={bioRef}
+                    className={`${styles.bio} ${styles.bioCollapsible} ${
+                      bioCollapsed && bioCanExpand ? styles.bioCollapsed : ""
+                    }`}
+                  >
+                    {profile.bio}
+                  </p>
+                  {bioCanExpand ? (
+                    <button
+                      type="button"
+                      className={styles.bioToggle}
+                      onClick={() => setBioCollapsed((prev) => !prev)}
+                    >
+                      {bioCollapsed ? "See more" : "Collapse"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className={styles.navRow}>
                 {navItems.map((item) => (
@@ -649,10 +1409,204 @@ export default function ProfileLayout({
               </div>
 
               {children}
+
+              <ProfileEditOverlay
+                open={Boolean(isOwner && editProfileOpen)}
+                token={getStoredAccessToken()}
+                viewerId={viewerId}
+                profile={profile}
+                onClose={() => setEditProfileOpen(false)}
+                onSaved={(updated) => setProfile(updated)}
+              />
             </ProfileProvider>
           ) : null}
         </div>
       )}
+      {avatarMenuOpen ? (
+        <div
+          className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeAvatarMenu}
+        >
+          <div
+            className={styles.avatarMenuCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className={styles.avatarMenuItem}
+              onClick={handleAvatarUploadSelect}
+            >
+              Upload photo
+            </button>
+            <button
+              type="button"
+              className={`${styles.avatarMenuItem}`}
+              onClick={() => {
+                closeAvatarMenu();
+                openAvatarConfirm();
+              }}
+            >
+              Remove current photo
+            </button>
+            <button
+              type="button"
+              className={`${styles.avatarMenuItem} ${styles.avatarMenuDanger}`}
+              onClick={closeAvatarMenu}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {avatarConfirmOpen ? (
+        <div
+          className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeAvatarConfirm}
+        >
+          <div
+            className={styles.modalCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <div>
+                <h3 className={styles.modalTitle}>Remove avatar?</h3>
+                <p className={styles.modalBody}>
+                  This will reset your avatar to the default image.
+                </p>
+              </div>
+            </div>
+            {avatarError ? (
+              <div className={styles.modalError}>{avatarError}</div>
+            ) : null}
+            <div className={styles.modalActions}>
+              <button
+                className={styles.modalSecondary}
+                onClick={closeAvatarConfirm}
+                disabled={avatarSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className={`${styles.modalPrimary} ${styles.modalDanger}`}
+                onClick={handleConfirmRemoveAvatar}
+                disabled={avatarSubmitting}
+              >
+                {avatarSubmitting ? "Removing..." : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {avatarViewerUrl ? (
+        <ImageViewerOverlay
+          url={avatarViewerUrl}
+          alt={`${profile?.displayName || "User"} avatar`}
+          onClose={() => setAvatarViewerUrl(null)}
+        />
+      ) : null}
+      {avatarCropOpen ? (
+        <div
+          className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeAvatarCrop}
+        >
+          <div
+            className={`${styles.modalCard} ${styles.avatarCropCard}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.avatarCropHeader}>
+              <div>
+                <h3 className={styles.modalTitle}>Crop avatar</h3>
+                <p className={styles.modalBody}>
+                  Adjust the frame and zoom to choose the best area.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.closeBtn}
+                aria-label="Close"
+                onClick={closeAvatarCrop}
+              >
+                <IconClose />
+              </button>
+            </div>
+            <div className={styles.avatarCropGrid}>
+              <div className={styles.avatarCropperCard}>
+                {avatarPreview ? (
+                  <div className={styles.cropperWrapper}>
+                    <Cropper
+                      image={avatarPreview}
+                      crop={crop}
+                      zoom={zoom}
+                      aspect={1}
+                      onCropChange={setCrop}
+                      onZoomChange={setZoom}
+                      onCropComplete={(_, croppedPixels) =>
+                        setCroppedAreaPixels(croppedPixels)
+                      }
+                    />
+                  </div>
+                ) : (
+                  <div className={styles.avatarPlaceholder}>
+                    No image selected
+                  </div>
+                )}
+              </div>
+              <div className={styles.avatarCropControls}>
+                <div className={styles.avatarThumbSmall}>
+                  {avatarThumb ? (
+                    <img src={avatarThumb} alt="Preview" />
+                  ) : (
+                    <img
+                      src={profile?.avatarUrl || DEFAULT_AVATAR_URL}
+                      alt="Current avatar"
+                    />
+                  )}
+                </div>
+                <div className={styles.sliderRow}>
+                  <span className={styles.sliderLabel}>Zoom</span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={3}
+                    step={0.1}
+                    value={zoom}
+                    onChange={(e) => setZoom(Number(e.target.value))}
+                  />
+                  <span className={styles.sliderValue}>{zoom.toFixed(1)}x</span>
+                </div>
+                {avatarError ? (
+                  <div className={styles.inlineError}>{avatarError}</div>
+                ) : null}
+                <div className={styles.avatarCropActions}>
+                  <button
+                    type="button"
+                    className={styles.modalSecondary}
+                    onClick={closeAvatarCrop}
+                    disabled={avatarSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.modalPrimaryAccent}
+                    onClick={handleSubmitAvatar}
+                    disabled={avatarSubmitting}
+                  >
+                    {avatarSubmitting ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {blockOpen ? (
         <div
           className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
@@ -747,7 +1701,7 @@ export default function ProfileLayout({
                         setReportReason(
                           group.reasons.length === 1
                             ? group.reasons[0].key
-                            : null
+                            : null,
                         );
                       }}
                     >
@@ -835,18 +1789,248 @@ export default function ProfileLayout({
           </div>
         </div>
       ) : null}
+      {!isOwner && profile && canViewAbout && (aboutOpen || aboutClosing)
+        ? (() => {
+            const p = profile!;
+            return (
+              <div
+                className={`${styles.modalOverlay} ${
+                  aboutClosing
+                    ? styles.modalOverlayClosing
+                    : styles.modalOverlayOpen
+                }`}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="about-user-title"
+                onClick={closeAboutModal}
+              >
+                <div
+                  className={`${styles.modalCard} ${styles.aboutCard}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className={styles.aboutHeader}>
+                    <div>
+                      <h3 className={styles.aboutTitle} id="about-user-title">
+                        About this user
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.aboutClose}
+                      aria-label="Close"
+                      onClick={closeAboutModal}
+                    >
+                      <IconClose />
+                    </button>
+                  </div>
+
+                  <div className={styles.aboutGrid}>
+                    <div className={styles.aboutLeft}>
+                      <div className={styles.aboutIdentityRow}>
+                        <div className={styles.aboutAvatarRing}>
+                          <img
+                            src={p.avatarUrl || DEFAULT_AVATAR_URL}
+                            alt={`${p.displayName} avatar`}
+                            className={styles.aboutAvatar}
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className={styles.aboutIdentityText}>
+                          <div className={styles.aboutName}>
+                            {p.displayName}
+                          </div>
+                          <div className={styles.aboutHandle}>
+                            @{p.username}
+                          </div>
+                        </div>
+                      </div>
+
+                      {p.bio ? (
+                        <div className={styles.aboutBio}>{p.bio}</div>
+                      ) : getVisibilityStatus(p.visibility?.bio) ? (
+                        <div className={styles.aboutMuted}>
+                          {getVisibilityStatus(p.visibility?.bio) === "Private"
+                            ? "This bio is private."
+                            : "Bio visible to followers only."}
+                        </div>
+                      ) : (
+                        <div className={styles.aboutMuted}>
+                          No bio provided.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className={styles.aboutRight}>
+                      <div className={`${styles.aboutSectionTitle}`}>
+                        Details
+                      </div>
+                      <div className={styles.aboutRows}>
+                        <div className={styles.aboutRow}>
+                          <div className={styles.aboutLabel}>Workplace</div>
+                          {(() => {
+                            const display = getFieldDisplay(
+                              p.workplace?.companyName ?? "",
+                              p.visibility?.workplace,
+                            );
+                            return (
+                              <div
+                                className={`${styles.aboutValue} ${
+                                  display.muted ? styles.aboutValueMuted : ""
+                                }`}
+                              >
+                                {display.text}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <div className={styles.aboutRow}>
+                          <div className={styles.aboutLabel}>Location</div>
+                          {(() => {
+                            const display = getFieldDisplay(
+                              p.location ?? "",
+                              p.visibility?.location,
+                            );
+                            return (
+                              <div
+                                className={`${styles.aboutValue} ${
+                                  display.muted ? styles.aboutValueMuted : ""
+                                }`}
+                              >
+                                {display.text}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <div className={styles.aboutRow}>
+                          <div className={styles.aboutLabel}>Gender</div>
+                          {(() => {
+                            const display = getFieldDisplay(
+                              p.gender?.trim()
+                                ? humanizeUnderscoreValue(p.gender)
+                                : "",
+                              p.visibility?.gender,
+                            );
+                            return (
+                              <div
+                                className={`${styles.aboutValue} ${
+                                  display.muted ? styles.aboutValueMuted : ""
+                                }`}
+                              >
+                                {display.text}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <div className={styles.aboutRow}>
+                          <div className={styles.aboutLabel}>Birthdate</div>
+                          {(() => {
+                            const display = getFieldDisplay(
+                              p.birthdate ?? "",
+                              p.visibility?.birthdate,
+                            );
+                            return (
+                              <div
+                                className={`${styles.aboutValue} ${
+                                  display.muted ? styles.aboutValueMuted : ""
+                                }`}
+                              >
+                                {display.text}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      <div className={`${styles.aboutSectionTitle}`}>Stats</div>
+                      <div className={styles.aboutStatsGrid}>
+                        <div className={styles.aboutStat}>
+                          <div className={styles.aboutStatValue}>
+                            {formatCount(p.stats.totalPosts)}
+                          </div>
+                          <div className={styles.aboutStatLabel}>Posts</div>
+                        </div>
+                        <div className={styles.aboutStat}>
+                          <div className={styles.aboutStatValue}>
+                            {formatCount(p.stats.followers)}
+                          </div>
+                          <div className={styles.aboutStatLabel}>Followers</div>
+                        </div>
+                        <div className={styles.aboutStat}>
+                          <div className={styles.aboutStatValue}>
+                            {formatCount(p.stats.following)}
+                          </div>
+                          <div className={styles.aboutStatLabel}>Following</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()
+        : null}
       {toast ? <div className={styles.toast}>{toast}</div> : null}
+      {profile ? (
+        (followersTab === "followers" ? canViewFollowers : canViewFollowing) ? (
+          <FollowersOverlay
+            open={followersOpen}
+            closing={followersClosing}
+            ownerUserId={profile.userId}
+            ownerUsername={profile.username}
+            initialTab={followersTab}
+            viewerId={viewerId}
+            onCountsChange={handleOverlayCountsChange}
+            onClose={closeFollowersModal}
+          />
+        ) : null
+      ) : null}
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({
+  label,
+  value,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  onClick?: () => void;
+}) {
   return (
-    <div className={styles.statCard}>
+    <div
+      className={`${styles.statCard} ${onClick ? styles.statCardClickable : ""}`}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (!onClick) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
       <span className={styles.statValue}>{value}</span>
       <span className={styles.statLabel}>{label}</span>
     </div>
   );
+}
+
+function humanizeUnderscoreValue(value?: string | null) {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (!trimmed.includes("_")) return trimmed;
+  return trimmed
+    .split("_")
+    .filter(Boolean)
+    .map((part) =>
+      part.length
+        ? `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`
+        : part,
+    )
+    .join(" ");
 }
 
 function ProfileSkeleton() {
@@ -908,6 +2092,19 @@ function IconDots() {
   );
 }
 
+function IconClose() {
+  return (
+    <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M6 6l12 12M18 6L6 18"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function IconInfo() {
   return (
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
@@ -926,6 +2123,29 @@ function IconInfo() {
         strokeLinecap="round"
       />
       <circle cx="12" cy="8" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconLock() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+      <rect
+        x="4.5"
+        y="10"
+        width="15"
+        height="10"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M8 10V7.5a4 4 0 0 1 8 0V10"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="15" r="1" fill="currentColor" />
     </svg>
   );
 }
@@ -1011,32 +2231,20 @@ function IconBookmark() {
 
 function IconRepeat() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <svg
+      aria-hidden
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="var(--color-text-muted)"
+      xmlns="http://www.w3.org/2000/svg"
+    >
       <path
-        d="M4 7.5c.6-1.8 2.3-3 4.2-3h9.3"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <path
-        d="m14.5 2.5 3 2.7-3 2.7"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M20 16.5c-.6 1.8-2.3 3-4.2 3H6.5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <path
-        d="m9.5 21.5-3-2.7 3-2.7"
-        stroke="currentColor"
-        strokeWidth="1.6"
+        stroke="none"
+        strokeWidth={1}
         strokeLinecap="round"
         strokeLinejoin="round"
+        d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"
       />
     </svg>
   );

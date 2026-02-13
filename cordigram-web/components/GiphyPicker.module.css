@@ -151,7 +151,9 @@
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
   background: #1e1f22;
 }
 

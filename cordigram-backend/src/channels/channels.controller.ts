@@ -63,10 +63,7 @@ export class ChannelsController {
   }
 
   @Delete(':id')
-  async deleteChannel(
-    @Param('id') channelId: string,
-    @Request() req: any,
-  ) {
+  async deleteChannel(@Param('id') channelId: string, @Request() req: any) {
     await this.channelsService.deleteChannel(channelId, req.user.userId);
     return { message: 'Channel deleted successfully' };
   }

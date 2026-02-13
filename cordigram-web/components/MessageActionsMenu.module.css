@@ -1,0 +1,50 @@
+.overlay {
+  position: absolute;
+  z-index: 1000;
+}
+
+.menu {
+  background: #2b2d31;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 6px;
+  min-width: 200px;
+  border: 1px solid #3f4147;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  color: #dbdee1;
+  font-size: 14px;
+  text-align: left;
+  font-weight: 500;
+}
+
+.menuItem:hover {
+  background: #404249;
+}
+
+.menuItem.danger {
+  color: #f23f43;
+}
+
+.menuItem.danger:hover {
+  background: rgba(242, 63, 67, 0.1);
+}
+
+.icon {
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+}

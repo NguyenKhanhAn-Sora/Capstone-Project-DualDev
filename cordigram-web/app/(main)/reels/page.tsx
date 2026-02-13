@@ -4,16 +4,21 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import EmojiPicker from "emoji-picker-react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   fetchReelsFeed,
   fetchReelDetail,
+  fetchPostDetail,
+  fetchFeed,
+  fetchUserPosts,
   likePost,
   unlikePost,
   savePost,
   unsavePost,
   repostPost,
   unrepostPost,
+  createPost,
+  createReel,
   followUser,
   unfollowUser,
   viewPost,
@@ -23,6 +28,7 @@ import {
   setPostHideLikeCount,
   updatePostVisibility,
   updatePost,
+  updatePostNotificationMute,
   deletePost,
   searchProfiles,
   type ProfileSearchItem,
@@ -32,6 +38,31 @@ import ReelComments from "./ReelComments";
 import styles from "./reel.module.css";
 import postStyles from "../post/post.module.css";
 import feedStyles from "../home-feed.module.css";
+import { DateSelect } from "@/ui/date-select/date-select";
+import { TimeSelect } from "@/ui/time-select/time-select";
+import RepostOverlay, {
+  type QuoteInput,
+  type RepostTarget,
+} from "@/ui/repost-overlay/repost-overlay";
+
+function LocationPinIcon() {
+  return (
+    <svg
+      aria-hidden
+      width={14}
+      height={14}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 21s-6-5.5-6-10a6 6 0 1 1 12 0c0 4.5-6 10-6 10Z" />
+      <circle cx="12" cy="11" r="2.5" />
+    </svg>
+  );
+}
 
 const formatCount = (value?: number) => {
   const n = value ?? 0;
@@ -45,8 +76,26 @@ const REEL_STATS_POLL_INTERVAL = 5000;
 const VIEW_THRESHOLD = 0.5;
 const VIEW_DWELL_MS = 2000;
 const VIEW_COOLDOWN_MS = 5 * 60 * 1000;
+const COMMENT_PANEL_WIDTH = "clamp(320px, 28vw, 420px)";
 
 type ReelItem = FeedItem & { durationSeconds?: number };
+
+const isRepostOfReel = (item: FeedItem): boolean => {
+  const duration = (item as any)?.durationSeconds as number | undefined;
+  const mediaIsVideo = item.media?.some((m) => m?.type === "video");
+  return Boolean(
+    item.repostOf &&
+    (item.kind === "reel" || typeof duration === "number" || mediaIsVideo),
+  );
+};
+
+const coerceReelKind = (item: ReelItem): ReelItem => {
+  if (item.kind === "reel") return item;
+  if (isRepostOfReel(item)) {
+    return { ...item, kind: "reel" } as ReelItem;
+  }
+  return item;
+};
 
 type ReportCategory = {
   key:
@@ -196,6 +245,13 @@ const extractMentionsFromCaption = (value: string) => {
   return Array.from(handles);
 };
 
+const buildLocalDateTimeIso = (date: string, time: string) => {
+  if (!date || !time) return null;
+  const dt = new Date(`${date}T${time}:00`);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString();
+};
+
 const findActiveMention = (value: string, caret: number) => {
   const beforeCaret = value.slice(0, caret);
   const match = /(^|[\s([{.,!?])@([a-zA-Z0-9_.]{0,30})$/i.exec(beforeCaret);
@@ -204,6 +260,12 @@ const findActiveMention = (value: string, caret: number) => {
   const start = caret - handle.length - 1;
   return { handle, start, end: caret };
 };
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const QUOTE_CHAR_LIMIT = 500;
+const REPOST_ANIMATION_MS = 200;
 
 type ReelVideoProps = {
   item: ReelItem;
@@ -333,6 +395,33 @@ const IconRepost = ({ filled }: { filled?: boolean }) => (
         />
       </>
     )}
+const IconRepost = () => (
+  <svg aria-hidden width="26" height="26" viewBox="0 0 48 48" fill="none">
+    <path
+      fill="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      d="M21.68 3.18a2 2 0 0 1 2.14.32l21.5 19a2 2 0 0 1-.02 3.02l-21.5 18.5a2 2 0 0 1-3.3-1.52v-9.97c-5.68.28-11.95 1.75-16.09 5.88A2 2 0 0 1 1 37c0-11.68 7.7-21.05 19.5-21.94V5a2 2 0 0 1 1.18-1.82ZM24.5 30.5v7.64l16.46-14.16L24.5 9.44V17a2 2 0 0 1-2.05 2c-8.4-.21-15.62 5.34-17.09 13.66 4.47-2.7 9.8-3.87 14.98-4.13.68-.03 1.22-.04 1.6-.04 1.19 0 2.56.26 2.56 2.01Z"
+    />
+  </svg>
+);
+
+const IconReup = ({ size = 16 }: { size?: number }) => (
+  <svg
+    aria-hidden
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      stroke="none"
+      strokeWidth={1}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"
+    />
   </svg>
 );
 
@@ -391,6 +480,7 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
       observer.disconnect();
     };
   }, [item.content, item.content?.length, item.hashtags?.length]);
+  }, [item.id, item.content, item.content?.length, item.hashtags?.length]);
 
   useEffect(() => {
     viewSentRef.current = false;
@@ -479,6 +569,7 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
     const ratio = Math.min(
       1,
       Math.max(0, (e.clientX - rect.left) / Math.max(rect.width, 1))
+      Math.max(0, (e.clientX - rect.left) / Math.max(rect.width, 1)),
     );
     const video = videoRef.current;
     if (video && duration) {
@@ -500,6 +591,7 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
     () => item.hashtags?.map((tag) => `#${tag}`) ?? [],
     [item.hashtags]
   );
+  const hashtags = useMemo(() => item.hashtags ?? [], [item.hashtags]);
   const shellClass = [
     styles.videoShell,
     !isPlaying ? styles.videoShellPaused : "",
@@ -549,6 +641,49 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
       </div>
       <div className={styles.captionCard}>
         <div className={styles.captionHeader}>
+          {item.repostOfAuthorUsername ? (
+            <div className={styles.captionRepostBanner}>
+              <span className={styles.captionRepostIcon}>
+                <IconReup size={14} />
+              </span>
+              <span className={styles.captionRepostText}>
+                Reposted from{" "}
+                {item.repostOfAuthorId ? (
+                  <Link
+                    href={`/profile/${item.repostOfAuthorId}`}
+                    className={styles.captionRepostLink}
+                  >
+                    @{item.repostOfAuthorUsername}
+                  </Link>
+                ) : (
+                  <span className={styles.captionRepostLink}>
+                    @{item.repostOfAuthorUsername}
+                  </span>
+                )}
+              </span>
+            </div>
+          ) : null}
+
+          {item.location ? (
+            <a
+              className={styles.captionLocationRow}
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                item.location,
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <span className={styles.captionLocationIcon} aria-hidden>
+                <LocationPinIcon />
+              </span>
+              <span className={styles.captionLocationLink}>
+                {item.location}
+              </span>
+            </a>
+          ) : null}
+
           {item.authorUsername ? (
             item.authorId ? (
               <Link
@@ -580,6 +715,14 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
             <span key={tag} className={styles.hashtagInline}>
               {tag}
             </span>
+            <Link
+              key={tag}
+              href={`/hashtag/${encodeURIComponent(tag)}`}
+              className={styles.hashtagInline}
+              onClick={(e) => e.stopPropagation()}
+            >
+              #{tag}
+            </Link>
           ))}
         </div>
       </div>
@@ -600,6 +743,7 @@ function ReelActions({
   onLike: (id: string, liked: boolean) => void;
   onSave: (id: string, saved: boolean) => void;
   onRepost: (id: string, reposted: boolean) => void;
+  onRepost: (id: string, reposted: boolean, anchor?: DOMRect | null) => void;
   onComment: (id: string) => void;
   onFollow: (authorId: string, nextFollow: boolean) => void;
   viewerId?: string;
@@ -607,6 +751,7 @@ function ReelActions({
   const following = Boolean(
     item.flags?.following ??
       (item as unknown as { following?: boolean }).following
+    (item as unknown as { following?: boolean }).following,
   );
   const isSelf = Boolean(viewerId && item.authorId === viewerId);
   const hideLikeCount =
@@ -660,6 +805,7 @@ function ReelActions({
             }`}
             onClick={() => onFollow(item.authorId!, !following)}
             aria-label={following ? "Đang theo dõi" : "Theo dõi"}
+            aria-label={following ? "Following" : "Follow"}
           >
             {following ? (
               <span className={styles.tickIcon}>✓</span>
@@ -712,6 +858,17 @@ function ReelActions({
       >
         <span className={`${styles.actionBtnWrap}`}>
           <IconRepost filled={item.reposted} />
+        onClick={(e) =>
+          onRepost(
+            item.id,
+            Boolean(item.reposted),
+            e.currentTarget.getBoundingClientRect(),
+          )
+        }
+        aria-label="Repost reel"
+      >
+        <span className={`${styles.actionBtnWrap}`}>
+          <IconRepost />
         </span>
         <span>{formatCount(item.stats?.reposts)}</span>
       </button>
@@ -720,13 +877,25 @@ function ReelActions({
 }
 
 export default function ReelPage() {
+      : getUserIdFromToken(localStorage.getItem("accessToken"))
+export default function ReelPage({
+  scopeOverride,
+}: {
+  scopeOverride?: "all" | "following";
+} = {}) {
+  const REELS_PAGE_SIZE = 10;
   const canRender = useRequireAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams<{ id?: string | string[] }>();
+  const scope = useMemo<"all" | "following">(() => {
+    if (scopeOverride) return scopeOverride;
+    return searchParams?.get("scope") === "following" ? "following" : "all";
+  }, [scopeOverride, searchParams]);
   const [viewerId, setViewerId] = useState<string | undefined>(() =>
     typeof window === "undefined"
       ? undefined
-      : getUserIdFromToken(localStorage.getItem("accessToken"))
+      : getUserIdFromToken(localStorage.getItem("accessToken")),
   );
   const requestedReelId = useMemo(() => {
     const fromPath = params?.id
@@ -751,14 +920,26 @@ export default function ReelPage() {
 
     return undefined;
   }, [params, viewerId]);
+  const singleMode = useMemo(
+    () => searchParams?.get("single") === "1",
+    [searchParams],
+  );
+  const originReelId = useMemo(
+    () => searchParams?.get("origin") || undefined,
+    [searchParams],
+  );
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string>("");
   const [items, setItems] = useState<ReelItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const activeIndexRef = useRef(0);
   const listRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const autoLoadLockRef = useRef(false);
   const visibleReelsRef = useRef<Set<string>>(new Set());
   const viewCooldownRef = useRef<Map<string, number>>(new Map());
   const [transition, setTransition] = useState<"next" | "prev" | null>(null);
@@ -768,10 +949,11 @@ export default function ReelPage() {
   const commentPanelRef = useRef<HTMLElement | null>(null);
   const commentCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
+  const menuRef = useRef<HTMLDivElement | null>(null);
+    null,
   );
   const missingDetailRef = useRef<Set<string>>(new Set());
   const [openMoreMenuId, setOpenMoreMenuId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportClosing, setReportClosing] = useState(false);
   const reportHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -782,15 +964,24 @@ export default function ReelPage() {
   const [reportNote, setReportNote] = useState("");
   const [reportError, setReportError] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [repostTarget, setRepostTarget] = useState<RepostTarget | null>(null);
   const [visibilityModalOpen, setVisibilityModalOpen] = useState(false);
   const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [visibilitySelected, setVisibilitySelected] = useState<
     "public" | "followers" | "private"
   >("public");
   const [visibilityError, setVisibilityError] = useState("");
+  const [muteModalOpen, setMuteModalOpen] = useState(false);
+  const [muteTargetId, setMuteTargetId] = useState<string | null>(null);
+  const [muteOption, setMuteOption] = useState("5m");
+  const [muteCustomDate, setMuteCustomDate] = useState("");
+  const [muteCustomTime, setMuteCustomTime] = useState("");
+  const [muteSaving, setMuteSaving] = useState(false);
+  const [muteError, setMuteError] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [editTargetId, setEditTargetId] = useState<string | null>(null);
   const [editCaption, setEditCaption] = useState("");
   const editCaptionRef = useRef<HTMLTextAreaElement | null>(null);
   const editEmojiRef = useRef<HTMLDivElement | null>(null);
@@ -815,12 +1006,19 @@ export default function ReelPage() {
   const [locationSuggestions, setLocationSuggestions] = useState<
     Array<{ label: string; lat: string; lon: string }>
   >([]);
+  const suppressNextLocationSuggestRef = useRef(false);
+  const [locationFocused, setLocationFocused] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [locationOpen, setLocationOpen] = useState(false);
   const [locationHighlight, setLocationHighlight] = useState(-1);
   const [editAllowComments, setEditAllowComments] = useState(true);
   const [editAllowDownload, setEditAllowDownload] = useState(false);
+  const [lockedEditAllowDownload, setLockedEditAllowDownload] = useState<
+    boolean | null
+  >(null);
+  const [lockedEditAllowDownloadLoading, setLockedEditAllowDownloadLoading] =
+    useState(false);
   const [editHideLikeCount, setEditHideLikeCount] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
@@ -833,6 +1031,58 @@ export default function ReelPage() {
     if (!openMoreMenuId) return;
     const handleClick = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+  const activeReel = items[activeIndex];
+
+  const editingReel = useMemo(() => {
+    if (!editTargetId) return null;
+    return items.find((it) => it.id === editTargetId) ?? null;
+  }, [editTargetId, items]);
+
+  useEffect(() => {
+    if (!editOpen) {
+      setLockedEditAllowDownload(null);
+      setLockedEditAllowDownloadLoading(false);
+      return;
+    }
+    if (!token || !editingReel?.repostOf) {
+      setLockedEditAllowDownload(null);
+      setLockedEditAllowDownloadLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLockedEditAllowDownloadLoading(true);
+    (async () => {
+      try {
+        const originalId = String(editingReel.repostOf);
+        let original: FeedItem | null = null;
+        try {
+          original = await fetchReelDetail({ token, reelId: originalId });
+        } catch {
+          original = await fetchPostDetail({ token, postId: originalId });
+        }
+        if (cancelled) return;
+        const next = Boolean(original?.allowDownload);
+        setLockedEditAllowDownload(next);
+        setEditAllowDownload(next);
+      } catch {
+        if (cancelled) return;
+        setLockedEditAllowDownload(null);
+      } finally {
+        if (!cancelled) setLockedEditAllowDownloadLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editingReel?.id, editingReel?.repostOf, editOpen, token]);
+
+  useEffect(() => {
+    if (!openMoreMenuId) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest(`[data-more-menu-id="${openMoreMenuId}"]`)) {
         setOpenMoreMenuId(null);
       }
     };
@@ -927,6 +1177,18 @@ export default function ReelPage() {
 
   useEffect(() => {
     if (!editOpen) return;
+
+    if (suppressNextLocationSuggestRef.current) {
+      suppressNextLocationSuggestRef.current = false;
+      return;
+    }
+
+    // Only suggest while the input is actively focused. This avoids the dropdown
+    // popping open just because we seeded an existing location when opening edit.
+    if (!locationFocused) {
+      return;
+    }
+
     if (!locationQuery.trim()) {
       setLocationSuggestions([]);
       setLocationOpen(false);
@@ -964,6 +1226,7 @@ export default function ReelPage() {
           : [];
         setLocationSuggestions(mapped);
         setLocationOpen(true);
+        setLocationOpen(mapped.length > 0);
         setLocationHighlight(mapped.length ? 0 : -1);
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -981,6 +1244,7 @@ export default function ReelPage() {
       clearTimeout(timer);
     };
   }, [editOpen, locationQuery]);
+  }, [editOpen, locationFocused, locationQuery]);
 
   useEffect(() => {
     if (!canRender) return;
@@ -1000,6 +1264,42 @@ export default function ReelPage() {
 
         if (!nextItems.length && viewerId) {
           const owned =
+  const loadPage = useCallback(
+    async (nextPage: number, opts?: { initial?: boolean }) => {
+      if (!token) return;
+      const isInitial = Boolean(opts?.initial);
+      if (isInitial) setLoading(true);
+      else setLoadingMore(true);
+
+      try {
+        const limit = nextPage * REELS_PAGE_SIZE;
+
+        let base = ((await fetchReelsFeed({ token, limit, scope })) || []).map(
+          coerceReelKind,
+        );
+        let nextItems = [...base];
+        let nextHasMore = base.length >= limit;
+
+        // Bring in reposted reels that may only be delivered via main feed
+        try {
+          const repostCandidates = (
+            (await fetchFeed({ token, limit: 40, scope })) || []
+          )
+            .filter(isRepostOfReel)
+            .map(coerceReelKind);
+          if (repostCandidates.length) {
+            const seen = new Set(nextItems.map((it) => it.id));
+            repostCandidates.forEach((it) => {
+              if (!seen.has(it.id)) {
+                seen.add(it.id);
+                nextItems.push(it);
+              }
+            });
+          }
+        } catch {}
+
+        if (!nextItems.length && viewerId && scope !== "following") {
+          const ownedBase = (
             (await fetchReelsFeed({
               token,
               authorId: viewerId,
@@ -1021,6 +1321,144 @@ export default function ReelPage() {
         setError(
           (err as { message?: string })?.message ||
             "Không tải được danh sách reel"
+              scope,
+              limit,
+            })) || []
+          ).map(coerceReelKind);
+          nextHasMore = ownedBase.length >= limit;
+          const owned = [...ownedBase];
+          try {
+            const repostOwned = (
+              (await fetchUserPosts({ token, userId: viewerId, limit: 40 })) ||
+              []
+            )
+              .filter(isRepostOfReel)
+              .map(coerceReelKind);
+            const seenOwned = new Set(owned.map((it) => it.id));
+            repostOwned.forEach((it) => {
+              if (!seenOwned.has(it.id)) {
+                seenOwned.add(it.id);
+                owned.push(it);
+              }
+            });
+          } catch {}
+          if (owned.length) nextItems = owned;
+        }
+
+        nextItems = nextItems.slice(0, limit);
+
+        setItems(nextItems);
+        setHasMore(nextHasMore);
+        setPage(nextPage);
+
+        if (isInitial) {
+          const initialIndex = requestedReelId
+            ? nextItems.findIndex((it) => it.id === requestedReelId)
+            : 0;
+          setActiveIndex(initialIndex >= 0 ? initialIndex : 0);
+        }
+
+        setError("");
+      } catch (err) {
+        setError(
+          (err as { message?: string })?.message || "Unable to load reels",
+        );
+      } finally {
+        if (isInitial) setLoading(false);
+        else setLoadingMore(false);
+      }
+    },
+    [REELS_PAGE_SIZE, requestedReelId, scope, token, viewerId],
+  );
+
+  const loadMore = useCallback(() => {
+    if (!token) return;
+    if (singleMode) return;
+    if (loading || loadingMore) return;
+    if (!hasMore) return;
+    void loadPage(page + 1);
+  }, [hasMore, loadPage, loading, loadingMore, page, singleMode, token]);
+
+  useEffect(() => {
+    if (!token) return;
+    if (singleMode && requestedReelId) return;
+    void loadPage(1, { initial: true });
+  }, [loadPage, requestedReelId, singleMode, token, viewerId]);
+
+  useEffect(() => {
+    if (!loadingMore) autoLoadLockRef.current = false;
+  }, [loadingMore]);
+
+  useEffect(() => {
+    const container = listRef.current;
+    if (!container) return;
+    if (singleMode) return;
+    if (!items.length) return;
+    if (!hasMore) return;
+    if (loading || loadingMore) return;
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const triggerIndex = Math.max(0, items.length - 2);
+    const triggerItem = items[triggerIndex];
+    const triggerEl = triggerItem ? itemRefs.current[triggerItem.id] : null;
+    if (!triggerEl) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isVisible = entries.some((entry) => entry.isIntersecting);
+        if (!isVisible) return;
+        if (autoLoadLockRef.current) return;
+        autoLoadLockRef.current = true;
+        loadMore();
+      },
+      {
+        root: container,
+        threshold: 0.6,
+      },
+    );
+
+    observer.observe(triggerEl);
+    return () => observer.disconnect();
+  }, [hasMore, items, loadMore, loading, loadingMore, singleMode]);
+
+  useEffect(() => {
+    if (!singleMode || !token || !requestedReelId) return;
+    let cancelled = false;
+    setLoading(true);
+    const load = async () => {
+      try {
+        const detail = await fetchReelDetail({
+          token,
+          reelId: requestedReelId,
+        });
+        if (cancelled || !detail) return;
+        setItems([coerceReelKind(detail as ReelItem)]);
+        setActiveIndex(0);
+        setError("");
+      } catch (err) {
+        if (cancelled) return;
+        if (originReelId && originReelId !== requestedReelId) {
+          try {
+            const fallback = await fetchReelDetail({
+              token,
+              reelId: originReelId,
+            });
+            if (cancelled || !fallback) return;
+            setItems([coerceReelKind(fallback as ReelItem)]);
+            setActiveIndex(0);
+            setError("");
+            return;
+          } catch (fallbackErr) {
+            setError(
+              (fallbackErr as { message?: string })?.message ||
+                (err as { message?: string })?.message ||
+                "Unable to load reel",
+            );
+            return;
+          }
+        }
+        setError(
+          (err as { message?: string })?.message || "Unable to load reel",
         );
       } finally {
         if (!cancelled) setLoading(false);
@@ -1028,10 +1466,12 @@ export default function ReelPage() {
     };
 
     void load();
+  }, [token, viewerId, requestedReelId]);
+
     return () => {
       cancelled = true;
     };
-  }, [token, viewerId, requestedReelId]);
+  }, [singleMode, token, requestedReelId, originReelId]);
 
   useEffect(() => {
     if (!token || !viewerId) return;
@@ -1091,6 +1531,7 @@ export default function ReelPage() {
         if (cancelled) return;
         setError(
           (err as { message?: string })?.message || "Không tải được reel"
+          (err as { message?: string })?.message || "Unable to load reel",
         );
       });
 
@@ -1102,6 +1543,7 @@ export default function ReelPage() {
   const updateItem = (id: string, patch: Partial<ReelItem>) => {
     setItems((prev) =>
       prev.map((it) => (it.id === id ? { ...it, ...patch } : it))
+      prev.map((it) => (it.id === id ? { ...it, ...patch } : it)),
     );
   };
 
@@ -1109,6 +1551,7 @@ export default function ReelPage() {
     id: string,
     field: keyof NonNullable<FeedItem["stats"]>,
     delta: number
+    delta: number,
   ) => {
     setItems((prev) =>
       prev.map((it) =>
@@ -1122,6 +1565,8 @@ export default function ReelPage() {
             }
           : it
       )
+          : it,
+      ),
     );
   };
 
@@ -1139,9 +1584,12 @@ export default function ReelPage() {
               }
             : it
         )
+    []
+            : it,
+        ),
       );
     },
-    []
+    [],
   );
 
   const showToast = useCallback((message: string, duration = 1600) => {
@@ -1176,10 +1624,12 @@ export default function ReelPage() {
     setEditAllowDownload(
       Boolean(
         (current as any)?.allowDownload ??
-          (current as any)?.allowDownloads ??
-          (current as any)?.flags?.allowDownload ??
           (current as any)?.permissions?.allowDownload
       )
+        (current as any)?.allowDownloads ??
+        (current as any)?.flags?.allowDownload ??
+        (current as any)?.permissions?.allowDownload,
+      ),
     );
     setEditHideLikeCount(Boolean(current?.hideLikeCount));
     setEditError("");
@@ -1188,6 +1638,7 @@ export default function ReelPage() {
 
   const openEditModal = () => {
     if (!active) return;
+    setEditTargetId(active.id);
     applyEditSeed(active);
     setEditOpen(true);
     setOpenMoreMenuId(null);
@@ -1196,10 +1647,13 @@ export default function ReelPage() {
   const closeEditModal = () => {
     if (editSaving) return;
     setEditOpen(false);
+    event: React.ChangeEvent<HTMLTextAreaElement>
+    setEditTargetId(null);
+    setLocationFocused(false);
   };
 
   const handleCaptionChange = (
-    event: React.ChangeEvent<HTMLTextAreaElement>
+    event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
     const value = event.target.value;
     const caret = event.target.selectionStart ?? value.length;
@@ -1275,6 +1729,7 @@ export default function ReelPage() {
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
         prev + 1 < mentionSuggestions.length ? prev + 1 : 0
+        prev + 1 < mentionSuggestions.length ? prev + 1 : 0,
       );
       return;
     }
@@ -1283,6 +1738,7 @@ export default function ReelPage() {
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
         prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1,
       );
       return;
     }
@@ -1319,6 +1775,7 @@ export default function ReelPage() {
   };
 
   const pickLocation = (label: string) => {
+    suppressNextLocationSuggestRef.current = true;
     setEditLocation(label);
     setLocationQuery(label);
     setLocationOpen(false);
@@ -1332,6 +1789,7 @@ export default function ReelPage() {
       e.preventDefault();
       setLocationHighlight((prev) =>
         prev + 1 < locationSuggestions.length ? prev + 1 : 0
+        prev + 1 < locationSuggestions.length ? prev + 1 : 0,
       );
       return;
     }
@@ -1339,6 +1797,7 @@ export default function ReelPage() {
       e.preventDefault();
       setLocationHighlight((prev) =>
         prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1
+        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1,
       );
       return;
     }
@@ -1355,12 +1814,15 @@ export default function ReelPage() {
     setEditSuccess("");
 
     if (!token || !active) {
+    const targetId = editTargetId ?? active?.id;
+    if (!token || !targetId) {
       setEditError("Please sign in to edit reels");
       return;
     }
 
     const normalizedHashtags = Array.from(
       new Set(editHashtags.map((t) => normalizeHashtag(t.toString())))
+      new Set(editHashtags.map((t) => normalizeHashtag(t.toString()))),
     ).filter(Boolean);
 
     const normalizedMentions = Array.from(
@@ -1372,11 +1834,17 @@ export default function ReelPage() {
           ),
         ].filter(Boolean)
       )
+            t.toString().trim().replace(/^@/, "").toLowerCase(),
+          ),
+        ].filter(Boolean),
+      ),
     );
 
     const trimmedLocation = editLocation.trim();
 
     const payload = {
+    const isRepost = Boolean((editingReel ?? active)?.repostOf);
+    const payload: any = {
       content: editCaption || "",
       hashtags: normalizedHashtags,
       mentions: normalizedMentions,
@@ -1385,19 +1853,32 @@ export default function ReelPage() {
       allowDownload: editAllowDownload,
       hideLikeCount: editHideLikeCount,
     } as const;
+      hideLikeCount: editHideLikeCount,
+    };
+
+    if (isRepost) {
+      payload.allowDownload = Boolean(
+        lockedEditAllowDownload ?? editAllowDownload,
+      );
+    } else {
+      payload.allowDownload = editAllowDownload;
+    }
 
     try {
       setEditSaving(true);
       const updated = await updatePost({
         token,
         postId: active.id,
+        prev.map((it) => (it.id === active.id ? { ...it, ...updated } : it))
+        postId: targetId,
         payload,
       });
       setItems((prev) =>
-        prev.map((it) => (it.id === active.id ? { ...it, ...updated } : it))
+        prev.map((it) => (it.id === targetId ? { ...it, ...updated } : it)),
       );
       setEditSuccess("Reel updated");
       setEditOpen(false);
+      setEditTargetId(null);
       showToast("Reel updated");
     } catch (err: any) {
       const message =
@@ -1436,6 +1917,7 @@ export default function ReelPage() {
             : Math.max(
                 0,
                 Math.min(idx === -1 ? activeIndex : idx, next.length - 1)
+                Math.min(idx === -1 ? activeIndex : idx, next.length - 1),
               );
         nextTargetId = next[plannedIndex]?.id ?? null;
         setActiveIndex(plannedIndex);
@@ -1481,6 +1963,7 @@ export default function ReelPage() {
       updateStats(id, "hearts", liked ? 1 : -1);
       setError(
         (err as { message?: string })?.message || "Không thể cập nhật like"
+        (err as { message?: string })?.message || "Unable to update like",
       );
     }
   };
@@ -1529,6 +2012,124 @@ export default function ReelPage() {
       updateStats(id, "reposts", reposted ? 1 : -1);
       setError((err as { message?: string })?.message || "Không thể repost");
     }
+      setError((err as { message?: string })?.message || "Unable to save reel");
+    }
+  };
+
+  const incrementRepostStat = useCallback((postId: string) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== postId) return it;
+        const currentShares = it.stats?.reposts ?? it.stats?.shares ?? 0;
+        const nextShares = currentShares + 1;
+        return {
+          ...it,
+          stats: {
+            ...it.stats,
+            shares: nextShares,
+            reposts: nextShares,
+          },
+          reposted: true,
+          flags: { ...(it.flags || {}), reposted: true },
+        };
+      }),
+    );
+  }, []);
+
+  const resolveOriginalPostId = useCallback(
+    (postId: string) => {
+      const target = items.find((it) => it.id === postId);
+      return (target as any)?.repostOf || postId;
+    },
+    [items],
+  );
+
+  const handleQuickRepost = useCallback(
+    async (target: RepostTarget) => {
+      if (!token) {
+        showToast("Sign in to repost");
+        return;
+      }
+      const originalId = resolveOriginalPostId(target.postId);
+      const targetId = target.postId;
+      await createPost({ token, payload: { repostOf: originalId } });
+      incrementRepostStat(originalId);
+      if (originalId !== targetId) {
+        incrementRepostStat(targetId);
+        try {
+          await repostPost({ token, postId: targetId });
+        } catch {}
+      }
+      showToast("Reposted");
+    },
+    [incrementRepostStat, resolveOriginalPostId, showToast, token],
+  );
+
+  const handleShareQuote = useCallback(
+    async (target: RepostTarget, input: QuoteInput) => {
+      if (!token) {
+        showToast("Sign in to repost");
+        return;
+      }
+      const originalId = resolveOriginalPostId(target.postId);
+      const targetId = target.postId;
+
+      const note = input.content.trim();
+      const mentions = extractMentionsFromCaption(note);
+      const payload = {
+        repostOf: originalId,
+        content: note || undefined,
+        hashtags: input.hashtags.length ? input.hashtags : undefined,
+        location: input.location.trim() || undefined,
+        allowComments: input.allowComments,
+        allowDownload: Boolean(target.originalAllowDownload),
+        hideLikeCount: input.hideLikeCount,
+        visibility: input.visibility,
+        mentions: mentions.length ? mentions : undefined,
+      } as const;
+
+      if (target.kind === "reel") {
+        await createReel({ token, payload: payload as any });
+      } else {
+        await createPost({ token, payload: payload as any });
+      }
+
+      incrementRepostStat(originalId);
+      if (originalId !== targetId) {
+        incrementRepostStat(targetId);
+        try {
+          await repostPost({ token, postId: targetId });
+        } catch {}
+      }
+
+      showToast("Reposted with quote");
+    },
+    [incrementRepostStat, resolveOriginalPostId, showToast, token],
+  );
+
+  const handleRepost = (
+    id: string,
+    _reposted: boolean,
+    anchor?: DOMRect | null,
+  ) => {
+    const target = items.find((x) => x.id === id);
+    if (!target) return;
+    const label =
+      target.authorUsername ||
+      target.authorDisplayName ||
+      target.authorId ||
+      "creator";
+    const kind = (target as any)?.kind === "post" ? "post" : "reel";
+    if (!token) {
+      showToast("Sign in to repost");
+      return;
+    }
+    setRepostTarget({
+      postId: id,
+      label,
+      kind,
+      originalAllowDownload: Boolean(target.allowDownload),
+    });
   };
 
   const handleViewed = (id: string, ms?: number) => {
@@ -1550,11 +2151,13 @@ export default function ReelPage() {
   const isAuthor = useMemo(
     () => Boolean(active?.authorId && viewerId && active.authorId === viewerId),
     [active?.authorId, viewerId]
+    [active?.authorId, viewerId],
   );
 
   const selectedReportGroup = useMemo(
     () => REPORT_GROUPS.find((g) => g.key === reportCategory),
     [reportCategory]
+    [reportCategory],
   );
 
   const commentsToggleLabel =
@@ -1568,18 +2171,21 @@ export default function ReelPage() {
     () =>
       Boolean(
         active &&
-          ((active as any)?.allowDownloads ??
-            (active as any)?.allowDownload ??
-            (active as any)?.flags?.allowDownloads ??
-            (active as any)?.flags?.allowDownload ??
-            (active as any)?.permissions?.allowDownloads ??
             (active as any)?.permissions?.allowDownload)
-      ),
     [active]
+    active?.flags?.following ?? (active as any)?.following
+        ((active as any)?.allowDownloads ??
+          (active as any)?.allowDownload ??
+          (active as any)?.flags?.allowDownloads ??
+          (active as any)?.flags?.allowDownload ??
+          (active as any)?.permissions?.allowDownloads ??
+          (active as any)?.permissions?.allowDownload),
+      ),
+    [active],
   );
 
   const activeFollowing = Boolean(
-    active?.flags?.following ?? (active as any)?.following
+    active?.flags?.following ?? (active as any)?.following,
   );
 
   const activeSaved = Boolean(active?.flags?.saved ?? active?.saved);
@@ -1588,6 +2194,40 @@ export default function ReelPage() {
     if (!editOpen) return;
     applyEditSeed(active);
   }, [active, applyEditSeed, editOpen]);
+  const muteOptions = useMemo(
+    () => [
+      { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
+      { key: "10m", label: "10 minutes", ms: 10 * 60 * 1000 },
+      { key: "15m", label: "15 minutes", ms: 15 * 60 * 1000 },
+      { key: "30m", label: "30 minutes", ms: 30 * 60 * 1000 },
+      { key: "1h", label: "1 hour", ms: 60 * 60 * 1000 },
+      { key: "1d", label: "1 day", ms: 24 * 60 * 60 * 1000 },
+      { key: "until", label: "Until I turn it back on", ms: null },
+      { key: "custom", label: "Choose date & time", ms: null },
+    ],
+    [],
+  );
+
+  const muteTarget = useMemo(
+    () => (muteTargetId ? items.find((it) => it.id === muteTargetId) : null),
+    [items, muteTargetId],
+  );
+
+  const isMutedForItem = (item?: ReelItem | null) => {
+    if (!item) return false;
+    if (item.notificationsMutedIndefinitely) return true;
+    if (item.notificationsMutedUntil) {
+      const dt = new Date(item.notificationsMutedUntil);
+      if (!Number.isNaN(dt.getTime()) && dt.getTime() > Date.now()) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // NOTE: Do not re-seed edit form values while the modal is open.
+  // The active reel can change due to scrolling / navigation, and re-seeding would
+  // overwrite user input mid-typing (e.g., location field getting cleared).
 
   useEffect(() => {
     if (!active) return;
@@ -1604,6 +2244,12 @@ export default function ReelPage() {
   useEffect(() => {
     if (!transition) return;
     const id = setTimeout(() => setTransition(null), 420);
+    const id = setTimeout(() => {
+      setTransition(null);
+      transitionRef.current = null;
+      // Force update state after transition ends
+      computeNearestRef.current?.();
+    }, 600);
     return () => clearTimeout(id);
   }, [transition]);
 
@@ -1618,6 +2264,20 @@ export default function ReelPage() {
     const el = target ? itemRefs.current[target.id] : null;
     setTransition("next");
     if (el) {
+    const container = listRef.current;
+
+    transitionRef.current = "next";
+
+    // Manually apply noSnap class immediately to prevent snap fighting
+    if (container && styles.noSnap) {
+      container.classList.add(styles.noSnap);
+    }
+
+    setTransition("next");
+    if (el && container) {
+      const targetTop = el.offsetTop;
+      container.scrollTo({ top: targetTop, behavior: "smooth" });
+    } else if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     } else {
       setActiveIndex(nextIndex);
@@ -1631,6 +2291,21 @@ export default function ReelPage() {
     const el = target ? itemRefs.current[target.id] : null;
     setTransition("prev");
     if (el) {
+    const container = listRef.current;
+
+    transitionRef.current = "prev";
+
+    // Manually apply noSnap class immediately to prevent snap fighting
+    if (container && styles.noSnap) {
+      container.classList.add(styles.noSnap);
+    }
+
+    setTransition("prev");
+    if (el && container) {
+      // Use element offset relative to the scroll container to avoid layout transforms and page offsets
+      const targetTop = el.offsetTop;
+      container.scrollTo({ top: targetTop, behavior: "smooth" });
+    } else if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     } else {
       setActiveIndex(nextIndex);
@@ -1663,13 +2338,17 @@ export default function ReelPage() {
   const scrollTickingRef = useRef(false);
   const urlSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSyncedIdRef = useRef<string | null>(null);
+
   const lastSyncedPathRef = useRef<string | null>(null);
+  const transitionRef = useRef<"next" | "prev" | null>(null);
+  const computeNearestRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const container = listRef.current;
     if (!container || !items.length) return;
 
     const computeNearest = () => {
+      if (transitionRef.current) return;
       if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
       scrollRafRef.current = requestAnimationFrame(() => {
         const rect = container.getBoundingClientRect();
@@ -1696,6 +2375,8 @@ export default function ReelPage() {
         }
       });
     };
+
+    computeNearestRef.current = computeNearest;
 
     const handleScroll = () => {
       if (scrollTickingRef.current) return;
@@ -1739,6 +2420,7 @@ export default function ReelPage() {
         });
       },
       { root: container, threshold: [VIEW_THRESHOLD] }
+      { root: container, threshold: [VIEW_THRESHOLD] },
     );
 
     items.forEach((it) => {
@@ -1793,6 +2475,7 @@ export default function ReelPage() {
 
   useEffect(() => {
     if (!currentReelId) return;
+    if (singleMode) return;
 
     if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
     urlSyncTimerRef.current = setTimeout(() => {
@@ -1815,6 +2498,7 @@ export default function ReelPage() {
       if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
     };
   }, [currentReelId]);
+  }, [currentReelId, singleMode]);
 
   useEffect(() => {
     if (!token) return;
@@ -1850,6 +2534,8 @@ export default function ReelPage() {
                 }
               : it
           )
+              : it,
+          ),
         );
       } catch {
         /* silent */
@@ -2000,6 +2686,7 @@ export default function ReelPage() {
           localStorage.setItem(
             "lastOwnedReelId",
             JSON.stringify({ id: active.id, ownerId: active.authorId })
+            JSON.stringify({ id: active.id, ownerId: active.authorId }),
           );
         } catch {
           /* ignore storage errors */
@@ -2115,6 +2802,96 @@ export default function ReelPage() {
   const handleMuteNotifications = () => {
     setOpenMoreMenuId(null);
     showToast("Notifications muted for this reel");
+  const openMuteModal = (item: ReelItem) => {
+    setMuteTargetId(item.id);
+    setMuteError("");
+    setMuteOption("5m");
+    setMuteCustomDate("");
+    setMuteCustomTime("");
+    setMuteModalOpen(true);
+    setOpenMoreMenuId(null);
+  };
+
+  const closeMuteModal = () => {
+    if (muteSaving) return;
+    setMuteModalOpen(false);
+    setMuteTargetId(null);
+  };
+
+  const handleEnableReelNotifications = async (item: ReelItem) => {
+    if (!token) return;
+    setOpenMoreMenuId(null);
+    setMuteSaving(true);
+    setMuteError("");
+    try {
+      const res = await updatePostNotificationMute({
+        token,
+        postId: item.id,
+        enabled: true,
+      });
+      updateItem(item.id, {
+        notificationsMutedUntil: res.mutedUntil ?? null,
+        notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+      });
+      setMuteModalOpen(false);
+      setMuteTargetId(null);
+    } catch (err: any) {
+      setMuteError(err?.message || "Failed to update notifications");
+    } finally {
+      setMuteSaving(false);
+    }
+  };
+
+  const handleSaveReelMute = async () => {
+    if (!token || !muteTarget) return;
+    setMuteSaving(true);
+    setMuteError("");
+
+    try {
+      let mutedUntil: string | null = null;
+      let mutedIndefinitely = false;
+      const selected = muteOptions.find((opt) => opt.key === muteOption);
+
+      if (muteOption === "until") {
+        mutedIndefinitely = true;
+      } else if (muteOption === "custom") {
+        const iso = buildLocalDateTimeIso(muteCustomDate, muteCustomTime);
+        if (!iso) {
+          setMuteError("Please select a valid date and time.");
+          setMuteSaving(false);
+          return;
+        }
+        const dt = new Date(iso);
+        if (dt.getTime() <= Date.now()) {
+          setMuteError("Please choose a future time.");
+          setMuteSaving(false);
+          return;
+        }
+        mutedUntil = iso;
+      } else if (selected?.ms) {
+        mutedUntil = new Date(Date.now() + selected.ms).toISOString();
+      } else {
+        mutedIndefinitely = true;
+      }
+
+      const res = await updatePostNotificationMute({
+        token,
+        postId: muteTarget.id,
+        mutedUntil,
+        mutedIndefinitely,
+      });
+
+      updateItem(muteTarget.id, {
+        notificationsMutedUntil: res.mutedUntil ?? null,
+        notificationsMutedIndefinitely: res.mutedIndefinitely ?? false,
+      });
+      setMuteModalOpen(false);
+      setMuteTargetId(null);
+    } catch (err: any) {
+      setMuteError(err?.message || "Failed to update notifications");
+    } finally {
+      setMuteSaving(false);
+    }
   };
 
   const handleDeletePost = () => {
@@ -2134,6 +2911,7 @@ export default function ReelPage() {
     if (!active?.authorId) return;
     const currentFollowing = Boolean(
       active.flags?.following ?? (active as any)?.following
+      active.flags?.following ?? (active as any)?.following,
     );
     onFollow(active.authorId, !currentFollowing);
     setOpenMoreMenuId(null);
@@ -2147,6 +2925,14 @@ export default function ReelPage() {
   const handleGoProfile = () => {
     if (!active?.authorId) return;
     const target = `/profile/${active.authorId}`;
+    setOpenMoreMenuId(null);
+    router.push(target);
+  };
+
+  const handleGoReel = () => {
+    const targetId = active?.repostOf || active?.id;
+    if (!targetId) return;
+    const target = `/reels/${targetId}?single=1`;
     setOpenMoreMenuId(null);
     router.push(target);
   };
@@ -2168,6 +2954,8 @@ export default function ReelPage() {
           ? { ...p, flags: { ...p.flags, following: nextFollow } }
           : p
       )
+          : p,
+      ),
     );
     try {
       if (nextFollow) await followUser({ token, userId: authorId });
@@ -2179,9 +2967,12 @@ export default function ReelPage() {
             ? { ...p, flags: { ...p.flags, following: !nextFollow } }
             : p
         )
+        (err as { message?: string })?.message || "Không thể cập nhật follow"
+            : p,
+        ),
       );
       setError(
-        (err as { message?: string })?.message || "Không thể cập nhật follow"
+        (err as { message?: string })?.message || "Unable to update follow",
       );
     }
   };
@@ -2191,6 +2982,25 @@ export default function ReelPage() {
       syncStats(reelId, { comments: total });
     },
     [syncStats]
+    [syncStats],
+  );
+
+  const commentTarget = useMemo(
+    () => items.find((it) => it.id === commentReelId),
+    [commentReelId, items],
+  );
+
+  const showComments = commentsRender && commentReelId;
+
+  const commentDockStyle = useMemo(
+    () =>
+      ({
+        "--sidebar-width": COMMENT_PANEL_WIDTH,
+        width: COMMENT_PANEL_WIDTH,
+        maxWidth: COMMENT_PANEL_WIDTH,
+        minWidth: COMMENT_PANEL_WIDTH,
+      }) as React.CSSProperties,
+    [],
   );
 
   if (!canRender) return null;
@@ -2210,6 +3020,18 @@ export default function ReelPage() {
               <div className={styles.feedScroll} ref={listRef}>
                 {items.map((item) => {
                   const isActive = active?.id === item.id;
+              <div
+                className={`${styles.feedScroll} ${
+                  transition ? styles.noSnap : ""
+                }`}
+                ref={listRef}
+              >
+                {items.map((item) => {
+                  const isActive = active?.id === item.id;
+                  const isSelf = Boolean(
+                    item.authorId && viewerId && item.authorId === viewerId,
+                  );
+                  const isMutedForReel = isMutedForItem(item);
                   return (
                     <div
                       key={item.id}
@@ -2220,34 +3042,45 @@ export default function ReelPage() {
                       className={styles.feedItem}
                     >
                       {isActive ? (
-                        <div
-                          className={`${styles.stage} ${
                             commentsRender ? styles.stageWithComments : ""
                           } ${commentsOpen ? styles.stageShifted : ""}`}
-                        >
-                          <div className={styles.videoColumn}>
-                            <div
-                              className={`${styles.reelWrapper} ${
                                 transition === "next"
-                                  ? styles.slideNext
                                   : transition === "prev"
+                                autoplay
+                                  ref={menuRef}
+                      <div
+                        className={`${styles.stage} ${
+                          !isActive ? styles.stageInactive : ""
+                        }`}
+                      >
+                        <div className={styles.videoColumn}>
+                          <div
+                            className={`${styles.reelWrapper} ${
+                              transition === "next" && isActive
+                                ? styles.slideNext
+                                : transition === "prev" && isActive
                                   ? styles.slidePrev
                                   : ""
-                              }`}
+                            }`}
+                          >
+                            <ReelVideo
+                              item={item}
+                              autoplay={isActive}
+                              onViewed={(ms) => handleViewed(item.id, ms)}
                             >
-                              <ReelVideo
-                                item={item}
-                                autoplay
-                                onViewed={(ms) => handleViewed(item.id, ms)}
+                              <div
+                                className={`${styles.moreMenuWrap} ${
+                                  openMoreMenuId === item.id
+                                    ? styles.moreMenuWrapVisible
+                                    : ""
+                                }`}
+                                style={{
+                                  opacity: isActive ? undefined : 0,
+                                  pointerEvents: isActive ? undefined : "none",
+                                }}
+                                data-more-menu-id={item.id}
                               >
-                                <div
-                                  className={`${styles.moreMenuWrap} ${
-                                    openMoreMenuId === item.id
-                                      ? styles.moreMenuWrapVisible
-                                      : ""
-                                  }`}
-                                  ref={menuRef}
-                                >
+                                <div className={styles.moreMenuButton}>
                                   <button
                                     type="button"
                                     className={styles.moreBtn}
@@ -2257,6 +3090,7 @@ export default function ReelPage() {
                                       e.stopPropagation();
                                       setOpenMoreMenuId((prev) =>
                                         prev === item.id ? null : item.id
+                                        prev === item.id ? null : item.id,
                                       );
                                     }}
                                   >
@@ -2311,6 +3145,18 @@ export default function ReelPage() {
                                             }}
                                           >
                                             Mute notifications
+                                              if (isMutedForItem(item)) {
+                                                handleEnableReelNotifications(
+                                                  item,
+                                                );
+                                              } else {
+                                                openMuteModal(item);
+                                              }
+                                            }}
+                                          >
+                                            {isMutedForItem(item)
+                                              ? "Turn on notification"
+                                              : "Mute notifications"}
                                           </button>
                                           <button
                                             type="button"
@@ -2345,6 +3191,19 @@ export default function ReelPage() {
                                           >
                                             Copy link
                                           </button>
+                                          {item.repostOf ? (
+                                            <button
+                                              type="button"
+                                              className={styles.moreMenuItem}
+                                              role="menuitem"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleGoReel();
+                                              }}
+                                            >
+                                              Go to this reel
+                                            </button>
+                                          ) : null}
                                           <button
                                             type="button"
                                             className={`${styles.moreMenuItem} ${styles.moreMenuDanger}`}
@@ -2422,6 +3281,19 @@ export default function ReelPage() {
                                           >
                                             Copy link
                                           </button>
+                                          {item.repostOf ? (
+                                            <button
+                                              type="button"
+                                              className={styles.moreMenuItem}
+                                              role="menuitem"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleGoReel();
+                                              }}
+                                            >
+                                              Go to this reel
+                                            </button>
+                                          ) : null}
                                           <button
                                             type="button"
                                             className={styles.moreMenuItem}
@@ -2438,7 +3310,38 @@ export default function ReelPage() {
                                     </div>
                                   ) : null}
                                 </div>
-                              </ReelVideo>
+                                {isSelf && isMutedForReel ? (
+                                  <span
+                                    className={styles.muteBadge}
+                                    title="Notifications muted"
+                                    aria-label="Notifications muted"
+                                  >
+                                    <svg
+                                      aria-hidden
+                                      width="18"
+                                      height="18"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
+                                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                                      <line x1="3" y1="3" x2="21" y2="21" />
+                                    </svg>
+                                  </span>
+                                ) : null}
+                              </div>
+                            </ReelVideo>
+                            <div
+                              style={{
+                                opacity: isActive ? 1 : 0,
+                                transition: "opacity 0.2s",
+                                pointerEvents: isActive ? "auto" : "none",
+                              }}
+                            >
                               <ReelActions
                                 item={item}
                                 onLike={handleLike}
@@ -2451,29 +3354,6 @@ export default function ReelPage() {
                             </div>
                           </div>
                           <div className={styles.navColumn}>
-                            <button
-                              className={styles.navBtn}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                goPrev();
-                              }}
-                              disabled={activeIndex <= 0}
-                              aria-label="Previous reel"
-                            >
-                              <IconArrow up />
-                            </button>
-                            <button
-                              className={styles.navBtn}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                goNext();
-                              }}
-                              disabled={activeIndex >= items.length - 1}
-                              aria-label="Next reel"
-                            >
-                              <IconArrow />
-                            </button>
-                          </div>
                           {commentsRender && commentReelId ? (
                             <ReelComments
                               open={commentsOpen}
@@ -2487,10 +3367,8 @@ export default function ReelPage() {
                               onTotalChange={handleCommentTotal}
                               onClose={() => {
                                 setCommentsOpen(false);
-                              }}
                             />
                           ) : null}
-                        </div>
                       ) : (
                         <div className={styles.stageGhost}>
                           <div className={styles.videoColumn}>
@@ -2500,18 +3378,74 @@ export default function ReelPage() {
                                 autoplay={false}
                                 onViewed={(ms) => handleViewed(item.id, ms)}
                               />
-                            </div>
-                          </div>
-                        </div>
                       )}
+                        </div>
+                        <div
+                          className={styles.navColumn}
+                          style={{
+                            opacity: isActive ? 1 : 0,
+                            transition: "opacity 0.2s",
+                            pointerEvents: isActive ? "auto" : "none",
+                          }}
+                        >
+                          <button
+                            className={styles.navBtn}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              goPrev();
+                            }}
+                            disabled={activeIndex <= 0}
+                            aria-label="Previous reel"
+                          >
+                            <IconArrow up />
+                          </button>
+                          <button
+                            className={styles.navBtn}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              goNext();
+                            }}
+                            disabled={activeIndex >= items.length - 1}
+                            aria-label="Next reel"
+                          >
+                            <IconArrow />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
               </div>
+              {showComments && commentTarget ? (
+                <ReelComments
+                  open={Boolean(commentsOpen)}
+                  postId={commentTarget.id}
+                  token={token}
+                  panelRef={commentPanelRef}
+                  viewerId={viewerId}
+                  postAuthorId={commentTarget.authorId}
+                  allowComments={commentTarget.allowComments}
+                  initialCount={commentTarget.stats?.comments}
+                  onTotalChange={handleCommentTotal}
+                  style={commentDockStyle}
+                  onClose={() => {
+                    setCommentsOpen(false);
+                  }}
+                />
+              ) : null}
             </div>
           )}
         </div>
       </div>
+
+      <RepostOverlay
+        target={repostTarget}
+        onRequestClose={() => setRepostTarget(null)}
+        onQuickRepost={handleQuickRepost}
+        onShareQuote={handleShareQuote}
+        quoteCharLimit={QUOTE_CHAR_LIMIT}
+        animationMs={REPOST_ANIMATION_MS}
+      />
 
       {toastMessage ? (
         <div className={postStyles.toast} role="status" aria-live="polite">
@@ -2674,31 +3608,35 @@ export default function ReelPage() {
                   <span className={feedStyles.editLabelText}>Hashtags</span>
                 </div>
                 <div className={feedStyles.chipRow}>
-                  {editHashtags.map((tag) => (
-                    <span key={tag} className={feedStyles.chip}>
-                      #{tag}
-                      <button
-                        type="button"
                         className={feedStyles.chipRemove}
-                        onClick={() => removeHashtag(tag)}
-                        aria-label={`Remove ${tag}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                  <input
                     className={feedStyles.editInput}
-                    placeholder="Add hashtag"
-                    value={hashtagDraft}
-                    onChange={(e) => setHashtagDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === ",") {
-                        e.preventDefault();
-                        addHashtag();
-                      }
-                    }}
-                  />
+                <div className={feedStyles.chipShell}>
+                  <div className={feedStyles.chips}>
+                    {editHashtags.map((tag) => (
+                      <span key={tag} className={feedStyles.chip}>
+                        #{tag}
+                        <button
+                          type="button"
+                          onClick={() => removeHashtag(tag)}
+                          aria-label={`Remove ${tag}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    <input
+                      className={feedStyles.chipInput}
+                      placeholder="Add hashtag"
+                      value={hashtagDraft}
+                      onChange={(e) => setHashtagDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === ",") {
+                          e.preventDefault();
+                          addHashtag();
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -2717,6 +3655,16 @@ export default function ReelPage() {
                   onFocus={() =>
                     setLocationOpen(Boolean(locationSuggestions.length))
                   }
+                  onFocus={() => {
+                    setLocationFocused(true);
+                    setLocationOpen(Boolean(locationSuggestions.length));
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      setLocationFocused(false);
+                      setLocationOpen(false);
+                    }, 120);
+                  }}
                   onKeyDown={onLocationKeyDown}
                 />
                 {locationOpen ? (
@@ -2770,11 +3718,27 @@ export default function ReelPage() {
                     type="checkbox"
                     checked={editAllowDownload}
                     onChange={() => setEditAllowDownload((prev) => !prev)}
+                    checked={
+                      editingReel?.repostOf
+                        ? Boolean(lockedEditAllowDownload ?? editAllowDownload)
+                        : editAllowDownload
+                    }
+                    disabled={Boolean(editingReel?.repostOf)}
+                    onChange={
+                      editingReel?.repostOf
+                        ? undefined
+                        : () => setEditAllowDownload((prev) => !prev)
+                    }
                   />
                   <div>
                     <p className={feedStyles.switchTitle}>Allow downloads</p>
                     <p className={feedStyles.switchHint}>
                       Share the original file with people you trust
+                      {editingReel?.repostOf
+                        ? lockedEditAllowDownloadLoading
+                          ? "Inherited from original post (loading…)"
+                          : "Inherited from the original post (can’t be changed)"
+                        : "Share the original file with people you trust"}
                     </p>
                   </div>
                 </label>
@@ -2954,6 +3918,94 @@ export default function ReelPage() {
         </div>
       ) : null}
 
+      {muteModalOpen && muteTarget ? (
+        <div
+          className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeMuteModal}
+        >
+          <div
+            className={`${feedStyles.modalCard} ${feedStyles.modalCardOpen}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={feedStyles.modalHeader}>
+              <div>
+                <h3 className={feedStyles.modalTitle}>Mute notifications</h3>
+                <p className={feedStyles.modalBody}>
+                  Choose how long to pause alerts for this reel.
+                </p>
+              </div>
+              <button
+                className={feedStyles.closeBtn}
+                aria-label="Close"
+                onClick={closeMuteModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={feedStyles.muteOptionGrid}>
+              {muteOptions.map((option) => (
+                <button
+                  key={option.key}
+                  className={`${feedStyles.muteOption} ${
+                    muteOption === option.key ? feedStyles.muteOptionActive : ""
+                  }`}
+                  onClick={() => setMuteOption(option.key)}
+                  type="button"
+                >
+                  <span className={feedStyles.muteOptionTitle}>
+                    {option.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {muteOption === "custom" ? (
+              <div className={feedStyles.muteCustomRow}>
+                <div className={feedStyles.mutePicker}>
+                  <label className={feedStyles.editLabel}>Date</label>
+                  <DateSelect
+                    value={muteCustomDate}
+                    onChange={setMuteCustomDate}
+                    minDate={new Date()}
+                    maxDate={null}
+                    placeholder="yyyy-mm-dd"
+                  />
+                </div>
+                <div className={feedStyles.mutePicker}>
+                  <label className={feedStyles.editLabel}>Time</label>
+                  <TimeSelect
+                    value={muteCustomTime}
+                    onChange={setMuteCustomTime}
+                    selectedDate={muteCustomDate}
+                    minDateTime={new Date()}
+                    disabled={!muteCustomDate}
+                    placeholder="hh:mm"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {muteError ? (
+              <div className={feedStyles.inlineError}>{muteError}</div>
+            ) : null}
+
+            <div className={feedStyles.modalActions}>
+              <button
+                type="button"
+                className={feedStyles.modalPrimary}
+                onClick={handleSaveReelMute}
+                disabled={muteSaving}
+              >
+                {muteSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {reportOpen ? (
         <div
           className={`${postStyles.reportOverlay} ${
@@ -3011,6 +4063,7 @@ export default function ReelPage() {
                           group.reasons.length === 1
                             ? group.reasons[0].key
                             : null
+                            : null,
                         );
                       }}
                     >

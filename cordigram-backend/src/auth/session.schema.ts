@@ -17,6 +17,30 @@ export class Session extends Document {
 
   @Prop({ default: '' })
   deviceInfo: string;
+
+  @Prop({ default: '' })
+  deviceIdHash: string;
+
+  @Prop({ default: '' })
+  deviceType: string;
+
+  @Prop({ default: '' })
+  os: string;
+
+  @Prop({ default: '' })
+  browser: string;
+
+  @Prop({ default: '' })
+  ip: string;
+
+  @Prop({ default: '' })
+  location: string;
+
+  @Prop({ default: '' })
+  loginMethod: string;
+
+  @Prop({ type: Date, default: null })
+  lastSeenAt: Date | null;
 }
 
 export const SessionSchema = SchemaFactory.createForClass(Session);

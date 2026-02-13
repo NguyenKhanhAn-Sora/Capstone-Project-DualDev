@@ -1,11 +1,10 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../profile.module.css";
-import { fetchUserPosts, type FeedItem } from "@/lib/api";
-import { getStoredAccessToken } from "@/lib/auth";
+import type { FeedItem } from "@/lib/api";
 import { useProfileContext } from "./profile-context";
 
 const formatCount = (value?: number) => {
@@ -35,36 +34,41 @@ const IconView = () => (
 
 export default function ProfilePostsPage() {
   const router = useRouter();
-  const { profile } = useProfileContext();
-  const [posts, setPosts] = useState<FeedItem[]>([]);
-  const [postsLoading, setPostsLoading] = useState(false);
-  const [error, setError] = useState<string>("");
+  const { tabs, prefetchTab } = useProfileContext();
+  const tab = tabs?.posts;
 
   useEffect(() => {
-    const token = getStoredAccessToken();
-    if (!token || !profile) return;
-    setPostsLoading(true);
-    setError("");
-    fetchUserPosts({ token, userId: profile.userId, limit: 30 })
-      .then((items) => setPosts(items))
-      .catch((err: unknown) => {
-        const message =
-          typeof err === "object" && err && "message" in err
-            ? String((err as { message?: string }).message)
-            : "Unable to load posts";
-        setError(message || "Unable to load posts");
-      })
-      .finally(() => setPostsLoading(false));
-  }, [profile]);
+    prefetchTab?.("posts");
+  }, [prefetchTab]);
+
+  const error = tab?.error ?? "";
+  const items = tab?.items ?? [];
+  const showSkeleton = !!(
+    tab &&
+    (tab.loading || (!tab.loaded && !tab.error)) &&
+    items.length === 0
+  );
+  const showEmpty = !!(
+    tab &&
+    tab.loaded &&
+    !tab.loading &&
+    !error &&
+    items.length === 0
+  );
+  const suppressGrid = Boolean(error) && items.length === 0 && !showSkeleton;
 
   return (
     <>
       {error ? <div className={styles.errorBox}>{error}</div> : null}
-      <PostGrid
-        items={posts}
-        loading={postsLoading}
-        onSelect={(id) => router.push(`/post/${id}`)}
-      />
+      {suppressGrid ? null : showEmpty ? (
+        <div className={styles.errorBox}>No posts yet.</div>
+      ) : (
+        <PostGrid
+          items={items}
+          loading={showSkeleton}
+          onSelect={(path) => router.push(path)}
+        />
+      )}
     </>
   );
 }
@@ -76,7 +80,7 @@ function PostGrid({
 }: {
   items: FeedItem[];
   loading: boolean;
-  onSelect: (id: string) => void;
+  onSelect: (path: string) => void;
 }) {
   const handleEnter = (e: React.MouseEvent<HTMLVideoElement>) => {
     const el = e.currentTarget;
@@ -100,17 +104,23 @@ function PostGrid({
     );
   }
 
+  if (!items.length) {
+    return <div className={styles.errorBox}>No posts yet.</div>;
+  }
+
   return (
     <div className={styles.grid}>
       {items.map((item) => {
         const media = item.media?.[0];
         if (!media) return null;
+        const targetPath =
+          item.kind === "reel" ? `/reels/${item.id}` : `/post/${item.id}`;
         return (
           <button
             key={item.id}
             type="button"
             className={styles.tile}
-            onClick={() => onSelect(item.id)}
+            onClick={() => onSelect(targetPath)}
           >
             {media.type === "video" ? (
               <video

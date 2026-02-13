@@ -27,7 +27,11 @@ export class Server extends Document {
     type: [
       {
         userId: { type: Types.ObjectId, ref: 'User' },
-        role: { type: String, enum: ['owner', 'moderator', 'member'], default: 'member' },
+        role: {
+          type: String,
+          enum: ['owner', 'moderator', 'member'],
+          default: 'member',
+        },
         joinedAt: { type: Date, default: Date.now },
       },
     ],

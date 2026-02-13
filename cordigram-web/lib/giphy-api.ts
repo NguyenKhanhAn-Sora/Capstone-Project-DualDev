@@ -1,6 +1,6 @@
 // Giphy API Service
-const GIPHY_API_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || '';
-const GIPHY_BASE_URL = 'https://api.giphy.com/v1';
+const GIPHY_API_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || "";
+const GIPHY_BASE_URL = "https://api.giphy.com/v1";
 
 export interface GiphyGif {
   id: string;
@@ -45,20 +45,20 @@ export interface GiphySearchResponse {
 export async function searchGifs(
   query: string,
   limit: number = 20,
-  offset: number = 0
+  offset: number = 0,
 ): Promise<GiphySearchResponse> {
   try {
     const url = `${GIPHY_BASE_URL}/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}&rating=g&lang=en`;
-    
+
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error(`Giphy API error: ${response.status}`);
     }
-    
+
     return await response.json();
   } catch (error) {
-    console.error('Failed to search GIFs:', error);
+    console.error("Failed to search GIFs:", error);
     throw error;
   }
 }
@@ -68,20 +68,20 @@ export async function searchGifs(
  */
 export async function getTrendingGifs(
   limit: number = 20,
-  offset: number = 0
+  offset: number = 0,
 ): Promise<GiphySearchResponse> {
   try {
     const url = `${GIPHY_BASE_URL}/gifs/trending?api_key=${GIPHY_API_KEY}&limit=${limit}&offset=${offset}&rating=g`;
-    
+
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error(`Giphy API error: ${response.status}`);
     }
-    
+
     return await response.json();
   } catch (error) {
-    console.error('Failed to get trending GIFs:', error);
+    console.error("Failed to get trending GIFs:", error);
     throw error;
   }
 }
@@ -92,20 +92,20 @@ export async function getTrendingGifs(
 export async function searchStickers(
   query: string,
   limit: number = 20,
-  offset: number = 0
+  offset: number = 0,
 ): Promise<GiphySearchResponse> {
   try {
     const url = `${GIPHY_BASE_URL}/stickers/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}&rating=g&lang=en`;
-    
+
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error(`Giphy API error: ${response.status}`);
     }
-    
+
     return await response.json();
   } catch (error) {
-    console.error('Failed to search stickers:', error);
+    console.error("Failed to search stickers:", error);
     throw error;
   }
 }
@@ -115,20 +115,20 @@ export async function searchStickers(
  */
 export async function getTrendingStickers(
   limit: number = 20,
-  offset: number = 0
+  offset: number = 0,
 ): Promise<GiphySearchResponse> {
   try {
     const url = `${GIPHY_BASE_URL}/stickers/trending?api_key=${GIPHY_API_KEY}&limit=${limit}&offset=${offset}&rating=g`;
-    
+
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error(`Giphy API error: ${response.status}`);
     }
-    
+
     return await response.json();
   } catch (error) {
-    console.error('Failed to get trending stickers:', error);
+    console.error("Failed to get trending stickers:", error);
     throw error;
   }
 }
@@ -139,17 +139,17 @@ export async function getTrendingStickers(
 export async function getGifById(id: string): Promise<GiphyGif> {
   try {
     const url = `${GIPHY_BASE_URL}/gifs/${id}?api_key=${GIPHY_API_KEY}`;
-    
+
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error(`Giphy API error: ${response.status}`);
     }
-    
+
     const data = await response.json();
     return data.data;
   } catch (error) {
-    console.error('Failed to get GIF by ID:', error);
+    console.error("Failed to get GIF by ID:", error);
     throw error;
   }
 }
