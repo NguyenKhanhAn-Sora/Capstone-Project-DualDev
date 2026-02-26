@@ -1,0 +1,45 @@
+import { Module, forwardRef } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { User, UserSchema } from './user.schema';
+import { Follow, FollowSchema } from './follow.schema';
+import { Block, BlockSchema } from './block.schema';
+import { Profile, ProfileSchema } from '../profiles/profile.schema';
+import {
+  UserTasteProfile,
+  UserTasteProfileSchema,
+} from '../explore/user-taste.schema';
+import { UsersService } from './users.service';
+import { UsersController } from './users.controller';
+import { BlocksService } from './blocks.service';
+import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { OtpModule } from '../otp/otp.module';
+import { Session, SessionSchema } from '../auth/session.schema';
+import { ActivityModule } from '../activity/activity.module';
+import { ModerationAction, ModerationActionSchema } from '../moderation/moderation-action.schema';
+import { Post, PostSchema } from '../posts/post.schema';
+import { Comment, CommentSchema } from '../comment/comment.schema';
+
+@Module({
+  imports: [
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: Follow.name, schema: FollowSchema },
+      { name: Block.name, schema: BlockSchema },
+      { name: Profile.name, schema: ProfileSchema },
+      { name: UserTasteProfile.name, schema: UserTasteProfileSchema },
+      { name: Session.name, schema: SessionSchema },
+      { name: ModerationAction.name, schema: ModerationActionSchema },
+      { name: Post.name, schema: PostSchema },
+      { name: Comment.name, schema: CommentSchema },
+    ]),
+    forwardRef(() => AuthModule),
+    NotificationsModule,
+    OtpModule,
+    ActivityModule,
+  ],
+  controllers: [UsersController],
+  providers: [UsersService, BlocksService],
+  exports: [UsersService, BlocksService],
+})
+export class UsersModule {}
