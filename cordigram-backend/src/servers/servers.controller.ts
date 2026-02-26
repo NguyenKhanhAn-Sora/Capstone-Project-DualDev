@@ -56,6 +56,11 @@ export class ServersController {
     return { message: 'Server deleted successfully' };
   }
 
+  @Post(':id/join')
+  async joinServer(@Param('id') serverId: string, @Request() req: any) {
+    return this.serversService.joinServer(serverId, req.user.userId);
+  }
+
   @Post(':id/members/:memberId')
   async addMember(
     @Param('id') serverId: string,

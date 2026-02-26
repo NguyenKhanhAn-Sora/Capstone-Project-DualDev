@@ -1,4 +1,10 @@
-import { IsString, IsOptional, MinLength, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  MinLength,
+  MaxLength,
+  IsEnum,
+} from 'class-validator';
 
 export class CreateServerDto {
   @IsString()
@@ -14,4 +20,20 @@ export class CreateServerDto {
   @IsOptional()
   @IsString()
   avatarUrl?: string;
+
+  @IsOptional()
+  @IsEnum([
+    'custom',
+    'gaming',
+    'friends',
+    'study-group',
+    'school-club',
+    'local-community',
+    'artists-creators',
+  ])
+  template?: string;
+
+  @IsOptional()
+  @IsEnum(['club-community', 'me-and-friends'])
+  purpose?: string;
 }

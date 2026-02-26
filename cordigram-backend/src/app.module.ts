@@ -28,6 +28,7 @@ import { PollsModule } from './polls/polls.module';
 import { LivekitModule } from './livekit/livekit.module';
 import { ActivityModule } from './activity/activity.module';
 import { AdminModule } from './admin/admin.module';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { AdminModule } from './admin/admin.module';
     LivekitModule,
     ActivityModule,
     AdminModule,
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -22,11 +22,24 @@ function getCurrentUserId(): string | null {
   return payload?.userId ?? payload?.sub ?? null;
 }
 
+export type ServerTemplate =
+  | "custom"
+  | "gaming"
+  | "friends"
+  | "study-group"
+  | "school-club"
+  | "local-community"
+  | "artists-creators";
+
+export type ServerPurpose = "club-community" | "me-and-friends";
+
 export interface Server {
   _id: string;
   name: string;
   description?: string;
   avatarUrl?: string;
+  template?: ServerTemplate;
+  purpose?: ServerPurpose;
   ownerId: string;
   members: Array<{
     userId: string;
@@ -36,6 +49,7 @@ export interface Server {
   channels: Channel[];
   memberCount: number;
   isActive: boolean;
+  isPublic?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -43,11 +57,14 @@ export interface Server {
 export interface Channel {
   _id: string;
   name: string;
-  type: "text" | "voice";
+  type: "text" | "voice" | "thread";
   description?: string;
   serverId: string;
   createdBy: string;
   isDefault: boolean;
+  isPrivate?: boolean;
+  parentChannelId?: string;
+  threads?: string[];
   messageCount: number;
   isActive: boolean;
   createdAt: string;
@@ -88,15 +105,17 @@ export async function createServer(
   name: string,
   description?: string,
   avatarUrl?: string,
+  template?: ServerTemplate,
+  purpose?: ServerPurpose,
 ): Promise<Server> {
   const response = await fetch(`${API_BASE_URL}/servers`, {
     method: "POST",
     headers: getHeaders(),
-    body: JSON.stringify({ name, description, avatarUrl }),
+    body: JSON.stringify({ name, description, avatarUrl, template, purpose }),
   });
 
   if (!response.ok) {
-    throw new Error("Failed to create server");
+    throw new Error("Không tạo được máy chủ");
   }
 
   return response.json();
@@ -110,7 +129,7 @@ export async function getMyServers(): Promise<Server[]> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     console.error("API Error:", response.status, errorData);
-    throw new Error(errorData.message || "Failed to fetch servers");
+    throw new Error(errorData.message || "Không tải được danh sách máy chủ");
   }
 
   return response.json();
@@ -122,7 +141,7 @@ export async function getServer(serverId: string): Promise<Server> {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to fetch server");
+    throw new Error("Không tải được thông tin máy chủ");
   }
 
   return response.json();
@@ -141,7 +160,7 @@ export async function updateServer(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to update server");
+    throw new Error("Không cập nhật được máy chủ");
   }
 
   return response.json();
@@ -154,7 +173,7 @@ export async function deleteServer(serverId: string): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to delete server");
+    throw new Error("Không xóa được máy chủ");
   }
 }
 
@@ -164,15 +183,16 @@ export async function createChannel(
   name: string,
   type: "text" | "voice",
   description?: string,
+  isPrivate?: boolean,
 ): Promise<Channel> {
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}/channels`, {
     method: "POST",
     headers: getHeaders(),
-    body: JSON.stringify({ name, type, description }),
+    body: JSON.stringify({ name, type, description, isPrivate }),
   });
 
   if (!response.ok) {
-    throw new Error("Failed to create channel");
+    throw new Error("Không tạo được kênh");
   }
 
   return response.json();
@@ -192,7 +212,7 @@ export async function getChannels(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to fetch channels");
+    throw new Error("Không tải được danh sách kênh");
   }
 
   return response.json();
@@ -210,7 +230,7 @@ export async function getChannel(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to fetch channel");
+    throw new Error("Không tải được thông tin kênh");
   }
 
   return response.json();
@@ -232,7 +252,7 @@ export async function updateChannel(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to update channel");
+    throw new Error("Không cập nhật được kênh");
   }
 
   return response.json();
@@ -251,8 +271,180 @@ export async function deleteChannel(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to delete channel");
+    throw new Error("Không xóa được kênh");
   }
+}
+
+// Server Events
+export type EventFrequency =
+  | "none"
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "yearly";
+export type EventLocationType = "voice" | "other";
+
+export type EventStatus = "scheduled" | "live" | "ended";
+
+export interface ServerEvent {
+  _id: string;
+  serverId: string;
+  channelId?: { _id: string; name: string; type: string } | null;
+  locationType: EventLocationType;
+  topic: string;
+  startAt: string;
+  endAt: string;
+  frequency: EventFrequency;
+  description?: string | null;
+  coverImageUrl?: string | null;
+  createdBy: string;
+  inviteCode?: string | null;
+  inviteExpiresAt?: string | null;
+  status?: EventStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEventPayload {
+  topic: string;
+  startAt: string; // ISO date string
+  frequency: EventFrequency;
+  locationType: EventLocationType;
+  endAt?: string; // ISO date string - dùng khi chọn "Một nơi khác"
+  channelId?: string;
+  description?: string;
+  coverImageUrl?: string;
+}
+
+/** Base URL for event share links (production: https://cordigram.com) */
+export function getEventsBaseUrl(): string {
+  if (typeof window !== "undefined") return window.location.origin;
+  return process.env.NEXT_PUBLIC_APP_URL || "https://cordigram.com";
+}
+
+/** Build event share link: /events/{serverId}/{eventId} */
+export function getEventShareLink(serverId: string, eventId: string): string {
+  return `${getEventsBaseUrl()}/events/${serverId}/${eventId}`;
+}
+
+export async function getServerEvents(serverId: string): Promise<{
+  active: ServerEvent[];
+  upcoming: ServerEvent[];
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/events`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) throw new Error("Không tải được sự kiện");
+  return response.json();
+}
+
+export async function startServerEvent(
+  serverId: string,
+  eventId: string,
+): Promise<ServerEvent> {
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/events/${eventId}/start`,
+    { method: "POST", headers: getHeaders() },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không bắt đầu được sự kiện");
+  }
+  return res.json();
+}
+
+export async function endServerEvent(
+  serverId: string,
+  eventId: string,
+): Promise<ServerEvent> {
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/events/${eventId}/end`,
+    { method: "POST", headers: getHeaders() },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không kết thúc được sự kiện");
+  }
+  return res.json();
+}
+
+export interface EventPreviewResponse {
+  event: {
+    _id: string;
+    topic: string;
+    startAt: string;
+    endAt: string;
+    coverImageUrl: string | null;
+    description: string | null;
+    channelId: { name: string; type: string } | null;
+  };
+  server: { _id: string; name: string; isPublic: boolean; avatarUrl?: string | null };
+  isMember: boolean;
+}
+
+/** Public (optional auth): get event preview by serverId + eventId */
+export async function getEventPreview(
+  serverId: string,
+  eventId: string,
+): Promise<EventPreviewResponse> {
+  const url = `${API_BASE_URL}/events/${serverId}/${eventId}`;
+  const res = await fetch(url, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error("Không tải được sự kiện");
+  return res.json();
+}
+
+/** Join a public server (requires auth) */
+export async function joinServer(serverId: string): Promise<Server> {
+  const res = await fetch(`${API_BASE_URL}/servers/${serverId}/join`, {
+    method: "POST",
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không tham gia được máy chủ");
+  }
+  return res.json();
+}
+
+export async function createServerEvent(
+  serverId: string,
+  payload: CreateEventPayload,
+): Promise<ServerEvent> {
+  const body: Record<string, unknown> = {
+    topic: payload.topic,
+    startAt: payload.startAt,
+    frequency: payload.frequency,
+    locationType: payload.locationType,
+  };
+  if (payload.endAt != null && payload.endAt !== "") body.endAt = payload.endAt;
+  if (payload.channelId != null && payload.channelId !== "") body.channelId = payload.channelId;
+  if (payload.description != null && payload.description !== "") body.description = payload.description;
+  if (payload.coverImageUrl != null && payload.coverImageUrl !== "") body.coverImageUrl = payload.coverImageUrl;
+
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/events`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(body),
+    },
+  );
+  if (!response.ok) {
+    let message = "Failed to create event";
+    try {
+      const data = await response.json();
+      if (data.message) {
+        message = Array.isArray(data.message) ? data.message.join(", ") : data.message;
+      }
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
+  }
+  return response.json();
 }
 
 // Messages
@@ -271,7 +463,7 @@ export async function createMessage(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to create message");
+    throw new Error("Không tạo được tin nhắn");
   }
 
   return response.json();
@@ -291,7 +483,7 @@ export async function getMessages(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to fetch messages");
+    throw new Error("Không tải được tin nhắn");
   }
 
   return response.json();
@@ -312,7 +504,7 @@ export async function updateMessage(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to update message");
+    throw new Error("Không cập nhật được tin nhắn");
   }
 
   return response.json();
@@ -331,7 +523,7 @@ export async function deleteMessage(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to delete message");
+    throw new Error("Không xóa được tin nhắn");
   }
 }
 
@@ -349,7 +541,7 @@ export async function addMessageReaction(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to add reaction");
+    throw new Error("Không thêm được cảm xúc");
   }
 
   return response.json();
@@ -433,7 +625,7 @@ export async function followUser(userId: string): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to follow user");
+    throw new Error("Không theo dõi được người dùng");
   }
 }
 
@@ -445,7 +637,7 @@ export async function unfollowUser(userId: string): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to unfollow user");
+    throw new Error("Không bỏ theo dõi được người dùng");
   }
 }
 

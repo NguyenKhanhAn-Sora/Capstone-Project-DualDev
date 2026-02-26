@@ -31,7 +31,14 @@ export async function getLiveKitToken(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get LiveKit token");
+    const data = await response.json().catch(() => ({}));
+    const message =
+      typeof (data as { message?: string }).message === "string"
+        ? (data as { message: string }).message
+        : Array.isArray((data as { message?: string[] }).message)
+          ? (data as { message: string[] }).message.join(", ")
+          : "Failed to get LiveKit token";
+    throw new Error(message);
   }
 
   return response.json();
@@ -57,7 +64,7 @@ export async function getDMRoomName(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to get room name");
+    throw new Error("Không lấy được tên phòng");
   }
 
   return response.json();

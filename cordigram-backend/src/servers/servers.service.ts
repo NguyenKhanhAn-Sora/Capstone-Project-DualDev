@@ -29,6 +29,8 @@ export class ServersService {
       name: createServerDto.name,
       description: createServerDto.description || null,
       avatarUrl: createServerDto.avatarUrl || null,
+      template: createServerDto.template || 'custom',
+      purpose: createServerDto.purpose || 'me-and-friends',
       ownerId: userObjectId,
       members: [
         {
@@ -38,6 +40,7 @@ export class ServersService {
         },
       ],
       memberCount: 1,
+      isPublic: true,
     });
 
     const savedServer = await server.save();
@@ -121,6 +124,8 @@ export class ServersService {
       server.description = updateServerDto.description;
     if (updateServerDto.avatarUrl !== undefined)
       server.avatarUrl = updateServerDto.avatarUrl;
+    if (updateServerDto.isPublic !== undefined)
+      server.isPublic = updateServerDto.isPublic;
 
     return server.save();
   }
@@ -175,6 +180,25 @@ export class ServersService {
     server.memberCount = server.members.length;
 
     return server.save();
+  }
+
+  /** Join a public server (used from event link). Fails if server is private. */
+  async joinServer(serverId: string, userId: string): Promise<Server> {
+    const server = await this.serverModel.findById(serverId);
+
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    if (!server.isPublic) {
+      throw new ForbiddenException('You do not have access to this server');
+    }
+
+    return this.addMemberToServer(serverId, userId, 'member');
+  }
+
+  isMember(server: Server, userId: string): boolean {
+    return server.members.some((m) => m.userId.toString() === userId);
   }
 
   async removeMemberFromServer(
