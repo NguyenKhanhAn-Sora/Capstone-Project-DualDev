@@ -1,0 +1,259 @@
+.embedContainer {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.liveKitRoom {
+  width: 100%;
+  height: 100%;
+}
+
+.wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.videoArea {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.videoGrid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+/* Equal grid for 1–15 participants */
+.videoGrid[data-participant-count="1"] {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+.videoGrid[data-participant-count="2"] {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
+}
+
+.videoGrid[data-participant-count="3"] {
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr;
+}
+
+.videoGrid[data-participant-count="4"] {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.videoGrid[data-participant-count="5"],
+.videoGrid[data-participant-count="6"] {
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.videoGrid[data-participant-count="7"],
+.videoGrid[data-participant-count="8"],
+.videoGrid[data-participant-count="9"] {
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+}
+
+.videoGrid[data-participant-count="10"],
+.videoGrid[data-participant-count="11"],
+.videoGrid[data-participant-count="12"] {
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+}
+
+.videoGrid[data-participant-count="13"],
+.videoGrid[data-participant-count="14"],
+.videoGrid[data-participant-count="15"] {
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+}
+
+.videoTileWrapper {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0f0f0f;
+  border: 2px solid rgba(255, 255, 255, 0.06);
+  min-height: 0;
+}
+
+.videoTileWrapper.speaking {
+  border-color: #22c55e;
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.4);
+}
+
+.videoTile {
+  width: 100%;
+  height: 100%;
+  min-height: 60px;
+  position: relative;
+}
+
+.videoElement {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.avatarPlaceholder {
+  width: 100%;
+  height: 100%;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary, #5865f2);
+  color: #fff;
+  font-size: 24px;
+  font-weight: 600;
+  border-radius: 10px;
+}
+
+.participantInfo {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.participantName {
+  font-size: 12px;
+  color: #fff;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.micOn {
+  color: #22c55e;
+  display: flex;
+}
+
+.micOff {
+  color: #ef4444;
+  display: flex;
+}
+
+/* Screen share layout */
+.screenShareLayout {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.screenShareMain {
+  flex: 1;
+  min-width: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0f0f0f;
+}
+
+.screenShareSidebar {
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.sidebarTile {
+  flex-shrink: 0;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0f0f0f;
+  position: relative;
+}
+
+.sidebarTile .participantName {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 6px;
+  font-size: 10px;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #2b2d31;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.controlBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: #1e1f22;
+  color: #b5bac1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.controlBtn:hover {
+  background: #36373d;
+  color: #fff;
+}
+
+.controlBtnOff {
+  background: #da373c;
+  color: #fff;
+}
+
+.controlBtnActive {
+  background: #5865f2;
+  color: #fff;
+}
+
+.leaveBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: #da373c;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+}
+
+.leaveBtn:hover {
+  background: #a12828;
+}
