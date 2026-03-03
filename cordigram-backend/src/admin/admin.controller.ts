@@ -40,6 +40,29 @@ export class AdminController {
     return this.adminService.getReportDetail(type, targetId);
   }
 
+  @Get('moderation/media')
+  async getMediaModerationQueue(
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    return this.adminService.getMediaModerationQueue();
+  }
+
+  @Get('moderation/media/:postId')
+  async getMediaModerationDetail(
+    @Param('postId') postId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    return this.adminService.getMediaModerationDetail(postId);
+  }
+
   @Post('reports/:type/:targetId/violation')
   async markReportViolation(
     @Param('type') type: string,

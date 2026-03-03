@@ -1330,6 +1330,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const [mediaIndex, setMediaIndex] = useState(0);
   const [mediaDirection, setMediaDirection] = useState<"next" | "prev">("next");
+  const [revealedMediaMap, setRevealedMediaMap] = useState<Record<string, boolean>>({});
   const mediaVideoRef = useRef<HTMLVideoElement | null>(null);
   const [soundOn, setSoundOn] = useState(false);
   const mediaTimeRef = useRef<Map<string, number>>(new Map());
@@ -2763,6 +2764,26 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const media = post?.media ?? [];
   const currentMedia = media[mediaIndex];
+  const currentMediaKey = currentMedia?.url || `media-${mediaIndex}`;
+  const currentMediaMetadata =
+    currentMedia?.metadata && typeof currentMedia.metadata === "object"
+      ? (currentMedia.metadata as Record<string, unknown>)
+      : null;
+  const moderationDecision = currentMediaMetadata?.moderationDecision;
+  const currentOriginalUrlRaw =
+    currentMediaMetadata?.originalSecureUrl ?? currentMediaMetadata?.originalUrl;
+  const currentOriginalUrl =
+    typeof currentOriginalUrlRaw === "string" && currentOriginalUrlRaw.trim()
+      ? currentOriginalUrlRaw
+      : null;
+  const isCurrentBlurredByModeration =
+    moderationDecision === "blur" && Boolean(currentOriginalUrl);
+  const shouldRevealCurrentMedia =
+    Boolean(revealedMediaMap[currentMediaKey]) && Boolean(currentOriginalUrl);
+  const currentMediaDisplayUrl =
+    shouldRevealCurrentMedia && currentOriginalUrl
+      ? currentOriginalUrl
+      : currentMedia?.url;
 
   useEffect(() => {
     const videoEl = mediaVideoRef.current;
@@ -2955,12 +2976,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       if (!resumeReady) return null;
       return (
         <video
-          key={currentMedia.url}
+          key={`${currentMedia.url}-${shouldRevealCurrentMedia ? "revealed" : "blurred"}`}
           className={`${styles.mediaVisual} ${transitionClass}`}
           controls
           controlsList="nodownload noremoteplayback"
           onContextMenu={(e) => e.preventDefault()}
-          src={currentMedia.url}
+          src={currentMediaDisplayUrl}
           ref={mediaVideoRef}
           playsInline
           preload="metadata"
@@ -2977,9 +2998,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     }
     return (
       <img
-        key={currentMedia.url}
+        key={`${currentMedia.url}-${shouldRevealCurrentMedia ? "revealed" : "blurred"}`}
         className={`${styles.mediaVisual} ${transitionClass}`}
-        src={currentMedia.url}
+        src={currentMediaDisplayUrl}
         alt="Post media"
         onContextMenu={(e) => e.preventDefault()}
       />
@@ -4705,6 +4726,28 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             <div className={styles.mediaPane}>
               <div className={styles.mediaCarousel}>
                 {renderMedia()}
+                {isCurrentBlurredByModeration && !shouldRevealCurrentMedia ? (
+                  <div className={styles.moderationRevealOverlay}>
+                    <div className={styles.moderationRevealBox}>
+                      <p className={styles.moderationRevealNote}>
+                        This image has been blurred due to violation of our
+                        standards.
+                      </p>
+                      <button
+                        type="button"
+                        className={styles.moderationRevealButton}
+                        onClick={() =>
+                          setRevealedMediaMap((prev) => ({
+                            ...prev,
+                            [currentMediaKey]: true,
+                          }))
+                        }
+                      >
+                        View image
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 {media.length > 1 ? (
                   <>
                     <button

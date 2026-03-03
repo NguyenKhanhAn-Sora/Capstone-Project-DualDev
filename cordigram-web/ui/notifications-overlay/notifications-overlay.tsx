@@ -174,6 +174,7 @@ const TAB_FILTER: Record<TabKey, Array<NotificationItem["type"]>> = {
     "post_mention",
     "follow",
     "login_alert",
+    "post_moderation",
     "report",
   ],
   like: ["post_like", "comment_like"],
@@ -317,6 +318,21 @@ function buildMessage(item: NotificationItem): JSX.Element {
   }
   if (item.type === "login_alert") {
     return <>You're signing in on a new device</>;
+  }
+  if (item.type === "post_moderation") {
+    const targetLabel = item.postKind === "reel" ? "reel" : "post";
+    if (item.moderationDecision === "approve" || item.moderationDecision === "blur") {
+      return <>Your {targetLabel} was published successfully.</>;
+    }
+    if (item.moderationDecision === "reject") {
+      return (
+        <>
+          Your {targetLabel} was rejected. Please go to Violation Center to see
+          details.
+        </>
+      );
+    }
+    return <>Your {targetLabel} was published successfully.</>;
   }
   if (item.type === "report") {
     if (item.reportAudience === "offender") {
@@ -683,6 +699,11 @@ export default function NotificationsOverlay(props: {
     const targetUrl =
       item.type === "report" && item.reportAudience === "offender"
         ? "/settings?section=violations"
+        : item.type === "post_moderation" &&
+            item.moderationDecision === "reject"
+          ? "/settings?section=violations"
+          : item.type === "post_moderation" && item.postId
+            ? `/post/${item.postId}`
         : item.postId
           ? `/post/${item.postId}`
           : item.type === "follow" && item.actor?.id
@@ -980,8 +1001,16 @@ export default function NotificationsOverlay(props: {
                 >
                   <div className={styles.avatarWrap}>
                     <Image
-                      src={item.type === "report" ? "/logo.png" : item.actor.avatarUrl}
-                      alt={item.type === "report" ? "Cordigram" : item.actor.displayName}
+                      src={
+                        item.type === "report" || item.type === "post_moderation"
+                          ? "/logo.png"
+                          : item.actor.avatarUrl
+                      }
+                      alt={
+                        item.type === "report" || item.type === "post_moderation"
+                          ? "Cordigram"
+                          : item.actor.displayName
+                      }
                       width={44}
                       height={44}
                       className={styles.avatar}

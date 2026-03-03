@@ -63,6 +63,9 @@
 }
 
 .actionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 12px;
   padding: 10px 16px;
@@ -70,6 +73,7 @@
   color: #fff;
   font-weight: 700;
   cursor: pointer;
+  text-decoration: none;
   box-shadow: 0 12px 24px rgba(52, 112, 162, 0.28);
   transition:
     transform 0.18s ease,
@@ -170,6 +174,12 @@
 .queueList {
   display: grid;
   gap: 12px;
+}
+
+.emptyState {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
 }
 
 .queueItem {

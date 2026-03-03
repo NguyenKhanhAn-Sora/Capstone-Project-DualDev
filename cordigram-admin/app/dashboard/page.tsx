@@ -56,6 +56,16 @@ export default function AdminDashboardPage() {
       lastReportedAt: string;
     }>;
   } | null>(null);
+  const [moderationItems, setModerationItems] = useState<
+    Array<{
+      postId: string;
+      authorDisplayName: string | null;
+      authorUsername: string | null;
+      moderationDecision: 'approve' | 'blur' | 'reject';
+      reasons: string[];
+      createdAt: string | null;
+    }>
+  >([]);
 
   const handleLogout = async () => {
     try {
@@ -147,6 +157,47 @@ export default function AdminDashboardPage() {
     };
 
     loadStats();
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready || typeof window === 'undefined') return;
+    const token = localStorage.getItem('adminAccessToken') || '';
+    if (!token) return;
+
+    const loadModeration = async () => {
+      try {
+        const response = await fetch(
+          `${getApiBaseUrl()}/admin/moderation/media`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to load moderation queue');
+        }
+
+        const payload = (await response.json()) as {
+          items: Array<{
+            postId: string;
+            authorDisplayName: string | null;
+            authorUsername: string | null;
+            moderationDecision: 'approve' | 'blur' | 'reject';
+            reasons: string[];
+            createdAt: string | null;
+          }>;
+        };
+
+        setModerationItems((payload.items ?? []).slice(0, 3));
+      } catch {
+        setModerationItems([]);
+      }
+    };
+
+    loadModeration();
   }, [ready]);
 
   if (!ready) return null;
@@ -241,9 +292,9 @@ export default function AdminDashboardPage() {
           </div>
           <div className={styles.topActions}>
             <span className={styles.syncBadge}>Synced 2 mins ago</span>
-            <button className={styles.actionButton} type="button">
+            <Link href="/moderation" className={styles.actionButton}>
               Open Moderation Queue
-            </button>
+            </Link>
             <button
               className={styles.actionButton}
               type="button"
@@ -296,6 +347,41 @@ export default function AdminDashboardPage() {
             <span className={`${styles.kpiDelta} ${styles.kpiDeltaNegative}`}>
               High risk: {formatNumber(stats?.highRiskReportsCount)}
             </span>
+          </div>
+        </section>
+
+        <section className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>Auto Moderation (Basic)</h2>
+            <Link href="/moderation" className={styles.panelAction}>
+              Open details
+            </Link>
+          </div>
+          <div className={styles.queueList}>
+            {moderationItems.length === 0 ? (
+              <p className={styles.emptyState}>No moderated media yet.</p>
+            ) : (
+              moderationItems.map((item) => (
+                <div className={styles.queueItem} key={item.postId}>
+                  <span className={styles.queueTitle}>
+                    {item.authorDisplayName || 'Unknown'}
+                    {item.authorUsername ? ` (@${item.authorUsername})` : ''}
+                  </span>
+                  <div className={styles.queueMeta}>
+                    <span className={styles.tag}>
+                      {item.moderationDecision.toUpperCase()}
+                    </span>
+                    {item.reasons?.[0] ? <span>{item.reasons[0]}</span> : null}
+                    <Link
+                      href={`/moderation/${item.postId}`}
+                      className={styles.panelAction}
+                    >
+                      View
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
 

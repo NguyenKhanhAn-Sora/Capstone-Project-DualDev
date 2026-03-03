@@ -49,6 +49,8 @@ export type NotificationItem = {
   reportStrikeTotal?: number | null;
   reportReason?: string | null;
   reportActionExpiresAt?: string | null;
+  moderationDecision?: 'approve' | 'blur' | 'reject' | null;
+  moderationReasons?: string[];
   readAt: string | null;
   createdAt: string;
   activityAt: string;
@@ -103,6 +105,8 @@ type NotificationDoc = {
   reportStrikeTotal?: number | null;
   reportReason?: string | null;
   reportActionExpiresAt?: Date | null;
+  moderationDecision?: 'approve' | 'blur' | 'reject' | null;
+  moderationReasons?: string[];
   readAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -900,6 +904,53 @@ export class NotificationsService {
     return response;
   }
 
+  async createPostModerationResultNotification(params: {
+    recipientId: string;
+    postId?: string | null;
+    postKind?: PostKind;
+    decision: 'approve' | 'blur' | 'reject';
+    reasons?: string[];
+  }): Promise<NotificationItem> {
+    const recipientObjectId = new Types.ObjectId(params.recipientId);
+    const postObjectId =
+      params.postId && Types.ObjectId.isValid(params.postId)
+        ? new Types.ObjectId(params.postId)
+        : null;
+
+    const doc = await this.notificationModel
+      .create({
+        recipientId: recipientObjectId,
+        actorId: recipientObjectId,
+        postId: postObjectId,
+        commentId: null,
+        postKind: params.postKind ?? 'post',
+        type: 'post_moderation',
+        moderationDecision: params.decision,
+        moderationReasons: (params.reasons ?? []).slice(0, 3),
+        readAt: null,
+      })
+      .then((created) => created.toObject() as NotificationDoc);
+
+    const profile = await this.profileModel
+      .findOne({ userId: recipientObjectId })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const response = this.toResponse(doc, profile ?? null, {
+      recipientId: params.recipientId,
+    });
+    const { unreadCount } = await this.getUnreadCount(params.recipientId);
+
+    if (await this.canEmitNotification(params.recipientId)) {
+      this.gateway.emitToUser(params.recipientId, 'notification:new', {
+        notification: response,
+        unreadCount,
+      } satisfies NotificationRealtimePayload);
+    }
+
+    return response;
+  }
+
   async createReportDismissedNotification(params: {
     recipientId: string;
   }): Promise<NotificationItem> {
@@ -1094,6 +1145,10 @@ export class NotificationsService {
       reportActionExpiresAt: doc.reportActionExpiresAt
         ? doc.reportActionExpiresAt.toISOString()
         : null,
+      moderationDecision: doc.moderationDecision ?? null,
+      moderationReasons: Array.isArray(doc.moderationReasons)
+        ? doc.moderationReasons
+        : [],
       readAt: doc.readAt ? doc.readAt.toISOString() : null,
       createdAt,
       activityAt,

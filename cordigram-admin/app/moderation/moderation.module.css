@@ -1,0 +1,173 @@
+.page {
+  min-height: 100vh;
+  background: var(--color-bg);
+  padding: 28px 20px 48px;
+}
+
+.shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.eyebrow {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+
+.title {
+  margin: 4px 0 0;
+  font-size: 28px;
+  color: var(--color-text);
+}
+
+.backButton {
+  text-decoration: none;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summaryCard {
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  display: grid;
+  gap: 8px;
+}
+
+.label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.value {
+  color: var(--color-text);
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.panel {
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  padding: 16px;
+}
+
+.panelHeader {
+  margin-bottom: 12px;
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 18px;
+}
+
+.empty {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+}
+
+.row {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.rowMain {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.badge {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 8px;
+}
+
+.badgeApprove {
+  color: #0f766e;
+  background: rgba(16, 185, 129, 0.18);
+}
+
+.badgeBlur {
+  color: #a16207;
+  background: rgba(234, 179, 8, 0.22);
+}
+
+.badgeReject {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.2);
+}
+
+.rowTitle {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.rowMeta {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.reason {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.detailButton {
+  text-decoration: none;
+  color: var(--color-primary-strong);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .summaryGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

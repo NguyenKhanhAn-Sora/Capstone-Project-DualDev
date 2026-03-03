@@ -1095,6 +1095,234 @@ export class AdminService {
     };
   }
 
+  async getMediaModerationQueue(limit = 20): Promise<{
+    items: Array<{
+      postId: string;
+      authorDisplayName: string | null;
+      authorUsername: string | null;
+      createdAt: Date | null;
+      visibility: string;
+      kind: 'post' | 'reel';
+      moderationDecision: 'approve' | 'blur' | 'reject';
+      moderationProvider: string | null;
+      moderatedMediaCount: number;
+      previewUrl: string | null;
+      reasons: string[];
+    }>;
+    counts: {
+      approve: number;
+      blur: number;
+      reject: number;
+    };
+  }> {
+    const safeLimit = Math.min(Math.max(limit, 1), 50);
+
+    const docs = await this.postModel
+      .find({
+        deletedAt: null,
+        'media.metadata.moderationDecision': { $in: ['approve', 'blur', 'reject'] },
+      })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit)
+      .select('authorId createdAt visibility kind media')
+      .lean();
+
+    const authorIds = Array.from(
+      new Set(
+        docs
+          .map((doc) => doc.authorId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    const authorObjectIds = authorIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const profiles = authorObjectIds.length
+      ? await this.profileModel
+          .find({ userId: { $in: authorObjectIds } })
+          .select('userId displayName username')
+          .lean()
+      : [];
+
+    const profileMap = new Map(
+      profiles.map((profile) => [profile.userId.toString(), profile]),
+    );
+
+    const counts = {
+      approve: 0,
+      blur: 0,
+      reject: 0,
+    };
+
+    const items: Array<{
+      postId: string;
+      authorDisplayName: string | null;
+      authorUsername: string | null;
+      createdAt: Date | null;
+      visibility: string;
+      kind: 'post' | 'reel';
+      moderationDecision: 'approve' | 'blur' | 'reject';
+      moderationProvider: string | null;
+      moderatedMediaCount: number;
+      previewUrl: string | null;
+      reasons: string[];
+    }> = [];
+
+    for (const doc of docs) {
+      const media = Array.isArray(doc.media) ? doc.media : [];
+      const moderated = media.filter((item: any) => {
+        const decision = item?.metadata?.moderationDecision;
+        return (
+          decision === 'approve' || decision === 'blur' || decision === 'reject'
+        );
+      });
+
+      if (!moderated.length) continue;
+
+      const decisionRank: Record<'approve' | 'blur' | 'reject', number> = {
+        approve: 1,
+        blur: 2,
+        reject: 3,
+      };
+
+      const primary = moderated
+        .map((item: any) => ({
+          decision: item?.metadata?.moderationDecision as
+            | 'approve'
+            | 'blur'
+            | 'reject',
+          provider:
+            typeof item?.metadata?.moderationProvider === 'string'
+              ? item.metadata.moderationProvider
+              : null,
+          reasons: Array.isArray(item?.metadata?.moderationReasons)
+            ? item.metadata.moderationReasons.filter((x: any) => typeof x === 'string')
+            : [],
+          url: typeof item?.url === 'string' ? item.url : null,
+        }))
+        .sort((a, b) => decisionRank[b.decision] - decisionRank[a.decision])[0];
+
+      counts[primary.decision] += 1;
+
+      const profile = profileMap.get(doc.authorId?.toString?.() ?? '');
+
+      items.push({
+        postId: doc._id.toString(),
+        authorDisplayName: profile?.displayName ?? null,
+        authorUsername: profile?.username ?? null,
+        createdAt: doc.createdAt ?? null,
+        visibility: doc.visibility ?? 'public',
+        kind: (doc.kind ?? 'post') as 'post' | 'reel',
+        moderationDecision: primary.decision,
+        moderationProvider: primary.provider,
+        moderatedMediaCount: moderated.length,
+        previewUrl: primary.url,
+        reasons: primary.reasons,
+      });
+    }
+
+    return { items, counts };
+  }
+
+  async getMediaModerationDetail(postId: string): Promise<{
+    postId: string;
+    content: string;
+    createdAt: Date | null;
+    visibility: string;
+    kind: 'post' | 'reel';
+    author: {
+      displayName: string | null;
+      username: string | null;
+      avatarUrl: string | null;
+    };
+    media: Array<{
+      index: number;
+      type: 'image' | 'video';
+      url: string;
+      moderationDecision: 'approve' | 'blur' | 'reject' | 'unknown';
+      moderationProvider: string | null;
+      moderationReasons: string[];
+      moderationScores: Record<string, number>;
+    }>;
+  }> {
+    const doc = await this.postModel
+      .findOne({ _id: postId, deletedAt: null })
+      .select('authorId content createdAt visibility kind media')
+      .lean();
+
+    if (!doc) {
+      throw new NotFoundException('Post not found');
+    }
+
+    const profile = await this.profileModel
+      .findOne({ userId: doc.authorId })
+      .select('displayName username avatarUrl')
+      .lean();
+
+    const mediaItems = (Array.isArray(doc.media) ? doc.media : []).map(
+      (item: any, index: number) => {
+        const rawDecision = item?.metadata?.moderationDecision;
+        const moderationDecision: 'approve' | 'blur' | 'reject' | 'unknown' =
+          rawDecision === 'approve' || rawDecision === 'blur' || rawDecision === 'reject'
+            ? rawDecision
+            : 'unknown';
+
+        const rawScores =
+          item?.metadata?.moderationScores &&
+          typeof item.metadata.moderationScores === 'object'
+            ? item.metadata.moderationScores
+            : {};
+
+        const moderationScores = Object.entries(rawScores).reduce(
+          (acc, [key, value]) => {
+            if (typeof value === 'number' && Number.isFinite(value)) {
+              acc[key] = value;
+            }
+            return acc;
+          },
+          {} as Record<string, number>,
+        );
+
+        const mediaType: 'image' | 'video' =
+          item?.type === 'video' ? 'video' : 'image';
+        const moderationReasons: string[] = Array.isArray(
+          item?.metadata?.moderationReasons,
+        )
+          ? item.metadata.moderationReasons.filter((x: any) => typeof x === 'string')
+          : [];
+
+        return {
+          index,
+          type: mediaType,
+          url: typeof item?.url === 'string' ? item.url : '',
+          moderationDecision,
+          moderationProvider:
+            typeof item?.metadata?.moderationProvider === 'string'
+              ? item.metadata.moderationProvider
+              : null,
+          moderationReasons,
+          moderationScores,
+        };
+      },
+    );
+
+    return {
+      postId: doc._id.toString(),
+      content: doc.content ?? '',
+      createdAt: doc.createdAt ?? null,
+      visibility: doc.visibility ?? 'public',
+      kind: (doc.kind ?? 'post') as 'post' | 'reel',
+      author: {
+        displayName: profile?.displayName ?? null,
+        username: profile?.username ?? null,
+        avatarUrl: profile?.avatarUrl ?? null,
+      },
+      media: mediaItems,
+    };
+  }
+
   async resolveReportAction(params: {
     type: string;
     targetId: string;

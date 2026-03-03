@@ -30,6 +30,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ActivityLogService } from '../activity/activity.service';
 import { PostSchedulerService } from './post-scheduler.service';
 import { User } from '../users/user.schema';
+import { MediaModerationService } from './media-moderation.service';
+import { ModerationAction } from '../moderation/moderation-action.schema';
 type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
@@ -44,6 +46,8 @@ export class PostsService {
   constructor(
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(ModerationAction.name)
+    private readonly moderationActionModel: Model<ModerationAction>,
     @InjectModel(PostInteraction.name)
     private readonly postInteractionModel: Model<PostInteraction>,
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
@@ -59,6 +63,7 @@ export class PostsService {
     private readonly notificationsService: NotificationsService,
     private readonly activityLogService: ActivityLogService,
     private readonly postScheduler: PostSchedulerService,
+    private readonly mediaModerationService: MediaModerationService,
   ) {}
 
   async create(authorId: string, dto: CreatePostDto) {
@@ -177,6 +182,28 @@ export class PostsService {
       await this.postModel
         .updateOne({ _id: repostOf }, { $inc: { 'stats.reposts': 1 } })
         .exec();
+    }
+
+    const moderationSummary = this.resolvePostModerationSummary(media);
+    if (moderationSummary?.decision === 'reject') {
+      await this.applyAutoModerationRejectToPost({
+        authorId,
+        postId: doc._id.toString(),
+        reason:
+          moderationSummary.reasons[0] ??
+          'Automated moderation rejected this post',
+        allReasons: moderationSummary.reasons,
+      });
+    }
+
+    if (moderationSummary) {
+      await this.notificationsService.createPostModerationResultNotification({
+        recipientId: authorId,
+        postId: doc._id.toString(),
+        postKind: 'post',
+        decision: moderationSummary.decision,
+        reasons: moderationSummary.reasons,
+      });
     }
 
     return this.toResponse(doc);
@@ -391,6 +418,28 @@ export class PostsService {
       mentions: normalizedMentions,
       source: 'post',
     });
+
+    const moderationSummary = this.resolvePostModerationSummary(media);
+    if (moderationSummary?.decision === 'reject') {
+      await this.applyAutoModerationRejectToPost({
+        authorId,
+        postId: doc._id.toString(),
+        reason:
+          moderationSummary.reasons[0] ??
+          'Automated moderation rejected this reel',
+        allReasons: moderationSummary.reasons,
+      });
+    }
+
+    if (moderationSummary) {
+      await this.notificationsService.createPostModerationResultNotification({
+        recipientId: authorId,
+        postId: doc._id.toString(),
+        postKind: 'reel',
+        decision: moderationSummary.decision,
+        reasons: moderationSummary.reasons,
+      });
+    }
 
     return this.toResponse(doc);
   }
@@ -764,6 +813,19 @@ export class PostsService {
 
   private async uploadSingle(authorId: string, file: UploadedFile) {
     const resourceType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+    const moderation =
+      resourceType === 'image'
+        ? await this.mediaModerationService.moderateImage({
+            buffer: file.buffer,
+            filename: file.originalname,
+            mimetype: file.mimetype,
+          })
+        : await this.mediaModerationService.moderateVideo({
+            buffer: file.buffer,
+            filename: file.originalname,
+            mimetype: file.mimetype,
+          });
+
     const folder = this.buildUploadFolder(authorId);
 
     const upload = await this.cloudinary.uploadBuffer({
@@ -773,10 +835,38 @@ export class PostsService {
       overwrite: false,
     });
 
+    const secureUrl =
+      moderation.decision === 'blur'
+        ? resourceType === 'image'
+          ? this.cloudinary.buildBlurImageUrl({
+              publicId: upload.publicId,
+              secure: true,
+            })
+          : this.cloudinary.buildBlurVideoUrl({
+              publicId: upload.publicId,
+              secure: true,
+            })
+        : upload.secureUrl;
+
+    const url =
+      moderation.decision === 'blur'
+        ? resourceType === 'image'
+          ? this.cloudinary.buildBlurImageUrl({
+              publicId: upload.publicId,
+              secure: false,
+            })
+          : this.cloudinary.buildBlurVideoUrl({
+              publicId: upload.publicId,
+              secure: false,
+            })
+        : upload.url;
+
     return {
       folder,
-      url: upload.url,
-      secureUrl: upload.secureUrl,
+      url,
+      secureUrl,
+      originalUrl: upload.url,
+      originalSecureUrl: upload.secureUrl,
       publicId: upload.publicId,
       resourceType: upload.resourceType,
       bytes: upload.bytes,
@@ -784,7 +874,115 @@ export class PostsService {
       width: upload.width,
       height: upload.height,
       duration: upload.duration,
+      moderationDecision: moderation.decision,
+      moderationProvider: moderation.provider,
+      moderationReasons: moderation.reasons,
+      moderationScores: moderation.scores,
     };
+  }
+
+  private resolvePostModerationSummary(media: Array<{
+    type: 'image' | 'video';
+    url: string;
+    metadata?: Record<string, unknown> | null;
+  }>): {
+    decision: 'approve' | 'blur' | 'reject';
+    reasons: string[];
+  } | null {
+    const decisions = (media ?? [])
+      .map((item) => {
+        const rawDecision = item?.metadata?.['moderationDecision'];
+        if (
+          rawDecision === 'approve' ||
+          rawDecision === 'blur' ||
+          rawDecision === 'reject'
+        ) {
+          const reasonsRaw = item?.metadata?.['moderationReasons'];
+          const reasons = Array.isArray(reasonsRaw)
+            ? reasonsRaw.filter((value): value is string => typeof value === 'string')
+            : [];
+          return { decision: rawDecision, reasons };
+        }
+        return null;
+      })
+      .filter(
+        (
+          value,
+        ): value is {
+          decision: 'approve' | 'blur' | 'reject';
+          reasons: string[];
+        } => Boolean(value),
+      );
+
+    if (!decisions.length) return null;
+
+    if (decisions.some((item) => item.decision === 'reject')) {
+      return {
+        decision: 'reject',
+        reasons:
+          decisions.find((item) => item.decision === 'reject')?.reasons ?? [],
+      };
+    }
+
+    if (decisions.some((item) => item.decision === 'blur')) {
+      return {
+        decision: 'blur',
+        reasons: decisions.find((item) => item.decision === 'blur')?.reasons ?? [],
+      };
+    }
+
+    return {
+      decision: 'approve',
+      reasons: decisions.find((item) => item.decision === 'approve')?.reasons ?? [],
+    };
+  }
+
+  private async applyAutoModerationRejectToPost(params: {
+    authorId: string;
+    postId: string;
+    reason: string;
+    allReasons: string[];
+  }) {
+    const authorObjectId = this.asObjectId(params.authorId, 'authorId');
+    const postObjectId = this.asObjectId(params.postId, 'postId');
+    const admin = await this.userModel
+      .findOne({ roles: 'admin', status: 'active' })
+      .select('_id')
+      .lean()
+      .exec();
+    const moderatorId = admin?._id
+      ? new Types.ObjectId(admin._id)
+      : authorObjectId;
+
+    await this.moderationActionModel.create({
+      targetType: 'post',
+      targetId: postObjectId,
+      action: 'remove_post',
+      category: 'automated_content_moderation',
+      reason: params.reason,
+      severity: 'low',
+      note: `Auto reject: ${params.allReasons.join(', ')}`,
+      moderatorId,
+    });
+
+    await this.postModel
+      .updateOne(
+        { _id: postObjectId },
+        {
+          $set: {
+            moderationState: 'removed',
+            deletedAt: new Date(),
+            deletedBy: moderatorId,
+            deletedSource: 'system',
+            deletedReason: params.reason,
+          },
+        },
+      )
+      .exec();
+
+    await this.userModel
+      .updateOne({ _id: authorObjectId }, { $inc: { strikeCount: 1 } })
+      .exec();
   }
 
   async getFeed(

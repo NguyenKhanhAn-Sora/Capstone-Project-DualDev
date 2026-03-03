@@ -11,6 +11,7 @@ export type NotificationType =
   | 'post_mention'
   | 'follow'
   | 'login_alert'
+  | 'post_moderation'
   | 'report';
 
 export type ReportNotificationOutcome = 'no_violation' | 'action_taken';
@@ -65,6 +66,7 @@ export class Notification extends Document {
       'post_mention',
       'follow',
       'login_alert',
+      'post_moderation',
       'report',
     ],
     index: true,
@@ -143,6 +145,12 @@ export class Notification extends Document {
 
   @Prop({ type: Date, default: null })
   reportActionExpiresAt?: Date | null;
+
+  @Prop({ type: String, enum: ['approve', 'blur', 'reject'], default: null })
+  moderationDecision?: 'approve' | 'blur' | 'reject' | null;
+
+  @Prop({ type: [String], default: [] })
+  moderationReasons?: string[];
 
   @Prop({ type: Date, default: null })
   readAt: Date | null;

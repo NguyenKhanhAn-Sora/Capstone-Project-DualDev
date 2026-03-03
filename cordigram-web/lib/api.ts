@@ -1372,6 +1372,7 @@ export type NotificationItem = {
     | "post_mention"
     | "follow"
     | "login_alert"
+    | "post_moderation"
     | "report";
   actor: {
     id: string;
@@ -1399,6 +1400,8 @@ export type NotificationItem = {
   reportStrikeTotal?: number | null;
   reportReason?: string | null;
   reportActionExpiresAt?: string | null;
+  moderationDecision?: "approve" | "blur" | "reject" | null;
+  moderationReasons?: string[];
   readAt: string | null;
   createdAt: string;
   activityAt: string;
@@ -1899,6 +1902,8 @@ export type UploadPostMediaResponse = {
   folder: string;
   url: string;
   secureUrl: string;
+  originalUrl?: string;
+  originalSecureUrl?: string;
   publicId: string;
   resourceType: string;
   bytes: number;
@@ -1906,6 +1911,10 @@ export type UploadPostMediaResponse = {
   width?: number;
   height?: number;
   duration?: number;
+  moderationDecision?: "approve" | "blur" | "reject";
+  moderationProvider?: string | null;
+  moderationReasons?: string[];
+  moderationScores?: Record<string, number>;
 };
 
 export type ReportProblemAttachment = {

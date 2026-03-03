@@ -17,6 +17,7 @@ export type NotificationReceivedDetail = {
       | "post_mention"
       | "follow"
       | "login_alert"
+      | "post_moderation"
       | "report";
     actor: {
       id: string;
@@ -41,6 +42,8 @@ export type NotificationReceivedDetail = {
     reportStrikeTotal?: number | null;
     reportReason?: string | null;
     reportActionExpiresAt?: string | null;
+    moderationDecision?: "approve" | "blur" | "reject" | null;
+    moderationReasons?: string[];
     readAt: string | null;
     createdAt: string;
     activityAt: string;

@@ -27,6 +27,11 @@ import {
 import { ActivityModule } from '../activity/activity.module';
 import { PostSchedulerService } from './post-scheduler.service';
 import { User, UserSchema } from '../users/user.schema';
+import { MediaModerationService } from './media-moderation.service';
+import {
+  ModerationAction,
+  ModerationActionSchema,
+} from '../moderation/moderation-action.schema';
 
 @Module({
   imports: [
@@ -44,10 +49,11 @@ import { User, UserSchema } from '../users/user.schema';
       { name: UserTasteProfile.name, schema: UserTasteProfileSchema },
       { name: PostImpressionEvent.name, schema: PostImpressionEventSchema },
       { name: User.name, schema: UserSchema },
+      { name: ModerationAction.name, schema: ModerationActionSchema },
     ]),
   ],
   controllers: [PostsController, ReelsController, ExploreController],
-  providers: [PostsService, PostSchedulerService],
+  providers: [PostsService, PostSchedulerService, MediaModerationService],
   exports: [PostsService],
 })
 export class PostsModule {}
