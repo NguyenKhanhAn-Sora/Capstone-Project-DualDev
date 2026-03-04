@@ -12,12 +12,14 @@ class Settings(BaseSettings):
 
     blur_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
     reject_threshold: float = Field(default=0.80, ge=0.0, le=1.0)
+    nudity_blur_threshold: float = Field(default=0.95, ge=0.0, le=1.0)
+    nudity_reject_threshold: float = Field(default=0.995, ge=0.0, le=1.0)
     violence_blur_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
     violence_reject_threshold: float = Field(default=0.82, ge=0.0, le=1.0)
     gore_blur_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     gore_reject_threshold: float = Field(default=0.78, ge=0.0, le=1.0)
-    weapons_blur_threshold: float = Field(default=0.68, ge=0.0, le=1.0)
-    weapons_reject_threshold: float = Field(default=0.9, ge=0.0, le=1.0)
+    weapons_blur_threshold: float = Field(default=0.50, ge=0.0, le=1.0)
+    weapons_reject_threshold: float = Field(default=0.76, ge=0.0, le=1.0)
 
     max_image_bytes: int = 15 * 1024 * 1024
     max_video_bytes: int = 100 * 1024 * 1024

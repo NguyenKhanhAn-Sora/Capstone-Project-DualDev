@@ -64,6 +64,46 @@ class HeuristicImageModerationProvider(ImageModerationProvider):
         rgb_uint8 = arr.astype(np.uint8)
         bgr = cv2.cvtColor(rgb_uint8, cv2.COLOR_RGB2BGR)
         hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+        ycrcb = cv2.cvtColor(bgr, cv2.COLOR_BGR2YCrCb)
+
+        hsv_skin_mask = cv2.inRange(
+            hsv,
+            np.array([0, 18, 45], dtype=np.uint8),
+            np.array([26, 200, 255], dtype=np.uint8),
+        )
+        ycrcb_skin_mask = cv2.inRange(
+            ycrcb,
+            np.array([0, 135, 85], dtype=np.uint8),
+            np.array([255, 180, 135], dtype=np.uint8),
+        )
+
+        combined_skin_mask = cv2.bitwise_and(
+            skin_mask.astype(np.uint8) * 255,
+            cv2.bitwise_or(hsv_skin_mask, ycrcb_skin_mask),
+        )
+        skin_kernel = np.ones((3, 3), dtype=np.uint8)
+        combined_skin_mask = cv2.morphologyEx(
+            combined_skin_mask,
+            cv2.MORPH_OPEN,
+            skin_kernel,
+            iterations=1,
+        )
+        combined_skin_mask = cv2.morphologyEx(
+            combined_skin_mask,
+            cv2.MORPH_CLOSE,
+            skin_kernel,
+            iterations=1,
+        )
+        refined_skin_ratio = float(np.count_nonzero(combined_skin_mask) / total_pixels)
+
+        largest_skin_blob_ratio = 0.0
+        component_count, _, component_stats, _ = cv2.connectedComponentsWithStats(
+            combined_skin_mask,
+            connectivity=8,
+        )
+        if component_count > 1:
+            largest_area = int(component_stats[1:, cv2.CC_STAT_AREA].max(initial=0))
+            largest_skin_blob_ratio = float(largest_area / total_pixels)
 
         blood_low_1 = np.array([0, 70, 40], dtype=np.uint8)
         blood_high_1 = np.array([12, 255, 255], dtype=np.uint8)
@@ -105,10 +145,42 @@ class HeuristicImageModerationProvider(ImageModerationProvider):
         val = hsv[:, :, 2].astype(np.float32)
         metallic_mask = (sat < 45) & (val > 70)
         metallic_ratio = float(np.count_nonzero(metallic_mask) / total_pixels)
+        dark_metal_mask = (sat < 55) & (val > 35) & (val < 170)
+        dark_metal_ratio = float(np.count_nonzero(dark_metal_mask) / total_pixels)
+
+        blue_dominant_mask = (blue > red * 1.12) & (blue > green * 1.08)
+        blue_dominant_ratio = float(np.count_nonzero(blue_dominant_mask) / total_pixels)
+
+        pink_dominant_mask = (
+            (red > 120)
+            & (blue > 105)
+            & (green > 80)
+            & (red > green * 1.05)
+            & (blue > green * 1.02)
+        )
+        pink_dominant_ratio = float(np.count_nonzero(pink_dominant_mask) / total_pixels)
+
+        laplacian_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+        low_texture_signal = self._normalize(140.0 - laplacian_var, low=20.0, high=120.0)
+
+        pastel_mask = (sat > 35) & (sat < 165) & (val > 145)
+        pastel_ratio = float(np.count_nonzero(pastel_mask) / total_pixels)
+        stylized_signal = min(
+            1.0,
+            (self._normalize(pink_dominant_ratio, low=0.16, high=0.52) * 0.55)
+            + (self._normalize(pastel_ratio, low=0.2, high=0.62) * 0.25)
+            + (low_texture_signal * 0.20),
+        )
 
         line_density = float(np.count_nonzero(edges) / total_pixels)
 
-        nudity = self._normalize(skin_ratio, low=0.18, high=0.55)
+        broad_skin_signal = self._normalize(refined_skin_ratio, low=0.48, high=0.9)
+        contiguous_skin_signal = self._normalize(
+            largest_skin_blob_ratio,
+            low=0.24,
+            high=0.62,
+        )
+        nudity = broad_skin_signal * 0.35 + contiguous_skin_signal * 0.65
         violence = max(
             self._normalize(vivid_red_ratio, low=0.05, high=0.20),
             self._normalize(blood_ratio, low=0.04, high=0.18),
@@ -118,12 +190,41 @@ class HeuristicImageModerationProvider(ImageModerationProvider):
             self._normalize(blood_ratio, low=0.03, high=0.14),
         )
 
-        line_signal = min(1.0, (long_line_count / 220.0) + (diagonal_line_count / 140.0))
-        weapons = max(
-            self._normalize(metallic_ratio, low=0.35, high=0.7) * 0.6
-            + self._normalize(line_density, low=0.06, high=0.2) * 0.4,
-            line_signal,
+        line_signal = min(1.0, (long_line_count / 180.0) + (diagonal_line_count / 120.0))
+        metallic_signal = max(
+            self._normalize(metallic_ratio, low=0.22, high=0.58),
+            self._normalize(dark_metal_ratio, low=0.24, high=0.62),
         )
+        weapons = (
+            metallic_signal * 0.72
+            + self._normalize(line_density, low=0.055, high=0.19) * 0.18
+            + line_signal * 0.10
+        )
+        if metallic_signal < 0.2:
+            weapons = min(weapons, 0.26)
+
+        if violence < 0.15 and gore < 0.12 and weapons < 0.2:
+            if refined_skin_ratio < 0.62 or largest_skin_blob_ratio < 0.28:
+                nudity *= 0.12
+
+        if blue_dominant_ratio >= 0.45 and violence < 0.2 and gore < 0.16:
+            nudity *= 0.2
+
+        if largest_skin_blob_ratio < 0.22:
+            nudity = min(nudity, 0.45)
+
+        if (
+            stylized_signal >= 0.45
+            and violence < 0.22
+            and gore < 0.18
+            and weapons < 0.24
+            and largest_skin_blob_ratio < 0.52
+        ):
+            suppression = 0.18 + (0.22 * (1.0 - min(1.0, stylized_signal)))
+            nudity *= suppression
+
+        if refined_skin_ratio < 0.55 and largest_skin_blob_ratio < 0.32:
+            nudity = min(nudity, 0.58)
 
         sensitive = min(
             1.0,

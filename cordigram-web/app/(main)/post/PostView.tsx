@@ -1793,12 +1793,27 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     try {
       await deletePost({ token, postId: post.id });
       setDeletePostOpen(false);
+      const fallbackProfilePath = post.authorId ? `/profile/${post.authorId}` : "/";
       if (typeof window !== "undefined") {
         sessionStorage.clear();
-        window.location.replace("/");
+        let canGoBackToInAppPage = false;
+        if (window.history.length > 1 && document.referrer) {
+          try {
+            const referrerUrl = new URL(document.referrer);
+            canGoBackToInAppPage = referrerUrl.origin === window.location.origin;
+          } catch {
+            canGoBackToInAppPage = false;
+          }
+        }
+
+        if (canGoBackToInAppPage) {
+          window.history.back();
+        } else {
+          window.location.replace(fallbackProfilePath);
+        }
         return;
       }
-      router.push("/");
+      router.push(fallbackProfilePath);
     } catch (err: any) {
       setDeletePostError(err?.message || "Failed to delete post");
     } finally {
@@ -2784,6 +2799,55 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     shouldRevealCurrentMedia && currentOriginalUrl
       ? currentOriginalUrl
       : currentMedia?.url;
+
+  const goToPrevMedia = useCallback(() => {
+    if (media.length <= 1) return;
+    setMediaDirection("prev");
+    setMediaIndex((prev) => (prev - 1 + media.length) % media.length);
+  }, [media.length]);
+
+  const goToNextMedia = useCallback(() => {
+    if (media.length <= 1) return;
+    setMediaDirection("next");
+    setMediaIndex((prev) => (prev + 1) % media.length);
+  }, [media.length]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (media.length <= 1) return;
+
+    const handleMediaArrowKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tagName = target.tagName;
+        if (
+          target.isContentEditable ||
+          tagName === "INPUT" ||
+          tagName === "TEXTAREA" ||
+          tagName === "SELECT" ||
+          target.closest("[contenteditable='true']")
+        ) {
+          return;
+        }
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        goToPrevMedia();
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        goToNextMedia();
+      }
+    };
+
+    document.addEventListener("keydown", handleMediaArrowKey);
+    return () => {
+      document.removeEventListener("keydown", handleMediaArrowKey);
+    };
+  }, [goToNextMedia, goToPrevMedia, media.length]);
 
   useEffect(() => {
     const videoEl = mediaVideoRef.current;
@@ -4752,12 +4816,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                   <>
                     <button
                       className={`${styles.mediaNavBtn} ${styles.mediaNavLeft}`}
-                      onClick={() => {
-                        setMediaDirection("prev");
-                        setMediaIndex(
-                          (prev) => (prev - 1 + media.length) % media.length,
-                        );
-                      }}
+                      onClick={goToPrevMedia}
                       aria-label="Previous media"
                     >
                       <svg
@@ -4772,10 +4831,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     </button>
                     <button
                       className={`${styles.mediaNavBtn} ${styles.mediaNavRight}`}
-                      onClick={() => {
-                        setMediaDirection("next");
-                        setMediaIndex((prev) => (prev + 1) % media.length);
-                      }}
+                      onClick={goToNextMedia}
                       aria-label="Next media"
                     >
                       <svg
