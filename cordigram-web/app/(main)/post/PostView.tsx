@@ -3,7 +3,7 @@
 import { JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import styles from "./post.module.css";
@@ -192,6 +192,7 @@ const REPORT_GROUPS: ReportCategory[] = [
 
 const COMMENT_POLL_INTERVAL = 4000;
 const COMMENT_PAGE_SIZE = 20;
+const PROFILE_POST_NAV_KEY_PREFIX = "profile-post-nav:";
 
 const normalizeHashtag = (value: string) =>
   value
@@ -349,8 +350,12 @@ const IconClose = ({ size = 18 }: IconProps) => (
 
 export default function PostView({ postId, asModal }: PostViewProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromProfile = searchParams?.get("fromProfile") === "1";
+  const profileNavProfileId = (searchParams?.get("profileId") || "").trim();
   const [token, setToken] = useState<string | null>(null);
   const [post, setPost] = useState<FeedItem | null>(null);
+  const [profilePostIds, setProfilePostIds] = useState<string[]>([]);
   const [captionMentionMap, setCaptionMentionMap] = useState<
     Record<string, string>
   >({});
@@ -1402,16 +1407,82 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const canonicalPostId = post?.repostOf || postId;
 
+  const profilePostIndex = useMemo(() => {
+    if (!profilePostIds.length) return -1;
+    const candidates = [postId, post?.id].filter(
+      (value): value is string => typeof value === "string" && !!value,
+    );
+    for (const candidate of candidates) {
+      const idx = profilePostIds.indexOf(candidate);
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  }, [post?.id, postId, profilePostIds]);
+
+  const canGoPrevProfilePost = profilePostIndex > 0;
+  const canGoNextProfilePost =
+    profilePostIndex >= 0 && profilePostIndex < profilePostIds.length - 1;
+  const showProfilePostNav =
+    Boolean(asModal) &&
+    fromProfile &&
+    profilePostIds.length > 1 &&
+    profilePostIndex >= 0;
+
+  const buildProfilePostHref = useCallback(
+    (targetPostId: string) => {
+      if (!fromProfile) return `/post/${targetPostId}`;
+      const query = new URLSearchParams();
+      query.set("fromProfile", "1");
+      if (profileNavProfileId) {
+        query.set("profileId", profileNavProfileId);
+      }
+      return `/post/${targetPostId}?${query.toString()}`;
+    },
+    [fromProfile, profileNavProfileId],
+  );
+
+  const goToPrevProfilePost = useCallback(() => {
+    if (!canGoPrevProfilePost) return;
+    const targetPostId = profilePostIds[profilePostIndex - 1];
+    if (!targetPostId) return;
+    persistResume();
+    router.replace(buildProfilePostHref(targetPostId), { scroll: false });
+  }, [
+    buildProfilePostHref,
+    canGoPrevProfilePost,
+    persistResume,
+    profilePostIds,
+    profilePostIndex,
+    router,
+  ]);
+
+  const goToNextProfilePost = useCallback(() => {
+    if (!canGoNextProfilePost) return;
+    const targetPostId = profilePostIds[profilePostIndex + 1];
+    if (!targetPostId) return;
+    persistResume();
+    router.replace(buildProfilePostHref(targetPostId), { scroll: false });
+  }, [
+    buildProfilePostHref,
+    canGoNextProfilePost,
+    persistResume,
+    profilePostIds,
+    profilePostIndex,
+    router,
+  ]);
+
   const goToPostPage = useCallback(() => {
     setShowMoreMenu(false);
     persistResume();
 
+    const targetHref = buildProfilePostHref(canonicalPostId);
+
     if (typeof window !== "undefined") {
-      window.location.href = `/post/${canonicalPostId}`;
+      window.location.href = targetHref;
     } else {
-      router.push(`/post/${canonicalPostId}`);
+      router.push(targetHref);
     }
-  }, [persistResume, canonicalPostId, router]);
+  }, [buildProfilePostHref, persistResume, canonicalPostId, router]);
 
   const viewerUserId = viewer?.userId ?? viewer?.id;
 
@@ -1547,6 +1618,35 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     const accessToken = localStorage.getItem("accessToken");
     setToken(accessToken);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!fromProfile || !profileNavProfileId) {
+      setProfilePostIds([]);
+      return;
+    }
+
+    try {
+      const raw = window.sessionStorage.getItem(
+        `${PROFILE_POST_NAV_KEY_PREFIX}${profileNavProfileId}`,
+      );
+      if (!raw) {
+        setProfilePostIds([]);
+        return;
+      }
+      const parsed = JSON.parse(raw) as { ids?: unknown };
+      if (!Array.isArray(parsed?.ids)) {
+        setProfilePostIds([]);
+        return;
+      }
+      const ids = parsed.ids.filter(
+        (value): value is string => typeof value === "string" && !!value,
+      );
+      setProfilePostIds(ids);
+    } catch {
+      setProfilePostIds([]);
+    }
+  }, [fromProfile, profileNavProfileId]);
 
   useEffect(() => {
     if (!token) return;
@@ -2848,6 +2948,43 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       document.removeEventListener("keydown", handleMediaArrowKey);
     };
   }, [goToNextMedia, goToPrevMedia, media.length]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!showProfilePostNav) return;
+
+    const handleProfilePostArrowKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tagName = target.tagName;
+        if (
+          target.isContentEditable ||
+          tagName === "INPUT" ||
+          tagName === "TEXTAREA" ||
+          tagName === "SELECT" ||
+          target.closest("[contenteditable='true']")
+        ) {
+          return;
+        }
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        goToPrevProfilePost();
+      } else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        goToNextProfilePost();
+      }
+    };
+
+    document.addEventListener("keydown", handleProfilePostArrowKey);
+    return () => {
+      document.removeEventListener("keydown", handleProfilePostArrowKey);
+    };
+  }, [goToNextProfilePost, goToPrevProfilePost, showProfilePostNav]);
 
   useEffect(() => {
     const videoEl = mediaVideoRef.current;
@@ -4777,6 +4914,47 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       className={asModal ? styles.modalOverlay : styles.pageShell}
       onClick={asModal ? goClose : undefined}
     >
+      {showProfilePostNav ? (
+        <div
+          className={styles.profilePostNavRail}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className={styles.profilePostNavBtn}
+            onClick={goToPrevProfilePost}
+            aria-label="Previous post"
+            disabled={!canGoPrevProfilePost}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M12 7.2 5.6 13.6a1 1 0 1 1-1.4-1.4l7.1-7.1a1 1 0 0 1 1.4 0l7.1 7.1a1 1 0 0 1-1.4 1.4L12 7.2Z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className={styles.profilePostNavBtn}
+            onClick={goToNextProfilePost}
+            aria-label="Next post"
+            disabled={!canGoNextProfilePost}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="m12 16.8 6.4-6.4a1 1 0 1 1 1.4 1.4l-7.1 7.1a1 1 0 0 1-1.4 0l-7.1-7.1a1 1 0 1 1 1.4-1.4L12 16.8Z" />
+            </svg>
+          </button>
+        </div>
+      ) : null}
       <div
         className={asModal ? styles.modalCard : styles.pageCard}
         onClick={(e) => asModal && e.stopPropagation()}

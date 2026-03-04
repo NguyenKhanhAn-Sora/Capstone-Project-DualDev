@@ -11,6 +11,7 @@ import {
   fetchPostDetail,
   fetchFeed,
   fetchUserPosts,
+  fetchUserReels,
   likePost,
   unlikePost,
   savePost,
@@ -869,6 +870,14 @@ export default function ReelPage({
     () => searchParams?.get("single") === "1",
     [searchParams],
   );
+  const profileMode = useMemo(
+    () => searchParams?.get("fromProfile") === "1",
+    [searchParams],
+  );
+  const profileModeUserId = useMemo(
+    () => (searchParams?.get("profileId") || "").trim() || undefined,
+    [searchParams],
+  );
   const originReelId = useMemo(
     () => searchParams?.get("origin") || undefined,
     [searchParams],
@@ -1202,31 +1211,44 @@ export default function ReelPage({
       try {
         const limit = nextPage * REELS_PAGE_SIZE;
 
-        let base = ((await fetchReelsFeed({ token, limit, scope })) || []).map(
-          coerceReelKind,
-        );
+        let base: ReelItem[] = [];
+        if (profileMode && profileModeUserId) {
+          base = (
+            (await fetchUserReels({
+              token,
+              userId: profileModeUserId,
+              limit,
+            })) || []
+          ).map(coerceReelKind);
+        } else {
+          base = ((await fetchReelsFeed({ token, limit, scope })) || []).map(
+            coerceReelKind,
+          );
+        }
         let nextItems = [...base];
         let nextHasMore = base.length >= limit;
 
         // Bring in reposted reels that may only be delivered via main feed
-        try {
-          const repostCandidates = (
-            (await fetchFeed({ token, limit: 40, scope })) || []
-          )
-            .filter(isRepostOfReel)
-            .map(coerceReelKind);
-          if (repostCandidates.length) {
-            const seen = new Set(nextItems.map((it) => it.id));
-            repostCandidates.forEach((it) => {
-              if (!seen.has(it.id)) {
-                seen.add(it.id);
-                nextItems.push(it);
-              }
-            });
-          }
-        } catch {}
+        if (!profileMode) {
+          try {
+            const repostCandidates = (
+              (await fetchFeed({ token, limit: 40, scope })) || []
+            )
+              .filter(isRepostOfReel)
+              .map(coerceReelKind);
+            if (repostCandidates.length) {
+              const seen = new Set(nextItems.map((it) => it.id));
+              repostCandidates.forEach((it) => {
+                if (!seen.has(it.id)) {
+                  seen.add(it.id);
+                  nextItems.push(it);
+                }
+              });
+            }
+          } catch {}
+        }
 
-        if (!nextItems.length && viewerId && scope !== "following") {
+        if (!profileMode && !nextItems.length && viewerId && scope !== "following") {
           const ownedBase = (
             (await fetchReelsFeed({
               token,
@@ -1279,7 +1301,15 @@ export default function ReelPage({
         else setLoadingMore(false);
       }
     },
-    [REELS_PAGE_SIZE, requestedReelId, scope, token, viewerId],
+    [
+      REELS_PAGE_SIZE,
+      profileMode,
+      profileModeUserId,
+      requestedReelId,
+      scope,
+      token,
+      viewerId,
+    ],
   );
 
   const loadMore = useCallback(() => {
@@ -2344,7 +2374,15 @@ export default function ReelPage({
 
     if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
     urlSyncTimerRef.current = setTimeout(() => {
-      const target = `/reels/${currentReelId}`;
+      const query = new URLSearchParams();
+      if (profileMode) {
+        query.set("fromProfile", "1");
+        if (profileModeUserId) query.set("profileId", profileModeUserId);
+      }
+      const qs = query.toString();
+      const target = qs
+        ? `/reels/${currentReelId}?${qs}`
+        : `/reels/${currentReelId}`;
       if (lastSyncedIdRef.current === currentReelId) return;
       lastSyncedIdRef.current = currentReelId;
 
@@ -2362,7 +2400,7 @@ export default function ReelPage({
     return () => {
       if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
     };
-  }, [currentReelId, singleMode]);
+  }, [currentReelId, profileMode, profileModeUserId, singleMode]);
 
   useEffect(() => {
     if (!token) return;
