@@ -3,6 +3,8 @@ import { Document, Types } from 'mongoose';
 
 export type ModerationTargetType = 'post' | 'comment' | 'user';
 export type ModerationActionType =
+  | 'auto_hidden_pending_review'
+  | 'rollback_moderation'
   | 'no_violation'
   | 'remove_post'
   | 'restrict_post'
@@ -25,6 +27,8 @@ export class ModerationAction extends Document {
   @Prop({
     type: String,
     enum: [
+      'auto_hidden_pending_review',
+      'rollback_moderation',
       'no_violation',
       'remove_post',
       'restrict_post',
@@ -62,6 +66,15 @@ export class ModerationAction extends Document {
 
   @Prop({ type: Date })
   updatedAt?: Date;
+
+  @Prop({ type: Date, default: null, index: true })
+  invalidatedAt?: Date | null;
+
+  @Prop({ type: String, default: null })
+  invalidatedReason?: string | null;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  invalidatedBy?: Types.ObjectId | null;
 }
 
 export const ModerationActionSchema =

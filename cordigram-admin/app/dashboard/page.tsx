@@ -67,22 +67,6 @@ export default function AdminDashboardPage() {
     }>
   >([]);
 
-  const handleLogout = async () => {
-    try {
-      await fetch(`${getApiBaseUrl()}/auth/admin/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (_err) {}
-
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("adminAccessToken");
-      localStorage.removeItem("adminRoles");
-    }
-
-    router.replace("/login");
-  };
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     const token = localStorage.getItem("adminAccessToken") || "";
@@ -289,19 +273,6 @@ export default function AdminDashboardPage() {
           <div className={styles.titleGroup}>
             <span className={styles.eyebrow}>Admin Dashboard</span>
             <h1 className={styles.title}>Welcome back, Admin</h1>
-          </div>
-          <div className={styles.topActions}>
-            <span className={styles.syncBadge}>Synced 2 mins ago</span>
-            <Link href="/moderation" className={styles.actionButton}>
-              Open Moderation Queue
-            </Link>
-            <button
-              className={styles.actionButton}
-              type="button"
-              onClick={handleLogout}
-            >
-              Sign out
-            </button>
           </div>
         </div>
 

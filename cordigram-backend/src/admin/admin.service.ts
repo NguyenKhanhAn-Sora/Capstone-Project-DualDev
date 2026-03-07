@@ -87,6 +87,783 @@ export class AdminService {
     return Math.min(1.5, Math.max(0.3, Number(weight.toFixed(2))));
   }
 
+  private async getAvgReportReviewMinutes(
+    since: Date,
+  ): Promise<number | null> {
+    const buildPipeline = () => [
+      {
+        $match: {
+          status: 'resolved',
+          createdAt: { $ne: null },
+          resolvedAt: { $ne: null, $gte: since },
+        },
+      },
+      {
+        $project: {
+          durationMs: { $subtract: ['$resolvedAt', '$createdAt'] },
+        },
+      },
+      {
+        $match: {
+          durationMs: { $gte: 0 },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalMs: { $sum: '$durationMs' },
+        },
+      },
+    ];
+
+    const [postAgg, commentAgg, userAgg] = await Promise.all([
+      this.reportPostModel.aggregate(buildPipeline()).exec(),
+      this.reportCommentModel.aggregate(buildPipeline()).exec(),
+      this.reportUserModel.aggregate(buildPipeline()).exec(),
+    ]);
+
+    const merged = [postAgg[0], commentAgg[0], userAgg[0]].filter(Boolean) as Array<{
+      count?: number;
+      totalMs?: number;
+    }>;
+
+    const totalCount = merged.reduce((sum, row) => sum + (row.count ?? 0), 0);
+    const totalMs = merged.reduce((sum, row) => sum + (row.totalMs ?? 0), 0);
+
+    if (!totalCount || !Number.isFinite(totalMs)) {
+      return null;
+    }
+
+    return Number((totalMs / totalCount / 60000).toFixed(1));
+  }
+
+  private getStrikeIncrement(
+    action: string,
+    severity: 'low' | 'medium' | 'high' | null,
+  ): number {
+    if (['warn', 'mute_interaction', 'no_violation'].includes(action)) {
+      return 0;
+    }
+    if (action === 'suspend_user') {
+      return 3;
+    }
+    if (severity === 'high') return 3;
+    if (severity === 'medium') return 2;
+    return 1;
+  }
+
+  private async resolveOffenderIdByTarget(params: {
+    targetType: 'post' | 'comment' | 'user';
+    targetId: Types.ObjectId;
+  }): Promise<Types.ObjectId | null> {
+    const { targetType, targetId } = params;
+    if (targetType === 'post') {
+      const post = await this.postModel.findById(targetId).select('authorId').lean();
+      return post?.authorId ? new Types.ObjectId(post.authorId) : null;
+    }
+
+    if (targetType === 'comment') {
+      const comment = await this.commentModel
+        .findById(targetId)
+        .select('authorId')
+        .lean();
+      return comment?.authorId ? new Types.ObjectId(comment.authorId) : null;
+    }
+
+    return new Types.ObjectId(targetId);
+  }
+
+  private async revertModerationActionEffects(params: {
+    targetType: 'post' | 'comment' | 'user';
+    targetId: Types.ObjectId;
+    action: string;
+    severity: 'low' | 'medium' | 'high' | null;
+  }): Promise<void> {
+    const { targetType, targetId, action, severity } = params;
+
+    if (targetType === 'post') {
+      if (action === 'remove_post' || action === 'restrict_post') {
+        await this.postModel
+          .updateOne(
+            { _id: targetId },
+            {
+              $set: {
+                moderationState: 'normal',
+                deletedAt: null,
+                deletedBy: null,
+                deletedSource: null,
+                deletedReason: null,
+                autoHiddenPendingReview: false,
+                autoHiddenAt: null,
+                autoHiddenUntil: null,
+                autoHiddenEscalatedAt: null,
+              },
+            },
+          )
+          .exec();
+      }
+    }
+
+    if (targetType === 'comment') {
+      if (action === 'delete_comment') {
+        await this.commentModel
+          .updateOne(
+            { _id: targetId },
+            {
+              $set: {
+                moderationState: 'normal',
+                deletedAt: null,
+                deletedBy: null,
+                deletedSource: null,
+                deletedReason: null,
+                autoHiddenPendingReview: false,
+                autoHiddenAt: null,
+                autoHiddenUntil: null,
+                autoHiddenEscalatedAt: null,
+              },
+            },
+          )
+          .exec();
+      }
+    }
+
+    if (targetType === 'user') {
+      if (action === 'suspend_user') {
+        await this.userModel
+          .updateOne(
+            { _id: targetId },
+            {
+              $set: {
+                status: 'active',
+                suspendedUntil: null,
+                suspendedIndefinitely: false,
+              },
+            },
+          )
+          .exec();
+      }
+
+      if (action === 'limit_account') {
+        await this.userModel
+          .updateOne(
+            { _id: targetId },
+            {
+              $set: {
+                status: 'active',
+                accountLimitedUntil: null,
+                accountLimitedIndefinitely: false,
+              },
+            },
+          )
+          .exec();
+      }
+    }
+
+    if (action === 'mute_interaction') {
+      const offenderId = await this.resolveOffenderIdByTarget({
+        targetType,
+        targetId,
+      });
+      if (offenderId) {
+        await this.userModel
+          .updateOne(
+            { _id: offenderId },
+            {
+              $set: {
+                interactionMutedUntil: null,
+                interactionMutedIndefinitely: false,
+              },
+            },
+          )
+          .exec();
+      }
+    }
+
+    const strikeDelta = this.getStrikeIncrement(action, severity);
+    if (strikeDelta > 0) {
+      const offenderId = await this.resolveOffenderIdByTarget({
+        targetType,
+        targetId,
+      });
+      if (offenderId) {
+        const offender = await this.userModel
+          .findById(offenderId)
+          .select('strikeCount')
+          .lean();
+        const nextStrike = Math.max(0, (offender?.strikeCount ?? 0) - strikeDelta);
+        await this.userModel
+          .updateOne({ _id: offenderId }, { $set: { strikeCount: nextStrike } })
+          .exec();
+      }
+    }
+  }
+
+  async getResolvedReports(params?: {
+    type?: string;
+    limit?: number;
+  }): Promise<{
+    items: Array<{
+      actionId: string;
+      type: 'post' | 'comment' | 'user';
+      targetId: string;
+      targetLabel: string;
+      action: string;
+      category: string;
+      reason: string;
+      severity: 'low' | 'medium' | 'high' | null;
+      note: string | null;
+      expiresAt: Date | null;
+      resolvedAt: Date | null;
+      moderatorDisplayName: string | null;
+      moderatorUsername: string | null;
+      moderatorEmail: string | null;
+      penaltyActive: boolean;
+      rollbackSupported: boolean;
+    }>;
+  }> {
+    const normalizedType =
+      params?.type === 'post' || params?.type === 'comment' || params?.type === 'user'
+        ? params.type
+        : null;
+    const safeLimit = Math.min(Math.max(params?.limit ?? 80, 1), 200);
+
+    const query: Record<string, unknown> = {
+      invalidatedAt: null,
+      action: {
+        $in: [
+          'no_violation',
+          'remove_post',
+          'restrict_post',
+          'delete_comment',
+          'warn',
+          'mute_interaction',
+          'suspend_user',
+          'limit_account',
+          'violation',
+        ],
+      },
+    };
+    if (normalizedType) {
+      query.targetType = normalizedType;
+    }
+
+    const actions = await this.moderationActionModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .limit(safeLimit)
+      .select(
+        '_id targetType targetId action category reason severity note expiresAt moderatorId createdAt',
+      )
+      .lean();
+
+    const [resolvedPostTargetIds, resolvedCommentTargetIds, resolvedUserTargetIds] =
+      await Promise.all([
+        normalizedType && normalizedType !== 'post'
+          ? Promise.resolve<Array<Types.ObjectId | string>>([])
+          : this.reportPostModel
+              .distinct('postId', { status: 'resolved' })
+              .exec(),
+        normalizedType && normalizedType !== 'comment'
+          ? Promise.resolve<Array<Types.ObjectId | string>>([])
+          : this.reportCommentModel
+              .distinct('commentId', { status: 'resolved' })
+              .exec(),
+        normalizedType && normalizedType !== 'user'
+          ? Promise.resolve<Array<Types.ObjectId | string>>([])
+          : this.reportUserModel
+              .distinct('targetUserId', { status: 'resolved' })
+              .exec(),
+      ]);
+
+    const resolvedPostTargetSet = new Set(
+      resolvedPostTargetIds
+        .filter((id) => id)
+        .map((id) => id.toString()),
+    );
+    const resolvedCommentTargetSet = new Set(
+      resolvedCommentTargetIds
+        .filter((id) => id)
+        .map((id) => id.toString()),
+    );
+    const resolvedUserTargetSet = new Set(
+      resolvedUserTargetIds
+        .filter((id) => id)
+        .map((id) => id.toString()),
+    );
+
+    const resolvedActions = actions.filter((item) => {
+      const key = item.targetId?.toString?.() ?? '';
+      if (!key) return false;
+      if (item.targetType === 'post') return resolvedPostTargetSet.has(key);
+      if (item.targetType === 'comment') return resolvedCommentTargetSet.has(key);
+      return resolvedUserTargetSet.has(key);
+    });
+
+    const moderatorIds = Array.from(
+      new Set(
+        resolvedActions.map((item) => item.moderatorId?.toString?.()).filter(Boolean),
+      ),
+    )
+      .filter((id): id is string => Boolean(id))
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const [moderatorProfiles, moderatorUsers] = moderatorIds.length
+      ? await Promise.all([
+          this.profileModel
+            .find({ userId: { $in: moderatorIds } })
+            .select('userId displayName username')
+            .lean(),
+          this.userModel
+            .find({ _id: { $in: moderatorIds } })
+            .select('_id email')
+            .lean(),
+        ])
+      : [[], []];
+
+    const moderatorProfileMap = new Map(
+      moderatorProfiles.map((profile) => [profile.userId.toString(), profile]),
+    );
+    const moderatorUserMap = new Map(
+      moderatorUsers.map((user) => [user._id.toString(), user]),
+    );
+
+    const postIds = resolvedActions
+      .filter((item) => item.targetType === 'post')
+      .map((item) => item.targetId)
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id.toString()));
+    const commentIds = resolvedActions
+      .filter((item) => item.targetType === 'comment')
+      .map((item) => item.targetId)
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id.toString()));
+    const userIds = resolvedActions
+      .filter((item) => item.targetType === 'user')
+      .map((item) => item.targetId)
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id.toString()));
+
+    type ResolvedPostDoc = {
+      _id: Types.ObjectId;
+      authorId?: Types.ObjectId | null;
+      content?: string | null;
+      moderationState?: string | null;
+      deletedAt?: Date | null;
+    };
+    type ResolvedCommentDoc = {
+      _id: Types.ObjectId;
+      authorId?: Types.ObjectId | null;
+      content?: string | null;
+      moderationState?: string | null;
+      deletedAt?: Date | null;
+    };
+    type ResolvedUserDoc = {
+      _id: Types.ObjectId;
+      status?: string | null;
+      interactionMutedUntil?: Date | null;
+      interactionMutedIndefinitely?: boolean;
+      accountLimitedUntil?: Date | null;
+      accountLimitedIndefinitely?: boolean;
+      suspendedUntil?: Date | null;
+      suspendedIndefinitely?: boolean;
+    };
+    type ResolvedUserProfileDoc = {
+      userId: Types.ObjectId;
+      displayName?: string | null;
+      username?: string | null;
+    };
+    type ResolvedPostAuthorProfileDoc = {
+      userId: Types.ObjectId;
+      displayName?: string | null;
+      username?: string | null;
+    };
+    type ResolvedCommentAuthorProfileDoc = {
+      userId: Types.ObjectId;
+      displayName?: string | null;
+      username?: string | null;
+    };
+
+    const [posts, comments, users, userProfiles]: [
+      ResolvedPostDoc[],
+      ResolvedCommentDoc[],
+      ResolvedUserDoc[],
+      ResolvedUserProfileDoc[],
+    ] = await Promise.all([
+      postIds.length
+        ? this.postModel
+            .find({ _id: { $in: postIds } })
+            .select('_id authorId content moderationState deletedAt')
+            .lean<ResolvedPostDoc[]>()
+            .exec()
+        : Promise.resolve<ResolvedPostDoc[]>([]),
+      commentIds.length
+        ? this.commentModel
+            .find({ _id: { $in: commentIds } })
+            .select('_id authorId content moderationState deletedAt')
+            .lean<ResolvedCommentDoc[]>()
+            .exec()
+        : Promise.resolve<ResolvedCommentDoc[]>([]),
+      userIds.length
+        ? this.userModel
+            .find({ _id: { $in: userIds } })
+            .select('_id status interactionMutedUntil interactionMutedIndefinitely accountLimitedUntil accountLimitedIndefinitely suspendedUntil suspendedIndefinitely')
+            .lean<ResolvedUserDoc[]>()
+            .exec()
+        : Promise.resolve<ResolvedUserDoc[]>([]),
+      userIds.length
+        ? this.profileModel
+            .find({ userId: { $in: userIds } })
+            .select('userId displayName username')
+            .lean<ResolvedUserProfileDoc[]>()
+            .exec()
+        : Promise.resolve<ResolvedUserProfileDoc[]>([]),
+    ]);
+
+    const postMap = new Map<string, ResolvedPostDoc>(
+      posts.map((item): [string, ResolvedPostDoc] => [item._id.toString(), item]),
+    );
+    const commentMap = new Map<string, ResolvedCommentDoc>(
+      comments.map(
+        (item): [string, ResolvedCommentDoc] => [item._id.toString(), item],
+      ),
+    );
+    const userMap = new Map<string, ResolvedUserDoc>(
+      users.map((item): [string, ResolvedUserDoc] => [item._id.toString(), item]),
+    );
+    const userProfileMap = new Map<string, ResolvedUserProfileDoc>(
+      userProfiles.map(
+        (item): [string, ResolvedUserProfileDoc] => [item.userId.toString(), item],
+      ),
+    );
+
+    const postAuthorIds = Array.from(
+      new Set(posts.map((item) => item.authorId?.toString?.()).filter(Boolean)),
+    )
+      .filter((id): id is string => Boolean(id))
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const postAuthorProfiles = postAuthorIds.length
+      ? await this.profileModel
+          .find({ userId: { $in: postAuthorIds } })
+          .select('userId displayName username')
+          .lean<ResolvedPostAuthorProfileDoc[]>()
+          .exec()
+      : [];
+
+    const postAuthorProfileMap = new Map<string, ResolvedPostAuthorProfileDoc>(
+      postAuthorProfiles.map((item) => [item.userId.toString(), item]),
+    );
+
+    const commentAuthorIds = Array.from(
+      new Set(comments.map((item) => item.authorId?.toString?.()).filter(Boolean)),
+    )
+      .filter((id): id is string => Boolean(id))
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const commentAuthorProfiles = commentAuthorIds.length
+      ? await this.profileModel
+          .find({ userId: { $in: commentAuthorIds } })
+          .select('userId displayName username')
+          .lean<ResolvedCommentAuthorProfileDoc[]>()
+          .exec()
+      : [];
+
+    const commentAuthorProfileMap = new Map<string, ResolvedCommentAuthorProfileDoc>(
+      commentAuthorProfiles.map((item) => [item.userId.toString(), item]),
+    );
+
+    const rollbackSupportedActions = new Set([
+      'remove_post',
+      'restrict_post',
+      'delete_comment',
+      'warn',
+      'mute_interaction',
+      'suspend_user',
+      'limit_account',
+      'violation',
+    ]);
+
+    const items = resolvedActions.map((item) => {
+      const moderatorId = item.moderatorId?.toString?.() ?? '';
+      const moderatorProfile = moderatorProfileMap.get(moderatorId);
+      const moderatorUser = moderatorUserMap.get(moderatorId);
+
+      let targetLabel = `${item.targetType} ${item.targetId.toString()}`;
+      let penaltyActive = false;
+
+      if (item.targetType === 'post') {
+        const post = postMap.get(item.targetId.toString());
+        const postAuthorId = post?.authorId?.toString?.() ?? '';
+        const postAuthorProfile = postAuthorId
+          ? postAuthorProfileMap.get(postAuthorId)
+          : null;
+        if (postAuthorProfile?.username) {
+          targetLabel = `@${postAuthorProfile.username}`;
+        } else if (postAuthorProfile?.displayName) {
+          targetLabel = postAuthorProfile.displayName;
+        } else if (post?.content?.trim()) {
+          targetLabel = post.content.slice(0, 100);
+        }
+        if (item.action === 'remove_post') {
+          penaltyActive = Boolean(post?.deletedAt || post?.moderationState === 'removed');
+        } else if (item.action === 'restrict_post') {
+          penaltyActive = post?.moderationState === 'restricted';
+        }
+      }
+
+      if (item.targetType === 'comment') {
+        const comment = commentMap.get(item.targetId.toString());
+        const commentAuthorId = comment?.authorId?.toString?.() ?? '';
+        const commentAuthorProfile = commentAuthorId
+          ? commentAuthorProfileMap.get(commentAuthorId)
+          : null;
+        if (commentAuthorProfile?.username) {
+          targetLabel = `@${commentAuthorProfile.username}`;
+        } else if (commentAuthorProfile?.displayName) {
+          targetLabel = commentAuthorProfile.displayName;
+        } else if (comment?.content?.trim()) {
+          targetLabel = comment.content.slice(0, 100);
+        }
+        if (item.action === 'delete_comment') {
+          penaltyActive = Boolean(
+            comment?.deletedAt || comment?.moderationState === 'removed',
+          );
+        }
+      }
+
+      if (item.targetType === 'user') {
+        const profile = userProfileMap.get(item.targetId.toString());
+        const user = userMap.get(item.targetId.toString());
+        targetLabel =
+          (profile?.username ? `@${profile.username}` : null) ||
+          profile?.displayName ||
+          item.targetId.toString();
+        if (item.action === 'suspend_user') {
+          penaltyActive =
+            user?.status === 'banned' ||
+            Boolean(user?.suspendedIndefinitely) ||
+            (user?.suspendedUntil ? new Date(user.suspendedUntil).getTime() > Date.now() : false);
+        } else if (item.action === 'limit_account') {
+          penaltyActive =
+            user?.status === 'pending' ||
+            Boolean(user?.accountLimitedIndefinitely) ||
+            (user?.accountLimitedUntil
+              ? new Date(user.accountLimitedUntil).getTime() > Date.now()
+              : false);
+        } else if (item.action === 'mute_interaction') {
+          penaltyActive =
+            Boolean(user?.interactionMutedIndefinitely) ||
+            (user?.interactionMutedUntil
+              ? new Date(user.interactionMutedUntil).getTime() > Date.now()
+              : false);
+        }
+      }
+
+      return {
+        actionId: item._id.toString(),
+        type: item.targetType,
+        targetId: item.targetId.toString(),
+        targetLabel,
+        action: item.action,
+        category: item.category,
+        reason: item.reason,
+        severity: item.severity ?? null,
+        note: item.note ?? null,
+        expiresAt: item.expiresAt ?? null,
+        resolvedAt: item.createdAt ?? null,
+        moderatorDisplayName: moderatorProfile?.displayName ?? null,
+        moderatorUsername: moderatorProfile?.username ?? null,
+        moderatorEmail: moderatorUser?.email ?? null,
+        penaltyActive,
+        rollbackSupported: rollbackSupportedActions.has(item.action),
+      };
+    });
+
+    return { items };
+  }
+
+  async reopenResolvedCase(params: {
+    type: string;
+    targetId: string;
+    note?: string | null;
+    adminId: string;
+  }): Promise<{ status: 'ok'; reopenedCount: number }> {
+    const normalizedType =
+      params.type === 'post' || params.type === 'comment' || params.type === 'user'
+        ? params.type
+        : null;
+    if (!normalizedType) {
+      throw new BadRequestException('Invalid target type');
+    }
+    if (!Types.ObjectId.isValid(params.targetId) || !Types.ObjectId.isValid(params.adminId)) {
+      throw new BadRequestException('Invalid target/admin id');
+    }
+
+    const targetObjectId = new Types.ObjectId(params.targetId);
+    const moderatorObjectId = new Types.ObjectId(params.adminId);
+
+    const latestModerationAction = await this.moderationActionModel
+      .findOne({
+        targetType: normalizedType,
+        targetId: targetObjectId,
+        invalidatedAt: null,
+        action: {
+          $in: [
+            'remove_post',
+            'restrict_post',
+            'delete_comment',
+            'warn',
+            'mute_interaction',
+            'suspend_user',
+            'limit_account',
+            'violation',
+          ],
+        },
+      })
+      .sort({ createdAt: -1 })
+      .select('_id targetType targetId action severity')
+      .lean();
+
+    if (latestModerationAction) {
+      await this.revertModerationActionEffects({
+        targetType: latestModerationAction.targetType,
+        targetId: new Types.ObjectId(latestModerationAction.targetId),
+        action: latestModerationAction.action,
+        severity: latestModerationAction.severity ?? null,
+      });
+
+      await this.moderationActionModel
+        .updateOne(
+          { _id: latestModerationAction._id },
+          {
+            $set: {
+              invalidatedAt: new Date(),
+              invalidatedReason: 'reopen_replaced',
+              invalidatedBy: moderatorObjectId,
+            },
+          },
+        )
+        .exec();
+    }
+
+    const reopenPayload = {
+      status: 'open',
+      resolvedAction: null,
+      resolvedCategory: null,
+      resolvedReason: null,
+      resolvedSeverity: null,
+      resolvedNote: null,
+      resolvedBy: null,
+      resolvedAt: null,
+    };
+
+    const concreteResult =
+      normalizedType === 'post'
+        ? await this.reportPostModel
+            .updateMany(
+              {
+                postId: { $in: [targetObjectId, params.targetId as any] },
+                status: 'resolved',
+              },
+              reopenPayload,
+            )
+            .exec()
+        : normalizedType === 'comment'
+          ? await this.reportCommentModel
+              .updateMany(
+                {
+                  commentId: { $in: [targetObjectId, params.targetId as any] },
+                  status: 'resolved',
+                },
+                reopenPayload,
+              )
+              .exec()
+          : await this.reportUserModel
+              .updateMany(
+                {
+                  targetUserId: { $in: [targetObjectId, params.targetId as any] },
+                  status: 'resolved',
+                },
+                reopenPayload,
+              )
+              .exec();
+
+    await this.moderationActionModel.create({
+      targetType: normalizedType,
+      targetId: targetObjectId,
+      action: 'rollback_moderation',
+      category: 'other',
+      reason: 'reopen_case',
+      severity: null,
+      note: params.note ?? 'Case reopened for moderation review',
+      moderatorId: moderatorObjectId,
+      expiresAt: null,
+    });
+
+    return {
+      status: 'ok',
+      reopenedCount: concreteResult.modifiedCount ?? 0,
+    };
+  }
+
+  async rollbackResolvedDecision(params: {
+    actionId: string;
+    note?: string | null;
+    adminId: string;
+  }): Promise<{ status: 'ok' }> {
+    if (!Types.ObjectId.isValid(params.actionId) || !Types.ObjectId.isValid(params.adminId)) {
+      throw new BadRequestException('Invalid action/admin id');
+    }
+
+    const moderationAction = await this.moderationActionModel
+      .findById(params.actionId)
+      .select('targetType targetId action severity')
+      .lean();
+
+    if (!moderationAction) {
+      throw new NotFoundException('Moderation action not found');
+    }
+
+    if (
+      ['auto_hidden_pending_review', 'no_violation', 'rollback_moderation'].includes(
+        moderationAction.action,
+      )
+    ) {
+      throw new BadRequestException('This moderation action cannot be rolled back');
+    }
+
+    const targetType = moderationAction.targetType;
+    const targetId = new Types.ObjectId(moderationAction.targetId);
+    const adminId = new Types.ObjectId(params.adminId);
+
+    await this.revertModerationActionEffects({
+      targetType,
+      targetId,
+      action: moderationAction.action,
+      severity: moderationAction.severity ?? null,
+    });
+
+    await this.moderationActionModel.create({
+      targetType,
+      targetId,
+      action: 'rollback_moderation',
+      category: 'other',
+      reason: 'rollback_moderation',
+      severity: null,
+      note:
+        params.note ??
+        `Rollback moderation action: ${moderationAction.action}`,
+      moderatorId: adminId,
+      expiresAt: null,
+    });
+
+    return { status: 'ok' };
+  }
+
   private async getReportStats(): Promise<{
     openReportsCount: number;
     highRiskCount: number;
@@ -104,6 +881,8 @@ export class AdminService {
       score: number;
       severity: 'low' | 'medium' | 'high';
       autoHideSuggested: boolean;
+      autoHiddenPendingReview: boolean;
+      escalatedPriority: boolean;
       lastReportedAt: Date;
     }>;
   }> {
@@ -272,7 +1051,7 @@ export class AdminService {
       addReport('user', report.targetUserId?.toString?.() ?? '', report),
     );
 
-    const queue = Array.from(queueMap.values())
+    const baseQueue = Array.from(queueMap.values())
       .filter((item) => item.targetId)
       .map((item) => {
         const categoryEntries = Object.entries(item.categoryCounts).sort(
@@ -314,13 +1093,134 @@ export class AdminService {
           score,
           severity,
           autoHideSuggested,
+          autoHiddenPendingReview: false,
+          escalatedPriority: false,
           lastReportedAt: item.lastReportedAt,
+        };
+      });
+
+    const postTargetIds = baseQueue
+      .filter((item) => item.type === 'post' && Types.ObjectId.isValid(item.targetId))
+      .map((item) => new Types.ObjectId(item.targetId));
+    const commentTargetIds = baseQueue
+      .filter(
+        (item) => item.type === 'comment' && Types.ObjectId.isValid(item.targetId),
+      )
+      .map((item) => new Types.ObjectId(item.targetId));
+
+    type AutoHiddenTargetDoc = {
+      _id: Types.ObjectId;
+      autoHiddenPendingReview?: boolean | null;
+      autoHiddenUntil?: Date | null;
+      autoHiddenEscalatedAt?: Date | null;
+    };
+
+    const [postTargets, commentTargets]: [
+      AutoHiddenTargetDoc[],
+      AutoHiddenTargetDoc[],
+    ] = await Promise.all([
+      postTargetIds.length
+        ? this.postModel
+            .find({ _id: { $in: postTargetIds } })
+            .select('_id autoHiddenPendingReview autoHiddenUntil autoHiddenEscalatedAt')
+            .lean<AutoHiddenTargetDoc[]>()
+            .exec()
+        : Promise.resolve<AutoHiddenTargetDoc[]>([]),
+      commentTargetIds.length
+        ? this.commentModel
+            .find({ _id: { $in: commentTargetIds } })
+            .select('_id autoHiddenPendingReview autoHiddenUntil autoHiddenEscalatedAt')
+            .lean<AutoHiddenTargetDoc[]>()
+            .exec()
+        : Promise.resolve<AutoHiddenTargetDoc[]>([]),
+    ]);
+
+    const postTargetMap = new Map<string, AutoHiddenTargetDoc>(
+      postTargets.map(
+        (target): [string, AutoHiddenTargetDoc] => [target._id.toString(), target],
+      ),
+    );
+    const commentTargetMap = new Map<string, AutoHiddenTargetDoc>(
+      commentTargets.map(
+        (target): [string, AutoHiddenTargetDoc] => [target._id.toString(), target],
+      ),
+    );
+
+    const nowDate = new Date();
+    const escalatedPostIds: Types.ObjectId[] = [];
+    const escalatedCommentIds: Types.ObjectId[] = [];
+
+    const queue = baseQueue
+      .map((item) => {
+        if (item.type === 'user') {
+          return item;
+        }
+
+        const target =
+          item.type === 'post'
+            ? postTargetMap.get(item.targetId)
+            : commentTargetMap.get(item.targetId);
+        const autoHiddenPendingReview = Boolean(target?.autoHiddenPendingReview);
+        const hiddenUntilMs = target?.autoHiddenUntil
+          ? new Date(target.autoHiddenUntil).getTime()
+          : 0;
+        const escalatedPriority =
+          autoHiddenPendingReview &&
+          Number.isFinite(hiddenUntilMs) &&
+          hiddenUntilMs > 0 &&
+          nowDate.getTime() > hiddenUntilMs;
+
+        if (escalatedPriority && !target?.autoHiddenEscalatedAt) {
+          if (item.type === 'post' && Types.ObjectId.isValid(item.targetId)) {
+            escalatedPostIds.push(new Types.ObjectId(item.targetId));
+          }
+          if (item.type === 'comment' && Types.ObjectId.isValid(item.targetId)) {
+            escalatedCommentIds.push(new Types.ObjectId(item.targetId));
+          }
+        }
+
+        return {
+          ...item,
+          autoHiddenPendingReview,
+          escalatedPriority,
         };
       })
       .sort((a, b) => {
+        if (a.escalatedPriority !== b.escalatedPriority) {
+          return a.escalatedPriority ? -1 : 1;
+        }
+        if (a.autoHiddenPendingReview !== b.autoHiddenPendingReview) {
+          return a.autoHiddenPendingReview ? -1 : 1;
+        }
         if (b.score !== a.score) return b.score - a.score;
         return b.lastReportedAt.getTime() - a.lastReportedAt.getTime();
       });
+
+    if (escalatedPostIds.length) {
+      await this.postModel
+        .updateMany(
+          {
+            _id: { $in: escalatedPostIds },
+            autoHiddenPendingReview: true,
+            autoHiddenEscalatedAt: null,
+          },
+          { $set: { autoHiddenEscalatedAt: nowDate } },
+        )
+        .exec();
+    }
+
+    if (escalatedCommentIds.length) {
+      await this.commentModel
+        .updateMany(
+          {
+            _id: { $in: escalatedCommentIds },
+            autoHiddenPendingReview: true,
+            autoHiddenEscalatedAt: null,
+          },
+          { $set: { autoHiddenEscalatedAt: nowDate } },
+        )
+        .exec();
+    }
 
     const reportQueueLimit = 5;
     const seededByType: typeof queue = [];
@@ -343,7 +1243,8 @@ export class AdminService {
     const reportQueue = [...seededByType, ...remaining].slice(0, reportQueueLimit);
     const openReportsCount = queue.length;
     const highRiskCount = queue.filter(
-      (item) => item.severity === 'high' || item.autoHideSuggested,
+      (item) =>
+        item.severity === 'high' || item.autoHideSuggested || item.escalatedPriority,
     ).length;
     const medianScore = queue.length
       ? (() => {
@@ -496,6 +1397,10 @@ export class AdminService {
       media: Array<{ type: 'image' | 'video'; url: string }>;
       createdAt: Date | null;
       visibility: string;
+      autoHiddenPendingReview?: boolean;
+      autoHiddenAt?: Date | null;
+      autoHiddenUntil?: Date | null;
+      autoHiddenEscalatedAt?: Date | null;
     } | null;
     commentPreview?: {
       authorDisplayName: string | null;
@@ -511,6 +1416,10 @@ export class AdminService {
       postAuthorAvatarUrl: string | null;
       postAuthorUsername: string | null;
       postAuthorDisplayName: string | null;
+      autoHiddenPendingReview?: boolean;
+      autoHiddenAt?: Date | null;
+      autoHiddenUntil?: Date | null;
+      autoHiddenEscalatedAt?: Date | null;
     } | null;
     userPreview?: {
       displayName: string | null;
@@ -536,6 +1445,13 @@ export class AdminService {
       moderatorEmail: string | null;
       resolvedAt: Date | null;
     } | null;
+    autoModeration?: {
+      pendingReview: boolean;
+      hiddenAt: Date | null;
+      hiddenUntil: Date | null;
+      escalatedPriority: boolean;
+      escalatedAt: Date | null;
+    };
   }> {
     const now = Date.now();
     const since1h = new Date(now - 60 * 60 * 1000);
@@ -577,19 +1493,52 @@ export class AdminService {
               .select('reporterId category createdAt')
               .lean();
 
-    const reporterIds = Array.from(
+    const reporterSummarySourceReports = reports.length
+      ? reports
+      : normalizedType === 'post'
+        ? await this.reportPostModel
+            .find({
+              postId: targetId,
+              createdAt: { $gte: since30d },
+            })
+            .select('reporterId category createdAt')
+            .lean()
+        : normalizedType === 'comment'
+          ? await this.reportCommentModel
+              .find({
+                commentId: targetId,
+                createdAt: { $gte: since30d },
+              })
+              .select('reporterId category createdAt')
+              .lean()
+          : await this.reportUserModel
+              .find({
+                targetUserId: targetId,
+                createdAt: { $gte: since30d },
+              })
+              .select('reporterId category createdAt')
+              .lean();
+
+    const reporterSummaryReporterIds = Array.from(
       new Set(
-        reports
+        reporterSummarySourceReports
           .map((report) => report.reporterId?.toString?.())
           .filter((id): id is string => Boolean(id)),
       ),
     );
 
-    const reporterWeights = await this.getReporterWeights(reporterIds, since7d);
+    const reportsForSignals = reports.length
+      ? reports
+      : reporterSummarySourceReports;
+
+    const reporterWeights = await this.getReporterWeights(
+      reporterSummaryReporterIds,
+      since7d,
+    );
 
     const categoryCounts: Record<string, number> = {};
     let scoreTotal = 0;
-    reports.forEach((report) => {
+    reportsForSignals.forEach((report) => {
       const reporterId = report.reporterId?.toString?.() ?? 'unknown';
       const weight = reporterWeights.get(reporterId) ?? 0.5;
       const category = report.category || 'other';
@@ -606,21 +1555,29 @@ export class AdminService {
     const categoryBreakdown = categoryEntries.map(([category, count]) => ({
       category,
       count,
-      percent: reports.length
-        ? Number(((count / reports.length) * 100).toFixed(1))
+      percent: reportsForSignals.length
+        ? Number(((count / reportsForSignals.length) * 100).toFixed(1))
         : 0,
     }));
 
-    const reportsLast1h = reports.filter((report) => {
+    const reportsLast1h = reportsForSignals.filter((report) => {
       if (!report.createdAt) return false;
       const createdAt = new Date(report.createdAt).getTime();
       return Number.isFinite(createdAt) && createdAt >= since1h.getTime();
     }).length;
-    const reportsLast24h = reports.filter((report) => {
+    const reportsLast24h = reportsForSignals.filter((report) => {
       if (!report.createdAt) return false;
       const createdAt = new Date(report.createdAt).getTime();
       return Number.isFinite(createdAt) && createdAt >= since24h.getTime();
     }).length;
+
+    const reporterIds = Array.from(
+      new Set(
+        reportsForSignals
+          .map((report) => report.reporterId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
 
     const reporterWeightsList = reporterIds
       .map((id) => reporterWeights.get(id))
@@ -644,7 +1601,7 @@ export class AdminService {
       string,
       { reportsForTarget30d: number; latestReportAt: Date | null }
     >();
-    reports.forEach((report) => {
+    reporterSummarySourceReports.forEach((report) => {
       const reporterId = report.reporterId?.toString?.();
       if (!reporterId) return;
       const existing = reporterActivity.get(reporterId);
@@ -665,7 +1622,7 @@ export class AdminService {
       }
     });
 
-    const reporterObjectIds = reporterIds
+    const reporterObjectIds = reporterSummaryReporterIds
       .filter((id) => Types.ObjectId.isValid(id))
       .map((id) => new Types.ObjectId(id));
 
@@ -689,7 +1646,7 @@ export class AdminService {
       reporterUsers.map((user) => [user._id.toString(), user]),
     );
 
-    const reporterSummary = reporterIds
+    const reporterSummary = reporterSummaryReporterIds
       .map((reporterId) => {
         const profile = reporterProfileMap.get(reporterId);
         const user = reporterUserMap.get(reporterId);
@@ -733,7 +1690,9 @@ export class AdminService {
         ? await (async () => {
             const post = await this.postModel
               .findById(targetId)
-              .select('authorId content media createdAt visibility')
+              .select(
+                'authorId content media createdAt visibility autoHiddenPendingReview autoHiddenAt autoHiddenUntil autoHiddenEscalatedAt',
+              )
               .lean();
             if (!post) return null;
             const profile = await this.profileModel
@@ -752,6 +1711,10 @@ export class AdminService {
               })),
               createdAt: post.createdAt ?? null,
               visibility: post.visibility ?? 'public',
+              autoHiddenPendingReview: Boolean(post.autoHiddenPendingReview),
+              autoHiddenAt: post.autoHiddenAt ?? null,
+              autoHiddenUntil: post.autoHiddenUntil ?? null,
+              autoHiddenEscalatedAt: post.autoHiddenEscalatedAt ?? null,
             };
           })()
         : null;
@@ -761,7 +1724,9 @@ export class AdminService {
         ? await (async () => {
             const comment = await this.commentModel
               .findById(targetId)
-              .select('authorId content media createdAt postId')
+              .select(
+                'authorId content media createdAt postId autoHiddenPendingReview autoHiddenAt autoHiddenUntil autoHiddenEscalatedAt',
+              )
               .lean();
             if (!comment) return null;
 
@@ -800,6 +1765,10 @@ export class AdminService {
               postAuthorAvatarUrl: postAuthorProfile?.avatarUrl ?? null,
               postAuthorUsername: postAuthorProfile?.username ?? null,
               postAuthorDisplayName: postAuthorProfile?.displayName ?? null,
+              autoHiddenPendingReview: Boolean(comment.autoHiddenPendingReview),
+              autoHiddenAt: comment.autoHiddenAt ?? null,
+              autoHiddenUntil: comment.autoHiddenUntil ?? null,
+              autoHiddenEscalatedAt: comment.autoHiddenEscalatedAt ?? null,
             };
           })()
         : null;
@@ -944,6 +1913,45 @@ export class AdminService {
 
     const latestModeration = moderationHistoryItems[0] ?? null;
 
+    const autoHiddenSource =
+      normalizedType === 'post'
+        ? postPreview
+        : normalizedType === 'comment'
+          ? commentPreview
+          : null;
+    const hiddenUntilMs = autoHiddenSource?.autoHiddenUntil
+      ? new Date(autoHiddenSource.autoHiddenUntil).getTime()
+      : 0;
+    const escalatedPriority =
+      Boolean(autoHiddenSource?.autoHiddenPendingReview) &&
+      Number.isFinite(hiddenUntilMs) &&
+      hiddenUntilMs > 0 &&
+      Date.now() > hiddenUntilMs;
+
+    if (
+      escalatedPriority &&
+      autoHiddenSource?.autoHiddenPendingReview &&
+      !autoHiddenSource?.autoHiddenEscalatedAt &&
+      targetObjectId
+    ) {
+      if (normalizedType === 'post') {
+        await this.postModel
+          .updateOne(
+            { _id: targetObjectId, autoHiddenEscalatedAt: null },
+            { $set: { autoHiddenEscalatedAt: new Date() } },
+          )
+          .exec();
+      }
+      if (normalizedType === 'comment') {
+        await this.commentModel
+          .updateOne(
+            { _id: targetObjectId, autoHiddenEscalatedAt: null },
+            { $set: { autoHiddenEscalatedAt: new Date() } },
+          )
+          .exec();
+      }
+    }
+
     return {
       targetId,
       score: Number(scoreTotal.toFixed(2)),
@@ -951,7 +1959,7 @@ export class AdminService {
       topReason,
       categories,
       categoryBreakdown,
-      totalReports: reports.length,
+      totalReports: reportsForSignals.length,
       velocity: {
         reportsLast1h,
         reportsLast24h,
@@ -968,6 +1976,13 @@ export class AdminService {
       commentPreview,
       userPreview,
       latestModeration,
+      autoModeration: {
+        pendingReview: Boolean(autoHiddenSource?.autoHiddenPendingReview),
+        hiddenAt: autoHiddenSource?.autoHiddenAt ?? null,
+        hiddenUntil: autoHiddenSource?.autoHiddenUntil ?? null,
+        escalatedPriority,
+        escalatedAt: autoHiddenSource?.autoHiddenEscalatedAt ?? null,
+      },
     };
   }
 
@@ -990,6 +2005,8 @@ export class AdminService {
     openReportsCount: number;
     highRiskReportsCount: number;
     medianReportScore: number | null;
+    avgReportReviewMinutes: number | null;
+    reviewSlaTargetMinutes: number;
     reportQueue: Array<{
       type: 'post' | 'comment' | 'user';
       targetId: string;
@@ -1003,6 +2020,8 @@ export class AdminService {
       score: number;
       severity: 'low' | 'medium' | 'high';
       autoHideSuggested: boolean;
+      autoHiddenPendingReview: boolean;
+      escalatedPriority: boolean;
       lastReportedAt: Date;
     }>;
   }> {
@@ -1011,6 +2030,7 @@ export class AdminService {
     const since48h = new Date(now - 48 * 60 * 60 * 1000);
     const since7d = new Date(now - 7 * 24 * 60 * 60 * 1000);
     const since14d = new Date(now - 14 * 24 * 60 * 60 * 1000);
+    const since30d = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
     const [
       totalUsers,
@@ -1022,6 +2042,7 @@ export class AdminService {
       storageUsage,
       realtimeStats,
       reportStats,
+      avgReportReviewMinutes,
     ] = await Promise.all([
       this.userModel.countDocuments({}).exec(),
       this.postModel.countDocuments({ deletedAt: null }).exec(),
@@ -1057,6 +2078,7 @@ export class AdminService {
         participants: null,
       })),
       this.getReportStats(),
+      this.getAvgReportReviewMinutes(since30d),
     ]);
 
     const postsCreatedDeltaPct = postsCreatedPrev7d
@@ -1091,6 +2113,8 @@ export class AdminService {
       openReportsCount: reportStats.openReportsCount,
       highRiskReportsCount: reportStats.highRiskCount,
       medianReportScore: reportStats.medianScore,
+      avgReportReviewMinutes,
+      reviewSlaTargetMinutes: 20,
       reportQueue: reportStats.reportQueue,
     };
   }
@@ -1642,6 +2666,10 @@ export class AdminService {
             {
               $set: {
                 moderationState: 'removed',
+                autoHiddenPendingReview: false,
+                autoHiddenAt: null,
+                autoHiddenUntil: null,
+                autoHiddenEscalatedAt: null,
                 deletedAt: new Date(),
                 deletedBy: moderatorObjectId,
                 deletedSource: 'admin',
@@ -1658,7 +2686,36 @@ export class AdminService {
             {
               $set: {
                 moderationState: 'restricted',
+                autoHiddenPendingReview: false,
+                autoHiddenAt: null,
+                autoHiddenUntil: null,
+                autoHiddenEscalatedAt: null,
                 visibility: 'followers',
+                deletedAt: null,
+                deletedBy: null,
+                deletedSource: null,
+                deletedReason: null,
+              },
+            },
+          )
+          .exec();
+      }
+
+      if (
+        ['no_violation', 'warn', 'violation', 'mute_interaction'].includes(
+          resolvedAction,
+        )
+      ) {
+        await this.postModel
+          .updateOne(
+            { _id: targetObjectId, autoHiddenPendingReview: true },
+            {
+              $set: {
+                moderationState: 'normal',
+                autoHiddenPendingReview: false,
+                autoHiddenAt: null,
+                autoHiddenUntil: null,
+                autoHiddenEscalatedAt: null,
                 deletedAt: null,
                 deletedBy: null,
                 deletedSource: null,
@@ -1687,6 +2744,41 @@ export class AdminService {
           moderatorId: moderatorObjectId.toString(),
           reason,
         });
+
+        await this.commentModel
+          .updateOne(
+            { _id: targetObjectId },
+            {
+              $set: {
+                autoHiddenPendingReview: false,
+                autoHiddenAt: null,
+                autoHiddenUntil: null,
+                autoHiddenEscalatedAt: null,
+              },
+            },
+          )
+          .exec();
+      }
+
+      if (
+        ['no_violation', 'warn', 'violation', 'mute_interaction'].includes(
+          resolvedAction,
+        )
+      ) {
+        await this.commentModel
+          .updateOne(
+            { _id: targetObjectId, autoHiddenPendingReview: true },
+            {
+              $set: {
+                moderationState: 'normal',
+                autoHiddenPendingReview: false,
+                autoHiddenAt: null,
+                autoHiddenUntil: null,
+                autoHiddenEscalatedAt: null,
+              },
+            },
+          )
+          .exec();
       }
     }
 
@@ -2011,5 +3103,94 @@ export class AdminService {
     }
 
     return { status: 'ok' };
+  }
+
+  async rollbackAutoHiddenAndDismiss(params: {
+    type: string;
+    targetId: string;
+    note?: string | null;
+    adminId: string;
+  }): Promise<{ status: 'ok' | 'already_resolved' }> {
+    const normalizedType =
+      params.type === 'comment'
+        ? 'comment'
+        : params.type === 'post'
+          ? 'post'
+          : null;
+    if (!normalizedType) {
+      throw new BadRequestException('Rollback is only available for post/comment');
+    }
+    if (!Types.ObjectId.isValid(params.targetId)) {
+      throw new BadRequestException('Invalid target id');
+    }
+
+    const targetObjectId = new Types.ObjectId(params.targetId);
+    if (normalizedType === 'post') {
+      const post = await this.postModel
+        .findById(targetObjectId)
+        .select('_id autoHiddenPendingReview')
+        .lean();
+      if (!post?._id) {
+        throw new NotFoundException('Post not found');
+      }
+      if (!post.autoHiddenPendingReview) {
+        throw new BadRequestException('Post is not in auto-hidden pending state');
+      }
+      await this.postModel
+        .updateOne(
+          { _id: targetObjectId },
+          {
+            $set: {
+              moderationState: 'normal',
+              autoHiddenPendingReview: false,
+              autoHiddenAt: null,
+              autoHiddenUntil: null,
+              autoHiddenEscalatedAt: null,
+              deletedAt: null,
+              deletedBy: null,
+              deletedSource: null,
+              deletedReason: null,
+            },
+          },
+        )
+        .exec();
+    }
+
+    if (normalizedType === 'comment') {
+      const comment = await this.commentModel
+        .findById(targetObjectId)
+        .select('_id autoHiddenPendingReview')
+        .lean();
+      if (!comment?._id) {
+        throw new NotFoundException('Comment not found');
+      }
+      if (!comment.autoHiddenPendingReview) {
+        throw new BadRequestException('Comment is not in auto-hidden pending state');
+      }
+      await this.commentModel
+        .updateOne(
+          { _id: targetObjectId },
+          {
+            $set: {
+              moderationState: 'normal',
+              autoHiddenPendingReview: false,
+              autoHiddenAt: null,
+              autoHiddenUntil: null,
+              autoHiddenEscalatedAt: null,
+            },
+          },
+        )
+        .exec();
+    }
+
+    return this.resolveReportAction({
+      type: normalizedType,
+      targetId: params.targetId,
+      action: 'no_violation',
+      category: 'other',
+      reason: 'no_violation',
+      note: params.note ?? 'Rollback auto-hidden content and mark no violation',
+      adminId: params.adminId,
+    });
   }
 }

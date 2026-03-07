@@ -12,8 +12,11 @@ class Settings(BaseSettings):
 
     blur_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
     reject_threshold: float = Field(default=0.80, ge=0.0, le=1.0)
-    nudity_blur_threshold: float = Field(default=0.95, ge=0.0, le=1.0)
-    nudity_reject_threshold: float = Field(default=0.995, ge=0.0, le=1.0)
+    reject_margin: float = Field(default=0.08, ge=0.0, le=0.25)
+    uncertainty_margin: float = Field(default=0.06, ge=0.0, le=0.25)
+    hard_reject_single_label_threshold: float = Field(default=0.94, ge=0.0, le=1.0)
+    nudity_blur_threshold: float = Field(default=0.975, ge=0.0, le=1.0)
+    nudity_reject_threshold: float = Field(default=0.999, ge=0.0, le=1.0)
     violence_blur_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
     violence_reject_threshold: float = Field(default=0.82, ge=0.0, le=1.0)
     gore_blur_threshold: float = Field(default=0.5, ge=0.0, le=1.0)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./report.module.css";
@@ -26,10 +26,16 @@ const decodeJwt = (token: string): AdminPayload | null => {
 export default function ReportPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<"all" | "post" | "comment" | "user">("all");
+  const [queueFilter, setQueueFilter] = useState<
+    "all" | "high_priority" | "auto_hidden" | "escalated" | "auto_hide_suggested"
+  >("all");
   const [stats, setStats] = useState<{
     openReportsCount: number;
     highRiskReportsCount: number;
     medianReportScore: number | null;
+    avgReportReviewMinutes: number | null;
+    reviewSlaTargetMinutes: number;
     reportQueue: Array<{
       type: "post" | "comment" | "user";
       targetId: string;
@@ -43,25 +49,11 @@ export default function ReportPage() {
       score: number;
       severity: "low" | "medium" | "high";
       autoHideSuggested: boolean;
+      autoHiddenPendingReview: boolean;
+      escalatedPriority: boolean;
       lastReportedAt: string;
     }>;
   } | null>(null);
-
-  const handleLogout = async () => {
-    try {
-      await fetch(`${getApiBaseUrl()}/auth/admin/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (_err) {}
-
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("adminAccessToken");
-      localStorage.removeItem("adminRoles");
-    }
-
-    router.replace("/login");
-  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -104,6 +96,8 @@ export default function ReportPage() {
           openReportsCount: number;
           highRiskReportsCount: number;
           medianReportScore: number | null;
+          avgReportReviewMinutes: number | null;
+          reviewSlaTargetMinutes: number;
           reportQueue: Array<{
             type: "post" | "comment" | "user";
             targetId: string;
@@ -117,6 +111,8 @@ export default function ReportPage() {
             score: number;
             severity: "low" | "medium" | "high";
             autoHideSuggested: boolean;
+            autoHiddenPendingReview: boolean;
+            escalatedPriority: boolean;
             lastReportedAt: string;
           }>;
         };
@@ -129,13 +125,21 @@ export default function ReportPage() {
     loadStats();
   }, [ready]);
 
-  if (!ready) return null;
-
   const formatNumber = (value?: number) =>
     typeof value === "number" ? value.toLocaleString() : "--";
 
   const formatScore = (value?: number | null) =>
     typeof value === "number" ? value.toFixed(1) : "--";
+
+  const formatDurationMinutes = (value?: number | null) => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return "--";
+    const rounded = Math.max(0, Math.round(value));
+    if (rounded < 60) return `${rounded}m`;
+    const hours = Math.floor(rounded / 60);
+    const mins = rounded % 60;
+    if (!mins) return `${hours}h`;
+    return `${hours}h ${mins}m`;
+  };
 
   const formatRelativeTime = (value?: string) => {
     if (!value) return "--";
@@ -151,13 +155,46 @@ export default function ReportPage() {
 
   const formatReportStatus = (
     autoHideSuggested: boolean,
+    autoHiddenPendingReview: boolean,
+    escalatedPriority: boolean,
     severity: "low" | "medium" | "high",
   ) => {
+    if (escalatedPriority) return "Escalated priority";
+    if (autoHiddenPendingReview) return "Auto-hidden pending review";
     if (autoHideSuggested) return "Auto-hide suggested";
     if (severity === "high") return "High priority";
     if (severity === "medium") return "Review";
     return "Low priority";
   };
+
+  const reportQueue = stats?.reportQueue ?? [];
+  const filteredQueue = useMemo(() => {
+    return reportQueue.filter((report) => {
+      const typeMatched = typeFilter === "all" || report.type === typeFilter;
+      if (!typeMatched) return false;
+
+      if (queueFilter === "all") return true;
+      if (queueFilter === "high_priority") {
+        return (
+          report.severity === "high" ||
+          report.autoHiddenPendingReview ||
+          report.escalatedPriority
+        );
+      }
+      if (queueFilter === "auto_hidden") {
+        return report.autoHiddenPendingReview;
+      }
+      if (queueFilter === "escalated") {
+        return report.escalatedPriority;
+      }
+      if (queueFilter === "auto_hide_suggested") {
+        return report.autoHideSuggested;
+      }
+      return true;
+    });
+  }, [queueFilter, reportQueue, typeFilter]);
+
+  if (!ready) return null;
 
   return (
     <div className={styles.page}>
@@ -174,13 +211,9 @@ export default function ReportPage() {
             <Link href="/dashboard" className={styles.ghostButton}>
               Back to dashboard
             </Link>
-            <button
-              className={styles.ghostButton}
-              type="button"
-              onClick={handleLogout}
-            >
-              Sign out
-            </button>
+            <Link href="/report/resolved" className={styles.ghostButton}>
+              Resolved reports
+            </Link>
             <button className={styles.primaryButton} type="button">
               Open triage mode
             </button>
@@ -211,8 +244,12 @@ export default function ReportPage() {
           </article>
           <article className={styles.summaryCard}>
             <span className={styles.summaryLabel}>Avg time to review</span>
-            <span className={styles.summaryValue}>14m</span>
-            <span className={styles.summaryNote}>Target: 20m</span>
+            <span className={styles.summaryValue}>
+              {formatDurationMinutes(stats?.avgReportReviewMinutes)}
+            </span>
+            <span className={styles.summaryNote}>
+              Target: {formatDurationMinutes(stats?.reviewSlaTargetMinutes ?? 20)}
+            </span>
           </article>
         </section>
 
@@ -225,16 +262,94 @@ export default function ReportPage() {
               </p>
             </div>
             <div className={styles.filters}>
-              <button className={styles.filterChip} type="button">
+              <button
+                className={`${styles.filterChip} ${
+                  typeFilter === "all" ? styles.filterChipActive : ""
+                }`}
+                type="button"
+                onClick={() => setTypeFilter("all")}
+              >
                 All types
               </button>
-              <button className={styles.filterChip} type="button">
+              <button
+                className={`${styles.filterChip} ${
+                  typeFilter === "post" ? styles.filterChipActive : ""
+                }`}
+                type="button"
+                onClick={() => setTypeFilter("post")}
+              >
+                Posts
+              </button>
+              <button
+                className={`${styles.filterChip} ${
+                  typeFilter === "comment" ? styles.filterChipActive : ""
+                }`}
+                type="button"
+                onClick={() => setTypeFilter("comment")}
+              >
+                Comments
+              </button>
+              <button
+                className={`${styles.filterChip} ${
+                  typeFilter === "user" ? styles.filterChipActive : ""
+                }`}
+                type="button"
+                onClick={() => setTypeFilter("user")}
+              >
+                Users
+              </button>
+              <button
+                className={`${styles.filterChip} ${
+                  queueFilter === "all" ? styles.filterChipActive : ""
+                }`}
+                type="button"
+                onClick={() => setQueueFilter("all")}
+              >
+                All priority
+              </button>
+              <button
+                className={`${styles.filterChip} ${
+                  queueFilter === "high_priority" ? styles.filterChipActive : ""
+                }`}
+                type="button"
+                onClick={() => setQueueFilter("high_priority")}
+              >
                 High priority
               </button>
-              <button className={styles.filterChip} type="button">
+              <button
+                className={`${styles.filterChip} ${
+                  queueFilter === "auto_hidden" ? styles.filterChipActive : ""
+                }`}
+                type="button"
+                onClick={() => setQueueFilter("auto_hidden")}
+              >
+                Auto-hidden
+              </button>
+              <button
+                className={`${styles.filterChip} ${
+                  queueFilter === "escalated" ? styles.filterChipActive : ""
+                }`}
+                type="button"
+                onClick={() => setQueueFilter("escalated")}
+              >
+                Escalated
+              </button>
+              <button
+                className={`${styles.filterChip} ${
+                  queueFilter === "auto_hide_suggested"
+                    ? styles.filterChipActive
+                    : ""
+                }`}
+                type="button"
+                onClick={() => setQueueFilter("auto_hide_suggested")}
+              >
                 Auto-hide suggested
               </button>
             </div>
+          </div>
+
+          <div className={styles.filterSummary}>
+            Showing {filteredQueue.length} / {reportQueue.length} reports
           </div>
 
           <div className={styles.tableHeader}>
@@ -247,7 +362,7 @@ export default function ReportPage() {
           </div>
 
           <div className={styles.tableBody}>
-            {(stats?.reportQueue ?? []).map((report, index) => (
+            {filteredQueue.map((report, index) => (
               <div
                 className={styles.tableRow}
                 key={`${report.type}:${report.targetId}`}
@@ -284,17 +399,23 @@ export default function ReportPage() {
                 <div className={styles.reporters}>{report.uniqueReporters}</div>
                 <div
                   className={`${styles.statusPill} ${
-                    report.autoHideSuggested
+                    report.escalatedPriority
                       ? styles.statusHigh
-                      : report.severity === "high"
+                      : report.autoHiddenPendingReview
                         ? styles.statusHigh
-                        : report.severity === "medium"
-                          ? styles.statusReview
-                          : styles.statusLow
+                        : report.autoHideSuggested
+                      ? styles.statusHigh
+                        : report.severity === "high"
+                          ? styles.statusHigh
+                          : report.severity === "medium"
+                            ? styles.statusReview
+                            : styles.statusLow
                   }`}
                 >
                   {formatReportStatus(
                     report.autoHideSuggested,
+                    report.autoHiddenPendingReview,
+                    report.escalatedPriority,
                     report.severity,
                   )}
                 </div>
@@ -302,6 +423,12 @@ export default function ReportPage() {
                   {formatRelativeTime(report.lastReportedAt)}
                 </div>
                 <div className={styles.rowActions}>
+                  {report.escalatedPriority ? (
+                    <span className={styles.escalatedPill}>Escalated</span>
+                  ) : null}
+                  {report.autoHiddenPendingReview ? (
+                    <span className={styles.alertPill}>Auto-hidden</span>
+                  ) : null}
                   {report.autoHideSuggested ? (
                     <span className={styles.alertPill}>Auto-hide</span>
                   ) : null}
@@ -314,6 +441,11 @@ export default function ReportPage() {
                 </div>
               </div>
             ))}
+            {filteredQueue.length === 0 ? (
+              <div className={styles.emptyState}>
+                No reports match the selected filters.
+              </div>
+            ) : null}
           </div>
         </section>
 

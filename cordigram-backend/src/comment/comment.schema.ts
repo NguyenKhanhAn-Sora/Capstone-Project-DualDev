@@ -75,6 +75,18 @@ export class Comment extends Document {
   @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
 
+  @Prop({ type: Boolean, default: false, index: true })
+  autoHiddenPendingReview?: boolean;
+
+  @Prop({ type: Date, default: null })
+  autoHiddenAt?: Date | null;
+
+  @Prop({ type: Date, default: null, index: true })
+  autoHiddenUntil?: Date | null;
+
+  @Prop({ type: Date, default: null, index: true })
+  autoHiddenEscalatedAt?: Date | null;
+
   @Prop({ type: SchemaTypes.ObjectId, ref: 'User', default: null })
   deletedBy?: Types.ObjectId | null;
 

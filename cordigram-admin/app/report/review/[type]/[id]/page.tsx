@@ -111,6 +111,13 @@ type ReportDetailPayload = {
     } | null;
   } | null;
   latestModeration?: ModerationHistoryItem | null;
+  autoModeration?: {
+    pendingReview: boolean;
+    hiddenAt: string | null;
+    hiddenUntil: string | null;
+    escalatedPriority: boolean;
+    escalatedAt: string | null;
+  };
 };
 
 const MODAL_CLOSE_ANIMATION_MS = 180;
@@ -160,6 +167,53 @@ const formatModerationKey = (value: string | null | undefined): string => {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
+function CollapsibleCaption({
+  text,
+  className,
+}: {
+  text: string;
+  className?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [hasOverflow, setHasOverflow] = useState(false);
+  const textRef = useRef<HTMLParagraphElement | null>(null);
+
+  useEffect(() => {
+    setExpanded(false);
+    const element = textRef.current;
+    if (!element) {
+      setHasOverflow(false);
+      return;
+    }
+
+    // Measure overflow while text is clamped to 3 lines.
+    const overflow = element.scrollHeight > element.clientHeight + 1;
+    setHasOverflow(overflow);
+  }, [text]);
+
+  return (
+    <>
+      <p
+        ref={textRef}
+        className={`${className ?? ""} ${
+          expanded ? styles.collapsibleTextExpanded : styles.collapsibleText
+        }`}
+      >
+        {text}
+      </p>
+      {hasOverflow ? (
+        <button
+          type="button"
+          className={styles.textToggle}
+          onClick={() => setExpanded((prev) => !prev)}
+        >
+          {expanded ? "Collapse" : "See more"}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
 export default function ReportReviewPage() {
   const router = useRouter();
   const params = useParams();
@@ -186,28 +240,13 @@ export default function ReportReviewPage() {
     useState<number>(24 * 60);
   const [limitUntilTurnOn, setLimitUntilTurnOn] = useState(false);
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
+  const [rollbackSubmitting, setRollbackSubmitting] = useState(false);
   const [resolveToast, setResolveToast] = useState<string | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [detail, setDetail] = useState<ReportDetailPayload | null>(null);
   const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
   const [historyFilter, setHistoryFilter] = useState<"all" | "severe">("all");
-
-  const handleLogout = async () => {
-    try {
-      await fetch(`${getApiBaseUrl()}/auth/admin/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (_err) {}
-
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("adminAccessToken");
-      localStorage.removeItem("adminRoles");
-    }
-
-    router.replace("/login");
-  };
 
   const headerTitle =
     type === "post"
@@ -663,6 +702,47 @@ export default function ReportReviewPage() {
     }
   };
 
+  const rollbackAutoHide = async () => {
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("adminAccessToken") || ""
+        : "";
+    if (!token) return;
+
+    try {
+      setRollbackSubmitting(true);
+      const response = await fetch(
+        `${getApiBaseUrl()}/admin/reports/${type}/${targetId}/rollback-auto-hide`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            note: "Rollback auto-hidden content and mark no violation",
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to rollback auto-hidden item");
+      }
+
+      setResolveToast("Content restored and marked as no violation. Refreshing...");
+      if (reloadTimerRef.current) {
+        clearTimeout(reloadTimerRef.current);
+      }
+      reloadTimerRef.current = setTimeout(() => {
+        if (typeof window !== "undefined") {
+          window.location.reload();
+        }
+      }, RESOLVE_RELOAD_DELAY_MS);
+    } finally {
+      setRollbackSubmitting(false);
+    }
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.shell}>
@@ -678,13 +758,6 @@ export default function ReportReviewPage() {
             <Link href="/report" className={styles.ghostButton}>
               Back to report center
             </Link>
-            <button
-              className={styles.ghostButton}
-              type="button"
-              onClick={handleLogout}
-            >
-              Sign out
-            </button>
           </div>
         </header>
 
@@ -771,9 +844,10 @@ export default function ReportReviewPage() {
                     </div>
                   </div>
                   {detail?.postPreview?.content?.trim() ? (
-                    <p className={styles.postContent}>
-                      {detail.postPreview.content}
-                    </p>
+                    <CollapsibleCaption
+                      className={styles.postContent}
+                      text={detail.postPreview.content}
+                    />
                   ) : null}
                   {(detail?.postPreview?.media ?? []).length > 0 ? (
                     <div className={styles.mediaGrid}>
@@ -852,9 +926,10 @@ export default function ReportReviewPage() {
                       </div>
                     </div>
                     {detail?.commentPreview?.postExcerpt?.trim() ? (
-                      <p className={styles.postContent}>
-                        {detail.commentPreview.postExcerpt}
-                      </p>
+                      <CollapsibleCaption
+                        className={styles.postContent}
+                        text={detail.commentPreview.postExcerpt}
+                      />
                     ) : null}
                     {(detail?.commentPreview?.postMedia ?? []).length > 0 ? (
                       <div className={styles.mediaGrid}>
@@ -1139,6 +1214,14 @@ export default function ReportReviewPage() {
                 <h2 className={styles.panelTitle}>Decision</h2>
                 <span className={styles.panelTag}>Required</span>
               </div>
+              {detail?.autoModeration?.pendingReview ? (
+                <div className={styles.noteHint}>
+                  Auto-hidden pending review until {formatTime(detail.autoModeration.hiddenUntil)}
+                  {detail.autoModeration.escalatedPriority
+                    ? " · Escalated priority"
+                    : ""}
+                </div>
+              ) : null}
               <div className={styles.actionStack}>
                 <button
                   className={styles.actionPrimary}
@@ -1154,6 +1237,19 @@ export default function ReportReviewPage() {
                 >
                   Dismiss report
                 </button>
+                {(type === "post" || type === "comment") &&
+                detail?.autoModeration?.pendingReview ? (
+                  <button
+                    className={styles.actionRestore}
+                    type="button"
+                    onClick={rollbackAutoHide}
+                    disabled={rollbackSubmitting}
+                  >
+                    {rollbackSubmitting
+                      ? "Restoring..."
+                      : "Restore + mark no_violation"}
+                  </button>
+                ) : null}
                 {type === "post" && (
                   <button
                     className={styles.actionMuted}
@@ -1244,8 +1340,9 @@ export default function ReportReviewPage() {
                   {(detail?.reporterSummary ?? []).map((item) => (
                     <div className={styles.reporterRow} key={item.reporterId}>
                       <span>
-                        {item.displayName ||
-                          (item.username ? `@${item.username}` : item.reporterId)}
+                        {item.username
+                          ? `@${item.username}`
+                          : item.displayName || item.reporterId}
                       </span>
                       <span className={styles.reporterMeta}>
                         {item.reportsForTarget30d} reports / 30d · trust {item.trustWeight.toFixed(2)} ({getReporterTrustLabel(item.trustWeight)})

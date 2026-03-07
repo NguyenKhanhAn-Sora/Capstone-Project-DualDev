@@ -96,6 +96,15 @@ class HeuristicImageModerationProvider(ImageModerationProvider):
         )
         refined_skin_ratio = float(np.count_nonzero(combined_skin_mask) / total_pixels)
 
+        height = arr.shape[0]
+        upper_end = max(1, int(height * 0.35))
+        middle_end = max(upper_end + 1, int(height * 0.7))
+        upper_skin_ratio = float(np.count_nonzero(combined_skin_mask[:upper_end, :]) / total_pixels)
+        middle_skin_ratio = float(
+            np.count_nonzero(combined_skin_mask[upper_end:middle_end, :]) / total_pixels
+        )
+        lower_skin_ratio = float(np.count_nonzero(combined_skin_mask[middle_end:, :]) / total_pixels)
+
         largest_skin_blob_ratio = 0.0
         component_count, _, component_stats, _ = cv2.connectedComponentsWithStats(
             combined_skin_mask,
@@ -163,13 +172,26 @@ class HeuristicImageModerationProvider(ImageModerationProvider):
         laplacian_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
         low_texture_signal = self._normalize(140.0 - laplacian_var, low=20.0, high=120.0)
 
+        gray_blur = cv2.GaussianBlur(gray, (7, 7), 0)
+        residual_texture = float(np.mean(np.abs(gray.astype(np.float32) - gray_blur.astype(np.float32))))
+        flat_region_signal = self._normalize(22.0 - residual_texture, low=3.0, high=18.0)
+
         pastel_mask = (sat > 35) & (sat < 165) & (val > 145)
         pastel_ratio = float(np.count_nonzero(pastel_mask) / total_pixels)
+        high_sat_ratio = float(np.count_nonzero((sat > 95) & (val > 95)) / total_pixels)
         stylized_signal = min(
             1.0,
             (self._normalize(pink_dominant_ratio, low=0.16, high=0.52) * 0.55)
             + (self._normalize(pastel_ratio, low=0.2, high=0.62) * 0.25)
             + (low_texture_signal * 0.20),
+        )
+
+        anime_safe_signal = min(
+            1.0,
+            (stylized_signal * 0.45)
+            + (self._normalize(high_sat_ratio, low=0.12, high=0.42) * 0.20)
+            + (flat_region_signal * 0.20)
+            + (self._normalize(upper_skin_ratio, low=0.06, high=0.24) * 0.15),
         )
 
         line_density = float(np.count_nonzero(edges) / total_pixels)
@@ -181,6 +203,29 @@ class HeuristicImageModerationProvider(ImageModerationProvider):
             high=0.62,
         )
         nudity = broad_skin_signal * 0.35 + contiguous_skin_signal * 0.65
+
+        torso_exposure_signal = self._normalize(
+            (middle_skin_ratio * 1.35 + lower_skin_ratio * 1.65) - (upper_skin_ratio * 0.55),
+            low=0.08,
+            high=0.38,
+        )
+        explicit_nudity_evidence = min(
+            1.0,
+            (self._normalize(refined_skin_ratio, low=0.58, high=0.9) * 0.35)
+            + (self._normalize(largest_skin_blob_ratio, low=0.33, high=0.72) * 0.45)
+            + (torso_exposure_signal * 0.20),
+        )
+
+        if explicit_nudity_evidence < 0.42:
+            nudity *= 0.55
+
+        if anime_safe_signal >= 0.52 and explicit_nudity_evidence < 0.62:
+            suppression = 0.12 + (0.28 * (1.0 - explicit_nudity_evidence))
+            nudity *= suppression
+
+        if upper_skin_ratio > (middle_skin_ratio + lower_skin_ratio) * 1.4:
+            nudity *= 0.35
+
         violence = max(
             self._normalize(vivid_red_ratio, low=0.05, high=0.20),
             self._normalize(blood_ratio, low=0.04, high=0.18),
@@ -202,6 +247,8 @@ class HeuristicImageModerationProvider(ImageModerationProvider):
         )
         if metallic_signal < 0.2:
             weapons = min(weapons, 0.26)
+        if anime_safe_signal >= 0.58 and metallic_signal < 0.35 and high_sat_ratio >= 0.16:
+            weapons = min(weapons, 0.34)
 
         if violence < 0.15 and gore < 0.12 and weapons < 0.2:
             if refined_skin_ratio < 0.62 or largest_skin_blob_ratio < 0.28:
@@ -222,6 +269,9 @@ class HeuristicImageModerationProvider(ImageModerationProvider):
         ):
             suppression = 0.18 + (0.22 * (1.0 - min(1.0, stylized_signal)))
             nudity *= suppression
+
+        if anime_safe_signal >= 0.6 and explicit_nudity_evidence < 0.5:
+            nudity = min(nudity, 0.3)
 
         if refined_skin_ratio < 0.55 and largest_skin_blob_ratio < 0.32:
             nudity = min(nudity, 0.58)

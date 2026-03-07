@@ -11,6 +11,9 @@ class ImageModerationService:
         provider: ImageModerationProvider,
         blur_threshold: float,
         reject_threshold: float,
+        reject_margin: float,
+        uncertainty_margin: float,
+        hard_reject_single_label_threshold: float,
         nudity_blur_threshold: float,
         nudity_reject_threshold: float,
         violence_blur_threshold: float,
@@ -23,6 +26,9 @@ class ImageModerationService:
         self._provider = provider
         self._blur_threshold = blur_threshold
         self._reject_threshold = reject_threshold
+        self._reject_margin = reject_margin
+        self._uncertainty_margin = uncertainty_margin
+        self._hard_reject_single_label_threshold = hard_reject_single_label_threshold
         self._nudity_blur_threshold = nudity_blur_threshold
         self._nudity_reject_threshold = nudity_reject_threshold
         self._violence_blur_threshold = violence_blur_threshold
@@ -45,6 +51,9 @@ class ImageModerationService:
             scores=scores,
             blur_threshold=self._blur_threshold,
             reject_threshold=self._reject_threshold,
+            reject_margin=self._reject_margin,
+            uncertainty_margin=self._uncertainty_margin,
+            hard_reject_single_label_threshold=self._hard_reject_single_label_threshold,
             nudity_blur_threshold=self._nudity_blur_threshold,
             nudity_reject_threshold=self._nudity_reject_threshold,
             violence_blur_threshold=self._violence_blur_threshold,

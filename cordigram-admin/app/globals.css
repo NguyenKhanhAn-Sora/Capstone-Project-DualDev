@@ -51,10 +51,6 @@
   --font-roboto: "Roboto", sans-serif;
 }
 
-* {
-  user-select: none;
-}
-
 html,
 body {
   height: 100%;

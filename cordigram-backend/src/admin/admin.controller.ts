@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
   ForbiddenException,
@@ -38,6 +39,21 @@ export class AdminController {
       throw new ForbiddenException('Admin access required');
     }
     return this.adminService.getReportDetail(type, targetId);
+  }
+
+  @Get('reports-resolved')
+  async getResolvedReports(
+    @Query('type') type: string | undefined,
+    @Query('limit') limitRaw: string | undefined,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const parsedLimit = Number(limitRaw);
+    const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
+    return this.adminService.getResolvedReports({ type, limit });
   }
 
   @Get('moderation/media')
@@ -140,6 +156,73 @@ export class AdminController {
       suspendUntilTurnOn: body.suspendUntilTurnOn,
       limitDurationMinutes: body.limitDurationMinutes,
       limitUntilTurnOn: body.limitUntilTurnOn,
+      note: body.note ?? null,
+      adminId,
+    });
+  }
+
+  @Post('reports/:type/:targetId/rollback-auto-hide')
+  async rollbackAutoHide(
+    @Param('type') type: string,
+    @Param('targetId') targetId: string,
+    @Body()
+    body: {
+      note?: string | null;
+    },
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const adminId = req.user?.userId ?? '';
+    return this.adminService.rollbackAutoHiddenAndDismiss({
+      type,
+      targetId,
+      note: body.note ?? null,
+      adminId,
+    });
+  }
+
+  @Post('reports-resolved/:actionId/rollback')
+  async rollbackResolvedDecision(
+    @Param('actionId') actionId: string,
+    @Body()
+    body: {
+      note?: string | null;
+    },
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const adminId = req.user?.userId ?? '';
+    return this.adminService.rollbackResolvedDecision({
+      actionId,
+      note: body.note ?? null,
+      adminId,
+    });
+  }
+
+  @Post('reports/:type/:targetId/reopen')
+  async reopenResolvedCase(
+    @Param('type') type: string,
+    @Param('targetId') targetId: string,
+    @Body()
+    body: {
+      note?: string | null;
+    },
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const adminId = req.user?.userId ?? '';
+    return this.adminService.reopenResolvedCase({
+      type,
+      targetId,
       note: body.note ?? null,
       adminId,
     });
