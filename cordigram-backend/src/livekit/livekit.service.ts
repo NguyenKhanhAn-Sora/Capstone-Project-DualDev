@@ -1,17 +1,50 @@
-import { Injectable } from '@nestjs/common';
-import { AccessToken } from 'livekit-server-sdk';
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { ConfigService } from '../config/config.service';
+
+const VOICE_CHANNEL_MAX_PARTICIPANTS = 15;
 
 @Injectable()
 export class LivekitService {
   private readonly livekitApiKey: string;
   private readonly livekitApiSecret: string;
   private readonly livekitUrl: string;
+  private roomService: RoomServiceClient | null = null;
 
   constructor(private configService: ConfigService) {
     this.livekitApiKey = this.configService.livekitApiKey;
     this.livekitApiSecret = this.configService.livekitApiSecret;
     this.livekitUrl = this.configService.livekitUrl;
+  }
+
+  private getRoomService(): RoomServiceClient {
+    if (!this.roomService) {
+      const url = this.livekitUrl.replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:');
+      this.roomService = new RoomServiceClient(
+        url,
+        this.livekitApiKey,
+        this.livekitApiSecret,
+      );
+    }
+    return this.roomService;
+  }
+
+  /**
+   * For voice channel rooms (roomName starts with 'voice-'), ensure room has at most 15 participants
+   */
+  private async ensureVoiceChannelCapacity(roomName: string): Promise<void> {
+    if (!roomName.startsWith('voice-')) return;
+    try {
+      const participants = await this.getRoomService().listParticipants(roomName);
+      if (participants.length >= VOICE_CHANNEL_MAX_PARTICIPANTS) {
+        throw new BadRequestException(
+          'Kênh thoại đã đủ 15 người. Vui lòng thử lại sau.',
+        );
+      }
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      // Room may not exist yet (0 participants) - allow join
+    }
   }
 
   /**
@@ -22,6 +55,8 @@ export class LivekitService {
     participantName: string,
     participantId: string,
   ): Promise<string> {
+    await this.ensureVoiceChannelCapacity(roomName);
+
     const at = new AccessToken(this.livekitApiKey, this.livekitApiSecret, {
       identity: participantId,
       name: participantName,
@@ -45,5 +80,30 @@ export class LivekitService {
   generateRoomName(userId1: string, userId2: string): string {
     const sortedIds = [userId1, userId2].sort();
     return `dm-${sortedIds[0]}-${sortedIds[1]}`;
+  }
+
+  /** Room name for a server voice channel */
+  voiceChannelRoomName(serverId: string, channelId: string): string {
+    return `voice-${serverId}-${channelId}`;
+  }
+
+  /**
+   * List participants in a voice channel room (for sidebar display).
+   * Returns [] if room does not exist or on error.
+   */
+  async listVoiceChannelParticipants(
+    serverId: string,
+    channelId: string,
+  ): Promise<{ identity: string; name: string }[]> {
+    const roomName = this.voiceChannelRoomName(serverId, channelId);
+    try {
+      const participants = await this.getRoomService().listParticipants(roomName);
+      return participants.map((p) => ({
+        identity: p.identity ?? '',
+        name: p.name ?? p.identity ?? 'Người dùng',
+      }));
+    } catch {
+      return [];
+    }
   }
 }

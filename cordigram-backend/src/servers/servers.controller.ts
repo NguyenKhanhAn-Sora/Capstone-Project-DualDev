@@ -32,6 +32,14 @@ export class ServersController {
     return this.serversService.getServersByUserId(req.user.userId);
   }
 
+  @Get(':id/members')
+  async getServerMembers(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getServerMembers(serverId, req.user.userId);
+  }
+
   @Get(':id')
   async getServer(@Param('id') serverId: string) {
     return this.serversService.getServerById(serverId);
@@ -54,6 +62,11 @@ export class ServersController {
   async deleteServer(@Param('id') serverId: string, @Request() req: any) {
     await this.serversService.deleteServer(serverId, req.user.userId);
     return { message: 'Server deleted successfully' };
+  }
+
+  @Post(':id/join')
+  async joinServer(@Param('id') serverId: string, @Request() req: any) {
+    return this.serversService.joinServer(serverId, req.user.userId);
   }
 
   @Post(':id/members/:memberId')

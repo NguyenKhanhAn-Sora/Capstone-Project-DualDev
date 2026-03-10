@@ -139,7 +139,6 @@ export type CreatePostResponse = {
     hides?: number;
     reports?: number;
   };
-  repostOf?: string | null;
   repostOfAuthorId?: string;
   repostOfAuthorDisplayName?: string;
   repostOfAuthorUsername?: string;

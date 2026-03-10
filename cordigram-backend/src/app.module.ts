@@ -28,6 +28,9 @@ import { PollsModule } from './polls/polls.module';
 import { LivekitModule } from './livekit/livekit.module';
 import { ActivityModule } from './activity/activity.module';
 import { AdminModule } from './admin/admin.module';
+import { EventsModule } from './events/events.module';
+import { InboxModule } from './inbox/inbox.module';
+import { ServerInvitesModule } from './server-invites/server-invites.module';
 
 @Module({
   imports: [
@@ -58,6 +61,9 @@ import { AdminModule } from './admin/admin.module';
     LivekitModule,
     ActivityModule,
     AdminModule,
+    EventsModule,
+    InboxModule,
+    ServerInvitesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

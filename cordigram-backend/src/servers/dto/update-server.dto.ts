@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, MaxLength } from 'class-validator';
 
 export class UpdateServerDto {
   @IsOptional()
@@ -14,4 +14,8 @@ export class UpdateServerDto {
   @IsOptional()
   @IsString()
   avatarUrl?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isPublic?: boolean;
 }

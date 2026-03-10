@@ -1,12 +1,16 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { LivekitService } from './livekit.service';
+import { ServersService } from '../servers/servers.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 
 @Controller('livekit')
 @UseGuards(JwtAuthGuard)
 export class LivekitController {
-  constructor(private readonly livekitService: LivekitService) {}
+  constructor(
+    private readonly livekitService: LivekitService,
+    private readonly serversService: ServersService,
+  ) {}
 
   @Post('token')
   async getToken(
@@ -48,5 +52,25 @@ export class LivekitController {
     );
 
     return { roomName };
+  }
+
+  @Get('voice-channel-participants')
+  async getVoiceChannelParticipants(
+    @Query('serverId') serverId: string,
+    @Query('channelId') channelId: string,
+    @CurrentUser() user: any,
+  ) {
+    if (!serverId || !channelId) {
+      return { participants: [] };
+    }
+    const server = await this.serversService.getServerById(serverId);
+    if (!this.serversService.isMember(server, user.userId)) {
+      throw new ForbiddenException('Bạn không thuộc máy chủ này');
+    }
+    const participants = await this.livekitService.listVoiceChannelParticipants(
+      serverId,
+      channelId,
+    );
+    return { participants };
   }
 }

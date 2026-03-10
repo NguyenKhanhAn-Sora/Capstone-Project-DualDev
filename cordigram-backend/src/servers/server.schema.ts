@@ -2,6 +2,15 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
 export type ChannelType = 'text' | 'voice';
+export type ServerTemplate =
+  | 'custom'
+  | 'gaming'
+  | 'friends'
+  | 'study-group'
+  | 'school-club'
+  | 'local-community'
+  | 'artists-creators';
+export type ServerPurpose = 'club-community' | 'me-and-friends';
 
 export interface ServerMember {
   userId: Types.ObjectId;
@@ -19,6 +28,28 @@ export class Server extends Document {
 
   @Prop({ type: String, default: null })
   avatarUrl: string | null;
+
+  @Prop({
+    type: String,
+    enum: [
+      'custom',
+      'gaming',
+      'friends',
+      'study-group',
+      'school-club',
+      'local-community',
+      'artists-creators',
+    ],
+    default: 'custom',
+  })
+  template: ServerTemplate;
+
+  @Prop({
+    type: String,
+    enum: ['club-community', 'me-and-friends'],
+    default: 'me-and-friends',
+  })
+  purpose: ServerPurpose;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   ownerId: Types.ObjectId;
@@ -47,6 +78,9 @@ export class Server extends Document {
 
   @Prop({ type: Boolean, default: true })
   isActive: boolean;
+
+  @Prop({ type: Boolean, default: true })
+  isPublic: boolean;
 }
 
 export const ServerSchema = SchemaFactory.createForClass(Server);

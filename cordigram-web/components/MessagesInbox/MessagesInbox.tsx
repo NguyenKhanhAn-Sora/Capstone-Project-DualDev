@@ -1,0 +1,361 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import styles from "./MessagesInbox.module.css";
+import {
+  fetchInboxForYou,
+  fetchInboxUnread,
+  fetchInboxMentions,
+  markInboxSeen,
+  type InboxForYouItem,
+  type InboxServerInviteItem,
+  type InboxUnreadItem,
+  type InboxMentionItem,
+} from "@/lib/inbox-api";
+import { acceptServerInvite, declineServerInvite } from "@/lib/servers-api";
+type TabKey = "for-you" | "unread" | "mentions";
+
+interface MessagesInboxProps {
+  onClose: () => void;
+  onNavigateToChannel?: (serverId: string, channelId: string) => void;
+  /** Gọi sau khi đánh dấu một mục đã xem (để parent cập nhật chấm đỏ trên icon hộp thư). */
+  onMarkSeen?: () => void;
+  /** Sau khi chấp nhận lời mời: parent load lại danh sách server và chọn server vừa tham gia. */
+  onAcceptInvite?: (serverId: string) => Promise<void>;
+}
+
+function formatTimeAgo(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffM = Math.floor(diffMs / 60000);
+  const diffH = Math.floor(diffMs / 3600000);
+  const diffD = Math.floor(diffMs / 86400000);
+  if (diffM < 60) return `${diffM} phút`;
+  if (diffH < 24) return `${diffH} giờ`;
+  if (diffD < 28) return `${diffD} ngày`;
+  return d.toLocaleDateString("vi-VN");
+}
+
+export default function MessagesInbox({ onClose, onNavigateToChannel, onMarkSeen, onAcceptInvite }: MessagesInboxProps) {
+  const router = useRouter();
+  const [tab, setTab] = useState<TabKey>("for-you");
+  const [forYouItems, setForYouItems] = useState<InboxForYouItem[]>([]);
+  const [unreadItems, setUnreadItems] = useState<InboxUnreadItem[]>([]);
+  const [mentionItems, setMentionItems] = useState<InboxMentionItem[]>([]);
+  const [loading, setLoading] = useState({ "for-you": true, unread: true, mentions: true });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [forYouRes, unreadRes, mentionsRes] = await Promise.all([
+          fetchInboxForYou(),
+          fetchInboxUnread(),
+          fetchInboxMentions(),
+        ]);
+        if (cancelled) return;
+        setForYouItems(forYouRes.items ?? []);
+        setUnreadItems(unreadRes.items ?? []);
+        setMentionItems(mentionsRes.items ?? []);
+      } catch (e) {
+        if (!cancelled) {
+          setForYouItems([]);
+          setUnreadItems([]);
+          setMentionItems([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading({ "for-you": false, unread: false, mentions: false });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Chỉ dùng cho event: ấn vào = đã đọc + đi tới trang sự kiện. */
+  const handleForYouClick = async (item: InboxForYouItem) => {
+    if (item.type !== "event") return;
+    const sourceType = "event";
+    try {
+      await markInboxSeen(sourceType, item._id);
+      setForYouItems((prev) =>
+        prev.map((i) =>
+          i._id === item._id && i.type === item.type ? { ...i, seen: true } : i,
+        ),
+      );
+      onMarkSeen?.();
+    } catch (_) {}
+    router.push(`/messages?server=${item.serverId}&event=${item._id}`);
+    onClose();
+  };
+
+  const removeInviteFromList = (inviteId: string) => {
+    setForYouItems((prev) => prev.filter((i) => !(i.type === "server_invite" && i._id === inviteId)));
+    onMarkSeen?.();
+  };
+
+  /** Chấp nhận lời mời vào máy chủ (nút ✓). */
+  const handleAcceptInvite = async (item: InboxServerInviteItem) => {
+    try {
+      await acceptServerInvite(item._id);
+      await markInboxSeen("server_invite", item._id);
+      removeInviteFromList(item._id);
+      if (onAcceptInvite) {
+        await onAcceptInvite(item.serverId);
+      } else {
+        router.push(`/messages?server=${item.serverId}`);
+      }
+      onClose();
+    } catch (e) {
+      console.error("Accept invite failed", e);
+    }
+  };
+
+  /** Từ chối lời mời vào máy chủ (nút ✗). */
+  const handleDeclineInvite = async (item: InboxServerInviteItem) => {
+    try {
+      await declineServerInvite(item._id);
+      await markInboxSeen("server_invite", item._id);
+      removeInviteFromList(item._id);
+    } catch (e) {
+      console.error("Decline invite failed", e);
+    }
+  };
+
+  const handleUnreadClick = (item: InboxUnreadItem) => {
+    if (onNavigateToChannel) onNavigateToChannel(item.serverId, item.channelId);
+    else router.push(`/messages?server=${item.serverId}&channel=${item.channelId}`);
+    onClose();
+  };
+
+  const handleMentionClick = (item: InboxMentionItem) => {
+    if (onNavigateToChannel) onNavigateToChannel(item.serverId, item.channelId);
+    else router.push(`/messages?server=${item.serverId}&channel=${item.channelId}`);
+    onClose();
+  };
+
+  return (
+    <>
+      <div className={styles.backdrop} onClick={onClose} aria-hidden />
+      <div className={styles.panel} role="dialog" aria-labelledby="inbox-title">
+        <div className={styles.header}>
+          <h2 id="inbox-title" className={styles.title}>
+            <span className={styles.titleIcon} aria-hidden>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+            </span>
+            Hộp thư đến
+          </h2>
+          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Đóng">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className={styles.tabs}>
+          <button
+            type="button"
+            className={`${styles.tab} ${tab === "for-you" ? styles.tabActive : ""}`}
+            onClick={() => setTab("for-you")}
+          >
+            Dành cho Bạn
+          </button>
+          <button
+            type="button"
+            className={`${styles.tab} ${tab === "unread" ? styles.tabActive : ""}`}
+            onClick={() => setTab("unread")}
+          >
+            Chưa đọc
+          </button>
+          <button
+            type="button"
+            className={`${styles.tab} ${tab === "mentions" ? styles.tabActive : ""}`}
+            onClick={() => setTab("mentions")}
+          >
+            Đề cập
+          </button>
+        </div>
+
+        <div className={styles.list}>
+          {tab === "for-you" && (
+            <>
+              {loading["for-you"] ? (
+                <div className={styles.loading}>Đang tải...</div>
+              ) : forYouItems.length === 0 ? (
+                <div className={styles.empty}>
+                  Không có sự kiện hay lời mời nào từ các máy chủ của bạn.
+                </div>
+              ) : (
+                forYouItems.map((item) =>
+                  item.type === "event" ? (
+                    <button
+                      key={`event-${item._id}`}
+                      type="button"
+                      className={styles.eventItem}
+                      onClick={() => handleForYouClick(item)}
+                    >
+                      <div className={styles.eventItemAvatarWrap}>
+                        <div
+                          className={styles.eventAvatar}
+                          style={
+                            item.serverAvatarUrl
+                              ? { backgroundImage: `url(${item.serverAvatarUrl})` }
+                              : undefined
+                          }
+                        >
+                          {!item.serverAvatarUrl && item.serverName.charAt(0).toUpperCase()}
+                        </div>
+                        {item.seen !== true && <span className={styles.eventItemUnreadDot} aria-hidden />}
+                      </div>
+                      <div className={styles.eventBody}>
+                        <p className={styles.eventTitle}>
+                          {item.topic}
+                          {item.status === "live" && (
+                            <span style={{ color: "var(--color-primary)", marginLeft: 6 }}>• Đang diễn ra</span>
+                          )}
+                        </p>
+                        <p className={styles.eventMeta}>
+                          đã bắt đầu trong Máy chủ của {item.serverName}.
+                        </p>
+                        <p className={styles.eventTime}>{formatTimeAgo(item.startAt)}</p>
+                      </div>
+                    </button>
+                  ) : (
+                    <div
+                      key={`invite-${item._id}`}
+                      className={styles.inviteItem}
+                    >
+                      <div className={styles.eventItemAvatarWrap}>
+                        <div
+                          className={styles.eventAvatar}
+                          style={
+                            item.serverAvatarUrl
+                              ? { backgroundImage: `url(${item.serverAvatarUrl})` }
+                              : undefined
+                          }
+                        >
+                          {!item.serverAvatarUrl && item.serverName.charAt(0).toUpperCase()}
+                        </div>
+                        {item.seen !== true && <span className={styles.eventItemUnreadDot} aria-hidden />}
+                      </div>
+                      <div className={styles.eventBody}>
+                        <p className={styles.eventTitle}>
+                          Lời mời vào máy chủ
+                        </p>
+                        <p className={styles.eventMeta}>
+                          {item.inviterDisplay} mời bạn tham gia {item.serverName}.
+                        </p>
+                        <p className={styles.eventTime}>{formatTimeAgo(item.createdAt)}</p>
+                      </div>
+                      <div className={styles.inviteItemActions}>
+                        <button
+                          type="button"
+                          className={styles.inviteActionBtn}
+                          title="Chấp nhận"
+                          onClick={() => handleAcceptInvite(item)}
+                          aria-label="Chấp nhận lời mời"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.inviteActionBtn} ${styles.inviteActionBtnDecline}`}
+                          title="Từ chối"
+                          onClick={() => handleDeclineInvite(item)}
+                          aria-label="Từ chối lời mời"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ),
+                )
+              )}
+            </>
+          )}
+
+          {tab === "unread" && (
+            <>
+              {loading.unread ? (
+                <div className={styles.loading}>Đang tải...</div>
+              ) : unreadItems.length === 0 ? (
+                <div className={styles.empty}>
+                  Không có tin nhắn hoặc thông báo chưa đọc từ các kênh.
+                </div>
+              ) : (
+                unreadItems.map((item) => (
+                  <button
+                    key={`${item.serverId}-${item.channelId}`}
+                    type="button"
+                    className={styles.unreadItem}
+                    onClick={() => handleUnreadClick(item)}
+                  >
+                    <div className={styles.eventAvatar}>
+                      {item.serverName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className={styles.eventBody}>
+                      <p className={styles.eventTitle}>
+                        # {item.channelName}
+                        <span className={styles.badge} style={{ marginLeft: 8 }}>
+                          {item.unreadCount}
+                        </span>
+                      </p>
+                      <p className={styles.eventMeta}>
+                        {item.serverName}
+                      </p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </>
+          )}
+
+          {tab === "mentions" && (
+            <>
+              {loading.mentions ? (
+                <div className={styles.loading}>Đang tải...</div>
+              ) : mentionItems.length === 0 ? (
+                <div className={styles.empty}>
+                  Chưa có ai đề cập bạn trong kênh.
+                </div>
+              ) : (
+                mentionItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={styles.mentionItem}
+                    onClick={() => handleMentionClick(item)}
+                  >
+                    <div className={styles.eventAvatar}>
+                      {item.actorName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className={styles.eventBody}>
+                      <p className={styles.eventTitle}>
+                        {item.actorName} đã đề cập bạn trong # {item.channelName}
+                      </p>
+                      <p className={styles.eventMeta}>
+                        {item.serverName} • {formatTimeAgo(item.createdAt)}
+                      </p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

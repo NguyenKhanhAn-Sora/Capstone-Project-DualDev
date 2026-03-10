@@ -25,7 +25,7 @@
   height: 56px;
   border-radius: 50%;
   object-fit: cover;
-  cursor: pointer;
+  cursor: pointer; 
   transition: all 0.2s ease;
 }
 
@@ -214,6 +214,68 @@
   overflow: hidden;
 }
 
+/* Thanh thể hiện đang ở DM hay Server + Hộp thư */
+.contextBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-shrink: 0;
+}
+
+.contextBarLabel {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contextBarActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.inboxBtnWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.inboxBadge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f23f43;
+  pointer-events: none;
+}
+
+.inboxBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.inboxBtn:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-primary);
+}
+
 .listHeader {
   padding: 16px;
   border-bottom: 1px solid var(--color-border);
@@ -292,13 +354,423 @@
   pointer-events: none;
 }
 
+/* Server header (tên máy chủ + mời) */
+.serverHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.serverNameBtn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 4px;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.serverNameBtn:hover {
+  background: var(--color-surface-hover, rgba(255, 255, 255, 0.06));
+}
+
+.serverNameText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inviteServerBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background 0.2s;
+}
+
+.inviteServerBtn:hover {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+}
+
+.serverMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.serverMenuItem:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+.eventCountBadge {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* Sự kiện đang diễn ra - bên trên Sự kiện */
+.activeEventsBlock {
+  padding: 8px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.activeEventCard {
+  background: var(--color-surface-muted);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+}
+
+.activeEventHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.activeEventLive {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #248046;
+}
+
+.activeEventDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #248046;
+  flex-shrink: 0;
+}
+
+.activeEventDismiss {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.activeEventDismiss:hover {
+  color: var(--color-text);
+}
+
+.activeEventTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 6px;
+}
+
+.activeEventLocation {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+}
+
+.activeEventLocation svg {
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+
+.activeEventDetailBtn {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: none;
+  background: #248046;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.activeEventDetailBtn:hover {
+  background: #1e6b3a;
+}
+
+/* Modal Chi Tiết Sự Kiện */
+.eventDetailOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10004;
+}
+
+.eventDetailModal {
+  background: #313338;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px;
+  position: relative;
+}
+
+.eventDetailClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  color: #b5bac1;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.eventDetailClose:hover {
+  background: #1e1f22;
+  color: #fff;
+}
+
+.eventDetailTitle {
+  margin: 0 32px 16px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #f2f3f5;
+}
+
+.eventDetailBanner {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.eventDetailMeta {
+  margin-bottom: 12px;
+}
+
+.eventDetailLive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #248046;
+}
+
+.eventDetailRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #b5bac1;
+  margin-bottom: 12px;
+}
+
+.eventDetailIcon {
+  flex-shrink: 0;
+}
+
+.eventDetailDesc {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: #b5bac1;
+  line-height: 1.5;
+}
+
+.eventDetailActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.eventDetailCopyBtn {
+  padding: 10px 20px;
+  border-radius: 4px;
+  border: none;
+  background: #2b2d31;
+  color: #f2f3f5;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.eventDetailCopyBtn:hover {
+  background: #36373d;
+}
+
+.eventDetailJoinBtn {
+  padding: 10px 20px;
+  border-radius: 4px;
+  border: none;
+  background: #248046;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.eventDetailJoinBtn:hover {
+  background: #1e6b3a;
+}
+
+.eventDetailJoinBtn.eventDetailInterestedActive {
+  background: #248046;
+  color: #fff;
+}
+
+.eventDetailHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.eventDetailHeaderTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #f2f3f5;
+  flex: 1;
+}
+
+.eventDetailCreateBtn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  background: #5865f2;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.eventDetailCreateBtn:hover {
+  background: #4752c4;
+}
+
+.eventDetailCountdown {
+  font-size: 14px;
+  color: #5865f2;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.eventDetailStartDate {
+  font-size: 13px;
+  color: #b5bac1;
+  margin-bottom: 12px;
+}
+
+.eventDetailStartBtn {
+  padding: 10px 20px;
+  border-radius: 4px;
+  border: none;
+  background: #5865f2;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.eventDetailStartBtn:hover {
+  background: #4752c4;
+}
+
+.eventDetailEndBtn {
+  padding: 10px 20px;
+  border-radius: 4px;
+  border: none;
+  background: #da373c;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.eventDetailEndBtn:hover {
+  background: #a12828;
+}
+
+.eventDetailTabs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #1e1f22;
+}
+
+.eventDetailTab {
+  padding: 8px 0;
+  font-size: 14px;
+  color: #b5bac1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.eventDetailTab.active {
+  color: #f2f3f5;
+  border-bottom-color: #5865f2;
+}
+
 /* Conversations Container */
 .conversationsContainer {
   flex: 1;
-  overflow-y: auto;
-  padding: 8px 0;
+  min-height: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.conversationsScrollArea {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 0;
 }
 
 .section {
@@ -333,6 +805,39 @@
 .tabBtn.active {
   color: var(--color-primary);
   border-bottom-color: var(--color-primary);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 8px;
+  margin: 8px 0 0;
+  gap: 8px;
+}
+
+.sectionHeader .sectionTitle {
+  margin: 0;
+  padding: 0;
+}
+
+.addChannelBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background 0.2s;
+}
+
+.addChannelBtn:hover {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
 }
 
 .sectionTitle {
@@ -862,6 +1367,10 @@
 .activeNowHeader {
   padding: 16px;
   border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .activeNowTitle {
@@ -871,12 +1380,403 @@
   margin: 0;
 }
 
+.activeNowCloseBtn {
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.activeNowCloseBtn:hover {
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
 .activeNowContainer {
   flex: 1;
   overflow-y: auto;
   padding: 12px 0;
   display: flex;
   flex-direction: column;
+}
+
+/* DM Profile card (right sidebar when in DM) */
+.dmProfileCard {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.dmProfileAvatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.dmProfileDisplayName {
+  margin: 0;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.dmProfileUsername {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.dmProfileEmail {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.dmProfileBio {
+  padding: 8px 12px;
+  background: var(--color-bg);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dmProfileViewFull {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.dmProfileViewFull:hover {
+  text-decoration: underline;
+}
+
+/* Toggle to reopen DM profile sidebar when closed */
+.dmProfileSidebarToggle {
+  width: 48px;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 16px 8px;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+}
+
+.dmProfileSidebarToggle:hover {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+}
+
+/* Voice channel header icon */
+.voiceChannelIcon {
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+  color: #248046;
+}
+
+/* Voice call view (when voice channel selected) */
+.voiceCallView {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--color-bg);
+}
+
+.voiceCallVideoArea {
+  flex: 1;
+  min-height: 200px;
+  background: #2b2d31;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.voiceCallError {
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.voiceCallError p {
+  margin: 0 0 16px 0;
+}
+
+.voiceCallErrorBtn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: none;
+  background: #da373c;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.voiceCallErrorBtn:hover {
+  background: #a12828;
+}
+
+.voiceCallConnecting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: var(--color-text-muted);
+}
+
+.voiceCallSpinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.voiceCallVideoPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.voiceCallAvatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 48px;
+  font-weight: 600;
+}
+
+.voiceCallControls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: #2b2d31;
+  border-top: 1px solid var(--color-border);
+}
+
+.voiceCallControlBtn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: #1e1f22;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.voiceCallControlBtn:hover {
+  color: var(--color-text);
+  background: #36373d;
+}
+
+.voiceCallLeaveBtn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: #da373c;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+}
+
+.voiceCallLeaveBtn:hover {
+  background: #a12828;
+}
+
+/* Voice channel sidebar */
+.voiceChannelWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.voiceChannelWrap .conversationItem {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.voiceChannelRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.voiceChannelIconSidebar {
+  font-size: 16px;
+  margin-right: 6px;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.voiceChannelIconSidebar.voiceChannelIconActive {
+  color: #248046;
+}
+
+.voiceInviteBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 4px 8px 0;
+  background: #2b2d31;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.voiceInviteBar svg {
+  flex-shrink: 0;
+}
+
+.voiceInviteBar span {
+  flex: 1;
+}
+
+.voiceInviteBarClickable {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.voiceInviteBarClickable:hover {
+  color: var(--color-text);
+}
+
+.voiceInviteDismiss {
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.voiceInviteDismiss:hover {
+  color: var(--color-text);
+}
+
+/* Khung người trong kênh thoại — bên dưới voiceInviteBar, mọi người đều thấy; label + avatar + tên */
+.voiceChannelParticipants {
+  margin: 4px 8px 12px;
+  padding: 8px 10px;
+  background: #2f3136;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.voiceChannelParticipantsLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #b9bbbe;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding-bottom: 2px;
+}
+
+.voiceChannelParticipant {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #36393f;
+}
+
+.voiceChannelParticipantAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.voiceChannelParticipantName {
+  flex: 1;
+  font-size: 14px;
+  color: #dcddde;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voiceChannelParticipantIcons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  color: #b9bbbe;
+}
+
+.voiceChannelParticipantIcons svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.9;
 }
 
 .activeUserItem {
@@ -996,15 +1896,15 @@
   border-color: var(--color-primary);
 }
 
-/* Menu Items */
-.menuItems {
+/* DM Sidebar: danh sách menu (Friends, Mission, ...) */
+.dmSidebarMenuList {
   display: flex;
   flex-direction: column;
   padding: 8px 0;
   border-bottom: 1px solid var(--color-border);
 }
 
-.menuItem {
+.dmSidebarMenuEntry {
   padding: 12px 16px;
   background: transparent;
   border: none;
@@ -1018,11 +1918,11 @@
   transition: all 0.2s ease;
 }
 
-.menuItem:hover {
+.dmSidebarMenuEntry:hover {
   background-color: var(--color-surface-muted);
 }
 
-.menuItem svg {
+.dmSidebarMenuEntry svg {
   flex-shrink: 0;
 }
 
@@ -1203,6 +2103,15 @@
 .voiceButton:hover {
   background-color: var(--color-surface-muted);
   color: var(--color-text);
+}
+
+.voiceButtonMuted {
+  color: #f23f43;
+}
+
+.voiceButtonMuted:hover {
+  background-color: rgba(242, 63, 67, 0.15);
+  color: #f23f43;
 }
 
 /* Plus Button & Menu */

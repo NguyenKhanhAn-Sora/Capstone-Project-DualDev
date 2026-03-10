@@ -10,12 +10,18 @@ import { Server } from './server.schema';
 import { Channel } from '../channels/channel.schema';
 import { CreateServerDto } from './dto/create-server.dto';
 import { UpdateServerDto } from './dto/update-server.dto';
+import { User } from '../users/user.schema';
+import { Profile } from '../profiles/profile.schema';
+import { ServerInvite } from '../server-invites/server-invite.schema';
 
 @Injectable()
 export class ServersService {
   constructor(
     @InjectModel(Server.name) private serverModel: Model<Server>,
     @InjectModel(Channel.name) private channelModel: Model<Channel>,
+    @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(Profile.name) private profileModel: Model<Profile>,
+    @InjectModel(ServerInvite.name) private serverInviteModel: Model<ServerInvite>,
   ) {}
 
   async createServer(
@@ -29,6 +35,8 @@ export class ServersService {
       name: createServerDto.name,
       description: createServerDto.description || null,
       avatarUrl: createServerDto.avatarUrl || null,
+      template: createServerDto.template || 'custom',
+      purpose: createServerDto.purpose || 'me-and-friends',
       ownerId: userObjectId,
       members: [
         {
@@ -38,6 +46,7 @@ export class ServersService {
         },
       ],
       memberCount: 1,
+      isPublic: true,
     });
 
     const savedServer = await server.save();
@@ -121,6 +130,8 @@ export class ServersService {
       server.description = updateServerDto.description;
     if (updateServerDto.avatarUrl !== undefined)
       server.avatarUrl = updateServerDto.avatarUrl;
+    if (updateServerDto.isPublic !== undefined)
+      server.isPublic = updateServerDto.isPublic;
 
     return server.save();
   }
@@ -177,6 +188,25 @@ export class ServersService {
     return server.save();
   }
 
+  /** Join a public server (used from event link). Fails if server is private. */
+  async joinServer(serverId: string, userId: string): Promise<Server> {
+    const server = await this.serverModel.findById(serverId);
+
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    if (!server.isPublic) {
+      throw new ForbiddenException('You do not have access to this server');
+    }
+
+    return this.addMemberToServer(serverId, userId, 'member');
+  }
+
+  isMember(server: Server, userId: string): boolean {
+    return server.members.some((m) => m.userId.toString() === userId);
+  }
+
   async removeMemberFromServer(
     serverId: string,
     memberId: string,
@@ -200,5 +230,151 @@ export class ServersService {
     server.memberCount = server.members.length;
 
     return server.save();
+  }
+
+  /** Danh sách thành viên máy chủ (chỉ chủ server). Trả về: tên, avatar, gia nhập server từ, đã tham gia Cordigram, cách gia nhập (link / mời bởi). */
+  async getServerMembers(
+    serverId: string,
+    requesterUserId: string,
+  ): Promise<
+    Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      joinedAt: Date;
+      joinedCordigramAt: Date;
+      joinMethod: 'owner' | 'invited' | 'link';
+      invitedBy?: { id: string; username: string };
+      role: string;
+    }>
+  > {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+    if (server.ownerId.toString() !== requesterUserId) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ mới có thể xem danh sách thành viên',
+      );
+    }
+
+    const memberIds = server.members.map((m) => m.userId.toString());
+    const userIds = server.members.map((m) => m.userId);
+    const users = await this.userModel
+      .find({ _id: { $in: userIds } })
+      .select('_id createdAt')
+      .lean()
+      .exec();
+    const userMap = new Map(
+      users.map((u) => [
+        u._id.toString(),
+        u as unknown as { _id: Types.ObjectId; createdAt: Date },
+      ]),
+    );
+
+    const profiles = await this.profileModel
+      .find({ userId: { $in: userIds } })
+      .select('userId displayName username avatarUrl')
+      .lean()
+      .exec();
+    const profileByUserId = new Map(
+      profiles.map((p: any) => [p.userId.toString(), p]),
+    );
+
+    const serverObjectId = new Types.ObjectId(serverId);
+    const acceptedInvites = await this.serverInviteModel
+      .find({
+        serverId: serverObjectId,
+        status: 'accepted',
+        toUserId: { $in: userIds },
+      })
+      .populate('fromUserId', '_id')
+      .lean()
+      .exec();
+    const inviteByToId = new Map<
+      string,
+      { fromUserId: string; fromUsername?: string }
+    >();
+    const inviterIds = [
+      ...new Set(
+        (acceptedInvites as any[]).map((inv) => {
+          const from = inv.fromUserId;
+          return (from?._id ?? from)?.toString();
+        }),
+      ),
+    ].filter(Boolean);
+    if (inviterIds.length > 0) {
+      const inviterProfiles = await this.profileModel
+        .find({ userId: { $in: inviterIds.map((id) => new Types.ObjectId(id)) } })
+        .select('userId username')
+        .lean()
+        .exec();
+      const inviterMap = new Map(
+        (inviterProfiles as any[]).map((p) => [p.userId.toString(), p.username]),
+      );
+      for (const inv of acceptedInvites as any[]) {
+        const toId = (inv.toUserId?._id ?? inv.toUserId)?.toString();
+        const fromId = (inv.fromUserId?._id ?? inv.fromUserId)?.toString();
+        if (toId && fromId) {
+          inviteByToId.set(toId, {
+            fromUserId: fromId,
+            fromUsername: inviterMap.get(fromId),
+          });
+        }
+      }
+    }
+
+    const result: Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      joinedAt: Date;
+      joinedCordigramAt: Date;
+      joinMethod: 'owner' | 'invited' | 'link';
+      invitedBy?: { id: string; username: string };
+      role: string;
+    }> = [];
+
+    for (const m of server.members) {
+      const uid = m.userId.toString();
+      const profile = profileByUserId.get(uid) as
+        | { displayName: string; username: string; avatarUrl: string }
+        | undefined;
+      const user = userMap.get(uid);
+      const joinedCordigramAt = user?.createdAt
+        ? new Date(user.createdAt)
+        : m.joinedAt;
+      const joinedAt = m.joinedAt instanceof Date ? m.joinedAt : new Date(m.joinedAt);
+      const isOwner = server.ownerId.toString() === uid;
+      const invite = inviteByToId.get(uid);
+
+      let joinMethod: 'owner' | 'invited' | 'link' = 'link';
+      let invitedBy: { id: string; username: string } | undefined;
+      if (isOwner) {
+        joinMethod = 'owner';
+      } else if (invite) {
+        joinMethod = 'invited';
+        invitedBy = {
+          id: invite.fromUserId,
+          username: invite.fromUsername ?? 'Người dùng',
+        };
+      }
+
+      result.push({
+        userId: uid,
+        displayName: profile?.displayName ?? 'Người dùng',
+        username: profile?.username ?? uid,
+        avatarUrl: profile?.avatarUrl ?? '',
+        joinedAt,
+        joinedCordigramAt,
+        joinMethod,
+        invitedBy,
+        role: m.role,
+      });
+    }
+
+    return result;
   }
 }

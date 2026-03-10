@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { LivekitService } from './livekit.service';
 import { LivekitController } from './livekit.controller';
+import { ServersModule } from '../servers/servers.module';
 
 @Module({
+  imports: [ServersModule],
   controllers: [LivekitController],
   providers: [LivekitService],
   exports: [LivekitService],
