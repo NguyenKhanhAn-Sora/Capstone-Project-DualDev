@@ -124,7 +124,6 @@ export default function InviteServerPage() {
   if (!server) return null;
 
   // Máy chủ riêng tư: vẫn hiển thị form tham gia; khi bấm Chấp nhận sẽ gọi accept lời mời (nếu có)
-
   const hasAvatar = isValidAvatarUrl(server.avatarUrl ?? undefined);
   const initial = server.name.charAt(0).toUpperCase();
   const acceptLabel = userDisplayName ? `Chấp nhận với tên ${userDisplayName}` : "Chấp nhận tham gia";
