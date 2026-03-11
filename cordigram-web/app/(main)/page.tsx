@@ -2574,7 +2574,7 @@ function FeedCard({
     }
   };
   const [mediaIndex, setMediaIndex] = useState(0);
-  const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [soundOn, setSoundOn] = useState(false);
   const lastTimeRef = useRef(0);
@@ -2649,6 +2649,7 @@ function FeedCard({
   useEffect(() => {
     setMediaIndex(0);
     setSoundOn(false);
+    setImageViewerOpen(false);
   }, [id]);
 
   useEffect(() => {
@@ -2656,6 +2657,7 @@ function FeedCard({
     if (mediaCount === 0) {
       setMediaIndex(0);
       setSoundOn(false);
+      setImageViewerOpen(false);
       return;
     }
     setMediaIndex((prev) => (prev >= mediaCount ? 0 : prev));
@@ -3914,7 +3916,7 @@ function FeedCard({
                 alt={t("media.alt")}
                 className={styles.mediaVisual}
                 onContextMenu={(e) => e.preventDefault()}
-                onClick={() => setImageViewerUrl(current.url)}
+                onClick={() => setImageViewerOpen(true)}
               />
             );
           })()}
@@ -3967,11 +3969,33 @@ function FeedCard({
         </div>
       ) : null}
 
-      {imageViewerUrl ? (
+      {imageViewerOpen && media?.[mediaIndex] ? (
         <ImageViewerOverlay
-          url={imageViewerUrl}
+          url={media[mediaIndex].url}
+          mediaType={media[mediaIndex].type}
           alt={t("media.overlayAlt")}
-          onClose={() => setImageViewerUrl(null)}
+          onClose={() => setImageViewerOpen(false)}
+          onPrevious={
+            media.length > 1
+              ? () =>
+                  setMediaIndex((prev) =>
+                    media.length ? (prev - 1 + media.length) % media.length : 0,
+                  )
+              : undefined
+          }
+          onNext={
+            media.length > 1
+              ? () =>
+                  setMediaIndex((prev) =>
+                    media.length ? (prev + 1) % media.length : 0,
+                  )
+              : undefined
+          }
+          previousLabel={t("media.previous")}
+          nextLabel={t("media.next")}
+          counterText={
+            media.length > 1 ? `${mediaIndex + 1}/${media.length}` : undefined
+          }
         />
       ) : null}
 

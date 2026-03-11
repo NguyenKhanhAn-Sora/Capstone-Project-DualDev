@@ -26,6 +26,7 @@ const decodeJwt = (token: string): AdminPayload | null => {
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [quickActionToast, setQuickActionToast] = useState<string | null>(null);
   const [stats, setStats] = useState<{
     totalUsers: number;
     newUsers24h: number;
@@ -53,6 +54,8 @@ export default function AdminDashboardPage() {
       score: number;
       severity: "low" | "medium" | "high";
       autoHideSuggested: boolean;
+      autoHiddenPendingReview?: boolean;
+      escalatedPriority?: boolean;
       lastReportedAt: string;
     }>;
   } | null>(null);
@@ -64,6 +67,13 @@ export default function AdminDashboardPage() {
       moderationDecision: 'approve' | 'blur' | 'reject';
       reasons: string[];
       createdAt: string | null;
+    }>
+  >([]);
+  const [recentActivities, setRecentActivities] = useState<
+    Array<{
+      actor: string;
+      action: string;
+      occurredAt: string | null;
     }>
   >([]);
 
@@ -131,6 +141,8 @@ export default function AdminDashboardPage() {
             score: number;
             severity: "low" | "medium" | "high";
             autoHideSuggested: boolean;
+            autoHiddenPendingReview?: boolean;
+            escalatedPriority?: boolean;
             lastReportedAt: string;
           }>;
         };
@@ -142,6 +154,14 @@ export default function AdminDashboardPage() {
 
     loadStats();
   }, [ready]);
+
+  useEffect(() => {
+    if (!quickActionToast) return;
+    const timer = window.setTimeout(() => {
+      setQuickActionToast(null);
+    }, 2800);
+    return () => window.clearTimeout(timer);
+  }, [quickActionToast]);
 
   useEffect(() => {
     if (!ready || typeof window === 'undefined') return;
@@ -182,6 +202,120 @@ export default function AdminDashboardPage() {
     };
 
     loadModeration();
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready || typeof window === "undefined") return;
+    const token = localStorage.getItem("adminAccessToken") || "";
+    if (!token) return;
+
+    const mapResolvedToActivity = (items: Array<{
+      action: string;
+      type: "post" | "comment" | "user";
+      targetLabel: string;
+      resolvedAt: string | null;
+      moderatorDisplayName: string | null;
+      moderatorUsername: string | null;
+      moderatorEmail: string | null;
+    }>) => {
+      const actionMap: Record<string, string> = {
+        no_violation: "Marked no violation for",
+        remove_post: "Removed",
+        restrict_post: "Restricted",
+        delete_comment: "Deleted",
+        warn: "Warned",
+        mute_interaction: "Muted interactions for",
+        suspend_user: "Suspended",
+        limit_account: "Limited account",
+        violation: "Applied violation to",
+      };
+
+      return items.slice(0, 5).map((item) => ({
+        actor:
+          item.moderatorDisplayName?.trim() ||
+          (item.moderatorUsername?.trim()
+            ? `@${item.moderatorUsername.trim()}`
+            : item.moderatorEmail?.trim() || "admin"),
+        action: `${actionMap[item.action] ?? "Updated"} ${
+          item.type
+        } ${item.targetLabel || item.type}`,
+        occurredAt: item.resolvedAt ?? null,
+      }));
+    };
+
+    const loadRecentActivityFallback = async () => {
+      const response = await fetch(`${getApiBaseUrl()}/admin/reports-resolved?limit=5`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load fallback recent activity");
+      }
+
+      const payload = (await response.json()) as {
+        items?: Array<{
+          action: string;
+          type: "post" | "comment" | "user";
+          targetLabel: string;
+          resolvedAt: string | null;
+          moderatorDisplayName: string | null;
+          moderatorUsername: string | null;
+          moderatorEmail: string | null;
+        }>;
+      };
+
+      return mapResolvedToActivity(payload.items ?? []);
+    };
+
+    const loadRecentActivity = async () => {
+      try {
+        const response = await fetch(
+          `${getApiBaseUrl()}/admin/activity/recent?limit=5`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load recent activity");
+        }
+
+        const payload = (await response.json()) as {
+          items?: Array<{
+            actor: string;
+            action: string;
+            occurredAt: string | null;
+          }>;
+        };
+
+        let normalized = (payload.items ?? []).slice(0, 5).map((item) => ({
+          actor: item.actor || "admin",
+          action: item.action || "Updated moderation activity",
+          occurredAt: item.occurredAt ?? null,
+        }));
+
+        if (normalized.length === 0) {
+          normalized = await loadRecentActivityFallback();
+        }
+
+        setRecentActivities(normalized);
+      } catch {
+        try {
+          const fallback = await loadRecentActivityFallback();
+          setRecentActivities(fallback);
+        } catch {
+          setRecentActivities([]);
+        }
+      }
+    };
+
+    loadRecentActivity();
   }, [ready]);
 
   if (!ready) return null;
@@ -265,6 +399,54 @@ export default function AdminDashboardPage() {
     stats.postsCreatedDeltaPct < 0;
   const isNewUsersDeltaNegative =
     typeof stats?.newUsersDeltaPct === "number" && stats.newUsersDeltaPct < 0;
+
+  const handleReviewContentQuickAction = () => {
+    const queue = stats?.reportQueue ?? [];
+    if (!queue.length) {
+      setQuickActionToast("No open reports to review right now.");
+      return;
+    }
+
+    const severeCandidates = queue.filter(
+      (item) =>
+        Boolean(item.autoHiddenPendingReview) ||
+        Boolean(item.escalatedPriority) ||
+        Boolean(item.autoHideSuggested) ||
+        item.severity === "high",
+    );
+
+    if (!severeCandidates.length) {
+      setQuickActionToast("No critical report found right now.");
+      return;
+    }
+
+    const priorityRank = (item: {
+      autoHiddenPendingReview?: boolean;
+      escalatedPriority?: boolean;
+      autoHideSuggested: boolean;
+      severity: "low" | "medium" | "high";
+    }) => {
+      if (item.autoHiddenPendingReview || item.escalatedPriority) return 0;
+      if (item.autoHideSuggested) return 1;
+      if (item.severity === "high") return 2;
+      return 3;
+    };
+
+    const target = [...severeCandidates].sort((a, b) => {
+      const rankDiff = priorityRank(a) - priorityRank(b);
+      if (rankDiff !== 0) return rankDiff;
+      const aTime = new Date(a.lastReportedAt).getTime();
+      const bTime = new Date(b.lastReportedAt).getTime();
+      return bTime - aTime;
+    })[0];
+
+    if (!target) {
+      setQuickActionToast("No critical report found right now.");
+      return;
+    }
+
+    router.push(`/report/review/${target.type}/${target.targetId}`);
+  };
 
   return (
     <div className={styles.page}>
@@ -468,9 +650,6 @@ export default function AdminDashboardPage() {
           <div className={styles.panel}>
             <div className={styles.panelHeader}>
               <h2 className={styles.panelTitle}>Quick Actions</h2>
-              <Link href="/tools" className={styles.panelAction}>
-                Open tools
-              </Link>
             </div>
             <div className={styles.quickActions}>
               <div className={styles.quickCard}>
@@ -478,7 +657,7 @@ export default function AdminDashboardPage() {
                 <span className={styles.quickDesc}>
                   Locate a user to review profile or reports.
                 </span>
-                <Link href="/users" className={styles.quickButton}>
+                <Link href="/content-moderation?tab=user" className={styles.quickButton}>
                   Search
                 </Link>
               </div>
@@ -487,16 +666,20 @@ export default function AdminDashboardPage() {
                 <span className={styles.quickDesc}>
                   Jump into the latest flagged posts.
                 </span>
-                <Link href="/reports" className={styles.quickButton}>
+                <button
+                  type="button"
+                  className={styles.quickButton}
+                  onClick={handleReviewContentQuickAction}
+                >
                   Review
-                </Link>
+                </button>
               </div>
               <div className={styles.quickCard}>
                 <span className={styles.quickTitle}>Broadcast Notice</span>
                 <span className={styles.quickDesc}>
                   Send a system notice to all users.
                 </span>
-                <Link href="/notifications" className={styles.quickButton}>
+                <Link href="/broadcast-notice" className={styles.quickButton}>
                   Draft
                 </Link>
               </div>
@@ -512,30 +695,25 @@ export default function AdminDashboardPage() {
             </Link>
           </div>
           <div className={styles.activityTable}>
-            <div className={styles.activityRow}>
-              <span className={styles.activityActor}>superadmin</span>
-              <span className={styles.activityAction}>
-                Resolved report #1293 (post harassment)
-              </span>
-              <span>12 mins ago</span>
-            </div>
-            <div className={styles.activityRow}>
-              <span className={styles.activityActor}>mod-ly</span>
-              <span className={styles.activityAction}>
-                Suspended user @riverlane for impersonation
-              </span>
-              <span>48 mins ago</span>
-            </div>
-            <div className={styles.activityRow}>
-              <span className={styles.activityActor}>audit-bot</span>
-              <span className={styles.activityAction}>
-                Detected spike in report volume for reels
-              </span>
-              <span>2 hours ago</span>
-            </div>
+            {recentActivities.length === 0 ? (
+              <div className={styles.activityRow}>
+                <span className={styles.activityActor}>--</span>
+                <span className={styles.activityAction}>No recent admin actions.</span>
+                <span>--</span>
+              </div>
+            ) : (
+              recentActivities.map((item, index) => (
+                <div className={styles.activityRow} key={`${item.actor}-${item.occurredAt ?? index}`}>
+                  <span className={styles.activityActor}>{item.actor}</span>
+                  <span className={styles.activityAction}>{item.action}</span>
+                  <span>{formatRelativeTime(item.occurredAt ?? undefined)}</span>
+                </div>
+              ))
+            )}
           </div>
         </section>
       </div>
+      {quickActionToast ? <div className={styles.quickToast}>{quickActionToast}</div> : null}
     </div>
   );
 }

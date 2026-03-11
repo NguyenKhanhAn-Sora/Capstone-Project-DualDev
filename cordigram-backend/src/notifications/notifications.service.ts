@@ -9,6 +9,11 @@ import {
   ReportNotificationSeverity,
   ReportNotificationTargetType,
 } from './notification.schema';
+import {
+  BroadcastNotice,
+  BroadcastTargetMode,
+  SystemNoticeLevel,
+} from './broadcast-notice.schema';
 import type { PostKind } from '../posts/post.schema';
 import { Profile } from '../profiles/profile.schema';
 import { NotificationsGateway } from './notifications.gateway';
@@ -17,6 +22,8 @@ import { Post } from '../posts/post.schema';
 
 const DEFAULT_AVATAR_URL =
   'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
+const CORDIGRAM_LOGO_AVATAR_URL =
+  'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
 
 export type NotificationActor = {
   id: string;
@@ -51,6 +58,10 @@ export type NotificationItem = {
   reportActionExpiresAt?: string | null;
   moderationDecision?: 'approve' | 'blur' | 'reject' | null;
   moderationReasons?: string[];
+  systemNoticeTitle?: string | null;
+  systemNoticeBody?: string | null;
+  systemNoticeLevel?: SystemNoticeLevel | null;
+  systemNoticeActionUrl?: string | null;
   readAt: string | null;
   createdAt: string;
   activityAt: string;
@@ -76,6 +87,7 @@ export type ForceLogoutPayload = {
 
 type NotificationDoc = {
   _id: Types.ObjectId;
+  recipientId?: Types.ObjectId | null;
   type: NotificationType;
   actorId?: Types.ObjectId | null;
   postId?: Types.ObjectId | null;
@@ -107,6 +119,10 @@ type NotificationDoc = {
   reportActionExpiresAt?: Date | null;
   moderationDecision?: 'approve' | 'blur' | 'reject' | null;
   moderationReasons?: string[];
+  systemNoticeTitle?: string | null;
+  systemNoticeBody?: string | null;
+  systemNoticeLevel?: SystemNoticeLevel | null;
+  systemNoticeActionUrl?: string | null;
   readAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -119,6 +135,8 @@ export class NotificationsService {
   constructor(
     @InjectModel(Notification.name)
     private readonly notificationModel: Model<Notification>,
+    @InjectModel(BroadcastNotice.name)
+    private readonly broadcastNoticeModel: Model<BroadcastNotice>,
     @InjectModel(Profile.name)
     private readonly profileModel: Model<Profile>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
@@ -951,6 +969,225 @@ export class NotificationsService {
     return response;
   }
 
+  async broadcastSystemNotice(params: {
+    adminId: string;
+    title?: string | null;
+    body: string;
+    level: SystemNoticeLevel;
+    actionUrl?: string | null;
+    targetMode: BroadcastTargetMode;
+    includeUserIds: string[];
+    excludeUserIds: string[];
+  }): Promise<{
+    targetUserCount: number;
+    realtimeDeliveredCount: number;
+    broadcastId: string;
+    createdAt: string;
+  }> {
+    const adminObjectId = new Types.ObjectId(params.adminId);
+
+    const baseFilter = {
+      status: 'active',
+      signupStage: 'completed',
+    } as const;
+
+    const includeObjectIds = params.includeUserIds.map((id) => new Types.ObjectId(id));
+    const excludeObjectIds = params.excludeUserIds.map((id) => new Types.ObjectId(id));
+
+    const recipientFilter: {
+      status: 'active';
+      signupStage: 'completed';
+      _id?: { $in?: Types.ObjectId[]; $nin?: Types.ObjectId[] };
+    } = { ...baseFilter };
+
+    if (params.targetMode === 'include') {
+      recipientFilter._id = { $in: includeObjectIds };
+    } else if (params.targetMode === 'exclude') {
+      recipientFilter._id = { $nin: excludeObjectIds };
+    }
+
+    const recipientIds = await this.userModel
+      .find(recipientFilter)
+      .select('_id')
+      .lean<{ _id: Types.ObjectId }[]>()
+      .exec();
+
+    if (!recipientIds.length) {
+      const emptyBroadcast = await this.broadcastNoticeModel.create({
+        adminId: adminObjectId,
+        title: params.title ?? null,
+        body: params.body,
+        level: params.level,
+        actionUrl: params.actionUrl ?? null,
+        targetMode: params.targetMode,
+        includeCount: includeObjectIds.length,
+        excludeCount: excludeObjectIds.length,
+        targetUserCount: 0,
+        realtimeDeliveredCount: 0,
+      });
+      return {
+        targetUserCount: 0,
+        realtimeDeliveredCount: 0,
+        broadcastId: emptyBroadcast._id.toString(),
+        createdAt: (emptyBroadcast.createdAt ?? new Date()).toISOString(),
+      };
+    }
+
+    const now = new Date();
+    const payloads = recipientIds.map((item) => ({
+      recipientId: item._id,
+      actorId: adminObjectId,
+      postId: null,
+      commentId: null,
+      postKind: 'post' as PostKind,
+      type: 'system_notice' as NotificationType,
+      systemNoticeTitle: params.title ?? null,
+      systemNoticeBody: params.body,
+      systemNoticeLevel: params.level,
+      systemNoticeActionUrl: params.actionUrl ?? null,
+      readAt: null,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    const inserted = (await this.notificationModel.insertMany(payloads, {
+      ordered: false,
+    })) as unknown as NotificationDoc[];
+
+    const profile = await this.profileModel
+      .findOne({ userId: adminObjectId })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    let realtimeDeliveredCount = 0;
+    inserted.forEach((doc) => {
+      const recipientId = doc.recipientId?.toString?.() ?? null;
+      if (!recipientId) return;
+      const response = this.toResponse(doc, profile ?? null, { recipientId });
+      this.gateway.emitToUser(recipientId, 'notification:new', {
+        notification: response,
+        unreadCount: 0,
+      } satisfies NotificationRealtimePayload);
+      realtimeDeliveredCount += 1;
+    });
+
+    const broadcast = await this.broadcastNoticeModel.create({
+      adminId: adminObjectId,
+      title: params.title ?? null,
+      body: params.body,
+      level: params.level,
+      actionUrl: params.actionUrl ?? null,
+      targetMode: params.targetMode,
+      includeCount: includeObjectIds.length,
+      excludeCount: excludeObjectIds.length,
+      targetUserCount: recipientIds.length,
+      realtimeDeliveredCount,
+    });
+
+    return {
+      targetUserCount: recipientIds.length,
+      realtimeDeliveredCount,
+      broadcastId: broadcast._id.toString(),
+      createdAt: (broadcast.createdAt ?? now).toISOString(),
+    };
+  }
+
+  async listSystemNoticeHistory(limit = 30): Promise<{
+    items: Array<{
+      id: string;
+      title: string | null;
+      body: string;
+      level: SystemNoticeLevel;
+      actionUrl: string | null;
+      targetMode: BroadcastTargetMode;
+      includeCount: number;
+      excludeCount: number;
+      targetUserCount: number;
+      realtimeDeliveredCount: number;
+      createdAt: string;
+      admin: {
+        userId: string;
+        displayName: string | null;
+        username: string | null;
+        email: string | null;
+      };
+    }>;
+  }> {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const rows = await this.broadcastNoticeModel
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(safeLimit)
+      .lean<
+        Array<{
+          _id: Types.ObjectId;
+          adminId: Types.ObjectId;
+          title?: string | null;
+          body: string;
+          level: SystemNoticeLevel;
+          actionUrl?: string | null;
+          targetMode?: BroadcastTargetMode;
+          includeCount?: number;
+          excludeCount?: number;
+          targetUserCount: number;
+          realtimeDeliveredCount: number;
+          createdAt?: Date;
+        }>
+      >()
+      .exec();
+
+    const adminIds = Array.from(
+      new Set(rows.map((item) => item.adminId?.toString?.()).filter(Boolean)),
+    )
+      .filter((id): id is string => typeof id === 'string' && Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const [profiles, users] = adminIds.length
+      ? await Promise.all([
+          this.profileModel
+            .find({ userId: { $in: adminIds } })
+            .select('userId displayName username')
+            .lean<Array<{ userId: Types.ObjectId; displayName?: string; username?: string }>>()
+            .exec(),
+          this.userModel
+            .find({ _id: { $in: adminIds } })
+            .select('_id email')
+            .lean<Array<{ _id: Types.ObjectId; email?: string }>>()
+            .exec(),
+        ])
+      : [[], []];
+
+    const profileMap = new Map(profiles.map((item) => [item.userId.toString(), item]));
+    const userMap = new Map(users.map((item) => [item._id.toString(), item]));
+
+    const items = rows.map((row) => {
+      const adminId = row.adminId.toString();
+      const profile = profileMap.get(adminId);
+      const user = userMap.get(adminId);
+      return {
+        id: row._id.toString(),
+        title: row.title ?? null,
+        body: row.body,
+        level: row.level,
+        actionUrl: row.actionUrl ?? null,
+        targetMode: row.targetMode ?? 'all',
+        includeCount: Number(row.includeCount ?? 0),
+        excludeCount: Number(row.excludeCount ?? 0),
+        targetUserCount: Number(row.targetUserCount ?? 0),
+        realtimeDeliveredCount: Number(row.realtimeDeliveredCount ?? 0),
+        createdAt: (row.createdAt ?? new Date()).toISOString(),
+        admin: {
+          userId: adminId,
+          displayName: profile?.displayName ?? null,
+          username: profile?.username ?? null,
+          email: user?.email ?? null,
+        },
+      };
+    });
+
+    return { items };
+  }
+
   async createReportDismissedNotification(params: {
     recipientId: string;
   }): Promise<NotificationItem> {
@@ -1117,7 +1354,10 @@ export class NotificationsService {
         id: profile?.userId?.toString() ?? actorId,
         displayName: profile?.displayName ?? 'Unknown user',
         username: profile?.username ?? '',
-        avatarUrl: profile?.avatarUrl ?? DEFAULT_AVATAR_URL,
+        avatarUrl:
+          doc.type === 'system_notice'
+            ? CORDIGRAM_LOGO_AVATAR_URL
+            : (profile?.avatarUrl ?? DEFAULT_AVATAR_URL),
       },
       postId: doc.postId ? doc.postId.toString() : null,
       commentId: doc.commentId ? doc.commentId.toString() : null,
@@ -1149,6 +1389,10 @@ export class NotificationsService {
       moderationReasons: Array.isArray(doc.moderationReasons)
         ? doc.moderationReasons
         : [],
+      systemNoticeTitle: doc.systemNoticeTitle ?? null,
+      systemNoticeBody: doc.systemNoticeBody ?? null,
+      systemNoticeLevel: doc.systemNoticeLevel ?? null,
+      systemNoticeActionUrl: doc.systemNoticeActionUrl ?? null,
       readAt: doc.readAt ? doc.readAt.toISOString() : null,
       createdAt,
       activityAt,

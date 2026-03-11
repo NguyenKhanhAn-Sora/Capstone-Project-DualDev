@@ -9,7 +9,7 @@ import styles from "./admin-shell.module.css";
 type NavItem = {
   href: string;
   label: string;
-  icon: "dashboard" | "report" | "resolved" | "moderation";
+  icon: "dashboard" | "report" | "resolved" | "moderation" | "content" | "audit" | "broadcast";
   matcher: (pathname: string) => boolean;
 };
 
@@ -37,6 +37,33 @@ function NavIcon({ icon }: { icon: NavItem["icon"] }) {
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" />
         <path d="M8 12.5l2.6 2.6L16 9.8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (icon === "content") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M8 9h8M8 12h8M8 15h5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (icon === "audit") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M9 9h6M9 13h6M9 17h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (icon === "broadcast") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 14V8a2 2 0 0 1 2-2h2l6-3v18l-6-3H6a2 2 0 0 1-2-2Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M17 8.5a4.2 4.2 0 0 1 0 7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     );
   }
@@ -73,6 +100,24 @@ const NAV_ITEMS: NavItem[] = [
     label: "Auto Moderation",
     icon: "moderation",
     matcher: (pathname) => pathname === "/moderation" || pathname.startsWith("/moderation/"),
+  },
+  {
+    href: "/content-moderation",
+    label: "Content Moderation",
+    icon: "content",
+    matcher: (pathname) => pathname === "/content-moderation" || pathname.startsWith("/content-moderation/"),
+  },
+  {
+    href: "/audit",
+    label: "Audit Log",
+    icon: "audit",
+    matcher: (pathname) => pathname === "/audit" || pathname.startsWith("/audit/"),
+  },
+  {
+    href: "/broadcast-notice",
+    label: "Broadcast Notice",
+    icon: "broadcast",
+    matcher: (pathname) => pathname === "/broadcast-notice" || pathname.startsWith("/broadcast-notice/"),
   },
 ];
 

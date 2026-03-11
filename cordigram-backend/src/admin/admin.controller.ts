@@ -28,6 +28,109 @@ export class AdminController {
     return this.adminService.getStats();
   }
 
+  @Get('activity/recent')
+  async getRecentActivity(
+    @Query('limit') limitRaw: string | undefined,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const parsedLimit = Number(limitRaw);
+    const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
+    return this.adminService.getRecentAdminActivity(limit);
+  }
+
+  @Get('activity/logs')
+  async getAuditLogs(
+    @Query('limit') limitRaw: string | undefined,
+    @Query('offset') offsetRaw: string | undefined,
+    @Query('type') type: string | undefined,
+    @Query('action') action: string | undefined,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const parsedLimit = Number(limitRaw);
+    const parsedOffset = Number(offsetRaw);
+    const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
+    const offset = Number.isFinite(parsedOffset) ? parsedOffset : undefined;
+    return this.adminService.getAuditLogs({
+      limit,
+      offset,
+      type,
+      action,
+    });
+  }
+
+  @Get('broadcast-notice/history')
+  async getBroadcastNoticeHistory(
+    @Query('limit') limitRaw: string | undefined,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const parsedLimit = Number(limitRaw);
+    const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
+    return this.adminService.getBroadcastNoticeHistory(limit);
+  }
+
+  @Get('broadcast-notice/users/suggest')
+  async suggestBroadcastUsers(
+    @Query('q') query: string | undefined,
+    @Query('limit') limitRaw: string | undefined,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const parsedLimit = Number(limitRaw);
+    const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
+    return this.adminService.suggestBroadcastUsers(query, limit);
+  }
+
+  @Post('broadcast-notice/send')
+  async sendBroadcastNotice(
+    @Body()
+    body: {
+      title?: string;
+      body?: string;
+      level?: 'info' | 'warning' | 'critical';
+      actionUrl?: string | null;
+      targetMode?: 'all' | 'include' | 'exclude';
+      includeUserIds?: string[];
+      excludeUserIds?: string[];
+    },
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+
+    const adminId = req.user?.userId ?? '';
+    return this.adminService.sendBroadcastNotice({
+      adminId,
+      title: body.title ?? '',
+      body: body.body ?? '',
+      level: body.level,
+      actionUrl: body.actionUrl ?? null,
+      targetMode: body.targetMode,
+      includeUserIds: Array.isArray(body.includeUserIds)
+        ? body.includeUserIds
+        : [],
+      excludeUserIds: Array.isArray(body.excludeUserIds)
+        ? body.excludeUserIds
+        : [],
+    });
+  }
+
   @Get('reports/:type/:targetId')
   async getReportDetail(
     @Param('type') type: string,
@@ -65,6 +168,153 @@ export class AdminController {
       throw new ForbiddenException('Admin access required');
     }
     return this.adminService.getMediaModerationQueue();
+  }
+
+  @Get('moderation/content/posts')
+  async getDirectModerationPosts(
+    @Query('q') q: string | undefined,
+    @Query('limit') limitRaw: string | undefined,
+    @Query('offset') offsetRaw: string | undefined,
+    @Query('state') state: string | undefined,
+    @Query('type') type: string | undefined,
+    @Query('visibility') visibility: string | undefined,
+    @Query('autoHidden') autoHidden: string | undefined,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const parsedLimit = Number(limitRaw);
+    const parsedOffset = Number(offsetRaw);
+    const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
+    const offset = Number.isFinite(parsedOffset) ? parsedOffset : undefined;
+    return this.adminService.getDirectModerationPosts({
+      q,
+      limit,
+      offset,
+      state,
+      type,
+      visibility,
+      autoHidden,
+    });
+  }
+
+  @Get('moderation/content/comments')
+  async getDirectModerationComments(
+    @Query('q') q: string | undefined,
+    @Query('limit') limitRaw: string | undefined,
+    @Query('offset') offsetRaw: string | undefined,
+    @Query('state') state: string | undefined,
+    @Query('autoHidden') autoHidden: string | undefined,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const parsedLimit = Number(limitRaw);
+    const parsedOffset = Number(offsetRaw);
+    const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
+    const offset = Number.isFinite(parsedOffset) ? parsedOffset : undefined;
+    return this.adminService.getDirectModerationComments({
+      q,
+      limit,
+      offset,
+      state,
+      autoHidden,
+    });
+  }
+
+  @Get('moderation/content/users')
+  async getDirectModerationUsers(
+    @Query('q') q: string | undefined,
+    @Query('limit') limitRaw: string | undefined,
+    @Query('offset') offsetRaw: string | undefined,
+    @Query('status') status: string | undefined,
+    @Query('risk') risk: string | undefined,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const parsedLimit = Number(limitRaw);
+    const parsedOffset = Number(offsetRaw);
+    const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
+    const offset = Number.isFinite(parsedOffset) ? parsedOffset : undefined;
+    return this.adminService.getDirectModerationUsers({
+      q,
+      limit,
+      offset,
+      status,
+      risk,
+    });
+  }
+
+  @Get('moderation/content/:type/:targetId')
+  async getDirectModerationTargetDetail(
+    @Param('type') type: string,
+    @Param('targetId') targetId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    return this.adminService.getDirectModerationTargetDetail(type, targetId);
+  }
+
+  @Post('moderation/content/action')
+  async moderateContentDirect(
+    @Body()
+    body: {
+      type?: 'post' | 'comment' | 'user';
+      targetId?: string;
+      action?:
+        | 'no_violation'
+        | 'remove_post'
+        | 'restrict_post'
+        | 'delete_comment'
+        | 'warn'
+        | 'mute_interaction'
+        | 'suspend_user'
+        | 'limit_account'
+        | 'violation';
+      category?: string;
+      reason?: string;
+      severity?: 'low' | 'medium' | 'high';
+      muteDurationMinutes?: number;
+      muteUntilTurnOn?: boolean;
+      suspendDurationMinutes?: number;
+      suspendUntilTurnOn?: boolean;
+      limitDurationMinutes?: number;
+      limitUntilTurnOn?: boolean;
+      note?: string | null;
+    },
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const adminId = req.user?.userId ?? '';
+    return this.adminService.moderateContentDirect({
+      type: body.type ?? 'post',
+      targetId: body.targetId ?? '',
+      action: body.action,
+      category: body.category ?? '',
+      reason: body.reason ?? '',
+      severity: body.severity,
+      muteDurationMinutes: body.muteDurationMinutes,
+      muteUntilTurnOn: body.muteUntilTurnOn,
+      suspendDurationMinutes: body.suspendDurationMinutes,
+      suspendUntilTurnOn: body.suspendUntilTurnOn,
+      limitDurationMinutes: body.limitDurationMinutes,
+      limitUntilTurnOn: body.limitUntilTurnOn,
+      note: body.note ?? null,
+      adminId,
+    });
   }
 
   @Get('moderation/media/:postId')

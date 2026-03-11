@@ -12,7 +12,8 @@ export type NotificationType =
   | 'follow'
   | 'login_alert'
   | 'post_moderation'
-  | 'report';
+  | 'report'
+  | 'system_notice';
 
 export type ReportNotificationOutcome = 'no_violation' | 'action_taken';
 export type ReportNotificationAudience = 'reporter' | 'offender';
@@ -68,6 +69,7 @@ export class Notification extends Document {
       'login_alert',
       'post_moderation',
       'report',
+      'system_notice',
     ],
     index: true,
     required: true,
@@ -151,6 +153,18 @@ export class Notification extends Document {
 
   @Prop({ type: [String], default: [] })
   moderationReasons?: string[];
+
+  @Prop({ type: String, default: null })
+  systemNoticeTitle?: string | null;
+
+  @Prop({ type: String, default: null })
+  systemNoticeBody?: string | null;
+
+  @Prop({ type: String, enum: ['info', 'warning', 'critical'], default: null })
+  systemNoticeLevel?: 'info' | 'warning' | 'critical' | null;
+
+  @Prop({ type: String, default: null })
+  systemNoticeActionUrl?: string | null;
 
   @Prop({ type: Date, default: null })
   readAt: Date | null;

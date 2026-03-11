@@ -1373,7 +1373,8 @@ export type NotificationItem = {
     | "follow"
     | "login_alert"
     | "post_moderation"
-    | "report";
+    | "report"
+    | "system_notice";
   actor: {
     id: string;
     displayName: string;
@@ -1402,6 +1403,10 @@ export type NotificationItem = {
   reportActionExpiresAt?: string | null;
   moderationDecision?: "approve" | "blur" | "reject" | null;
   moderationReasons?: string[];
+  systemNoticeTitle?: string | null;
+  systemNoticeBody?: string | null;
+  systemNoticeLevel?: "info" | "warning" | "critical" | null;
+  systemNoticeActionUrl?: string | null;
   readAt: string | null;
   createdAt: string;
   activityAt: string;
