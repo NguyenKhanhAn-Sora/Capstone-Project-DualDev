@@ -8,6 +8,10 @@ import { NotificationsController } from './notifications.controller';
 import { NotificationsGateway } from './notifications.gateway';
 import { NotificationsService } from './notifications.service';
 import { Notification, NotificationSchema } from './notification.schema';
+import {
+  BroadcastNotice,
+  BroadcastNoticeSchema,
+} from './broadcast-notice.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { User, UserSchema } from '../users/user.schema';
 import { Post, PostSchema } from '../posts/post.schema';
@@ -24,6 +28,7 @@ import { Post, PostSchema } from '../posts/post.schema';
     }),
     MongooseModule.forFeature([
       { name: Notification.name, schema: NotificationSchema },
+      { name: BroadcastNotice.name, schema: BroadcastNoticeSchema },
       { name: Profile.name, schema: ProfileSchema },
       { name: User.name, schema: UserSchema },
       { name: Post.name, schema: PostSchema },

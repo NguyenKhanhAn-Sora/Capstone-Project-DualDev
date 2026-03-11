@@ -63,6 +63,9 @@
 }
 
 .actionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 12px;
   padding: 10px 16px;
@@ -70,6 +73,7 @@
   color: #fff;
   font-weight: 700;
   cursor: pointer;
+  text-decoration: none;
   box-shadow: 0 12px 24px rgba(52, 112, 162, 0.28);
   transition:
     transform 0.18s ease,
@@ -170,6 +174,12 @@
 .queueList {
   display: grid;
   gap: 12px;
+}
+
+.emptyState {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
 }
 
 .queueItem {
@@ -306,11 +316,30 @@
   justify-content: center;
   padding: 8px 12px;
   border-radius: 10px;
+  border: none;
   background: rgba(74, 163, 228, 0.12);
   color: var(--color-primary-strong);
   font-weight: 700;
   font-size: 12px;
   text-decoration: none;
+  cursor: pointer;
+}
+
+.quickToast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 45;
+  min-width: min(420px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, #f59e0b 42%, var(--color-border));
+  background: color-mix(in srgb, #fef3c7 85%, var(--color-surface));
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 14px 28px rgba(120, 53, 15, 0.18);
 }
 
 .activityTable {
@@ -320,7 +349,7 @@
 
 .activityRow {
   display: grid;
-  grid-template-columns: 140px 1fr 120px;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr) max-content;
   gap: 12px;
   font-size: 13px;
   color: var(--color-text-muted);
@@ -332,12 +361,24 @@
 }
 
 .activityActor {
+  display: block;
   font-weight: 700;
   color: var(--color-text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .activityAction {
+  min-width: 0;
   color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.activityRow > span:last-child {
+  justify-self: end;
+  white-space: nowrap;
 }
 
 @media (max-width: 1100px) {

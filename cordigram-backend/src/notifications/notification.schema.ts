@@ -11,7 +11,9 @@ export type NotificationType =
   | 'post_mention'
   | 'follow'
   | 'login_alert'
-  | 'report';
+  | 'post_moderation'
+  | 'report'
+  | 'system_notice';
 
 export type ReportNotificationOutcome = 'no_violation' | 'action_taken';
 export type ReportNotificationAudience = 'reporter' | 'offender';
@@ -65,7 +67,9 @@ export class Notification extends Document {
       'post_mention',
       'follow',
       'login_alert',
+      'post_moderation',
       'report',
+      'system_notice',
     ],
     index: true,
     required: true,
@@ -143,6 +147,24 @@ export class Notification extends Document {
 
   @Prop({ type: Date, default: null })
   reportActionExpiresAt?: Date | null;
+
+  @Prop({ type: String, enum: ['approve', 'blur', 'reject'], default: null })
+  moderationDecision?: 'approve' | 'blur' | 'reject' | null;
+
+  @Prop({ type: [String], default: [] })
+  moderationReasons?: string[];
+
+  @Prop({ type: String, default: null })
+  systemNoticeTitle?: string | null;
+
+  @Prop({ type: String, default: null })
+  systemNoticeBody?: string | null;
+
+  @Prop({ type: String, enum: ['info', 'warning', 'critical'], default: null })
+  systemNoticeLevel?: 'info' | 'warning' | 'critical' | null;
+
+  @Prop({ type: String, default: null })
+  systemNoticeActionUrl?: string | null;
 
   @Prop({ type: Date, default: null })
   readAt: Date | null;

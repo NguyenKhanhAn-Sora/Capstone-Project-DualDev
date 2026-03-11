@@ -130,12 +130,18 @@
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
   gap: 18px;
+  align-items: start;
 }
 
 .mainColumn,
 .sideColumn {
   display: grid;
   gap: 16px;
+}
+
+.sideColumn {
+  align-self: start;
+  align-content: start;
 }
 
 .panel {
@@ -279,6 +285,36 @@
   margin: 0;
   font-size: 14px;
   color: var(--color-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.collapsibleText {
+  display: -webkit-box;
+  line-clamp: 3;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.collapsibleTextExpanded {
+  display: block;
+}
+
+.textToggle {
+  width: fit-content;
+  border: none;
+  background: transparent;
+  color: var(--color-primary-strong);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.textToggle:hover {
+  text-decoration: underline;
 }
 
 .mediaGrid {
@@ -536,10 +572,13 @@
   gap: 10px;
 }
 
+.actionStack > button {
+  padding: 16px 12px;
+}
+
 .actionPrimary {
   border: none;
   border-radius: 12px;
-  padding: 10px 12px;
   background: #0f766e;
   color: #fff;
   font-weight: 700;
@@ -549,7 +588,6 @@
 .actionGhost {
   border: 1px solid var(--color-border);
   border-radius: 12px;
-  padding: 10px 12px;
   background: var(--color-surface-muted);
   font-weight: 600;
   cursor: pointer;
@@ -558,11 +596,25 @@
 .actionMuted {
   border: 1px solid rgba(185, 28, 28, 0.2);
   border-radius: 12px;
-  padding: 10px 12px;
   background: rgba(239, 68, 68, 0.1);
   font-weight: 600;
   color: #b91c1c;
   cursor: pointer;
+}
+
+.actionRestore {
+  border: 1px solid rgba(15, 118, 110, 0.35);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(15, 118, 110, 0.12);
+  font-weight: 700;
+  color: #115e59;
+  cursor: pointer;
+}
+
+.actionRestore:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .notes {

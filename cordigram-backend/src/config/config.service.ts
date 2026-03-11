@@ -115,6 +115,23 @@ export class ConfigService {
     return Number(process.env.CLOUDINARY_MAX_FILE_SIZE ?? 15 * 1024 * 1024);
   }
 
+  get moderationEnabled(): boolean {
+    return String(process.env.MODERATION_ENABLED ?? 'true').toLowerCase() === 'true';
+  }
+
+  get moderationServiceUrl(): string | null {
+    const value = process.env.MODERATION_SERVICE_URL?.trim() ?? '';
+    return value ? value.replace(/\/$/, '') : null;
+  }
+
+  get moderationTimeoutMs(): number {
+    return Number(process.env.MODERATION_TIMEOUT_MS ?? 8000);
+  }
+
+  get moderationFailOpen(): boolean {
+    return String(process.env.MODERATION_FAIL_OPEN ?? 'true').toLowerCase() === 'true';
+  }
+
   get googleClientId(): string {
     return this.require('GOOGLE_CLIENT_ID');
   }

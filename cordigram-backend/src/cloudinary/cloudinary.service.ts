@@ -108,4 +108,30 @@ export class CloudinaryService implements OnModuleInit {
       limitBytes,
     };
   }
+
+  buildBlurImageUrl(params: {
+    publicId: string;
+    blurStrength?: number;
+    secure?: boolean;
+  }): string {
+    const { publicId, blurStrength = 1800, secure = true } = params;
+    return cloudinary.url(publicId, {
+      resource_type: 'image',
+      secure,
+      transformation: [{ effect: `blur:${blurStrength}` }],
+    });
+  }
+
+  buildBlurVideoUrl(params: {
+    publicId: string;
+    blurStrength?: number;
+    secure?: boolean;
+  }): string {
+    const { publicId, blurStrength = 900, secure = true } = params;
+    return cloudinary.url(publicId, {
+      resource_type: 'video',
+      secure,
+      transformation: [{ effect: `blur:${blurStrength}` }],
+    });
+  }
 }

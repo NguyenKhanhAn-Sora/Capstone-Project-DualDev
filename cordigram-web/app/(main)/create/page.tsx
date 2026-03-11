@@ -661,6 +661,12 @@ export default function CreatePostPage() {
               typeof finalDuration === "number"
                 ? Math.round(finalDuration * 100) / 100
                 : finalDuration,
+            moderationDecision: upload.moderationDecision,
+            moderationProvider: upload.moderationProvider,
+            moderationReasons: upload.moderationReasons,
+            moderationScores: upload.moderationScores,
+            originalUrl: upload.originalUrl,
+            originalSecureUrl: upload.originalSecureUrl,
           },
         });
       }

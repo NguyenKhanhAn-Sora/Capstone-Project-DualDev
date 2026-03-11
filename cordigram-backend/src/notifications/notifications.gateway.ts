@@ -74,6 +74,14 @@ export class NotificationsGateway
     });
   }
 
+  emitToAll<T>(event: string, payload: T): void {
+    this.server.emit(event, payload);
+  }
+
+  getConnectedUserCount(): number {
+    return this.connections.size;
+  }
+
   private extractToken(client: Socket): string | null {
     const authToken = client.handshake.auth?.token;
     if (typeof authToken === 'string' && authToken.trim()) {

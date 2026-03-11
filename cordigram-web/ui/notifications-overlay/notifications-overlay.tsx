@@ -127,6 +127,71 @@ function IconDots() {
   );
 }
 
+function IconSeverityInfo() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 10.4v6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="7.6" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconSeverityWarning() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 3.8 20 18a1.2 1.2 0 0 1-1.04 1.8H5.04A1.2 1.2 0 0 1 4 18L12 3.8Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="M12 9v4.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="16.4" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconSeverityCritical() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 7.8v6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="16.8" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function renderSystemNoticeBadge(item: NotificationItem): JSX.Element | null {
+  if (item.type !== "system_notice") return null;
+  const level = item.systemNoticeLevel ?? "info";
+
+  if (level === "critical") {
+    return (
+      <span className={`${styles.noticeBadge} ${styles.noticeBadgeCritical}`}>
+        <IconSeverityCritical />
+        <span>Critical</span>
+      </span>
+    );
+  }
+
+  if (level === "warning") {
+    return (
+      <span className={`${styles.noticeBadge} ${styles.noticeBadgeWarning}`}>
+        <IconSeverityWarning />
+        <span>Warning</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className={`${styles.noticeBadge} ${styles.noticeBadgeInfo}`}>
+      <IconSeverityInfo />
+      <span>Info</span>
+    </span>
+  );
+}
+
 const TABS: TabConfig[] = [
   {
     key: "all",
@@ -174,7 +239,9 @@ const TAB_FILTER: Record<TabKey, Array<NotificationItem["type"]>> = {
     "post_mention",
     "follow",
     "login_alert",
+    "post_moderation",
     "report",
+    "system_notice",
   ],
   like: ["post_like", "comment_like"],
   comment: ["post_comment", "comment_reply"],
@@ -317,6 +384,21 @@ function buildMessage(item: NotificationItem): JSX.Element {
   }
   if (item.type === "login_alert") {
     return <>You're signing in on a new device</>;
+  }
+  if (item.type === "post_moderation") {
+    const targetLabel = item.postKind === "reel" ? "reel" : "post";
+    if (item.moderationDecision === "approve" || item.moderationDecision === "blur") {
+      return <>Your {targetLabel} was published successfully.</>;
+    }
+    if (item.moderationDecision === "reject") {
+      return (
+        <>
+          Your {targetLabel} was rejected. Please go to Violation Center to see
+          details.
+        </>
+      );
+    }
+    return <>Your {targetLabel} was published successfully.</>;
   }
   if (item.type === "report") {
     if (item.reportAudience === "offender") {
@@ -486,6 +568,19 @@ function buildMessage(item: NotificationItem): JSX.Element {
       <>
         Thank you for your report. We reviewed this case and currently found no
         policy violation.
+      </>
+    );
+  }
+  if (item.type === "system_notice") {
+    const title = item.systemNoticeTitle?.trim() || "";
+    const body = item.systemNoticeBody?.trim() || "";
+    if (!title) {
+      return <>{body || "System notice"}</>;
+    }
+    return (
+      <>
+        <span className={styles.itemName}>{title}</span>
+        {body ? `: ${body}` : ""}
       </>
     );
   }
@@ -683,6 +778,13 @@ export default function NotificationsOverlay(props: {
     const targetUrl =
       item.type === "report" && item.reportAudience === "offender"
         ? "/settings?section=violations"
+        : item.type === "post_moderation" &&
+            item.moderationDecision === "reject"
+          ? "/settings?section=violations"
+          : item.type === "post_moderation" && item.postId
+            ? `/post/${item.postId}`
+        : item.type === "system_notice" && item.systemNoticeActionUrl
+          ? item.systemNoticeActionUrl
         : item.postId
           ? `/post/${item.postId}`
           : item.type === "follow" && item.actor?.id
@@ -707,6 +809,10 @@ export default function NotificationsOverlay(props: {
       emitNotificationRead({ id: item.id });
     }
     onClose();
+    if (/^https?:\/\//i.test(targetUrl)) {
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
     router.push(targetUrl);
   };
 
@@ -980,14 +1086,27 @@ export default function NotificationsOverlay(props: {
                 >
                   <div className={styles.avatarWrap}>
                     <Image
-                      src={item.type === "report" ? "/logo.png" : item.actor.avatarUrl}
-                      alt={item.type === "report" ? "Cordigram" : item.actor.displayName}
+                      src={
+                        item.type === "report" ||
+                        item.type === "post_moderation" ||
+                        item.type === "system_notice"
+                          ? "/logo.png"
+                          : item.actor.avatarUrl
+                      }
+                      alt={
+                        item.type === "report" ||
+                        item.type === "post_moderation" ||
+                        item.type === "system_notice"
+                          ? "Cordigram"
+                          : item.actor.displayName
+                      }
                       width={44}
                       height={44}
                       className={styles.avatar}
                     />
                   </div>
                   <div className={styles.itemContent}>
+                    {renderSystemNoticeBadge(item)}
                     <p className={styles.itemText}>{buildMessage(item)}</p>
                     <span className={styles.itemTime}>
                       {formatRelativeTime(item.activityAt || item.createdAt)}

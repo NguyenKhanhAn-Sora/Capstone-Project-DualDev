@@ -2328,7 +2328,12 @@ export class UsersService {
     const limit = Math.min(Math.max(Number(params.limit) || 50, 1), 100);
 
     const rawActions = await this.moderationActionModel
-      .find({ action: { $ne: 'no_violation' } })
+      .find({
+        action: {
+          $nin: ['no_violation', 'rollback_moderation', 'auto_hidden_pending_review'],
+        },
+        invalidatedAt: null,
+      })
       .sort({ createdAt: -1 })
       .limit(300)
       .select(
