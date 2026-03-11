@@ -1,0 +1,178 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10010;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.popup {
+  background: #313338;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+}
+
+.iconWrap {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.icon {
+  color: #eb459e;
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #f2f3f5;
+  text-align: center;
+}
+
+.subtitle {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: #b5bac1;
+  text-align: center;
+}
+
+.checkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.checkRow input {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  accent-color: #5865f2;
+}
+
+.checkLabel {
+  font-size: 14px;
+  color: #dbdee1;
+  font-weight: 500;
+}
+
+.checkDesc {
+  margin: 0 0 16px 30px;
+  font-size: 13px;
+  color: #949ba4;
+}
+
+.info {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 12px;
+  background: #2b2d31;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #b5bac1;
+}
+
+.infoIcon {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.blockSection {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #3f4147;
+}
+
+.blockTitle {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f2f3f5;
+}
+
+.blockBox {
+  padding: 12px;
+  background: #2b2d31;
+  border-radius: 8px;
+  border: 1px solid #3f4147;
+}
+
+.blockText {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f2f3f5;
+}
+
+.blockDesc {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #b5bac1;
+}
+
+.blockBtn {
+  padding: 8px 16px;
+  background: transparent;
+  color: #f23f42;
+  border: 1px solid #f23f42;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.blockBtn:hover {
+  background: rgba(242, 63, 66, 0.15);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.btnCancel {
+  padding: 10px 20px;
+  background: #4e5058;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btnCancel:hover {
+  background: #5d6069;
+}
+
+.btnIgnore {
+  padding: 10px 20px;
+  background: #5865f2;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btnIgnore:hover {
+  background: #4752c4;
+}
+
+.loading {
+  text-align: center;
+  padding: 24px;
+  color: #b5bac1;
+  font-size: 14px;
+}

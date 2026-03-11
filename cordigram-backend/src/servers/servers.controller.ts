@@ -8,6 +8,7 @@ import {
   Param,
   UseGuards,
   Request,
+  BadRequestException,
 } from '@nestjs/common';
 import { ServersService } from './servers.service';
 import { CreateServerDto } from './dto/create-server.dto';
@@ -69,6 +70,12 @@ export class ServersController {
     return this.serversService.joinServer(serverId, req.user.userId);
   }
 
+  @Post(':id/leave')
+  async leaveServer(@Param('id') serverId: string, @Request() req: any) {
+    await this.serversService.leaveServer(serverId, req.user.userId);
+    return { message: 'Left server successfully' };
+  }
+
   @Post(':id/members/:memberId')
   async addMember(
     @Param('id') serverId: string,
@@ -87,6 +94,22 @@ export class ServersController {
       serverId,
       memberId,
       req.user.userId,
+    );
+  }
+
+  @Patch(':id/transfer-ownership')
+  async transferOwnership(
+    @Param('id') serverId: string,
+    @Body() body: { newOwnerId: string },
+    @Request() req: any,
+  ) {
+    if (!body?.newOwnerId) {
+      throw new BadRequestException('newOwnerId is required');
+    }
+    return this.serversService.transferOwnership(
+      serverId,
+      req.user.userId,
+      body.newOwnerId,
     );
   }
 }

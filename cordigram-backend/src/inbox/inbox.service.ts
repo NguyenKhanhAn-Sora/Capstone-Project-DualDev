@@ -6,6 +6,9 @@ import { EventsService } from '../events/events.service';
 import { ServerInvitesService } from '../server-invites/server-invites.service';
 import { ServerEvent } from '../events/event.schema';
 import { InboxSeen } from './inbox-seen.schema';
+import { DirectMessagesService } from '../direct-messages/direct-messages.service';
+import { MessagesService } from '../messages/messages.service';
+import { IgnoredService } from '../users/ignored.service';
 
 export interface InboxEventItem {
   type: 'event';
@@ -38,6 +41,29 @@ export interface InboxServerInviteItem {
 
 export type InboxForYouItem = InboxEventItem | InboxServerInviteItem;
 
+export interface InboxUnreadDmItem {
+  type: 'dm';
+  userId: string;
+  displayName: string;
+  username: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
+export interface InboxUnreadChannelItem {
+  type: 'channel';
+  channelId: string;
+  channelName: string;
+  serverId: string;
+  serverName: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount?: number;
+}
+
+export type InboxUnreadItem = InboxUnreadDmItem | InboxUnreadChannelItem;
+
 @Injectable()
 export class InboxService {
   constructor(
@@ -45,6 +71,9 @@ export class InboxService {
     private readonly serversService: ServersService,
     private readonly eventsService: EventsService,
     private readonly serverInvitesService: ServerInvitesService,
+    private readonly directMessagesService: DirectMessagesService,
+    private readonly messagesService: MessagesService,
+    private readonly ignoredService: IgnoredService,
   ) {}
 
   /** Dành cho bạn: sự kiện từ server + lời mời vào máy chủ (gộp, sắp xếp, đánh dấu đã xem). */
@@ -146,9 +175,61 @@ export class InboxService {
     };
   }
 
-  /** Tin nhắn/kênh chưa đọc - placeholder, sẽ triển khai khi có channel read state */
-  async getUnread(_userId: string): Promise<unknown[]> {
-    return [];
+  /** Tin nhắn chưa đọc: DM (displayName + nội dung tin) và kênh server (tên server, tên kênh + nội dung). Loại trừ người bị bỏ qua. */
+  async getUnread(userId: string): Promise<InboxUnreadItem[]> {
+    const ignoredSet = await this.ignoredService.getIgnoredUserIds(userId);
+    const [dmItems, servers] = await Promise.all([
+      this.directMessagesService.getUnreadConversations(userId),
+      this.serversService.getServersByUserId(userId),
+    ]);
+    const result: InboxUnreadItem[] = dmItems.map((c) => ({
+      type: 'dm',
+      userId: c.userId,
+      displayName: c.displayName,
+      username: c.username,
+      lastMessage: c.lastMessage,
+      lastMessageAt: c.lastMessageAt,
+      unreadCount: c.unreadCount,
+    }));
+
+    for (const server of servers) {
+      const serverId = server._id.toString();
+      const channels = (server as any).channels ?? [];
+      for (const ch of channels) {
+        const channelId = ch._id?.toString?.() ?? ch.toString?.() ?? '';
+        const channelName = (ch as any).name ?? 'general';
+        const channelType = (ch as any).type;
+        if (channelType !== 'text') continue;
+        const messages = await this.messagesService.getMessagesByChannelId(
+          channelId,
+          1,
+          0,
+          userId,
+        );
+        const lastMsg = messages[0];
+        if (!lastMsg) continue;
+        const senderId = (lastMsg as any).senderId?._id ?? (lastMsg as any).senderId;
+        const senderStr = senderId?.toString?.();
+        if (senderStr && ignoredSet.has(senderStr)) continue;
+        result.push({
+          type: 'channel',
+          channelId,
+          channelName,
+          serverId,
+          serverName: (server as any).name ?? 'Máy chủ',
+          lastMessage: (lastMsg as any).content ?? '',
+          lastMessageAt: (lastMsg as any).createdAt?.toISOString?.() ?? new Date().toISOString(),
+          unreadCount: 1,
+        });
+      }
+    }
+
+    result.sort((a, b) => {
+      const timeA = a.type === 'dm' ? a.lastMessageAt : a.lastMessageAt;
+      const timeB = b.type === 'dm' ? b.lastMessageAt : b.lastMessageAt;
+      return new Date(timeB).getTime() - new Date(timeA).getTime();
+    });
+    return result.slice(0, 50);
   }
 
   /** Đề cập trong kênh - placeholder, sẽ triển khai khi có mention trong message */

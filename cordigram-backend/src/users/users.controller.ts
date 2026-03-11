@@ -17,6 +17,7 @@ import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import type { Request } from 'express';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { BlocksService } from './blocks.service';
+import { IgnoredService } from './ignored.service';
 import { RequestChangeEmailCurrentOtpDto } from './dto/request-change-email-current-otp.dto';
 import { VerifyChangeEmailCurrentOtpDto } from './dto/verify-change-email-current-otp.dto';
 import { RequestChangeEmailNewOtpDto } from './dto/request-change-email-new-otp.dto';
@@ -41,6 +42,7 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly blocksService: BlocksService,
+    private readonly ignoredService: IgnoredService,
     private readonly authService: AuthService,
   ) {}
 
@@ -526,6 +528,53 @@ export class UsersController {
       throw new UnauthorizedException('Unauthorized');
     }
     return this.blocksService.unblock(userId, targetUserId);
+  }
+
+  @Post(':id/ignore')
+  async ignore(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('id') targetUserId: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.ignoredService.addIgnored(userId, targetUserId);
+  }
+
+  @Delete(':id/ignore')
+  async unignore(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('id') targetUserId: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.ignoredService.removeIgnored(userId, targetUserId);
+  }
+
+  @Get('ignored-ids')
+  async getIgnoredIds(@Req() req: Request & { user?: AuthenticatedUser }) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const set = await this.ignoredService.getIgnoredUserIds(userId);
+    return { ignoredUserIds: Array.from(set) };
+  }
+
+  @Get(':id/is-ignored')
+  async isIgnored(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('id') targetUserId: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const ignored = await this.ignoredService.isIgnored(userId, targetUserId);
+    return { isIgnored: ignored };
   }
 
   @Get(':id/followers')

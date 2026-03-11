@@ -29,6 +29,56 @@ export class DirectMessagesGateway
 
   private connectedUsers = new Map<string, string>(); // userId -> socketId
 
+  emitReactionUpdate(payload: {
+    messageId: string;
+    senderId: string;
+    receiverId: string;
+    reactions: any[];
+  }) {
+    // Fallback broadcast (client will ignore if messageId not present in view)
+    this.server.emit('reaction-added', {
+      messageId: payload.messageId,
+      reactions: payload.reactions,
+    });
+    this.server.emit('reaction-updated', {
+      messageId: payload.messageId,
+      reactions: payload.reactions,
+    });
+
+    const receiverSocket = this.connectedUsers.get(payload.receiverId);
+    if (receiverSocket) {
+      this.server.to(receiverSocket).emit('reaction-added', {
+        messageId: payload.messageId,
+        reactions: payload.reactions,
+      });
+    }
+
+    const senderSocket = this.connectedUsers.get(payload.senderId);
+    if (senderSocket) {
+      this.server.to(senderSocket).emit('reaction-updated', {
+        messageId: payload.messageId,
+        reactions: payload.reactions,
+      });
+    }
+  }
+
+  emitNewDirectMessageFromRest(payload: {
+    senderId: string;
+    receiverId: string;
+    message: any;
+  }) {
+    const receiverSocket = this.connectedUsers.get(payload.receiverId);
+    if (receiverSocket) {
+      this.server.to(receiverSocket).emit('new-message', {
+        message: payload.message,
+        fromUser: {
+          userId: payload.senderId,
+          username: payload.message?.senderId?.username,
+        },
+      });
+    }
+  }
+
   constructor(
     private readonly directMessagesService: DirectMessagesService,
     private readonly jwtService: JwtService,

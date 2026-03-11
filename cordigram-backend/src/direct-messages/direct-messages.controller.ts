@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { DirectMessagesService } from './direct-messages.service';
+import { DirectMessagesGateway } from './direct-messages.gateway';
 import {
   CreateDirectMessageDto,
   MarkAsReadDto,
@@ -22,7 +23,10 @@ import { CurrentUser } from '../auth/current-user.decorator';
 @Controller('direct-messages')
 @UseGuards(JwtAuthGuard)
 export class DirectMessagesController {
-  constructor(private readonly directMessagesService: DirectMessagesService) {}
+  constructor(
+    private readonly directMessagesService: DirectMessagesService,
+    private readonly directMessagesGateway: DirectMessagesGateway,
+  ) {}
 
   @Post(':receiverId')
   async createDirectMessage(
@@ -37,9 +41,22 @@ export class DirectMessagesController {
     );
 
     // Populate sender and receiver info
-    return this.directMessagesService.getDirectMessageById(
+    const populated = await this.directMessagesService.getDirectMessageById(
       message._id.toString(),
     );
+
+    // Emit realtime to receiver (REST send should behave like websocket send-message)
+    try {
+      this.directMessagesGateway.emitNewDirectMessageFromRest({
+        senderId: user.userId,
+        receiverId,
+        message: populated,
+      });
+    } catch (e) {
+      // ignore socket emit errors
+    }
+
+    return populated;
   }
 
   @Get('conversation/:userId')
@@ -132,9 +149,27 @@ export class DirectMessagesController {
       user.userId,
     );
 
-    return this.directMessagesService.getDirectMessageById(
+    const populated = await this.directMessagesService.getDirectMessageById(
       message._id.toString(),
     );
+
+    // Emit realtime update to both sender + receiver so both UIs update without reload
+    try {
+      const senderId = (populated as any).senderId?._id?.toString?.() || (populated as any).senderId?.toString?.();
+      const receiverId = (populated as any).receiverId?._id?.toString?.() || (populated as any).receiverId?.toString?.();
+      if (senderId && receiverId) {
+        this.directMessagesGateway.emitReactionUpdate({
+          messageId: (populated as any)._id?.toString?.() || messageId,
+          senderId,
+          receiverId,
+          reactions: (populated as any).reactions || [],
+        });
+      }
+    } catch (e) {
+      // don't fail request if socket emit fails
+    }
+
+    return populated;
   }
 
   @Get('available-users/list')

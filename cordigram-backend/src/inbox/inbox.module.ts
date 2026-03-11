@@ -6,6 +6,9 @@ import { InboxSeen, InboxSeenSchema } from './inbox-seen.schema';
 import { ServersModule } from '../servers/servers.module';
 import { EventsModule } from '../events/events.module';
 import { ServerInvitesModule } from '../server-invites/server-invites.module';
+import { DirectMessagesModule } from '../direct-messages/direct-messages.module';
+import { MessagesModule } from '../messages/messages.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -13,6 +16,9 @@ import { ServerInvitesModule } from '../server-invites/server-invites.module';
     ServersModule,
     EventsModule,
     ServerInvitesModule,
+    DirectMessagesModule,
+    MessagesModule,
+    UsersModule,
   ],
   providers: [InboxService],
   controllers: [InboxController],

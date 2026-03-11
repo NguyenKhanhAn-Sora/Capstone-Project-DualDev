@@ -1,0 +1,49 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: transparent;
+}
+
+.menu {
+  position: fixed;
+  background: #2b2d31;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 6px 0;
+  min-width: 200px;
+  border: 1px solid #3f4147;
+  z-index: 9999;
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 10px 14px;
+  cursor: pointer;
+  text-align: left;
+  color: #dbdee1;
+  font-size: 14px;
+  font-weight: 500;
+  box-sizing: border-box;
+}
+
+.menuItem:hover {
+  background: #404249;
+}
+
+.menuItem.danger {
+  color: #f23f42;
+}
+
+.menuItem.danger:hover {
+  background: rgba(242, 63, 66, 0.15);
+}
+
+.divider {
+  height: 1px;
+  background: #3f4147;
+  margin: 4px 0;
+}

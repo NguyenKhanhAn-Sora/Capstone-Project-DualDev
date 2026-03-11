@@ -7,14 +7,17 @@ interface ReplyMessagePreviewProps {
   message: {
     id: string;
     text: string;
+    senderDisplayName?: string;
     senderName?: string;
     messageType?: "text" | "gif" | "sticker" | "voice";
   };
+  headerText?: string;
   onClose: () => void;
 }
 
 export default function ReplyMessagePreview({
   message,
+  headerText,
   onClose,
 }: ReplyMessagePreviewProps) {
   const getPreviewText = () => {
@@ -37,9 +40,13 @@ export default function ReplyMessagePreview({
       <div className={styles.replyLine} />
       <div className={styles.content}>
         <div className={styles.header}>
-          <span className={styles.label}>Đang trả lời</span>
-          {message.senderName && (
-            <span className={styles.senderName}>{message.senderName}</span>
+          <span className={styles.label}>
+            {headerText || "Đang trả lời"}
+          </span>
+          {!headerText && (message.senderDisplayName || message.senderName) && (
+            <span className={styles.senderName}>
+              {message.senderDisplayName || message.senderName}
+            </span>
           )}
         </div>
         <div className={styles.previewText}>{getPreviewText()}</div>

@@ -7,13 +7,17 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Message } from './message.schema';
 import { Channel } from '../channels/channel.schema';
+import { Profile } from '../profiles/profile.schema';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { IgnoredService } from '../users/ignored.service';
 
 @Injectable()
 export class MessagesService {
   constructor(
     @InjectModel(Message.name) private messageModel: Model<Message>,
     @InjectModel(Channel.name) private channelModel: Model<Channel>,
+    @InjectModel(Profile.name) private profileModel: Model<Profile>,
+    private readonly ignoredService: IgnoredService,
   ) {}
 
   async createMessage(
@@ -34,6 +38,9 @@ export class MessagesService {
       senderId: userObjectId,
       content: createMessageDto.content,
       attachments: createMessageDto.attachments || [],
+      replyTo: createMessageDto.replyTo
+        ? new Types.ObjectId(createMessageDto.replyTo)
+        : null,
     });
 
     const savedMessage = await message.save();
@@ -42,24 +49,148 @@ export class MessagesService {
     channel.messageCount = (channel.messageCount || 0) + 1;
     await channel.save();
 
-    return savedMessage;
+    const enriched = await this.getMessageByIdEnriched(savedMessage._id.toString());
+    return enriched as any;
+  }
+
+  async getMessageByIdEnriched(messageId: string): Promise<any> {
+    const msg = await this.messageModel
+      .findById(messageId)
+      .populate('senderId', 'email')
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'senderId', select: 'email' },
+      })
+      .lean()
+      .exec();
+
+    if (!msg) return null;
+
+    const senderId = msg.senderId?._id ?? msg.senderId;
+    const senderUserId = senderId != null ? new Types.ObjectId(senderId.toString()) : null;
+    const senderProfile = senderUserId
+      ? await this.profileModel
+          .findOne({ userId: senderUserId })
+          .select('username displayName avatarUrl')
+          .lean()
+          .exec()
+      : null;
+
+    const result: any = {
+      ...msg,
+      senderId: {
+        ...(typeof msg.senderId === 'object' ? msg.senderId : { _id: msg.senderId, email: '' }),
+        displayName: senderProfile?.displayName ?? undefined,
+        username: senderProfile?.username ?? undefined,
+        avatarUrl: senderProfile?.avatarUrl ?? undefined,
+      },
+    };
+
+    const replyToRaw = msg.replyTo as any;
+    if (replyToRaw && typeof replyToRaw === 'object') {
+      const rtSenderId = replyToRaw.senderId?._id ?? replyToRaw.senderId;
+      const rtUserId = rtSenderId != null ? new Types.ObjectId(rtSenderId.toString()) : null;
+      const rtProfile = rtUserId
+        ? await this.profileModel
+            .findOne({ userId: rtUserId })
+            .select('username displayName avatarUrl')
+            .lean()
+            .exec()
+        : null;
+      result.replyTo = {
+        ...replyToRaw,
+        senderId: {
+          ...(typeof replyToRaw.senderId === 'object'
+            ? replyToRaw.senderId
+            : { _id: replyToRaw.senderId, email: '' }),
+          displayName: rtProfile?.displayName ?? undefined,
+          username: rtProfile?.username ?? undefined,
+        },
+      };
+    }
+
+    return result;
   }
 
   async getMessagesByChannelId(
     channelId: string,
     limit: number = 50,
     skip: number = 0,
-  ): Promise<Message[]> {
-    return this.messageModel
-      .find({
-        channelId: new Types.ObjectId(channelId),
-        isDeleted: false,
-      })
+    viewerId?: string,
+  ): Promise<any[]> {
+    const match: any = {
+      channelId: new Types.ObjectId(channelId),
+      isDeleted: false,
+    };
+    if (viewerId) {
+      const ignoredSet = await this.ignoredService.getIgnoredUserIds(viewerId);
+      if (ignoredSet.size > 0) {
+        match.senderId = { $nin: Array.from(ignoredSet).map((id) => new Types.ObjectId(id)) };
+      }
+    }
+    const messages = await this.messageModel
+      .find(match)
       .populate('senderId', 'email')
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'senderId', select: 'email' },
+      })
       .sort({ createdAt: -1 })
       .limit(limit)
       .skip(skip)
+      .lean()
       .exec();
+
+    const enriched = await Promise.all(
+      messages.map(async (msg: any) => {
+        const senderId = msg.senderId?._id ?? msg.senderId;
+        const senderUserId = senderId != null ? new Types.ObjectId(senderId.toString()) : null;
+        const senderProfile = senderUserId
+          ? await this.profileModel
+              .findOne({ userId: senderUserId })
+              .select('username displayName avatarUrl')
+              .lean()
+              .exec()
+          : null;
+
+        const result: any = {
+          ...msg,
+          senderId: {
+            ...(typeof msg.senderId === 'object' ? msg.senderId : { _id: msg.senderId, email: '' }),
+            displayName: senderProfile?.displayName ?? undefined,
+            username: senderProfile?.username ?? undefined,
+            avatarUrl: senderProfile?.avatarUrl ?? undefined,
+          },
+        };
+
+        const replyToRaw = msg.replyTo as any;
+        if (replyToRaw && typeof replyToRaw === 'object') {
+          const rtSenderId = replyToRaw.senderId?._id ?? replyToRaw.senderId;
+          const rtUserId = rtSenderId != null ? new Types.ObjectId(rtSenderId.toString()) : null;
+          const rtProfile = rtUserId
+            ? await this.profileModel
+                .findOne({ userId: rtUserId })
+                .select('username displayName avatarUrl')
+                .lean()
+                .exec()
+            : null;
+          result.replyTo = {
+            ...replyToRaw,
+            senderId: {
+              ...(typeof replyToRaw.senderId === 'object'
+                ? replyToRaw.senderId
+                : { _id: replyToRaw.senderId, email: '' }),
+              displayName: rtProfile?.displayName ?? undefined,
+              username: rtProfile?.username ?? undefined,
+            },
+          };
+        }
+
+        return result;
+      }),
+    );
+
+    return enriched;
   }
 
   async getMessageById(messageId: string): Promise<Message> {

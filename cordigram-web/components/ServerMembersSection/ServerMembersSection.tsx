@@ -2,6 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import * as serversApi from "@/lib/servers-api";
+import { blockUser, ignoreUser } from "@/lib/api";
+import MemberContextMenu from "@/components/MemberContextMenu/MemberContextMenu";
+import MemberProfilePopup from "@/components/MemberProfilePopup/MemberProfilePopup";
+import IgnoreUserPopup from "@/components/IgnoreUserPopup/IgnoreUserPopup";
 import styles from "./ServerMembersSection.module.css";
 
 /** Hiển thị "X ngày trước" hoặc "X năm" nếu >= 365 ngày */
@@ -27,11 +31,21 @@ function joinMethodLabel(
 export interface ServerMembersSectionProps {
   serverId: string;
   isOwner: boolean;
+  currentUserId: string;
+  token: string | null;
+  /** Gọi khi user chọn "Nhắn tin" → đóng panel và mở DM với thành viên đó */
+  onNavigateToDM?: (userId: string, displayName: string, username: string, avatarUrl?: string) => void;
+  /** Gọi sau khi chuyển quyền sở hữu thành công (để parent đóng panel / refresh) */
+  onOwnershipTransferred?: () => void;
 }
 
 export default function ServerMembersSection({
   serverId,
   isOwner,
+  currentUserId,
+  token,
+  onNavigateToDM,
+  onOwnershipTransferred,
 }: ServerMembersSectionProps) {
   const [members, setMembers] = useState<serversApi.ServerMemberRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +57,11 @@ export default function ServerMembersSection({
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [filterDays, setFilterDays] = useState<7 | 30 | null>(null);
   const [filterRole, setFilterRole] = useState<"all" | "mod" | "admin">("all");
+  const [memberMenu, setMemberMenu] = useState<{ row: serversApi.ServerMemberRow; x: number; y: number } | null>(null);
+  const [profileMember, setProfileMember] = useState<serversApi.ServerMemberRow | null>(null);
+  const [ignoreMember, setIgnoreMember] = useState<serversApi.ServerMemberRow | null>(null);
+  const [transferConfirmMember, setTransferConfirmMember] = useState<serversApi.ServerMemberRow | null>(null);
+  const [transferring, setTransferring] = useState(false);
 
   useEffect(() => {
     if (!serverId || !isOwner) {
@@ -234,14 +253,35 @@ export default function ServerMembersSection({
                   <td className={`${styles.td} ${styles.tdJoinMethod}`}>{joinMethodLabel(row)}</td>
                   <td className={styles.td}>{row.role === "owner" ? "Chủ" : row.role === "moderator" ? "Mod" : "Thành viên"}</td>
                   <td className={styles.tdSignal}>
-                    <button type="button" className={styles.iconBtn} title="Thành viên" aria-label="Thành viên">
+                    <button
+                      type="button"
+                      className={styles.iconBtn}
+                      title="Hồ sơ"
+                      aria-label="Hồ sơ"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setProfileMember(row);
+                      }}
+                    >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                         <circle cx="9" cy="7" r="4" />
                         <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
                       </svg>
                     </button>
-                    <button type="button" className={styles.iconBtn} title="Tùy chọn" aria-label="Tùy chọn">
+                    <button
+                      type="button"
+                      className={styles.iconBtn}
+                      title="Tùy chọn"
+                      aria-label="Tùy chọn"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                        setMemberMenu({ row, x: rect.left, y: rect.bottom + 4 });
+                      }}
+                    >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <circle cx="12" cy="6" r="1.5" />
                         <circle cx="12" cy="12" r="1.5" />
@@ -333,6 +373,171 @@ export default function ServerMembersSection({
             </div>
           </div>
         </div>
+      )}
+
+      {memberMenu && (
+        <MemberContextMenu
+          x={memberMenu.x}
+          y={memberMenu.y}
+          member={memberMenu.row}
+          isServerOwner={isOwner}
+          onClose={() => setMemberMenu(null)}
+          onProfile={() => {
+            setProfileMember(memberMenu.row);
+            setMemberMenu(null);
+          }}
+          onMessage={() => {
+            if (onNavigateToDM) {
+              onNavigateToDM(
+                memberMenu.row.userId,
+                memberMenu.row.displayName || memberMenu.row.username,
+                memberMenu.row.username,
+                memberMenu.row.avatarUrl,
+              );
+            }
+            setMemberMenu(null);
+          }}
+          onNickname={() => {
+            if (isOwner) {
+              const name = memberMenu.row.displayName || memberMenu.row.username;
+              alert(`Chỉ chủ server mới có thể đổi biệt danh cho thành viên. (Đổi biệt danh cho ${name} - tính năng sẽ được bổ sung.)`);
+            }
+            setMemberMenu(null);
+          }}
+          onIgnore={() => {
+            setIgnoreMember(memberMenu.row);
+            setMemberMenu(null);
+          }}
+          onBlock={async () => {
+            if (!token) return;
+            try {
+              await blockUser({ token, userId: memberMenu.row.userId });
+              setMembers((prev) => prev.filter((m) => m.userId !== memberMenu.row.userId));
+            } catch (err) {
+              console.error(err);
+            }
+            setMemberMenu(null);
+          }}
+          onTransferOwnership={
+            isOwner && memberMenu.row.role !== "owner" && memberMenu.row.userId !== currentUserId
+              ? () => {
+                  setTransferConfirmMember(memberMenu.row);
+                  setMemberMenu(null);
+                }
+              : undefined
+          }
+        />
+      )}
+
+      {transferConfirmMember && (
+        <div
+          className={styles.filterOverlay}
+          role="dialog"
+          aria-modal
+          aria-labelledby="transfer-title"
+          onClick={() => !transferring && setTransferConfirmMember(null)}
+        >
+          <div className={styles.filterModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.filterHeader}>
+              <h3 id="transfer-title" className={styles.filterTitle}>
+                Chuyển quyền sở hữu
+              </h3>
+              <button
+                type="button"
+                className={styles.filterClose}
+                onClick={() => setTransferConfirmMember(null)}
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.filterBody}>
+              <p className={styles.transferText}>
+                Chuyển quyền sở hữu máy chủ cho <strong>{transferConfirmMember.displayName || transferConfirmMember.username}</strong>? Người này sẽ trở thành chủ máy chủ, bạn sẽ trở thành thành viên.
+              </p>
+            </div>
+            <div className={styles.filterFooter}>
+              <button
+                type="button"
+                className={styles.filterCancel}
+                onClick={() => setTransferConfirmMember(null)}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                className={styles.transferConfirmBtn}
+                disabled={transferring}
+                onClick={async () => {
+                  if (!serverId || !transferConfirmMember) return;
+                  setTransferring(true);
+                  try {
+                    await serversApi.transferServerOwnership(serverId, transferConfirmMember.userId);
+                    setTransferConfirmMember(null);
+                    onOwnershipTransferred?.();
+                  } catch (err) {
+                    console.error(err);
+                    alert(err instanceof Error ? err.message : "Không chuyển được quyền sở hữu");
+                  } finally {
+                    setTransferring(false);
+                  }
+                }}
+              >
+                {transferring ? "Đang xử lý..." : "Chuyển quyền"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {profileMember && (
+        <MemberProfilePopup
+          member={profileMember}
+          currentUserId={currentUserId}
+          token={token}
+          serverJoinDate={profileMember.joinedAt}
+          onClose={() => setProfileMember(null)}
+          onMessage={() => {
+            if (onNavigateToDM) {
+              onNavigateToDM(
+                profileMember.userId,
+                profileMember.displayName || profileMember.username,
+                profileMember.username,
+                profileMember.avatarUrl,
+              );
+            }
+            setProfileMember(null);
+          }}
+        />
+      )}
+
+      {ignoreMember && (
+        <IgnoreUserPopup
+          displayName={ignoreMember.displayName || ignoreMember.username}
+          userId={ignoreMember.userId}
+          token={token ?? undefined}
+          onClose={() => setIgnoreMember(null)}
+          onConfirm={async (opts) => {
+            if (!token || !ignoreMember) return;
+            try {
+              await ignoreUser({ token, userId: ignoreMember.userId });
+            } catch (err) {
+              console.error("Ignore user failed", err);
+            }
+            setIgnoreMember(null);
+          }}
+          onBlock={async () => {
+            if (!token) return;
+            try {
+              await blockUser({ token, userId: ignoreMember.userId });
+              setMembers((prev) => prev.filter((m) => m.userId !== ignoreMember.userId));
+            } catch (err) {
+              console.error(err);
+            }
+            setIgnoreMember(null);
+          }}
+          onRestore={() => setIgnoreMember(null)}
+        />
       )}
     </div>
   );

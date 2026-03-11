@@ -77,6 +77,9 @@ export interface Message {
   senderId: {
     _id: string;
     email: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
   };
   content: string;
   attachments: string[];
@@ -84,11 +87,16 @@ export interface Message {
     userId: string;
     emoji: string;
   }>;
-  isEdited: boolean;
+  isEdited?: boolean;
   editedAt?: string;
-  isDeleted: boolean;
+  isDeleted?: boolean;
   createdAt: string;
   updatedAt: string;
+  replyTo?: string | {
+    _id: string;
+    content: string;
+    senderId?: { _id: string; email?: string; displayName?: string; username?: string };
+  };
 }
 
 export interface Friend {
@@ -205,6 +213,30 @@ export async function getServerMembers(
   }
   const data = await response.json();
   return Array.isArray(data) ? data : [];
+}
+
+/** Chuyển quyền sở hữu máy chủ: chỉ chủ hiện tại mới gọi được. newOwnerId trở thành chủ, chủ cũ trở thành thành viên. */
+export async function transferServerOwnership(
+  serverId: string,
+  newOwnerId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/transfer-ownership`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify({ newOwnerId }),
+    },
+  );
+  if (!response.ok) {
+    const text = await response.text();
+    let msg = "Không chuyển được quyền sở hữu";
+    try {
+      const j = JSON.parse(text);
+      if (j.message) msg = j.message;
+    } catch (_) {}
+    throw new Error(msg);
+  }
 }
 
 /** Tạo lời mời vào máy chủ (chỉ mời được người follow hoặc đang follow mình). */
@@ -493,6 +525,17 @@ export async function joinServer(serverId: string): Promise<Server> {
   return res.json();
 }
 
+export async function leaveServer(serverId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/servers/${serverId}/leave`, {
+    method: "POST",
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không thể rời máy chủ");
+  }
+}
+
 export async function createServerEvent(
   serverId: string,
   payload: CreateEventPayload,
@@ -536,13 +579,19 @@ export async function createMessage(
   channelId: string,
   content: string,
   attachments?: string[],
+  replyTo?: string,
 ): Promise<Message> {
+  const body: { content: string; attachments?: string[]; replyTo?: string } = {
+    content,
+    ...(attachments?.length ? { attachments } : {}),
+    ...(replyTo ? { replyTo } : {}),
+  };
   const response = await fetch(
     `${API_BASE_URL}/channels/${channelId}/messages`,
     {
       method: "POST",
       headers: getHeaders(),
-      body: JSON.stringify({ content, attachments }),
+      body: JSON.stringify(body),
     },
   );
 

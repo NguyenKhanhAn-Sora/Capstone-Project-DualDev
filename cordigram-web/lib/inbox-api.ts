@@ -43,14 +43,28 @@ export interface InboxForYouResponse {
   items: InboxForYouItem[];
 }
 
-export interface InboxUnreadItem {
+export interface InboxUnreadDmItem {
+  type: "dm";
+  userId: string;
+  displayName: string;
+  username: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
+export interface InboxUnreadChannelItem {
+  type: "channel";
   channelId: string;
   channelName: string;
   serverId: string;
   serverName: string;
-  unreadCount: number;
-  lastMessageAt?: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount?: number;
 }
+
+export type InboxUnreadItem = InboxUnreadDmItem | InboxUnreadChannelItem;
 
 export interface InboxUnreadResponse {
   items: InboxUnreadItem[];

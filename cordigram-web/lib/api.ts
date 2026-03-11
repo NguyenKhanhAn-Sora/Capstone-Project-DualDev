@@ -1034,6 +1034,21 @@ export async function followUser(opts: {
   });
 }
 
+/** Check if current user follows target user. Uses GET /users/:id/is-following */
+export async function checkFollowStatus(opts: {
+  token: string;
+  targetUserId: string;
+}): Promise<{ isFollowing: boolean }> {
+  const { token, targetUserId } = opts;
+  return apiFetch<{ isFollowing: boolean }>({
+    path: `/users/${targetUserId}/is-following`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function blockUser(opts: {
   token: string;
   userId: string;
@@ -1056,6 +1071,50 @@ export async function unblockUser(opts: {
   return apiFetch<{ blocked: boolean }>({
     path: `/users/${userId}/block`,
     method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+/** Bỏ qua user: ẩn hồ sơ/tin nhắn và tắt thông báo từ họ (backend lọc tin nhắn của người bị bỏ qua). */
+export async function ignoreUser(opts: {
+  token: string;
+  userId: string;
+}): Promise<{ ignored: boolean }> {
+  const { token, userId } = opts;
+  return apiFetch<{ ignored: boolean }>({
+    path: `/users/${userId}/ignore`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function unignoreUser(opts: {
+  token: string;
+  userId: string;
+}): Promise<{ ignored: boolean }> {
+  const { token, userId } = opts;
+  return apiFetch<{ ignored: boolean }>({
+    path: `/users/${userId}/ignore`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+/** Kiểm tra current user đã bỏ qua target user chưa. */
+export async function checkIgnoreStatus(opts: {
+  token: string;
+  targetUserId: string;
+}): Promise<{ isIgnored: boolean }> {
+  const { token, targetUserId } = opts;
+  return apiFetch<{ isIgnored: boolean }>({
+    path: `/users/${targetUserId}/is-ignored`,
+    method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -2667,6 +2726,39 @@ export async function getFollowing(opts?: {
       Authorization: `Bearer ${token}`,
     },
   });
+}
+
+export type ConversationListItem = {
+  userId: string;
+  username: string;
+  avatar?: string;
+  lastMessage?: string;
+  lastMessageTime?: string;
+  unreadCount: number;
+};
+
+export async function getConversationList(opts?: {
+  token?: string;
+}): Promise<ConversationListItem[]> {
+  const token =
+    opts?.token ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("token");
+  const list = await apiFetch<any[]>({
+    path: "/direct-messages/conversations",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return (list || []).map((c: any) => ({
+    userId: String(c.userId ?? c.user_id ?? ""),
+    username: c.username ?? "",
+    avatar: c.avatar,
+    lastMessage: c.lastMessage,
+    lastMessageTime: c.lastMessageTime,
+    unreadCount: typeof c.unreadCount === "number" ? c.unreadCount : 0,
+  }));
 }
 
 export async function getDirectMessages(

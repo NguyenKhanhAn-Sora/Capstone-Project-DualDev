@@ -19,6 +19,8 @@ type TabKey = "for-you" | "unread" | "mentions";
 interface MessagesInboxProps {
   onClose: () => void;
   onNavigateToChannel?: (serverId: string, channelId: string) => void;
+  /** Nhảy sang DM với user (userId, displayName, username, avatarUrl?). */
+  onNavigateToDM?: (userId: string, displayName: string, username: string, avatarUrl?: string) => void;
   /** Gọi sau khi đánh dấu một mục đã xem (để parent cập nhật chấm đỏ trên icon hộp thư). */
   onMarkSeen?: () => void;
   /** Sau khi chấp nhận lời mời: parent load lại danh sách server và chọn server vừa tham gia. */
@@ -38,7 +40,7 @@ function formatTimeAgo(iso: string): string {
   return d.toLocaleDateString("vi-VN");
 }
 
-export default function MessagesInbox({ onClose, onNavigateToChannel, onMarkSeen, onAcceptInvite }: MessagesInboxProps) {
+export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigateToDM, onMarkSeen, onAcceptInvite }: MessagesInboxProps) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("for-you");
   const [forYouItems, setForYouItems] = useState<InboxForYouItem[]>([]);
@@ -127,8 +129,13 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onMarkSeen
   };
 
   const handleUnreadClick = (item: InboxUnreadItem) => {
-    if (onNavigateToChannel) onNavigateToChannel(item.serverId, item.channelId);
-    else router.push(`/messages?server=${item.serverId}&channel=${item.channelId}`);
+    if (item.type === "dm") {
+      if (onNavigateToDM) onNavigateToDM(item.userId, item.displayName, item.username, "");
+      else router.push(`/messages?dm=${item.userId}`);
+    } else {
+      if (onNavigateToChannel) onNavigateToChannel(item.serverId, item.channelId);
+      else router.push(`/messages?server=${item.serverId}&channel=${item.channelId}`);
+    }
     onClose();
   };
 
@@ -295,29 +302,55 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onMarkSeen
                   Không có tin nhắn hoặc thông báo chưa đọc từ các kênh.
                 </div>
               ) : (
-                unreadItems.map((item) => (
-                  <button
-                    key={`${item.serverId}-${item.channelId}`}
-                    type="button"
-                    className={styles.unreadItem}
-                    onClick={() => handleUnreadClick(item)}
-                  >
-                    <div className={styles.eventAvatar}>
-                      {item.serverName.charAt(0).toUpperCase()}
-                    </div>
-                    <div className={styles.eventBody}>
-                      <p className={styles.eventTitle}>
-                        # {item.channelName}
-                        <span className={styles.badge} style={{ marginLeft: 8 }}>
-                          {item.unreadCount}
-                        </span>
-                      </p>
-                      <p className={styles.eventMeta}>
-                        {item.serverName}
-                      </p>
-                    </div>
-                  </button>
-                ))
+                unreadItems.map((item) =>
+                  item.type === "dm" ? (
+                    <button
+                      key={`dm-${item.userId}`}
+                      type="button"
+                      className={styles.unreadItem}
+                      onClick={() => handleUnreadClick(item)}
+                    >
+                      <div className={styles.eventAvatar}>
+                        {item.displayName?.charAt(0)?.toUpperCase() ?? item.username?.charAt(0)?.toUpperCase() ?? "?"}
+                      </div>
+                      <div className={styles.eventBody}>
+                        <p className={styles.eventTitle}>
+                          {item.displayName} nhắn tin cho bạn
+                          {item.unreadCount > 0 && (
+                            <span className={styles.badge} style={{ marginLeft: 8 }}>
+                              {item.unreadCount}
+                            </span>
+                          )}
+                        </p>
+                        <p className={styles.eventMeta}>{item.lastMessage || "Tin nhắn"}</p>
+                        <p className={styles.eventTime}>{formatTimeAgo(item.lastMessageAt)}</p>
+                      </div>
+                    </button>
+                  ) : (
+                    <button
+                      key={`${item.serverId}-${item.channelId}`}
+                      type="button"
+                      className={styles.unreadItem}
+                      onClick={() => handleUnreadClick(item)}
+                    >
+                      <div className={styles.eventAvatar}>
+                        {item.serverName?.charAt(0)?.toUpperCase() ?? "#"}
+                      </div>
+                      <div className={styles.eventBody}>
+                        <p className={styles.eventTitle}>
+                          {item.serverName}, #{item.channelName}
+                          {(item.unreadCount ?? 0) > 0 && (
+                            <span className={styles.badge} style={{ marginLeft: 8 }}>
+                              {item.unreadCount}
+                            </span>
+                          )}
+                        </p>
+                        <p className={styles.eventMeta}>{item.lastMessage || "Tin nhắn"}</p>
+                        <p className={styles.eventTime}>{formatTimeAgo(item.lastMessageAt)}</p>
+                      </div>
+                    </button>
+                  )
+                )
               )}
             </>
           )}

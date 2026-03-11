@@ -9,9 +9,11 @@ import { User, UserSchema } from '../users/user.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { Follow, FollowSchema } from '../users/follow.schema';
 import { MessageReport, MessageReportSchema } from './message-report.schema';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
+    UsersModule,
     MongooseModule.forFeature([
       { name: DirectMessage.name, schema: DirectMessageSchema },
       { name: User.name, schema: UserSchema },

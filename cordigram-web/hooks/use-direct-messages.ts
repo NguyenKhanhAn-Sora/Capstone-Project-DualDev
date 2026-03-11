@@ -72,6 +72,10 @@ export const useDirectMessages = ({
     byUserId: string;
     messageIds: string[];
   } | null>(null);
+  const [reactionUpdate, setReactionUpdate] = useState<{
+    messageId: string;
+    reactions: any[];
+  } | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [callEvent, setCallEvent] = useState<CallEvent | null>(null);
   const [callEnded, setCallEnded] = useState<{ from: string } | null>(null);
@@ -153,6 +157,18 @@ export const useDirectMessages = ({
 
     socket.on("reaction-added", (data: any) => {
       console.log("Reaction added:", data);
+      if (data?.messageId && Array.isArray(data?.reactions)) {
+        setReactionUpdate({ messageId: data.messageId, reactions: data.reactions });
+        setTimeout(() => setReactionUpdate(null), 500);
+      }
+    });
+
+    socket.on("reaction-updated", (data: any) => {
+      console.log("Reaction updated:", data);
+      if (data?.messageId && Array.isArray(data?.reactions)) {
+        setReactionUpdate({ messageId: data.messageId, reactions: data.reactions });
+        setTimeout(() => setReactionUpdate(null), 500);
+      }
     });
 
     // Call-related events
@@ -347,6 +363,7 @@ export const useDirectMessages = ({
     messageSent,
     userTyping,
     messagesRead,
+    reactionUpdate,
     onlineUsers,
     callEvent,
     callEnded,

@@ -6,12 +6,15 @@ import styles from "./ServerContextMenu.module.css";
 export interface ServerContextMenuServer {
   _id: string;
   name: string;
+  ownerId?: string;
 }
 
 export interface ServerContextMenuProps {
   x: number;
   y: number;
   server: ServerContextMenuServer;
+  /** True = chủ máy chủ → hiện Cài đặt máy chủ, Tạo kênh/Danh mục/Sự kiện. False = thành viên → hiện Hiện tất cả kênh, Rời khỏi phòng */
+  isOwner: boolean;
   onClose: () => void;
   onMarkAsRead: () => void;
   onInviteToServer: () => void;
@@ -19,12 +22,17 @@ export interface ServerContextMenuProps {
   onNotificationSettings: () => void;
   hideMutedChannels: boolean;
   onToggleHideMutedChannels: () => void;
+  /** Chỉ khi !isOwner */
+  showAllChannels?: boolean;
+  onToggleShowAllChannels?: () => void;
   onServerSettings: () => void;
   onSecuritySettings: () => void;
   onEditServerProfile: () => void;
   onCreateChannel: () => void;
   onCreateCategory: () => void;
   onCreateEvent: () => void;
+  /** Chỉ khi !isOwner. Rời khỏi máy chủ */
+  onLeaveServer?: () => void;
   /** Current notification level for display: "all" | "mentions" | "none" */
   notificationLevel?: "all" | "mentions" | "none";
 }
@@ -42,6 +50,7 @@ export default function ServerContextMenu({
   x,
   y,
   server,
+  isOwner,
   onClose,
   onMarkAsRead,
   onInviteToServer,
@@ -49,12 +58,15 @@ export default function ServerContextMenu({
   onNotificationSettings,
   hideMutedChannels,
   onToggleHideMutedChannels,
+  showAllChannels = false,
+  onToggleShowAllChannels,
   onServerSettings,
   onSecuritySettings,
   onEditServerProfile,
   onCreateChannel,
   onCreateCategory,
   onCreateEvent,
+  onLeaveServer,
   notificationLevel = "all",
 }: ServerContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -148,36 +160,76 @@ export default function ServerContextMenu({
             <span className={`${styles.checkbox} ${hideMutedChannels ? styles.checked : ""}`} />
           </span>
         </button>
+        {!isOwner && (
+          <button
+            type="button"
+            className={styles.menuItem}
+            onClick={onToggleShowAllChannels}
+            role="menuitem"
+          >
+            <span className={styles.checkboxWrap}>
+              <span>Hiện tất cả kênh</span>
+              <span className={`${styles.checkbox} ${showAllChannels ? styles.checked : ""}`} />
+            </span>
+          </button>
+        )}
         <div className={styles.divider} />
-        <button
-          type="button"
-          className={`${styles.menuItem} ${styles.menuItemWithSub}`}
-          onClick={onServerSettings}
-          role="menuitem"
-        >
-          <span>Cài đặt máy chủ</span>
-          <span className={styles.arrow}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </span>
-        </button>
-        <button type="button" className={styles.menuItem} onClick={onSecuritySettings} role="menuitem">
-          Cài Đặt Bảo Mật
-        </button>
-        <button type="button" className={styles.menuItem} onClick={onEditServerProfile} role="menuitem">
-          Chỉnh Sửa Hồ Sơ Theo Máy Chủ
-        </button>
-        <div className={styles.divider} />
-        <button type="button" className={styles.menuItem} onClick={onCreateChannel} role="menuitem">
-          Tạo kênh
-        </button>
-        <button type="button" className={styles.menuItem} onClick={onCreateCategory} role="menuitem">
-          Tạo Danh Mục
-        </button>
-        <button type="button" className={styles.menuItem} onClick={onCreateEvent} role="menuitem">
-          Tạo Sự kiện
-        </button>
+        {isOwner && (
+          <>
+            <button
+              type="button"
+              className={`${styles.menuItem} ${styles.menuItemWithSub}`}
+              onClick={onServerSettings}
+              role="menuitem"
+            >
+              <span>Cài đặt máy chủ</span>
+              <span className={styles.arrow}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </span>
+            </button>
+            <button type="button" className={styles.menuItem} onClick={onSecuritySettings} role="menuitem">
+              Cài Đặt Bảo Mật
+            </button>
+            <button type="button" className={styles.menuItem} onClick={onEditServerProfile} role="menuitem">
+              Chỉnh Sửa Hồ Sơ Theo Máy Chủ
+            </button>
+            <div className={styles.divider} />
+            <button type="button" className={styles.menuItem} onClick={onCreateChannel} role="menuitem">
+              Tạo kênh
+            </button>
+            <button type="button" className={styles.menuItem} onClick={onCreateCategory} role="menuitem">
+              Tạo Danh Mục
+            </button>
+            <button type="button" className={styles.menuItem} onClick={onCreateEvent} role="menuitem">
+              Tạo Sự kiện
+            </button>
+          </>
+        )}
+        {!isOwner && (
+          <>
+            <button type="button" className={styles.menuItem} onClick={onSecuritySettings} role="menuitem">
+              Cài Đặt Bảo Mật
+            </button>
+            <button type="button" className={styles.menuItem} onClick={onEditServerProfile} role="menuitem">
+              Chỉnh Sửa Hồ Sơ Theo Máy Chủ
+            </button>
+            <div className={styles.divider} />
+            <button
+              type="button"
+              className={`${styles.menuItem} ${styles.menuItemDanger}`}
+              onClick={() => {
+                onLeaveServer?.();
+                onClose();
+              }}
+              role="menuitem"
+            >
+              Rời khỏi phòng
+            </button>
+          </>
+        )}
+
       </div>
 
       {submenu === "mute" && menuRef.current && (

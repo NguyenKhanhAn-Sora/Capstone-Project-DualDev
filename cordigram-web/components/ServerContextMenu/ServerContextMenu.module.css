@@ -39,6 +39,14 @@
   background: #404249;
 }
 
+.menuItemDanger {
+  color: #f23f42 !important;
+}
+
+.menuItemDanger:hover {
+  background: rgba(242, 63, 66, 0.15);
+}
+
 .menuItemWithSub {
   position: relative;
 }

@@ -37,6 +37,9 @@ export class Message extends Document {
 
   @Prop({ type: Boolean, default: false })
   isDeleted: boolean;
+
+  @Prop({ type: Types.ObjectId, ref: 'Message', default: null })
+  replyTo: Types.ObjectId | null;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef, memo, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, memo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -10,10 +11,12 @@ import {
   useDirectMessages,
   type DirectMessage,
 } from "@/hooks/use-direct-messages";
+import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
 import {
   sendDirectMessage,
   getDirectMessages,
+  getConversationList,
   getAvailableUsers,
   fetchCurrentProfile,
   uploadMedia,
@@ -83,6 +86,8 @@ interface UIMessage {
   text: string;
   senderId: string;
   senderEmail: string;
+  /** Display name lấy từ Profile.displayName (userDisplayName). */
+  senderDisplayName?: string;
   senderName?: string;
   senderAvatar?: string;
   timestamp: Date;
@@ -96,6 +101,14 @@ interface UIMessage {
   reactions?: MessageReaction[]; // Reactions của message
   isPinned?: boolean; // Whether the message is pinned
   replyTo?: string; // ID of the message being replied to
+  replyToMessage?: {
+    id: string;
+    senderId?: string;
+    senderDisplayName?: string;
+    senderName?: string;
+    messageType?: "text" | "gif" | "sticker" | "voice";
+    text: string;
+  } | null;
 }
 
 // GiphyMessage component for rendering GIF/Sticker
@@ -354,6 +367,15 @@ function areMessagesEqual(
   if (prevProps.message.messageType !== nextProps.message.messageType)
     return false;
   if (prevProps.message.giphyId !== nextProps.message.giphyId) return false;
+  if (prevProps.message.voiceUrl !== nextProps.message.voiceUrl) return false;
+  if (prevProps.message.voiceDuration !== nextProps.message.voiceDuration)
+    return false;
+
+  // ✅ Re-render if reactions changed (otherwise UI requires reload)
+  if (prevProps.message.reactions !== nextProps.message.reactions) return false;
+  if (prevProps.message.replyTo !== nextProps.message.replyTo) return false;
+  if (prevProps.message.replyToMessage !== nextProps.message.replyToMessage)
+    return false;
 
   // Don't re-render if only timestamp changed
   return true;
@@ -371,6 +393,8 @@ const MessageItem = memo(
     onPin,
     onReport,
     onDelete,
+    scrollContainerRef,
+    dmPartnerDisplayName,
   }: {
     message: UIMessage;
     renderMessageContent: (message: UIMessage) => React.ReactNode;
@@ -381,12 +405,49 @@ const MessageItem = memo(
     onPin?: (messageId: string) => void;
     onReport?: (messageId: string) => void;
     onDelete?: (messageId: string) => void;
+    scrollContainerRef?: React.RefObject<HTMLElement | null>;
+    dmPartnerDisplayName?: string;
   }) => {
     const messageRef = useRef<HTMLDivElement>(null);
     const [isHovered, setIsHovered] = useState(false);
     const [showQuickReactions, setShowQuickReactions] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showActionsMenu, setShowActionsMenu] = useState(false);
+    const [fixedReactionPosition, setFixedReactionPosition] = useState<{
+      top: number;
+      left: number;
+    } | null>(null);
+
+    const updateFixedPosition = useCallback(() => {
+      const el = messageRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const fromCurrentUser = message.isFromCurrentUser;
+      const PADDING = 8;
+      const QUICK_BAR_W = 380; // estimate to keep inside viewport
+      const baseLeft = fromCurrentUser ? rect.right - QUICK_BAR_W - 10 : rect.left + 50;
+      const clampedLeft = Math.min(
+        Math.max(baseLeft, PADDING),
+        Math.max(PADDING, window.innerWidth - PADDING - QUICK_BAR_W),
+      );
+
+      setFixedReactionPosition({
+        top: rect.top - 50,
+        left: clampedLeft,
+      });
+    }, [message.isFromCurrentUser]);
+
+    useLayoutEffect(() => {
+      if (!scrollContainerRef?.current || (!isHovered && !showEmojiPicker && !showActionsMenu)) {
+        setFixedReactionPosition(null);
+        return;
+      }
+      updateFixedPosition();
+      const container = scrollContainerRef.current;
+      const onScroll = () => updateFixedPosition();
+      container.addEventListener("scroll", onScroll, { passive: true });
+      return () => container.removeEventListener("scroll", onScroll);
+    }, [scrollContainerRef, isHovered, showEmojiPicker, showActionsMenu, updateFixedPosition]);
 
     // ✅ Setup Intersection Observer to detect when message is visible
     useEffect(() => {
@@ -457,7 +518,10 @@ const MessageItem = memo(
           {/* Name and timestamp */}
           <div className={styles.messageHeader}>
             <span className={styles.messageSenderName}>
-              {message.senderName || message.senderEmail || "Unknown"}
+              {message.senderDisplayName ||
+                message.senderName ||
+                message.senderEmail ||
+                "Unknown"}
             </span>
             <span className={styles.messageTime}>
               {formatMessageTime(message.timestamp)}
@@ -465,6 +529,56 @@ const MessageItem = memo(
           </div>
 
           {/* Message bubble */}
+          {message.replyToMessage && (
+            <div className={styles.replyContext}>
+              <div className={styles.replyContextLine} />
+              <div className={styles.replyContextContent}>
+                <div className={styles.replyContextLabel}>
+                  {(() => {
+                    const replierName = message.isFromCurrentUser
+                      ? "Bạn"
+                      : message.senderDisplayName ||
+                        message.senderName ||
+                        message.senderEmail ||
+                        "Người dùng";
+
+                    // Case 1: A tự trả lời tin nhắn của A
+                    if (
+                      message.replyToMessage.senderId &&
+                      message.replyToMessage.senderId === message.senderId
+                    ) {
+                      return `${replierName} đã trả lời chính mình`;
+                    }
+
+                    // Case 2: A trả lời tin nhắn của B (người đang xem là B) → "A đã trả lời tin nhắn của bạn"
+                    if (
+                      message.replyToMessage.senderId &&
+                      message.replyToMessage.senderId === currentUserId
+                    ) {
+                      return `${replierName} đã trả lời tin nhắn của bạn`;
+                    }
+
+                    // Fallback: trả lời tin nhắn của người khác (hiếm trong DM)
+                    return `${replierName} đã trả lời ${
+                      message.replyToMessage.senderDisplayName ||
+                      message.replyToMessage.senderName ||
+                      dmPartnerDisplayName ||
+                      "người dùng"
+                    }`;
+                  })()}
+                </div>
+                <div className={styles.replyContextText}>
+                  {message.replyToMessage.messageType === "gif"
+                    ? "GIF"
+                    : message.replyToMessage.messageType === "sticker"
+                      ? "Sticker"
+                      : message.replyToMessage.messageType === "voice"
+                        ? "Tin nhắn thoại"
+                        : message.replyToMessage.text}
+                </div>
+              </div>
+            </div>
+          )}
           <div
             className={`${styles.messageBubble} ${
               message.isFromCurrentUser ? styles.sent : styles.received
@@ -473,7 +587,7 @@ const MessageItem = memo(
             {renderMessageContent(message)}
           </div>
 
-          {/* Message Reactions */}
+          {/* Message Reactions (ẩn khi đang hiện ở thanh sticky phía trên) */}
           {message.reactions && message.reactions.length > 0 && (
             <MessageReactions
               reactions={message.reactions}
@@ -540,23 +654,66 @@ const MessageItem = memo(
           )}
         </div>
 
-        {/* Quick Reaction Bar on Hover */}
-        {isHovered && (
+        {/* Quick Reaction Bar on Hover — portal với position:fixed + z-index cao để đè lên chatHeader khi cần */}
+        {isHovered && (scrollContainerRef && fixedReactionPosition ? (
+          createPortal(
+            <div
+              style={{
+                position: "fixed",
+                zIndex: 10005,
+                top: fixedReactionPosition.top,
+                left: fixedReactionPosition.left,
+              }}
+            >
+              <QuickReactionBar
+                onReactionSelect={(emoji) => onReaction?.(message.id, emoji)}
+                onMoreClick={() => setShowEmojiPicker(true)}
+                onReplyClick={() => onReply?.(message)}
+                onMenuClick={() => setShowActionsMenu(true)}
+              />
+            </div>,
+            document.body,
+          )
+        ) : (
           <QuickReactionBar
             onReactionSelect={(emoji) => onReaction?.(message.id, emoji)}
             onMoreClick={() => setShowEmojiPicker(true)}
             onReplyClick={() => onReply?.(message)}
             onMenuClick={() => setShowActionsMenu(true)}
             position={{
-              top: message.isFromCurrentUser ? -45 : -45,
+              top: -45,
               right: message.isFromCurrentUser ? 10 : undefined,
               left: message.isFromCurrentUser ? undefined : 50,
             }}
           />
-        )}
+        ))}
 
-        {/* Emoji Reaction Picker */}
-        {showEmojiPicker && (
+        {/* Emoji Reaction Picker — portal để đè lên chatHeader */}
+        {showEmojiPicker && (scrollContainerRef && fixedReactionPosition ? (
+          createPortal(
+            <div
+              style={{
+                position: "fixed",
+                zIndex: 10006,
+                top: fixedReactionPosition.top + 50,
+                // Emoji picker width is fixed (340px), clamp by shifting left if needed
+                left: Math.min(
+                  fixedReactionPosition.left,
+                  Math.max(8, window.innerWidth - 8 - 340),
+                ),
+              }}
+            >
+              <EmojiReactionPicker
+                onSelect={(emoji) => {
+                  onReaction?.(message.id, emoji);
+                  setShowEmojiPicker(false);
+                }}
+                onClose={() => setShowEmojiPicker(false)}
+              />
+            </div>,
+            document.body,
+          )
+        ) : (
           <EmojiReactionPicker
             onSelect={(emoji) => {
               onReaction?.(message.id, emoji);
@@ -564,12 +721,12 @@ const MessageItem = memo(
             }}
             onClose={() => setShowEmojiPicker(false)}
             position={{
-              top: message.isFromCurrentUser ? 50 : 50,
+              top: 50,
               right: message.isFromCurrentUser ? 10 : undefined,
               left: message.isFromCurrentUser ? undefined : 50,
             }}
           />
-        )}
+        ))}
 
         {/* Message Actions Menu */}
         {showActionsMenu && (
@@ -633,6 +790,56 @@ function isValidAvatarUrl(url: string | undefined): boolean {
   return url.startsWith("http://") || url.startsWith("https://");
 }
 
+function normalizeReactions(
+  raw:
+    | Array<{ userId: any; emoji: string }>
+    | Array<{ userIds: string[]; emoji: string; count: number }>
+    | undefined
+    | null,
+): MessageReaction[] | undefined {
+  if (!raw || raw.length === 0) return undefined;
+
+  const first: any = raw[0];
+  // Already UI format
+  if (first && Array.isArray(first.userIds) && typeof first.count === "number") {
+    return raw as any;
+  }
+
+  // Backend format: [{ userId, emoji }]
+  const map = new Map<string, Set<string>>();
+  for (const r of raw as any[]) {
+    const emoji = r.emoji;
+    const userId =
+      typeof r.userId === "string"
+        ? r.userId
+        : r.userId?._id?.toString?.() || r.userId?.toString?.();
+    if (!emoji || !userId) continue;
+    const set = map.get(emoji) || new Set<string>();
+    set.add(userId);
+    map.set(emoji, set);
+  }
+
+  return Array.from(map.entries()).map(([emoji, set]) => ({
+    emoji,
+    userIds: Array.from(set),
+    count: set.size,
+  }));
+}
+
+function mapReplyToMessage(raw: any): UIMessage["replyToMessage"] {
+  if (!raw || !raw._id) return null;
+  const sender = raw.senderId;
+  return {
+    id: raw._id,
+    senderId: typeof sender === "string" ? sender : sender?._id,
+    senderDisplayName:
+      typeof sender === "object" ? sender?.displayName || undefined : undefined,
+    senderName: typeof sender === "object" ? sender?.username || "" : "",
+    messageType: raw.type || "text",
+    text: raw.content || "",
+  };
+}
+
 export default function MessagesPage() {
   const canRender = useRequireAuth();
   const searchParams = useSearchParams();
@@ -662,6 +869,7 @@ export default function MessagesPage() {
     serverName: string;
   } | null>(null);
   const [hideMutedChannels, setHideMutedChannels] = useState(false);
+  const [showAllChannels, setShowAllChannels] = useState(false);
   const [serverNotificationLevel, setServerNotificationLevel] = useState<"all" | "mentions" | "none">("all");
   const [showEventsPopup, setShowEventsPopup] = useState(false);
   const [showCreateEventWizard, setShowCreateEventWizard] = useState(false);
@@ -712,6 +920,8 @@ export default function MessagesPage() {
   const [conversations, setConversations] = useState<Map<string, UIMessage[]>>(
     new Map(),
   );
+  /** Unread count per DM conversation (userId -> count). Updated from getConversationList; cleared when user opens chat. */
+  const [dmUnreadCounts, setDmUnreadCounts] = useState<Record<string, number>>({});
   const [loadingDirectMessages, setLoadingDirectMessages] = useState(false);
   const [token, setToken] = useState<string>("");
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
@@ -808,6 +1018,7 @@ export default function MessagesPage() {
     userTyping,
     notifyTyping,
     messagesRead,
+    reactionUpdate,
     markAsRead,
     callEvent,
     callEnded, // ✅ Added to handle when caller cancels
@@ -821,6 +1032,80 @@ export default function MessagesPage() {
     userId: currentUserId,
     token,
   });
+
+  const prevChannelRef = useRef<string | null>(null);
+  const {
+    isConnected: isChannelSocketConnected,
+    newMessageChannel,
+    reactionUpdateChannel,
+    joinChannel,
+    leaveChannel,
+    clearNewMessageChannel,
+  } = useChannelMessages({ token });
+
+  // ✅ Sync reactions from WebSocket so both users see updates
+  useEffect(() => {
+    if (!reactionUpdate) return;
+    const { messageId, reactions } = reactionUpdate;
+    setConversations((prev) => {
+      const newMap = new Map(prev);
+      for (const [friendId, list] of newMap.entries()) {
+        const idx = (list || []).findIndex((m) => m.id === messageId);
+        if (idx === -1) continue;
+        const updated = [...(list || [])];
+        updated[idx] = {
+          ...updated[idx],
+          reactions: normalizeReactions(reactions),
+        };
+        newMap.set(friendId, updated);
+      }
+      return newMap;
+    });
+  }, [reactionUpdate]);
+
+  // ✅ Sync channel reaction updates from WebSocket (nhiều thành viên trong kênh)
+  useEffect(() => {
+    if (!reactionUpdateChannel || !selectedChannel) return;
+    const { messageId, reactions } = reactionUpdateChannel;
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m.id === messageId);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      next[idx] = {
+        ...next[idx],
+        reactions: normalizeReactions(reactions),
+      };
+      return next;
+    });
+  }, [reactionUpdateChannel, selectedChannel]);
+
+  // ✅ New message in channel from WebSocket (thành viên khác gửi → hiện ngay không cần reload)
+  useEffect(() => {
+    if (!newMessageChannel?.message || !selectedChannel) return;
+    const msg = newMessageChannel.message as any;
+    const channelId = typeof msg.channelId === "string" ? msg.channelId : msg.channelId?._id ?? msg.channelId;
+    if (channelId !== selectedChannel) return;
+    const senderId = typeof msg.senderId === "string" ? msg.senderId : msg.senderId?._id;
+    if (senderId === currentUserId) return;
+    const uiMessage: UIMessage = {
+      id: msg._id,
+      text: msg.content,
+      senderId: senderId ?? "",
+      senderEmail: typeof msg.senderId === "object" ? msg.senderId?.email ?? "" : "",
+      senderName: typeof msg.senderId === "object" ? (msg.senderId?.username || msg.senderId?.email) ?? "" : "",
+      senderDisplayName: typeof msg.senderId === "object" ? msg.senderId?.displayName : undefined,
+      senderAvatar: typeof msg.senderId === "object" ? (msg.senderId?.avatarUrl ?? msg.senderId?.avatar) : undefined,
+      timestamp: new Date(msg.createdAt),
+      isFromCurrentUser: false,
+      type: "server",
+      reactions: normalizeReactions(msg.reactions),
+      replyTo: msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo._id : typeof msg.replyTo === "string" ? msg.replyTo : undefined,
+      replyToMessage: mapReplyToMessage(msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo : null),
+    };
+    setMessages((prev) => [...prev, uiMessage]);
+    shouldAutoScrollRef.current = true;
+    clearNewMessageChannel();
+  }, [newMessageChannel, selectedChannel, currentUserId, clearNewMessageChannel]);
 
   // Cleanup typing timeout on unmount or friend change
   useEffect(() => {
@@ -1474,6 +1759,25 @@ export default function MessagesPage() {
     };
   }, [currentUserId, selectedServer]);
 
+  // Load DM unread counts for friends list and DIRECT MESSAGES indicator
+  useEffect(() => {
+    if (!token || selectedServer) return;
+    let cancelled = false;
+    getConversationList({ token })
+      .then((list) => {
+        if (cancelled) return;
+        const counts: Record<string, number> = {};
+        list.forEach((c) => {
+          if (c.userId) counts[c.userId] = c.unreadCount ?? 0;
+        });
+        setDmUnreadCounts(counts);
+      })
+      .catch(() => {
+        if (!cancelled) setDmUnreadCounts({});
+      });
+    return () => { cancelled = true; };
+  }, [token, selectedServer, selectedDirectMessageFriend?._id]);
+
   // Mở server từ link /messages?server=xxx (sau khi join từ event link)
   useEffect(() => {
     const serverIdFromUrl = searchParams.get("server");
@@ -1497,6 +1801,7 @@ export default function MessagesPage() {
         text: msg.content,
         senderId: msg.senderId._id,
         senderEmail: msg.senderId.email,
+        senderDisplayName: msg.senderId.displayName || undefined,
         senderName: msg.senderId.username || msg.senderId.email,
         senderAvatar: msg.senderId.avatar,
         timestamp: new Date(msg.createdAt),
@@ -1507,6 +1812,9 @@ export default function MessagesPage() {
         giphyId: msg.giphyId || undefined,
         voiceUrl: msg.voiceUrl ?? undefined,
         voiceDuration: msg.voiceDuration ?? undefined,
+        reactions: normalizeReactions(msg.reactions),
+        replyTo: msg.replyTo?._id || undefined,
+        replyToMessage: mapReplyToMessage(msg.replyTo),
       };
 
       //  Replace optimistic message with real message from server
@@ -1571,6 +1879,7 @@ export default function MessagesPage() {
         text: msg.content,
         senderId: msg.senderId._id,
         senderEmail: msg.senderId.email,
+        senderDisplayName: msg.senderId.displayName || undefined,
         senderName: msg.senderId.username || msg.senderId.email,
         senderAvatar: msg.senderId.avatar,
         timestamp: new Date(msg.createdAt),
@@ -1581,6 +1890,9 @@ export default function MessagesPage() {
         giphyId: msg.giphyId || undefined,
         voiceUrl: msg.voiceUrl ?? undefined,
         voiceDuration: msg.voiceDuration ?? undefined,
+        reactions: normalizeReactions(msg.reactions),
+        replyTo: msg.replyTo?._id || undefined,
+        replyToMessage: mapReplyToMessage(msg.replyTo),
       };
 
       console.log("📨 [RECEIVE-DEBUG] Created UIMessage:", {
@@ -1645,6 +1957,14 @@ export default function MessagesPage() {
         return newMap;
       });
 
+      // Increment unread indicator when receiving message in a conversation we're not viewing
+      if (selectedDirectMessageFriend?._id !== friendId) {
+        setDmUnreadCounts((prev) => ({
+          ...prev,
+          [friendId]: (prev[friendId] ?? 0) + 1,
+        }));
+      }
+
       // Auto-scroll to bottom if viewing this conversation (instant for incoming messages)
       if (
         selectedDirectMessageFriend &&
@@ -1706,9 +2026,25 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (selectedChannel && selectedTextChannel) {
+      setReplyingTo(null);
+      const prev = prevChannelRef.current;
+      if (prev && prev !== selectedChannel) leaveChannel(prev);
+      prevChannelRef.current = selectedChannel;
+      joinChannel(selectedChannel);
       loadMessages(selectedChannel);
     }
-  }, [selectedChannel, selectedTextChannel?._id]);
+  }, [selectedChannel, selectedTextChannel?._id, joinChannel, leaveChannel]);
+
+  useEffect(() => {
+    if (!selectedChannel && prevChannelRef.current) {
+      leaveChannel(prevChannelRef.current);
+      prevChannelRef.current = null;
+    }
+  }, [selectedChannel, leaveChannel]);
+
+  useEffect(() => {
+    if (isChannelSocketConnected && selectedChannel) joinChannel(selectedChannel);
+  }, [isChannelSocketConnected, selectedChannel, joinChannel]);
 
   // Voice channel: auto-join LiveKit room when user is in a voice channel (no separate call button)
   useEffect(() => {
@@ -1788,6 +2124,7 @@ export default function MessagesPage() {
     }
   }, [conversations, selectedDirectMessageFriend]);
 
+
   const loadServers = async () => {
     try {
       setLoading(true);
@@ -1852,26 +2189,40 @@ export default function MessagesPage() {
     try {
       const backendMessages = await serversApi.getMessages(channelId, 50, 0);
 
-      const uiMessages: UIMessage[] = backendMessages.map((msg) => ({
+      const uiMessages: UIMessage[] = backendMessages.map((msg: serversApi.Message) => ({
         id: msg._id,
         text: msg.content,
         senderId:
           typeof msg.senderId === "string" ? msg.senderId : msg.senderId._id,
-        senderEmail: typeof msg.senderId === "string" ? "" : msg.senderId.email,
+        senderEmail: typeof msg.senderId === "string" ? "" : (msg.senderId as any).email ?? "",
         senderName:
           typeof msg.senderId === "string"
             ? ""
-            : (msg.senderId as any).username || msg.senderId.email,
+            : (msg.senderId as any).username || (msg.senderId as any).email || "",
+        senderDisplayName:
+          typeof msg.senderId === "string"
+            ? undefined
+            : (msg.senderId as any).displayName || undefined,
         senderAvatar:
           typeof msg.senderId === "string"
             ? undefined
-            : (msg.senderId as any).avatar,
+            : (msg.senderId as any).avatarUrl || (msg.senderId as any).avatar,
         timestamp: new Date(msg.createdAt),
         isFromCurrentUser:
           (typeof msg.senderId === "string"
             ? msg.senderId
-            : msg.senderId._id) === currentUserId,
-        type: "server", // Phân biệt là message từ server/channel
+            : (msg.senderId as any)._id) === currentUserId,
+        type: "server",
+        reactions: normalizeReactions(msg.reactions),
+        replyTo:
+          msg.replyTo && typeof msg.replyTo === "object"
+            ? msg.replyTo._id
+            : typeof msg.replyTo === "string"
+              ? msg.replyTo
+              : undefined,
+        replyToMessage: mapReplyToMessage(
+          msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo : null,
+        ),
       }));
 
       setMessages(uiMessages);
@@ -1963,6 +2314,7 @@ export default function MessagesPage() {
         text: msg.content,
         senderId: msg.senderId._id,
         senderEmail: msg.senderId.email,
+        senderDisplayName: msg.senderId.displayName || undefined,
         senderName: msg.senderId.username || msg.senderId.email,
         senderAvatar: msg.senderId.avatar,
         timestamp: new Date(msg.createdAt),
@@ -1973,6 +2325,9 @@ export default function MessagesPage() {
         giphyId: msg.giphyId || undefined, // Giphy ID if it's a GIF/sticker
         voiceUrl: msg.voiceUrl ?? undefined, // Voice message URL
         voiceDuration: msg.voiceDuration ?? undefined, // Voice message duration
+        reactions: normalizeReactions(msg.reactions),
+        replyTo: msg.replyTo?._id || undefined,
+        replyToMessage: mapReplyToMessage(msg.replyTo),
       }));
 
       console.log(
@@ -2041,6 +2396,7 @@ export default function MessagesPage() {
     setMessageText("");
     setSelectedServer(null);
     setSelectedChannel(null);
+    setDmUnreadCounts((prev) => ({ ...prev, [friend._id]: 0 })); // Clear unread indicator when opening chat
     shouldAutoScrollRef.current = true; // ✅ Enable auto-scroll when switching conversations
     // Pre-scroll to bottom BEFORE loading (prevents visual jump)
     if (messagesContainerRef.current) {
@@ -2049,67 +2405,104 @@ export default function MessagesPage() {
     await loadDirectMessages(friend._id);
   };
 
-  // Handler for adding/removing reactions
+  // Handler for adding/removing reactions (DM and channel)
+  const applyReactionUpdate = (
+    msg: UIMessage,
+    messageId: string,
+    emoji: string,
+  ): UIMessage => {
+    if (msg.id !== messageId) return msg;
+    const reactions = msg.reactions || [];
+    const existingReaction = reactions.find(
+      (r) => r.userIds.includes(currentUserId) && r.emoji === emoji,
+    );
+    if (existingReaction) {
+      return {
+        ...msg,
+        reactions: reactions
+          .map((r) => ({
+            ...r,
+            userIds: r.userIds.filter((id) => id !== currentUserId),
+            count: r.count - 1,
+          }))
+          .filter((r) => r.count > 0),
+      };
+    }
+    const emojiReaction = reactions.find((r) => r.emoji === emoji);
+    if (emojiReaction) {
+      return {
+        ...msg,
+        reactions: reactions.map((r) =>
+          r.emoji === emoji
+            ? {
+                ...r,
+                userIds: [...r.userIds, currentUserId],
+                count: r.count + 1,
+              }
+            : r,
+        ),
+      };
+    }
+    return {
+      ...msg,
+      reactions: [...reactions, { emoji, userIds: [currentUserId], count: 1 }],
+    };
+  };
+
   const handleReaction = async (messageId: string, emoji: string) => {
     try {
-      await addMessageReaction(messageId, emoji, { token });
-
-      // Update local state
       if (selectedDirectMessageFriend) {
         const friendId = selectedDirectMessageFriend._id;
-        const currentMessages = conversations.get(friendId) || [];
-        const updatedMessages = currentMessages.map((msg) => {
-          if (msg.id === messageId) {
-            const reactions = msg.reactions || [];
-            const existingReaction = reactions.find(
-              (r) => r.userIds.includes(currentUserId) && r.emoji === emoji
-            );
-
-            if (existingReaction) {
-              // Remove reaction
-              return {
-                ...msg,
-                reactions: reactions
-                  .map((r) => ({
-                    ...r,
-                    userIds: r.userIds.filter((id) => id !== currentUserId),
-                    count: r.count - 1,
-                  }))
-                  .filter((r) => r.count > 0),
-              };
-            } else {
-              // Add reaction
-              const emojiReaction = reactions.find((r) => r.emoji === emoji);
-              if (emojiReaction) {
-                return {
-                  ...msg,
-                  reactions: reactions.map((r) =>
-                    r.emoji === emoji
-                      ? {
-                          ...r,
-                          userIds: [...r.userIds, currentUserId],
-                          count: r.count + 1,
-                        }
-                      : r
-                  ),
-                };
-              } else {
-                return {
-                  ...msg,
-                  reactions: [
-                    ...reactions,
-                    { emoji, userIds: [currentUserId], count: 1 },
-                  ],
-                };
-              }
-            }
-          }
-          return msg;
+        setConversations((prev) => {
+          const newMap = new Map(prev);
+          const currentMessages = newMap.get(friendId) || [];
+          const updatedMessages = currentMessages.map((msg) =>
+            applyReactionUpdate(msg, messageId, emoji),
+          );
+          newMap.set(friendId, updatedMessages);
+          return newMap;
         });
-        setConversations(new Map(conversations.set(friendId, updatedMessages)));
+        const updatedFromServer = await addMessageReaction(messageId, emoji, { token });
+        if (updatedFromServer?.reactions) {
+          setConversations((prev) => {
+            const newMap = new Map(prev);
+            const list = newMap.get(friendId) || [];
+            const idx = list.findIndex((m) => m.id === messageId);
+            if (idx === -1) return newMap;
+            const next = [...list];
+            next[idx] = {
+              ...next[idx],
+              reactions: normalizeReactions(updatedFromServer.reactions),
+            };
+            newMap.set(friendId, next);
+            return newMap;
+          });
+        }
+        return;
       }
 
-      // Socket will be notified via backend gateway
+      if (selectedChannel) {
+        setMessages((prev) =>
+          prev.map((msg) => applyReactionUpdate(msg, messageId, emoji)),
+        );
+        const updatedFromServer = await serversApi.addMessageReaction(
+          selectedChannel,
+          messageId,
+          emoji,
+        );
+        if (updatedFromServer?.reactions) {
+          setMessages((prev) => {
+            const idx = prev.findIndex((m) => m.id === messageId);
+            if (idx === -1) return prev;
+            const next = [...prev];
+            next[idx] = {
+              ...next[idx],
+              reactions: normalizeReactions(updatedFromServer.reactions),
+            };
+            return next;
+          });
+        }
+      }
     } catch (error) {
       console.error("Failed to add reaction:", error);
     }
@@ -2203,19 +2596,17 @@ export default function MessagesPage() {
   const handleSendMessage = async () => {
     if (!messageText.trim() || !selectedChannel) return;
 
-    // Save content before clearing input
     const content = messageText.trim();
 
     try {
-      // Clear input immediately for better UX
       setMessageText("");
-
-      // ✅ Enable auto-scroll for new message
       shouldAutoScrollRef.current = true;
 
       const newMessage = await serversApi.createMessage(
         selectedChannel,
         content,
+        undefined,
+        replyingTo?.id,
       );
 
       const uiMessage: UIMessage = {
@@ -2224,30 +2615,48 @@ export default function MessagesPage() {
         senderId:
           typeof newMessage.senderId === "string"
             ? newMessage.senderId
-            : newMessage.senderId._id,
+            : (newMessage.senderId as any)?._id,
         senderEmail:
           typeof newMessage.senderId === "string"
             ? ""
-            : newMessage.senderId.email,
+            : (newMessage.senderId as any)?.email ?? "",
         senderName:
           typeof newMessage.senderId === "string"
             ? currentUserProfile?.username || ""
-            : (newMessage.senderId as any).username ||
-              newMessage.senderId.email,
+            : (newMessage.senderId as any)?.username || (newMessage.senderId as any)?.email || currentUserProfile?.username || "",
+        senderDisplayName:
+          typeof newMessage.senderId === "string"
+            ? currentUserProfile?.displayName || undefined
+            : (newMessage.senderId as any)?.displayName ?? currentUserProfile?.displayName ?? undefined,
         senderAvatar:
           typeof newMessage.senderId === "string"
             ? currentUserProfile?.avatar
-            : (newMessage.senderId as any).avatar,
+            : (newMessage.senderId as any)?.avatarUrl ?? (newMessage.senderId as any)?.avatar ?? currentUserProfile?.avatar,
         timestamp: new Date(newMessage.createdAt),
         isFromCurrentUser: true,
         type: "server",
+        replyTo: replyingTo?.id ?? (newMessage.replyTo && typeof newMessage.replyTo === "object" ? (newMessage.replyTo as any)._id : typeof newMessage.replyTo === "string" ? newMessage.replyTo : undefined),
+        replyToMessage:
+          mapReplyToMessage(
+            newMessage.replyTo && typeof newMessage.replyTo === "object" ? newMessage.replyTo : null,
+          ) ?? (replyingTo
+            ? {
+                id: replyingTo.id,
+                senderId: replyingTo.senderId,
+                senderDisplayName: replyingTo.senderDisplayName,
+                senderName: replyingTo.senderName,
+                messageType: replyingTo.messageType ?? "text",
+                text: replyingTo.text,
+              }
+            : null),
+        reactions: normalizeReactions((newMessage as any).reactions),
       };
 
       setMessages((prev) => [...prev, uiMessage]);
+      setReplyingTo(null);
     } catch (err) {
       console.error("Failed to send message", err);
       setError("Không gửi được tin nhắn");
-      // Restore message text on error
       setMessageText(content);
     }
   };
@@ -2257,6 +2666,7 @@ export default function MessagesPage() {
 
     const messageContent = messageText.trim();
     const friendId = selectedDirectMessageFriend._id;
+    let optimisticMessage: UIMessage | null = null;
 
     try {
       // ✅ Stop typing indicator immediately
@@ -2272,11 +2682,12 @@ export default function MessagesPage() {
       setMessageText("");
 
       // ✅ FIX: Create optimistic message
-      const optimisticMessage: UIMessage = {
+      optimisticMessage = {
         id: `temp-${Date.now()}-${Math.random()}`, // Unique temporary ID
         text: messageContent,
         senderId: currentUserId,
         senderEmail: "",
+        senderDisplayName: currentUserProfile?.displayName || undefined,
         senderName: currentUserProfile?.username || "",
         senderAvatar: currentUserProfile?.avatar,
         timestamp: new Date(),
@@ -2284,32 +2695,96 @@ export default function MessagesPage() {
         type: "direct",
         isRead: false, // Not read yet
         messageType: "text",
+        replyTo: replyingTo?.id,
+        replyToMessage: replyingTo
+          ? {
+              id: replyingTo.id,
+              senderId: replyingTo.senderId,
+              senderDisplayName: replyingTo.senderDisplayName,
+              senderName: replyingTo.senderName,
+              messageType: replyingTo.messageType,
+              text: replyingTo.text,
+            }
+          : null,
       };
 
       // ✅ Enable auto-scroll for new message
       shouldAutoScrollRef.current = true;
 
-      // ✅ OPTIMISTIC UPDATE: Only update conversations Map (single source of truth for DMs)
-      // DON'T update messages array to avoid duplicate key errors
+      // ✅ OPTIMISTIC UPDATE: thêm tin nhắn vào conversation ngay để hiển thị không cần reload
       setConversations((prev) => {
         const newMap = new Map(prev);
         const currentMessages = newMap.get(friendId) || [];
-        newMap.set(friendId, [...currentMessages, optimisticMessage]);
+        newMap.set(friendId, [...currentMessages, optimisticMessage!]);
         return newMap;
       });
 
-      // Send via API to support replyTo
-      await sendDirectMessage(friendId, {
+      // Gửi qua API (REST); response trả về tin nhắn đã tạo — dùng để thay temp bằng bản thật
+      const created = await sendDirectMessage(friendId, {
         token,
         content: messageContent,
         replyTo: replyingTo?.id,
       });
 
-      // Clear reply preview
+      if (created && created._id) {
+        const serverMessage: UIMessage = {
+          id: created._id,
+          text: created.content,
+          senderId: typeof created.senderId === "string" ? created.senderId : created.senderId?._id,
+          senderEmail: typeof created.senderId === "object" ? created.senderId?.email : "",
+          senderDisplayName: typeof created.senderId === "object" ? (created.senderId?.displayName || undefined) : undefined,
+          senderName: typeof created.senderId === "object" ? (created.senderId?.username || created.senderId?.email) : "",
+          senderAvatar: typeof created.senderId === "object" ? created.senderId?.avatar : currentUserProfile?.avatar,
+          timestamp: new Date(created.createdAt),
+          isFromCurrentUser: true,
+          type: "direct",
+          isRead: created.isRead ?? false,
+          messageType: created.type || "text",
+          giphyId: created.giphyId ?? undefined,
+          voiceUrl: created.voiceUrl ?? undefined,
+          voiceDuration: created.voiceDuration ?? undefined,
+          replyTo:
+            (created.replyTo?._id as any) ||
+            (typeof created.replyTo === "string" ? created.replyTo : undefined) ||
+            replyingTo?.id,
+          replyToMessage:
+            mapReplyToMessage(created.replyTo) ||
+            (replyingTo
+              ? {
+                  id: replyingTo.id,
+                  senderId: replyingTo.senderId,
+                  senderDisplayName: replyingTo.senderDisplayName,
+                  senderName: replyingTo.senderName,
+                  messageType: replyingTo.messageType,
+                  text: replyingTo.text,
+                }
+              : null),
+          reactions: normalizeReactions(created.reactions),
+        };
+        setConversations((prev) => {
+          const newMap = new Map(prev);
+          const list = newMap.get(friendId) || [];
+          const idx = optimisticMessage ? list.findIndex((m) => m.id === optimisticMessage!.id) : -1;
+          const next = idx >= 0 ? [...list.slice(0, idx), serverMessage, ...list.slice(idx + 1)] : [...list, serverMessage];
+          newMap.set(friendId, next);
+          return newMap;
+        });
+      }
+
       setReplyingTo(null);
     } catch (err) {
       console.error("Failed to send direct message", err);
       setError("Không gửi được tin nhắn trực tiếp");
+      // Khôi phục tin nhắn đã gửi vào input và gỡ optimistic message
+      setMessageText(messageContent);
+      if (!optimisticMessage) return;
+      setConversations((prev) => {
+        const newMap = new Map(prev);
+        const list = newMap.get(friendId) || [];
+        const next = list.filter((m) => m.id !== optimisticMessage!.id);
+        newMap.set(friendId, next);
+        return newMap;
+      });
     }
   };
 
@@ -2329,6 +2804,7 @@ export default function MessagesPage() {
         text: gif.title || `Sent a ${type}`,
         senderId: currentUserId,
         senderEmail: "",
+        senderDisplayName: currentUserProfile?.displayName || undefined,
         senderName: currentUserProfile?.username || "",
         senderAvatar: currentUserProfile?.avatar,
         timestamp: new Date(),
@@ -2416,6 +2892,7 @@ export default function MessagesPage() {
         text: "Tin nhắn thoại",
         senderId: currentUserId,
         senderEmail: "",
+        senderDisplayName: currentUserProfile?.displayName || undefined,
         senderName: currentUserProfile?.username || "",
         senderAvatar: currentUserProfile?.avatar,
         timestamp: new Date(),
@@ -2492,6 +2969,7 @@ export default function MessagesPage() {
             text: response.content,
             senderId: response.senderId._id,
             senderEmail: response.senderId.email,
+            senderDisplayName: response.senderId.displayName || undefined,
             senderName: response.senderId.username || response.senderId.email,
             senderAvatar: response.senderId.avatar,
             timestamp: new Date(response.createdAt),
@@ -2825,6 +3303,7 @@ export default function MessagesPage() {
             text: isImage ? `📤 Uploading image...` : `📤 Uploading video...`,
             senderId: currentUserId,
             senderEmail: "",
+            senderDisplayName: currentUserProfile?.displayName || undefined,
             senderName: currentUserProfile?.username || "",
             senderAvatar: currentUserProfile?.avatar,
             timestamp: new Date(),
@@ -2892,6 +3371,7 @@ export default function MessagesPage() {
             text: mediaMessage,
             senderId: currentUserId,
             senderEmail: "",
+            senderDisplayName: currentUserProfile?.displayName || undefined,
             senderName: currentUserProfile?.username || "",
             senderAvatar: currentUserProfile?.avatar,
             timestamp: new Date(),
@@ -3001,6 +3481,7 @@ export default function MessagesPage() {
         text: `📊 Creating poll...`,
         senderId: currentUserId,
         senderEmail: "",
+        senderDisplayName: currentUserProfile?.displayName || undefined,
         senderName: currentUserProfile?.username || "",
         senderAvatar: currentUserProfile?.avatar,
         timestamp: new Date(),
@@ -3050,6 +3531,7 @@ export default function MessagesPage() {
         text: pollMessage,
         senderId: currentUserId,
         senderEmail: "",
+        senderDisplayName: currentUserProfile?.displayName || undefined,
         senderName: currentUserProfile?.username || "",
         senderAvatar: currentUserProfile?.avatar,
         timestamp: new Date(),
@@ -3275,7 +3757,7 @@ export default function MessagesPage() {
                     <polyline points="22,6 12,13 2,6" />
                   </svg>
                 </button>
-                {hasInboxNotification && <span className={styles.inboxBadge} aria-hidden />}
+                {hasInboxNotification && <span className={styles.inboxDot} aria-hidden />}
               </span>
             </div>
           </div>
@@ -3343,9 +3825,11 @@ export default function MessagesPage() {
 
                 {/* Direct Messages Section */}
                 <div className={styles.directMessagesSection}>
-                  <h3 className={styles.directMessagesTitle}>
-                    DIRECT MESSAGES
-                  </h3>
+                  <div className={styles.directMessagesTitleRow}>
+                    <h3 className={styles.directMessagesTitle}>
+                      DIRECT MESSAGES
+                    </h3>
+                  </div>
 
                   {/* Friends List */}
                   <div className={styles.friendsList}>
@@ -3389,6 +3873,14 @@ export default function MessagesPage() {
                                 {friend.email}
                               </p>
                             </div>
+                            {(dmUnreadCounts[friend._id] ?? 0) > 0 && (
+                              <span className={styles.friendUnreadWrap}>
+                                <span className={styles.dmUnreadDot} aria-hidden />
+                                <span className={styles.dmUnreadBadge}>
+                                  {dmUnreadCounts[friend._id]! > 99 ? "99+" : dmUnreadCounts[friend._id]}
+                                </span>
+                              </span>
+                            )}
                           </div>
                         );
                       })
@@ -3768,14 +4260,16 @@ export default function MessagesPage() {
                                   </div>
                                   <span className={styles.voiceChannelParticipantName}>{p.name}</span>
                                   <div className={styles.voiceChannelParticipantIcons}>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" title="Micro tắt (mute)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-label="Micro tắt (mute)" role="img">
+                                      <title>Micro tắt (mute)</title>
                                       <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
                                       <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                                       <line x1="12" y1="19" x2="12" y2="23" />
                                       <line x1="8" y1="23" x2="16" y2="23" />
                                       <line x1="2" y1="2" x2="22" y2="22" />
                                     </svg>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" title="Tai nghe tắt (deafen)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-label="Tai nghe tắt (deafen)" role="img">
+                                      <title>Tai nghe tắt (deafen)</title>
                                       <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
                                       <path d="M21 19a2 2 0 0 1-2 2h-1v-4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v4H5a2 2 0 0 1-2-2v-5" />
                                       <line x1="2" y1="2" x2="22" y2="22" />
@@ -4043,6 +4537,7 @@ export default function MessagesPage() {
                     </button>
                   </div>
                 </div>
+                {/* Sticky reaction bar (DM): hiện reaction của tin nhắn khi kéo lên gần header */}
                 {/* Messages Container */}
                 <div
                   ref={messagesContainerRef}
@@ -4088,18 +4583,25 @@ export default function MessagesPage() {
                       (
                         conversations.get(selectedDirectMessageFriend._id) || []
                       ).map((message) => (
-                        <MessageItem
+                        <div
                           key={message.id}
-                          message={message}
-                          renderMessageContent={renderMessageContent}
-                          onVisible={handleMessageVisible}
-                          currentUserId={currentUserId}
-                          onReaction={handleReaction}
-                          onReply={handleReplyToMessage}
-                          onPin={handlePinMessage}
-                          onReport={(msgId) => setShowReportDialog(msgId)}
-                          onDelete={(msgId) => setShowDeleteDialog(msgId)}
-                        />
+                          data-message-id={message.id}
+                          data-has-reactions={message.reactions?.length ? "true" : undefined}
+                        >
+                          <MessageItem
+                            message={message}
+                            renderMessageContent={renderMessageContent}
+                            onVisible={handleMessageVisible}
+                            currentUserId={currentUserId}
+                            onReaction={handleReaction}
+                            onReply={handleReplyToMessage}
+                            onPin={handlePinMessage}
+                            onReport={(msgId) => setShowReportDialog(msgId)}
+                            onDelete={(msgId) => setShowDeleteDialog(msgId)}
+                            scrollContainerRef={messagesContainerRef}
+                            dmPartnerDisplayName={selectedDirectMessageFriend.displayName || selectedDirectMessageFriend.username}
+                          />
+                        </div>
                       ))
                     )
                   ) : loading ? (
@@ -4128,18 +4630,24 @@ export default function MessagesPage() {
                     </div>
                   ) : (
                     messages.map((message) => (
-                      <MessageItem
+                      <div
                         key={message.id}
-                        message={message}
-                        renderMessageContent={renderMessageContent}
-                        onVisible={handleMessageVisible}
-                        currentUserId={currentUserId}
-                        onReaction={handleReaction}
-                        onReply={handleReplyToMessage}
-                        onPin={handlePinMessage}
-                        onReport={(msgId) => setShowReportDialog(msgId)}
-                        onDelete={(msgId) => setShowDeleteDialog(msgId)}
-                      />
+                        data-message-id={message.id}
+                        data-has-reactions={message.reactions?.length ? "true" : undefined}
+                      >
+                        <MessageItem
+                          message={message}
+                          renderMessageContent={renderMessageContent}
+                          onVisible={handleMessageVisible}
+                          currentUserId={currentUserId}
+                          onReaction={handleReaction}
+                          onReply={handleReplyToMessage}
+                          onPin={handlePinMessage}
+                          onReport={(msgId) => setShowReportDialog(msgId)}
+                          onDelete={(msgId) => setShowDeleteDialog(msgId)}
+                          scrollContainerRef={messagesContainerRef}
+                        />
+                      </div>
                     ))
                   )}
 
@@ -4192,6 +4700,17 @@ export default function MessagesPage() {
                 {replyingTo && (
                   <ReplyMessagePreview
                     message={replyingTo}
+                    headerText={
+                      replyingTo.isFromCurrentUser
+                        ? "Bạn đã trả lời chính mình"
+                        : `Bạn đã trả lời ${
+                            selectedDirectMessageFriend?.displayName ||
+                            replyingTo.senderDisplayName ||
+                            replyingTo.senderName ||
+                            replyingTo.senderEmail ||
+                            "người dùng"
+                          }`
+                    }
                     onClose={() => setReplyingTo(null)}
                   />
                 )}
@@ -4798,6 +5317,22 @@ export default function MessagesPage() {
             setSelectedChannel(channelId);
             setShowMessagesInbox(false);
           }}
+          onNavigateToDM={(userId, displayName, username, avatarUrl) => {
+            setShowMessagesInbox(false);
+            const existing = friends.find((f) => f._id === userId);
+            const friend: serversApi.Friend = existing ?? {
+              _id: userId,
+              displayName: displayName || username,
+              username: username || "",
+              avatarUrl: avatarUrl ?? "",
+              email: "",
+            };
+            if (!existing) setFriends((prev) => (prev.some((f) => f._id === userId) ? prev : [...prev, friend]));
+            setSelectedDirectMessageFriend(friend);
+            setSelectedServer(null);
+            setSelectedChannel(null);
+            loadDirectMessages(userId);
+          }}
           onAcceptInvite={async (serverId) => {
             await loadServers();
             setSelectedServer(serverId);
@@ -4847,7 +5382,17 @@ export default function MessagesPage() {
         <ServerContextMenu
           x={serverContextMenu.x}
           y={serverContextMenu.y}
-          server={{ _id: serverContextMenu.server._id, name: serverContextMenu.server.name }}
+          server={{
+            _id: serverContextMenu.server._id,
+            name: serverContextMenu.server.name,
+            ownerId: String(
+              (serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId ?? ""
+            ),
+          }}
+          isOwner={
+            currentUserId !== "" &&
+            String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId
+          }
           onClose={() => setServerContextMenu(null)}
           onMarkAsRead={() => setServerContextMenu(null)}
           onInviteToServer={() => {
@@ -4863,6 +5408,8 @@ export default function MessagesPage() {
           onToggleHideMutedChannels={() => {
             setHideMutedChannels((v) => !v);
           }}
+          showAllChannels={showAllChannels}
+          onToggleShowAllChannels={() => setShowAllChannels((v) => !v)}
           onServerSettings={() => {
             setServerSettingsTarget({
               serverId: serverContextMenu.server._id,
@@ -4886,6 +5433,21 @@ export default function MessagesPage() {
             setShowEventsPopup(true);
             if (serverContextMenu.server._id) loadActiveEvents(serverContextMenu.server._id);
             setServerContextMenu(null);
+          }}
+          onLeaveServer={async () => {
+            const serverId = serverContextMenu.server._id;
+            try {
+              await serversApi.leaveServer(serverId);
+              setServers((prev) => prev.filter((s) => s._id !== serverId));
+              if (selectedServer === serverId) {
+                setSelectedServer(null);
+                setSelectedChannel(null);
+              }
+              setServerContextMenu(null);
+            } catch (err) {
+              console.error(err);
+              alert((err as Error)?.message ?? "Không thể rời máy chủ");
+            }
           }}
           notificationLevel={serverNotificationLevel}
         />
@@ -4924,6 +5486,30 @@ export default function MessagesPage() {
                     servers.find((s) => s._id === serverSettingsTarget?.serverId)?.ownerId === currentUserId
                   )
                 }
+                currentUserId={currentUserId ?? ""}
+                token={token}
+                onNavigateToDM={(userId, displayName, username, avatarUrl) => {
+                  setShowServerSettingsPanel(false);
+                  setServerSettingsTarget(null);
+                  const existing = friends.find((f) => f._id === userId);
+                  const friend: serversApi.Friend = existing ?? {
+                    _id: userId,
+                    displayName: displayName || username,
+                    username: username || "",
+                    avatarUrl: avatarUrl ?? "",
+                    email: "",
+                  };
+                  if (!existing) setFriends((prev) => (prev.some((f) => f._id === userId) ? prev : [...prev, friend]));
+                  setSelectedDirectMessageFriend(friend);
+                  setSelectedServer(null);
+                  setSelectedChannel(null);
+                  loadDirectMessages(userId);
+                }}
+                onOwnershipTransferred={async () => {
+                  setShowServerSettingsPanel(false);
+                  setServerSettingsTarget(null);
+                  await loadServers();
+                }}
               />
             );
           }

@@ -427,3 +427,34 @@
 .filterApply:hover {
   background: #4752c4;
 }
+
+.transferText {
+  margin: 0;
+  font-size: 14px;
+  color: #dbdee1;
+  line-height: 1.5;
+}
+
+.transferText strong {
+  color: #f2f3f5;
+}
+
+.transferConfirmBtn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  background: #da373c;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.transferConfirmBtn:hover:not(:disabled) {
+  background: #a12828;
+}
+
+.transferConfirmBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

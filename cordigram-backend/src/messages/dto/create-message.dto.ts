@@ -15,4 +15,8 @@ export class CreateMessageDto {
   @IsOptional()
   @IsArray()
   attachments?: string[];
+
+  @IsOptional()
+  @IsString()
+  replyTo?: string;
 }

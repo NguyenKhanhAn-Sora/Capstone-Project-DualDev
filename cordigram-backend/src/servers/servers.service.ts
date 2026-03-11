@@ -232,6 +232,30 @@ export class ServersService {
     return server.save();
   }
 
+  /** Thành viên (không phải chủ) rời máy chủ. Chủ không thể rời. */
+  async leaveServer(serverId: string, userId: string): Promise<void> {
+    const server = await this.serverModel.findById(serverId);
+
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    if (server.ownerId.toString() === userId) {
+      throw new ForbiddenException('Chủ máy chủ không thể rời. Hãy chuyển quyền hoặc xóa máy chủ.');
+    }
+
+    const wasMember = server.members.some((m) => m.userId.toString() === userId);
+    if (!wasMember) {
+      return;
+    }
+
+    server.members = server.members.filter(
+      (m) => m.userId.toString() !== userId,
+    );
+    server.memberCount = server.members.length;
+    await server.save();
+  }
+
   /** Danh sách thành viên máy chủ (chỉ chủ server). Trả về: tên, avatar, gia nhập server từ, đã tham gia Cordigram, cách gia nhập (link / mời bởi). */
   async getServerMembers(
     serverId: string,
@@ -376,5 +400,46 @@ export class ServersService {
     }
 
     return result;
+  }
+
+  /**
+   * Chuyển quyền sở hữu máy chủ: A (owner) chuyển cho B → B thành owner, A thành member.
+   * Chỉ chủ hiện tại mới gọi được; newOwnerId phải là thành viên và không phải chủ hiện tại.
+   */
+  async transferOwnership(
+    serverId: string,
+    currentOwnerUserId: string,
+    newOwnerId: string,
+  ): Promise<Server> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+    if (server.ownerId.toString() !== currentOwnerUserId) {
+      throw new ForbiddenException('Chỉ chủ máy chủ mới có thể chuyển quyền sở hữu');
+    }
+    if (newOwnerId === currentOwnerUserId) {
+      throw new BadRequestException('Không thể chuyển quyền cho chính mình');
+    }
+    const newOwnerObjectId = new Types.ObjectId(newOwnerId);
+    const currentOwnerObjectId = new Types.ObjectId(currentOwnerUserId);
+    const newOwnerMember = server.members.find(
+      (m) => m.userId.toString() === newOwnerId,
+    );
+    if (!newOwnerMember) {
+      throw new BadRequestException('Người nhận phải là thành viên của máy chủ');
+    }
+
+    server.ownerId = newOwnerObjectId;
+    for (let i = 0; i < server.members.length; i++) {
+      const m = server.members[i];
+      if (m.userId.equals(currentOwnerObjectId)) {
+        server.members[i].role = 'member';
+      } else if (m.userId.equals(newOwnerObjectId)) {
+        server.members[i].role = 'owner';
+      }
+    }
+    await server.save();
+    return server;
   }
 }

@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './user.schema';
 import { Follow, FollowSchema } from './follow.schema';
 import { Block, BlockSchema } from './block.schema';
+import { Ignored, IgnoredSchema } from './ignored.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import {
   UserTasteProfile,
@@ -11,6 +12,7 @@ import {
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { BlocksService } from './blocks.service';
+import { IgnoredService } from './ignored.service';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OtpModule } from '../otp/otp.module';
@@ -23,6 +25,7 @@ import { ActivityModule } from '../activity/activity.module';
       { name: User.name, schema: UserSchema },
       { name: Follow.name, schema: FollowSchema },
       { name: Block.name, schema: BlockSchema },
+      { name: Ignored.name, schema: IgnoredSchema },
       { name: Profile.name, schema: ProfileSchema },
       { name: UserTasteProfile.name, schema: UserTasteProfileSchema },
       { name: Session.name, schema: SessionSchema },
@@ -33,7 +36,7 @@ import { ActivityModule } from '../activity/activity.module';
     ActivityModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService, BlocksService],
-  exports: [UsersService, BlocksService],
+  providers: [UsersService, BlocksService, IgnoredService],
+  exports: [UsersService, BlocksService, IgnoredService],
 })
 export class UsersModule {}
