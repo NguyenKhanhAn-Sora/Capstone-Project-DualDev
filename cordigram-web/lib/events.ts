@@ -16,7 +16,9 @@ export type NotificationReceivedDetail = {
       | "post_comment"
       | "post_mention"
       | "follow"
-      | "login_alert";
+      | "login_alert"
+      | "post_moderation"
+      | "report";
     actor: {
       id: string;
       displayName: string;
@@ -30,6 +32,18 @@ export type NotificationReceivedDetail = {
     commentCount: number;
     mentionCount: number;
     mentionSource: "post" | "comment";
+    reportOutcome?: "no_violation" | "action_taken" | null;
+    reportAudience?: "reporter" | "offender" | null;
+    reportTargetType?: "post" | "comment" | "user" | null;
+    reportAction?: string | null;
+    reportTargetId?: string | null;
+    reportSeverity?: "low" | "medium" | "high" | null;
+    reportStrikeDelta?: number | null;
+    reportStrikeTotal?: number | null;
+    reportReason?: string | null;
+    reportActionExpiresAt?: string | null;
+    moderationDecision?: "approve" | "blur" | "reject" | null;
+    moderationReasons?: string[];
     readAt: string | null;
     createdAt: string;
     activityAt: string;

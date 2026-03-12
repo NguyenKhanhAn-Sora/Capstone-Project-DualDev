@@ -6,6 +6,7 @@ import { ProfilesController } from './profiles.controller';
 import { Follow, FollowSchema } from '../users/follow.schema';
 import { Post, PostSchema } from '../posts/post.schema';
 import { CompaniesModule } from '../companies/companies.module';
+import { User, UserSchema } from '../users/user.schema';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CompaniesModule } from '../companies/companies.module';
       { name: Profile.name, schema: ProfileSchema },
       { name: Follow.name, schema: FollowSchema },
       { name: Post.name, schema: PostSchema },
+      { name: User.name, schema: UserSchema },
     ]),
   ],
   providers: [ProfilesService],

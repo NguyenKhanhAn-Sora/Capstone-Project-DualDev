@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchCurrentProfile, fetchUserSettings } from "@/lib/api";
+import { getAccessTokenStatus } from "@/lib/auth";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -82,6 +83,8 @@ export default function GoogleCallbackPage() {
 
     if (accessToken && !needsProfile) {
       localStorage.setItem("accessToken", accessToken);
+      const redirectAfterLogin =
+        getAccessTokenStatus(accessToken) === "banned" ? "/banned" : "/";
 
       const decodedEmail = decodeJwtEmail(accessToken);
       const safeEmail =
@@ -108,7 +111,7 @@ export default function GoogleCallbackPage() {
         })
         .finally(async () => {
           await syncThemeFromServer(accessToken);
-          router.replace("/");
+          router.replace(redirectAfterLogin);
         });
       return;
     }

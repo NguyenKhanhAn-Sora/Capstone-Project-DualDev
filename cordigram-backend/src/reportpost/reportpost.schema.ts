@@ -45,6 +45,36 @@ export class ReportPost extends Document {
 
   @Prop({ type: String, trim: true, maxlength: 500, default: null })
   note?: string | null;
+
+  @Prop({ type: String, default: 'open', index: true })
+  status?: 'open' | 'resolved';
+
+  @Prop({ type: String, default: null })
+  resolvedAction?: string | null;
+
+  @Prop({ type: String, default: null })
+  resolvedCategory?: string | null;
+
+  @Prop({ type: String, default: null })
+  resolvedReason?: string | null;
+
+  @Prop({ type: String, enum: ['low', 'medium', 'high'], default: null })
+  resolvedSeverity?: 'low' | 'medium' | 'high' | null;
+
+  @Prop({ type: String, trim: true, maxlength: 500, default: null })
+  resolvedNote?: string | null;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  resolvedBy?: Types.ObjectId | null;
+
+  @Prop({ type: Date, default: null })
+  resolvedAt?: Date | null;
+
+  @Prop({ type: Date })
+  createdAt?: Date;
+
+  @Prop({ type: Date })
+  updatedAt?: Date;
 }
 
 export const ReportPostSchema = SchemaFactory.createForClass(ReportPost);

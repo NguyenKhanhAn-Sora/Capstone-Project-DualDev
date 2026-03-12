@@ -1,11 +1,8 @@
 .page {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 640px) clamp(
-      320px,
-      28vw,
-      420px
-    );
   gap: 24px;
+  width: 100%;
+  /* max-width: 1268px; */
   padding: 24px 0 24px 24px;
   min-height: 100vh;
   background: var(--color-bg-home);
@@ -175,7 +172,6 @@
   height: 44px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.12);
   background: #0b1020;
 }
 
@@ -844,7 +840,6 @@
 .repostTextarea:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 1px var(--color-primary);
-  background: rgba(0, 0, 0, 0.2);
 }
 
 .editCard {

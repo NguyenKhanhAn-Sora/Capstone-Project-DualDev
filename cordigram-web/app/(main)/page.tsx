@@ -46,6 +46,10 @@ import { formatDistanceToNow } from "date-fns";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useScrollRestoration } from "@/hooks/use-scroll-restoration";
 import { useTranslations } from "next-intl";
+import {
+  getInteractionMutedMessage,
+  INTERACTION_MUTED_FALLBACK_MESSAGE,
+} from "@/lib/interaction-mute";
 import styles from "./home-feed.module.css";
 
 type LocalFlags = {
@@ -379,8 +383,9 @@ export default function HomePage({
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [repostTarget, setRepostTarget] = useState<RepostTarget | null>(null);
+  const [interactionMuteOverlayMessage, setInteractionMuteOverlayMessage] =
+    useState<string | null>(null);
   const reportHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const repostHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [viewerId, setViewerId] = useState<string | undefined>(() =>
@@ -702,7 +707,6 @@ export default function HomePage({
   useEffect(() => {
     return () => {
       if (reportHideTimerRef.current) clearTimeout(reportHideTimerRef.current);
-      if (repostHideTimerRef.current) clearTimeout(repostHideTimerRef.current);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, []);
@@ -911,34 +915,12 @@ export default function HomePage({
 
   const onLike = async (postId: string, liked: boolean) => {
     if (!token) return;
-    setItems((prev) =>
-      prev.map((p) =>
-        p.item.id === postId
-          ? {
-              ...p,
-              item: {
-                ...p.item,
-                stats: {
-                  ...p.item.stats,
-                  hearts: Math.max(
-                    0,
-                    (p.item.stats.hearts ?? 0) + (liked ? 1 : -1),
-                  ),
-                },
-              },
-              flags: { ...p.flags, liked },
-            }
-          : p,
-      ),
-    );
     try {
       if (liked) {
         await likePost({ token, postId });
       } else {
         await unlikePost({ token, postId });
       }
-      void syncStats();
-    } catch {
       setItems((prev) =>
         prev.map((p) =>
           p.item.id === postId
@@ -950,15 +932,23 @@ export default function HomePage({
                     ...p.item.stats,
                     hearts: Math.max(
                       0,
-                      (p.item.stats.hearts ?? 0) + (liked ? -1 : 1),
+                      (p.item.stats.hearts ?? 0) + (liked ? 1 : -1),
                     ),
                   },
                 },
-                flags: { ...p.flags, liked: !liked },
+                flags: { ...p.flags, liked },
               }
             : p,
         ),
       );
+      void syncStats();
+    } catch (err) {
+      const mutedMessage = getInteractionMutedMessage(err);
+      if (mutedMessage) {
+        setInteractionMuteOverlayMessage(
+          mutedMessage || INTERACTION_MUTED_FALLBACK_MESSAGE,
+        );
+      }
     }
   };
 
@@ -1056,17 +1046,28 @@ export default function HomePage({
         showToast(t("toast.signInToRepost"));
         return;
       }
-      const originalId = resolveOriginalPostId(target.postId);
-      const targetId = target.postId;
-      await createPost({ token, payload: { repostOf: originalId } });
-      incrementRepostStat(originalId);
-      if (originalId !== targetId) {
-        incrementRepostStat(targetId);
-        try {
-          await repostPost({ token, postId: targetId });
-        } catch {}
+      try {
+        const originalId = resolveOriginalPostId(target.postId);
+        const targetId = target.postId;
+        await createPost({ token, payload: { repostOf: originalId } });
+        incrementRepostStat(originalId);
+        if (originalId !== targetId) {
+          incrementRepostStat(targetId);
+          try {
+            await repostPost({ token, postId: targetId });
+          } catch {}
+        }
+        showToast(t("toast.reposted"));
+      } catch (err) {
+        const mutedMessage = getInteractionMutedMessage(err);
+        if (mutedMessage) {
+          setInteractionMuteOverlayMessage(
+            mutedMessage || INTERACTION_MUTED_FALLBACK_MESSAGE,
+          );
+          return;
+        }
+        throw err;
       }
-      showToast(t("toast.reposted"));
     },
     [incrementRepostStat, resolveOriginalPostId, showToast, t, token],
   );
@@ -1077,38 +1078,49 @@ export default function HomePage({
         showToast(t("toast.signInToRepost"));
         return;
       }
-      const originalId = resolveOriginalPostId(target.postId);
-      const targetId = target.postId;
+      try {
+        const originalId = resolveOriginalPostId(target.postId);
+        const targetId = target.postId;
 
-      const note = input.content.trim();
-      const mentions = extractMentionsFromCaption(note);
-      const payload = {
-        repostOf: originalId,
-        content: note || undefined,
-        hashtags: input.hashtags.length ? input.hashtags : undefined,
-        location: input.location.trim() || undefined,
-        allowComments: input.allowComments,
-        allowDownload: Boolean(target.originalAllowDownload),
-        hideLikeCount: input.hideLikeCount,
-        visibility: input.visibility,
-        mentions: mentions.length ? mentions : undefined,
-      };
+        const note = input.content.trim();
+        const mentions = extractMentionsFromCaption(note);
+        const payload = {
+          repostOf: originalId,
+          content: note || undefined,
+          hashtags: input.hashtags.length ? input.hashtags : undefined,
+          location: input.location.trim() || undefined,
+          allowComments: input.allowComments,
+          allowDownload: Boolean(target.originalAllowDownload),
+          hideLikeCount: input.hideLikeCount,
+          visibility: input.visibility,
+          mentions: mentions.length ? mentions : undefined,
+        };
 
-      if (target.kind === "reel") {
-        await createReel({ token, payload: payload as any });
-      } else {
-        await createPost({ token, payload });
+        if (target.kind === "reel") {
+          await createReel({ token, payload: payload as any });
+        } else {
+          await createPost({ token, payload });
+        }
+
+        incrementRepostStat(originalId);
+        if (originalId !== targetId) {
+          incrementRepostStat(targetId);
+          try {
+            await repostPost({ token, postId: targetId });
+          } catch {}
+        }
+
+        showToast(t("toast.repostedWithQuote"));
+      } catch (err) {
+        const mutedMessage = getInteractionMutedMessage(err);
+        if (mutedMessage) {
+          setInteractionMuteOverlayMessage(
+            mutedMessage || INTERACTION_MUTED_FALLBACK_MESSAGE,
+          );
+          return;
+        }
+        throw err;
       }
-
-      incrementRepostStat(originalId);
-      if (originalId !== targetId) {
-        incrementRepostStat(targetId);
-        try {
-          await repostPost({ token, postId: targetId });
-        } catch {}
-      }
-
-      showToast(t("toast.repostedWithQuote"));
     },
     [incrementRepostStat, resolveOriginalPostId, showToast, t, token],
   );
@@ -1679,6 +1691,43 @@ export default function HomePage({
         quoteCharLimit={QUOTE_CHAR_LIMIT}
         animationMs={REPORT_ANIMATION_MS}
       />
+
+      {interactionMuteOverlayMessage ? (
+        <div
+          className={`${styles.modalOverlay} ${styles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setInteractionMuteOverlayMessage(null)}
+        >
+          <div
+            className={`${styles.modalCard} ${styles.modalCardOpen}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <div>
+                <h3 className={styles.modalTitle}>Interaction muted</h3>
+                <p className={styles.modalBody}>{interactionMuteOverlayMessage}</p>
+              </div>
+              <button
+                className={styles.closeBtn}
+                aria-label={tCommon("close")}
+                onClick={() => setInteractionMuteOverlayMessage(null)}
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.modalPrimary}
+                onClick={() => setInteractionMuteOverlayMessage(null)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {toastMessage ? <div className={styles.toast}>{toastMessage}</div> : null}
     </div>
@@ -2525,7 +2574,7 @@ function FeedCard({
     }
   };
   const [mediaIndex, setMediaIndex] = useState(0);
-  const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [soundOn, setSoundOn] = useState(false);
   const lastTimeRef = useRef(0);
@@ -2600,6 +2649,7 @@ function FeedCard({
   useEffect(() => {
     setMediaIndex(0);
     setSoundOn(false);
+    setImageViewerOpen(false);
   }, [id]);
 
   useEffect(() => {
@@ -2607,6 +2657,7 @@ function FeedCard({
     if (mediaCount === 0) {
       setMediaIndex(0);
       setSoundOn(false);
+      setImageViewerOpen(false);
       return;
     }
     setMediaIndex((prev) => (prev >= mediaCount ? 0 : prev));
@@ -2869,12 +2920,14 @@ function FeedCard({
   const hideLikeToggleLabel = hideLikeCount
     ? t("menu.showLike")
     : t("menu.hideLike");
+  const isReachRestricted = data.moderationState === "restricted";
   const showInlineFollow =
     !isSelf &&
     Boolean(authorOwnerId) &&
     (!initialFollowingRef.current || followToggledRef.current || !isFollowing);
 
   const shareCount = stats.reposts ?? stats.shares ?? 0;
+  const canRepost = data.canRepost !== false;
 
   const isMutedForPost = useMemo(() => {
     if (!isSelf) return false;
@@ -3611,17 +3664,19 @@ function FeedCard({
                     >
                       {t("menu.editPost")}
                     </button>
-                    <button
-                      className={styles.menuItem}
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setVisibilityError("");
-                        setVisibilitySelected(visibility ?? "public");
-                        setVisibilityModalOpen(true);
-                      }}
-                    >
-                      {t("menu.editVisibility")}
-                    </button>
+                    {!isReachRestricted ? (
+                      <button
+                        className={styles.menuItem}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setVisibilityError("");
+                          setVisibilitySelected(visibility ?? "public");
+                          setVisibilityModalOpen(true);
+                        }}
+                      >
+                        {t("menu.editVisibility")}
+                      </button>
+                    ) : null}
                     <button
                       className={styles.menuItem}
                       onClick={() => {
@@ -3861,7 +3916,7 @@ function FeedCard({
                 alt={t("media.alt")}
                 className={styles.mediaVisual}
                 onContextMenu={(e) => e.preventDefault()}
-                onClick={() => setImageViewerUrl(current.url)}
+                onClick={() => setImageViewerOpen(true)}
               />
             );
           })()}
@@ -3914,11 +3969,33 @@ function FeedCard({
         </div>
       ) : null}
 
-      {imageViewerUrl ? (
+      {imageViewerOpen && media?.[mediaIndex] ? (
         <ImageViewerOverlay
-          url={imageViewerUrl}
+          url={media[mediaIndex].url}
+          mediaType={media[mediaIndex].type}
           alt={t("media.overlayAlt")}
-          onClose={() => setImageViewerUrl(null)}
+          onClose={() => setImageViewerOpen(false)}
+          onPrevious={
+            media.length > 1
+              ? () =>
+                  setMediaIndex((prev) =>
+                    media.length ? (prev - 1 + media.length) % media.length : 0,
+                  )
+              : undefined
+          }
+          onNext={
+            media.length > 1
+              ? () =>
+                  setMediaIndex((prev) =>
+                    media.length ? (prev + 1) % media.length : 0,
+                  )
+              : undefined
+          }
+          previousLabel={t("media.previous")}
+          nextLabel={t("media.next")}
+          counterText={
+            media.length > 1 ? `${mediaIndex + 1}/${media.length}` : undefined
+          }
         />
       ) : null}
 
@@ -3978,13 +4055,17 @@ function FeedCard({
           <IconSave size={20} filled={saved} />
           <span>{saved ? t("actions.saved") : t("actions.save")}</span>
         </button>
-        <button
-          className={styles.actionBtn}
-          onClick={(e) => onShare(id, e.currentTarget.getBoundingClientRect())}
-        >
-          <IconReup size={20} />
-          <span>{t("actions.repost")}</span>
-        </button>
+        {canRepost ? (
+          <button
+            className={styles.actionBtn}
+            onClick={(e) =>
+              onShare(id, e.currentTarget.getBoundingClientRect())
+            }
+          >
+            <IconReup size={20} />
+            <span>{t("actions.repost")}</span>
+          </button>
+        ) : null}
       </div>
 
       {editOpen

@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isAccessTokenValid } from "@/lib/auth";
+import { getAccessTokenStatus, isAccessTokenValid } from "@/lib/auth";
 
 export function useRequireAuth(): boolean {
   const router = useRouter();
   const [canRender, setCanRender] = useState(false);
   const lastTokenRef = useRef<string | null>(null);
+  const skipRestoreKey = "skipSessionRestore";
 
   useEffect(() => {
     const check = () => {
@@ -15,13 +16,24 @@ export function useRequireAuth(): boolean {
         typeof window !== "undefined"
           ? localStorage.getItem("accessToken")
           : null;
+      const previous = lastTokenRef.current;
       lastTokenRef.current = token;
       const valid = isAccessTokenValid(token);
       if (!valid) {
+        if (previous && !token && typeof window !== "undefined") {
+          window.sessionStorage.setItem(skipRestoreKey, "1");
+        }
         router.replace("/login");
         setCanRender(false);
         return false;
       }
+
+      if (getAccessTokenStatus(token) === "banned") {
+        router.replace("/banned");
+        setCanRender(false);
+        return false;
+      }
+
       setCanRender(true);
       return true;
     };
@@ -70,7 +82,11 @@ export function useRedirectIfAuthed(): boolean {
       lastTokenRef.current = token;
       const valid = isAccessTokenValid(token);
       if (valid) {
-        router.replace("/");
+        if (getAccessTokenStatus(token) === "banned") {
+          router.replace("/banned");
+        } else {
+          router.replace("/");
+        }
         setCanRender(false);
         return false;
       }

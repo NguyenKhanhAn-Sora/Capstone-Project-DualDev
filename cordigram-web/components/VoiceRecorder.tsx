@@ -21,7 +21,6 @@ export default function VoiceRecorder({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const pausedTimeRef = useRef<number>(0);
-  const recordingTimeRef = useRef<number>(0);
 
   // Start recording on mount
   useEffect(() => {
@@ -36,29 +35,12 @@ export default function VoiceRecorder({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      // Try MP4 first (best browser support), fallback to WebM, then OGG
-      let mimeType = "audio/mp4";
-      let fileExtension = "m4a";
-      
-      if (MediaRecorder.isTypeSupported("audio/mp4")) {
-        mimeType = "audio/mp4";
-        fileExtension = "m4a";
-        console.log("🎤 [RECORDER] Using MP4 format");
-      } else if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-        mimeType = "audio/webm;codecs=opus";
-        fileExtension = "webm";
-        console.log("🎤 [RECORDER] Using WebM with Opus codec");
-      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
-        mimeType = "audio/webm";
-        fileExtension = "webm";
-        console.log("🎤 [RECORDER] Using WebM format");
-      } else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
-        mimeType = "audio/ogg;codecs=opus";
-        fileExtension = "ogg";
-        console.log("🎤 [RECORDER] Using OGG with Opus codec");
-      } else {
-        console.warn("⚠️ [RECORDER] No preferred format supported, using default");
-      }
+      // Use webm format (widely supported)
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : MediaRecorder.isTypeSupported("audio/ogg")
+          ? "audio/ogg"
+          : "audio/mp4";
 
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
@@ -72,15 +54,8 @@ export default function VoiceRecorder({
 
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        console.log("🎤 [RECORDER] Recording stopped, blob size:", audioBlob.size);
-        console.log("🎤 [RECORDER] MIME type:", mimeType);
-        console.log("🎤 [RECORDER] Extension:", fileExtension);
-        
-        // Use ref to get the latest recording time (avoids stale closure)
-        const duration = Math.max(1, Math.floor(recordingTimeRef.current / 1000));
-        console.log("🎤 [RECORDER] Duration (seconds):", duration, "from ref:", recordingTimeRef.current);
-        // Pass both blob and metadata
-        (onRecordComplete as any)(audioBlob, duration, { mimeType, fileExtension });
+        const duration = Math.floor(recordingTime / 1000);
+        onRecordComplete(audioBlob, duration);
 
         // Stop all tracks
         stream.getTracks().forEach((track) => track.stop());
@@ -92,9 +67,9 @@ export default function VoiceRecorder({
 
       // Start timer
       timerRef.current = setInterval(() => {
-        const newTime = Date.now() - startTimeRef.current + pausedTimeRef.current;
-        recordingTimeRef.current = newTime;
-        setRecordingTime(newTime);
+        setRecordingTime(
+          Date.now() - startTimeRef.current + pausedTimeRef.current,
+        );
       }, 100);
     } catch (error) {
       console.error("Failed to access microphone:", error);
@@ -124,9 +99,9 @@ export default function VoiceRecorder({
       mediaRecorderRef.current.resume();
       startTimeRef.current = Date.now();
       timerRef.current = setInterval(() => {
-        const newTime = Date.now() - startTimeRef.current + pausedTimeRef.current;
-        recordingTimeRef.current = newTime;
-        setRecordingTime(newTime);
+        setRecordingTime(
+          Date.now() - startTimeRef.current + pausedTimeRef.current,
+        );
       }, 100);
       setIsPaused(false);
     } else {

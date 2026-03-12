@@ -33,7 +33,11 @@ import {
   type FollowListItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
-import { emitCurrentProfileUpdated } from "@/lib/events";
+import {
+  emitCurrentProfileUpdated,
+  NOTIFICATION_RECEIVED_EVENT,
+  type NotificationReceivedDetail,
+} from "@/lib/events";
 import {
   ProfileProvider,
   type ProfileTabKey,
@@ -123,7 +127,10 @@ const USER_REPORT_GROUPS: UserReportCategory[] = [
     reasons: [
       { key: "harassment", label: "Harassment or bullying" },
       { key: "hate_speech", label: "Hate speech or slurs" },
-      { key: "stalking", label: "Stalking or targeted intimidation" },
+      {
+        key: "offensive_discrimination",
+        label: "Offensive discrimination",
+      },
     ],
   },
   {
@@ -131,7 +138,8 @@ const USER_REPORT_GROUPS: UserReportCategory[] = [
     label: "Threats / Safety",
     accent: "#ef4444",
     reasons: [
-      { key: "threats", label: "Violence or physical threats" },
+      { key: "violence_threats", label: "Violence or physical threats" },
+      { key: "graphic_violence", label: "Graphic violence" },
       { key: "self_harm", label: "Encouraging self-harm" },
       { key: "extremism", label: "Extremism or terrorism" },
     ],
@@ -142,8 +150,7 @@ const USER_REPORT_GROUPS: UserReportCategory[] = [
     accent: "#22c55e",
     reasons: [
       { key: "impersonation", label: "Pretending to be someone else" },
-      { key: "fake_identity", label: "Fake or misleading identity" },
-      { key: "deceptive_claims", label: "Deceptive claims or credentials" },
+      { key: "fake_news", label: "Fake news or misinformation" },
     ],
   },
   {
@@ -152,8 +159,8 @@ const USER_REPORT_GROUPS: UserReportCategory[] = [
     accent: "#14b8a6",
     reasons: [
       { key: "spam", label: "Spam or mass mentions" },
-      { key: "scam", label: "Scam or fraud" },
-      { key: "unauthorized_ads", label: "Unwanted promotions" },
+      { key: "financial_scam", label: "Scam or fraud" },
+      { key: "unsolicited_ads", label: "Unwanted promotions" },
     ],
   },
   {
@@ -162,9 +169,8 @@ const USER_REPORT_GROUPS: UserReportCategory[] = [
     accent: "#06b6d4",
     reasons: [
       { key: "doxxing", label: "Sharing private information" },
-      { key: "unwanted_contact", label: "Unwanted contact or harassment" },
       {
-        key: "nonconsensual_content",
+        key: "nonconsensual_intimate",
         label: "Non-consensual intimate content",
       },
     ],
@@ -285,6 +291,9 @@ export default function ProfileLayout({
   const [blocking, setBlocking] = useState(false);
   const [blockError, setBlockError] = useState("");
   const [blockedView, setBlockedView] = useState(false);
+  const [blockedMessage, setBlockedMessage] = useState(
+    "The link may be broken or the profile may have been removed.",
+  );
   const [privateView, setPrivateView] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportCategory, setReportCategory] = useState<
@@ -396,6 +405,9 @@ export default function ProfileLayout({
       return;
     }
     setBlockedView(false);
+    setBlockedMessage(
+      "The link may be broken or the profile may have been removed.",
+    );
     setPrivateView(false);
     setViewerId(getUserIdFromToken(token));
 
@@ -414,7 +426,12 @@ export default function ProfileLayout({
             : "Unable to load profile";
         const lowered = message.toLowerCase();
         const isPrivate = maybeStatus === 403 && lowered.includes("private");
+        const isUnavailable =
+          lowered.includes("unavailable") ||
+          lowered.includes("suspended") ||
+          lowered.includes("banned");
         const isBlocked =
+          isUnavailable ||
           maybeStatus === 423 ||
           lowered.includes("block") ||
           (maybeStatus === 403 && !isPrivate);
@@ -423,6 +440,9 @@ export default function ProfileLayout({
           setError("");
         } else if (isBlocked) {
           setBlockedView(true);
+          if (isUnavailable) {
+            setBlockedMessage("This account is currently unavailable.");
+          }
           setError("");
         } else {
           setError(message || "Unable to load profile");
@@ -583,6 +603,72 @@ export default function ProfileLayout({
     void prefetchTab("repost");
     if (isOwner) void prefetchTab("saved");
   }, [profile?.userId, isOwner, prefetchTab]);
+
+  const removePostFromProfileTabs = useCallback((postId: string) => {
+    if (!postId) return;
+    let removedFromAuthored = false;
+
+    setTabs((prev) => {
+      let changed = false;
+
+      const pruneItems = (items: FeedItem[]): FeedItem[] =>
+        items.filter((item) => {
+          if (!item) return false;
+          const matchesDirect = item.id === postId;
+          const matchesOrigin = (item as { repostOf?: string | null }).repostOf === postId;
+          const shouldRemove = matchesDirect || matchesOrigin;
+          if (shouldRemove && matchesDirect && !item.repostOf) {
+            removedFromAuthored = true;
+          }
+          return !shouldRemove;
+        });
+
+      const nextPosts = pruneItems(prev.posts.items);
+      const nextReels = pruneItems(prev.reels.items);
+      const nextRepost = pruneItems(prev.repost.items);
+      const nextSaved = pruneItems(prev.saved.items);
+
+      if (nextPosts.length !== prev.posts.items.length) changed = true;
+      if (nextReels.length !== prev.reels.items.length) changed = true;
+      if (nextRepost.length !== prev.repost.items.length) changed = true;
+      if (nextSaved.length !== prev.saved.items.length) changed = true;
+
+      if (!changed) return prev;
+
+      return {
+        ...prev,
+        posts: { ...prev.posts, items: nextPosts },
+        reels: { ...prev.reels, items: nextReels },
+        repost: { ...prev.repost, items: nextRepost },
+        saved: { ...prev.saved, items: nextSaved },
+      };
+    });
+
+    if (removedFromAuthored) {
+      setAuthoredCount((prev) => (prev == null ? prev : Math.max(0, prev - 1)));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!profile?.userId || !viewerId || profile.userId !== viewerId) return;
+
+    const handleNotification = (event: Event) => {
+      const detail = (event as CustomEvent<NotificationReceivedDetail>).detail;
+      const notification = detail?.notification;
+      if (!notification || notification.type !== "report") return;
+      if (notification.reportOutcome !== "action_taken") return;
+      if (notification.reportAudience !== "offender") return;
+      if (notification.reportAction !== "remove_post") return;
+      if (!notification.postId) return;
+
+      removePostFromProfileTabs(notification.postId);
+    };
+
+    window.addEventListener(NOTIFICATION_RECEIVED_EVENT, handleNotification);
+    return () => {
+      window.removeEventListener(NOTIFICATION_RECEIVED_EVENT, handleNotification);
+    };
+  }, [profile?.userId, viewerId, removePostFromProfileTabs]);
 
   useEffect(() => {
     const token = getStoredAccessToken();
@@ -1095,7 +1181,13 @@ export default function ProfileLayout({
     }
   };
 
-  function BlockedProfile({ onHome }: { onHome: () => void }) {
+  function BlockedProfile({
+    onHome,
+    message,
+  }: {
+    onHome: () => void;
+    message?: string;
+  }) {
     return (
       <div className={styles.blockedWrap}>
         <div className={styles.blockedIcon} aria-hidden>
@@ -1103,7 +1195,7 @@ export default function ProfileLayout({
         </div>
         <div className={styles.blockedTitle}>Profile is not available</div>
         <div className={styles.blockedText}>
-          The link may be broken or the profile may have been removed.
+          {message || "The link may be broken or the profile may have been removed."}
         </div>
         <button type="button" className={styles.blockedButton} onClick={onHome}>
           Go back home
@@ -1177,7 +1269,10 @@ export default function ProfileLayout({
   return (
     <div className={styles.page}>
       {blockedView ? (
-        <BlockedProfile onHome={() => router.push("/")} />
+        <BlockedProfile
+          onHome={() => router.push("/")}
+          message={blockedMessage}
+        />
       ) : shouldShowPrivate ? (
         <PrivateProfile onHome={() => router.push("/")} />
       ) : (

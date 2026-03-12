@@ -415,7 +415,7 @@ export default function SignupPage() {
           setFieldError((prev) => ({ ...prev, username: undefined }));
         }
       } catch (_err) {
-        // Náº¿u API lá»—i, khÃ´ng cháº·n nhÆ°ng cÅ©ng khÃ´ng Ä‘áº·t available
+        // Nếu API lỗi, không chặn nhưng cũng không đặt available
       } finally {
         setUsernameChecking(false);
       }
@@ -696,7 +696,7 @@ export default function SignupPage() {
       const apiErr = err as ApiError<{ retryAfterSec?: number }>;
       if (
         apiErr.message?.toLowerCase().includes("email") &&
-        apiErr.message?.toLowerCase().includes("Ä‘Ã£")
+        apiErr.message?.toLowerCase().includes("đã")
       ) {
         setFieldError({ email: apiErr.message });
         setError("");
@@ -775,7 +775,7 @@ export default function SignupPage() {
       if (!trimmedPassword) {
         setFieldError((prev) => ({
           ...prev,
-          password: "Password is required",
+          password: "Password is reqiure",
         }));
         return;
       }
@@ -857,7 +857,6 @@ export default function SignupPage() {
     });
 
     setStoredAccessToken(res.accessToken);
-
     if (typeof window !== "undefined") {
       localStorage.setItem("ui-theme", "light");
     }
@@ -1009,13 +1008,11 @@ export default function SignupPage() {
       <form className="space-y-[16px]" onSubmit={handleVerifyOtp}>
         <div className="space-y-[6px]">
           <div className={styles.labelRow}>
-            <label className={styles.label} htmlFor="otp-code">Enter OTP code</label>
+            <label className={styles.label}>Enter OTP code</label>
             <span className={styles.muted}>Sent to {email}</span>
           </div>
           <input
             type="text"
-            name="otp-code"
-            id="otp-code"
             inputMode="numeric"
             pattern="[0-9]*"
             maxLength={6}
@@ -1023,7 +1020,6 @@ export default function SignupPage() {
             onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
             className={styles.input}
             placeholder="Example: 123456"
-            autoComplete="one-time-code"
           />
         </div>
         <div className={styles.inlineActions}>
@@ -1065,16 +1061,13 @@ export default function SignupPage() {
     <form className="space-y-[14px]" onSubmit={handleProfileNext}>
       <div className={styles.gridTwoCols}>
         <div className="space-y-[6px]">
-          <label className={styles.label} htmlFor="display-name">Display name</label>
+          <label className={styles.label}>Display name</label>
           <input
             type="text"
-            name="display-name"
-            id="display-name"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             className={styles.input}
             placeholder="E.g. Cordigrammer"
-            autoComplete="name"
             required
           />
           {fieldError.displayName && (
@@ -1082,11 +1075,9 @@ export default function SignupPage() {
           )}
         </div>
         <div className="space-y-[6px]">
-          <label className={styles.label} htmlFor="username">Username</label>
+          <label className={styles.label}>Username</label>
           <input
             type="text"
-            name="username"
-            id="username"
             value={username}
             onChange={(e) => {
               const cleaned = e.target.value
@@ -1097,7 +1088,6 @@ export default function SignupPage() {
                 .slice(0, 30);
               setUsername(cleaned);
             }}
-            autoComplete="username"
             className={styles.input}
             placeholder="username"
             pattern="^[a-z0-9_\\.]{3,30}$"
@@ -1551,7 +1541,7 @@ export default function SignupPage() {
                           active ? styles.stepBulletActive : ""
                         } ${done ? styles.stepBulletDone : ""}`}
                       >
-                        {done ? "âœ“" : index + 1}
+                        {done ? "✓" : index + 1}
                       </div>
                       <span className={styles.stepLabel}>{label}</span>
                     </div>
@@ -1646,15 +1636,15 @@ export default function SignupPage() {
 
                 <div className={styles["hero-badges"]}>
                   <div className={styles["hero-badge"]}>
-                    <span className={styles["hero-badge-icon"]}>â—†</span>
+                    <span className={styles["hero-badge-icon"]}>◆</span>
                     <p>Permissions and roles to manage communities safely.</p>
                   </div>
                   <div className={styles["hero-badge"]}>
-                    <span className={styles["hero-badge-icon"]}>â‡†</span>
+                    <span className={styles["hero-badge-icon"]}>⇆</span>
                     Multi-device sync with instant notifications.
                   </div>
                   <div className={styles["hero-badge"]}>
-                    <span className={styles["hero-badge-icon"]}>â˜…</span>
+                    <span className={styles["hero-badge-icon"]}>★</span>
                     Modern UI optimized for sharing content.
                   </div>
                 </div>

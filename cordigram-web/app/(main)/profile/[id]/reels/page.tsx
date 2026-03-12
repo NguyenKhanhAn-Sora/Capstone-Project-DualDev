@@ -34,7 +34,8 @@ const IconView = () => (
 
 export default function ProfileReelsPage() {
   const router = useRouter();
-  const { tabs, prefetchTab } = useProfileContext();
+  const { profile, tabs, prefetchTab } = useProfileContext();
+  const ownerUserId = profile.userId || profile.id;
   const tab = tabs?.reels;
 
   useEffect(() => {
@@ -66,7 +67,23 @@ export default function ProfileReelsPage() {
         <ReelGrid
           items={items}
           loading={showSkeleton}
-          onSelect={(path) => router.push(path)}
+          onSelect={(item) => {
+            const targetId = (item as any)?.repostOf || item.id;
+            const kind = (item as any)?.repostKind || item.kind;
+            const isReel = kind === "reel" || item.media?.[0]?.type === "video";
+
+            if (!isReel) {
+              router.push(`/post/${targetId}`);
+              return;
+            }
+
+            const query = new URLSearchParams();
+            query.set("fromProfile", "1");
+            if (ownerUserId) {
+              query.set("profileId", ownerUserId);
+            }
+            router.push(`/reels/${targetId}?${query.toString()}`);
+          }}
         />
       )}
     </>
@@ -80,15 +97,8 @@ function ReelGrid({
 }: {
   items: FeedItem[];
   loading: boolean;
-  onSelect: (path: string) => void;
+  onSelect: (item: FeedItem) => void;
 }) {
-  const resolveTargetPath = (item: FeedItem) => {
-    const targetId = (item as any)?.repostOf || item.id;
-    const kind = (item as any)?.repostKind || item.kind;
-    const isReel = kind === "reel" || item.media?.[0]?.type === "video";
-    return isReel ? `/reels/${targetId}?single=1` : `/post/${targetId}`;
-  };
-
   const handleEnter = (e: React.MouseEvent<HTMLVideoElement>) => {
     const el = e.currentTarget;
     el.currentTime = 0;
@@ -120,13 +130,12 @@ function ReelGrid({
       {items.map((item) => {
         const media = item.media?.[0];
         if (!media) return null;
-        const targetPath = resolveTargetPath(item);
         return (
           <button
             key={item.id}
             type="button"
             className={styles.tile}
-            onClick={() => onSelect(targetPath)}
+            onClick={() => onSelect(item)}
           >
             <video
               className={styles.tileMedia}

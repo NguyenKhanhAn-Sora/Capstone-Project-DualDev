@@ -24,6 +24,9 @@ import { v4 as uuid } from 'uuid';
 import { ConfigService } from '../config/config.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { User } from '../users/user.schema';
 
 type MulterFile = {
   buffer: Buffer;
@@ -56,6 +59,7 @@ export class ProfilesController {
     private readonly profilesService: ProfilesService,
     private readonly config: ConfigService,
     private readonly cloudinaryService: CloudinaryService,
+    @InjectModel(User.name) private readonly userModel: Model<User>,
   ) {}
 
   @Get('check-username')
@@ -96,12 +100,21 @@ export class ProfilesController {
       throw new NotFoundException('Profile not found');
     }
 
+    const userDoc = await this.userModel
+      .findById(user.userId)
+      .select('status signupStage accountLimitedUntil accountLimitedIndefinitely')
+      .lean();
+
     return {
       id: profile._id?.toString?.() ?? (profile as { id?: string }).id,
       userId: profile.userId?.toString?.() ?? user.userId,
       displayName: profile.displayName,
       username: profile.username,
       avatarUrl: profile.avatarUrl,
+      status: userDoc?.status ?? 'active',
+      signupStage: userDoc?.signupStage ?? 'completed',
+      accountLimitedUntil: userDoc?.accountLimitedUntil ?? null,
+      accountLimitedIndefinitely: Boolean(userDoc?.accountLimitedIndefinitely),
     };
   }
 

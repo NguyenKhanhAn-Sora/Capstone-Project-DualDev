@@ -23,7 +23,6 @@ import { ServersModule } from './servers/servers.module';
 import { ChannelsModule } from './channels/channels.module';
 import { MessagesModule } from './messages/messages.module';
 import { DirectMessagesModule } from './direct-messages/direct-messages.module';
-import { FollowsModule } from './follows/follows.module';
 import { PollsModule } from './polls/polls.module';
 import { LivekitModule } from './livekit/livekit.module';
 import { ActivityModule } from './activity/activity.module';
@@ -56,7 +55,6 @@ import { ServerInvitesModule } from './server-invites/server-invites.module';
     ChannelsModule,
     MessagesModule,
     DirectMessagesModule,
-    FollowsModule,
     PollsModule,
     LivekitModule,
     ActivityModule,

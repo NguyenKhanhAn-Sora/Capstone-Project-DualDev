@@ -15,6 +15,45 @@
   padding: 16px;
 }
 
+.profilePostNavRail {
+  position: fixed;
+  right: max(20px, calc((100vw - min(1200px, 96vw)) / 2 - 64px));
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 61;
+}
+
+.profilePostNavBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  color: var(--color-text, #e5e7eb);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    transform 0.14s ease,
+    border-color 0.16s ease;
+}
+
+.profilePostNavBtn:hover {
+  background: color-mix(in srgb, var(--color-surface-muted) 86%, transparent);
+  border-color: color-mix(in srgb, var(--color-border) 100%, transparent);
+  transform: translateY(-1px);
+}
+
+.profilePostNavBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .pageShell {
   width: 100%;
   display: flex;
@@ -47,6 +86,72 @@
   padding: unset;
   border: unset;
   border-radius: unset;
+}
+
+.moderationRevealOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.moderationRevealBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  max-width: min(560px, 90%);
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-bg) 72%, transparent);
+  backdrop-filter: blur(5px);
+  text-align: center;
+  pointer-events: auto;
+}
+
+.moderationRevealNote {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-text, #e5e7eb);
+  font-weight: 600;
+}
+
+.moderationRevealButton {
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+  color: var(--color-text, #e5e7eb);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.moderationRevealButton:hover {
+  background: color-mix(in srgb, var(--color-surface-muted) 85%, transparent);
+  border-color: color-mix(in srgb, var(--color-border) 100%, transparent);
+}
+
+:global([data-theme="light"]) .moderationRevealBox {
+  background: color-mix(in srgb, #0f172a 65%, transparent);
+}
+
+:global([data-theme="light"]) .moderationRevealNote,
+:global([data-theme="light"]) .moderationRevealButton {
+  color: #f8fafc;
+}
+
+:global([data-theme="light"]) .moderationRevealButton {
+  border-color: rgba(248, 250, 252, 0.35);
+  background: rgba(15, 23, 42, 0.28);
 }
 
 .headerRow {

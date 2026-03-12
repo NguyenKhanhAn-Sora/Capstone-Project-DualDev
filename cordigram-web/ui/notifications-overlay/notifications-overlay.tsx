@@ -127,6 +127,71 @@ function IconDots() {
   );
 }
 
+function IconSeverityInfo() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 10.4v6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="7.6" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconSeverityWarning() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 3.8 20 18a1.2 1.2 0 0 1-1.04 1.8H5.04A1.2 1.2 0 0 1 4 18L12 3.8Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="M12 9v4.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="16.4" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconSeverityCritical() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 7.8v6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="16.8" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function renderSystemNoticeBadge(item: NotificationItem): JSX.Element | null {
+  if (item.type !== "system_notice") return null;
+  const level = item.systemNoticeLevel ?? "info";
+
+  if (level === "critical") {
+    return (
+      <span className={`${styles.noticeBadge} ${styles.noticeBadgeCritical}`}>
+        <IconSeverityCritical />
+        <span>Critical</span>
+      </span>
+    );
+  }
+
+  if (level === "warning") {
+    return (
+      <span className={`${styles.noticeBadge} ${styles.noticeBadgeWarning}`}>
+        <IconSeverityWarning />
+        <span>Warning</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className={`${styles.noticeBadge} ${styles.noticeBadgeInfo}`}>
+      <IconSeverityInfo />
+      <span>Info</span>
+    </span>
+  );
+}
+
 const TABS: TabConfig[] = [
   {
     key: "all",
@@ -174,6 +239,9 @@ const TAB_FILTER: Record<TabKey, Array<NotificationItem["type"]>> = {
     "post_mention",
     "follow",
     "login_alert",
+    "post_moderation",
+    "report",
+    "system_notice",
   ],
   like: ["post_like", "comment_like"],
   comment: ["post_comment", "comment_reply"],
@@ -221,6 +289,19 @@ function buildLocalDateTimeIso(date: string, time: string) {
   const dt = new Date(`${date}T${time}:00`);
   if (Number.isNaN(dt.getTime())) return null;
   return dt.toISOString();
+}
+
+function formatRemainingHourMinute(value?: string | null): string | null {
+  if (!value) return null;
+  const expiresAt = new Date(value);
+  if (Number.isNaN(expiresAt.getTime())) return null;
+  const totalMinutes = Math.max(
+    0,
+    Math.floor((expiresAt.getTime() - Date.now()) / 60000),
+  );
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 function buildMessage(item: NotificationItem): JSX.Element {
@@ -303,6 +384,205 @@ function buildMessage(item: NotificationItem): JSX.Element {
   }
   if (item.type === "login_alert") {
     return <>You're signing in on a new device</>;
+  }
+  if (item.type === "post_moderation") {
+    const targetLabel = item.postKind === "reel" ? "reel" : "post";
+    if (item.moderationDecision === "approve" || item.moderationDecision === "blur") {
+      return <>Your {targetLabel} was published successfully.</>;
+    }
+    if (item.moderationDecision === "reject") {
+      return (
+        <>
+          Your {targetLabel} was rejected. Please go to Violation Center to see
+          details.
+        </>
+      );
+    }
+    return <>Your {targetLabel} was published successfully.</>;
+  }
+  if (item.type === "report") {
+    if (item.reportAudience === "offender") {
+      if (item.reportAction === "remove_post") {
+        const severity = item.reportSeverity
+          ? item.reportSeverity.charAt(0).toUpperCase() +
+            item.reportSeverity.slice(1)
+          : "Unknown";
+        const strikeDelta =
+          typeof item.reportStrikeDelta === "number"
+            ? `+${item.reportStrikeDelta}`
+            : null;
+        const strikeTotal =
+          typeof item.reportStrikeTotal === "number"
+            ? item.reportStrikeTotal
+            : null;
+        const targetLabel = item.reportTargetId
+          ? ` Post #${item.reportTargetId.slice(-8)}.`
+          : "";
+        return (
+          <>
+            Your post was removed due to a policy violation.
+            {targetLabel}
+            {` Severity: ${severity}.`}
+            {strikeDelta
+              ? ` Strike ${strikeDelta}${
+                  strikeTotal != null ? ` (Total ${strikeTotal})` : ""
+                }.`
+              : ""}{" "}
+            View details in Violation Center.
+          </>
+        );
+      }
+      if (item.reportAction === "restrict_post") {
+        const severity = item.reportSeverity
+          ? item.reportSeverity.charAt(0).toUpperCase() +
+            item.reportSeverity.slice(1)
+          : "Unknown";
+        const strikeDelta =
+          typeof item.reportStrikeDelta === "number"
+            ? `+${item.reportStrikeDelta}`
+            : null;
+        const strikeTotal =
+          typeof item.reportStrikeTotal === "number"
+            ? item.reportStrikeTotal
+            : null;
+        return (
+          <>
+            Your post reach is now restricted to followers only.
+            {` Severity: ${severity}.`}
+            {strikeDelta
+              ? ` Strike ${strikeDelta}${
+                  strikeTotal != null ? ` (Total ${strikeTotal})` : ""
+                }.`
+              : ""}{" "}
+            View details in Violation Center.
+          </>
+        );
+      }
+      if (item.reportAction === "warn" || item.reportAction === "warn_user") {
+        const targetType = item.reportTargetType ?? "content";
+        const targetLabel =
+          targetType === "post"
+            ? "post"
+            : targetType === "comment"
+              ? "comment"
+              : targetType === "user"
+                ? "account"
+                : "content";
+        return (
+          <>
+            You received a policy warning for your {targetLabel}. No strike was
+            added. View details in Violation Center.
+          </>
+        );
+      }
+      if (item.reportAction === "delete_comment") {
+        const severity = item.reportSeverity
+          ? item.reportSeverity.charAt(0).toUpperCase() +
+            item.reportSeverity.slice(1)
+          : "Unknown";
+        const strikeDelta =
+          typeof item.reportStrikeDelta === "number"
+            ? `+${item.reportStrikeDelta}`
+            : null;
+        const strikeTotal =
+          typeof item.reportStrikeTotal === "number"
+            ? item.reportStrikeTotal
+            : null;
+        return (
+          <>
+            Your comment was removed due to a policy violation.
+            {` Severity: ${severity}.`}
+            {strikeDelta
+              ? ` Strike ${strikeDelta}${
+                  strikeTotal != null ? ` (Total ${strikeTotal})` : ""
+                }.`
+              : ""}{" "}
+            View details in Violation Center.
+          </>
+        );
+      }
+      if (item.reportAction === "violation") {
+        const targetType = item.reportTargetType ?? "content";
+        const targetLabel =
+          targetType === "post"
+            ? "post"
+            : targetType === "comment"
+              ? "comment"
+              : targetType === "user"
+                ? "account"
+                : "content";
+        const severity = item.reportSeverity
+          ? item.reportSeverity.charAt(0).toUpperCase() +
+            item.reportSeverity.slice(1)
+          : "Unknown";
+        const strikeDelta =
+          typeof item.reportStrikeDelta === "number"
+            ? `+${item.reportStrikeDelta}`
+            : null;
+        const strikeTotal =
+          typeof item.reportStrikeTotal === "number"
+            ? item.reportStrikeTotal
+            : null;
+        return (
+          <>
+            A policy violation was recorded for your {targetLabel}.
+            {` Severity: ${severity}.`}
+            {strikeDelta
+              ? ` Strike ${strikeDelta}${
+                  strikeTotal != null ? ` (Total ${strikeTotal})` : ""
+                }.`
+              : ""}{" "}
+            View details in Violation Center.
+          </>
+        );
+      }
+      if (item.reportAction === "mute_interaction") {
+        const remaining = formatRemainingHourMinute(item.reportActionExpiresAt);
+        return (
+          <>
+            Your account is under interaction mute. You cannot post reels/posts,
+            comment, reply, like, or repost during this period.
+            {remaining
+              ? ` Remaining: ${remaining}.`
+              : " A moderator must turn this back on."}{" "}
+            View details in Violation Center.
+          </>
+        );
+      }
+      return (
+        <>
+          Action was taken on your reported content. View details in Violation
+          Center.
+        </>
+      );
+    }
+    if (item.reportOutcome === "action_taken") {
+      return (
+        <>
+          Thank you for your report. We reviewed this case and took appropriate
+          action according to our policy.
+        </>
+      );
+    }
+    return (
+      <>
+        Thank you for your report. We reviewed this case and currently found no
+        policy violation.
+      </>
+    );
+  }
+  if (item.type === "system_notice") {
+    const title = item.systemNoticeTitle?.trim() || "";
+    const body = item.systemNoticeBody?.trim() || "";
+    if (!title) {
+      return <>{body || "System notice"}</>;
+    }
+    return (
+      <>
+        <span className={styles.itemName}>{title}</span>
+        {body ? `: ${body}` : ""}
+      </>
+    );
   }
   return <>New notification</>;
 }
@@ -495,11 +775,21 @@ export default function NotificationsOverlay(props: {
       setLoginAlertItem(item);
       return;
     }
-    const targetUrl = item.postId
-      ? `/post/${item.postId}`
-      : item.type === "follow" && item.actor?.id
-        ? `/profile/${item.actor.id}`
-        : null;
+    const targetUrl =
+      item.type === "report" && item.reportAudience === "offender"
+        ? "/settings?section=violations"
+        : item.type === "post_moderation" &&
+            item.moderationDecision === "reject"
+          ? "/settings?section=violations"
+          : item.type === "post_moderation" && item.postId
+            ? `/post/${item.postId}`
+        : item.type === "system_notice" && item.systemNoticeActionUrl
+          ? item.systemNoticeActionUrl
+        : item.postId
+          ? `/post/${item.postId}`
+          : item.type === "follow" && item.actor?.id
+            ? `/profile/${item.actor.id}`
+            : null;
     if (!targetUrl) return;
     if (!item.readAt) {
       const token = getStoredAccessToken();
@@ -519,6 +809,10 @@ export default function NotificationsOverlay(props: {
       emitNotificationRead({ id: item.id });
     }
     onClose();
+    if (/^https?:\/\//i.test(targetUrl)) {
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
     router.push(targetUrl);
   };
 
@@ -792,14 +1086,27 @@ export default function NotificationsOverlay(props: {
                 >
                   <div className={styles.avatarWrap}>
                     <Image
-                      src={item.actor.avatarUrl}
-                      alt={item.actor.displayName}
+                      src={
+                        item.type === "report" ||
+                        item.type === "post_moderation" ||
+                        item.type === "system_notice"
+                          ? "/logo.png"
+                          : item.actor.avatarUrl
+                      }
+                      alt={
+                        item.type === "report" ||
+                        item.type === "post_moderation" ||
+                        item.type === "system_notice"
+                          ? "Cordigram"
+                          : item.actor.displayName
+                      }
                       width={44}
                       height={44}
                       className={styles.avatar}
                     />
                   </div>
                   <div className={styles.itemContent}>
+                    {renderSystemNoticeBadge(item)}
                     <p className={styles.itemText}>{buildMessage(item)}</p>
                     <span className={styles.itemTime}>
                       {formatRelativeTime(item.activityAt || item.createdAt)}

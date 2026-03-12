@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+* {
+  user-select: none;
+}
+
 :root {
   --color-bg: #f6f8fb;
   --color-surface: #ffffff;

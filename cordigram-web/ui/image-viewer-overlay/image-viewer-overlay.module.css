@@ -23,7 +23,6 @@
   max-height: 92vh;
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
-  background: #0f172a;
 }
 
 .close {
@@ -48,4 +47,63 @@
 
 .close:hover {
   background: rgba(15, 23, 42, 1);
+}
+
+.nav {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(15, 23, 42, 0.75);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition:
+    transform 120ms ease,
+    background 120ms ease;
+}
+
+.nav:hover {
+  background: rgba(15, 23, 42, 1);
+}
+
+.navLeft {
+  left: 18px;
+}
+
+.navRight {
+  right: 18px;
+}
+
+.counter {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(15, 23, 42, 0.75);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 700px) {
+  .nav {
+    width: 40px;
+    height: 40px;
+  }
+
+  .navLeft {
+    left: 10px;
+  }
+
+  .navRight {
+    right: 10px;
+  }
 }

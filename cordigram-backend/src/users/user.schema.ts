@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export type Role = 'user' | 'creator' | 'admin';
 export type Status = 'active' | 'banned' | 'pending';
@@ -115,6 +115,24 @@ export class User extends Document {
 
   @Prop({ type: String, default: 'pending' })
   status: Status;
+
+  @Prop({ type: Date, default: null })
+  interactionMutedUntil?: Date | null;
+
+  @Prop({ type: Boolean, default: false })
+  interactionMutedIndefinitely?: boolean;
+
+  @Prop({ type: Date, default: null })
+  accountLimitedUntil?: Date | null;
+
+  @Prop({ type: Boolean, default: false })
+  accountLimitedIndefinitely?: boolean;
+
+  @Prop({ type: Date, default: null })
+  suspendedUntil?: Date | null;
+
+  @Prop({ type: Boolean, default: false })
+  suspendedIndefinitely?: boolean;
 
   @Prop({ type: Boolean, default: false })
   isVerified: boolean;
@@ -256,6 +274,12 @@ export class User extends Document {
   @Prop({ type: Boolean, default: false })
   twoFactorEnabled?: boolean;
 
+  @Prop({ type: Date })
+  createdAt?: Date;
+
+  @Prop({ type: Date })
+  updatedAt?: Date;
+
   @Prop({
     type: [
       {
@@ -283,6 +307,10 @@ export class User extends Document {
 
   @Prop({ type: Number, default: 0 })
   followingCount: number;
+
+  @Prop({ type: Number, default: 0 })
+  strikeCount?: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+UserSchema.index({ email: 1 }, { unique: true });

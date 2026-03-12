@@ -67,16 +67,6 @@
   justify-content: center;
 }
 
-.hero-panel::after {
-  content: "";
-  position: absolute;
-  inset: auto -8% 12% auto;
-  width: 320px;
-  height: 320px;
-  background: radial-gradient(circle, #9aacef4d 0%, transparent 70%);
-  transform: rotate(-10deg);
-}
-
 .hero-card {
   position: relative;
   z-index: 1;

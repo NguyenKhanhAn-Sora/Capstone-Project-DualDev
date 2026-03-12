@@ -11,12 +11,12 @@ import {
   fetchPostDetail,
   fetchFeed,
   fetchUserPosts,
+  fetchUserReels,
   likePost,
   unlikePost,
   savePost,
   unsavePost,
   repostPost,
-  unrepostPost,
   createPost,
   createReel,
   followUser,
@@ -44,6 +44,10 @@ import RepostOverlay, {
   type QuoteInput,
   type RepostTarget,
 } from "@/ui/repost-overlay/repost-overlay";
+import {
+  getInteractionMutedMessage,
+  INTERACTION_MUTED_FALLBACK_MESSAGE,
+} from "@/lib/interaction-mute";
 
 function LocationPinIcon() {
   return (
@@ -354,47 +358,6 @@ const IconSave = ({ filled }: { filled?: boolean }) => (
   </svg>
 );
 
-const IconRepost = ({ filled }: { filled?: boolean }) => (
-  <svg aria-hidden width="26" height="26" viewBox="0 0 24 24">
-    {filled ? (
-      <>
-        <path
-          d="M7 7h10.5L15 4.5M17.5 7 15 9.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M17 17H6.5L9 19.5M6.5 17 9 14.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </>
-    ) : (
-      <>
-        <path
-          d="M7 7h10.5L15 4.5M17.5 7 15 9.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M17 17H6.5L9 19.5M6.5 17 9 14.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </>
-    )}
 const IconRepost = () => (
   <svg aria-hidden width="26" height="26" viewBox="0 0 48 48" fill="none">
     <path
@@ -479,7 +442,6 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
       clearTimeout(timeoutId);
       observer.disconnect();
     };
-  }, [item.content, item.content?.length, item.hashtags?.length]);
   }, [item.id, item.content, item.content?.length, item.hashtags?.length]);
 
   useEffect(() => {
@@ -568,7 +530,6 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = Math.min(
       1,
-      Math.max(0, (e.clientX - rect.left) / Math.max(rect.width, 1))
       Math.max(0, (e.clientX - rect.left) / Math.max(rect.width, 1)),
     );
     const video = videoRef.current;
@@ -587,10 +548,6 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
   };
 
   const percent = duration ? Math.min(100, (current / duration) * 100) : 0;
-  const hashtags = useMemo(
-    () => item.hashtags?.map((tag) => `#${tag}`) ?? [],
-    [item.hashtags]
-  );
   const hashtags = useMemo(() => item.hashtags ?? [], [item.hashtags]);
   const shellClass = [
     styles.videoShell,
@@ -712,9 +669,6 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
           <span>{item.content || ""}</span>
           {hashtags.length ? " " : ""}
           {hashtags.map((tag) => (
-            <span key={tag} className={styles.hashtagInline}>
-              {tag}
-            </span>
             <Link
               key={tag}
               href={`/hashtag/${encodeURIComponent(tag)}`}
@@ -742,7 +696,6 @@ function ReelActions({
   item: ReelItem;
   onLike: (id: string, liked: boolean) => void;
   onSave: (id: string, saved: boolean) => void;
-  onRepost: (id: string, reposted: boolean) => void;
   onRepost: (id: string, reposted: boolean, anchor?: DOMRect | null) => void;
   onComment: (id: string) => void;
   onFollow: (authorId: string, nextFollow: boolean) => void;
@@ -750,7 +703,6 @@ function ReelActions({
 }) {
   const following = Boolean(
     item.flags?.following ??
-      (item as unknown as { following?: boolean }).following
     (item as unknown as { following?: boolean }).following,
   );
   const isSelf = Boolean(viewerId && item.authorId === viewerId);
@@ -804,7 +756,6 @@ function ReelActions({
               following ? styles.followBadgeOn : styles.followBadgeOff
             }`}
             onClick={() => onFollow(item.authorId!, !following)}
-            aria-label={following ? "Đang theo dõi" : "Theo dõi"}
             aria-label={following ? "Following" : "Follow"}
           >
             {following ? (
@@ -849,35 +800,30 @@ function ReelActions({
         </span>
         <span>{formatCount(item.stats?.saves)}</span>
       </button>
-      <button
-        className={`${styles.actionBtn} ${
-          item.reposted ? styles.actionActive : ""
-        }`}
-        onClick={() => onRepost(item.id, Boolean(item.reposted))}
-        aria-label="Repost reel"
-      >
-        <span className={`${styles.actionBtnWrap}`}>
-          <IconRepost filled={item.reposted} />
-        onClick={(e) =>
-          onRepost(
-            item.id,
-            Boolean(item.reposted),
-            e.currentTarget.getBoundingClientRect(),
-          )
-        }
-        aria-label="Repost reel"
-      >
-        <span className={`${styles.actionBtnWrap}`}>
-          <IconRepost />
-        </span>
-        <span>{formatCount(item.stats?.reposts)}</span>
-      </button>
+      {item.canRepost !== false ? (
+        <button
+          className={`${styles.actionBtn} ${
+            item.reposted ? styles.actionActive : ""
+          }`}
+          onClick={(e) =>
+            onRepost(
+              item.id,
+              Boolean(item.reposted),
+              e.currentTarget.getBoundingClientRect(),
+            )
+          }
+          aria-label="Repost reel"
+        >
+          <span className={`${styles.actionBtnWrap}`}>
+            <IconRepost />
+          </span>
+          <span>{formatCount(item.stats?.reposts)}</span>
+        </button>
+      ) : null}
     </div>
   );
 }
 
-export default function ReelPage() {
-      : getUserIdFromToken(localStorage.getItem("accessToken"))
 export default function ReelPage({
   scopeOverride,
 }: {
@@ -924,6 +870,14 @@ export default function ReelPage({
     () => searchParams?.get("single") === "1",
     [searchParams],
   );
+  const profileMode = useMemo(
+    () => searchParams?.get("fromProfile") === "1",
+    [searchParams],
+  );
+  const profileModeUserId = useMemo(
+    () => (searchParams?.get("profileId") || "").trim() || undefined,
+    [searchParams],
+  );
   const originReelId = useMemo(
     () => searchParams?.get("origin") || undefined,
     [searchParams],
@@ -948,8 +902,6 @@ export default function ReelPage({
   const [commentsRender, setCommentsRender] = useState(false);
   const commentPanelRef = useRef<HTMLElement | null>(null);
   const commentCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  const menuRef = useRef<HTMLDivElement | null>(null);
     null,
   );
   const missingDetailRef = useRef<Set<string>>(new Set());
@@ -979,6 +931,8 @@ export default function ReelPage({
   const [muteSaving, setMuteSaving] = useState(false);
   const [muteError, setMuteError] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [interactionMuteOverlayMessage, setInteractionMuteOverlayMessage] =
+    useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editTargetId, setEditTargetId] = useState<string | null>(null);
@@ -1027,10 +981,6 @@ export default function ReelPage({
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
-  useEffect(() => {
-    if (!openMoreMenuId) return;
-    const handleClick = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
   const activeReel = items[activeIndex];
 
   const editingReel = useMemo(() => {
@@ -1225,7 +1175,6 @@ export default function ReelPage({
             }))
           : [];
         setLocationSuggestions(mapped);
-        setLocationOpen(true);
         setLocationOpen(mapped.length > 0);
         setLocationHighlight(mapped.length ? 0 : -1);
       } catch (err) {
@@ -1243,7 +1192,6 @@ export default function ReelPage({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [editOpen, locationQuery]);
   }, [editOpen, locationFocused, locationQuery]);
 
   useEffect(() => {
@@ -1253,17 +1201,6 @@ export default function ReelPage({
     setViewerId(getUserIdFromToken(stored));
   }, [canRender]);
 
-  useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
-
-    const load = async () => {
-      setLoading(true);
-      try {
-        let nextItems = (await fetchReelsFeed({ token })) || [];
-
-        if (!nextItems.length && viewerId) {
-          const owned =
   const loadPage = useCallback(
     async (nextPage: number, opts?: { initial?: boolean }) => {
       if (!token) return;
@@ -1274,53 +1211,49 @@ export default function ReelPage({
       try {
         const limit = nextPage * REELS_PAGE_SIZE;
 
-        let base = ((await fetchReelsFeed({ token, limit, scope })) || []).map(
-          coerceReelKind,
-        );
+        let base: ReelItem[] = [];
+        if (profileMode && profileModeUserId) {
+          base = (
+            (await fetchUserReels({
+              token,
+              userId: profileModeUserId,
+              limit,
+            })) || []
+          ).map(coerceReelKind);
+        } else {
+          base = ((await fetchReelsFeed({ token, limit, scope })) || []).map(
+            coerceReelKind,
+          );
+        }
         let nextItems = [...base];
         let nextHasMore = base.length >= limit;
 
         // Bring in reposted reels that may only be delivered via main feed
-        try {
-          const repostCandidates = (
-            (await fetchFeed({ token, limit: 40, scope })) || []
-          )
-            .filter(isRepostOfReel)
-            .map(coerceReelKind);
-          if (repostCandidates.length) {
-            const seen = new Set(nextItems.map((it) => it.id));
-            repostCandidates.forEach((it) => {
-              if (!seen.has(it.id)) {
-                seen.add(it.id);
-                nextItems.push(it);
-              }
-            });
-          }
-        } catch {}
+        if (!profileMode) {
+          try {
+            const repostCandidates = (
+              (await fetchFeed({ token, limit: 40, scope })) || []
+            )
+              .filter(isRepostOfReel)
+              .map(coerceReelKind);
+            if (repostCandidates.length) {
+              const seen = new Set(nextItems.map((it) => it.id));
+              repostCandidates.forEach((it) => {
+                if (!seen.has(it.id)) {
+                  seen.add(it.id);
+                  nextItems.push(it);
+                }
+              });
+            }
+          } catch {}
+        }
 
-        if (!nextItems.length && viewerId && scope !== "following") {
+        if (!profileMode && !nextItems.length && viewerId && scope !== "following") {
           const ownedBase = (
             (await fetchReelsFeed({
               token,
               authorId: viewerId,
               includeOwned: true,
-            })) || [];
-          if (owned.length) nextItems = owned;
-        }
-
-        if (cancelled) return;
-
-        setItems(nextItems);
-        const initialIndex = requestedReelId
-          ? nextItems.findIndex((it) => it.id === requestedReelId)
-          : 0;
-        setActiveIndex(initialIndex >= 0 ? initialIndex : 0);
-        setError("");
-      } catch (err) {
-        if (cancelled) return;
-        setError(
-          (err as { message?: string })?.message ||
-            "Không tải được danh sách reel"
               scope,
               limit,
             })) || []
@@ -1368,7 +1301,15 @@ export default function ReelPage({
         else setLoadingMore(false);
       }
     },
-    [REELS_PAGE_SIZE, requestedReelId, scope, token, viewerId],
+    [
+      REELS_PAGE_SIZE,
+      profileMode,
+      profileModeUserId,
+      requestedReelId,
+      scope,
+      token,
+      viewerId,
+    ],
   );
 
   const loadMore = useCallback(() => {
@@ -1466,7 +1407,6 @@ export default function ReelPage({
     };
 
     void load();
-  }, [token, viewerId, requestedReelId]);
 
     return () => {
       cancelled = true;
@@ -1530,7 +1470,6 @@ export default function ReelPage({
       .catch((err) => {
         if (cancelled) return;
         setError(
-          (err as { message?: string })?.message || "Không tải được reel"
           (err as { message?: string })?.message || "Unable to load reel",
         );
       });
@@ -1542,7 +1481,6 @@ export default function ReelPage({
 
   const updateItem = (id: string, patch: Partial<ReelItem>) => {
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, ...patch } : it))
       prev.map((it) => (it.id === id ? { ...it, ...patch } : it)),
     );
   };
@@ -1550,7 +1488,6 @@ export default function ReelPage({
   const updateStats = (
     id: string,
     field: keyof NonNullable<FeedItem["stats"]>,
-    delta: number
     delta: number,
   ) => {
     setItems((prev) =>
@@ -1563,8 +1500,6 @@ export default function ReelPage({
                 [field]: Math.max(0, (it.stats?.[field] ?? 0) + delta),
               },
             }
-          : it
-      )
           : it,
       ),
     );
@@ -1582,9 +1517,6 @@ export default function ReelPage({
                   ...patch,
                 },
               }
-            : it
-        )
-    []
             : it,
         ),
       );
@@ -1624,8 +1556,6 @@ export default function ReelPage({
     setEditAllowDownload(
       Boolean(
         (current as any)?.allowDownload ??
-          (current as any)?.permissions?.allowDownload
-      )
         (current as any)?.allowDownloads ??
         (current as any)?.flags?.allowDownload ??
         (current as any)?.permissions?.allowDownload,
@@ -1647,7 +1577,6 @@ export default function ReelPage({
   const closeEditModal = () => {
     if (editSaving) return;
     setEditOpen(false);
-    event: React.ChangeEvent<HTMLTextAreaElement>
     setEditTargetId(null);
     setLocationFocused(false);
   };
@@ -1728,7 +1657,6 @@ export default function ReelPage({
       e.preventDefault();
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
-        prev + 1 < mentionSuggestions.length ? prev + 1 : 0
         prev + 1 < mentionSuggestions.length ? prev + 1 : 0,
       );
       return;
@@ -1737,7 +1665,6 @@ export default function ReelPage({
       e.preventDefault();
       if (!mentionSuggestions.length) return;
       setMentionHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1
         prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1,
       );
       return;
@@ -1788,7 +1715,6 @@ export default function ReelPage({
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setLocationHighlight((prev) =>
-        prev + 1 < locationSuggestions.length ? prev + 1 : 0
         prev + 1 < locationSuggestions.length ? prev + 1 : 0,
       );
       return;
@@ -1796,7 +1722,6 @@ export default function ReelPage({
     if (e.key === "ArrowUp") {
       e.preventDefault();
       setLocationHighlight((prev) =>
-        prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1
         prev - 1 >= 0 ? prev - 1 : locationSuggestions.length - 1,
       );
       return;
@@ -1813,7 +1738,6 @@ export default function ReelPage({
     setEditError("");
     setEditSuccess("");
 
-    if (!token || !active) {
     const targetId = editTargetId ?? active?.id;
     if (!token || !targetId) {
       setEditError("Please sign in to edit reels");
@@ -1821,7 +1745,6 @@ export default function ReelPage({
     }
 
     const normalizedHashtags = Array.from(
-      new Set(editHashtags.map((t) => normalizeHashtag(t.toString())))
       new Set(editHashtags.map((t) => normalizeHashtag(t.toString()))),
     ).filter(Boolean);
 
@@ -1830,10 +1753,6 @@ export default function ReelPage({
         [
           ...extractMentionsFromCaption(editCaption || ""),
           ...editMentions.map((t) =>
-            t.toString().trim().replace(/^@/, "").toLowerCase()
-          ),
-        ].filter(Boolean)
-      )
             t.toString().trim().replace(/^@/, "").toLowerCase(),
           ),
         ].filter(Boolean),
@@ -1842,7 +1761,6 @@ export default function ReelPage({
 
     const trimmedLocation = editLocation.trim();
 
-    const payload = {
     const isRepost = Boolean((editingReel ?? active)?.repostOf);
     const payload: any = {
       content: editCaption || "",
@@ -1850,9 +1768,6 @@ export default function ReelPage({
       mentions: normalizedMentions,
       location: trimmedLocation || undefined,
       allowComments: editAllowComments,
-      allowDownload: editAllowDownload,
-      hideLikeCount: editHideLikeCount,
-    } as const;
       hideLikeCount: editHideLikeCount,
     };
 
@@ -1868,8 +1783,6 @@ export default function ReelPage({
       setEditSaving(true);
       const updated = await updatePost({
         token,
-        postId: active.id,
-        prev.map((it) => (it.id === active.id ? { ...it, ...updated } : it))
         postId: targetId,
         payload,
       });
@@ -1916,7 +1829,6 @@ export default function ReelPage({
             ? 0
             : Math.max(
                 0,
-                Math.min(idx === -1 ? activeIndex : idx, next.length - 1)
                 Math.min(idx === -1 ? activeIndex : idx, next.length - 1),
               );
         nextTargetId = next[plannedIndex]?.id ?? null;
@@ -1944,27 +1856,28 @@ export default function ReelPage({
 
   const handleLike = async (id: string, liked: boolean) => {
     if (!token) return;
-    updateItem(id, {
-      liked: !liked,
-      flags: {
-        ...(items.find((x) => x.id === id)?.flags || {}),
-        liked: !liked,
-      },
-    });
-    updateStats(id, "hearts", liked ? -1 : 1);
     try {
       if (liked) await unlikePost({ token, postId: id });
       else await likePost({ token, postId: id });
-    } catch (err) {
       updateItem(id, {
-        liked,
-        flags: { ...(items.find((x) => x.id === id)?.flags || {}), liked },
+        liked: !liked,
+        flags: {
+          ...(items.find((x) => x.id === id)?.flags || {}),
+          liked: !liked,
+        },
       });
-      updateStats(id, "hearts", liked ? 1 : -1);
-      setError(
-        (err as { message?: string })?.message || "Không thể cập nhật like"
-        (err as { message?: string })?.message || "Unable to update like",
-      );
+      updateStats(id, "hearts", liked ? -1 : 1);
+    } catch (err) {
+      const mutedMessage = getInteractionMutedMessage(err);
+      if (mutedMessage) {
+        setInteractionMuteOverlayMessage(
+          mutedMessage || INTERACTION_MUTED_FALLBACK_MESSAGE,
+        );
+      } else {
+        setError(
+          (err as { message?: string })?.message || "Unable to update like",
+        );
+      }
     }
   };
 
@@ -1987,31 +1900,6 @@ export default function ReelPage({
         flags: { ...(items.find((x) => x.id === id)?.flags || {}), saved },
       });
       updateStats(id, "saves", saved ? 1 : -1);
-      setError((err as { message?: string })?.message || "Không thể lưu reel");
-    }
-  };
-
-  const handleRepost = async (id: string, reposted: boolean) => {
-    if (!token) return;
-    updateItem(id, {
-      reposted: !reposted,
-      flags: {
-        ...(items.find((x) => x.id === id)?.flags || {}),
-        reposted: !reposted,
-      },
-    });
-    updateStats(id, "reposts", reposted ? -1 : 1);
-    try {
-      if (reposted) await unrepostPost({ token, postId: id });
-      else await repostPost({ token, postId: id });
-    } catch (err) {
-      updateItem(id, {
-        reposted,
-        flags: { ...(items.find((x) => x.id === id)?.flags || {}), reposted },
-      });
-      updateStats(id, "reposts", reposted ? 1 : -1);
-      setError((err as { message?: string })?.message || "Không thể repost");
-    }
       setError((err as { message?: string })?.message || "Unable to save reel");
     }
   };
@@ -2050,17 +1938,28 @@ export default function ReelPage({
         showToast("Sign in to repost");
         return;
       }
-      const originalId = resolveOriginalPostId(target.postId);
-      const targetId = target.postId;
-      await createPost({ token, payload: { repostOf: originalId } });
-      incrementRepostStat(originalId);
-      if (originalId !== targetId) {
-        incrementRepostStat(targetId);
-        try {
-          await repostPost({ token, postId: targetId });
-        } catch {}
+      try {
+        const originalId = resolveOriginalPostId(target.postId);
+        const targetId = target.postId;
+        await createPost({ token, payload: { repostOf: originalId } });
+        incrementRepostStat(originalId);
+        if (originalId !== targetId) {
+          incrementRepostStat(targetId);
+          try {
+            await repostPost({ token, postId: targetId });
+          } catch {}
+        }
+        showToast("Reposted");
+      } catch (err) {
+        const mutedMessage = getInteractionMutedMessage(err);
+        if (mutedMessage) {
+          setInteractionMuteOverlayMessage(
+            mutedMessage || INTERACTION_MUTED_FALLBACK_MESSAGE,
+          );
+          return;
+        }
+        throw err;
       }
-      showToast("Reposted");
     },
     [incrementRepostStat, resolveOriginalPostId, showToast, token],
   );
@@ -2071,38 +1970,49 @@ export default function ReelPage({
         showToast("Sign in to repost");
         return;
       }
-      const originalId = resolveOriginalPostId(target.postId);
-      const targetId = target.postId;
+      try {
+        const originalId = resolveOriginalPostId(target.postId);
+        const targetId = target.postId;
 
-      const note = input.content.trim();
-      const mentions = extractMentionsFromCaption(note);
-      const payload = {
-        repostOf: originalId,
-        content: note || undefined,
-        hashtags: input.hashtags.length ? input.hashtags : undefined,
-        location: input.location.trim() || undefined,
-        allowComments: input.allowComments,
-        allowDownload: Boolean(target.originalAllowDownload),
-        hideLikeCount: input.hideLikeCount,
-        visibility: input.visibility,
-        mentions: mentions.length ? mentions : undefined,
-      } as const;
+        const note = input.content.trim();
+        const mentions = extractMentionsFromCaption(note);
+        const payload = {
+          repostOf: originalId,
+          content: note || undefined,
+          hashtags: input.hashtags.length ? input.hashtags : undefined,
+          location: input.location.trim() || undefined,
+          allowComments: input.allowComments,
+          allowDownload: Boolean(target.originalAllowDownload),
+          hideLikeCount: input.hideLikeCount,
+          visibility: input.visibility,
+          mentions: mentions.length ? mentions : undefined,
+        } as const;
 
-      if (target.kind === "reel") {
-        await createReel({ token, payload: payload as any });
-      } else {
-        await createPost({ token, payload: payload as any });
+        if (target.kind === "reel") {
+          await createReel({ token, payload: payload as any });
+        } else {
+          await createPost({ token, payload: payload as any });
+        }
+
+        incrementRepostStat(originalId);
+        if (originalId !== targetId) {
+          incrementRepostStat(targetId);
+          try {
+            await repostPost({ token, postId: targetId });
+          } catch {}
+        }
+
+        showToast("Reposted with quote");
+      } catch (err) {
+        const mutedMessage = getInteractionMutedMessage(err);
+        if (mutedMessage) {
+          setInteractionMuteOverlayMessage(
+            mutedMessage || INTERACTION_MUTED_FALLBACK_MESSAGE,
+          );
+          return;
+        }
+        throw err;
       }
-
-      incrementRepostStat(originalId);
-      if (originalId !== targetId) {
-        incrementRepostStat(targetId);
-        try {
-          await repostPost({ token, postId: targetId });
-        } catch {}
-      }
-
-      showToast("Reposted with quote");
     },
     [incrementRepostStat, resolveOriginalPostId, showToast, token],
   );
@@ -2150,13 +2060,11 @@ export default function ReelPage({
   const active = items[activeIndex];
   const isAuthor = useMemo(
     () => Boolean(active?.authorId && viewerId && active.authorId === viewerId),
-    [active?.authorId, viewerId]
     [active?.authorId, viewerId],
   );
 
   const selectedReportGroup = useMemo(
     () => REPORT_GROUPS.find((g) => g.key === reportCategory),
-    [reportCategory]
     [reportCategory],
   );
 
@@ -2171,9 +2079,6 @@ export default function ReelPage({
     () =>
       Boolean(
         active &&
-            (active as any)?.permissions?.allowDownload)
-    [active]
-    active?.flags?.following ?? (active as any)?.following
         ((active as any)?.allowDownloads ??
           (active as any)?.allowDownload ??
           (active as any)?.flags?.allowDownloads ??
@@ -2190,10 +2095,6 @@ export default function ReelPage({
 
   const activeSaved = Boolean(active?.flags?.saved ?? active?.saved);
 
-  useEffect(() => {
-    if (!editOpen) return;
-    applyEditSeed(active);
-  }, [active, applyEditSeed, editOpen]);
   const muteOptions = useMemo(
     () => [
       { key: "5m", label: "5 minutes", ms: 5 * 60 * 1000 },
@@ -2243,7 +2144,6 @@ export default function ReelPage({
 
   useEffect(() => {
     if (!transition) return;
-    const id = setTimeout(() => setTransition(null), 420);
     const id = setTimeout(() => {
       setTransition(null);
       transitionRef.current = null;
@@ -2262,8 +2162,6 @@ export default function ReelPage({
     if (nextIndex <= activeIndex) return;
     const target = items[nextIndex];
     const el = target ? itemRefs.current[target.id] : null;
-    setTransition("next");
-    if (el) {
     const container = listRef.current;
 
     transitionRef.current = "next";
@@ -2289,8 +2187,6 @@ export default function ReelPage({
     if (nextIndex >= activeIndex) return;
     const target = items[nextIndex];
     const el = target ? itemRefs.current[target.id] : null;
-    setTransition("prev");
-    if (el) {
     const container = listRef.current;
 
     transitionRef.current = "prev";
@@ -2419,7 +2315,6 @@ export default function ReelPage({
           }
         });
       },
-      { root: container, threshold: [VIEW_THRESHOLD] }
       { root: container, threshold: [VIEW_THRESHOLD] },
     );
 
@@ -2479,7 +2374,15 @@ export default function ReelPage({
 
     if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
     urlSyncTimerRef.current = setTimeout(() => {
-      const target = `/reels/${currentReelId}`;
+      const query = new URLSearchParams();
+      if (profileMode) {
+        query.set("fromProfile", "1");
+        if (profileModeUserId) query.set("profileId", profileModeUserId);
+      }
+      const qs = query.toString();
+      const target = qs
+        ? `/reels/${currentReelId}?${qs}`
+        : `/reels/${currentReelId}`;
       if (lastSyncedIdRef.current === currentReelId) return;
       lastSyncedIdRef.current = currentReelId;
 
@@ -2497,8 +2400,7 @@ export default function ReelPage({
     return () => {
       if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
     };
-  }, [currentReelId]);
-  }, [currentReelId, singleMode]);
+  }, [currentReelId, profileMode, profileModeUserId, singleMode]);
 
   useEffect(() => {
     if (!token) return;
@@ -2532,8 +2434,6 @@ export default function ReelPage({
                   saved: detail.saved ?? it.saved,
                   reposted: detail.reposted ?? it.reposted,
                 }
-              : it
-          )
               : it,
           ),
         );
@@ -2685,7 +2585,6 @@ export default function ReelPage({
         try {
           localStorage.setItem(
             "lastOwnedReelId",
-            JSON.stringify({ id: active.id, ownerId: active.authorId })
             JSON.stringify({ id: active.id, ownerId: active.authorId }),
           );
         } catch {
@@ -2799,9 +2698,6 @@ export default function ReelPage({
     openEditModal();
   };
 
-  const handleMuteNotifications = () => {
-    setOpenMoreMenuId(null);
-    showToast("Notifications muted for this reel");
   const openMuteModal = (item: ReelItem) => {
     setMuteTargetId(item.id);
     setMuteError("");
@@ -2910,7 +2806,6 @@ export default function ReelPage({
   const handleFollowFromMenu = () => {
     if (!active?.authorId) return;
     const currentFollowing = Boolean(
-      active.flags?.following ?? (active as any)?.following
       active.flags?.following ?? (active as any)?.following,
     );
     onFollow(active.authorId, !currentFollowing);
@@ -2952,8 +2847,6 @@ export default function ReelPage({
       prev.map((p) =>
         p.authorId === authorId
           ? { ...p, flags: { ...p.flags, following: nextFollow } }
-          : p
-      )
           : p,
       ),
     );
@@ -2965,9 +2858,6 @@ export default function ReelPage({
         prev.map((p) =>
           p.authorId === authorId
             ? { ...p, flags: { ...p.flags, following: !nextFollow } }
-            : p
-        )
-        (err as { message?: string })?.message || "Không thể cập nhật follow"
             : p,
         ),
       );
@@ -2981,7 +2871,6 @@ export default function ReelPage({
     (reelId: string, total: number) => {
       syncStats(reelId, { comments: total });
     },
-    [syncStats]
     [syncStats],
   );
 
@@ -3017,9 +2906,6 @@ export default function ReelPage({
             <div className={styles.stateCard}>No reels yet.</div>
           ) : (
             <div className={styles.stageShell}>
-              <div className={styles.feedScroll} ref={listRef}>
-                {items.map((item) => {
-                  const isActive = active?.id === item.id;
               <div
                 className={`${styles.feedScroll} ${
                   transition ? styles.noSnap : ""
@@ -3041,13 +2927,6 @@ export default function ReelPage({
                       data-reel-id={item.id}
                       className={styles.feedItem}
                     >
-                      {isActive ? (
-                            commentsRender ? styles.stageWithComments : ""
-                          } ${commentsOpen ? styles.stageShifted : ""}`}
-                                transition === "next"
-                                  : transition === "prev"
-                                autoplay
-                                  ref={menuRef}
                       <div
                         className={`${styles.stage} ${
                           !isActive ? styles.stageInactive : ""
@@ -3089,7 +2968,6 @@ export default function ReelPage({
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setOpenMoreMenuId((prev) =>
-                                        prev === item.id ? null : item.id
                                         prev === item.id ? null : item.id,
                                       );
                                     }}
@@ -3141,10 +3019,6 @@ export default function ReelPage({
                                             role="menuitem"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              handleMuteNotifications();
-                                            }}
-                                          >
-                                            Mute notifications
                                               if (isMutedForItem(item)) {
                                                 handleEnableReelNotifications(
                                                   item,
@@ -3353,32 +3227,6 @@ export default function ReelPage({
                               />
                             </div>
                           </div>
-                          <div className={styles.navColumn}>
-                          {commentsRender && commentReelId ? (
-                            <ReelComments
-                              open={commentsOpen}
-                              postId={commentReelId}
-                              token={token}
-                              panelRef={commentPanelRef}
-                              viewerId={viewerId}
-                              postAuthorId={item.authorId}
-                              allowComments={item.allowComments}
-                              initialCount={item.stats?.comments}
-                              onTotalChange={handleCommentTotal}
-                              onClose={() => {
-                                setCommentsOpen(false);
-                            />
-                          ) : null}
-                      ) : (
-                        <div className={styles.stageGhost}>
-                          <div className={styles.videoColumn}>
-                            <div className={styles.reelWrapper}>
-                              <ReelVideo
-                                item={item}
-                                autoplay={false}
-                                onViewed={(ms) => handleViewed(item.id, ms)}
-                              />
-                      )}
                         </div>
                         <div
                           className={styles.navColumn}
@@ -3447,6 +3295,45 @@ export default function ReelPage({
         animationMs={REPOST_ANIMATION_MS}
       />
 
+      {interactionMuteOverlayMessage ? (
+        <div
+          className={`${feedStyles.modalOverlay} ${feedStyles.modalOverlayOpen}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setInteractionMuteOverlayMessage(null)}
+        >
+          <div
+            className={`${feedStyles.modalCard} ${feedStyles.modalCardOpen}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={feedStyles.modalHeader}>
+              <div>
+                <h3 className={feedStyles.modalTitle}>Interaction muted</h3>
+                <p className={feedStyles.modalBody}>
+                  {interactionMuteOverlayMessage}
+                </p>
+              </div>
+              <button
+                className={feedStyles.closeBtn}
+                aria-label="Close"
+                onClick={() => setInteractionMuteOverlayMessage(null)}
+              >
+                ×
+              </button>
+            </div>
+            <div className={feedStyles.modalActions}>
+              <button
+                type="button"
+                className={feedStyles.modalPrimary}
+                onClick={() => setInteractionMuteOverlayMessage(null)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {toastMessage ? (
         <div className={postStyles.toast} role="status" aria-live="polite">
           {toastMessage}
@@ -3467,10 +3354,6 @@ export default function ReelPage({
             <div className={feedStyles.modalHeader}>
               <div>
                 <h3 className={feedStyles.modalTitle}>Edit reel</h3>
-                <p className={feedStyles.modalBody}>
-                  Update caption, hashtags, mentions, location, and reel
-                  controls.
-                </p>
               </div>
               <button
                 className={feedStyles.closeBtn}
@@ -3607,9 +3490,6 @@ export default function ReelPage({
                 <div className={feedStyles.editLabelRow}>
                   <span className={feedStyles.editLabelText}>Hashtags</span>
                 </div>
-                <div className={feedStyles.chipRow}>
-                        className={feedStyles.chipRemove}
-                    className={feedStyles.editInput}
                 <div className={feedStyles.chipShell}>
                   <div className={feedStyles.chips}>
                     {editHashtags.map((tag) => (
@@ -3652,9 +3532,6 @@ export default function ReelPage({
                     setEditLocation(e.target.value);
                     setLocationQuery(e.target.value);
                   }}
-                  onFocus={() =>
-                    setLocationOpen(Boolean(locationSuggestions.length))
-                  }
                   onFocus={() => {
                     setLocationFocused(true);
                     setLocationOpen(Boolean(locationSuggestions.length));
@@ -3716,8 +3593,6 @@ export default function ReelPage({
                 <label className={feedStyles.switchRow}>
                   <input
                     type="checkbox"
-                    checked={editAllowDownload}
-                    onChange={() => setEditAllowDownload((prev) => !prev)}
                     checked={
                       editingReel?.repostOf
                         ? Boolean(lockedEditAllowDownload ?? editAllowDownload)
@@ -3733,7 +3608,6 @@ export default function ReelPage({
                   <div>
                     <p className={feedStyles.switchTitle}>Allow downloads</p>
                     <p className={feedStyles.switchHint}>
-                      Share the original file with people you trust
                       {editingReel?.repostOf
                         ? lockedEditAllowDownloadLoading
                           ? "Inherited from original post (loading…)"
@@ -4062,7 +3936,6 @@ export default function ReelPage({
                         setReportReason(
                           group.reasons.length === 1
                             ? group.reasons[0].key
-                            : null
                             : null,
                         );
                       }}

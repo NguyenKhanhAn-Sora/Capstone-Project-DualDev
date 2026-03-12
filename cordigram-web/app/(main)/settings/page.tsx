@@ -38,8 +38,10 @@ import {
   type ActivityType,
   fetchNotificationSettings,
   updateNotificationSettings,
+  fetchViolationHistory,
   type NotificationCategoryKey,
   type NotificationSettingsResponse,
+  type ViolationHistoryItem,
   upsertRecentAccount,
   removeRecentAccount,
   type ProfileDetailResponse,
@@ -101,6 +103,15 @@ const SETTINGS_SECTIONS = [
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M6 3h12a2 2 0 0 1 2 2v16l-8-4-8 4V5a2 2 0 0 1 2-2Z" />
+      </svg>
+    ),
+  },
+  {
+    key: "violations",
+    label: "Violation Center",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2.5 4 6v6.1c0 5 3.3 9.5 8 10.9 4.7-1.4 8-5.9 8-10.9V6ZM12 13.8a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2Zm1.1-2.9a1.1 1.1 0 1 1-2.2 0V8.2a1.1 1.1 0 0 1 2.2 0Z" />
       </svg>
     ),
   },
@@ -185,6 +196,51 @@ const getInitials = (value?: string | null) => {
     .map((part) => part[0]?.toUpperCase())
     .join("");
 };
+
+const formatSeverityLabel = (value: "low" | "medium" | "high" | null) => {
+  if (!value) return "N/A";
+  if (value === "high") return "High";
+  if (value === "medium") return "Medium";
+  return "Low";
+};
+
+const formatActionLabel = (action: string) => {
+  switch (action) {
+    case "remove_post":
+      return "Removed post";
+    case "restrict_post":
+      return "Restricted post";
+    case "delete_comment":
+      return "Deleted comment";
+    case "warn":
+    case "warn_user":
+      return "Warning issued";
+    case "mute_interaction":
+      return "Interaction muted";
+    case "suspend_user":
+      return "Account suspended";
+    case "limit_account":
+      return "Account limited";
+    default:
+      return "Policy action";
+  }
+};
+
+const formatRemainingHourMinute = (
+  value?: string | null,
+  nowMs = Date.now(),
+): string | null => {
+  if (!value) return null;
+  const expiresAt = new Date(value);
+  if (Number.isNaN(expiresAt.getTime())) return null;
+  const totalMinutes = Math.max(0, Math.floor((expiresAt.getTime() - nowMs) / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+const isWarnAction = (action: string) =>
+  action === "warn" || action === "warn_user";
 
 type IconProps = { size?: number; filled?: boolean };
 
@@ -514,6 +570,15 @@ export default function SettingsPage() {
   const [activityFilter, setActivityFilter] = useState<"all" | ActivityType>(
     "all",
   );
+  const [violationItems, setViolationItems] = useState<ViolationHistoryItem[]>(
+    [],
+  );
+  const [violationLoading, setViolationLoading] = useState(false);
+  const [violationError, setViolationError] = useState<string | null>(null);
+  const [currentStrikeTotal, setCurrentStrikeTotal] = useState(0);
+  const [violationNowMs, setViolationNowMs] = useState(() => Date.now());
+  const [selectedViolation, setSelectedViolation] =
+    useState<ViolationHistoryItem | null>(null);
   const [contentOpen, setContentOpen] = useState({
     activity: false,
     hidden: false,
@@ -843,6 +908,22 @@ export default function SettingsPage() {
     [token, activityFilter, activityCursor],
   );
 
+  const loadViolationCenter = useCallback(async () => {
+    if (!token) return;
+    setViolationLoading(true);
+    setViolationError(null);
+    try {
+      const res = await fetchViolationHistory({ token, limit: 100 });
+      setViolationItems(res.items ?? []);
+      setCurrentStrikeTotal(res.currentStrikeTotal ?? 0);
+    } catch (err) {
+      const apiErr = err as ApiError | undefined;
+      setViolationError(apiErr?.message || "Unable to load violation history.");
+    } finally {
+      setViolationLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => {
     if (!token || activeKey !== "content") return;
     loadContentSettings();
@@ -852,6 +933,26 @@ export default function SettingsPage() {
     if (!token || activeKey !== "content") return;
     loadActivityLog("reset");
   }, [token, activeKey, activityFilter, loadActivityLog]);
+
+  useEffect(() => {
+    if (!token || activeKey !== "violations") return;
+    loadViolationCenter();
+  }, [token, activeKey, loadViolationCenter]);
+
+  useEffect(() => {
+    if (activeKey !== "violations") return;
+    setViolationNowMs(Date.now());
+    const timer = window.setInterval(() => {
+      setViolationNowMs(Date.now());
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, [activeKey]);
+
+  useEffect(() => {
+    if (activeKey !== "violations") {
+      setSelectedViolation(null);
+    }
+  }, [activeKey]);
 
   useEffect(() => {
     if (!token || activeKey !== "notifications") return;
@@ -3706,6 +3807,124 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </>
+            ) : activeKey === "violations" ? (
+              <>
+                <div className={styles.sectionHeader}>
+                  <h2 className={styles.sectionTitle}>Violation Center</h2>
+                  <p className={styles.sectionDesc}>
+                    Review moderation actions and your strike history.
+                  </p>
+                </div>
+
+                <div className={styles.sectionCard}>
+                  <div className={styles.notificationRow}>
+                    <div className={styles.notificationMeta}>
+                      <p className={styles.infoTitle}>Current strike total</p>
+                      <p className={styles.infoValue}>{currentStrikeTotal}</p>
+                    </div>
+                    <div className={styles.notificationActions}>
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        onClick={loadViolationCenter}
+                        disabled={violationLoading}
+                      >
+                        {violationLoading ? "Refreshing..." : "Refresh"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.sectionCard}>
+                  {violationLoading ? (
+                    <p className={styles.hint}>Loading violation history...</p>
+                  ) : null}
+                  {violationError ? (
+                    <p className={styles.error}>{violationError}</p>
+                  ) : null}
+
+                  {violationItems.length ? (
+                    <div className={styles.activityList}>
+                      {violationItems.map((item) => {
+                        const timeLabel = item.createdAt
+                          ? formatDistanceToNow(new Date(item.createdAt), {
+                              addSuffix: true,
+                            })
+                          : "";
+                        const isWarn = isWarnAction(item.action);
+                        const canOpenDetail = item.targetType !== "user";
+                        const isMuteInteraction =
+                          item.action === "mute_interaction";
+                        const remainingMute = isMuteInteraction
+                          ? formatRemainingHourMinute(
+                              item.actionExpiresAt,
+                              violationNowMs,
+                            )
+                          : null;
+                        return (
+                          <div
+                            key={item.id}
+                            className={`${styles.activityRow} ${
+                              canOpenDetail ? styles.activityRowClickable : ""
+                            }`}
+                            role={canOpenDetail ? "button" : undefined}
+                            tabIndex={canOpenDetail ? 0 : -1}
+                            onClick={() => {
+                              if (!canOpenDetail) return;
+                              setSelectedViolation(item);
+                            }}
+                            onKeyDown={(event) => {
+                              if (!canOpenDetail) return;
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                setSelectedViolation(item);
+                              }
+                            }}
+                          >
+                            <div className={styles.activityIcon}>
+                              <IconReport />
+                            </div>
+                            <div className={styles.activityBody}>
+                              <div className={styles.activityHeader}>
+                                <p className={styles.activityTitle}>
+                                  {formatActionLabel(item.action)} ·{" "}
+                                  {item.targetType.toUpperCase()}
+                                </p>
+                                <span className={styles.activityTime}>
+                                  {timeLabel}
+                                </span>
+                              </div>
+                              <p className={styles.activitySubtitle}>
+                                {isMuteInteraction
+                                  ? `Interaction muted${
+                                      remainingMute
+                                        ? ` · Remaining ${remainingMute}`
+                                        : " · Until turn on"
+                                    }`
+                                  : `Severity ${formatSeverityLabel(item.severity)} · ${
+                                      isWarn
+                                        ? "No strike added"
+                                        : `Strike +${item.strikeDelta} (Total ${item.strikeTotalAfter})`
+                                    }`}
+                              </p>
+                              <p className={styles.contentSub}>
+                                Reason: {item.reason}
+                              </p>
+                              {canOpenDetail ? (
+                                <p className={styles.hint}>
+                                  Click to view violated content
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : !violationLoading ? (
+                    <p className={styles.hint}>No violations found.</p>
+                  ) : null}
+                </div>
+              </>
             ) : activeKey === "system" ? (
               <>
                 <div className={styles.sectionHeader}>
@@ -4132,6 +4351,102 @@ export default function SettingsPage() {
             ) : loginDevicesLoading ? null : (
               <p className={styles.hint}>No devices recorded yet.</p>
             )}
+          </div>
+        </div>
+      ) : null}
+
+      {selectedViolation && selectedViolation.targetType !== "user" ? (
+        <div className={styles.overlayBackdrop}>
+          <div
+            className={`${styles.overlayCard} ${styles.violationDetailCard}`}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className={styles.overlayHeader}>
+              <div>
+                <p className={styles.kicker}>Violation Center</p>
+                <h2 className={styles.overlayTitle}>Violated content</h2>
+              </div>
+              <div className={styles.overlayActions}>
+                <button
+                  type="button"
+                  className={styles.closeButton}
+                  onClick={() => setSelectedViolation(null)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.violationContentBlock}>
+              {selectedViolation.targetType === "comment" ? (
+                <p className={styles.hint}>Your violated comment</p>
+              ) : null}
+              <p className={styles.violationContentText}>
+                {selectedViolation.previewText || "No text content captured."}
+              </p>
+            </div>
+
+            {selectedViolation.previewMedia ? (
+              <div className={styles.violationPreviewMedia}>
+                {selectedViolation.previewMedia.type === "video" ? (
+                  <video
+                    src={selectedViolation.previewMedia.url}
+                    controls
+                    className={styles.violationPreviewMediaEl}
+                  />
+                ) : (
+                  <img
+                    src={selectedViolation.previewMedia.url}
+                    alt="Violated content"
+                    className={styles.violationPreviewMediaEl}
+                  />
+                )}
+              </div>
+            ) : null}
+
+            {selectedViolation.targetType === "comment" &&
+            selectedViolation.relatedPostPreview ? (
+              <>
+                <div className={styles.violationContentBlock}>
+                  <p className={styles.hint}>Parent post context</p>
+                  <p className={styles.violationContentText}>
+                    {selectedViolation.relatedPostPreview.text ||
+                      "No captured."}
+                  </p>
+                </div>
+
+                {selectedViolation.relatedPostPreview.media ? (
+                  <div className={styles.violationPreviewMedia}>
+                    {selectedViolation.relatedPostPreview.media.type ===
+                    "video" ? (
+                      <video
+                        src={selectedViolation.relatedPostPreview.media.url}
+                        controls
+                        className={styles.violationPreviewMediaEl}
+                      />
+                    ) : (
+                      <img
+                        src={selectedViolation.relatedPostPreview.media.url}
+                        alt="Parent post content"
+                        className={styles.violationPreviewMediaEl}
+                      />
+                    )}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+
+            <div className={styles.confirmActions}>
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={() => setSelectedViolation(null)}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

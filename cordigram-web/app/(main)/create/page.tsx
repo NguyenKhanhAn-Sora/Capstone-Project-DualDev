@@ -9,6 +9,7 @@ import { TimeSelect } from "@/ui/time-select/time-select";
 import {
   createPost,
   createReel,
+  fetchCurrentProfile,
   searchProfiles,
   uploadPostMedia,
   type CreatePostRequest,
@@ -191,6 +192,15 @@ export default function CreatePostPage() {
     start: number;
     end: number;
   } | null>(null);
+  const [accountLimited, setAccountLimited] = useState<{
+    active: boolean;
+    until: string | null;
+    indefinitely: boolean;
+  }>({
+    active: false,
+    until: null,
+    indefinitely: false,
+  });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const captionRef = useRef<HTMLTextAreaElement | null>(null);
   const audienceRef = useRef<HTMLDivElement | null>(null);
@@ -221,6 +231,47 @@ export default function CreatePostPage() {
   );
   const scheduledDate = scheduleParts.date;
   const scheduledTime = scheduleParts.time;
+
+  useEffect(() => {
+    if (!canRender || typeof window === "undefined") return;
+
+    let cancelled = false;
+
+    const loadAccountState = async () => {
+      const token = localStorage.getItem("accessToken") || "";
+      if (!token) {
+        if (!cancelled) {
+          setAccountLimited({ active: false, until: null, indefinitely: false });
+        }
+        return;
+      }
+
+      try {
+        const me = await fetchCurrentProfile({ token });
+        const isLimited =
+          me.status === "pending" &&
+          me.signupStage === "completed" &&
+          (Boolean(me.accountLimitedIndefinitely) || Boolean(me.accountLimitedUntil));
+
+        if (cancelled) return;
+        setAccountLimited({
+          active: isLimited,
+          until: me.accountLimitedUntil ?? null,
+          indefinitely: Boolean(me.accountLimitedIndefinitely),
+        });
+      } catch {
+        if (!cancelled) {
+          setAccountLimited({ active: false, until: null, indefinitely: false });
+        }
+      }
+    };
+
+    loadAccountState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canRender]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -610,6 +661,12 @@ export default function CreatePostPage() {
               typeof finalDuration === "number"
                 ? Math.round(finalDuration * 100) / 100
                 : finalDuration,
+            moderationDecision: upload.moderationDecision,
+            moderationProvider: upload.moderationProvider,
+            moderationReasons: upload.moderationReasons,
+            moderationScores: upload.moderationScores,
+            originalUrl: upload.originalUrl,
+            originalSecureUrl: upload.originalSecureUrl,
           },
         });
       }
@@ -813,13 +870,6 @@ export default function CreatePostPage() {
     }
   };
 
-  const onScheduleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  };
-
   const onHashtagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
@@ -1011,6 +1061,26 @@ export default function CreatePostPage() {
 
   if (!canRender) return null;
 
+  if (accountLimited.active) {
+    const untilLabel = accountLimited.indefinitely
+      ? "until a moderator turns this restriction off"
+      : accountLimited.until
+        ? `until ${new Date(accountLimited.until).toLocaleString()}`
+        : "temporarily";
+
+    return (
+      <div className={styles.screen}>
+        <div className={styles.limitNotice}>
+          <h1 className={styles.limitTitle}>Create is unavailable</h1>
+          <p className={styles.limitText}>
+            Your account is currently limited to read-only mode {untilLabel}.
+            You can still browse posts and continue using messages.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.screen}>
       <div className={styles.headerRow}>
@@ -1136,7 +1206,7 @@ export default function CreatePostPage() {
                 <>
                   <li>Maximum size: 30 GB, video duration: 60 minutes.</li>
                   <li>
-                    Recommended: â€œ.mp4â€. Other major formats are supported.
+                    Recommended: “.mp4”. Other major formats are supported.
                   </li>
                   <li>High-resolution recommended: 1080p, 1440p, 4K.</li>
                   <li>Recommended: 16:9 for landscape, 9:16 for vertical.</li>
@@ -1524,7 +1594,7 @@ export default function CreatePostPage() {
                       }`}
                       aria-hidden
                     >
-                      â–¼
+                      ▼
                     </span>
                   </button>
                   {audienceOpen && (
@@ -1555,7 +1625,7 @@ export default function CreatePostPage() {
                             }`}
                             aria-hidden
                           >
-                            {form.audience === option.value ? "âœ“" : ""}
+                            {form.audience === option.value ? "✓" : ""}
                           </span>
                         </button>
                       ))}

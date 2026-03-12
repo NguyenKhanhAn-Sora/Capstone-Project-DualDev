@@ -7,6 +7,23 @@ import styles from "../profile.module.css";
 import type { FeedItem } from "@/lib/api";
 import { useProfileContext } from "./profile-context";
 
+const PROFILE_POST_NAV_KEY_PREFIX = "profile-post-nav:";
+
+const saveProfilePostNav = (profileId: string, items: FeedItem[]) => {
+  if (typeof window === "undefined") return;
+  const ids = items
+    .filter((item) => item.kind !== "reel")
+    .map((item) => item.id)
+    .filter((id) => !!id);
+  if (!ids.length) return;
+  const key = `${PROFILE_POST_NAV_KEY_PREFIX}${profileId}`;
+  const payload = JSON.stringify({
+    ids,
+    createdAt: Date.now(),
+  });
+  window.sessionStorage.setItem(key, payload);
+};
+
 const formatCount = (value?: number) => {
   const n = value ?? 0;
   if (n >= 1_000_000)
@@ -34,7 +51,7 @@ const IconView = () => (
 
 export default function ProfilePostsPage() {
   const router = useRouter();
-  const { tabs, prefetchTab } = useProfileContext();
+  const { profile, tabs, prefetchTab } = useProfileContext();
   const tab = tabs?.posts;
 
   useEffect(() => {
@@ -66,7 +83,26 @@ export default function ProfilePostsPage() {
         <PostGrid
           items={items}
           loading={showSkeleton}
-          onSelect={(path) => router.push(path)}
+          onSelect={(item) => {
+            const targetPath =
+              item.kind === "reel" ? `/reels/${item.id}` : `/post/${item.id}`;
+
+            if (item.kind === "reel") {
+              router.push(targetPath);
+              return;
+            }
+
+            if (profile.id) {
+              saveProfilePostNav(profile.id, items);
+            }
+
+            const query = new URLSearchParams();
+            query.set("fromProfile", "1");
+            if (profile.id) {
+              query.set("profileId", profile.id);
+            }
+            router.push(`${targetPath}?${query.toString()}`);
+          }}
         />
       )}
     </>
@@ -80,7 +116,7 @@ function PostGrid({
 }: {
   items: FeedItem[];
   loading: boolean;
-  onSelect: (path: string) => void;
+  onSelect: (item: FeedItem) => void;
 }) {
   const handleEnter = (e: React.MouseEvent<HTMLVideoElement>) => {
     const el = e.currentTarget;
@@ -120,7 +156,7 @@ function PostGrid({
             key={item.id}
             type="button"
             className={styles.tile}
-            onClick={() => onSelect(targetPath)}
+            onClick={() => onSelect(item)}
           >
             {media.type === "video" ? (
               <video

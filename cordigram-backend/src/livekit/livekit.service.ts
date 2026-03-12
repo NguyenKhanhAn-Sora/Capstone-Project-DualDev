@@ -106,4 +106,25 @@ export class LivekitService {
       return [];
     }
   }
+
+  /**
+   * Return a lightweight snapshot of current LiveKit usage for admin dashboard.
+   */
+  async getRealtimeStats(): Promise<{
+    rooms: number;
+    participants: number;
+  }> {
+    const rooms = await this.getRoomService().listRooms();
+
+    const participants = rooms.reduce((sum, room) => {
+      const roomParticipants =
+        typeof room.numParticipants === 'number' ? room.numParticipants : 0;
+      return sum + roomParticipants;
+    }, 0);
+
+    return {
+      rooms: rooms.length,
+      participants,
+    };
+  }
 }

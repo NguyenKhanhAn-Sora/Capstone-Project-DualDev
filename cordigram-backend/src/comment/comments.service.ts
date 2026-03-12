@@ -20,6 +20,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { ConfigService } from '../config/config.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ActivityLogService } from '../activity/activity.service';
+import { User } from '../users/user.schema';
 
 type UploadedFile = {
   originalname: string;
@@ -37,6 +38,8 @@ export class CommentsService {
     private readonly commentLikeModel: Model<CommentLike>,
     @InjectModel(Post.name)
     private readonly postModel: Model<Post>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<User>,
     @InjectModel(Profile.name)
     private readonly profileModel: Model<Profile>,
     @InjectModel(Follow.name)
@@ -52,8 +55,14 @@ export class CommentsService {
     const userObjectId = this.asObjectId(userId, 'userId');
     const postObjectId = this.asObjectId(postId, 'postId');
 
+    await this.assertInteractionNotMuted(userObjectId);
+
     const post = await this.postModel
-      .findOne({ _id: postObjectId, deletedAt: null })
+      .findOne({
+        _id: postObjectId,
+        deletedAt: null,
+        moderationState: 'normal',
+      })
       .select('authorId allowComments status kind content media')
       .lean();
 
@@ -83,7 +92,12 @@ export class CommentsService {
       }
       parentId = new Types.ObjectId(dto.parentId);
       const parent = await this.commentModel
-        .findOne({ _id: parentId, postId: postObjectId, deletedAt: null })
+        .findOne({
+          _id: parentId,
+          postId: postObjectId,
+          deletedAt: null,
+          moderationState: { $in: ['normal', null] },
+        })
         .select('_id rootCommentId authorId')
         .lean();
 
@@ -187,6 +201,161 @@ export class CommentsService {
     });
   }
 
+  private async collectCommentSubtreeIds(params: {
+    postObjectId: Types.ObjectId;
+    rootCommentId: Types.ObjectId;
+  }): Promise<Types.ObjectId[]> {
+    const { postObjectId, rootCommentId } = params;
+    const idsToDelete: Types.ObjectId[] = [rootCommentId];
+    const visited = new Set<string>([rootCommentId.toString()]);
+
+    let frontier = [rootCommentId];
+    while (frontier.length) {
+      const children = await this.commentModel
+        .find({
+          postId: postObjectId,
+          deletedAt: null,
+          parentId: { $in: frontier },
+        })
+        .select('_id')
+        .lean();
+
+      const nextFrontier: Types.ObjectId[] = [];
+      for (const child of children) {
+        const cid = (child as { _id?: Types.ObjectId })._id;
+        if (!cid) continue;
+        const key = cid.toString();
+        if (visited.has(key)) continue;
+        visited.add(key);
+        idsToDelete.push(cid);
+        nextFrontier.push(cid);
+      }
+      frontier = nextFrontier;
+    }
+
+    return idsToDelete;
+  }
+
+  private async softDeleteCommentSubtree(params: {
+    postObjectId: Types.ObjectId;
+    rootCommentId: Types.ObjectId;
+    postAuthorId?: Types.ObjectId | null;
+    deletedBy?: Types.ObjectId | null;
+    deletedSource?: 'user' | 'admin' | 'system' | null;
+    deletedReason?: string | null;
+    moderationState?: 'removed' | null;
+  }): Promise<{ deleted: true; count: number }> {
+    const {
+      postObjectId,
+      rootCommentId,
+      postAuthorId,
+      deletedBy,
+      deletedSource,
+      deletedReason,
+      moderationState,
+    } = params;
+
+    const idsToDelete = await this.collectCommentSubtreeIds({
+      postObjectId,
+      rootCommentId,
+    });
+
+    const now = new Date();
+    const $set: Record<string, unknown> = { deletedAt: now };
+    if (deletedBy) $set.deletedBy = deletedBy;
+    if (deletedSource) $set.deletedSource = deletedSource;
+    if (deletedReason) $set.deletedReason = deletedReason;
+    if (moderationState) $set.moderationState = moderationState;
+
+    const deleteResult = await this.commentModel
+      .updateMany(
+        { _id: { $in: idsToDelete }, deletedAt: null },
+        { $set },
+      )
+      .exec();
+
+    const deletedCount = deleteResult.modifiedCount ?? 0;
+
+    if (deletedCount > 0) {
+      await this.postModel
+        .updateOne(
+          { _id: postObjectId },
+          { $inc: { 'stats.comments': -deletedCount } },
+        )
+        .exec();
+
+      await this.commentLikeModel
+        .deleteMany({ commentId: { $in: idsToDelete } })
+        .exec();
+
+      const [latest, distinctAuthors] = await Promise.all([
+        this.commentModel
+          .findOne({ postId: postObjectId, deletedAt: null })
+          .sort({ createdAt: -1 })
+          .select('authorId')
+          .lean(),
+        this.commentModel.distinct('authorId', {
+          postId: postObjectId,
+          deletedAt: null,
+        }),
+      ]);
+
+      if (postAuthorId) {
+        await this.notificationsService.decrementPostCommentNotification({
+          recipientId: postAuthorId.toString(),
+          postId: postObjectId.toString(),
+          actorIds: (distinctAuthors ?? []).map((id) => id.toString()),
+          latestActorId: latest?.authorId?.toString() ?? null,
+        });
+      }
+    }
+
+    return { deleted: true, count: deletedCount };
+  }
+
+  private async assertInteractionNotMuted(
+    userObjectId: Types.ObjectId,
+  ): Promise<void> {
+    const user = await this.userModel
+      .findById(userObjectId)
+      .select('interactionMutedUntil interactionMutedIndefinitely')
+      .lean()
+      .exec();
+
+    if (user?.interactionMutedIndefinitely) {
+      throw new ForbiddenException(
+        'Interaction is muted until a moderator turns it back on',
+      );
+    }
+
+    const mutedUntil = user?.interactionMutedUntil ?? null;
+    if (!mutedUntil) return;
+
+    const mutedDate = new Date(mutedUntil);
+    if (Number.isNaN(mutedDate.getTime()) || mutedDate.getTime() <= Date.now()) {
+      await this.userModel
+        .updateOne(
+          { _id: userObjectId },
+          { $set: { interactionMutedUntil: null, interactionMutedIndefinitely: false } },
+        )
+        .exec();
+      return;
+    }
+
+    const readableMutedUntil = new Intl.DateTimeFormat('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(mutedDate);
+
+    throw new ForbiddenException(
+      `Interaction is muted until ${readableMutedUntil}`,
+    );
+  }
+
   async list(
     userId: string,
     postId: string,
@@ -199,7 +368,11 @@ export class CommentsService {
     const postObjectId = this.asObjectId(postId, 'postId');
 
     const post = await this.postModel
-      .findOne({ _id: postObjectId, deletedAt: null })
+      .findOne({
+        _id: postObjectId,
+        deletedAt: null,
+        moderationState: 'normal',
+      })
       .select('authorId allowComments status')
       .lean();
 
@@ -230,6 +403,7 @@ export class CommentsService {
     const query: Record<string, unknown> = {
       postId: postObjectId,
       deletedAt: null,
+      moderationState: { $in: ['normal', null] },
     };
 
     if (excludedAuthorIds.length) {
@@ -276,6 +450,7 @@ export class CommentsService {
               $match: {
                 parentId: { $in: parentIds },
                 deletedAt: null,
+                moderationState: { $in: ['normal', null] },
                 ...(excludedAuthorIds.length
                   ? { authorId: { $nin: excludedAuthorIds } }
                   : {}),
@@ -366,7 +541,11 @@ export class CommentsService {
     const commentObjectId = this.asObjectId(commentId, 'commentId');
 
     const post = await this.postModel
-      .findOne({ _id: postObjectId, deletedAt: null })
+      .findOne({
+        _id: postObjectId,
+        deletedAt: null,
+        moderationState: 'normal',
+      })
       .select('authorId')
       .lean();
 
@@ -375,7 +554,12 @@ export class CommentsService {
     }
 
     const comment = await this.commentModel
-      .findOne({ _id: commentObjectId, postId: postObjectId, deletedAt: null })
+      .findOne({
+        _id: commentObjectId,
+        postId: postObjectId,
+        deletedAt: null,
+        moderationState: { $in: ['normal', null] },
+      })
       .select('_id authorId')
       .lean();
 
@@ -394,79 +578,56 @@ export class CommentsService {
       throw new ForbiddenException('Not allowed to delete this comment');
     }
 
-    // Gather the subtree rooted at the target comment (target + all descendants).
-    const idsToDelete: Types.ObjectId[] = [commentObjectId];
-    const visited = new Set<string>([commentObjectId.toString()]);
+    return this.softDeleteCommentSubtree({
+      postObjectId,
+      rootCommentId: commentObjectId,
+      postAuthorId: post.authorId ?? null,
+      deletedBy: userObjectId,
+      deletedSource: 'user',
+      moderationState: null,
+    });
+  }
 
-    // BFS to collect all descendants by parentId.
-    let frontier = [commentObjectId];
-    while (frontier.length) {
-      const children = await this.commentModel
-        .find({
-          postId: postObjectId,
-          deletedAt: null,
-          parentId: { $in: frontier },
-        })
-        .select('_id')
-        .lean();
+  async adminDeleteCommentForModeration(params: {
+    postId: string;
+    commentId: string;
+    moderatorId: string;
+    reason?: string | null;
+  }): Promise<{ deleted: true; count: number }> {
+    const postObjectId = this.asObjectId(params.postId, 'postId');
+    const commentObjectId = this.asObjectId(params.commentId, 'commentId');
+    const moderatorObjectId = this.asObjectId(params.moderatorId, 'moderatorId');
 
-      const nextFrontier: Types.ObjectId[] = [];
-      for (const child of children) {
-        const cid = (child as { _id?: Types.ObjectId })._id;
-        if (!cid) continue;
-        const key = cid.toString();
-        if (visited.has(key)) continue;
-        visited.add(key);
-        idsToDelete.push(cid);
-        nextFrontier.push(cid);
-      }
-      frontier = nextFrontier;
+    const post = await this.postModel
+      .findById(postObjectId)
+      .select('authorId')
+      .lean();
+    if (!post) {
+      throw new NotFoundException('Post not found');
     }
 
-    const now = new Date();
-    const deleteResult = await this.commentModel
-      .updateMany(
-        { _id: { $in: idsToDelete }, deletedAt: null },
-        { $set: { deletedAt: now } },
-      )
-      .exec();
+    const comment = await this.commentModel
+      .findOne({
+        _id: commentObjectId,
+        postId: postObjectId,
+        deletedAt: null,
+      })
+      .select('_id')
+      .lean();
 
-    const deletedCount = deleteResult.modifiedCount ?? 0;
-
-    if (deletedCount > 0) {
-      await this.postModel
-        .updateOne(
-          { _id: postObjectId },
-          { $inc: { 'stats.comments': -deletedCount } },
-        )
-        .exec();
-      await this.commentLikeModel
-        .deleteMany({ commentId: { $in: idsToDelete } })
-        .exec();
-
-      const [latest, distinctAuthors] = await Promise.all([
-        this.commentModel
-          .findOne({ postId: postObjectId, deletedAt: null })
-          .sort({ createdAt: -1 })
-          .select('authorId')
-          .lean(),
-        this.commentModel.distinct('authorId', {
-          postId: postObjectId,
-          deletedAt: null,
-        }),
-      ]);
-
-      if (post.authorId) {
-        await this.notificationsService.decrementPostCommentNotification({
-          recipientId: post.authorId.toString(),
-          postId: postObjectId.toString(),
-          actorIds: (distinctAuthors ?? []).map((id) => id.toString()),
-          latestActorId: latest?.authorId?.toString() ?? null,
-        });
-      }
+    if (!comment?._id) {
+      throw new NotFoundException('Comment not found');
     }
 
-    return { deleted: true, count: deletedCount };
+    return this.softDeleteCommentSubtree({
+      postObjectId,
+      rootCommentId: commentObjectId,
+      postAuthorId: post.authorId ?? null,
+      deletedBy: moderatorObjectId,
+      deletedSource: 'admin',
+      deletedReason: params.reason ?? null,
+      moderationState: 'removed',
+    });
   }
 
   async likeComment(userId: string, postId: string, commentId: string) {
@@ -474,8 +635,15 @@ export class CommentsService {
     const postObjectId = this.asObjectId(postId, 'postId');
     const commentObjectId = this.asObjectId(commentId, 'commentId');
 
+    await this.assertInteractionNotMuted(userObjectId);
+
     const comment = await this.commentModel
-      .findOne({ _id: commentObjectId, postId: postObjectId, deletedAt: null })
+      .findOne({
+        _id: commentObjectId,
+        postId: postObjectId,
+        deletedAt: null,
+        moderationState: { $in: ['normal', null] },
+      })
       .select('authorId content')
       .lean();
 
@@ -508,7 +676,11 @@ export class CommentsService {
 
     if (created) {
       const post = await this.postModel
-        .findOne({ _id: postObjectId, deletedAt: null })
+        .findOne({
+          _id: postObjectId,
+          deletedAt: null,
+          moderationState: 'normal',
+        })
         .select('authorId kind content media')
         .lean();
 
@@ -556,7 +728,12 @@ export class CommentsService {
     const commentObjectId = this.asObjectId(commentId, 'commentId');
 
     const comment = await this.commentModel
-      .findOne({ _id: commentObjectId, postId: postObjectId, deletedAt: null })
+      .findOne({
+        _id: commentObjectId,
+        postId: postObjectId,
+        deletedAt: null,
+        moderationState: { $in: ['normal', null] },
+      })
       .select('authorId')
       .lean();
 
@@ -613,7 +790,11 @@ export class CommentsService {
     const commentObjectId = this.asObjectId(params.commentId, 'commentId');
 
     const post = await this.postModel
-      .findOne({ _id: postObjectId, deletedAt: null })
+      .findOne({
+        _id: postObjectId,
+        deletedAt: null,
+        moderationState: 'normal',
+      })
       .select('authorId')
       .lean();
 
@@ -743,7 +924,12 @@ export class CommentsService {
     const commentObjectId = this.asObjectId(commentId, 'commentId');
 
     const comment = await this.commentModel
-      .findOne({ _id: commentObjectId, postId: postObjectId, deletedAt: null })
+      .findOne({
+        _id: commentObjectId,
+        postId: postObjectId,
+        deletedAt: null,
+        moderationState: { $in: ['normal', null] },
+      })
       .select(
         '_id authorId content media createdAt updatedAt parentId rootCommentId mentions',
       )
@@ -758,7 +944,11 @@ export class CommentsService {
     }
 
     const post = await this.postModel
-      .findOne({ _id: postObjectId, deletedAt: null })
+      .findOne({
+        _id: postObjectId,
+        deletedAt: null,
+        moderationState: 'normal',
+      })
       .select('kind')
       .lean();
 
@@ -843,7 +1033,11 @@ export class CommentsService {
     const commentObjectId = this.asObjectId(commentId, 'commentId');
 
     const post = await this.postModel
-      .findOne({ _id: postObjectId, deletedAt: null })
+      .findOne({
+        _id: postObjectId,
+        deletedAt: null,
+        moderationState: 'normal',
+      })
       .select('authorId')
       .lean();
 
@@ -856,7 +1050,12 @@ export class CommentsService {
     }
 
     const comment = await this.commentModel
-      .findOne({ _id: commentObjectId, postId: postObjectId, deletedAt: null })
+      .findOne({
+        _id: commentObjectId,
+        postId: postObjectId,
+        deletedAt: null,
+        moderationState: { $in: ['normal', null] },
+      })
       .select('_id parentId')
       .lean();
 
@@ -897,7 +1096,11 @@ export class CommentsService {
     const commentObjectId = this.asObjectId(commentId, 'commentId');
 
     const post = await this.postModel
-      .findOne({ _id: postObjectId, deletedAt: null })
+      .findOne({
+        _id: postObjectId,
+        deletedAt: null,
+        moderationState: 'normal',
+      })
       .select('authorId')
       .lean();
 
@@ -982,7 +1185,11 @@ export class CommentsService {
     const postObjectId = this.asObjectId(postId, 'postId');
 
     const post = await this.postModel
-      .findOne({ _id: postObjectId, deletedAt: null })
+      .findOne({
+        _id: postObjectId,
+        deletedAt: null,
+        moderationState: 'normal',
+      })
       .select('allowComments')
       .lean();
 

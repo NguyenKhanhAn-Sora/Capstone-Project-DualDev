@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import nodemailer, { Transporter } from 'nodemailer';
 import { ConfigService } from '../config/config.service';
 
@@ -17,6 +17,18 @@ export class MailService {
         pass: this.config.smtpPass,
       },
     });
+  }
+
+  private formatReasonLabel(reason?: string | null): string {
+    if (!reason?.trim()) {
+      return 'Violation of community rules';
+    }
+
+    return reason
+      .trim()
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
   }
 
   async sendOtpEmail(
@@ -76,9 +88,7 @@ export class MailService {
       });
     } catch (err) {
       this.logger.error(`Failed to send OTP email to ${email}`, err as Error);
-      throw new BadRequestException(
-        'Unable to send verification email. Please try again later.',
-      );
+      throw err;
     }
   }
 
@@ -138,9 +148,7 @@ export class MailService {
         `Failed to send password reset email to ${email}`,
         err as Error,
       );
-      throw new BadRequestException(
-        'Unable to send password reset email. Please try again later.',
-      );
+      throw err;
     }
   }
 
@@ -205,9 +213,7 @@ export class MailService {
         `Failed to send change email OTP to ${email}`,
         err as Error,
       );
-      throw new BadRequestException(
-        'Unable to send verification email. Please try again later.',
-      );
+      throw err;
     }
   }
 
@@ -272,9 +278,7 @@ export class MailService {
         `Failed to send change password OTP to ${email}`,
         err as Error,
       );
-      throw new BadRequestException(
-        'Unable to send verification email. Please try again later.',
-      );
+      throw err;
     }
   }
 
@@ -336,9 +340,7 @@ export class MailService {
       });
     } catch (err) {
       this.logger.error(`Failed to send passkey OTP to ${email}`, err as Error);
-      throw new BadRequestException(
-        'Unable to send verification email. Please try again later.',
-      );
+      throw err;
     }
   }
 
@@ -403,9 +405,88 @@ export class MailService {
         `Failed to send two-factor OTP to ${email}`,
         err as Error,
       );
-      throw new BadRequestException(
-        'Unable to send verification email. Please try again later.',
+      throw err;
+    }
+  }
+
+  async sendAccountBannedEmail(params: {
+    email: string;
+    reason?: string | null;
+    moderatorNote?: string | null;
+  }): Promise<void> {
+    const { email, reason, moderatorNote } = params;
+    const subject = 'Cordigram account suspended';
+    const normalizedReason = this.formatReasonLabel(reason);
+    const normalizedNote = moderatorNote?.trim() || null;
+    const supportEmail = 'cordigram@gmail.com';
+    const text = [
+      'Your Cordigram account has been suspended.',
+      `Reason: ${normalizedReason}`,
+      normalizedNote ? `Moderator note: ${normalizedNote}` : null,
+      '',
+      `If you think this is a mistake, contact us at ${supportEmail}.`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const logoUrl =
+      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const html = `
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
+        <tr>
+          <td align="center">
+            <table width="560" cellpadding="0" cellspacing="0" role="presentation" style="background:#ffffff;border-radius:18px;box-shadow:0 12px 40px rgba(15,23,42,0.08);padding:32px 36px;">
+              <tr>
+                <td align="center" style="padding-bottom:20px;">
+                  <img src="${logoUrl}" alt="Cordigram" height="46" style="display:block;">
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size:22px;font-weight:700;padding-bottom:10px;color:#0f172a;">Account suspended</td>
+              </tr>
+              <tr>
+                <td style="font-size:15px;line-height:1.6;padding-bottom:10px;color:#475569;">
+                  Your Cordigram account has been suspended after a moderation review.
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size:14px;line-height:1.6;padding:10px 14px;border-radius:12px;background:#f8fafc;color:#334155;margin-bottom:10px;">
+                  <strong>Reason:</strong> ${normalizedReason}
+                </td>
+              </tr>
+              ${
+                normalizedNote
+                  ? `<tr><td style="font-size:14px;line-height:1.6;color:#475569;padding-top:10px;"><strong>Moderator note:</strong> ${normalizedNote}</td></tr>`
+                  : ''
+              }
+              <tr>
+                <td style="font-size:14px;line-height:1.6;color:#475569;padding-top:16px;">
+                  If you believe this is an error, please contact us at
+                  <a href="mailto:${supportEmail}" style="color:#2563eb;text-decoration:none;">${supportEmail}</a>.
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;line-height:1.5;color:#94a3b8;padding-top:16px;">— Cordigram Team</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>`;
+
+    try {
+      await this.transporter.sendMail({
+        from: this.config.mailFrom,
+        to: email,
+        subject,
+        text,
+        html,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Failed to send account banned email to ${email}`,
+        err as Error,
       );
+      throw err;
     }
   }
 }

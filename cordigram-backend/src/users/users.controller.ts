@@ -122,6 +122,22 @@ export class UsersController {
     });
   }
 
+  @Get('violations')
+  async getViolations(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Query('limit') limit?: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.usersService.getViolationHistory({
+      userId,
+      limit: parsedLimit,
+    });
+  }
+
   @Get('password-change/status')
   async getPasswordChangeStatus(
     @Req() req: Request & { user?: AuthenticatedUser },

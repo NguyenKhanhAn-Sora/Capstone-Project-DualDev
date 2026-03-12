@@ -1,0 +1,369 @@
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  background:
+    radial-gradient(circle at 10% -10%, rgba(74, 163, 228, 0.14), transparent 38%),
+    radial-gradient(circle at 95% 0%, rgba(34, 211, 238, 0.12), transparent 32%),
+    var(--color-bg);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 28px 18px 20px;
+  border-right: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 92%, #cde6fb 8%);
+  box-shadow: 12px 0 28px rgba(13, 34, 68, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  z-index: 20;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 14px;
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.brandMark {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, #3879ad 0%, #4aa3e4 72%, #3dc5df 100%);
+  box-shadow: 0 10px 20px rgba(50, 113, 164, 0.3);
+}
+
+.brandTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.brandSubtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.nav {
+  display: grid;
+  gap: 10px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  text-decoration: none;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.navIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  color: color-mix(in srgb, var(--color-primary-strong) 75%, var(--color-text));
+  flex: 0 0 32px;
+}
+
+.navIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.navText {
+  min-width: 0;
+  display: block;
+}
+
+.navItem:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-primary) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+}
+
+.navItemActive {
+  border-color: color-mix(in srgb, var(--color-primary) 52%, var(--color-border));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-primary) 14%, var(--color-surface)) 0%,
+    color-mix(in srgb, var(--color-primary-accent) 14%, var(--color-surface)) 100%
+  );
+  box-shadow: 0 10px 22px rgba(51, 113, 164, 0.16);
+}
+
+.navItemActive .navIcon {
+  background: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
+  color: var(--color-primary-strong);
+}
+
+.navLabel {
+  display: block;
+  margin: 0;
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.footer {
+  margin-top: auto;
+  padding: 12px 10px 8px;
+  border-top: 1px dashed var(--color-border);
+}
+
+.footerMeta {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.signOutButton {
+  width: 100%;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, #dc2626 38%, var(--color-border));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, #ef4444 18%, var(--color-surface)) 0%,
+    color-mix(in srgb, #b91c1c 18%, var(--color-surface)) 100%
+  );
+  color: color-mix(in srgb, #7f1d1d 72%, var(--color-text));
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease;
+}
+
+.signOutButton:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, #dc2626 64%, var(--color-border));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, #ef4444 25%, var(--color-surface)) 0%,
+    color-mix(in srgb, #b91c1c 25%, var(--color-surface)) 100%
+  );
+  box-shadow: 0 10px 20px rgba(127, 29, 29, 0.18);
+}
+
+.signOutButton:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, #fff 72%, transparent),
+    0 0 0 4px rgba(220, 38, 38, 0.45);
+}
+
+.signOutIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.signOutIcon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.content {
+  min-width: 0;
+}
+
+.signOutOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(9, 16, 32, 0.48);
+  backdrop-filter: blur(2px);
+}
+
+.signOutDialog {
+  width: min(420px, 100%);
+  border-radius: 18px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+  padding: 20px;
+}
+
+.signOutDialogTitle {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.2;
+  color: var(--color-text);
+}
+
+.signOutDialogText {
+  margin: 10px 0 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.signOutDialogActions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.signOutCancelButton,
+.signOutConfirmButton {
+  height: 40px;
+  border-radius: 11px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.signOutCancelButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.signOutCancelButton:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-primary) 44%, var(--color-border));
+}
+
+.signOutConfirmButton {
+  border: 1px solid color-mix(in srgb, #dc2626 55%, var(--color-border));
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(185, 28, 28, 0.25);
+}
+
+.signOutConfirmButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 24px rgba(185, 28, 28, 0.32);
+}
+
+.signOutCancelButton:disabled,
+.signOutConfirmButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+@media (max-width: 1024px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    box-shadow: 0 10px 24px rgba(16, 38, 72, 0.08);
+    gap: 12px;
+  }
+
+  .nav {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .navItem {
+    min-width: 180px;
+    flex: 0 0 auto;
+  }
+
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 10px;
+  }
+
+  .footerMeta {
+    margin: 0;
+  }
+
+  .signOutButton {
+    width: auto;
+    padding: 0 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  .sidebar {
+    padding: 14px 12px 12px;
+  }
+
+  .brand {
+    padding: 6px 4px 10px;
+  }
+
+  .brandSubtitle,
+  .footerMeta {
+    font-size: 11px;
+  }
+
+  .navItem {
+    min-width: 162px;
+    padding: 9px 10px;
+  }
+
+  .navLabel {
+    font-size: 14px;
+  }
+
+  .signOutDialog {
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .signOutDialogActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}

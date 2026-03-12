@@ -18,6 +18,11 @@ export interface UploadResult {
   duration?: number;
 }
 
+export interface StorageUsage {
+  usedBytes: number;
+  limitBytes: number | null;
+}
+
 @Injectable()
 export class CloudinaryService implements OnModuleInit {
   constructor(private readonly config: ConfigService) {}
@@ -77,5 +82,56 @@ export class CloudinaryService implements OnModuleInit {
       height: res.height,
       duration: res.duration,
     };
+  }
+
+  async getStorageUsage(): Promise<StorageUsage> {
+    const usage = await cloudinary.api.usage();
+    const gb = 1024 * 1024 * 1024;
+    const toNumber = (value: unknown) =>
+      typeof value === 'number' ? value : null;
+
+    const storageUsed = toNumber(usage?.storage?.usage) ?? 0;
+    const storageLimit = toNumber(usage?.storage?.limit);
+    const creditsUsed =
+      toNumber(usage?.credits?.used) ??
+      toNumber(usage?.credits_used) ??
+      toNumber(usage?.credits);
+    const creditsLimit =
+      toNumber(usage?.credits?.limit) ?? toNumber(usage?.credits_limit);
+
+    const usedBytes = storageUsed || (creditsUsed ? creditsUsed * gb : 0);
+    const limitBytes =
+      storageLimit ?? (creditsLimit ? creditsLimit * gb : null);
+
+    return {
+      usedBytes,
+      limitBytes,
+    };
+  }
+
+  buildBlurImageUrl(params: {
+    publicId: string;
+    blurStrength?: number;
+    secure?: boolean;
+  }): string {
+    const { publicId, blurStrength = 1800, secure = true } = params;
+    return cloudinary.url(publicId, {
+      resource_type: 'image',
+      secure,
+      transformation: [{ effect: `blur:${blurStrength}` }],
+    });
+  }
+
+  buildBlurVideoUrl(params: {
+    publicId: string;
+    blurStrength?: number;
+    secure?: boolean;
+  }): string {
+    const { publicId, blurStrength = 900, secure = true } = params;
+    return cloudinary.url(publicId, {
+      resource_type: 'video',
+      secure,
+      transformation: [{ effect: `blur:${blurStrength}` }],
+    });
   }
 }

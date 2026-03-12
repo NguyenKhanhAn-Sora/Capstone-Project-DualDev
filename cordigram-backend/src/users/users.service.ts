@@ -22,6 +22,9 @@ import { parseDuration } from '../common/time.util';
 import { createHmac } from 'crypto';
 import { Session } from '../auth/session.schema';
 import { ActivityType } from '../activity/activity.schema';
+import { ModerationAction } from '../moderation/moderation-action.schema';
+import { Post } from '../posts/post.schema';
+import { Comment } from '../comment/comment.schema';
 
 type NotificationCategoryKey = 'follow' | 'comment' | 'like' | 'mentions';
 
@@ -55,6 +58,10 @@ export class UsersService {
     private readonly sessionModel: Model<Session>,
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
     @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
+    @InjectModel(ModerationAction.name)
+    private readonly moderationActionModel: Model<ModerationAction>,
+    @InjectModel(Post.name) private readonly postModel: Model<Post>,
+    @InjectModel(Comment.name) private readonly commentModel: Model<Comment>,
     @InjectModel(UserTasteProfile.name)
     private readonly tasteProfileModel: Model<UserTasteProfile>,
     private readonly blocksService: BlocksService,
@@ -492,7 +499,7 @@ export class UsersService {
       const fetchSize = Math.min(Math.max(take * 12, take), 300);
 
       const fallbackUsers = await this.userModel
-        .find({ _id: { $nin: excludedObjectIds } })
+        .find({ _id: { $nin: excludedObjectIds }, status: { $ne: 'banned' } })
         .sort({ followerCount: -1, _id: -1 })
         .limit(fetchSize)
         .select('_id')
@@ -684,7 +691,7 @@ export class UsersService {
         .exec(),
       this.userModel
         .find({ _id: { $in: candidateIds } })
-        .select('_id followerCount')
+        .select('_id followerCount status')
         .lean()
         .exec(),
     ]);
@@ -699,13 +706,19 @@ export class UsersService {
       const id = u._id?.toString?.();
       if (id) followerCountByUserId.set(id, Number(u.followerCount ?? 0));
     });
+    const activeCandidateIds = new Set(
+      users
+        .filter((u: any) => u?.status !== 'banned')
+        .map((u: any) => u._id?.toString?.())
+        .filter((id: unknown): id is string => Boolean(id)),
+    );
 
     const sameCompanySet = new Set(sameCompanyIds);
     const tasteWeightMap = new Map<string, number>();
     tasteAuthorWeights.forEach((t) => tasteWeightMap.set(t.userId, t.w));
 
     const scored = Array.from(candidateSet)
-      .filter((id) => !excluded.has(id))
+      .filter((id) => !excluded.has(id) && activeCandidateIds.has(id))
       .map((id) => {
         const mutual = mutualMap.get(id) ?? 0;
         const sameCompany = sameCompanySet.has(id) ? 1 : 0;
@@ -802,6 +815,59 @@ export class UsersService {
 
   findById(userId: string): Promise<User | null> {
     return this.userModel.findById(userId).exec();
+  }
+
+  async releaseAccountLimitIfExpired(userId: string): Promise<User | null> {
+    const user = await this.findById(userId);
+    if (!user) return null;
+
+    const accountLimitedUntil =
+      user.accountLimitedUntil instanceof Date ? user.accountLimitedUntil : null;
+    const isExpired =
+      accountLimitedUntil != null && accountLimitedUntil.getTime() <= Date.now();
+    const canAutoRelease =
+      user.status === 'pending' &&
+      user.signupStage === 'completed' &&
+      !user.accountLimitedIndefinitely;
+
+    const suspendedUntil =
+      user.suspendedUntil instanceof Date ? user.suspendedUntil : null;
+    const isSuspendExpired =
+      suspendedUntil != null && suspendedUntil.getTime() <= Date.now();
+    const canAutoUnsuspend =
+      user.status === 'banned' && !user.suspendedIndefinitely;
+
+    const shouldReleaseLimit = canAutoRelease && isExpired;
+    const shouldUnsuspend = canAutoUnsuspend && isSuspendExpired;
+
+    if (!shouldReleaseLimit && !shouldUnsuspend) {
+      return user;
+    }
+
+    const update: Record<string, unknown> = {};
+
+    if (shouldReleaseLimit) {
+      update.accountLimitedUntil = null;
+      update.accountLimitedIndefinitely = false;
+      update.status = 'active';
+    }
+
+    if (shouldUnsuspend) {
+      update.suspendedUntil = null;
+      update.suspendedIndefinitely = false;
+      update.status = 'active';
+    }
+
+    await this.userModel
+      .updateOne(
+        { _id: user._id },
+        {
+          $set: update,
+        },
+      )
+      .exec();
+
+    return this.findById(userId);
   }
 
   async createPending(email: string): Promise<User> {
@@ -2233,6 +2299,201 @@ export class UsersService {
       .exec();
 
     return Boolean(follow?._id);
+  }
+
+  async getViolationHistory(params: { userId: string; limit?: number }): Promise<{
+    currentStrikeTotal: number;
+    items: Array<{
+      id: string;
+      targetType: 'post' | 'comment' | 'user';
+      targetId: string;
+      action: string;
+      category: string;
+      reason: string;
+      severity: 'low' | 'medium' | 'high' | null;
+      strikeDelta: number;
+      strikeTotalAfter: number;
+      actionExpiresAt: string | null;
+      previewText: string | null;
+      previewMedia: { type: 'image' | 'video'; url: string } | null;
+      relatedPostId: string | null;
+      relatedPostPreview: {
+        text: string | null;
+        media: { type: 'image' | 'video'; url: string } | null;
+      } | null;
+      createdAt: string;
+    }>;
+  }> {
+    const userObjectId = this.asObjectId(params.userId, 'userId');
+    const limit = Math.min(Math.max(Number(params.limit) || 50, 1), 100);
+
+    const rawActions = await this.moderationActionModel
+      .find({
+        action: {
+          $nin: ['no_violation', 'rollback_moderation', 'auto_hidden_pending_review'],
+        },
+        invalidatedAt: null,
+      })
+      .sort({ createdAt: -1 })
+      .limit(300)
+      .select(
+        'targetType targetId action category reason severity expiresAt createdAt',
+      )
+      .lean()
+      .exec();
+
+    const commentIds = rawActions
+      .filter((item) => item.targetType === 'comment' && item.targetId)
+      .map((item) => item.targetId);
+    const commentRecords = commentIds.length
+      ? await this.commentModel
+          .find({ _id: { $in: commentIds } })
+          .select('_id authorId postId content media')
+          .lean()
+          .exec()
+      : [];
+    const relatedPostIdsFromComments = commentRecords
+      .map((comment) => comment.postId)
+      .filter((id): id is Types.ObjectId => Boolean(id));
+    const postIds = Array.from(
+      new Set(
+        rawActions
+          .filter((item) => item.targetType === 'post' && item.targetId)
+          .map((item) => item.targetId.toString())
+          .concat(relatedPostIdsFromComments.map((id) => id.toString())),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+    const [posts, comments] = await Promise.all([
+      postIds.length
+        ? this.postModel
+            .find({ _id: { $in: postIds } })
+            .select('_id authorId content media')
+            .lean()
+            .exec()
+        : Promise.resolve([]),
+      Promise.resolve(commentRecords),
+    ]);
+
+    const postMap = new Map(posts.map((post) => [post._id.toString(), post]));
+    const commentMap = new Map(
+      comments.map((comment) => [comment._id.toString(), comment]),
+    );
+
+    const mine = rawActions.filter((item) => {
+      if (item.targetType === 'post') {
+        const post = postMap.get(item.targetId.toString());
+        return post?.authorId?.toString() === userObjectId.toString();
+      }
+      if (item.targetType === 'comment') {
+        const comment = commentMap.get(item.targetId.toString());
+        return comment?.authorId?.toString() === userObjectId.toString();
+      }
+      return item.targetId?.toString() === userObjectId.toString();
+    });
+
+    const orderedAsc = mine
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt ?? 0).getTime() -
+          new Date(b.createdAt ?? 0).getTime(),
+      );
+
+    let runningStrike = 0;
+    const withTotals = orderedAsc.map((item) => {
+      const strikeDelta =
+        item.action === 'warn' || item.action === 'mute_interaction'
+          ? 0
+          : item.severity === 'high'
+            ? 3
+            : item.severity === 'medium'
+              ? 2
+              : 1;
+      runningStrike += strikeDelta;
+
+      const previewText =
+        item.targetType === 'post'
+          ? postMap.get(item.targetId.toString())?.content?.trim()?.slice(0, 160) ||
+            null
+          : item.targetType === 'comment'
+            ? commentMap.get(item.targetId.toString())?.content
+                ?.trim()
+                ?.slice(0, 160) || null
+            : null;
+
+      const postPreviewMedia =
+        item.targetType === 'post'
+          ? postMap.get(item.targetId.toString())?.media?.[0]
+          : null;
+      const commentPreviewMedia =
+        item.targetType === 'comment'
+          ? commentMap.get(item.targetId.toString())?.media
+          : null;
+      const previewMedia = postPreviewMedia ?? commentPreviewMedia ?? null;
+
+      const relatedPostId =
+        item.targetType === 'post'
+          ? item.targetId.toString()
+          : item.targetType === 'comment'
+            ? commentMap.get(item.targetId.toString())?.postId?.toString?.() ??
+              null
+            : null;
+
+      const relatedPost = relatedPostId ? postMap.get(relatedPostId) : null;
+      const relatedPostPreview =
+        item.targetType === 'comment'
+          ? {
+              text: relatedPost?.content?.trim()?.slice(0, 220) ?? null,
+              media:
+                relatedPost?.media?.[0] && relatedPost.media[0].url
+                  ? {
+                      type: relatedPost.media[0].type,
+                      url: relatedPost.media[0].url,
+                    }
+                  : null,
+            }
+          : null;
+
+      return {
+        id: item._id.toString(),
+        targetType: item.targetType,
+        targetId: item.targetId.toString(),
+        action: item.action,
+        category: item.category,
+        reason: item.reason,
+        severity: item.severity ?? null,
+        strikeDelta,
+        strikeTotalAfter: runningStrike,
+        actionExpiresAt: item.expiresAt
+          ? new Date(item.expiresAt).toISOString()
+          : null,
+        previewText,
+        previewMedia:
+          previewMedia && previewMedia.url
+            ? {
+                type: previewMedia.type,
+                url: previewMedia.url,
+              }
+            : null,
+        relatedPostId,
+        relatedPostPreview,
+        createdAt: item.createdAt
+          ? new Date(item.createdAt).toISOString()
+          : new Date().toISOString(),
+      };
+    });
+
+    const user = await this.userModel
+      .findById(userObjectId)
+      .select('strikeCount')
+      .lean()
+      .exec();
+
+    return {
+      currentStrikeTotal:
+        typeof user?.strikeCount === 'number' ? user.strikeCount : 0,
+      items: withTotals.reverse().slice(0, limit),
+    };
   }
 
   private asObjectId(id: string, field: string): Types.ObjectId {

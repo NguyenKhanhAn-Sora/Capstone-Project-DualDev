@@ -363,7 +363,6 @@ export default function ReelComments({
   } | null>(null);
   const [replyState, setReplyState] = useState<Record<string, ReplyState>>({});
   const [openCommentMenuId, setOpenCommentMenuId] = useState<string | null>(
-    null
     null,
   );
   const [commentMenuClosingId, setCommentMenuClosingId] = useState<
@@ -371,7 +370,6 @@ export default function ReelComments({
   >(null);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(
-    null
     null,
   );
   const [deleteTarget, setDeleteTarget] = useState<CommentItem | null>(null);
@@ -392,7 +390,6 @@ export default function ReelComments({
   const [reportError, setReportError] = useState("");
   const [reportClosing, setReportClosing] = useState(false);
   const emojiRef = useRef<HTMLDivElement | null>(null);
-    null
   const stickerRef = useRef<HTMLDivElement | null>(null);
   const gifRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -648,8 +645,6 @@ export default function ReelComments({
       setTotalCount((prev) =>
         typeof next === "function"
           ? (next as (p: number) => number)(prev)
-          : next
-    [onTotalChange, postId]
           : next,
       );
     },
@@ -665,25 +660,21 @@ export default function ReelComments({
 
   const commentsLocked = useMemo(
     () => allowComments === false,
-    [allowComments]
     [allowComments],
   );
 
   const canInteract = useMemo(
     () => Boolean(open && token && postId && !commentsLocked),
-    [commentsLocked, open, postId, token]
     [commentsLocked, open, postId, token],
   );
 
   const topLevelComments = useMemo(
     () => comments.filter((c) => !c.parentId),
-    [comments]
     [comments],
   );
 
   const selectedReportGroup = useMemo(
     () => REPORT_GROUPS.find((g) => g.key === reportCategory),
-    [reportCategory]
     [reportCategory],
   );
 
@@ -703,8 +694,6 @@ export default function ReelComments({
         (c) =>
           c.id !== targetId &&
           c.parentId !== targetId &&
-          c.rootCommentId !== targetId
-      )
           c.rootCommentId !== targetId,
       ),
     );
@@ -716,7 +705,6 @@ export default function ReelComments({
           (c) =>
             c.id !== targetId &&
             c.parentId !== targetId &&
-            c.rootCommentId !== targetId
             c.rootCommentId !== targetId,
         );
         if (parentId === targetId) continue;
@@ -743,7 +731,6 @@ export default function ReelComments({
     setReplyTarget(null);
     setEditingCommentId(null);
     setEmojiOpen(false);
-  }, [commentsLocked]);
     setCommentMentions([]);
     clearCommentMedia();
     resetMentionState();
@@ -810,7 +797,6 @@ export default function ReelComments({
       setDeleteTarget(null);
     } catch (err) {
       setDeleteError(
-        (err as { message?: string })?.message || "Failed to delete comment"
         (err as { message?: string })?.message || "Failed to delete comment",
       );
     } finally {
@@ -843,7 +829,6 @@ export default function ReelComments({
           const keep = (c.author?.id || c.authorId) !== blockTarget.id;
           if (!keep) removed += 1;
           return keep;
-        })
         }),
       );
       setReplyState((prev) => {
@@ -864,7 +849,6 @@ export default function ReelComments({
       setBlockTarget(null);
     } catch (err) {
       setError(
-        (err as { message?: string })?.message || "Failed to block user"
         (err as { message?: string })?.message || "Failed to block user",
       );
     } finally {
@@ -918,7 +902,6 @@ export default function ReelComments({
     } catch (err) {
       setReportSubmitting(false);
       setReportError(
-        (err as { message?: string })?.message || "Failed to report comment"
         (err as { message?: string })?.message || "Failed to report comment",
       );
     }
@@ -929,9 +912,6 @@ export default function ReelComments({
     focusInput();
   };
 
-  const renderCommentThread = (
-    comment: CommentItem,
-    depth = 0
   const renderCommentContent = (comment: CommentItem) => {
     const content = comment.content || "";
     const mentionMap = new Map<string, { userId?: string }>();
@@ -1009,11 +989,6 @@ export default function ReelComments({
     const timeAgo = formatCompactDistance(comment.createdAt);
     const authorId = comment.author?.id || comment.authorId;
     const isCommentOwner = Boolean(
-      viewerId && authorId && viewerId === authorId
-    );
-    const isPostOwner = Boolean(
-      viewerId && postAuthorId && viewerId === postAuthorId
-    );
       viewerId && authorId && viewerId === authorId,
     );
     const isPostOwner = Boolean(
@@ -1137,8 +1112,6 @@ export default function ReelComments({
                 <>@{fallbackLabel || "user"}</>
               )}
             </span>
-          </div>
-          <div className={postStyles.commentText}>{comment.content}</div>
             {isPostAuthorComment ? (
               <span className={postStyles.commentAuthorBadge}>
                 <IconCrown size={12} />
@@ -1346,7 +1319,6 @@ export default function ReelComments({
                       </div>
                     </div>
                   </div>,
-                  document.body
                   document.body,
                 )
               : null}
@@ -1375,7 +1347,6 @@ export default function ReelComments({
                   onClick={() =>
                     loadReplies(
                       comment.id,
-                      (replyState[comment.id]?.page ?? 1) + 1
                       (replyState[comment.id]?.page ?? 1) + 1,
                     )
                   }
@@ -1408,7 +1379,6 @@ export default function ReelComments({
 
     fetchComments({ token, postId, page: 1, limit: COMMENT_PAGE_SIZE })
       .then((res) => {
-        setComments(res?.items ?? []);
         setComments(prioritizeRootComments(res?.items ?? []));
         setPage(res?.page ?? 1);
         setHasMore(Boolean(res?.hasMore));
@@ -1420,7 +1390,6 @@ export default function ReelComments({
       })
       .catch((err) => setError(err?.message || "Failed to load comments"))
       .finally(() => setLoading(false));
-  }, [open, postId, token, updateTotal]);
   }, [open, postId, token, updateTotal, prioritizeRootComments]);
 
   useEffect(() => {
@@ -1428,11 +1397,6 @@ export default function ReelComments({
   }, [initialCount, postId]);
 
   useEffect(() => {
-    if (!emojiOpen) return;
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (!emojiRef.current) return;
-      if (!emojiRef.current.contains(event.target as Node)) {
-        setEmojiOpen(false);
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node | null;
       if (emojiRef.current && target && !emojiRef.current.contains(target)) {
@@ -1461,11 +1425,6 @@ export default function ReelComments({
 
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("touchstart", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, [emojiOpen]);
     document.addEventListener("keydown", handleEscape);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -1532,7 +1491,6 @@ export default function ReelComments({
         page: page + 1,
         limit: COMMENT_PAGE_SIZE,
       });
-      setComments((prev) => [...prev, ...(res?.items ?? [])]);
       setComments((prev) =>
         prioritizeRootComments([...prev, ...(res?.items ?? [])]),
       );
@@ -1547,7 +1505,6 @@ export default function ReelComments({
       }
     } catch (err) {
       setError(
-        (err as { message?: string })?.message || "Failed to load more comments"
         (err as { message?: string })?.message ||
           "Failed to load more comments",
       );
@@ -1559,7 +1516,6 @@ export default function ReelComments({
   const updateCommentEverywhere = useCallback(
     (targetId: string, updater: (c: CommentItem) => CommentItem) => {
       setComments((prev) =>
-        prev.map((c) => (c.id === targetId ? updater(c) : c))
         prev.map((c) => (c.id === targetId ? updater(c) : c)),
       );
 
@@ -1568,7 +1524,6 @@ export default function ReelComments({
         let changed = false;
         for (const [parentId, state] of Object.entries(prev)) {
           const items = state.items.map((c) =>
-            c.id === targetId ? updater(c) : c
             c.id === targetId ? updater(c) : c,
           );
           const mutated = items.some((c, idx) => c !== state.items[idx]);
@@ -1578,10 +1533,6 @@ export default function ReelComments({
         return changed ? next : prev;
       });
     },
-    []
-  const mergeLatestComments = useCallback((latest: CommentItem[]) => {
-      return [...mergedLatest, ...trailing];
-  }, []);
     [],
   );
 
@@ -1680,7 +1631,6 @@ export default function ReelComments({
         }));
       }
     },
-    [postId, token]
     [postId, token],
   );
 
@@ -1713,7 +1663,6 @@ export default function ReelComments({
             hasMore: true,
             loading: false,
             expanded: false,
-          }
           },
         );
       };
@@ -1779,7 +1728,6 @@ export default function ReelComments({
           } catch {
             /* ignore per-thread errors */
           }
-        })
         }),
       );
     };
@@ -1848,7 +1796,6 @@ export default function ReelComments({
         likesCount:
           typeof res?.likesCount === "number"
             ? res.likesCount
-            : c.likesCount ?? 0,
             : (c.likesCount ?? 0),
       }));
     } catch (err) {
@@ -1858,7 +1805,6 @@ export default function ReelComments({
         likesCount: Math.max(0, (c.likesCount ?? 0) + (liked ? 1 : -1)),
       }));
       setError(
-        (err as { message?: string })?.message || "Unable to update like"
         (err as { message?: string })?.message || "Unable to update like",
       );
     }
@@ -1866,8 +1812,6 @@ export default function ReelComments({
 
   const handleSubmit = async () => {
     if (!token || !postId || submitting || commentsLocked) return;
-    const content = text.trim();
-    if (!content) return;
     if (commentMediaUploading) return;
     const content = text.trim();
     const hasMedia = Boolean(commentMediaFile || commentMediaExternal);
@@ -1957,7 +1901,6 @@ export default function ReelComments({
         setReplyTarget(null);
       } catch (err) {
         setError(
-          (err as { message?: string })?.message || "Failed to update comment"
           (err as { message?: string })?.message || "Failed to update comment",
         );
       } finally {
@@ -2004,13 +1947,11 @@ export default function ReelComments({
       });
       scrollToComment(parentId);
     } else {
-      setComments((prev) => [...prev, optimistic]);
       setComments((prev) => prioritizeRootComments([...prev, optimistic]));
       scrollToComment(optimistic.id);
     }
 
     setText("");
-    setSubmitting(true);
 
     const incrementRepliesCount = (targetId: string | null | undefined) => {
       if (!targetId) return;
@@ -2041,7 +1982,6 @@ export default function ReelComments({
             expanded: true,
           };
           const items = state.items.map((c) =>
-            c.id === optimistic.id ? saved : c
             c.id === optimistic.id ? saved : c,
           );
           return { ...prev, [parentId]: { ...state, items } };
@@ -2052,7 +1992,6 @@ export default function ReelComments({
         }
       } else {
         setComments((prev) =>
-          prev.map((c) => (c.id === optimistic.id ? saved : c))
           prioritizeRootComments(
             prev.map((c) => (c.id === optimistic.id ? saved : c)),
           ),
@@ -2077,7 +2016,6 @@ export default function ReelComments({
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
       }
       setError(
-        (err as { message?: string })?.message || "Unable to send comment"
         (err as { message?: string })?.message || "Unable to send comment",
       );
     } finally {
@@ -2253,7 +2191,6 @@ export default function ReelComments({
   return (
     <>
       <aside
-        className={`${styles.commentSidebar} ${sidebarAnimClass}`}
         className={`${styles.commentSidebar} ${styles.commentSidebarDocked} ${sidebarAnimClass}`}
         role="complementary"
         aria-label="Comments"
@@ -2304,7 +2241,6 @@ export default function ReelComments({
             The post owner has turned off comments.
           </div>
         ) : (
-          <>
           <div>
             {replyTarget ? (
               <div className={postStyles.replyBadge}>
@@ -2332,66 +2268,6 @@ export default function ReelComments({
             ) : null}
 
             <div
-              className={postStyles.formRow}
-              style={{ paddingBottom: 12, paddingRight: 12 }}
-            >
-              <div className={postStyles.emojiWrap} ref={emojiRef}>
-                <button
-                  type="button"
-                  className={postStyles.emojiButton}
-                  onClick={() => setEmojiOpen((prev) => !prev)}
-                  aria-label="Add emoji"
-                  disabled={!canInteract}
-                >
-                  <svg
-                    aria-label="Emoji icon"
-                    fill="currentColor"
-                    height="22"
-                    role="img"
-                    viewBox="0 0 24 24"
-                    width="22"
-                  >
-                    <title>Emoji icon</title>
-                    <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
-                  </svg>
-                </button>
-                {emojiOpen ? (
-                  <div className={postStyles.emojiPopover}>
-                    <EmojiPicker
-                      onEmojiClick={(emojiData) => {
-                        insertEmoji(emojiData.emoji || "");
-                      }}
-                      searchDisabled={false}
-                      skinTonesDisabled={false}
-                      lazyLoadEmojis
-                    />
-                  </div>
-                ) : null}
-              </div>
-              <textarea
-                className={postStyles.input}
-                placeholder="Add a comment..."
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                rows={3}
-                ref={textareaRef}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit();
-                  }
-                }}
-                disabled={!canInteract || submitting}
-              />
-              <button
-                className={postStyles.submitBtn}
-                onClick={handleSubmit}
-                disabled={!canInteract || submitting || !text.trim()}
-              >
-                {submitting ? "Sending..." : "Post"}
-              </button>
-            </div>
-          </>
               className={postStyles.commentComposer}
               style={{ paddingBottom: 12, paddingRight: 12 }}
             >
@@ -2910,7 +2786,6 @@ export default function ReelComments({
                         setReportReason(
                           group.reasons.length === 1
                             ? group.reasons[0].key
-                            : null
                             : null,
                         );
                       }}

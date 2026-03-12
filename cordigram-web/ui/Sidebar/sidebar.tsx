@@ -27,11 +27,10 @@ import {
 import { useTheme } from "@/component/theme-provider";
 import SearchOverlay from "@/ui/search-overlay/search-overlay";
 import NotificationsOverlay from "@/ui/notifications-overlay/notifications-overlay";
-import { getStoredAccessToken } from "@/lib/auth";
+import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
 import { useTranslations } from "next-intl";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 const EyeIcon = ({ open }: { open: boolean }) => (
   <svg
     aria-hidden
@@ -224,6 +223,18 @@ export default function Sidebar() {
         },
       );
 
+      socket.on("auth:force_logout", () => {
+        socket.disconnect();
+        socketRef.current = null;
+        clearStoredAccessToken();
+        if (typeof window !== "undefined") {
+          try {
+            window.sessionStorage.setItem("skipSessionRestore", "1");
+          } catch (_err) {}
+          window.location.href = "/login?loggedOut=1";
+        }
+      });
+
       socketRef.current = socket;
     },
     [lastSeenAt],
@@ -352,7 +363,6 @@ export default function Sidebar() {
             width={52}
             height={52}
             className={styles.logo}
-            style={{ width: "auto", height: "auto" }}
             priority
           />
           <span className={styles.brandName}>CORDIGRAM</span>
@@ -659,7 +669,6 @@ function SwitchAccountOverlay({
             alt="Logo"
             width={48}
             height={48}
-            style={{ width: "auto", height: "auto" }}
           />
           <h2 className="text-center">{t("title")}</h2>
         </div>

@@ -38,6 +38,10 @@ import RepostOverlay, {
   type QuoteInput,
   type RepostTarget,
 } from "@/ui/repost-overlay/repost-overlay";
+import {
+  getInteractionMutedMessage,
+  INTERACTION_MUTED_FALLBACK_MESSAGE,
+} from "@/lib/interaction-mute";
 
 const REPORT_ANIMATION_MS = 200;
 const QUOTE_CHAR_LIMIT = 500;
@@ -415,6 +419,8 @@ export default function HashtagPage() {
   const [visibilityError, setVisibilityError] = useState("");
   const [repostTarget, setRepostTarget] = useState<RepostTarget | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [interactionMuteOverlayMessage, setInteractionMuteOverlayMessage] =
+    useState<string | null>(null);
 
   const updatePost = (
     postId: string,
@@ -476,54 +482,76 @@ export default function HashtagPage() {
   const handleQuickRepost = async (target: RepostTarget) => {
     const token = getStoredAccessToken();
     if (!token) return;
-    const originalId = resolveOriginalPostId(target.postId);
-    const targetId = target.postId;
-    await createPost({ token, payload: { repostOf: originalId } });
-    incrementRepostStat(originalId);
-    if (originalId !== targetId) {
-      incrementRepostStat(targetId);
-      try {
-        await repostPost({ token, postId: targetId });
-      } catch {}
+    try {
+      const originalId = resolveOriginalPostId(target.postId);
+      const targetId = target.postId;
+      await createPost({ token, payload: { repostOf: originalId } });
+      incrementRepostStat(originalId);
+      if (originalId !== targetId) {
+        incrementRepostStat(targetId);
+        try {
+          await repostPost({ token, postId: targetId });
+        } catch {}
+      }
+      showToast("Reposted");
+    } catch (err) {
+      const mutedMessage = getInteractionMutedMessage(err);
+      if (mutedMessage) {
+        setInteractionMuteOverlayMessage(
+          mutedMessage || INTERACTION_MUTED_FALLBACK_MESSAGE,
+        );
+        return;
+      }
+      throw err;
     }
-    showToast("Reposted");
   };
 
   const handleShareQuote = async (target: RepostTarget, input: QuoteInput) => {
     const token = getStoredAccessToken();
     if (!token) return;
-    const originalId = resolveOriginalPostId(target.postId);
-    const targetId = target.postId;
+    try {
+      const originalId = resolveOriginalPostId(target.postId);
+      const targetId = target.postId;
 
-    const note = input.content.trim();
-    const mentions = extractMentionsFromCaption(note);
-    const payload = {
-      repostOf: originalId,
-      content: note || undefined,
-      hashtags: input.hashtags.length ? input.hashtags : undefined,
-      location: input.location.trim() || undefined,
-      allowComments: input.allowComments,
-      allowDownload: Boolean(target.originalAllowDownload),
-      hideLikeCount: input.hideLikeCount,
-      visibility: input.visibility,
-      mentions: mentions.length ? mentions : undefined,
-    };
+      const note = input.content.trim();
+      const mentions = extractMentionsFromCaption(note);
+      const payload = {
+        repostOf: originalId,
+        content: note || undefined,
+        hashtags: input.hashtags.length ? input.hashtags : undefined,
+        location: input.location.trim() || undefined,
+        allowComments: input.allowComments,
+        allowDownload: Boolean(target.originalAllowDownload),
+        hideLikeCount: input.hideLikeCount,
+        visibility: input.visibility,
+        mentions: mentions.length ? mentions : undefined,
+      };
 
-    if (target.kind === "reel") {
-      await createReel({ token, payload: payload as any });
-    } else {
-      await createPost({ token, payload });
+      if (target.kind === "reel") {
+        await createReel({ token, payload: payload as any });
+      } else {
+        await createPost({ token, payload });
+      }
+
+      incrementRepostStat(originalId);
+      if (originalId !== targetId) {
+        incrementRepostStat(targetId);
+        try {
+          await repostPost({ token, postId: targetId });
+        } catch {}
+      }
+
+      showToast("Reposted with quote");
+    } catch (err) {
+      const mutedMessage = getInteractionMutedMessage(err);
+      if (mutedMessage) {
+        setInteractionMuteOverlayMessage(
+          mutedMessage || INTERACTION_MUTED_FALLBACK_MESSAGE,
+        );
+        return;
+      }
+      throw err;
     }
-
-    incrementRepostStat(originalId);
-    if (originalId !== targetId) {
-      incrementRepostStat(targetId);
-      try {
-        await repostPost({ token, postId: targetId });
-      } catch {}
-    }
-
-    showToast("Reposted with quote");
   };
 
   const onRepostIntent = (
@@ -727,21 +755,28 @@ export default function HashtagPage() {
     if (!token) return;
     const targetItem = posts.find((item) => item.id === postId);
     const targetId = targetItem?.repostOf || postId;
-    updatePost(postId, (item) => ({
-      ...item,
-      liked,
-      stats: {
-        ...item.stats,
-        hearts: Math.max(0, (item.stats?.hearts ?? 0) + (liked ? 1 : -1)),
-      },
-    }));
     try {
       if (liked) {
         await likePost({ token, postId: targetId });
       } else {
         await unlikePost({ token, postId: targetId });
       }
-    } catch {
+      updatePost(postId, (item) => ({
+        ...item,
+        liked,
+        stats: {
+          ...item.stats,
+          hearts: Math.max(0, (item.stats?.hearts ?? 0) + (liked ? 1 : -1)),
+        },
+      }));
+    } catch (err) {
+      const mutedMessage = getInteractionMutedMessage(err);
+      if (mutedMessage) {
+        setInteractionMuteOverlayMessage(
+          mutedMessage || INTERACTION_MUTED_FALLBACK_MESSAGE,
+        );
+        return;
+      }
       updatePost(postId, (item) => ({
         ...item,
         liked: !liked,
@@ -983,6 +1018,35 @@ export default function HashtagPage() {
         quoteCharLimit={QUOTE_CHAR_LIMIT}
         animationMs={REPORT_ANIMATION_MS}
       />
+
+      {interactionMuteOverlayMessage ? (
+        <div className={feedStyles.modalOverlay} role="dialog" aria-modal="true">
+          <div className={feedStyles.modalCard}>
+            <div className={feedStyles.modalHeader}>
+              <div>
+                <h3 className={feedStyles.modalTitle}>Interaction muted</h3>
+                <p className={feedStyles.modalBody}>{interactionMuteOverlayMessage}</p>
+              </div>
+              <button
+                className={feedStyles.closeBtn}
+                aria-label="Close"
+                onClick={() => setInteractionMuteOverlayMessage(null)}
+              >
+                ×
+              </button>
+            </div>
+            <div className={feedStyles.modalActions}>
+              <button
+                type="button"
+                className={feedStyles.modalPrimary}
+                onClick={() => setInteractionMuteOverlayMessage(null)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {deleteTarget ? (
         <div

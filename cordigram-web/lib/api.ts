@@ -107,7 +107,6 @@ export type UpdatePostRequest = {
 export type CreatePostResponse = {
   kind: "post" | "reel";
   id: string;
-  repostOf?: string | null;
   content: string;
   media: Array<{
     type: "image" | "video";
@@ -117,9 +116,10 @@ export type CreatePostResponse = {
   hashtags: string[];
   mentions: string[];
   topics?: string[];
-  videoDurationSec?: number | null;
   location?: string | null;
   visibility: "public" | "followers" | "private";
+  moderationState?: "normal" | "restricted" | "hidden" | "removed";
+  canRepost?: boolean;
   allowComments: boolean;
   allowDownload: boolean;
   hideLikeCount?: boolean;
@@ -1383,6 +1383,10 @@ export type CurrentProfileResponse = {
   displayName: string;
   username: string;
   avatarUrl: string;
+  status?: "active" | "pending" | "banned";
+  signupStage?: "otp_pending" | "info_pending" | "completed";
+  accountLimitedUntil?: string | null;
+  accountLimitedIndefinitely?: boolean;
 };
 
 export type UpdateAvatarResponse = {
@@ -1425,7 +1429,10 @@ export type NotificationItem = {
     | "post_comment"
     | "post_mention"
     | "follow"
-    | "login_alert";
+    | "login_alert"
+    | "post_moderation"
+    | "report"
+    | "system_notice";
   actor: {
     id: string;
     displayName: string;
@@ -1442,6 +1449,22 @@ export type NotificationItem = {
   commentCount: number;
   mentionCount: number;
   mentionSource: "post" | "comment";
+  reportOutcome?: "no_violation" | "action_taken" | null;
+  reportAudience?: "reporter" | "offender" | null;
+  reportTargetType?: "post" | "comment" | "user" | null;
+  reportAction?: string | null;
+  reportTargetId?: string | null;
+  reportSeverity?: "low" | "medium" | "high" | null;
+  reportStrikeDelta?: number | null;
+  reportStrikeTotal?: number | null;
+  reportReason?: string | null;
+  reportActionExpiresAt?: string | null;
+  moderationDecision?: "approve" | "blur" | "reject" | null;
+  moderationReasons?: string[];
+  systemNoticeTitle?: string | null;
+  systemNoticeBody?: string | null;
+  systemNoticeLevel?: "info" | "warning" | "critical" | null;
+  systemNoticeActionUrl?: string | null;
   readAt: string | null;
   createdAt: string;
   activityAt: string;
@@ -1457,6 +1480,32 @@ export type NotificationItem = {
 
 export type NotificationListResponse = {
   items: NotificationItem[];
+};
+
+export type ViolationHistoryItem = {
+  id: string;
+  targetType: "post" | "comment" | "user";
+  targetId: string;
+  action: string;
+  category: string;
+  reason: string;
+  severity: "low" | "medium" | "high" | null;
+  strikeDelta: number;
+  strikeTotalAfter: number;
+  actionExpiresAt: string | null;
+  previewText: string | null;
+  previewMedia: { type: "image" | "video"; url: string } | null;
+  relatedPostId: string | null;
+  relatedPostPreview: {
+    text: string | null;
+    media: { type: "image" | "video"; url: string } | null;
+  } | null;
+  createdAt: string;
+};
+
+export type ViolationHistoryResponse = {
+  currentStrikeTotal: number;
+  items: ViolationHistoryItem[];
 };
 
 export type NotificationUnreadCountResponse = {
@@ -1610,6 +1659,21 @@ export async function updateNotificationSettings(opts: {
       mutedUntil,
       mutedIndefinitely,
     }),
+  });
+}
+
+export async function fetchViolationHistory(opts: {
+  token: string;
+  limit?: number;
+}): Promise<ViolationHistoryResponse> {
+  const { token, limit } = opts;
+  const search = typeof limit === "number" ? `?limit=${limit}` : "";
+  return apiFetch<ViolationHistoryResponse>({
+    path: `/users/violations${search}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 }
 
@@ -1901,6 +1965,8 @@ export type UploadPostMediaResponse = {
   folder: string;
   url: string;
   secureUrl: string;
+  originalUrl?: string;
+  originalSecureUrl?: string;
   publicId: string;
   resourceType: string;
   bytes: number;
@@ -1908,6 +1974,10 @@ export type UploadPostMediaResponse = {
   width?: number;
   height?: number;
   duration?: number;
+  moderationDecision?: "approve" | "blur" | "reject";
+  moderationProvider?: string | null;
+  moderationReasons?: string[];
+  moderationScores?: Record<string, number>;
 };
 
 export type ReportProblemAttachment = {
@@ -2791,7 +2861,6 @@ export async function sendDirectMessage(
     giphyId?: string;
     voiceUrl?: string;
     voiceDuration?: number;
-    replyTo?: string;
   },
 ): Promise<any> {
   const token =
@@ -2812,109 +2881,7 @@ export async function sendDirectMessage(
       giphyId: opts.giphyId || undefined,
       voiceUrl: opts.voiceUrl || undefined,
       voiceDuration: opts.voiceDuration || undefined,
-      replyTo: opts.replyTo || undefined,
     }),
-  });
-}
-
-export async function addMessageReaction(
-  messageId: string,
-  emoji: string,
-  opts?: { token?: string },
-): Promise<any> {
-  const token =
-    opts?.token ||
-    localStorage.getItem("accessToken") ||
-    localStorage.getItem("token");
-
-  return apiFetch<any>({
-    path: `/direct-messages/${messageId}/reaction/${encodeURIComponent(emoji)}`,
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-}
-
-export async function pinDirectMessage(
-  messageId: string,
-  opts?: { token?: string },
-): Promise<any> {
-  const token =
-    opts?.token ||
-    localStorage.getItem("accessToken") ||
-    localStorage.getItem("token");
-
-  return apiFetch<any>({
-    path: `/direct-messages/${messageId}/pin`,
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-}
-
-export async function reportDirectMessage(
-  messageId: string,
-  reason: string,
-  description?: string,
-  opts?: { token?: string },
-): Promise<any> {
-  const token =
-    opts?.token ||
-    localStorage.getItem("accessToken") ||
-    localStorage.getItem("token");
-
-  return apiFetch<any>({
-    path: `/direct-messages/${messageId}/report`,
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      reason,
-      description: description || undefined,
-    }),
-  });
-}
-
-export async function deleteDirectMessage(
-  messageId: string,
-  deleteType: "for-everyone" | "for-me" = "for-me",
-  opts?: { token?: string },
-): Promise<any> {
-  const token =
-    opts?.token ||
-    localStorage.getItem("accessToken") ||
-    localStorage.getItem("token");
-
-  return apiFetch<any>({
-    path: `/direct-messages/${messageId}`,
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      deleteType,
-    }),
-  });
-}
-
-export async function getPinnedMessages(
-  userId: string,
-  opts?: { token?: string },
-): Promise<any[]> {
-  const token =
-    opts?.token ||
-    localStorage.getItem("accessToken") ||
-    localStorage.getItem("token");
-
-  return apiFetch<any[]>({
-    path: `/direct-messages/pinned/${userId}`,
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
   });
 }
 
@@ -2981,7 +2948,6 @@ export async function logoutAllDevices(opts: {
     },
   });
 }
-
 export async function getAvailableUsers(opts?: {
   token?: string;
 }): Promise<any[]> {
@@ -3133,6 +3099,107 @@ export async function createPoll(opts: {
   }
 
   return response.json();
+}
+
+export async function pinDirectMessage(
+  messageId: string,
+  opts?: { token?: string },
+): Promise<any> {
+  const token =
+    opts?.token ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("token");
+
+  return apiFetch<any>({
+    path: `/direct-messages/${messageId}/pin`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function reportDirectMessage(
+  messageId: string,
+  reason: string,
+  description?: string,
+  opts?: { token?: string },
+): Promise<any> {
+  const token =
+    opts?.token ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("token");
+
+  return apiFetch<any>({
+    path: `/direct-messages/${messageId}/report`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      reason,
+      description: description || undefined,
+    }),
+  });
+}
+
+export async function deleteDirectMessage(
+  messageId: string,
+  deleteType: "for-everyone" | "for-me" = "for-me",
+  opts?: { token?: string },
+): Promise<any> {
+  const token =
+    opts?.token ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("token");
+
+  return apiFetch<any>({
+    path: `/direct-messages/${messageId}`,
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      deleteType,
+    }),
+  });
+}
+
+export async function addMessageReaction(
+  messageId: string,
+  emoji: string,
+  opts?: { token?: string },
+): Promise<any> {
+  const token =
+    opts?.token ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("token");
+
+  return apiFetch<any>({
+    path: `/direct-messages/${messageId}/reaction/${encodeURIComponent(emoji)}`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function getPinnedMessages(
+  userId: string,
+  opts?: { token?: string },
+): Promise<any[]> {
+  const token =
+    opts?.token ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("token");
+
+  return apiFetch<any[]>({
+    path: `/direct-messages/pinned/${userId}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 }
 
 export async function getPoll(opts: {

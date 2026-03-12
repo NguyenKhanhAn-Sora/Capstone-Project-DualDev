@@ -3,18 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../login/login.module.css";
-import {
-  apiFetch,
-  requestPasswordReset,
-  resetPassword,
-  verifyResetOtp,
-  fetchCurrentProfile,
-} from "@/lib/api";
-import { setStoredAccessToken } from "@/lib/auth";
-
-const RECENT_ACCOUNTS_KEY = "recentAccounts";
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
+import { requestPasswordReset, resetPassword, verifyResetOtp } from "@/lib/api";
 const EyeIcon = ({ open }: { open: boolean }) => (
   <svg
     aria-hidden
@@ -110,58 +99,8 @@ export default function ForgotPasswordPage() {
         otp: otp.trim(),
         newPassword: newPassword.trim(),
       });
-      setMessage("Password updated. Signing you in...");
-
-      try {
-        const loginRes = await apiFetch<{ accessToken: string }>({
-          path: "/auth/login",
-          method: "POST",
-          body: JSON.stringify({
-            email: email.trim().toLowerCase(),
-            password: newPassword.trim(),
-          }),
-          credentials: "include",
-        });
-        setStoredAccessToken(loginRes.accessToken);
-
-        // Sync recent account so login screen displays correctly
-        try {
-          const profile = await fetchCurrentProfile({
-            token: loginRes.accessToken,
-          });
-          const normalizedEmail = email.trim().toLowerCase();
-          if (
-            emailRegex.test(normalizedEmail) &&
-            typeof window !== "undefined"
-          ) {
-            const raw = window.localStorage.getItem(RECENT_ACCOUNTS_KEY);
-            const parsed = raw ? (JSON.parse(raw) as any[]) : [];
-            const filtered = Array.isArray(parsed)
-              ? parsed.filter((item) => item?.email !== normalizedEmail)
-              : [];
-            const next = [
-              {
-                email: normalizedEmail,
-                username: profile.username,
-                displayName: profile.displayName,
-                avatarUrl: profile.avatarUrl,
-                lastUsed: Date.now(),
-              },
-              ...filtered,
-            ].slice(0, 5);
-            window.localStorage.setItem(
-              RECENT_ACCOUNTS_KEY,
-              JSON.stringify(next),
-            );
-          }
-        } catch (_err) {
-          // ignore recent-account update failure
-        }
-        setTimeout(() => router.push("/"), 300);
-      } catch (_err) {
-        setMessage("Password updated. Please sign in again.");
-        setTimeout(() => router.push("/login"), 500);
-      }
+      setMessage("Password updated. Redirecting to login...");
+      setTimeout(() => router.push("/login"), 500);
     } catch (err) {
       const apiErr = err as { message?: string };
       setError(apiErr?.message || "Password reset failed, please try again.");
@@ -187,8 +126,6 @@ export default function ForgotPasswordPage() {
               <input
                 className={styles["overlay-input"]}
                 type="email"
-                name="forgot-email"
-                id="forgot-email"
                 placeholder="Your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -211,8 +148,6 @@ export default function ForgotPasswordPage() {
               <input
                 className={styles["overlay-input"]}
                 type="text"
-                name="forgot-otp"
-                id="forgot-otp"
                 placeholder="Enter OTP"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
@@ -253,8 +188,6 @@ export default function ForgotPasswordPage() {
                 <input
                   className={`${styles["overlay-input"]} ${styles.passwordInput}`}
                   type={showNewPassword ? "text" : "password"}
-                  name="new-password"
-                  id="new-password"
                   placeholder="New password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
@@ -275,8 +208,6 @@ export default function ForgotPasswordPage() {
                 <input
                   className={`${styles["overlay-input"]} ${styles.passwordInput}`}
                   type={showConfirmPassword ? "text" : "password"}
-                  name="confirm-password"
-                  id="confirm-password"
                   placeholder="Confirm new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}

@@ -9,6 +9,7 @@ import { Model, Types, PipelineStage } from 'mongoose';
 import { Profile } from './profile.schema';
 import { Follow } from '../users/follow.schema';
 import { Post } from '../posts/post.schema';
+import { User } from '../users/user.schema';
 import { CompaniesService } from '../companies/companies.service';
 import type {
   ProfileFieldVisibility,
@@ -21,6 +22,7 @@ export class ProfilesService {
     @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
+    @InjectModel(User.name) private readonly userModel: Model<User>,
     private readonly companiesService: CompaniesService,
   ) {}
 
@@ -422,7 +424,34 @@ export class ProfilesService {
       },
     ];
 
-    return this.profileModel.aggregate(pipeline).exec();
+    const items = (await this.profileModel.aggregate(pipeline).exec()) as Array<{
+      id: string;
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      followersCount: number;
+    }>;
+
+    if (!items.length) return [];
+
+    const userIds = items
+      .map((item) => item.userId)
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const activeUsers = await this.userModel
+      .find({ _id: { $in: userIds }, status: { $ne: 'banned' } })
+      .select('_id')
+      .lean();
+
+    const activeUserIdSet = new Set(
+      activeUsers
+        .map((item) => item._id?.toString?.())
+        .filter((id): id is string => Boolean(id)),
+    );
+
+    return items.filter((item) => activeUserIdSet.has(item.userId));
   }
 
   async getProfileDetails(params: {
@@ -477,6 +506,15 @@ export class ProfilesService {
     const ownerId = this.asObjectId(profile.userId) ?? maybeObjectId;
     if (!ownerId) {
       throw new NotFoundException('Profile owner missing');
+    }
+
+    const ownerUser = await this.userModel
+      .findById(ownerId)
+      .select('status')
+      .lean();
+
+    if (!ownerUser || ownerUser.status === 'banned') {
+      throw new NotFoundException('Account is unavailable');
     }
 
     const viewerId = params.viewerId ? this.asObjectId(params.viewerId) : null;

@@ -27,8 +27,8 @@ export class PostSchedulerService implements OnModuleInit, OnModuleDestroy {
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
   ) {}
 
-  async onModuleInit() {
-    await this.initQueue();
+  onModuleInit() {
+    this.initQueue();
   }
 
   async onModuleDestroy() {
@@ -59,7 +59,7 @@ export class PostSchedulerService implements OnModuleInit, OnModuleDestroy {
     if (this.queue || this.worker) return;
 
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    this.connection = new IORedis(redisUrl, { 
+    this.connection = new IORedis(redisUrl, {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
     });

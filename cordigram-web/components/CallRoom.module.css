@@ -72,44 +72,39 @@
 
 .videoTileWrapper {
   position: relative;
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
-  background: #0f0f0f;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  border: 2px solid rgba(255, 255, 255, 0.05);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.videoTileWrapper:hover {
-  border-color: rgba(255, 255, 255, 0.1);
+  background: #1a1a1a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 3px solid transparent;
+  transition: all 0.3s ease;
 }
 
 /* Speaking indicator - glowing border */
 .videoTileWrapper.speaking {
-  border-color: #22c55e;
-  border-width: 3px;
+  border-color: #43b581;
   box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.4),
-    0 0 24px rgba(34, 197, 94, 0.6),
-    inset 0 0 20px rgba(34, 197, 94, 0.08);
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(67, 181, 129, 0.6),
+    inset 0 0 20px rgba(67, 181, 129, 0.1);
   animation: speakingGlow 1.5s ease-in-out infinite;
 }
 
 @keyframes speakingGlow {
   0%,
   100% {
-    border-color: #22c55e;
+    border-color: #43b581;
     box-shadow:
-      0 8px 24px rgba(0, 0, 0, 0.4),
-      0 0 24px rgba(34, 197, 94, 0.6),
-      inset 0 0 20px rgba(34, 197, 94, 0.08);
+      0 4px 12px rgba(0, 0, 0, 0.3),
+      0 0 20px rgba(67, 181, 129, 0.6),
+      inset 0 0 20px rgba(67, 181, 129, 0.1);
   }
   50% {
     border-color: #4ade80;
     box-shadow:
-      0 8px 24px rgba(0, 0, 0, 0.4),
-      0 0 32px rgba(74, 222, 128, 0.8),
-      inset 0 0 24px rgba(74, 222, 128, 0.12);
+      0 4px 12px rgba(0, 0, 0, 0.3),
+      0 0 30px rgba(74, 222, 128, 0.8),
+      inset 0 0 30px rgba(74, 222, 128, 0.2);
   }
 }
 
@@ -174,51 +169,36 @@
 /* Participant Info Overlay */
 .participantInfo {
   position: absolute;
-  bottom: 100px;
-  left: 16px;
-  display: inline-flex;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(12px);
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
   z-index: 10;
-  transition: all 0.3s ease;
-  max-width: fit-content;
-}
-
-.participantInfo:hover {
-  background: rgba(0, 0, 0, 0.75);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 .participantName {
   font-size: 14px;
   font-weight: 600;
   color: white;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-  letter-spacing: 0.2px;
-  white-space: nowrap;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .micOn {
-  color: #22c55e;
+  color: #43b581;
   display: flex;
   align-items: center;
-  flex-shrink: 0;
 }
 
 .micOff {
-  color: #ef4444;
+  color: #ed4245;
   display: flex;
   align-items: center;
-  flex-shrink: 0;
 }
 
 /* Responsive */
@@ -245,22 +225,14 @@
   }
 
   .participantInfo {
-    bottom: 90px;
-    left: 10px;
-    padding: 6px 12px;
-    gap: 6px;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    padding: 6px 10px;
   }
 
   .participantName {
-    font-size: 13px;
-    font-weight: 600;
-    max-width: 150px;
-  }
-
-  .micOn svg,
-  .micOff svg {
-    width: 12px;
-    height: 12px;
+    font-size: 12px;
   }
 }
 
@@ -379,13 +351,8 @@
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 28px 24px;
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.85) 0%,
-    rgba(0, 0, 0, 0.6) 50%,
-    transparent 100%
-  );
+  padding: 24px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -399,48 +366,29 @@
 }
 
 .controlButton {
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  position: relative;
-  overflow: hidden;
-}
-
-.controlButton::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    circle at center,
-    rgba(255, 255, 255, 0.1) 0%,
-    transparent 70%
-  );
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.controlButton:hover::before {
-  opacity: 1;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .controlButton:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
 }
 
 .controlButton:active {
-  transform: scale(0.92) translateY(-1px);
+  transform: scale(0.95);
 }
 
 .controlButton svg {
@@ -448,24 +396,12 @@
   height: 24px;
 }
 
-.controlButtonOn {
-  background: rgba(34, 197, 94, 0.9);
-  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
-}
-
-.controlButtonOn:hover {
-  background: rgba(34, 197, 94, 1);
-  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.6);
-}
-
 .controlButtonOff {
   background: rgba(239, 68, 68, 0.9);
-  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
 }
 
 .controlButtonOff:hover {
   background: rgba(239, 68, 68, 1);
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6);
 }
 
 .controlButtonActive {

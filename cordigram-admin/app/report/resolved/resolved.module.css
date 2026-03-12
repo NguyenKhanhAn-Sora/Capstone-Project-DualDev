@@ -1,0 +1,341 @@
+.page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 14% 10%, rgba(34, 211, 238, 0.14), transparent 48%),
+    radial-gradient(circle at 84% 5%, rgba(52, 112, 162, 0.12), transparent 48%),
+    var(--color-bg);
+  padding: 32px 24px 64px;
+  font-family: var(--font-roboto), sans-serif;
+}
+
+.shell {
+  /* max-width: 1280px; */
+  margin: 0 auto;
+  display: grid;
+  gap: 22px;
+}
+
+.topbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.eyebrow {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.26em;
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+
+.title {
+  margin: 8px 0 0;
+  font-size: clamp(26px, 4vw, 34px);
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 10px 0 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  max-width: 680px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.ghostButton {
+  text-decoration: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 600;
+  background: var(--color-surface);
+}
+
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 18px;
+  box-shadow: 0 18px 42px rgba(15, 22, 41, 0.08);
+  display: grid;
+  gap: 14px;
+}
+
+.searchRow {
+  display: flex;
+}
+
+.searchInput {
+  width: 100%;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-size: 13px;
+  padding: 0 12px;
+  outline: none;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+.searchInput:focus {
+  border-color: rgba(52, 112, 162, 0.55);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 3px rgba(74, 163, 228, 0.12);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filterChip {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filterChipActive {
+  background: #d8e8ff;
+  border-color: rgba(52, 112, 162, 0.42);
+  color: #1e3a5f;
+}
+
+.summary {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  padding: 0 4px;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 0.7fr 2.1fr 1.6fr 1fr 1fr 0.9fr 1.4fr;
+  gap: 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+  font-weight: 700;
+  padding: 0 8px;
+}
+
+.centerHeader {
+  text-align: center;
+}
+
+.tableBody {
+  display: grid;
+  gap: 10px;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 0.7fr 2.1fr 1.6fr 1fr 1fr 0.9fr 1.4fr;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  border-radius: 14px;
+  padding: 12px 8px;
+}
+
+.centerCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.typeCell {
+  display: flex;
+  align-items: center;
+}
+
+.targetTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.typeBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.typeBadgePost,
+.typeBadgeComment,
+.typeBadgeUser {
+  background: rgba(34, 211, 238, 0.18);
+  color: #0f766e;
+}
+
+.meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.actionPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.14);
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.statusHigh,
+.statusLow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.statusHigh {
+  background: rgba(239, 68, 68, 0.16);
+  color: #b91c1c;
+}
+
+.statusLow {
+  background: rgba(15, 118, 110, 0.14);
+  color: #0f766e;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.rowActionsCentered {
+  justify-content: center;
+}
+
+.inlineButton,
+.secondaryButton,
+.warningButton {
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inlineButton {
+  border: none;
+  background: var(--color-button-x);
+  color: #fff;
+  text-decoration: none;
+}
+
+.secondaryButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.warningButton {
+  border: 1px solid rgba(185, 28, 28, 0.25);
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  cursor: pointer;
+}
+
+.secondaryButton:disabled,
+.warningButton:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.emptyState {
+  border: 1px dashed var(--color-border);
+  border-radius: 14px;
+  padding: 18px;
+  text-align: center;
+  color: var(--color-text-muted);
+  background: var(--color-surface-muted);
+  font-size: 13px;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: rgba(15, 118, 110, 0.95);
+  color: #fff;
+  border: 1px solid rgba(15, 118, 110, 0.4);
+  border-radius: 12px;
+  padding: 10px 14px;
+  z-index: 60;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+@media (max-width: 1080px) {
+  .tableHeader {
+    display: none;
+  }
+
+  .tableRow {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .rowActions {
+    justify-content: flex-start;
+  }
+
+  .centerCell {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .rowActionsCentered {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  .page {
+    padding: 22px 14px 48px;
+  }
+}

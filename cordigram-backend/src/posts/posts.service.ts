@@ -29,6 +29,9 @@ import { PostImpressionEvent } from '../explore/impression-event.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ActivityLogService } from '../activity/activity.service';
 import { PostSchedulerService } from './post-scheduler.service';
+import { User } from '../users/user.schema';
+import { MediaModerationService } from './media-moderation.service';
+import { ModerationAction } from '../moderation/moderation-action.schema';
 type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
@@ -42,6 +45,9 @@ const REEL_MAX_DURATION_SECONDS = 90;
 export class PostsService {
   constructor(
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
+    @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(ModerationAction.name)
+    private readonly moderationActionModel: Model<ModerationAction>,
     @InjectModel(PostInteraction.name)
     private readonly postInteractionModel: Model<PostInteraction>,
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
@@ -57,9 +63,12 @@ export class PostsService {
     private readonly notificationsService: NotificationsService,
     private readonly activityLogService: ActivityLogService,
     private readonly postScheduler: PostSchedulerService,
+    private readonly mediaModerationService: MediaModerationService,
   ) {}
 
   async create(authorId: string, dto: CreatePostDto) {
+    await this.assertInteractionNotMuted(authorId);
+
     const normalizedHashtags = this.normalizeHashtags(dto.hashtags ?? []);
     const normalizedMentions = this.normalizeMentions(dto.mentions ?? []);
     const normalizedTopics = this.normalizeTopics(dto.topics ?? []);
@@ -81,7 +90,7 @@ export class PostsService {
     if (dto.repostOf) {
       repostOf = new Types.ObjectId(dto.repostOf);
       const original = await this.postModel
-        .findOne({ _id: repostOf, deletedAt: null })
+        .findOne({ _id: repostOf, deletedAt: null, moderationState: 'normal' })
         .lean();
       if (!original) {
         throw new NotFoundException('Original post not found');
@@ -175,6 +184,28 @@ export class PostsService {
         .exec();
     }
 
+    const moderationSummary = this.resolvePostModerationSummary(media);
+    if (moderationSummary?.decision === 'reject') {
+      await this.applyAutoModerationRejectToPost({
+        authorId,
+        postId: doc._id.toString(),
+        reason:
+          moderationSummary.reasons[0] ??
+          'Automated moderation rejected this post',
+        allReasons: moderationSummary.reasons,
+      });
+    }
+
+    if (moderationSummary) {
+      await this.notificationsService.createPostModerationResultNotification({
+        recipientId: authorId,
+        postId: doc._id.toString(),
+        postKind: 'post',
+        decision: moderationSummary.decision,
+        reasons: moderationSummary.reasons,
+      });
+    }
+
     return this.toResponse(doc);
   }
 
@@ -190,7 +221,7 @@ export class PostsService {
 
     const post = await this.postModel
       .findOne({ _id: postObjectId, deletedAt: null })
-      .select('authorId hashtags mentions kind')
+      .select('authorId hashtags mentions kind moderationState visibility')
       .lean();
 
     if (!post) {
@@ -232,6 +263,14 @@ export class PostsService {
       update.location = dto.location?.trim() || null;
     }
     if (dto.visibility !== undefined) {
+      if (
+        post.moderationState === 'restricted' &&
+        dto.visibility !== 'followers'
+      ) {
+        throw new ForbiddenException(
+          'Visibility is locked to followers while reach restriction is active',
+        );
+      }
       update.visibility = dto.visibility;
     }
     if (typeof dto.allowComments === 'boolean') {
@@ -282,6 +321,8 @@ export class PostsService {
   }
 
   async createReel(authorId: string, dto: CreateReelDto) {
+    await this.assertInteractionNotMuted(authorId);
+
     const normalizedHashtags = this.normalizeHashtags(dto.hashtags ?? []);
     const normalizedMentions = this.normalizeMentions(dto.mentions ?? []);
     const normalizedTopics = this.normalizeTopics(dto.topics ?? []);
@@ -377,6 +418,28 @@ export class PostsService {
       mentions: normalizedMentions,
       source: 'post',
     });
+
+    const moderationSummary = this.resolvePostModerationSummary(media);
+    if (moderationSummary?.decision === 'reject') {
+      await this.applyAutoModerationRejectToPost({
+        authorId,
+        postId: doc._id.toString(),
+        reason:
+          moderationSummary.reasons[0] ??
+          'Automated moderation rejected this reel',
+        allReasons: moderationSummary.reasons,
+      });
+    }
+
+    if (moderationSummary) {
+      await this.notificationsService.createPostModerationResultNotification({
+        recipientId: authorId,
+        postId: doc._id.toString(),
+        postKind: 'reel',
+        decision: moderationSummary.decision,
+        reasons: moderationSummary.reasons,
+      });
+    }
 
     return this.toResponse(doc);
   }
@@ -578,6 +641,8 @@ export class PostsService {
       topics: doc.topics,
       location: doc.location,
       visibility: doc.visibility,
+      moderationState: doc.moderationState ?? 'normal',
+      canRepost: (doc.moderationState ?? 'normal') === 'normal',
       allowComments: doc.allowComments,
       allowDownload: doc.allowDownload,
       hideLikeCount: doc.hideLikeCount,
@@ -652,6 +717,52 @@ export class PostsService {
     return null;
   }
 
+  private async assertInteractionNotMuted(userId: string): Promise<void> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    const userObjectId = new Types.ObjectId(userId);
+    const user = await this.userModel
+      .findById(userObjectId)
+      .select('interactionMutedUntil interactionMutedIndefinitely')
+      .lean()
+      .exec();
+
+    if (user?.interactionMutedIndefinitely) {
+      throw new ForbiddenException(
+        'Interaction is muted until a moderator turns it back on',
+      );
+    }
+
+    const mutedUntil = user?.interactionMutedUntil ?? null;
+    if (!mutedUntil) return;
+
+    const mutedDate = new Date(mutedUntil);
+    if (Number.isNaN(mutedDate.getTime()) || mutedDate.getTime() <= Date.now()) {
+      await this.userModel
+        .updateOne(
+          { _id: userObjectId },
+          { $set: { interactionMutedUntil: null, interactionMutedIndefinitely: false } },
+        )
+        .exec();
+      return;
+    }
+
+    const readableMutedUntil = new Intl.DateTimeFormat('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(mutedDate);
+
+    throw new ForbiddenException(
+      `Interaction is muted until ${readableMutedUntil}`,
+    );
+  }
+
   async uploadMedia(authorId: string, file: UploadedFile) {
     if (!file) {
       throw new BadRequestException('Missing file');
@@ -701,12 +812,20 @@ export class PostsService {
   }
 
   private async uploadSingle(authorId: string, file: UploadedFile) {
-    // Cloudinary uses 'video' resource type for both video and audio files
-    let resourceType: 'image' | 'video' | 'raw' = 'image';
-    if (file.mimetype.startsWith('video/') || file.mimetype.startsWith('audio/')) {
-      resourceType = 'video';
-    }
-    
+    const resourceType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+    const moderation =
+      resourceType === 'image'
+        ? await this.mediaModerationService.moderateImage({
+            buffer: file.buffer,
+            filename: file.originalname,
+            mimetype: file.mimetype,
+          })
+        : await this.mediaModerationService.moderateVideo({
+            buffer: file.buffer,
+            filename: file.originalname,
+            mimetype: file.mimetype,
+          });
+
     const folder = this.buildUploadFolder(authorId);
 
     const upload = await this.cloudinary.uploadBuffer({
@@ -716,10 +835,38 @@ export class PostsService {
       overwrite: false,
     });
 
+    const secureUrl =
+      moderation.decision === 'blur'
+        ? resourceType === 'image'
+          ? this.cloudinary.buildBlurImageUrl({
+              publicId: upload.publicId,
+              secure: true,
+            })
+          : this.cloudinary.buildBlurVideoUrl({
+              publicId: upload.publicId,
+              secure: true,
+            })
+        : upload.secureUrl;
+
+    const url =
+      moderation.decision === 'blur'
+        ? resourceType === 'image'
+          ? this.cloudinary.buildBlurImageUrl({
+              publicId: upload.publicId,
+              secure: false,
+            })
+          : this.cloudinary.buildBlurVideoUrl({
+              publicId: upload.publicId,
+              secure: false,
+            })
+        : upload.url;
+
     return {
       folder,
-      url: upload.url,
-      secureUrl: upload.secureUrl,
+      url,
+      secureUrl,
+      originalUrl: upload.url,
+      originalSecureUrl: upload.secureUrl,
       publicId: upload.publicId,
       resourceType: upload.resourceType,
       bytes: upload.bytes,
@@ -727,7 +874,115 @@ export class PostsService {
       width: upload.width,
       height: upload.height,
       duration: upload.duration,
+      moderationDecision: moderation.decision,
+      moderationProvider: moderation.provider,
+      moderationReasons: moderation.reasons,
+      moderationScores: moderation.scores,
     };
+  }
+
+  private resolvePostModerationSummary(media: Array<{
+    type: 'image' | 'video';
+    url: string;
+    metadata?: Record<string, unknown> | null;
+  }>): {
+    decision: 'approve' | 'blur' | 'reject';
+    reasons: string[];
+  } | null {
+    const decisions = (media ?? [])
+      .map((item) => {
+        const rawDecision = item?.metadata?.['moderationDecision'];
+        if (
+          rawDecision === 'approve' ||
+          rawDecision === 'blur' ||
+          rawDecision === 'reject'
+        ) {
+          const reasonsRaw = item?.metadata?.['moderationReasons'];
+          const reasons = Array.isArray(reasonsRaw)
+            ? reasonsRaw.filter((value): value is string => typeof value === 'string')
+            : [];
+          return { decision: rawDecision, reasons };
+        }
+        return null;
+      })
+      .filter(
+        (
+          value,
+        ): value is {
+          decision: 'approve' | 'blur' | 'reject';
+          reasons: string[];
+        } => Boolean(value),
+      );
+
+    if (!decisions.length) return null;
+
+    if (decisions.some((item) => item.decision === 'reject')) {
+      return {
+        decision: 'reject',
+        reasons:
+          decisions.find((item) => item.decision === 'reject')?.reasons ?? [],
+      };
+    }
+
+    if (decisions.some((item) => item.decision === 'blur')) {
+      return {
+        decision: 'blur',
+        reasons: decisions.find((item) => item.decision === 'blur')?.reasons ?? [],
+      };
+    }
+
+    return {
+      decision: 'approve',
+      reasons: decisions.find((item) => item.decision === 'approve')?.reasons ?? [],
+    };
+  }
+
+  private async applyAutoModerationRejectToPost(params: {
+    authorId: string;
+    postId: string;
+    reason: string;
+    allReasons: string[];
+  }) {
+    const authorObjectId = this.asObjectId(params.authorId, 'authorId');
+    const postObjectId = this.asObjectId(params.postId, 'postId');
+    const admin = await this.userModel
+      .findOne({ roles: 'admin', status: 'active' })
+      .select('_id')
+      .lean()
+      .exec();
+    const moderatorId = admin?._id
+      ? new Types.ObjectId(admin._id)
+      : authorObjectId;
+
+    await this.moderationActionModel.create({
+      targetType: 'post',
+      targetId: postObjectId,
+      action: 'remove_post',
+      category: 'automated_content_moderation',
+      reason: params.reason,
+      severity: 'low',
+      note: `Auto reject: ${params.allReasons.join(', ')}`,
+      moderatorId,
+    });
+
+    await this.postModel
+      .updateOne(
+        { _id: postObjectId },
+        {
+          $set: {
+            moderationState: 'removed',
+            deletedAt: new Date(),
+            deletedBy: moderatorId,
+            deletedSource: 'system',
+            deletedReason: params.reason,
+          },
+        },
+      )
+      .exec();
+
+    await this.userModel
+      .updateOne({ _id: authorObjectId }, { $inc: { strikeCount: 1 } })
+      .exec();
   }
 
   async getFeed(
@@ -741,6 +996,10 @@ export class PostsService {
     }
 
     const allowedKinds = kinds.length ? kinds : ['post', 'reel'];
+    const followerVisibleModerationFilter = {
+      $in: ['normal', 'restricted', null] as const,
+    };
+    const publicDiscoveryModerationFilter = { $in: ['normal', null] as const };
 
     const safeLimit = Math.min(Math.max(limit, 1), 50);
     const safePage = Math.min(Math.max(page || 1, 1), 50);
@@ -766,11 +1025,7 @@ export class PostsService {
     const followeeSet = new Set(followeeIds);
     const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
 
-    // Keep explore somewhat fresh to feel more like modern social feeds.
     const now = new Date();
-    const exploreFreshnessWindow = new Date(
-      now.getTime() - 14 * 24 * 60 * 60 * 1000,
-    );
 
     const { blockedIds, blockedByIds } =
       await this.blocksService.getBlockLists(userObjectId);
@@ -784,6 +1039,7 @@ export class PostsService {
         authorId: userObjectId,
         kind: { $in: allowedKinds },
         status: 'published',
+        moderationState: followerVisibleModerationFilter,
         deletedAt: null,
         publishedAt: { $ne: null },
         _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
@@ -798,6 +1054,7 @@ export class PostsService {
         kind: { $in: allowedKinds },
         status: 'published',
         visibility: { $ne: 'private' },
+        moderationState: followerVisibleModerationFilter,
         deletedAt: null,
         publishedAt: { $ne: null },
         _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
@@ -812,14 +1069,20 @@ export class PostsService {
         kind: { $in: allowedKinds },
         status: 'published',
         visibility: 'public',
+        moderationState: publicDiscoveryModerationFilter,
         deletedAt: null,
         publishedAt: { $ne: null },
-        createdAt: { $gte: exploreFreshnessWindow },
         _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
       })
       .sort({ 'stats.hearts': -1, 'stats.comments': -1, createdAt: -1 })
       .limit(candidateLimit)
       .lean();
+
+    const bannedAuthorIds = await this.getBannedAuthorIdSet([
+      ...ownedCandidates.map((item) => item.authorId),
+      ...followCandidates.map((item) => item.authorId),
+      ...exploreCandidates.map((item) => item.authorId),
+    ]);
 
     const merged: Post[] = [];
     const seen = new Set<string>();
@@ -830,7 +1093,11 @@ export class PostsService {
       const id = (
         candidate as { _id?: Types.ObjectId | string }
       )?._id?.toString?.();
+      const authorId = candidate.authorId?.toString?.();
       if (!id || seen.has(id) || hiddenIds.has(id)) {
+        return;
+      }
+      if (authorId && bannedAuthorIds.has(authorId)) {
         return;
       }
       merged.push(this.postModel.hydrate(candidate) as Post);
@@ -953,7 +1220,11 @@ export class PostsService {
 
     if (repostSourceIds.length) {
       const repostSources = await this.postModel
-        .find({ _id: { $in: repostSourceIds }, deletedAt: null })
+        .find({
+          _id: { $in: repostSourceIds },
+          deletedAt: null,
+          moderationState: 'normal',
+        })
         .select('authorId')
         .lean();
 
@@ -1044,6 +1315,9 @@ export class PostsService {
     }
 
     const allowedKinds = kinds.length ? kinds : ['post', 'reel'];
+    const followerVisibleModerationFilter = {
+      $in: ['normal', 'restricted', null] as const,
+    };
     const safeLimit = Math.min(Math.max(limit, 1), 50);
     const safePage = Math.min(Math.max(page || 1, 1), 50);
     const sliceStart = (safePage - 1) * safeLimit;
@@ -1085,6 +1359,7 @@ export class PostsService {
         kind: { $in: allowedKinds },
         status: 'published',
         visibility: { $ne: 'private' },
+        moderationState: followerVisibleModerationFilter,
         deletedAt: null,
         publishedAt: { $ne: null },
         _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
@@ -1092,6 +1367,10 @@ export class PostsService {
       .sort({ createdAt: -1 })
       .limit(candidateLimit)
       .lean();
+
+    const bannedFollowingAuthors = await this.getBannedAuthorIdSet(
+      followCandidates.map((item) => item.authorId),
+    );
 
     const merged: Post[] = [];
     const seen = new Set<string>();
@@ -1101,7 +1380,11 @@ export class PostsService {
       const id = (
         candidate as { _id?: Types.ObjectId | string }
       )?._id?.toString?.();
+      const authorId = candidate.authorId?.toString?.();
       if (!id || seen.has(id) || hiddenIds.has(id)) {
+        return;
+      }
+      if (authorId && bannedFollowingAuthors.has(authorId)) {
         return;
       }
       merged.push(this.postModel.hydrate(candidate) as Post);
@@ -1142,7 +1425,11 @@ export class PostsService {
 
     if (repostSourceIds.length) {
       const repostSources = await this.postModel
-        .find({ _id: { $in: repostSourceIds }, deletedAt: null })
+        .find({
+          _id: { $in: repostSourceIds },
+          deletedAt: null,
+          moderationState: 'normal',
+        })
         .select('authorId')
         .lean();
 
@@ -1320,6 +1607,7 @@ export class PostsService {
         kind: { $in: allowedKinds },
         status: 'published',
         visibility: 'public',
+        moderationState: 'normal',
         deletedAt: null,
         publishedAt: { $ne: null },
         createdAt: { $gte: freshnessWindow },
@@ -1334,12 +1622,21 @@ export class PostsService {
       .limit(candidateLimit)
       .lean();
 
-    if (!candidateDocs.length)
+    const bannedExploreAuthors = await this.getBannedAuthorIdSet(
+      candidateDocs.map((item) => item.authorId),
+    );
+
+    const visibleCandidateDocs = candidateDocs.filter((item) => {
+      const authorId = item.authorId?.toString?.();
+      return !authorId || !bannedExploreAuthors.has(authorId);
+    });
+
+    if (!visibleCandidateDocs.length)
       return [] as ReturnType<typeof this.toResponse>[];
 
     const taste = await this.getOrRebuildTasteProfile(userObjectId);
 
-    const candidates = candidateDocs.map(
+    const candidates = visibleCandidateDocs.map(
       (raw) => this.postModel.hydrate(raw) as Post,
     );
 
@@ -1516,7 +1813,11 @@ export class PostsService {
     ).map((id) => new Types.ObjectId(id));
 
     const posts = await this.postModel
-      .find({ _id: { $in: postIds }, deletedAt: null })
+      .find({
+        _id: { $in: postIds },
+        deletedAt: null,
+        moderationState: 'normal',
+      })
       .select('authorId hashtags topics kind primaryVideoDurationMs createdAt')
       .lean();
     const postMap = new Map(posts.map((p) => [p._id.toString(), p]));
@@ -1689,6 +1990,7 @@ export class PostsService {
       .find({
         kind: 'post',
         status: 'published',
+        moderationState: 'normal',
         deletedAt: null,
         publishedAt: { $ne: null },
         authorId: { $nin: excludedAuthorIds },
@@ -1699,10 +2001,19 @@ export class PostsService {
       .limit(candidateLimit)
       .lean();
 
-    if (!posts.length) return [] as ReturnType<typeof this.toResponse>[];
+    const bannedHashtagAuthors = await this.getBannedAuthorIdSet(
+      posts.map((item) => item.authorId),
+    );
+
+    const visiblePosts = posts.filter((item) => {
+      const authorId = item.authorId?.toString?.();
+      return !authorId || !bannedHashtagAuthors.has(authorId);
+    });
+
+    if (!visiblePosts.length) return [] as ReturnType<typeof this.toResponse>[];
 
     const now = new Date();
-    const ranked = posts
+    const ranked = visiblePosts
       .map((raw) => this.postModel.hydrate(raw) as Post)
       .map((post) => ({ post, score: this.scorePost(post, followeeSet, now) }))
       .sort((a, b) => {
@@ -1843,6 +2154,7 @@ export class PostsService {
       .find({
         kind: 'reel',
         status: 'published',
+        moderationState: 'normal',
         deletedAt: null,
         publishedAt: { $ne: null },
         authorId: { $nin: excludedAuthorIds },
@@ -1853,10 +2165,19 @@ export class PostsService {
       .limit(candidateLimit)
       .lean();
 
-    if (!posts.length) return [] as ReturnType<typeof this.toResponse>[];
+    const bannedHashtagReelAuthors = await this.getBannedAuthorIdSet(
+      posts.map((item) => item.authorId),
+    );
+
+    const visibleReels = posts.filter((item) => {
+      const authorId = item.authorId?.toString?.();
+      return !authorId || !bannedHashtagReelAuthors.has(authorId);
+    });
+
+    if (!visibleReels.length) return [] as ReturnType<typeof this.toResponse>[];
 
     const now = new Date();
-    const ranked = posts
+    const ranked = visibleReels
       .map((raw) => this.postModel.hydrate(raw) as Post)
       .map((post) => ({ post, score: this.scorePost(post, followeeSet, now) }))
       .sort((a, b) => {
@@ -1938,6 +2259,15 @@ export class PostsService {
     const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
     const targetObjectId = this.asObjectId(targetUserId, 'targetUserId');
 
+    const targetUser = await this.userModel
+      .findById(targetObjectId)
+      .select('status')
+      .lean();
+
+    if (!targetUser || targetUser.status === 'banned') {
+      return [] as ReturnType<typeof this.toResponse>[];
+    }
+
     if (viewerObjectId.toString() !== targetObjectId.toString()) {
       await this.blocksService.assertNotBlocked(viewerObjectId, targetObjectId);
     }
@@ -1963,6 +2293,7 @@ export class PostsService {
         kind: 'post',
         status: 'published',
         visibility: { $in: allowedVisibilities },
+        moderationState: { $in: ['normal', 'restricted', null] },
         deletedAt: null,
         publishedAt: { $ne: null },
       })
@@ -1985,6 +2316,15 @@ export class PostsService {
 
     const viewerObjectId = this.asObjectId(viewerId, 'viewerId');
     const targetObjectId = this.asObjectId(targetUserId, 'targetUserId');
+
+    const targetUser = await this.userModel
+      .findById(targetObjectId)
+      .select('status')
+      .lean();
+
+    if (!targetUser || targetUser.status === 'banned') {
+      return [] as ReturnType<typeof this.toResponse>[];
+    }
 
     if (viewerObjectId.toString() !== targetObjectId.toString()) {
       await this.blocksService.assertNotBlocked(viewerObjectId, targetObjectId);
@@ -2011,6 +2351,7 @@ export class PostsService {
         kind: 'reel',
         status: 'published',
         visibility: { $in: allowedVisibilities },
+        moderationState: { $in: ['normal', 'restricted', null] },
         deletedAt: null,
         publishedAt: { $ne: null },
       })
@@ -2047,15 +2388,24 @@ export class PostsService {
       .find({
         _id: { $in: postIds },
         status: 'published',
+        moderationState: { $in: ['normal', 'restricted', null] },
         deletedAt: null,
         publishedAt: { $ne: null },
       })
       .lean();
 
+    const bannedSavedAuthors = await this.getBannedAuthorIdSet(
+      posts.map((item) => item.authorId),
+    );
+
     const filtered: Post[] = [];
 
     for (const raw of posts) {
       const doc = this.postModel.hydrate(raw) as Post;
+      const authorId = doc.authorId?.toString?.();
+      if (authorId && bannedSavedAuthors.has(authorId)) {
+        continue;
+      }
 
       try {
         await this.blocksService.assertNotBlocked(viewerObjectId, doc.authorId);
@@ -2148,9 +2498,14 @@ export class PostsService {
       .find({
         _id: { $in: postIds },
         status: 'published',
+        moderationState: 'normal',
         deletedAt: null,
       })
       .lean();
+
+    const bannedHiddenAuthors = await this.getBannedAuthorIdSet(
+      posts.map((item) => item.authorId),
+    );
 
     if (!posts.length) {
       return [] as Array<
@@ -2163,6 +2518,10 @@ export class PostsService {
     const postMap = new Map<string, Post>();
     posts.forEach((raw) => {
       const doc = this.postModel.hydrate(raw) as Post;
+      const authorId = doc.authorId?.toString?.();
+      if (authorId && bannedHiddenAuthors.has(authorId)) {
+        return;
+      }
       const key = doc._id?.toString?.();
       if (key) postMap.set(key, doc);
     });
@@ -2225,13 +2584,23 @@ export class PostsService {
         _id: { $in: postIds },
         kind: 'reel',
         status: 'published',
+        moderationState: { $in: ['normal', 'restricted', null] },
         deletedAt: null,
         publishedAt: { $ne: null },
       })
       .lean();
 
+    const bannedSavedReelAuthors = await this.getBannedAuthorIdSet(
+      posts.map((item) => item.authorId),
+    );
+
     const postMap = new Map(
-      posts.map((p) => [p._id?.toString?.() ?? '', this.postModel.hydrate(p)]),
+      posts
+        .filter((p) => {
+          const authorId = p.authorId?.toString?.();
+          return !authorId || !bannedSavedReelAuthors.has(authorId);
+        })
+        .map((p) => [p._id?.toString?.() ?? '', this.postModel.hydrate(p)]),
     );
 
     const results: Post[] = [];
@@ -2298,7 +2667,11 @@ export class PostsService {
     );
 
     const post = await this.postModel
-      .findOne({ _id: postObjectId, deletedAt: null })
+      .findOne({
+        _id: postObjectId,
+        deletedAt: null,
+        moderationState: { $in: ['normal', 'restricted', null] },
+      })
       .lean();
 
     if (!post) {
@@ -2313,6 +2686,14 @@ export class PostsService {
       throw new NotFoundException('Post not found');
     }
 
+    const author = await this.userModel
+      .findById(post.authorId)
+      .select('status')
+      .lean();
+    if (!author || author.status === 'banned') {
+      throw new NotFoundException('Post not found');
+    }
+
     const isAuthor = post.authorId?.toString?.() === userId;
 
     if (!isAuthor && post.status !== 'published') {
@@ -2321,6 +2702,16 @@ export class PostsService {
 
     if (!isAuthor && post.visibility === 'private') {
       throw new ForbiddenException('Post is private');
+    }
+
+    if (!isAuthor && post.visibility === 'followers') {
+      const follows = await this.followModel
+        .findOne({ followerId: userObjectId, followeeId: post.authorId })
+        .select('_id')
+        .lean();
+      if (!follows?._id) {
+        throw new ForbiddenException('Post is available to followers only');
+      }
     }
 
     await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
@@ -2371,6 +2762,8 @@ export class PostsService {
   }
 
   async like(userId: string, postId: string) {
+    await this.assertInteractionNotMuted(userId);
+
     const { postObjectId, userObjectId } = await this.resolveIds(
       userId,
       postId,
@@ -2658,6 +3051,8 @@ export class PostsService {
   }
 
   async repost(userId: string, postId: string) {
+    await this.assertInteractionNotMuted(userId);
+
     const { postObjectId, userObjectId } = await this.resolveIds(
       userId,
       postId,
@@ -2871,7 +3266,7 @@ export class PostsService {
 
     const post = await this.postModel
       .findOne({ _id: postObjectId, deletedAt: null })
-      .select('authorId visibility')
+      .select('authorId visibility moderationState')
       .lean();
 
     if (!post) {
@@ -2880,6 +3275,15 @@ export class PostsService {
 
     if (!post.authorId || !post.authorId.equals(userObjectId)) {
       throw new ForbiddenException('Only the author can change visibility');
+    }
+
+    if (
+      post.moderationState === 'restricted' &&
+      visibility !== 'followers'
+    ) {
+      throw new ForbiddenException(
+        'Visibility is locked to followers while reach restriction is active',
+      );
     }
 
     if (post.visibility === visibility) {
@@ -2996,7 +3400,7 @@ export class PostsService {
     postId: Types.ObjectId,
   ) {
     const post = await this.postModel
-      .findOne({ _id: postId, deletedAt: null })
+      .findOne({ _id: postId, deletedAt: null, moderationState: 'normal' })
       .select('authorId')
       .lean();
 
@@ -3008,8 +3412,46 @@ export class PostsService {
       throw new ForbiddenException('Post author missing');
     }
 
+    const author = await this.userModel
+      .findById(post.authorId)
+      .select('status')
+      .lean();
+
+    if (!author || author.status === 'banned') {
+      throw new NotFoundException('Post not found');
+    }
+
     await this.blocksService.assertNotBlocked(viewerId, post.authorId);
     return post;
+  }
+
+  private async getBannedAuthorIdSet(
+    ids: Array<string | Types.ObjectId | null | undefined>,
+  ): Promise<Set<string>> {
+    const authorIds = Array.from(
+      new Set(
+        ids
+          .map((id) => id?.toString?.())
+          .filter((id): id is string => Boolean(id))
+          .filter((id) => Types.ObjectId.isValid(id)),
+      ),
+    );
+
+    if (!authorIds.length) return new Set<string>();
+
+    const bannedUsers = await this.userModel
+      .find({
+        _id: { $in: authorIds.map((id) => new Types.ObjectId(id)) },
+        status: 'banned',
+      })
+      .select('_id')
+      .lean();
+
+    return new Set(
+      bannedUsers
+        .map((item) => item._id?.toString?.())
+        .filter((id): id is string => Boolean(id)),
+    );
   }
 
   private async buildPostActivityMeta(postId: Types.ObjectId) {
@@ -3119,7 +3561,7 @@ export class PostsService {
 
   private async ensurePostExists(postId: Types.ObjectId) {
     const exists = await this.postModel
-      .findOne({ _id: postId, deletedAt: null })
+      .findOne({ _id: postId, deletedAt: null, moderationState: 'normal' })
       .select('_id')
       .lean();
     if (!exists) {

@@ -37,7 +37,6 @@ import { v4 as uuid } from 'uuid';
 import type { Response, Request } from 'express';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import type { AuthenticatedUser } from './jwt.strategy';
-
 type MulterFile = {
   buffer: Buffer;
   mimetype: string;
@@ -62,6 +61,9 @@ const avatarFileFilter = (
 
 @Controller('auth')
 export class AuthController {
+  private static readonly USER_REFRESH_COOKIE = 'refresh_token';
+  private static readonly ADMIN_REFRESH_COOKIE = 'admin_refresh_token';
+
   constructor(
     private readonly otpService: OtpService,
     private readonly mailService: MailService,
@@ -250,11 +252,47 @@ export class AuthController {
       ip,
     });
 
-    this.setRefreshCookie(res, result.refreshToken);
+    this.setRefreshCookie(res, result.refreshToken, {
+      name: AuthController.ADMIN_REFRESH_COOKIE,
+      path: '/auth/admin',
+    });
     return res.json({
       accessToken: result.accessToken,
       roles: result.roles,
     });
+  }
+
+  @Post('admin/refresh')
+  async refreshAdmin(@Req() req: Request, @Res() res: Response) {
+    const token = (req as Request & { cookies?: Record<string, string> })
+      .cookies?.[AuthController.ADMIN_REFRESH_COOKIE];
+    const ip =
+      (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0] ||
+      req.ip ||
+      '';
+    const result = await this.authService.refreshAccessToken({
+      refreshToken: token,
+      userAgent: req.headers['user-agent'] as string,
+      deviceInfo: req.headers['x-device-info'] as string,
+      deviceId: req.headers['x-device-id'] as string,
+      ip,
+    });
+    this.setRefreshCookie(res, result.refreshToken, {
+      name: AuthController.ADMIN_REFRESH_COOKIE,
+      path: '/auth/admin',
+    });
+    return res.json({ accessToken: result.accessToken });
+  }
+
+  @Post('admin/logout')
+  async adminLogout(@Req() req: Request, @Res() res: Response) {
+    const token = (req as Request & { cookies?: Record<string, string> })
+      .cookies?.[AuthController.ADMIN_REFRESH_COOKIE];
+    await this.authService.revokeRefreshToken(token ?? '');
+    res.clearCookie(AuthController.ADMIN_REFRESH_COOKIE, {
+      path: '/auth/admin',
+    });
+    return res.json({ success: true });
   }
 
   @Post('two-factor/verify')
@@ -340,38 +378,28 @@ export class AuthController {
   @Post('refresh')
   async refresh(@Req() req: Request, @Res() res: Response) {
     const token = (req as Request & { cookies?: Record<string, string> })
-      .cookies?.['refresh_token'];
+      .cookies?.[AuthController.USER_REFRESH_COOKIE];
     const ip =
       (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0] ||
       req.ip ||
       '';
-
-    if (!token) {
-      throw new UnauthorizedException('No refresh token provided');
-    }
-
-    try {
-      const result = await this.authService.refreshAccessToken({
-        refreshToken: token,
-        userAgent: req.headers['user-agent'] as string,
-        deviceInfo: req.headers['x-device-info'] as string,
-        deviceId: req.headers['x-device-id'] as string,
-        ip,
-      });
-      this.setRefreshCookie(res, result.refreshToken);
-      return res.json({ accessToken: result.accessToken });
-    } catch (error) {
-      res.clearCookie('refresh_token', { path: '/auth' });
-      throw error;
-    }
+    const result = await this.authService.refreshAccessToken({
+      refreshToken: token,
+      userAgent: req.headers['user-agent'] as string,
+      deviceInfo: req.headers['x-device-info'] as string,
+      deviceId: req.headers['x-device-id'] as string,
+      ip,
+    });
+    this.setRefreshCookie(res, result.refreshToken);
+    return res.json({ accessToken: result.accessToken });
   }
 
   @Post('logout')
   async logout(@Req() req: Request, @Res() res: Response) {
     const token = (req as Request & { cookies?: Record<string, string> })
-      .cookies?.['refresh_token'];
+      .cookies?.[AuthController.USER_REFRESH_COOKIE];
     await this.authService.revokeRefreshToken(token ?? '');
-    res.clearCookie('refresh_token', { path: '/auth' });
+    res.clearCookie(AuthController.USER_REFRESH_COOKIE, { path: '/auth' });
     return res.json({ success: true });
   }
 
@@ -451,14 +479,19 @@ export class AuthController {
     return this.authService.resetPassword(dto);
   }
 
-  private setRefreshCookie(res: Response, token: string) {
-    const isProduction = process.env.NODE_ENV === 'production';
-    res.cookie('refresh_token', token, {
+  private setRefreshCookie(
+    res: Response,
+    token: string,
+    options?: { name?: string; path?: string },
+  ) {
+    const name = options?.name ?? AuthController.USER_REFRESH_COOKIE;
+    const path = options?.path ?? '/auth';
+    res.cookie(name, token, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
-      path: '/auth',
-      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+      secure: true,
+      sameSite: 'lax',
+      path,
+      maxAge: 1000 * 60 * 60 * 24 * 30,
     });
   }
 

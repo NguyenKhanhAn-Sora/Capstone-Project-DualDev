@@ -12,6 +12,20 @@ export function decodeJwt(token: string): { exp?: number } | null {
   }
 }
 
+export function getAccessTokenStatus(
+  token: string | null,
+): "active" | "pending" | "banned" | null {
+  if (!token) return null;
+  const payload = decodeJwt(token) as
+    | { status?: "active" | "pending" | "banned" }
+    | null;
+  const status = payload?.status;
+  if (status === "active" || status === "pending" || status === "banned") {
+    return status;
+  }
+  return null;
+}
+
 export function isAccessTokenValid(token: string | null): boolean {
   if (!token) return false;
   const payload = decodeJwt(token);
@@ -40,41 +54,23 @@ export async function refreshSession(): Promise<string> {
     typeof window !== "undefined"
       ? window.localStorage.getItem("cordigramDeviceId")
       : null;
-  try {
-    const res = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(deviceId
-          ? { "x-device-id": deviceId, "x-login-method": "refresh" }
-          : { "x-login-method": "refresh" }),
-      },
-    });
+  const res = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
+    method: "POST",
+    credentials: "include",
+    headers: deviceId
+      ? { "x-device-id": deviceId, "x-login-method": "refresh" }
+      : { "x-login-method": "refresh" },
+  });
 
-    if (!res.ok) {
-      clearStoredAccessToken();
-      throw new Error(
-        `Failed to refresh session: ${res.status} ${res.statusText}`,
-      );
-    }
+  const text = await res.text();
+  const payload = text
+    ? (JSON.parse(text) as { accessToken?: string; message?: string })
+    : {};
 
-    const text = await res.text();
-    const payload = text
-      ? (JSON.parse(text) as { accessToken?: string; message?: string })
-      : {};
-
-    if (!payload.accessToken) {
-      clearStoredAccessToken();
-      throw new Error(
-        payload.message || "Cannot refresh session - no access token",
-      );
-    }
-
-    setStoredAccessToken(payload.accessToken);
-    return payload.accessToken;
-  } catch (error) {
-    clearStoredAccessToken();
-    throw error;
+  if (!res.ok || !payload.accessToken) {
+    throw new Error(payload.message || "Cannot refresh session");
   }
+
+  setStoredAccessToken(payload.accessToken);
+  return payload.accessToken;
 }

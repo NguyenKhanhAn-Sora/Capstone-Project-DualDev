@@ -2,7 +2,6 @@ import {
   IsString,
   IsEnum,
   IsOptional,
-  IsBoolean,
   MinLength,
   MaxLength,
 } from 'class-validator';
@@ -20,8 +19,4 @@ export class CreateChannelDto {
   @IsString()
   @MaxLength(500)
   description?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  isPrivate?: boolean;
 }

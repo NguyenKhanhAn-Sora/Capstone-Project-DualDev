@@ -14,8 +14,6 @@ import { DirectMessagesGateway } from './direct-messages.gateway';
 import {
   CreateDirectMessageDto,
   MarkAsReadDto,
-  ReportMessageDto,
-  DeleteMessageDto,
 } from './dto/create-direct-message.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -123,18 +121,13 @@ export class DirectMessagesController {
   @Delete(':messageId')
   async deleteDirectMessage(
     @Param('messageId') messageId: string,
-    @Body() deleteDto: DeleteMessageDto,
     @CurrentUser() user: any,
   ) {
-    const result = await this.directMessagesService.deleteDirectMessage(
+    await this.directMessagesService.deleteDirectMessage(
       messageId,
       user.userId,
-      deleteDto.deleteType || 'for-me',
     );
-    return {
-      deleted: true,
-      ...result,
-    };
+    return { deleted: true };
   }
 
   @Post(':messageId/reaction/:emoji')
@@ -175,41 +168,5 @@ export class DirectMessagesController {
   @Get('available-users/list')
   async getAvailableUsers(@CurrentUser() user: any) {
     return this.directMessagesService.getAvailableUsers(user.userId);
-  }
-
-  @Post(':messageId/pin')
-  async pinMessage(
-    @Param('messageId') messageId: string,
-    @CurrentUser() user: any,
-  ) {
-    const message = await this.directMessagesService.pinMessage(
-      messageId,
-      user.userId,
-    );
-
-    return this.directMessagesService.getDirectMessageById(
-      message._id.toString(),
-    );
-  }
-
-  @Post(':messageId/report')
-  async reportMessage(
-    @Param('messageId') messageId: string,
-    @Body() reportDto: ReportMessageDto,
-    @CurrentUser() user: any,
-  ) {
-    return this.directMessagesService.reportMessage(
-      messageId,
-      user.userId,
-      reportDto,
-    );
-  }
-
-  @Get('pinned/:userId')
-  async getPinnedMessages(
-    @Param('userId') userId: string,
-    @CurrentUser() user: any,
-  ) {
-    return this.directMessagesService.getPinnedMessages(user.userId, userId);
   }
 }

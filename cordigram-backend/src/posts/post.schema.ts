@@ -4,6 +4,7 @@ import { Document, SchemaTypes, Types } from 'mongoose';
 export type Visibility = 'public' | 'followers' | 'private';
 export type PostStatus = 'published' | 'scheduled';
 export type PostKind = 'post' | 'reel';
+export type ModerationState = 'normal' | 'restricted' | 'hidden' | 'removed';
 
 @Schema({ _id: false })
 export class Media {
@@ -160,8 +161,37 @@ export class Post extends Document {
   @Prop({ type: Number, default: 0 })
   qualityScore: number;
 
+  @Prop({
+    type: String,
+    enum: ['normal', 'restricted', 'hidden', 'removed'],
+    default: 'normal',
+    index: true,
+  })
+  moderationState?: ModerationState;
+
   @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
+
+  @Prop({ type: Boolean, default: false, index: true })
+  autoHiddenPendingReview?: boolean;
+
+  @Prop({ type: Date, default: null })
+  autoHiddenAt?: Date | null;
+
+  @Prop({ type: Date, default: null, index: true })
+  autoHiddenUntil?: Date | null;
+
+  @Prop({ type: Date, default: null, index: true })
+  autoHiddenEscalatedAt?: Date | null;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  deletedBy?: Types.ObjectId | null;
+
+  @Prop({ type: String, enum: ['user', 'admin', 'system'], default: null })
+  deletedSource?: 'user' | 'admin' | 'system' | null;
+
+  @Prop({ type: String, trim: true, maxlength: 500, default: null })
+  deletedReason?: string | null;
 
   @Prop({ type: Date })
   createdAt: Date;

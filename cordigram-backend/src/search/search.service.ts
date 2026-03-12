@@ -240,6 +240,7 @@ export class SearchService {
     const match: any = {
       $text: { $search: term },
       status: 'published',
+      moderationState: 'normal',
       deletedAt: null,
       publishedAt: { $ne: null },
       authorId: { $nin: excludedAuthorIds },
@@ -467,6 +468,7 @@ export class SearchService {
         .find({
           _id: { $in: postObjectIds },
           status: 'published',
+          moderationState: 'normal',
           deletedAt: null,
           publishedAt: { $ne: null },
         } as any)

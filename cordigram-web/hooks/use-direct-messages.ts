@@ -79,10 +79,6 @@ export const useDirectMessages = ({
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [callEvent, setCallEvent] = useState<CallEvent | null>(null);
   const [callEnded, setCallEnded] = useState<{ from: string } | null>(null);
-  const [messageDeleted, setMessageDeleted] = useState<{
-    messageId: string;
-    deleteType: string;
-  } | null>(null);
 
   useEffect(() => {
     if (!userId || !token) return;
@@ -232,15 +228,6 @@ export const useDirectMessages = ({
       setTimeout(() => setCallEnded(null), 1000);
     });
 
-    socket.on(
-      "message-deleted",
-      (data: { messageId: string; deleteType: string }) => {
-        console.log("Message deleted:", data);
-        setMessageDeleted(data);
-        setTimeout(() => setMessageDeleted(null), 1000);
-      }
-    );
-
     socket.on("error", (error: { message: string }) => {
       console.error("Socket error:", error);
     });
@@ -340,23 +327,6 @@ export const useDirectMessages = ({
     }
   }, []);
 
-  const emitDeleteMessage = useCallback(
-    (
-      messageId: string,
-      deleteType: "for-everyone" | "for-me",
-      receiverId: string
-    ) => {
-      if (socketRef.current && socketRef.current.connected) {
-        socketRef.current.emit("delete-message", {
-          messageId,
-          deleteType,
-          receiverId,
-        });
-      }
-    },
-    []
-  );
-
   return {
     isConnected,
     newMessage,
@@ -367,7 +337,6 @@ export const useDirectMessages = ({
     onlineUsers,
     callEvent,
     callEnded,
-    messageDeleted,
     sendMessage,
     notifyTyping,
     markAsRead,
@@ -377,6 +346,5 @@ export const useDirectMessages = ({
     rejectCall,
     sendIceCandidate,
     endCall,
-    emitDeleteMessage,
   };
 };

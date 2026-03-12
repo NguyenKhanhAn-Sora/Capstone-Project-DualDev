@@ -33,6 +33,7 @@ interface TokenPayload {
   type: 'signup' | 'access' | 'two-factor';
   loginMethod?: string;
   roles?: Role[];
+  status?: 'active' | 'pending' | 'banned';
 }
 
 @Injectable()
@@ -56,8 +57,19 @@ export class AuthService {
     });
   }
 
-  createAccessToken(userId: string, email: string, roles?: Role[]): string {
-    const payload: TokenPayload = { sub: userId, email, type: 'access', roles };
+  createAccessToken(
+    userId: string,
+    email: string,
+    roles?: Role[],
+    status?: 'active' | 'pending' | 'banned',
+  ): string {
+    const payload: TokenPayload = {
+      sub: userId,
+      email,
+      type: 'access',
+      roles,
+      status,
+    };
     const opts: JwtSignOptions = {
       secret: this.config.jwtSecret,
       expiresIn: this.config.jwtAccessExpiresIn as JwtSignOptions['expiresIn'],
@@ -216,7 +228,7 @@ export class AuthService {
     | { accessToken: string; refreshToken: string }
     | { requiresTwoFactor: true; twoFactorToken: string; expiresSec: number }
   > {
-    const user = await this.usersService.findByEmail(params.email);
+    let user = await this.usersService.findByEmail(params.email);
     if (!user) {
       throw new BadRequestException('Email does not exist in the system');
     }
@@ -230,7 +242,18 @@ export class AuthService {
       throw new UnauthorizedException('Incorrect password');
     }
 
-    if (user.status !== 'active') {
+    user = await this.usersService.releaseAccountLimitIfExpired(user.id);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const isLimitedPendingAccount =
+      user.status === 'pending' && user.signupStage === 'completed';
+    if (
+      user.status !== 'active' &&
+      user.status !== 'banned' &&
+      !isLimitedPendingAccount
+    ) {
       throw new UnauthorizedException('Account is not ready for login');
     }
 
@@ -286,6 +309,7 @@ export class AuthService {
       user.id,
       user.email,
       user.roles ?? ['user'],
+      user.status,
     );
     const { deviceType, os, browser } = this.parseUserAgent(params.userAgent);
     const deviceIdHash = this.buildDeviceIdHash({
@@ -370,6 +394,7 @@ export class AuthService {
       user.id,
       user.email,
       user.roles ?? ['admin'],
+      user.status,
     );
     const refresh = this.generateRefreshToken();
     const { deviceType, os, browser } = this.parseUserAgent(params.userAgent);
@@ -429,6 +454,7 @@ export class AuthService {
       user.id,
       user.email,
       user.roles ?? ['user'],
+      user.status,
     );
     const { deviceType, os, browser } = this.parseUserAgent(params.userAgent);
     const deviceIdHash = this.buildDeviceIdHash({
@@ -518,8 +544,9 @@ export class AuthService {
       return { mode: 'signup', signupToken, needsProfile: true };
     }
 
-    if (user.status === 'banned') {
-      throw new UnauthorizedException('Tài khoản đã bị khóa');
+    user = await this.usersService.releaseAccountLimitIfExpired(user.id);
+    if (!user) {
+      throw new UnauthorizedException('Tài khoản không tồn tại');
     }
 
     await this.usersService.addOrUpdateOAuthProvider({
@@ -530,7 +557,10 @@ export class AuthService {
     });
 
     const requiresProfile =
-      user.signupStage !== 'completed' || user.status !== 'active';
+      user.signupStage !== 'completed' ||
+      (user.status !== 'active' &&
+        user.status !== 'pending' &&
+        user.status !== 'banned');
 
     if (requiresProfile) {
       const signupToken = this.createSignupToken(user.id, email);
@@ -541,6 +571,7 @@ export class AuthService {
       user.id,
       email,
       user.roles ?? ['user'],
+      user.status,
     );
     const refresh = this.generateRefreshToken();
     const { deviceType, os, browser } = this.parseUserAgent(params.userAgent);
@@ -633,6 +664,7 @@ export class AuthService {
       user.id,
       user.email,
       user.roles ?? ['user'],
+      'active',
     );
     const refresh = this.generateRefreshToken();
     await this.persistRefreshToken({
@@ -664,8 +696,23 @@ export class AuthService {
     if (!session) {
       throw new ForbiddenException('Refresh token invalid or expired');
     }
-    const user = await this.usersService.findById(session.userId.toString());
-    if (!user || user.status !== 'active') {
+    let user = await this.usersService.findById(session.userId.toString());
+    if (!user) {
+      throw new ForbiddenException('User not allowed');
+    }
+
+    user = await this.usersService.releaseAccountLimitIfExpired(user.id);
+    if (!user) {
+      throw new ForbiddenException('User not allowed');
+    }
+
+    const isLimitedPendingAccount =
+      user.status === 'pending' && user.signupStage === 'completed';
+    if (
+      user.status !== 'active' &&
+      user.status !== 'banned' &&
+      !isLimitedPendingAccount
+    ) {
       throw new ForbiddenException('User not allowed');
     }
 
@@ -675,6 +722,7 @@ export class AuthService {
       user.id,
       user.email,
       user.roles ?? ['user'],
+      user.status,
     );
     const next = this.generateRefreshToken();
     const { deviceType, os, browser } = this.parseUserAgent(params.userAgent);
@@ -726,6 +774,7 @@ export class AuthService {
   async requestPasswordReset(dto: ForgotPasswordRequestDto) {
     const email = dto.email.toLowerCase();
     const user = await this.usersService.findByEmail(email);
+    // Không tiết lộ sự tồn tại, nhưng có thể từ chối nếu banned
     if (!user) return { ok: true };
     if (user.status === 'banned') {
       throw new ForbiddenException('Tài khoản đã bị khóa');

@@ -18,6 +18,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OtpModule } from '../otp/otp.module';
 import { Session, SessionSchema } from '../auth/session.schema';
 import { ActivityModule } from '../activity/activity.module';
+import { ModerationAction, ModerationActionSchema } from '../moderation/moderation-action.schema';
+import { Post, PostSchema } from '../posts/post.schema';
+import { Comment, CommentSchema } from '../comment/comment.schema';
 
 @Module({
   imports: [
@@ -29,6 +32,9 @@ import { ActivityModule } from '../activity/activity.module';
       { name: Profile.name, schema: ProfileSchema },
       { name: UserTasteProfile.name, schema: UserTasteProfileSchema },
       { name: Session.name, schema: SessionSchema },
+      { name: ModerationAction.name, schema: ModerationActionSchema },
+      { name: Post.name, schema: PostSchema },
+      { name: Comment.name, schema: CommentSchema },
     ]),
     forwardRef(() => AuthModule),
     NotificationsModule,

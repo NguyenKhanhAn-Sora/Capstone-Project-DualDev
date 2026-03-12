@@ -19,6 +19,7 @@ import {
 import { useRedirectIfAuthed } from "@/hooks/use-require-auth";
 import {
   clearStoredAccessToken,
+  getAccessTokenStatus,
   getStoredAccessToken,
   isAccessTokenValid,
   refreshSession,
@@ -88,6 +89,14 @@ export default function LoginPage() {
 
   const canRender = useRedirectIfAuthed();
 
+  const routeAfterAuth = (token: string) => {
+    if (getAccessTokenStatus(token) === "banned") {
+      router.replace("/banned");
+      return;
+    }
+    router.replace("/");
+  };
+
   useEffect(() => {
     if (twoFactorCooldown <= 0) return;
     const id = setInterval(
@@ -104,6 +113,10 @@ export default function LoginPage() {
       if (params.get("loggedOut") === "1") {
         clearStoredAccessToken();
         setError(null);
+        skipRestore = true;
+      }
+      if (window.sessionStorage.getItem("skipSessionRestore") === "1") {
+        window.sessionStorage.removeItem("skipSessionRestore");
         skipRestore = true;
       }
     }
@@ -139,13 +152,13 @@ export default function LoginPage() {
 
       const existing = getStoredAccessToken();
       if (isAccessTokenValid(existing)) {
-        router.replace("/");
+        routeAfterAuth(existing || "");
         return;
       }
 
       try {
-        await refreshSession();
-        router.replace("/");
+        const token = await refreshSession();
+        routeAfterAuth(token);
       } catch (_err) {
         clearStoredAccessToken();
         if (!active) return;
@@ -236,7 +249,7 @@ export default function LoginPage() {
         }
       }
       setTwoFactorToken(null);
-      router.replace("/");
+      routeAfterAuth(result.accessToken);
     } catch (err) {
       const apiErr = err as ApiError | undefined;
       setTwoFactorError(apiErr?.message || "Invalid or expired OTP.");
@@ -362,7 +375,7 @@ export default function LoginPage() {
     try {
       await refreshSession();
       await syncThemeFromServer(getStoredAccessToken() || "");
-      router.replace("/");
+      routeAfterAuth(getStoredAccessToken() || "");
     } catch (_err) {
       setCheckingSession(false);
       setModalError(null);
@@ -453,7 +466,7 @@ export default function LoginPage() {
         upsertRecentAccount({ email: trimmedEmail, lastUsed: Date.now() });
       }
 
-      router.replace("/");
+      routeAfterAuth(result.accessToken);
     } catch (err) {
       const apiErr = err as ApiError | undefined;
       setModalError(apiErr?.message || "Login failed. Please try again.");
@@ -550,7 +563,11 @@ export default function LoginPage() {
         });
       }
 
-      router.push("/");
+      if (getAccessTokenStatus(result.accessToken) === "banned") {
+        router.replace("/banned");
+      } else {
+        router.push("/");
+      }
     } catch (err) {
       const apiErr = err as ApiError | undefined;
       setError(apiErr?.message || "Login failed. Please try again.");
@@ -753,19 +770,6 @@ export default function LoginPage() {
 
           <div className={styles["login-right"]}>
             <div className="w-full max-w-[420px] rounded-2xl border border-[#e5edf5] bg-white p-10 shadow-xl">
-              {checkingSession ? (
-                <div className={styles["session-banner"]}>
-                  <div className={styles["session-spinner"]} />
-                  <div>
-                    <p className={styles["session-title"]}>
-                      Restoring your session
-                    </p>
-                    <p className={styles["session-sub"]}>
-                      Checking secure cookies and refreshing access.
-                    </p>
-                  </div>
-                </div>
-              ) : null}
               <h1 className="text-[32px] font-semibold leading-[1.2] text-slate-900 text-center">
                 Login
               </h1>
@@ -953,8 +957,6 @@ export default function LoginPage() {
               <div className={styles.passwordField}>
                 <input
                   type={showModalPassword ? "text" : "password"}
-                  name="modal-password"
-                  id="modal-password"
                   autoFocus
                   placeholder="Enter your password"
                   value={modalPassword}

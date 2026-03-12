@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '../config/config.service';
@@ -10,6 +10,10 @@ export type AuthenticatedUser = {
   userId: string;
   email: string;
   roles?: Role[];
+  status?: 'active' | 'pending' | 'banned';
+  signupStage?: 'otp_pending' | 'info_pending' | 'completed';
+  accountLimitedUntil?: Date | null;
+  accountLimitedIndefinitely?: boolean;
 };
 
 export type JwtPayload = {
@@ -17,6 +21,7 @@ export type JwtPayload = {
   email: string;
   type: 'access' | 'signup';
   roles?: Role[];
+  status?: 'active' | 'pending' | 'banned';
   iat?: number;
   exp?: number;
 };
@@ -52,6 +57,26 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         throw new UnauthorizedException('Device session revoked');
       }
     }
-    return { userId: payload.sub, email: payload.email, roles: payload.roles };
+
+    const user = await this.usersService.releaseAccountLimitIfExpired(payload.sub);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const roles = payload.roles ?? user.roles ?? [];
+    const isAdmin = roles.includes('admin');
+    if (user.status === 'banned' && !isAdmin) {
+      throw new ForbiddenException('Account is suspended.');
+    }
+
+    return {
+      userId: payload.sub,
+      email: payload.email,
+      roles,
+      status: user.status,
+      signupStage: user.signupStage,
+      accountLimitedUntil: user.accountLimitedUntil ?? null,
+      accountLimitedIndefinitely: Boolean(user.accountLimitedIndefinitely),
+    };
   }
 }

@@ -234,7 +234,7 @@ function CustomControls({ onDisconnect }: { onDisconnect: () => void }) {
         {/* Microphone */}
         <button
           onClick={toggleMicrophone}
-          className={`${styles.controlButton} ${isMuted ? styles.controlButtonOff : styles.controlButtonOn}`}
+          className={`${styles.controlButton} ${isMuted ? styles.controlButtonOff : ""}`}
           title={isMuted ? "Bật microphone" : "Tắt microphone"}
         >
           {isMuted ? (

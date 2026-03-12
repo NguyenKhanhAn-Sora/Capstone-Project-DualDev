@@ -1,6 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, SchemaTypes, Types } from 'mongoose';
 
+export type CommentModerationState =
+  | 'normal'
+  | 'restricted'
+  | 'hidden'
+  | 'removed';
+
 @Schema({ _id: false })
 export class CommentMedia {
   @Prop({ type: String, enum: ['image', 'video'], required: true })
@@ -69,6 +75,35 @@ export class Comment extends Document {
   @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
 
+  @Prop({ type: Boolean, default: false, index: true })
+  autoHiddenPendingReview?: boolean;
+
+  @Prop({ type: Date, default: null })
+  autoHiddenAt?: Date | null;
+
+  @Prop({ type: Date, default: null, index: true })
+  autoHiddenUntil?: Date | null;
+
+  @Prop({ type: Date, default: null, index: true })
+  autoHiddenEscalatedAt?: Date | null;
+
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'User', default: null })
+  deletedBy?: Types.ObjectId | null;
+
+  @Prop({ type: String, enum: ['user', 'admin', 'system'], default: null })
+  deletedSource?: 'user' | 'admin' | 'system' | null;
+
+  @Prop({ type: String, trim: true, maxlength: 500, default: null })
+  deletedReason?: string | null;
+
+  @Prop({
+    type: String,
+    enum: ['normal', 'restricted', 'hidden', 'removed'],
+    default: 'normal',
+    index: true,
+  })
+  moderationState?: CommentModerationState;
+
   @Prop({ type: Date, default: null, index: true })
   pinnedAt?: Date | null;
 
@@ -87,3 +122,16 @@ export const CommentSchema = SchemaFactory.createForClass(Comment);
 CommentSchema.index({ postId: 1, createdAt: -1 });
 CommentSchema.index({ postId: 1, parentId: 1, createdAt: 1 });
 CommentSchema.index({ postId: 1, pinnedAt: -1, createdAt: 1 });
+CommentSchema.index({
+  postId: 1,
+  parentId: 1,
+  deletedAt: 1,
+  moderationState: 1,
+  createdAt: 1,
+});
+CommentSchema.index({
+  postId: 1,
+  deletedAt: 1,
+  moderationState: 1,
+  createdAt: -1,
+});
