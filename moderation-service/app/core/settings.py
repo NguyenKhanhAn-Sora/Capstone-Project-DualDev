@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "cordigram-moderation-service"
     environment: str = "development"
+    moderation_provider: str = "sightengine"
 
     blur_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
     reject_threshold: float = Field(default=0.80, ge=0.0, le=1.0)
@@ -16,7 +17,7 @@ class Settings(BaseSettings):
     uncertainty_margin: float = Field(default=0.06, ge=0.0, le=0.25)
     hard_reject_single_label_threshold: float = Field(default=0.94, ge=0.0, le=1.0)
     nudity_blur_threshold: float = Field(default=0.975, ge=0.0, le=1.0)
-    nudity_reject_threshold: float = Field(default=0.999, ge=0.0, le=1.0)
+    nudity_reject_threshold: float = Field(default=0.92, ge=0.0, le=1.0)
     violence_blur_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
     violence_reject_threshold: float = Field(default=0.82, ge=0.0, le=1.0)
     gore_blur_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
@@ -28,6 +29,11 @@ class Settings(BaseSettings):
     max_video_bytes: int = 100 * 1024 * 1024
     video_sample_interval_sec: float = Field(default=2.0, gt=0.1)
     video_max_frames: int = Field(default=60, ge=1)
+
+    sightengine_api_user: str = ""
+    sightengine_api_secret: str = ""
+    sightengine_endpoint: str = "https://api.sightengine.com/1.0/check.json"
+    external_provider_timeout_sec: float = Field(default=6.0, ge=1.0, le=30.0)
 
     model_config = SettingsConfigDict(
         env_file=".env",

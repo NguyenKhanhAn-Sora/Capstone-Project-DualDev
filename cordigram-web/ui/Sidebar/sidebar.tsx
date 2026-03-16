@@ -61,6 +61,7 @@ const navItems = [
   },
   { key: "explore", href: "/explore", icon: IconCompass, hasAvatar: false },
   { key: "notification", href: "/notifications", icon: IconBell, hasAvatar: false },
+  { key: "ads", href: "/ads", icon: IconAds, hasAvatar: false },
   { key: "create", href: "/create", icon: IconPlus, hasAvatar: false },
   { key: "reels", href: "/reels", icon: IconReel, hasAvatar: false },
 ];
@@ -872,6 +873,26 @@ function IconPlus() {
       strokeWidth="2"
     >
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function IconAds() {
+  return (
+    <svg
+      width="26"
+      height="26"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      fill="none"
+      strokeWidth="2"
+    >
+      <path d="M4 14.5V7.8A1.8 1.8 0 0 1 5.8 6h7.4A1.8 1.8 0 0 1 15 7.8v8.4A1.8 1.8 0 0 1 13.2 18H9" />
+      <path d="M15 9h3.2a1.8 1.8 0 0 1 1.8 1.8V15" />
+      <path d="M18 18h.01" strokeLinecap="round" />
+      <path d="M3 18h3" strokeLinecap="round" />
+      <path d="M6 16.5V19.5" strokeLinecap="round" />
+      <path d="M20.5 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z" />
     </svg>
   );
 }

@@ -14,7 +14,13 @@ Microservice kiểm duyệt media cho Cordigram.
 - `blur`
 - `reject`
 
-> Phiên bản này dùng heuristic provider (`heuristic-v2`) để demo luồng kỹ thuật nhanh. Bạn có thể thay provider bằng model AI thật hoặc API ngoài mà không đổi contract endpoint.
+> Phiên bản hiện tại ưu tiên provider `sightengine-v1` (API ngoài), và fallback sang `heuristic-v2` nếu lỗi kết nối hoặc thiếu key. Contract endpoint không đổi.
+
+Luật quyết định hiện tại:
+
+- `reject`: nội dung 18+ (`nudity` vượt ngưỡng reject).
+- `blur`: `violence` hoặc `gore` hoặc `weapons` vượt ngưỡng blur.
+- `approve`: các trường hợp còn lại.
 
 ## Cài đặt
 
@@ -68,7 +74,7 @@ Ví dụ response:
   "reasons": [
     "nudity score 0.63 >= blur threshold 0.45"
   ],
-  "provider": "heuristic-v1",
+  "provider": "sightengine-v1",
   "blurThreshold": 0.45,
   "rejectThreshold": 0.8,
   "processingMs": 31
@@ -85,9 +91,12 @@ Ví dụ response:
 
 ## Ghi chú
 
-- Heuristic không thay thế model production.
-- `heuristic-v2` đã tăng độ nhạy cho nhóm máu me/bạo lực và thêm tín hiệu `weapons`.
-- Khi chuyển sang model thật, chỉ cần thay lớp provider trong `app/providers` và giữ nguyên schema response.
+- Cấu hình Sightengine trong `.env`:
+  - `MODERATION_PROVIDER=sightengine`
+  - `SIGHTENGINE_API_USER=...`
+  - `SIGHTENGINE_API_SECRET=...`
+  - `SIGHTENGINE_ENDPOINT=https://api.sightengine.com/1.0/check.json`
+- Nếu muốn chạy local không dùng API ngoài: `MODERATION_PROVIDER=heuristic`.
 - Tham số scan video có thể cấu hình thêm trong `.env`:
   - `MAX_VIDEO_BYTES`
   - `VIDEO_SAMPLE_INTERVAL_SEC`

@@ -9,6 +9,7 @@ from PIL import Image
 from app.core.rules import decide
 from app.core.settings import Settings, get_settings
 from app.providers.heuristic_provider import HeuristicImageModerationProvider
+from app.providers.sightengine_provider import SightengineImageModerationProvider
 from app.schemas import ModerationScores, VideoFrameModerationResult, VideoModerationResponse
 from app.services import ImageModerationService
 from app.video_scan import extract_sampled_frames
@@ -25,7 +26,19 @@ _ALLOWED_VIDEO_MIME_TYPES = {
 
 
 def get_service(settings: Settings = Depends(get_settings)) -> ImageModerationService:
-    provider = HeuristicImageModerationProvider()
+    fallback_provider = HeuristicImageModerationProvider()
+    provider_name = settings.moderation_provider.strip().lower()
+    if provider_name == "heuristic":
+        provider = fallback_provider
+    else:
+        provider = SightengineImageModerationProvider(
+            api_user=settings.sightengine_api_user,
+            api_secret=settings.sightengine_api_secret,
+            endpoint=settings.sightengine_endpoint,
+            timeout_sec=settings.external_provider_timeout_sec,
+            fallback_provider=fallback_provider,
+        )
+
     return ImageModerationService(
         provider=provider,
         blur_threshold=settings.blur_threshold,
@@ -181,11 +194,16 @@ async def moderate_video(
     )
 
     elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+    provider_label = (
+        "heuristic-v2-video"
+        if settings.moderation_provider.strip().lower() == "heuristic"
+        else "sightengine-v1-video"
+    )
     return VideoModerationResponse(
         decision=decision,
         scores=aggregate_scores,
         reasons=reasons,
-        provider="heuristic-v2-video",
+        provider=provider_label,
         blurThreshold=settings.blur_threshold,
         rejectThreshold=settings.reject_threshold,
         scannedFrames=len(frames),

@@ -3289,6 +3289,86 @@ export async function getMyVote(opts: {
   return response.json();
 }
 
+export type CreateStripeCheckoutSessionRequest = {
+  amount: number;
+  currency?: string;
+  campaignName?: string;
+  description?: string;
+  objective?: string;
+  adFormat?: string;
+  boostPackageId: string;
+  durationPackageId: string;
+};
+
+export type StripeCheckoutSessionResponse = {
+  id: string;
+  paymentIntentId?: string | null;
+  url: string | null;
+  status: string | null;
+  paymentStatus: string | null;
+  amountTotal: number | null;
+  currency: string | null;
+};
+
+export async function createStripeCheckoutSession(opts: {
+  token: string;
+  payload: CreateStripeCheckoutSessionRequest;
+}): Promise<StripeCheckoutSessionResponse> {
+  const { token, payload } = opts;
+  return apiFetch<StripeCheckoutSessionResponse>({
+    path: "/payments/checkout-session",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export type StripeCheckoutSessionStatus = {
+  id: string;
+  paymentIntentId?: string | null;
+  status: string | null;
+  paymentStatus: string | null;
+  amountTotal: number | null;
+  currency: string | null;
+  customerEmail?: string | null;
+  metadata?: Record<string, string>;
+};
+
+export async function getStripeCheckoutSessionStatus(opts: {
+  token: string;
+  sessionId: string;
+}): Promise<StripeCheckoutSessionStatus> {
+  const { token, sessionId } = opts;
+  return apiFetch<StripeCheckoutSessionStatus>({
+    path: `/payments/checkout-session/${encodeURIComponent(sessionId)}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export type MyAdsCreationStatus = {
+  hasCreatedAds: boolean;
+  latestPaidAt?: string | null;
+  latestPaymentId?: string | null;
+};
+
+export async function getMyAdsCreationStatus(opts: {
+  token: string;
+}): Promise<MyAdsCreationStatus> {
+  const { token } = opts;
+  return apiFetch<MyAdsCreationStatus>({
+    path: '/payments/me/ads-created',
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export function getApiBaseUrl(): string {
   return apiBaseUrl;
 }

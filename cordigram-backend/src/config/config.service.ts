@@ -163,4 +163,16 @@ export class ConfigService {
   get adminPassword(): string | null {
     return process.env.ADMIN_PASSWORD ?? null;
   }
+
+  get stripePublicKey(): string {
+    return this.require('STRIPE_PUBLIC_KEY');
+  }
+
+  get stripeSecretKey(): string {
+    return this.require('STRIPE_SECRET_KEY');
+  }
+
+  get stripeWebhookSecret(): string {
+    return this.require('STRIPE_WEBHOOK_SECRET');
+  }
 }
