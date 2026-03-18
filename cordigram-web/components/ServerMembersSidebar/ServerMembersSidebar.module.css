@@ -1,0 +1,458 @@
+/* =====================================================
+   SERVER MEMBERS SIDEBAR - DISCORD-LIKE DESIGN
+   ===================================================== */
+
+.container {
+  width: 240px;
+  height: 100%;
+  background: #2b2d31;
+  border-left: 1px solid #1e1f22;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebarTitle {
+  padding: 12px 16px 8px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #8e9297;
+  letter-spacing: 0.02em;
+}
+
+.loading,
+.error {
+  padding: 16px;
+  text-align: center;
+  color: #b5bac1;
+  font-size: 14px;
+}
+
+.error {
+  color: #f23f43;
+}
+
+/* =====================================================
+   GROUPS CONTAINER
+   ===================================================== */
+
+.groupsContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+}
+
+.groupsContainer::-webkit-scrollbar {
+  width: 8px;
+}
+
+.groupsContainer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.groupsContainer::-webkit-scrollbar-thumb {
+  background: #1e1f22;
+  border-radius: 4px;
+}
+
+/* =====================================================
+   ROLE GROUP
+   ===================================================== */
+
+.roleGroup {
+  margin-bottom: 8px;
+}
+
+.roleHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #8e9297;
+  letter-spacing: 0.02em;
+}
+
+.roleColorDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.roleName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberCount {
+  font-weight: 400;
+  color: #6d6f78;
+}
+
+/* =====================================================
+   MEMBER ITEM
+   ===================================================== */
+
+.membersList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.memberItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.memberItem:hover {
+  background: #35373c;
+}
+
+.memberItem:focus {
+  outline: none;
+  background: #35373c;
+}
+
+/* Avatar */
+.avatar {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.ownerBadge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  font-size: 10px;
+  background: #2b2d31;
+  border-radius: 50%;
+  padding: 1px;
+}
+
+/* Name */
+.memberName {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.selfBadge {
+  font-size: 12px;
+  color: #8e9297;
+  font-weight: 400;
+}
+
+/* =====================================================
+   CONTEXT MENU
+   ===================================================== */
+
+.contextMenu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 200px;
+  max-width: 280px;
+  background: #111214;
+  border-radius: 4px;
+  padding: 6px 8px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.24);
+  animation: fadeIn 0.1s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.contextMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: #b5bac1;
+  font-size: 14px;
+  text-align: left;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.contextMenuItem:hover {
+  background: #5865f2;
+  color: #fff;
+}
+
+.contextMenuItem svg {
+  flex-shrink: 0;
+}
+
+.contextMenuItemWarning {
+  color: #fee75c;
+}
+
+.contextMenuItemWarning:hover {
+  background: #fee75c;
+  color: #000;
+}
+
+.contextMenuItemDanger {
+  color: #f23f43;
+}
+
+.contextMenuItemDanger:hover {
+  background: #f23f43;
+  color: #fff;
+}
+
+.contextMenuDivider {
+  height: 1px;
+  background: #2e3035;
+  margin: 6px 0;
+}
+
+.contextMenuLabel {
+  padding: 6px 10px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #8e9297;
+  letter-spacing: 0.02em;
+}
+
+/* Role badges in context menu */
+.roleBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 10px 8px;
+}
+
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+}
+
+/* =====================================================
+   MODERATION MODAL
+   ===================================================== */
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.15s ease;
+}
+
+.modalContent {
+  width: 100%;
+  max-width: 440px;
+  background: #313338;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.modalTitle {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #f2f3f5;
+}
+
+.modalDescription {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: #b5bac1;
+  line-height: 1.4;
+}
+
+/* Form elements */
+.formGroup {
+  margin-bottom: 16px;
+}
+
+.formLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #b5bac1;
+  letter-spacing: 0.02em;
+}
+
+.formSelect {
+  width: 100%;
+  padding: 10px 12px;
+  background: #1e1f22;
+  border: none;
+  border-radius: 4px;
+  color: #f2f3f5;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.formSelect:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #5865f2;
+}
+
+.formTextarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: #1e1f22;
+  border: none;
+  border-radius: 4px;
+  color: #f2f3f5;
+  font-size: 14px;
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+.formTextarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #5865f2;
+}
+
+.formTextarea::placeholder {
+  color: #6d6f78;
+}
+
+/* Modal actions */
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btnCancel {
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #b5bac1;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.btnCancel:hover {
+  background: #4e5058;
+  color: #f2f3f5;
+}
+
+.btnCancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnDanger {
+  padding: 10px 20px;
+  background: #f23f43;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btnDanger:hover {
+  background: #da373c;
+}
+
+.btnDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnWarning {
+  padding: 10px 20px;
+  background: #fee75c;
+  border: none;
+  border-radius: 4px;
+  color: #000;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btnWarning:hover {
+  background: #ffd83d;
+}
+
+.btnWarning:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* =====================================================
+   RESPONSIVE
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .container {
+    width: 200px;
+  }
+
+  .contextMenu {
+    min-width: 180px;
+  }
+
+  .modalContent {
+    margin: 16px;
+    max-width: calc(100% - 32px);
+  }
+}

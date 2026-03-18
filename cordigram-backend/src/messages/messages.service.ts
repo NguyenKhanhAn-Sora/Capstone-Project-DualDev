@@ -8,6 +8,7 @@ import { Model, Types } from 'mongoose';
 import { Message } from './message.schema';
 import { Channel } from '../channels/channel.schema';
 import { Profile } from '../profiles/profile.schema';
+import { ChannelReadState } from './channel-read-state.schema';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { IgnoredService } from '../users/ignored.service';
 
@@ -17,6 +18,8 @@ export class MessagesService {
     @InjectModel(Message.name) private messageModel: Model<Message>,
     @InjectModel(Channel.name) private channelModel: Model<Channel>,
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
+    @InjectModel(ChannelReadState.name)
+    private channelReadStateModel: Model<ChannelReadState>,
     private readonly ignoredService: IgnoredService,
   ) {}
 
@@ -284,5 +287,36 @@ export class MessagesService {
     }
 
     return message.save();
+  }
+
+  /** Đánh dấu toàn bộ tin nhắn trong kênh là đã đọc đến thời điểm hiện tại. */
+  async markChannelAsRead(userId: string, channelId: string): Promise<void> {
+    const userObjectId = new Types.ObjectId(userId);
+    const channelObjectId = new Types.ObjectId(channelId);
+    await this.channelReadStateModel.findOneAndUpdate(
+      { userId: userObjectId, channelId: channelObjectId },
+      { $set: { lastReadAt: new Date() } },
+      { upsert: true },
+    );
+  }
+
+  /** Số tin nhắn chưa đọc trong kênh đối với user (tin có createdAt > lastReadAt). */
+  async getUnreadCountByChannelId(
+    userId: string,
+    channelId: string,
+  ): Promise<number> {
+    const userObjectId = new Types.ObjectId(userId);
+    const channelObjectId = new Types.ObjectId(channelId);
+    const readState = await this.channelReadStateModel
+      .findOne({ userId: userObjectId, channelId: channelObjectId })
+      .lean()
+      .exec();
+    const lastReadAt = readState?.lastReadAt ?? new Date(0);
+    return this.messageModel.countDocuments({
+      channelId: channelObjectId,
+      isDeleted: false,
+      createdAt: { $gt: lastReadAt },
+      senderId: { $ne: userObjectId }, // không đếm tin mình gửi
+    });
   }
 }

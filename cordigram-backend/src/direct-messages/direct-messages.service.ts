@@ -436,6 +436,21 @@ export class DirectMessagesService {
     );
   }
 
+  async markConversationAsRead(userId: string, fromUserId: string): Promise<void> {
+    await this.directMessageModel.updateMany(
+      {
+        receiverId: new Types.ObjectId(userId),
+        senderId: new Types.ObjectId(fromUserId),
+        isRead: false,
+        isDeleted: false,
+      },
+      {
+        isRead: true,
+        readAt: new Date(),
+      },
+    );
+  }
+
   async getUnreadCount(userId: string): Promise<number> {
     return this.directMessageModel.countDocuments({
       receiverId: new Types.ObjectId(userId),

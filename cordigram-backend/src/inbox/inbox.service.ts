@@ -200,6 +200,11 @@ export class InboxService {
         const channelName = (ch as any).name ?? 'general';
         const channelType = (ch as any).type;
         if (channelType !== 'text') continue;
+        const unreadCount = await this.messagesService.getUnreadCountByChannelId(
+          userId,
+          channelId,
+        );
+        if (unreadCount <= 0) continue;
         const messages = await this.messagesService.getMessagesByChannelId(
           channelId,
           1,
@@ -219,7 +224,7 @@ export class InboxService {
           serverName: (server as any).name ?? 'Máy chủ',
           lastMessage: (lastMsg as any).content ?? '',
           lastMessageAt: (lastMsg as any).createdAt?.toISOString?.() ?? new Date().toISOString(),
-          unreadCount: 1,
+          unreadCount,
         });
       }
     }

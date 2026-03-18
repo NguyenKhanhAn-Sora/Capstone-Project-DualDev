@@ -1,0 +1,325 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.loading {
+  padding: 40px;
+  text-align: center;
+  color: #b5bac1;
+}
+
+/* Default Role Message */
+.defaultRoleMessage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 20px;
+  color: #b5bac1;
+}
+
+.defaultRoleMessage svg {
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.defaultRoleMessage h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #f2f3f5;
+  margin: 0 0 8px 0;
+}
+
+.defaultRoleMessage p {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 16px 0;
+  max-width: 400px;
+}
+
+.memberCount {
+  font-size: 14px;
+  color: #b5bac1;
+  padding: 8px 16px;
+  background: #2b2d31;
+  border-radius: 4px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.searchWrapper {
+  flex: 1;
+  position: relative;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #b5bac1;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 10px 12px 10px 40px;
+  background: #1e1f22;
+  border: none;
+  border-radius: 4px;
+  color: #f2f3f5;
+  font-size: 14px;
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: #6d6f78;
+}
+
+.searchInput:focus {
+  box-shadow: 0 0 0 2px #5865f2;
+}
+
+.addBtn {
+  padding: 10px 16px;
+  background: #5865f2;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.addBtn:hover:not(:disabled) {
+  background: #4752c4;
+}
+
+.addBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Members List */
+.membersList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 20px;
+  color: #b5bac1;
+}
+
+.emptyState svg {
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.emptyState p {
+  font-size: 14px;
+  margin: 0 0 16px 0;
+}
+
+.addBtnSecondary {
+  padding: 10px 16px;
+  background: transparent;
+  border: 1px solid #4e5058;
+  border-radius: 4px;
+  color: #f2f3f5;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.addBtnSecondary:hover {
+  background: #35373c;
+}
+
+/* Member Item */
+.memberItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #2b2d31;
+  border-radius: 4px;
+}
+
+.memberItem:hover {
+  background: #35373c;
+}
+
+.memberInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.memberAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.memberAvatarPlaceholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #5865f2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.memberText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.memberName {
+  font-size: 14px;
+  font-weight: 500;
+  color: #f2f3f5;
+}
+
+.memberUsername {
+  font-size: 12px;
+  color: #b5bac1;
+}
+
+.removeBtn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #b5bac1;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.removeBtn:hover:not(:disabled) {
+  background: rgba(237, 66, 69, 0.1);
+  color: #ed4245;
+}
+
+.removeBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.modal {
+  width: 90%;
+  max-width: 440px;
+  max-height: 80vh;
+  background: #313338;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid #3f4147;
+}
+
+.modalHeader h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f2f3f5;
+  margin: 0;
+}
+
+.modalCloseBtn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #b5bac1;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.modalCloseBtn:hover {
+  color: #f2f3f5;
+  background: #35373c;
+}
+
+.modalBody {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.availableMembersList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.availableMemberItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #2b2d31;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.availableMemberItem:hover {
+  background: #35373c;
+}
+
+.noMembers {
+  padding: 20px;
+  text-align: center;
+  color: #b5bac1;
+  font-size: 14px;
+}

@@ -30,6 +30,7 @@ import { AdminModule } from './admin/admin.module';
 import { EventsModule } from './events/events.module';
 import { InboxModule } from './inbox/inbox.module';
 import { ServerInvitesModule } from './server-invites/server-invites.module';
+import { RolesModule } from './roles/roles.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { ServerInvitesModule } from './server-invites/server-invites.module';
     EventsModule,
     InboxModule,
     ServerInvitesModule,
+    RolesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

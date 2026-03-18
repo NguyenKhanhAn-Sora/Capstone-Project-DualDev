@@ -1,0 +1,202 @@
+"use client";
+
+import React, { useState, useCallback } from "react";
+import styles from "./DisplayTab.module.css";
+import type { Role } from "@/lib/servers-api";
+import * as serversApi from "@/lib/servers-api";
+import ColorPicker from "@/components/ColorPicker/ColorPicker";
+
+interface DisplayTabProps {
+  serverId: string;
+  role: Role;
+  isOwner: boolean;
+  onUpdate: (role: Role) => void;
+}
+
+export default function DisplayTab({
+  serverId,
+  role,
+  isOwner,
+  onUpdate,
+}: DisplayTabProps) {
+  const [name, setName] = useState(role.name);
+  const [color, setColor] = useState(role.color);
+  const [displaySeparately, setDisplaySeparately] = useState(role.displaySeparately);
+  const [mentionable, setMentionable] = useState(role.mentionable);
+  const [saving, setSaving] = useState(false);
+
+  const hasChanges =
+    name !== role.name ||
+    color !== role.color ||
+    displaySeparately !== role.displaySeparately ||
+    mentionable !== role.mentionable;
+
+  const handleSave = useCallback(async () => {
+    if (!isOwner || !hasChanges) return;
+    setSaving(true);
+    try {
+      const updated = await serversApi.updateRole(serverId, role._id, {
+        name: role.isDefault ? undefined : name,
+        color,
+        displaySeparately,
+        mentionable,
+      });
+      onUpdate(updated);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Không lưu được thay đổi");
+    } finally {
+      setSaving(false);
+    }
+  }, [serverId, role, name, color, displaySeparately, mentionable, isOwner, hasChanges, onUpdate]);
+
+  const handleReset = () => {
+    setName(role.name);
+    setColor(role.color);
+    setDisplaySeparately(role.displaySeparately);
+    setMentionable(role.mentionable);
+  };
+
+  React.useEffect(() => {
+    setName(role.name);
+    setColor(role.color);
+    setDisplaySeparately(role.displaySeparately);
+    setMentionable(role.mentionable);
+  }, [role]);
+
+  return (
+    <div className={styles.container}>
+      {/* Role Name */}
+      <div className={styles.section}>
+        <label className={styles.label}>
+          Tên vai trò <span className={styles.required}>*</span>
+        </label>
+        <input
+          type="text"
+          className={styles.input}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          disabled={!isOwner || role.isDefault}
+          maxLength={100}
+          placeholder="Nhập tên vai trò"
+        />
+      </div>
+
+      {/* Role Style Preview */}
+      <div className={styles.section}>
+        <label className={styles.label}>Phong cách Vai trò</label>
+        <div className={styles.stylePreview}>
+          <div className={styles.previewCard} style={{ borderColor: color }}>
+            <div className={styles.previewAvatar}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill={color}>
+                <circle cx="12" cy="8" r="4" />
+                <path d="M12 14c-4 0-8 2-8 4v2h16v-2c0-2-4-4-8-4z" />
+              </svg>
+            </div>
+            <div className={styles.previewInfo}>
+              <span className={styles.previewName} style={{ color }}>
+                Wumpus
+              </span>
+              <span className={styles.previewRole}>Ủng bộ nhạc</span>
+            </div>
+            <span className={styles.previewBadge}>Ổn định</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Role Color */}
+      <div className={styles.section}>
+        <label className={styles.label}>
+          Màu vai trò <span className={styles.required}>*</span>
+        </label>
+        <p className={styles.hint}>
+          Các thành viên sử dụng màu của vai trò cao nhất mà họ có trong danh sách vai trò.
+        </p>
+        <ColorPicker value={color} onChange={setColor} disabled={!isOwner} />
+      </div>
+
+      {/* Display Separately Toggle */}
+      <div className={styles.toggleSection}>
+        <div className={styles.toggleInfo}>
+          <span className={styles.toggleLabel}>
+            Hiển thị vai trò thành viên riêng biệt với các thành viên trực tuyến
+          </span>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={displaySeparately}
+          className={`${styles.toggle} ${displaySeparately ? styles.toggleOn : ""}`}
+          onClick={() => setDisplaySeparately((v) => !v)}
+          disabled={!isOwner}
+        >
+          <span className={styles.toggleThumb} />
+        </button>
+      </div>
+
+      {/* Mentionable Toggle */}
+      <div className={styles.toggleSection}>
+        <div className={styles.toggleInfo}>
+          <span className={styles.toggleLabel}>
+            Cho phép mọi người @mention vai trò này
+          </span>
+          <span className={styles.toggleHint}>
+            Ghi chú: Thành viên có quyền sử dụng "Đề cập @everyone, @here và Tất Cả Vai Trò"
+            sẽ luôn có thể đề cập người có vai trò này.
+          </span>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={mentionable}
+          className={`${styles.toggle} ${mentionable ? styles.toggleOn : ""}`}
+          onClick={() => setMentionable((v) => !v)}
+          disabled={!isOwner}
+        >
+          <span className={styles.toggleThumb} />
+        </button>
+      </div>
+
+      {/* View as Role Button */}
+      <div className={styles.section}>
+        <div className={styles.viewAsRole}>
+          <div className={styles.viewAsRoleInfo}>
+            <span className={styles.viewAsRoleTitle}>Xem Máy Chủ Theo Vai Trò</span>
+            <span className={styles.viewAsRoleDesc}>
+              Tính năng này cho phép bạn kiểm tra xem vai trò này có thể thực hiện những tác vụ
+              nào và truy cập những kênh nào. Chỉ dành cho Chủ Sở Hữu Máy Chủ và Quản Trị Viên.
+            </span>
+          </div>
+          <button className={styles.viewAsRoleBtn} disabled>
+            Xem Máy Chủ Theo Vai Trò
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Save/Reset Bar */}
+      {hasChanges && (
+        <div className={styles.saveBar}>
+          <span className={styles.saveBarText}>Cẩn thận - bạn có thay đổi chưa lưu!</span>
+          <div className={styles.saveBarActions}>
+            <button
+              className={styles.resetBtn}
+              onClick={handleReset}
+              disabled={saving}
+            >
+              Đặt lại
+            </button>
+            <button
+              className={styles.saveBtn}
+              onClick={handleSave}
+              disabled={saving || !isOwner}
+            >
+              {saving ? "Đang lưu..." : "Lưu thay đổi"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

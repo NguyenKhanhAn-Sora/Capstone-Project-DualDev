@@ -42,6 +42,19 @@
   background: rgba(242, 63, 66, 0.15);
 }
 
+.menuItem.warning {
+  color: #fee75c;
+}
+
+.menuItem.warning:hover {
+  background: rgba(254, 231, 92, 0.15);
+}
+
+.menuItem svg {
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
 .divider {
   height: 1px;
   background: #3f4147;

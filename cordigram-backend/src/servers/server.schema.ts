@@ -16,6 +16,14 @@ export interface ServerMember {
   userId: Types.ObjectId;
   role: 'owner' | 'moderator' | 'member';
   joinedAt: Date;
+  timeoutUntil?: Date | null; // Thời điểm hết timeout (null = không bị timeout)
+}
+
+export interface BannedUser {
+  userId: Types.ObjectId;
+  bannedAt: Date;
+  bannedBy: Types.ObjectId;
+  reason: string | null;
 }
 
 @Schema({ timestamps: true })
@@ -64,11 +72,25 @@ export class Server extends Document {
           default: 'member',
         },
         joinedAt: { type: Date, default: Date.now },
+        timeoutUntil: { type: Date, default: null }, // Thời điểm hết timeout
       },
     ],
     default: [],
   })
   members: ServerMember[];
+
+  @Prop({
+    type: [
+      {
+        userId: { type: Types.ObjectId, ref: 'User' },
+        bannedAt: { type: Date, default: Date.now },
+        bannedBy: { type: Types.ObjectId, ref: 'User' },
+        reason: { type: String, default: null },
+      },
+    ],
+    default: [],
+  })
+  bannedUsers: BannedUser[];
 
   @Prop({ type: [Types.ObjectId], ref: 'Channel', default: [] })
   channels: Types.ObjectId[];

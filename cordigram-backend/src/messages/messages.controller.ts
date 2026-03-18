@@ -49,6 +49,15 @@ export class MessagesController {
     return this.messagesService.getMessagesByChannelId(channelId, limit, skip, viewerId);
   }
 
+  @Post('read')
+  async markChannelAsRead(
+    @Param('channelId') channelId: string,
+    @Request() req: any,
+  ) {
+    await this.messagesService.markChannelAsRead(req.user.userId, channelId);
+    return { success: true };
+  }
+
   @Get(':id')
   async getMessage(@Param('id') messageId: string) {
     return this.messagesService.getMessageById(messageId);

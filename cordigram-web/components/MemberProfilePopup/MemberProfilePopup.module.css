@@ -231,3 +231,53 @@
   background: #5d6069;
   color: #fff;
 }
+
+/* =====================================================
+   ROLE BADGES
+   ===================================================== */
+
+.roleBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #4e5058;
+  color: #fff;
+}
+
+.roleBadgeOwner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: linear-gradient(135deg, #faa61a, #f47b67);
+  color: #fff;
+}
+
+.roleDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ownerIcon {
+  font-size: 12px;
+}
+
+.ownerCrown {
+  font-size: 16px;
+}

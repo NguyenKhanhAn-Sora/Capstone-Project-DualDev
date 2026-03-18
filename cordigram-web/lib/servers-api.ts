@@ -239,6 +239,542 @@ export async function transferServerOwnership(
   }
 }
 
+export type PruneRoleFilter = "all" | "none" | "member" | "moderator";
+
+// ===================== ROLES API =====================
+
+/**
+ * Interface định nghĩa tất cả permissions cho một role
+ */
+export interface RolePermissions {
+  // Quyền Quản Lý Máy Chủ
+  manageServer: boolean;
+  manageChannels: boolean;
+  manageEvents: boolean;
+
+  // Quyền Thành Viên
+  createInvite: boolean;
+  changeNickname: boolean;
+  manageNicknames: boolean;
+  kickMembers: boolean;
+  banMembers: boolean;
+  timeoutMembers: boolean;
+
+  // Quyền Kênh Tin Nhắn
+  sendMessages: boolean;
+  sendMessagesInThreads: boolean;
+  createPublicThreads: boolean;
+  createPrivateThreads: boolean;
+  embedLinks: boolean;
+  attachFiles: boolean;
+  addReactions: boolean;
+  manageMessages: boolean;
+  pinMessages: boolean;
+  bypassSlowMode: boolean;
+  manageThreads: boolean;
+  viewMessageHistory: boolean;
+  sendTTS: boolean;
+  sendVoiceMessages: boolean;
+  createPolls: boolean;
+
+  // Quyền Kênh Thoại
+  connect: boolean;
+  speak: boolean;
+  video: boolean;
+  muteMembers: boolean;
+  deafenMembers: boolean;
+  moveMembers: boolean;
+  setVoiceChannelStatus: boolean;
+}
+
+export interface Role {
+  _id: string;
+  name: string;
+  color: string;
+  icon: string | null;
+  serverId: string;
+  position: number;
+  displaySeparately: boolean;
+  mentionable: boolean;
+  isDefault: boolean;
+  permissions: RolePermissions;
+  memberIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRolePayload {
+  name: string;
+  color?: string;
+  icon?: string;
+  position?: number;
+  displaySeparately?: boolean;
+  mentionable?: boolean;
+  permissions?: Partial<RolePermissions>;
+}
+
+export interface UpdateRolePayload {
+  name?: string;
+  color?: string;
+  icon?: string;
+  position?: number;
+  displaySeparately?: boolean;
+  mentionable?: boolean;
+  permissions?: Partial<RolePermissions>;
+}
+
+/** Lấy danh sách tất cả roles của server */
+export async function getRoles(serverId: string): Promise<Role[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/roles`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    throw new Error("Không tải được danh sách vai trò");
+  }
+  return response.json();
+}
+
+/** Lấy chi tiết một role */
+export async function getRole(serverId: string, roleId: string): Promise<Role> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/roles/${roleId}`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    throw new Error("Không tải được thông tin vai trò");
+  }
+  return response.json();
+}
+
+/** Tạo role mới */
+export async function createRole(
+  serverId: string,
+  payload: CreateRolePayload,
+): Promise<Role> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/roles`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tạo được vai trò");
+  }
+  return response.json();
+}
+
+/** Cập nhật role */
+export async function updateRole(
+  serverId: string,
+  roleId: string,
+  payload: UpdateRolePayload,
+): Promise<Role> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/roles/${roleId}`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không cập nhật được vai trò");
+  }
+  return response.json();
+}
+
+/** Xóa role */
+export async function deleteRole(
+  serverId: string,
+  roleId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/roles/${roleId}`,
+    {
+      method: "DELETE",
+      headers: getHeaders(),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không xóa được vai trò");
+  }
+}
+
+/** Sắp xếp lại thứ tự roles */
+export async function reorderRoles(
+  serverId: string,
+  roleIds: string[],
+): Promise<Role[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/roles/reorder`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify({ roleIds }),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không sắp xếp được thứ tự vai trò");
+  }
+  return response.json();
+}
+
+/** Lấy danh sách member IDs của role */
+export async function getRoleMembers(
+  serverId: string,
+  roleId: string,
+): Promise<string[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/roles/${roleId}/members`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    throw new Error("Không tải được danh sách thành viên của vai trò");
+  }
+  return response.json();
+}
+
+/** Thêm member vào role */
+export async function addMemberToRole(
+  serverId: string,
+  roleId: string,
+  memberId: string,
+): Promise<Role> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/roles/${roleId}/members/${memberId}`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không thêm được thành viên vào vai trò");
+  }
+  return response.json();
+}
+
+/** Xóa member khỏi role */
+export async function removeMemberFromRole(
+  serverId: string,
+  roleId: string,
+  memberId: string,
+): Promise<Role> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/roles/${roleId}/members/${memberId}`,
+    {
+      method: "DELETE",
+      headers: getHeaders(),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không xóa được thành viên khỏi vai trò");
+  }
+  return response.json();
+}
+
+// ===================== END ROLES API =====================
+
+// ===================== MEMBERS WITH ROLES API =====================
+
+/**
+ * Thông tin member với roles (dùng cho UI hiển thị)
+ */
+export interface MemberWithRoles {
+  userId: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string;
+  joinedAt: string;
+  isOwner: boolean;
+  roles: Array<{
+    _id: string;
+    name: string;
+    color: string;
+    position: number;
+  }>;
+  highestRolePosition: number;
+  displayColor: string; // Màu hiển thị username (từ role cao nhất)
+}
+
+/**
+ * Response từ API getServerMembersWithRoles
+ */
+export interface MembersWithRolesResponse {
+  members: MemberWithRoles[];
+  currentUserPermissions: {
+    canKick: boolean;
+    canBan: boolean;
+    canTimeout: boolean;
+    isOwner: boolean;
+  };
+}
+
+/**
+ * Lấy danh sách thành viên với thông tin roles (PUBLIC - cho tất cả members)
+ * Trả về: members với role info + quyền của user hiện tại
+ */
+export async function getServerMembersWithRoles(
+  serverId: string,
+): Promise<MembersWithRolesResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/members-with-roles`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được danh sách thành viên");
+  }
+  return response.json();
+}
+
+// ===================== MODERATION API =====================
+
+/**
+ * Kick thành viên khỏi server
+ */
+export async function kickMember(
+  serverId: string,
+  memberId: string,
+  reason?: string,
+): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/kick/${memberId}`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ reason }),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không kick được thành viên");
+  }
+  return response.json();
+}
+
+/**
+ * Ban thành viên khỏi server
+ */
+export async function banMember(
+  serverId: string,
+  memberId: string,
+  reason?: string,
+  deleteMessageDays?: number,
+): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/ban/${memberId}`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ reason, deleteMessageDays }),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không ban được thành viên");
+  }
+  return response.json();
+}
+
+/**
+ * Unban thành viên
+ */
+export async function unbanMember(
+  serverId: string,
+  memberId: string,
+): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/unban/${memberId}`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không unban được thành viên");
+  }
+  return response.json();
+}
+
+/**
+ * Thông tin người bị ban
+ */
+export interface BannedUser {
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+  bannedAt: string;
+  reason: string | null;
+}
+
+/**
+ * Lấy danh sách người bị ban
+ */
+export async function getBannedUsers(
+  serverId: string,
+): Promise<BannedUser[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/bans`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được danh sách ban");
+  }
+  return response.json();
+}
+
+/**
+ * Timeout thành viên
+ */
+export async function timeoutMember(
+  serverId: string,
+  memberId: string,
+  durationSeconds: number,
+  reason?: string,
+): Promise<{ success: boolean; message: string; timeoutUntil: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/timeout/${memberId}`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ durationSeconds, reason }),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không timeout được thành viên");
+  }
+  return response.json();
+}
+
+/**
+ * Gỡ timeout
+ */
+export async function removeTimeout(
+  serverId: string,
+  memberId: string,
+): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/remove-timeout/${memberId}`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không gỡ timeout được");
+  }
+  return response.json();
+}
+
+// ===================== END MODERATION API =====================
+
+/**
+ * Permissions response của user hiện tại
+ */
+export interface CurrentUserServerPermissions {
+  isOwner: boolean;
+  canKick: boolean;
+  canBan: boolean;
+  canTimeout: boolean;
+  canManageServer: boolean;
+  canManageChannels: boolean;
+  canManageEvents: boolean;
+  canCreateInvite: boolean;
+}
+
+/**
+ * Lấy permissions của user hiện tại trong server
+ */
+export async function getCurrentUserPermissions(
+  serverId: string,
+): Promise<CurrentUserServerPermissions> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/my-permissions`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    // Fallback: lấy từ members-with-roles
+    try {
+      const membersResponse = await getServerMembersWithRoles(serverId);
+      return {
+        isOwner: membersResponse.currentUserPermissions.isOwner,
+        canKick: membersResponse.currentUserPermissions.canKick,
+        canBan: membersResponse.currentUserPermissions.canBan,
+        canTimeout: membersResponse.currentUserPermissions.canTimeout,
+        canManageServer: membersResponse.currentUserPermissions.isOwner,
+        canManageChannels: membersResponse.currentUserPermissions.isOwner,
+        canManageEvents: membersResponse.currentUserPermissions.isOwner,
+        canCreateInvite: true,
+      };
+    } catch {
+      return {
+        isOwner: false,
+        canKick: false,
+        canBan: false,
+        canTimeout: false,
+        canManageServer: false,
+        canManageChannels: false,
+        canManageEvents: false,
+        canCreateInvite: true,
+      };
+    }
+  }
+  return response.json();
+}
+
+/** Preview số lượng thành viên sẽ bị lược bỏ theo điều kiện. (Chỉ chủ server) */
+export async function getPruneCount(params: {
+  serverId: string;
+  days: number;
+  role?: PruneRoleFilter;
+}): Promise<number> {
+  const { serverId, days, role } = params;
+  const url = new URL(`${API_BASE_URL}/servers/${serverId}/prune/count`);
+  url.searchParams.set("days", String(days));
+  if (role) url.searchParams.set("role", role);
+  const res = await fetch(url.toString(), { headers: getHeaders() });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không tính được số lượng lược bỏ");
+  }
+  const payload = await res.json().catch(() => ({}));
+  return typeof payload?.count === "number" ? payload.count : 0;
+}
+
+/** Thực thi lược bỏ thành viên hàng loạt theo điều kiện. (Chỉ chủ server) */
+export async function pruneMembers(params: {
+  serverId: string;
+  days: number;
+  role?: PruneRoleFilter;
+}): Promise<number> {
+  const { serverId, days, role } = params;
+  const res = await fetch(`${API_BASE_URL}/servers/${serverId}/prune`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ days, role: role ?? "all" }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không lược bỏ được thành viên");
+  }
+  const payload = await res.json().catch(() => ({}));
+  return typeof payload?.removed === "number" ? payload.removed : 0;
+}
+
 /** Tạo lời mời vào máy chủ (chỉ mời được người follow hoặc đang follow mình). */
 export async function createServerInvite(
   serverId: string,
@@ -620,6 +1156,18 @@ export async function getMessages(
   }
 
   return response.json();
+}
+
+/** Đánh dấu toàn bộ tin nhắn trong kênh là đã đọc (để thông báo chưa đọc trong Hộp thư biến mất). */
+export async function markChannelAsRead(channelId: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/channels/${channelId}/messages/read`,
+    { method: "POST", headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không đánh dấu đã đọc được");
+  }
 }
 
 export async function updateMessage(

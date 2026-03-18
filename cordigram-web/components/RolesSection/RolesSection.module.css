@@ -1,0 +1,177 @@
+.container {
+  padding: 0;
+  max-width: 740px;
+}
+
+.loading,
+.error {
+  padding: 40px;
+  text-align: center;
+  color: #b5bac1;
+}
+
+.error {
+  color: #ed4245;
+}
+
+.retryBtn {
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: #5865f2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.retryBtn:hover {
+  background: #4752c4;
+}
+
+/* Banner */
+.banner {
+  background: linear-gradient(135deg, #5865f2 0%, #7289da 100%);
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.bannerContent {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.bannerIllustration {
+  flex-shrink: 0;
+}
+
+.illustrationPlaceholder {
+  width: 200px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bannerText {
+  flex: 1;
+}
+
+.bannerTitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 8px 0;
+}
+
+.bannerDesc {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+.createBtn {
+  padding: 10px 20px;
+  background: white;
+  color: #5865f2;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.createBtn:hover {
+  background: #f2f3f5;
+}
+
+/* Roles List */
+.rolesList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.roleItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #2b2d31;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.roleItem:hover {
+  background: #35373c;
+}
+
+.roleInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.roleColorDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.roleIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #3f4147;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #b5bac1;
+  flex-shrink: 0;
+}
+
+.roleName {
+  font-size: 16px;
+  font-weight: 500;
+  color: #f2f3f5;
+}
+
+.defaultRole {
+  margin-top: 16px;
+  background: #1e1f22;
+}
+
+.defaultRole:hover {
+  background: #2b2d31;
+}
+
+.defaultRoleText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.roleDesc {
+  font-size: 12px;
+  color: #b5bac1;
+}
+
+.roleArrow {
+  color: #b5bac1;
+  display: flex;
+  align-items: center;
+}
+
+.roleArrow svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}

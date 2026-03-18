@@ -1,0 +1,212 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 60px;
+}
+
+/* Search */
+.searchWrapper {
+  position: relative;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #b5bac1;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 10px 12px 10px 40px;
+  background: #1e1f22;
+  border: none;
+  border-radius: 4px;
+  color: #f2f3f5;
+  font-size: 14px;
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: #6d6f78;
+}
+
+.searchInput:focus {
+  box-shadow: 0 0 0 2px #5865f2;
+}
+
+/* Section */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: #b5bac1;
+  text-transform: uppercase;
+  margin: 0;
+  padding: 16px 0 8px;
+}
+
+.permissionsList {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Permission Item */
+.permissionItem {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid #3f4147;
+}
+
+.permissionItem:last-child {
+  border-bottom: none;
+}
+
+.permissionInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.permissionLabel {
+  font-size: 16px;
+  font-weight: 500;
+  color: #f2f3f5;
+}
+
+.permissionDesc {
+  font-size: 14px;
+  color: #b5bac1;
+  line-height: 1.4;
+}
+
+.permissionWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(250, 168, 26, 0.1);
+  border-radius: 4px;
+  font-size: 13px;
+  color: #faa81a;
+}
+
+.permissionWarning svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Toggle */
+.toggle {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: #4e5058;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggleOn {
+  background: #23a55a;
+}
+
+.toggleThumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.toggleOn .toggleThumb {
+  transform: translateX(20px);
+}
+
+/* No Results */
+.noResults {
+  padding: 40px;
+  text-align: center;
+  color: #b5bac1;
+  font-size: 14px;
+}
+
+/* Save Bar */
+.saveBar {
+  position: fixed;
+  bottom: 0;
+  left: 220px;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: #111214;
+  border-radius: 4px 4px 0 0;
+  z-index: 10;
+}
+
+.saveBarText {
+  font-size: 14px;
+  color: #f2f3f5;
+}
+
+.saveBarActions {
+  display: flex;
+  gap: 12px;
+}
+
+.resetBtn {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: #f2f3f5;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.resetBtn:hover {
+  text-decoration: underline;
+}
+
+.saveBtn {
+  padding: 8px 16px;
+  background: #23a55a;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.saveBtn:hover:not(:disabled) {
+  background: #1a7d45;
+}
+
+.saveBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

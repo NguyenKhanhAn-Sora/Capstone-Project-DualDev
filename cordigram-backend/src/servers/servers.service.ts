@@ -3,6 +3,8 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -13,6 +15,7 @@ import { UpdateServerDto } from './dto/update-server.dto';
 import { User } from '../users/user.schema';
 import { Profile } from '../profiles/profile.schema';
 import { ServerInvite } from '../server-invites/server-invite.schema';
+import { RolesService } from '../roles/roles.service';
 
 @Injectable()
 export class ServersService {
@@ -22,7 +25,107 @@ export class ServersService {
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
     @InjectModel(ServerInvite.name) private serverInviteModel: Model<ServerInvite>,
+    @Inject(forwardRef(() => RolesService))
+    private rolesService: RolesService,
   ) {}
+
+  /**
+   * Prune (bulk kick) members who are inactive for N days.
+   *
+   * "Last active" is derived from the latest login device `lastSeenAt` (if present).
+   * If a user has no loginDevices tracked yet, we fall back to `createdAt`.
+   *
+   * Notes:
+   * - Owner is never pruned.
+   * - `roleFilter` matches the server member role (owner/moderator/member).
+   */
+  private async resolvePrunableMemberIds(params: {
+    serverId: string;
+    requesterUserId: string;
+    days: number;
+    roleFilter?: 'moderator' | 'member' | 'none' | 'all';
+  }): Promise<string[]> {
+    const { serverId, requesterUserId, days, roleFilter } = params;
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) throw new NotFoundException(`Server with id ${serverId} not found`);
+    if (server.ownerId.toString() !== requesterUserId) {
+      throw new ForbiddenException('Chỉ chủ máy chủ mới có thể lược bỏ thành viên');
+    }
+    if (!Number.isFinite(days) || days <= 0) {
+      throw new BadRequestException('days must be a positive number');
+    }
+
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const normalizedRole = roleFilter ?? 'all';
+
+    const members = server.members.filter((m) => {
+      const uid = m.userId.toString();
+      if (uid === server.ownerId.toString()) return false; // never prune owner
+      if (normalizedRole === 'all') return true;
+      if (normalizedRole === 'none') return m.role === 'member';
+      return m.role === normalizedRole;
+    });
+
+    if (members.length === 0) return [];
+
+    const userIds = members.map((m) => m.userId);
+    const users = await this.userModel
+      .find({ _id: { $in: userIds } })
+      .select('_id createdAt loginDevices')
+      .lean()
+      .exec();
+
+    const prunable: string[] = [];
+    for (const u of users as any[]) {
+      const deviceLastSeen: Date | null =
+        Array.isArray(u.loginDevices) && u.loginDevices.length > 0
+          ? u.loginDevices
+              .map((d: any) => (d?.lastSeenAt ? new Date(d.lastSeenAt) : null))
+              .filter(Boolean)
+              .sort((a: Date, b: Date) => b.getTime() - a.getTime())[0] ?? null
+          : null;
+      const lastActive = deviceLastSeen ?? (u.createdAt ? new Date(u.createdAt) : new Date(0));
+      if (lastActive < cutoff) {
+        prunable.push(u._id.toString());
+      }
+    }
+    return prunable;
+  }
+
+  /** Preview count for prune members. */
+  async getPruneCount(params: {
+    serverId: string;
+    requesterUserId: string;
+    days: number;
+    roleFilter?: 'moderator' | 'member' | 'none' | 'all';
+  }): Promise<number> {
+    const ids = await this.resolvePrunableMemberIds(params);
+    return ids.length;
+  }
+
+  /** Execute prune members (bulk kick). Returns number of removed members. */
+  async pruneMembers(params: {
+    serverId: string;
+    requesterUserId: string;
+    days: number;
+    roleFilter?: 'moderator' | 'member' | 'none' | 'all';
+  }): Promise<number> {
+    const { serverId, requesterUserId } = params;
+    const ids = await this.resolvePrunableMemberIds(params);
+    if (ids.length === 0) return 0;
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) throw new NotFoundException(`Server with id ${serverId} not found`);
+    if (server.ownerId.toString() !== requesterUserId) {
+      throw new ForbiddenException('Chỉ chủ máy chủ mới có thể lược bỏ thành viên');
+    }
+
+    const removeSet = new Set(ids);
+    server.members = server.members.filter((m) => !removeSet.has(m.userId.toString()));
+    server.memberCount = server.members.length;
+    await server.save();
+    return ids.length;
+  }
 
   async createServer(
     createServerDto: CreateServerDto,
@@ -78,6 +181,9 @@ export class ServersService {
     // Update server with channels
     savedServer.channels = [savedTextChannel._id, savedVoiceChannel._id];
     await savedServer.save();
+
+    // Create default @everyone role for the server
+    await this.rolesService.createDefaultRole(savedServer._id.toString());
 
     return savedServer;
   }
@@ -150,6 +256,9 @@ export class ServersService {
 
     // Delete all channels in server
     await this.channelModel.deleteMany({ serverId });
+
+    // Delete all roles in server
+    await this.rolesService.deleteRolesByServer(serverId);
 
     // Delete server
     await this.serverModel.findByIdAndDelete(serverId);
@@ -400,6 +509,493 @@ export class ServersService {
     }
 
     return result;
+  }
+
+  // =====================================================
+  // USER PERMISSIONS
+  // =====================================================
+
+  /**
+   * Lấy permissions của user hiện tại trong server
+   * Trả về các quyền dựa trên roles của user
+   */
+  async getCurrentUserPermissions(
+    serverId: string,
+    userId: string,
+  ): Promise<{
+    isOwner: boolean;
+    canKick: boolean;
+    canBan: boolean;
+    canTimeout: boolean;
+    canManageServer: boolean;
+    canManageChannels: boolean;
+    canManageEvents: boolean;
+    canCreateInvite: boolean;
+  }> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    // Kiểm tra có phải member không
+    const isMember = server.members.some(
+      (m) => m.userId.toString() === userId,
+    );
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không phải thành viên của server này');
+    }
+
+    const isOwner = server.ownerId.toString() === userId;
+
+    // Owner có tất cả quyền
+    if (isOwner) {
+      return {
+        isOwner: true,
+        canKick: true,
+        canBan: true,
+        canTimeout: true,
+        canManageServer: true,
+        canManageChannels: true,
+        canManageEvents: true,
+        canCreateInvite: true,
+      };
+    }
+
+    // Lấy permissions từ roles
+    const permissions = await this.rolesService.calculateMemberPermissions(
+      serverId,
+      userId,
+    );
+
+    return {
+      isOwner: false,
+      canKick: permissions.kickMembers,
+      canBan: permissions.banMembers,
+      canTimeout: permissions.timeoutMembers,
+      canManageServer: permissions.manageServer,
+      canManageChannels: permissions.manageChannels,
+      canManageEvents: permissions.manageEvents,
+      canCreateInvite: permissions.createInvite,
+    };
+  }
+
+  // =====================================================
+  // PUBLIC MEMBER LIST WITH ROLE INFO
+  // =====================================================
+
+  /**
+   * Lấy danh sách thành viên với thông tin role (PUBLIC - cho tất cả members)
+   * Trả về: thông tin cơ bản + roles + màu hiển thị + quyền của user hiện tại
+   */
+  async getServerMembersWithRoles(
+    serverId: string,
+    requesterUserId: string,
+  ): Promise<{
+    members: Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      joinedAt: Date;
+      isOwner: boolean;
+      roles: Array<{ _id: string; name: string; color: string; position: number }>;
+      highestRolePosition: number;
+      displayColor: string;
+    }>;
+    currentUserPermissions: {
+      canKick: boolean;
+      canBan: boolean;
+      canTimeout: boolean;
+      isOwner: boolean;
+    };
+  }> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    // Kiểm tra người yêu cầu có phải member không
+    const isMember = server.members.some(
+      (m) => m.userId.toString() === requesterUserId,
+    );
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không phải thành viên của server này');
+    }
+
+    const userIds = server.members.map((m) => m.userId);
+
+    // Lấy profiles
+    const profiles = await this.profileModel
+      .find({ userId: { $in: userIds } })
+      .select('userId displayName username avatarUrl')
+      .lean()
+      .exec();
+    const profileByUserId = new Map(
+      profiles.map((p: any) => [p.userId.toString(), p]),
+    );
+
+    // Lấy thông tin role cho từng member
+    const membersResult: Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      joinedAt: Date;
+      isOwner: boolean;
+      roles: Array<{ _id: string; name: string; color: string; position: number }>;
+      highestRolePosition: number;
+      displayColor: string;
+    }> = [];
+
+    for (const m of server.members) {
+      const uid = m.userId.toString();
+      const profile = profileByUserId.get(uid) as
+        | { displayName: string; username: string; avatarUrl: string }
+        | undefined;
+
+      // Lấy role info cho member này
+      const roleInfo = await this.rolesService.getMemberRoleInfo(serverId, uid);
+
+      membersResult.push({
+        userId: uid,
+        displayName: profile?.displayName ?? 'Người dùng',
+        username: profile?.username ?? uid,
+        avatarUrl: profile?.avatarUrl ?? '',
+        joinedAt: m.joinedAt instanceof Date ? m.joinedAt : new Date(m.joinedAt),
+        isOwner: server.ownerId.toString() === uid,
+        roles: roleInfo.roles,
+        highestRolePosition: roleInfo.highestRole?.position ?? 0,
+        displayColor: roleInfo.displayColor,
+      });
+    }
+
+    // Sắp xếp members theo role position (cao nhất lên trước)
+    membersResult.sort((a, b) => {
+      if (a.isOwner !== b.isOwner) return a.isOwner ? -1 : 1;
+      return b.highestRolePosition - a.highestRolePosition;
+    });
+
+    // Lấy quyền của user hiện tại
+    const isOwner = server.ownerId.toString() === requesterUserId;
+    const [canKick, canBan, canTimeout] = await Promise.all([
+      this.rolesService.hasPermission(serverId, requesterUserId, 'kickMembers'),
+      this.rolesService.hasPermission(serverId, requesterUserId, 'banMembers'),
+      this.rolesService.hasPermission(serverId, requesterUserId, 'timeoutMembers'),
+    ]);
+
+    return {
+      members: membersResult,
+      currentUserPermissions: {
+        canKick,
+        canBan,
+        canTimeout,
+        isOwner,
+      },
+    };
+  }
+
+  // =====================================================
+  // MODERATION ACTIONS (KICK, BAN, TIMEOUT)
+  // =====================================================
+
+  /**
+   * Kick thành viên khỏi server
+   * Yêu cầu: quyền kickMembers + role hierarchy cao hơn target
+   */
+  async kickMember(
+    serverId: string,
+    actorId: string,
+    targetId: string,
+    reason?: string,
+  ): Promise<{ success: boolean; message: string }> {
+    // Validate quyền và role hierarchy
+    await this.rolesService.validateModerationAction(
+      serverId,
+      actorId,
+      targetId,
+      'kickMembers',
+    );
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    // Xóa member khỏi server
+    server.members = server.members.filter(
+      (m) => m.userId.toString() !== targetId,
+    );
+    server.memberCount = server.members.length;
+    await server.save();
+
+    // Xóa member khỏi tất cả roles
+    const roles = await this.rolesService.getRolesByServer(serverId);
+    for (const role of roles) {
+      if (!role.isDefault && role.memberIds.some((id) => id.toString() === targetId)) {
+        role.memberIds = role.memberIds.filter((id) => id.toString() !== targetId);
+        await role.save();
+      }
+    }
+
+    return {
+      success: true,
+      message: `Đã kick thành viên${reason ? `. Lý do: ${reason}` : ''}`,
+    };
+  }
+
+  /**
+   * Ban thành viên khỏi server (không cho tham gia lại)
+   * Yêu cầu: quyền banMembers + role hierarchy cao hơn target
+   */
+  async banMember(
+    serverId: string,
+    actorId: string,
+    targetId: string,
+    reason?: string,
+    deleteMessageDays?: number,
+  ): Promise<{ success: boolean; message: string }> {
+    // Validate quyền và role hierarchy
+    await this.rolesService.validateModerationAction(
+      serverId,
+      actorId,
+      targetId,
+      'banMembers',
+    );
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    // Thêm vào danh sách ban (nếu chưa có trường này, sẽ cần update schema)
+    if (!server.bannedUsers) {
+      server.bannedUsers = [];
+    }
+
+    // Kiểm tra đã ban chưa
+    const alreadyBanned = server.bannedUsers.some(
+      (b) => b.userId.toString() === targetId,
+    );
+    if (alreadyBanned) {
+      throw new BadRequestException('Người dùng này đã bị ban');
+    }
+
+    server.bannedUsers.push({
+      userId: new Types.ObjectId(targetId),
+      bannedAt: new Date(),
+      bannedBy: new Types.ObjectId(actorId),
+      reason: reason || null,
+    });
+
+    // Xóa member khỏi server
+    server.members = server.members.filter(
+      (m) => m.userId.toString() !== targetId,
+    );
+    server.memberCount = server.members.length;
+    await server.save();
+
+    // Xóa member khỏi tất cả roles
+    const roles = await this.rolesService.getRolesByServer(serverId);
+    for (const role of roles) {
+      if (!role.isDefault && role.memberIds.some((id) => id.toString() === targetId)) {
+        role.memberIds = role.memberIds.filter((id) => id.toString() !== targetId);
+        await role.save();
+      }
+    }
+
+    return {
+      success: true,
+      message: `Đã ban thành viên${reason ? `. Lý do: ${reason}` : ''}`,
+    };
+  }
+
+  /**
+   * Timeout (tạm khóa) thành viên trong khoảng thời gian
+   * Yêu cầu: quyền timeoutMembers + role hierarchy cao hơn target
+   */
+  async timeoutMember(
+    serverId: string,
+    actorId: string,
+    targetId: string,
+    durationSeconds: number,
+    reason?: string,
+  ): Promise<{ success: boolean; message: string; timeoutUntil: Date }> {
+    // Validate quyền và role hierarchy
+    await this.rolesService.validateModerationAction(
+      serverId,
+      actorId,
+      targetId,
+      'timeoutMembers',
+    );
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    // Tìm member và update timeout
+    const memberIndex = server.members.findIndex(
+      (m) => m.userId.toString() === targetId,
+    );
+    if (memberIndex === -1) {
+      throw new BadRequestException('Người dùng không phải thành viên server');
+    }
+
+    const timeoutUntil = new Date(Date.now() + durationSeconds * 1000);
+    server.members[memberIndex].timeoutUntil = timeoutUntil;
+    await server.save();
+
+    return {
+      success: true,
+      message: `Đã tạm khóa thành viên${reason ? `. Lý do: ${reason}` : ''}`,
+      timeoutUntil,
+    };
+  }
+
+  /**
+   * Gỡ timeout cho thành viên
+   */
+  async removeTimeout(
+    serverId: string,
+    actorId: string,
+    targetId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    // Validate quyền
+    await this.rolesService.validateModerationAction(
+      serverId,
+      actorId,
+      targetId,
+      'timeoutMembers',
+    );
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    const memberIndex = server.members.findIndex(
+      (m) => m.userId.toString() === targetId,
+    );
+    if (memberIndex === -1) {
+      throw new BadRequestException('Người dùng không phải thành viên server');
+    }
+
+    server.members[memberIndex].timeoutUntil = null;
+    await server.save();
+
+    return {
+      success: true,
+      message: 'Đã gỡ tạm khóa cho thành viên',
+    };
+  }
+
+  /**
+   * Unban thành viên
+   */
+  async unbanMember(
+    serverId: string,
+    actorId: string,
+    targetId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    // Chỉ người có quyền ban mới có thể unban
+    const hasBanPermission = await this.rolesService.hasPermission(
+      serverId,
+      actorId,
+      'banMembers',
+    );
+    if (!hasBanPermission) {
+      throw new ForbiddenException('Bạn không có quyền unban thành viên');
+    }
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    if (!server.bannedUsers) {
+      throw new BadRequestException('Người dùng này chưa bị ban');
+    }
+
+    const bannedIndex = server.bannedUsers.findIndex(
+      (b) => b.userId.toString() === targetId,
+    );
+    if (bannedIndex === -1) {
+      throw new BadRequestException('Người dùng này chưa bị ban');
+    }
+
+    server.bannedUsers.splice(bannedIndex, 1);
+    await server.save();
+
+    return {
+      success: true,
+      message: 'Đã gỡ ban cho thành viên',
+    };
+  }
+
+  /**
+   * Lấy danh sách người bị ban
+   */
+  async getBannedUsers(
+    serverId: string,
+    actorId: string,
+  ): Promise<
+    Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      bannedAt: Date;
+      reason: string | null;
+    }>
+  > {
+    const hasBanPermission = await this.rolesService.hasPermission(
+      serverId,
+      actorId,
+      'banMembers',
+    );
+    if (!hasBanPermission) {
+      throw new ForbiddenException('Bạn không có quyền xem danh sách ban');
+    }
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    if (!server.bannedUsers || server.bannedUsers.length === 0) {
+      return [];
+    }
+
+    const bannedUserIds = server.bannedUsers.map((b) => b.userId);
+    const profiles = await this.profileModel
+      .find({ userId: { $in: bannedUserIds } })
+      .select('userId displayName username avatarUrl')
+      .lean()
+      .exec();
+    const profileMap = new Map(
+      profiles.map((p: any) => [p.userId.toString(), p]),
+    );
+
+    return server.bannedUsers.map((b) => {
+      const profile = profileMap.get(b.userId.toString()) as any;
+      return {
+        userId: b.userId.toString(),
+        username: profile?.username ?? 'Người dùng',
+        displayName: profile?.displayName ?? 'Người dùng',
+        avatarUrl: profile?.avatarUrl ?? '',
+        bannedAt: b.bannedAt,
+        reason: b.reason,
+      };
+    });
+  }
+
+  /**
+   * Kiểm tra user có bị ban không
+   */
+  async isUserBanned(serverId: string, userId: string): Promise<boolean> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server || !server.bannedUsers) return false;
+    return server.bannedUsers.some((b) => b.userId.toString() === userId);
   }
 
   /**

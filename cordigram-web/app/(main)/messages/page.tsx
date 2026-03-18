@@ -34,6 +34,7 @@ import {
   pinDirectMessage,
   reportDirectMessage,
   deleteDirectMessage,
+  markDmConversationRead,
 } from "@/lib/api";
 import { getLiveKitToken, getDMRoomName, getVoiceChannelParticipants } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
@@ -64,6 +65,7 @@ import MessagesInbox from "@/components/MessagesInbox/MessagesInbox";
 import ServerContextMenu from "@/components/ServerContextMenu/ServerContextMenu";
 import ServerSettingsPanel from "@/components/ServerSettingsPanel/ServerSettingsPanel";
 import ServerMembersSection from "@/components/ServerMembersSection/ServerMembersSection";
+import RolesSection from "@/components/RolesSection/RolesSection";
 import { fetchInboxForYou } from "@/lib/inbox-api";
 
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
@@ -862,6 +864,7 @@ export default function MessagesPage() {
     x: number;
     y: number;
     server: BackendServer;
+    permissions?: serversApi.CurrentUserServerPermissions;
   } | null>(null);
   const [showServerSettingsPanel, setShowServerSettingsPanel] = useState(false);
   const [serverSettingsTarget, setServerSettingsTarget] = useState<{
@@ -1770,6 +1773,10 @@ export default function MessagesPage() {
         list.forEach((c) => {
           if (c.userId) counts[c.userId] = c.unreadCount ?? 0;
         });
+        // If user is currently viewing a DM conversation, keep its unread at 0
+        // to avoid race where the list fetch completes before mark-as-read does.
+        const activeDmId = selectedDirectMessageFriend?._id;
+        if (activeDmId) counts[activeDmId] = 0;
         setDmUnreadCounts(counts);
       })
       .catch(() => {
@@ -2032,6 +2039,8 @@ export default function MessagesPage() {
       prevChannelRef.current = selectedChannel;
       joinChannel(selectedChannel);
       loadMessages(selectedChannel);
+      // Đánh dấu kênh đã đọc để thông báo chưa đọc trong Hộp thư biến mất
+      serversApi.markChannelAsRead(selectedChannel).catch(() => {});
     }
   }, [selectedChannel, selectedTextChannel?._id, joinChannel, leaveChannel]);
 
@@ -2397,6 +2406,13 @@ export default function MessagesPage() {
     setSelectedServer(null);
     setSelectedChannel(null);
     setDmUnreadCounts((prev) => ({ ...prev, [friend._id]: 0 })); // Clear unread indicator when opening chat
+    // Ensure backend read-state is updated immediately when opening the conversation
+    try {
+      // Fire socket for realtime (fast)
+      markAllAsRead?.(friend._id);
+      // Also call REST to avoid race with getConversationList refresh
+      if (token) await markDmConversationRead({ token, userId: friend._id });
+    } catch (_err) {}
     shouldAutoScrollRef.current = true; // ✅ Enable auto-scroll when switching conversations
     // Pre-scroll to bottom BEFORE loading (prevents visual jump)
     if (messagesContainerRef.current) {
@@ -3683,12 +3699,32 @@ export default function MessagesPage() {
                 key={server._id}
                 className={styles.navBtn}
                 onClick={() => setSelectedServer(server._id)}
-                onContextMenu={(e) => {
+                onContextMenu={async (e) => {
                   e.preventDefault();
+                  // Fetch permissions cho server này
+                  let permissions: serversApi.CurrentUserServerPermissions | undefined;
+                  try {
+                    permissions = await serversApi.getCurrentUserPermissions(server._id);
+                  } catch {
+                    // Fallback: tính toán từ isOwner
+                    const isOwner = currentUserId !== "" && 
+                      String((server as any).ownerId?._id ?? (server as any).ownerId) === currentUserId;
+                    permissions = {
+                      isOwner,
+                      canKick: isOwner,
+                      canBan: isOwner,
+                      canTimeout: isOwner,
+                      canManageServer: isOwner,
+                      canManageChannels: isOwner,
+                      canManageEvents: isOwner,
+                      canCreateInvite: true,
+                    };
+                  }
                   setServerContextMenu({
                     x: e.clientX,
                     y: e.clientY,
                     server,
+                    permissions,
                   });
                 }}
                 title={server.name}
@@ -5389,10 +5425,20 @@ export default function MessagesPage() {
               (serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId ?? ""
             ),
           }}
-          isOwner={
-            currentUserId !== "" &&
-            String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId
-          }
+          permissions={serverContextMenu.permissions ?? {
+            isOwner: currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
+            canKick: false,
+            canBan: false,
+            canTimeout: false,
+            canManageServer: currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
+            canManageChannels: currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
+            canManageEvents: currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
+            canCreateInvite: true,
+          }}
           onClose={() => setServerContextMenu(null)}
           onMarkAsRead={() => setServerContextMenu(null)}
           onInviteToServer={() => {
@@ -5510,6 +5556,19 @@ export default function MessagesPage() {
                   setServerSettingsTarget(null);
                   await loadServers();
                 }}
+              />
+            );
+          }
+          if (section === "roles" && serverSettingsTarget?.serverId) {
+            return (
+              <RolesSection
+                serverId={serverSettingsTarget.serverId}
+                isOwner={
+                  !!(
+                    currentUserId &&
+                    servers.find((s) => s._id === serverSettingsTarget?.serverId)?.ownerId === currentUserId
+                  )
+                }
               />
             );
           }

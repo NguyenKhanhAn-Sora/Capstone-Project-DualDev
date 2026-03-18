@@ -2,11 +2,30 @@
 
 import React, { useState, useEffect } from "react";
 import styles from "./MemberProfilePopup.module.css";
-import type { ServerMemberRow } from "@/lib/servers-api";
+import type { ServerMemberRow, MemberWithRoles } from "@/lib/servers-api";
 import { checkFollowStatus, followUser, unfollowUser } from "@/lib/api";
 
+// Union type để hỗ trợ cả ServerMemberRow cũ và MemberWithRoles mới
+type MemberData = ServerMemberRow | MemberWithRoles;
+
+// Type guard để kiểm tra có phải MemberWithRoles không
+function isMemberWithRoles(member: MemberData): member is MemberWithRoles {
+  return 'roles' in member && Array.isArray((member as MemberWithRoles).roles);
+}
+
+// Helper function để tính màu contrast cho text trên background
+function getContrastColor(hexColor: string): string {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  // Calculate luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
 export interface MemberProfilePopupProps {
-  member: ServerMemberRow;
+  member: MemberData;
   currentUserId: string;
   token: string | null;
   serverJoinDate?: string;
@@ -84,7 +103,18 @@ export default function MemberProfilePopup({
           </div>
         </div>
 
-        <h2 className={styles.displayName}>{displayName}</h2>
+        {/* Tên hiển thị với màu theo role cao nhất */}
+        <h2 
+          className={styles.displayName}
+          style={{ 
+            color: isMemberWithRoles(member) ? member.displayColor : undefined 
+          }}
+        >
+          {displayName}
+          {isMemberWithRoles(member) && member.isOwner && (
+            <span className={styles.ownerCrown}> 👑</span>
+          )}
+        </h2>
         <p className={styles.username}>{member.username}</p>
 
         <div className={styles.actions}>
@@ -122,9 +152,42 @@ export default function MemberProfilePopup({
 
         <div className={styles.section}>
           <div className={styles.sectionLabel}>Vai trò</div>
-          <div className={styles.sectionRow}>
-            <span>{member.role === "owner" ? "Chủ" : member.role === "moderator" ? "Mod" : "Thành viên"}</span>
-          </div>
+          {/* Hiển thị role badges nếu có */}
+          {isMemberWithRoles(member) && member.roles.length > 0 ? (
+            <div className={styles.roleBadges}>
+              {member.isOwner && (
+                <span className={styles.roleBadgeOwner}>
+                  <span className={styles.ownerIcon}>👑</span>
+                  Chủ sở hữu
+                </span>
+              )}
+              {member.roles.map((role) => (
+                <span
+                  key={role._id}
+                  className={styles.roleBadge}
+                  style={{ 
+                    backgroundColor: role.color,
+                    color: getContrastColor(role.color)
+                  }}
+                >
+                  <span 
+                    className={styles.roleDot} 
+                    style={{ backgroundColor: role.color }}
+                  />
+                  {role.name}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.sectionRow}>
+              <span>
+                {'role' in member 
+                  ? (member.role === "owner" ? "Chủ" : member.role === "moderator" ? "Mod" : "Thành viên")
+                  : (member as MemberWithRoles).isOwner ? "Chủ" : "Thành viên"
+                }
+              </span>
+            </div>
+          )}
         </div>
 
         <div className={styles.section}>

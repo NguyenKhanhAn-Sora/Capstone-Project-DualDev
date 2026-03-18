@@ -5,6 +5,10 @@ import { MessagesService } from './messages.service';
 import { MessagesController } from './messages.controller';
 import { ChannelMessagesGateway } from './channel-messages.gateway';
 import { Message, MessageSchema } from './message.schema';
+import {
+  ChannelReadState,
+  ChannelReadStateSchema,
+} from './channel-read-state.schema';
 import { Channel, ChannelSchema } from '../channels/channel.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { UsersModule } from '../users/users.module';
@@ -14,6 +18,7 @@ import { UsersModule } from '../users/users.module';
     UsersModule,
     MongooseModule.forFeature([
       { name: Message.name, schema: MessageSchema },
+      { name: ChannelReadState.name, schema: ChannelReadStateSchema },
       { name: Channel.name, schema: ChannelSchema },
       { name: Profile.name, schema: ProfileSchema },
     ]),

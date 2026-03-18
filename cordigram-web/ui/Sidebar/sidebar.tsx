@@ -17,6 +17,7 @@ import {
   fetchNotificationSeenAt,
   updateNotificationSeenAt,
   type NotificationItem,
+  fetchDmUnreadCount,
 } from "@/lib/api";
 import {
   CURRENT_PROFILE_UPDATED_EVENT,
@@ -76,11 +77,13 @@ export default function Sidebar() {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationClosing, setNotificationClosing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [dmUnreadCount, setDmUnreadCount] = useState(0);
   const [lastSeenAt, setLastSeenAt] = useState<number | null>(null);
   const [lastSeenReady, setLastSeenReady] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const notificationOpenRef = useRef(false);
   const socketRef = useRef<Socket | null>(null);
+  const dmSocketRef = useRef<Socket | null>(null);
   const { theme, toggleTheme } = useTheme();
   const clearSessionAndGoHome = useCallback(
     (event?: React.MouseEvent<HTMLAnchorElement>) => {
@@ -240,13 +243,33 @@ export default function Sidebar() {
     [lastSeenAt],
   );
 
+  const connectDirectMessages = useCallback((token: string) => {
+    dmSocketRef.current?.disconnect();
+    const socket = io(`${getApiBaseUrl()}/direct-messages`, {
+      auth: { token },
+      transports: ["websocket"],
+    });
+
+    socket.on("dm-unread-count", (payload: { totalUnread?: number } | null) => {
+      const next = payload?.totalUnread;
+      if (typeof next === "number" && Number.isFinite(next)) {
+        setDmUnreadCount(next);
+      }
+    });
+
+    dmSocketRef.current = socket;
+  }, []);
+
   useEffect(() => {
     if (!lastSeenReady) return;
     const token = getStoredAccessToken();
     if (!token) {
       setUnreadCount(0);
+      setDmUnreadCount(0);
       socketRef.current?.disconnect();
       socketRef.current = null;
+      dmSocketRef.current?.disconnect();
+      dmSocketRef.current = null;
       return;
     }
 
@@ -262,13 +285,21 @@ export default function Sidebar() {
       .catch(() => setUnreadCount(0));
 
     connectNotifications(token);
+    connectDirectMessages(token);
+
+    fetchDmUnreadCount({ token })
+      .then((res) => setDmUnreadCount(res.unreadCount ?? 0))
+      .catch(() => setDmUnreadCount(0));
 
     return () => {
       socketRef.current?.disconnect();
       socketRef.current = null;
+      dmSocketRef.current?.disconnect();
+      dmSocketRef.current = null;
     };
   }, [
     connectNotifications,
+    connectDirectMessages,
     profile?.id,
     profile?.userId,
     lastSeenAt,
@@ -433,6 +464,11 @@ export default function Sidebar() {
                   )}
                 </span>
                 <span className={styles.label}>{t(`nav.${key}`)}</span>
+                {key === "message" && dmUnreadCount > 0 ? (
+                  <span className={styles.badge}>
+                    {dmUnreadCount > 99 ? "99+" : dmUnreadCount}
+                  </span>
+                ) : null}
               </Link>
             ),
           )}

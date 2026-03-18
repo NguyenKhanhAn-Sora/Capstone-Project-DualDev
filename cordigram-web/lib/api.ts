@@ -3292,3 +3292,34 @@ export async function getMyVote(opts: {
 export function getApiBaseUrl(): string {
   return apiBaseUrl;
 }
+
+export type DmUnreadCountResponse = {
+  unreadCount: number;
+};
+
+export async function fetchDmUnreadCount(opts: {
+  token: string;
+}): Promise<DmUnreadCountResponse> {
+  const { token } = opts;
+  return apiFetch<DmUnreadCountResponse>({
+    path: "/direct-messages/unread/count",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function markDmConversationRead(opts: {
+  token: string;
+  userId: string;
+}): Promise<{ success: boolean }> {
+  const { token, userId } = opts;
+  return apiFetch<{ success: boolean }>({
+    path: `/direct-messages/conversation/${userId}/read`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}

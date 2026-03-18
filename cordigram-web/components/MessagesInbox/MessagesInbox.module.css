@@ -223,6 +223,45 @@
   margin: 0;
 }
 
+.unreadTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.unreadTitle {
+  margin: 0;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unreadRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.unreadTime {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.unreadPreview {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .eventTime {
   font-size: 12px;
   color: var(--color-text-muted);

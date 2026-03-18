@@ -29,6 +29,27 @@ export class DirectMessagesGateway
 
   private connectedUsers = new Map<string, string>(); // userId -> socketId
 
+  private async emitDmUnreadCount(toUserId: string, fromUserId?: string) {
+    const socketId = this.connectedUsers.get(toUserId);
+    if (!socketId) return;
+    try {
+      const [totalUnread, conversationUnread] = await Promise.all([
+        this.directMessagesService.getUnreadCount(toUserId),
+        fromUserId
+          ? this.directMessagesService.getUnreadCountByUser(toUserId, fromUserId)
+          : Promise.resolve(undefined),
+      ]);
+      this.server.to(socketId).emit('dm-unread-count', {
+        totalUnread,
+        fromUserId: fromUserId ?? null,
+        conversationUnread:
+          typeof conversationUnread === 'number' ? conversationUnread : null,
+      });
+    } catch (_err) {
+      // ignore
+    }
+  }
+
   emitReactionUpdate(payload: {
     messageId: string;
     senderId: string;
@@ -77,6 +98,8 @@ export class DirectMessagesGateway
         },
       });
     }
+    // Also push unread count update (if receiver is online)
+    this.emitDmUnreadCount(payload.receiverId, payload.senderId);
   }
 
   constructor(
@@ -100,6 +123,9 @@ export class DirectMessagesGateway
       const userId = payload.userId || payload.sub;
       socket.data.userId = userId;
       this.connectedUsers.set(userId, socket.id);
+
+      // Send initial unread count to the user (badge can render immediately)
+      await this.emitDmUnreadCount(userId);
 
       // Notify others that user is online
       this.server.emit('user-online', {
@@ -171,6 +197,8 @@ export class DirectMessagesGateway
             username: populatedMessage.senderId['username'],
           },
         });
+        // Push unread count update to receiver (badge)
+        await this.emitDmUnreadCount(data.receiverId, senderId);
       } else {
         console.log('Receiver not online, message saved to database');
       }
@@ -238,6 +266,9 @@ export class DirectMessagesGateway
       const userId = socket.data.userId;
       await this.directMessagesService.markAsRead(data.messageIds, userId);
 
+      // Update receiver badge counts after marking read
+      await this.emitDmUnreadCount(userId, data.senderId);
+
       // Notify sender that messages are read
       const senderSocket = this.connectedUsers.get(data.senderId);
       if (senderSocket) {
@@ -248,6 +279,36 @@ export class DirectMessagesGateway
       }
     } catch (error) {
       console.error('Error marking as read:', error);
+    }
+  }
+
+  @SubscribeMessage('mark-all-as-read')
+  async handleMarkAllAsRead(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: { senderId: string },
+  ) {
+    try {
+      const userId = socket.data.userId;
+      if (!data?.senderId) return;
+      await this.directMessagesService.markConversationAsRead(
+        userId,
+        data.senderId,
+      );
+
+      // Update receiver badge counts after marking read
+      await this.emitDmUnreadCount(userId, data.senderId);
+
+      // Notify sender UI (optional)
+      const senderSocket = this.connectedUsers.get(data.senderId);
+      if (senderSocket) {
+        this.server.to(senderSocket).emit('messages-read', {
+          byUserId: userId,
+          messageIds: [],
+          all: true,
+        });
+      }
+    } catch (error) {
+      console.error('Error marking conversation as read:', error);
     }
   }
 

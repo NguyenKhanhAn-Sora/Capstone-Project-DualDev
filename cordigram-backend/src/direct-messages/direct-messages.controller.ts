@@ -101,6 +101,34 @@ export class DirectMessagesController {
     return { unreadCount: count };
   }
 
+  @Post('conversation/:userId/read')
+  async markConversationAsRead(
+    @Param('userId') fromUserId: string,
+    @CurrentUser() user: any,
+  ) {
+    await this.directMessagesService.markConversationAsRead(
+      user.userId,
+      fromUserId,
+    );
+    // Best-effort: push realtime unread update to this user
+    try {
+      const socketId = this.directMessagesGateway.getSocketIdByUserId(
+        user.userId,
+      );
+      if (socketId) {
+        const count = await this.directMessagesService.getUnreadCount(user.userId);
+        (this.directMessagesGateway as any).server
+          ?.to(socketId)
+          ?.emit?.('dm-unread-count', {
+            totalUnread: count,
+            fromUserId,
+            conversationUnread: 0,
+          });
+      }
+    } catch (_e) {}
+    return { success: true };
+  }
+
   @Patch(':messageId')
   async updateDirectMessage(
     @Param('messageId') messageId: string,

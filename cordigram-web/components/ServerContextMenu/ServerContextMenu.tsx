@@ -9,12 +9,25 @@ export interface ServerContextMenuServer {
   ownerId?: string;
 }
 
+/**
+ * Permissions props để xác định hiển thị options
+ */
+export interface ServerContextMenuPermissions {
+  isOwner: boolean;
+  canManageServer: boolean;
+  canManageChannels: boolean;
+  canManageEvents: boolean;
+  canCreateInvite: boolean;
+}
+
 export interface ServerContextMenuProps {
   x: number;
   y: number;
   server: ServerContextMenuServer;
-  /** True = chủ máy chủ → hiện Cài đặt máy chủ, Tạo kênh/Danh mục/Sự kiện. False = thành viên → hiện Hiện tất cả kênh, Rời khỏi phòng */
-  isOwner: boolean;
+  /** Permissions của user hiện tại - dùng để hiển thị options */
+  permissions: ServerContextMenuPermissions;
+  /** @deprecated Sử dụng permissions.isOwner thay thế */
+  isOwner?: boolean;
   onClose: () => void;
   onMarkAsRead: () => void;
   onInviteToServer: () => void;
@@ -22,7 +35,7 @@ export interface ServerContextMenuProps {
   onNotificationSettings: () => void;
   hideMutedChannels: boolean;
   onToggleHideMutedChannels: () => void;
-  /** Chỉ khi !isOwner */
+  /** Chỉ khi không phải owner */
   showAllChannels?: boolean;
   onToggleShowAllChannels?: () => void;
   onServerSettings: () => void;
@@ -31,7 +44,7 @@ export interface ServerContextMenuProps {
   onCreateChannel: () => void;
   onCreateCategory: () => void;
   onCreateEvent: () => void;
-  /** Chỉ khi !isOwner. Rời khỏi máy chủ */
+  /** Rời khỏi máy chủ - chỉ hiện khi không phải owner */
   onLeaveServer?: () => void;
   /** Current notification level for display: "all" | "mentions" | "none" */
   notificationLevel?: "all" | "mentions" | "none";
@@ -50,7 +63,8 @@ export default function ServerContextMenu({
   x,
   y,
   server,
-  isOwner,
+  permissions,
+  isOwner: isOwnerProp,
   onClose,
   onMarkAsRead,
   onInviteToServer,
@@ -72,6 +86,16 @@ export default function ServerContextMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const [submenu, setSubmenu] = useState<"mute" | "notifications" | null>(null);
   const [submenuPos, setSubmenuPos] = useState({ top: 0, left: 0 });
+
+  // Sử dụng permissions, fallback về isOwner prop cũ nếu có
+  const isOwner = permissions?.isOwner ?? isOwnerProp ?? false;
+  const canManageServer = permissions?.canManageServer ?? isOwner;
+  const canManageChannels = permissions?.canManageChannels ?? isOwner;
+  const canManageEvents = permissions?.canManageEvents ?? isOwner;
+  const canCreateInvite = permissions?.canCreateInvite ?? true;
+
+  // Kiểm tra có quyền quản lý nào không
+  const hasAnyManagePermission = canManageServer || canManageChannels || canManageEvents;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -111,14 +135,23 @@ export default function ServerContextMenu({
         role="menu"
         aria-label="Menu máy chủ"
       >
+        {/* Đánh dấu đã đọc - hiển thị cho tất cả */}
         <button type="button" className={styles.menuItem} onClick={onMarkAsRead} role="menuitem">
           Đánh Dấu Đã Đọc
         </button>
         <div className={styles.divider} />
-        <button type="button" className={styles.menuItem} onClick={onInviteToServer} role="menuitem">
-          Mời Vào Máy Chủ
-        </button>
-        <div className={styles.divider} />
+
+        {/* Mời vào máy chủ - hiển thị nếu có quyền createInvite */}
+        {canCreateInvite && (
+          <>
+            <button type="button" className={styles.menuItem} onClick={onInviteToServer} role="menuitem">
+              Mời Vào Máy Chủ
+            </button>
+            <div className={styles.divider} />
+          </>
+        )}
+
+        {/* Tắt âm máy chủ - hiển thị cho tất cả */}
         <div
           className={`${styles.menuItem} ${styles.menuItemWithSub}`}
           onMouseEnter={() => setSubmenu("mute")}
@@ -132,6 +165,8 @@ export default function ServerContextMenu({
             </svg>
           </span>
         </div>
+
+        {/* Cài đặt thông báo - hiển thị cho tất cả */}
         <div
           className={`${styles.menuItem} ${styles.menuItemWithSub}`}
           onMouseEnter={() => setSubmenu("notifications")}
@@ -149,6 +184,8 @@ export default function ServerContextMenu({
             </svg>
           </span>
         </div>
+
+        {/* Ẩn kênh bị tắt âm - hiển thị cho tất cả */}
         <button
           type="button"
           className={styles.menuItem}
@@ -160,6 +197,8 @@ export default function ServerContextMenu({
             <span className={`${styles.checkbox} ${hideMutedChannels ? styles.checked : ""}`} />
           </span>
         </button>
+
+        {/* Hiện tất cả kênh - chỉ hiện cho non-owner */}
         {!isOwner && (
           <button
             type="button"
@@ -173,48 +212,72 @@ export default function ServerContextMenu({
             </span>
           </button>
         )}
+
         <div className={styles.divider} />
-        {isOwner && (
+
+        {/* === Phần quản lý máy chủ - hiển thị nếu có quyền === */}
+        {hasAnyManagePermission && (
           <>
-            <button
-              type="button"
-              className={`${styles.menuItem} ${styles.menuItemWithSub}`}
-              onClick={onServerSettings}
-              role="menuitem"
-            >
-              <span>Cài đặt máy chủ</span>
-              <span className={styles.arrow}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </span>
-            </button>
-            <button type="button" className={styles.menuItem} onClick={onSecuritySettings} role="menuitem">
-              Cài Đặt Bảo Mật
-            </button>
-            <button type="button" className={styles.menuItem} onClick={onEditServerProfile} role="menuitem">
-              Chỉnh Sửa Hồ Sơ Theo Máy Chủ
-            </button>
-            <div className={styles.divider} />
-            <button type="button" className={styles.menuItem} onClick={onCreateChannel} role="menuitem">
-              Tạo kênh
-            </button>
-            <button type="button" className={styles.menuItem} onClick={onCreateCategory} role="menuitem">
-              Tạo Danh Mục
-            </button>
-            <button type="button" className={styles.menuItem} onClick={onCreateEvent} role="menuitem">
-              Tạo Sự kiện
-            </button>
+            {/* Cài đặt máy chủ - yêu cầu quyền manageServer */}
+            {canManageServer && (
+              <button
+                type="button"
+                className={`${styles.menuItem} ${styles.menuItemWithSub}`}
+                onClick={onServerSettings}
+                role="menuitem"
+              >
+                <span>Cài đặt máy chủ</span>
+                <span className={styles.arrow}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </span>
+              </button>
+            )}
           </>
         )}
+
+        {/* Cài đặt bảo mật - hiển thị cho tất cả */}
+        <button type="button" className={styles.menuItem} onClick={onSecuritySettings} role="menuitem">
+          Cài Đặt Bảo Mật
+        </button>
+
+        {/* Chỉnh sửa hồ sơ theo máy chủ - hiển thị cho tất cả */}
+        <button type="button" className={styles.menuItem} onClick={onEditServerProfile} role="menuitem">
+          Chỉnh Sửa Hồ Sơ Theo Máy Chủ
+        </button>
+
+        {/* === Phần tạo mới - hiển thị nếu có quyền === */}
+        {(canManageChannels || canManageEvents) && (
+          <>
+            <div className={styles.divider} />
+
+            {/* Tạo kênh - yêu cầu quyền manageChannels */}
+            {canManageChannels && (
+              <button type="button" className={styles.menuItem} onClick={onCreateChannel} role="menuitem">
+                Tạo kênh
+              </button>
+            )}
+
+            {/* Tạo danh mục - yêu cầu quyền manageChannels */}
+            {canManageChannels && (
+              <button type="button" className={styles.menuItem} onClick={onCreateCategory} role="menuitem">
+                Tạo Danh Mục
+              </button>
+            )}
+
+            {/* Tạo sự kiện - yêu cầu quyền manageEvents */}
+            {canManageEvents && (
+              <button type="button" className={styles.menuItem} onClick={onCreateEvent} role="menuitem">
+                Tạo Sự kiện
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Rời khỏi phòng - chỉ hiện cho non-owner */}
         {!isOwner && (
           <>
-            <button type="button" className={styles.menuItem} onClick={onSecuritySettings} role="menuitem">
-              Cài Đặt Bảo Mật
-            </button>
-            <button type="button" className={styles.menuItem} onClick={onEditServerProfile} role="menuitem">
-              Chỉnh Sửa Hồ Sơ Theo Máy Chủ
-            </button>
             <div className={styles.divider} />
             <button
               type="button"
@@ -229,9 +292,9 @@ export default function ServerContextMenu({
             </button>
           </>
         )}
-
       </div>
 
+      {/* Submenu: Tắt âm */}
       {submenu === "mute" && menuRef.current && (
         <div
           data-server-context-submenu
@@ -259,6 +322,7 @@ export default function ServerContextMenu({
         </div>
       )}
 
+      {/* Submenu: Thông báo */}
       {submenu === "notifications" && menuRef.current && (
         <div
           data-server-context-submenu

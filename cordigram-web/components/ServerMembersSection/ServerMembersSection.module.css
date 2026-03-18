@@ -458,3 +458,89 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Role Badges */
+.roleBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.ownerBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background: linear-gradient(135deg, #faa61a, #f47b67);
+  color: #fff;
+}
+
+.modBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #5865f2;
+  color: #fff;
+}
+
+.memberBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #4e5058;
+  color: #b5bac1;
+}
+
+.ownerCrown {
+  font-size: 12px;
+  margin-left: 2px;
+}
+
+/* Moderation modal */
+.moderationDesc {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #b5bac1;
+  line-height: 1.4;
+}
+
+.reasonInput {
+  width: 100%;
+  padding: 10px 12px;
+  background: #1e1f22;
+  border: 1px solid #383a40;
+  border-radius: 4px;
+  color: #f2f3f5;
+  font-size: 14px;
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+.reasonInput:focus {
+  outline: none;
+  border-color: #5865f2;
+}
+
+.reasonInput::placeholder {
+  color: #6d6f78;
+}
