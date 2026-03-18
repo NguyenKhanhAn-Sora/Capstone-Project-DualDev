@@ -687,6 +687,7 @@ export async function removeTimeout(
  */
 export interface CurrentUserServerPermissions {
   isOwner: boolean;
+  hasCustomRole: boolean; // User có vai trò nào ngoài @everyone không
   canKick: boolean;
   canBan: boolean;
   canTimeout: boolean;

@@ -524,6 +524,7 @@ export class ServersService {
     userId: string,
   ): Promise<{
     isOwner: boolean;
+    hasCustomRole: boolean; // User có vai trò nào ngoài @everyone không
     canKick: boolean;
     canBan: boolean;
     canTimeout: boolean;
@@ -547,10 +548,15 @@ export class ServersService {
 
     const isOwner = server.ownerId.toString() === userId;
 
+    // Kiểm tra user có vai trò nào ngoài @everyone không
+    const memberRoles = await this.rolesService.getMemberRoles(serverId, userId);
+    const hasCustomRole = memberRoles.some((r) => !r.isDefault);
+
     // Owner có tất cả quyền
     if (isOwner) {
       return {
         isOwner: true,
+        hasCustomRole: true, // Owner luôn có quyền
         canKick: true,
         canBan: true,
         canTimeout: true,
@@ -569,6 +575,7 @@ export class ServersService {
 
     return {
       isOwner: false,
+      hasCustomRole,
       canKick: permissions.kickMembers,
       canBan: permissions.banMembers,
       canTimeout: permissions.timeoutMembers,

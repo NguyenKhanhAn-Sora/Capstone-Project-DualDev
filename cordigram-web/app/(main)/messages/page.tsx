@@ -341,13 +341,17 @@ function areMessagesEqual(
     message: UIMessage;
     renderMessageContent: (message: UIMessage) => React.ReactNode;
     onVisible?: (messageId: string, isVisible: boolean) => void;
+    senderColor?: string;
   },
   nextProps: {
     message: UIMessage;
     renderMessageContent: (message: UIMessage) => React.ReactNode;
     onVisible?: (messageId: string, isVisible: boolean) => void;
+    senderColor?: string;
   },
 ) {
+  // Re-render if senderColor changed (role color)
+  if (prevProps.senderColor !== nextProps.senderColor) return false;
   // Re-render if message ID changed (different message)
   if (prevProps.message.id !== nextProps.message.id) return false;
 
@@ -397,6 +401,7 @@ const MessageItem = memo(
     onDelete,
     scrollContainerRef,
     dmPartnerDisplayName,
+    senderColor,
   }: {
     message: UIMessage;
     renderMessageContent: (message: UIMessage) => React.ReactNode;
@@ -409,6 +414,7 @@ const MessageItem = memo(
     onDelete?: (messageId: string) => void;
     scrollContainerRef?: React.RefObject<HTMLElement | null>;
     dmPartnerDisplayName?: string;
+    senderColor?: string; // Màu hiển thị từ role cao nhất
   }) => {
     const messageRef = useRef<HTMLDivElement>(null);
     const [isHovered, setIsHovered] = useState(false);
@@ -519,7 +525,10 @@ const MessageItem = memo(
         <div className={styles.messageContent}>
           {/* Name and timestamp */}
           <div className={styles.messageHeader}>
-            <span className={styles.messageSenderName}>
+            <span 
+              className={styles.messageSenderName}
+              style={senderColor ? { color: senderColor } : undefined}
+            >
               {message.senderDisplayName ||
                 message.senderName ||
                 message.senderEmail ||
@@ -850,6 +859,8 @@ export default function MessagesPage() {
   const [textChannels, setTextChannels] = useState<serversApi.Channel[]>([]);
   const [voiceChannels, setVoiceChannels] = useState<serversApi.Channel[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+  // Map userId -> displayColor (màu role cao nhất) cho server hiện tại
+  const [memberRoleColors, setMemberRoleColors] = useState<Record<string, string>>({});
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [messageText, setMessageText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -1665,12 +1676,29 @@ export default function MessagesPage() {
       loadChannels(selectedServer);
       loadActiveEvents(selectedServer);
       setSelectedDirectMessageFriend(null); // Clear selected DM friend when selecting server
+      
+      // Fetch member role colors cho server
+      serversApi.getServerMembersWithRoles(selectedServer)
+        .then((response) => {
+          const colorMap: Record<string, string> = {};
+          response.members.forEach((member) => {
+            if (member.displayColor && member.displayColor !== "#99AAB5") {
+              colorMap[member.userId] = member.displayColor;
+            }
+          });
+          setMemberRoleColors(colorMap);
+        })
+        .catch((err) => {
+          console.error("[MessagesPage] Failed to fetch member role colors:", err);
+          setMemberRoleColors({});
+        });
     } else {
       setTextChannels([]);
       setVoiceChannels([]);
       setSelectedChannel(null);
       setActiveServerEvents([]);
       setServerEventsTotalCount(0);
+      setMemberRoleColors({});
     }
   }, [selectedServer, loadActiveEvents]);
 
@@ -4682,6 +4710,7 @@ export default function MessagesPage() {
                           onReport={(msgId) => setShowReportDialog(msgId)}
                           onDelete={(msgId) => setShowDeleteDialog(msgId)}
                           scrollContainerRef={messagesContainerRef}
+                          senderColor={memberRoleColors[message.senderId]}
                         />
                       </div>
                     ))
