@@ -2,12 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import EmojiPicker from "emoji-picker-react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import {
+  createPost,
   createStripeCheckoutSession,
   type CreateStripeCheckoutSessionRequest,
+  fetchCurrentProfile,
+  getMyAdsCreationStatus,
   uploadMedia,
   uploadMediaBatch,
+  type CurrentProfileResponse,
   type UploadMediaResponse,
 } from "@/lib/api";
 import styles from "./create-ads.module.css";
@@ -23,6 +28,11 @@ type Cta =
 
 type Interest = {
   id: string;
+  label: string;
+};
+
+type SelectOption = {
+  value: string;
   label: string;
 };
 
@@ -111,6 +121,44 @@ const RECOMMENDED_INTERESTS: string[] = [
   "Travel",
 ];
 
+const FALLBACK_COUNTRIES = [
+  "United States",
+  "United Kingdom",
+  "Canada",
+  "Australia",
+  "Germany",
+  "France",
+  "Italy",
+  "Spain",
+  "Netherlands",
+  "Sweden",
+  "Norway",
+  "Denmark",
+  "Switzerland",
+  "Japan",
+  "South Korea",
+  "Singapore",
+  "India",
+  "Indonesia",
+  "Thailand",
+  "Malaysia",
+  "Vietnam",
+  "Philippines",
+  "China",
+  "Brazil",
+  "Mexico",
+  "Argentina",
+  "Chile",
+  "Colombia",
+  "South Africa",
+  "United Arab Emirates",
+  "Saudi Arabia",
+  "Turkey",
+  "Egypt",
+  "New Zealand",
+  "Ireland",
+];
+
 const BOOST_PACKAGES: BoostPackage[] = [
   {
     id: "light",
@@ -163,12 +211,98 @@ function ChevronDownIcon() {
   );
 }
 
+function CustomSelect({
+  value,
+  options,
+  placeholder,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  options: SelectOption[];
+  placeholder?: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      const root = rootRef.current;
+      if (!root) return;
+      if (root.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+
+    document.addEventListener("mousedown", onPointerDown, true);
+    document.addEventListener("touchstart", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown, true);
+      document.removeEventListener("touchstart", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  const selected = options.find((item) => item.value === value);
+
+  return (
+    <div className={styles.customSelect} ref={rootRef}>
+      <button
+        type="button"
+        className={`${styles.customSelectBtn} ${open ? styles.customSelectBtnOpen : ""}`}
+        onClick={() => !disabled && setOpen((prev) => !prev)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+      >
+        <span className={styles.customSelectText}>{selected?.label || placeholder || "Select"}</span>
+        <span className={`${styles.customSelectChevron} ${open ? styles.customSelectChevronOpen : ""}`}>
+          <ChevronDownIcon />
+        </span>
+      </button>
+
+      {open ? (
+        <div className={styles.customSelectMenu} role="listbox">
+          {options.map((item) => {
+            const active = item.value === value;
+            return (
+              <button
+                key={item.value || `empty-${item.label}`}
+                type="button"
+                role="option"
+                aria-selected={active}
+                className={`${styles.customSelectOption} ${active ? styles.customSelectOptionActive : ""}`}
+                onClick={() => {
+                  onChange(item.value);
+                  setOpen(false);
+                }}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function AdsCreatePage() {
   const canRender = useRequireAuth();
   const router = useRouter();
 
   const [objective, setObjective] = useState<Objective>("traffic");
   const [adFormat, setAdFormat] = useState<AdFormat>("single");
+  const [campaignName, setCampaignName] = useState("Student Promotion Campaign");
   const [primaryText, setPrimaryText] = useState(
     "Upgrade your setup with our newest collection. Limited launch offer available now.",
   );
@@ -183,6 +317,8 @@ export default function AdsCreatePage() {
   const [ageMin, setAgeMin] = useState<number>(18);
   const [ageMax, setAgeMax] = useState<number>(35);
   const [locationText, setLocationText] = useState("Vietnam");
+  const [countriesLoading, setCountriesLoading] = useState(true);
+  const [countryOptions, setCountryOptions] = useState<string[]>(FALLBACK_COUNTRIES);
   const [interestDraft, setInterestDraft] = useState("");
   const [interests, setInterests] = useState<Interest[]>([
     { id: "i-tech", label: "Technology" },
@@ -193,26 +329,35 @@ export default function AdsCreatePage() {
   const [mediaUploadError, setMediaUploadError] = useState("");
   const [publishValidationErrors, setPublishValidationErrors] =
     useState<PublishValidationErrors>({});
-  const [ctaOpen, setCtaOpen] = useState(false);
+  const [primaryEmojiOpen, setPrimaryEmojiOpen] = useState(false);
   const [publishMessage, setPublishMessage] = useState("");
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [isCreatingCheckout, setIsCreatingCheckout] = useState(false);
   const [paymentError, setPaymentError] = useState("");
-  const ctaRef = useRef<HTMLDivElement | null>(null);
+  const [currentProfile, setCurrentProfile] = useState<CurrentProfileResponse | null>(null);
+  const [hasCreatedAdsBefore, setHasCreatedAdsBefore] = useState(false);
+  const [preparedAdPostId, setPreparedAdPostId] = useState<string | null>(null);
+  const primaryEmojiRef = useRef<HTMLDivElement | null>(null);
+  const primaryTextInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const primaryTextSelectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
+  const primaryTextFieldRef = useRef<HTMLDivElement | null>(null);
+  const headlineFieldRef = useRef<HTMLLabelElement | null>(null);
+  const destinationUrlFieldRef = useRef<HTMLLabelElement | null>(null);
+  const mediaFieldRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!ctaOpen) return;
+    if (!primaryEmojiOpen) return;
 
     const onPointerDown = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
-      if (ctaRef.current?.contains(target)) return;
-      setCtaOpen(false);
+      if (primaryEmojiRef.current?.contains(target)) return;
+      setPrimaryEmojiOpen(false);
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCtaOpen(false);
+      if (event.key === "Escape") setPrimaryEmojiOpen(false);
     };
 
     document.addEventListener("mousedown", onPointerDown, true);
@@ -223,11 +368,97 @@ export default function AdsCreatePage() {
       document.removeEventListener("touchstart", onPointerDown, true);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [ctaOpen]);
+  }, [primaryEmojiOpen]);
 
-  const audienceSummary = useMemo(() => {
-    return `${locationText}, ${ageMin}-${ageMax}, Home Feed`;
-  }, [ageMax, ageMin, locationText]);
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCountries = async () => {
+      try {
+        setCountriesLoading(true);
+        const response = await fetch(
+          "https://restcountries.com/v3.1/all?fields=name,population,region",
+        );
+        if (!response.ok) throw new Error("Failed to fetch countries");
+
+        const rows = (await response.json()) as Array<{
+          name?: { common?: string };
+          population?: number;
+          region?: string;
+        }>;
+
+        const list = rows
+          .map((item) => ({
+            name: item.name?.common?.trim() ?? "",
+            population: item.population ?? 0,
+            region: item.region ?? "",
+          }))
+          .filter((item) => item.name && item.region !== "Antarctic")
+          .sort((a, b) => b.population - a.population)
+          .slice(0, 45)
+          .map((item) => item.name);
+
+        if (!cancelled && list.length > 0) {
+          setCountryOptions(Array.from(new Set(list)).sort((a, b) => a.localeCompare(b, "en")));
+        }
+      } catch {
+        if (!cancelled) setCountryOptions(FALLBACK_COUNTRIES);
+      } finally {
+        if (!cancelled) setCountriesLoading(false);
+      }
+    };
+
+    void loadCountries();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const token =
+      window.localStorage.getItem("accessToken") ||
+      window.localStorage.getItem("token");
+    if (!token) return;
+
+    let cancelled = false;
+    fetchCurrentProfile({ token })
+      .then((profile) => {
+        if (cancelled) return;
+        setCurrentProfile(profile);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCurrentProfile(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const token =
+      window.localStorage.getItem("accessToken") ||
+      window.localStorage.getItem("token");
+    if (!token) return;
+
+    let cancelled = false;
+    getMyAdsCreationStatus({ token })
+      .then((result) => {
+        if (cancelled) return;
+        setHasCreatedAdsBefore(result.hasCreatedAds === true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setHasCreatedAdsBefore(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const selectedBoost = useMemo(
     () => BOOST_PACKAGES.find((item) => item.id === selectedBoostId) ?? null,
@@ -244,6 +475,28 @@ export default function AdsCreatePage() {
     const duration = selectedDuration?.price ?? 0;
     return boost + duration;
   }, [selectedBoost, selectedDuration]);
+
+  const locationOptions = useMemo<SelectOption[]>(() => {
+    const sortedCountries = [...countryOptions].sort((a, b) => a.localeCompare(b, "en"));
+    const base = sortedCountries.map((name) => ({ value: name, label: name }));
+    const current = locationText.trim();
+    if (current && !base.some((item) => item.value.toLowerCase() === current.toLowerCase())) {
+      base.unshift({ value: current, label: current });
+    }
+
+    return [
+      {
+        value: "",
+        label: countriesLoading ? "Loading countries..." : "Select location",
+      },
+      ...base,
+    ];
+  }, [countryOptions, countriesLoading, locationText]);
+
+  const ctaOptions = useMemo<SelectOption[]>(
+    () => CTA_OPTIONS.map((item) => ({ value: item, label: item })),
+    [],
+  );
 
   const selectedObjectiveLabel = useMemo(
     () => OBJECTIVE_OPTIONS.find((item) => item.value === objective)?.label ?? "Objective",
@@ -314,6 +567,49 @@ export default function AdsCreatePage() {
     setInterests((prev) => prev.filter((item) => item.id !== id));
   };
 
+  const scrollFieldToCenter = (element: HTMLElement | null) => {
+    if (!element) return;
+    element.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+      inline: "nearest",
+    });
+  };
+
+  const insertPrimaryEmoji = (emoji: string) => {
+    if (!emoji) return;
+
+    const textarea = primaryTextInputRef.current;
+    const hasLiveSelection =
+      textarea &&
+      typeof textarea.selectionStart === "number" &&
+      typeof textarea.selectionEnd === "number" &&
+      document.activeElement === textarea;
+
+    const start = hasLiveSelection
+      ? (textarea?.selectionStart ?? 0)
+      : primaryTextSelectionRef.current.start;
+    const end = hasLiveSelection
+      ? (textarea?.selectionEnd ?? start)
+      : primaryTextSelectionRef.current.end;
+
+    setPrimaryText((value) => {
+      return value.slice(0, start) + emoji + value.slice(end);
+    });
+
+    setPublishValidationErrors((prev) => ({ ...prev, primaryText: undefined }));
+
+    const caret = start + emoji.length;
+    primaryTextSelectionRef.current = { start: caret, end: caret };
+
+    setTimeout(() => {
+      const el = primaryTextInputRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    }, 0);
+  };
+
   const handlePublish = () => {
     const nextErrors: PublishValidationErrors = {};
     const trimmedPrimaryText = primaryText.trim();
@@ -348,6 +644,24 @@ export default function AdsCreatePage() {
     setPublishValidationErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       setPaymentError("Please fill all required fields before payment.");
+
+      const firstErrorKey = ([
+        "primaryText",
+        "headline",
+        "destinationUrl",
+        "media",
+      ] as const).find((key) => Boolean(nextErrors[key]));
+
+      if (firstErrorKey === "primaryText") {
+        scrollFieldToCenter(primaryTextFieldRef.current);
+      } else if (firstErrorKey === "headline") {
+        scrollFieldToCenter(headlineFieldRef.current);
+      } else if (firstErrorKey === "destinationUrl") {
+        scrollFieldToCenter(destinationUrlFieldRef.current);
+      } else if (firstErrorKey === "media") {
+        scrollFieldToCenter(mediaFieldRef.current);
+      }
+
       return;
     }
 
@@ -371,15 +685,92 @@ export default function AdsCreatePage() {
       return;
     }
 
+    let promotedPostId = preparedAdPostId;
+    if (!promotedPostId) {
+      const creativeContent = [
+        "[[AD_PRIMARY_TEXT]]",
+        primaryText.trim(),
+        "[[/AD_PRIMARY_TEXT]]",
+        "",
+        "[[AD_HEADLINE]]",
+        headline.trim(),
+        "[[/AD_HEADLINE]]",
+        "",
+        "[[AD_DESCRIPTION]]",
+        description.trim(),
+        "[[/AD_DESCRIPTION]]",
+        "",
+        "[[AD_CTA]]",
+        cta.trim(),
+        "[[/AD_CTA]]",
+        "",
+        "[[AD_URL]]",
+        destinationUrl.trim(),
+        "[[/AD_URL]]",
+      ]
+        .join("\n")
+        .slice(0, 2200);
+
+      const creativeMedia = uploadedMedia.map((item) => ({
+        type: (item.resourceType === "video" ? "video" : "image") as
+          | "image"
+          | "video",
+        url: item.secureUrl,
+        metadata: {
+          width: item.width,
+          height: item.height,
+          bytes: item.bytes,
+          format: item.format,
+        },
+      }));
+
+      try {
+        const created = await createPost({
+          token,
+          payload: {
+            content: creativeContent,
+            media: creativeMedia,
+            visibility: "private",
+            allowComments: true,
+            allowDownload: false,
+            hideLikeCount: false,
+          },
+        });
+        promotedPostId = created.id;
+        setPreparedAdPostId(created.id);
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to prepare ad creative for checkout.";
+        setPaymentError(message);
+        return;
+      }
+    }
+
     const payload: CreateStripeCheckoutSessionRequest = {
       amount: totalBudget,
       currency: "vnd",
-      campaignName: "Cordigram Ads Campaign",
+      campaignName: campaignName.trim() || "Cordigram Ads Campaign",
       description: `${selectedBoost?.title ?? "Boost"} + ${selectedDuration?.days ?? 0} days`,
       objective,
       adFormat,
       boostPackageId: selectedBoostId,
       durationPackageId: selectedDurationId,
+      promotedPostId,
+      primaryText: primaryText.trim(),
+      headline: headline.trim(),
+      adDescription: description.trim(),
+      destinationUrl: destinationUrl.trim(),
+      cta,
+      interests: interests.map((item) => item.label.trim()).filter(Boolean),
+      locationText: locationText.trim(),
+      ageMin,
+      ageMax,
+      placement: "home_feed",
+      mediaUrls: uploadedMedia
+        .map((item) => item.secureUrl || item.url)
+        .filter((url): url is string => Boolean(url)),
     };
 
     setPaymentError("");
@@ -507,6 +898,18 @@ export default function AdsCreatePage() {
             Build your ad in a simple flow: objective, creative, audience, and package pricing.
           </p>
         </div>
+
+        {hasCreatedAdsBefore ? (
+          <div className={styles.topBarActions}>
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={() => router.push("/ads")}
+            >
+              Back to dashboard
+            </button>
+          </div>
+        ) : null}
       </header>
 
       <section className={styles.layout}>
@@ -540,6 +943,16 @@ export default function AdsCreatePage() {
               <span className={styles.pill}>Main content</span>
             </div>
 
+            <label className={styles.fieldLabel}>
+              Campaign name
+              <input
+                className={styles.input}
+                value={campaignName}
+                onChange={(e) => setCampaignName(e.target.value)}
+                placeholder="e.g. Back to school promo"
+              />
+            </label>
+
             <div className={styles.formatTabs}>
               {FORMAT_OPTIONS.map((item) => (
                 <button
@@ -553,24 +966,86 @@ export default function AdsCreatePage() {
               ))}
             </div>
 
-            <label className={styles.fieldLabel}>
-              Primary text
+            <div className={styles.fieldLabel} ref={primaryTextFieldRef}>
+              <div className={styles.emojiRow}>
+                <span>Primary text</span>
+                <div className={styles.emojiWrap} ref={primaryEmojiRef}>
+                  <button
+                    type="button"
+                    className={styles.emojiButton}
+                    onClick={() => setPrimaryEmojiOpen((prev) => !prev)}
+                    aria-label="Add emoji"
+                  >
+                    <svg
+                      aria-label="Emoji icon"
+                      fill="currentColor"
+                      height="20"
+                      role="img"
+                      viewBox="0 0 24 24"
+                      width="20"
+                    >
+                      <title>Emoji icon</title>
+                      <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
+                    </svg>
+                  </button>
+                  {primaryEmojiOpen ? (
+                    <div className={styles.emojiPopover}>
+                      <EmojiPicker
+                        onEmojiClick={(emojiData) => {
+                          insertPrimaryEmoji(emojiData.emoji || "");
+                        }}
+                        autoFocusSearch={false}
+                        lazyLoadEmojis
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
               <textarea
+                ref={primaryTextInputRef}
                 className={styles.textarea}
                 value={primaryText}
                 onChange={(e) => {
                   setPrimaryText(e.target.value);
+                  const start = e.target.selectionStart ?? e.target.value.length;
+                  const end = e.target.selectionEnd ?? start;
+                  primaryTextSelectionRef.current = { start, end };
                   setPublishValidationErrors((prev) => ({ ...prev, primaryText: undefined }));
+                }}
+                onSelect={(e) => {
+                  const start = e.currentTarget.selectionStart ?? 0;
+                  const end = e.currentTarget.selectionEnd ?? start;
+                  primaryTextSelectionRef.current = { start, end };
+                }}
+                onClick={(e) => {
+                  const start = e.currentTarget.selectionStart ?? 0;
+                  const end = e.currentTarget.selectionEnd ?? start;
+                  primaryTextSelectionRef.current = { start, end };
+                }}
+                onKeyUp={(e) => {
+                  const start = e.currentTarget.selectionStart ?? 0;
+                  const end = e.currentTarget.selectionEnd ?? start;
+                  primaryTextSelectionRef.current = { start, end };
+                }}
+                onFocus={(e) => {
+                  const start = e.currentTarget.selectionStart ?? 0;
+                  const end = e.currentTarget.selectionEnd ?? start;
+                  primaryTextSelectionRef.current = { start, end };
+                }}
+                onBlur={(e) => {
+                  const start = e.currentTarget.selectionStart ?? 0;
+                  const end = e.currentTarget.selectionEnd ?? start;
+                  primaryTextSelectionRef.current = { start, end };
                 }}
                 rows={4}
               />
-            </label>
+            </div>
             {publishValidationErrors.primaryText ? (
               <p className={styles.uploadError}>{publishValidationErrors.primaryText}</p>
             ) : null}
 
             <div className={styles.twoCols}>
-              <label className={styles.fieldLabel}>
+              <label className={styles.fieldLabel} ref={headlineFieldRef}>
                 Headline
                 <input
                   className={styles.input}
@@ -584,45 +1059,12 @@ export default function AdsCreatePage() {
 
               <label className={styles.fieldLabel}>
                 CTA button
-                <div className={styles.dropdown} ref={ctaRef}>
-                  <button
-                    type="button"
-                    className={`${styles.dropdownButton} ${ctaOpen ? styles.dropdownButtonOpen : ""}`}
-                    onClick={() => setCtaOpen((prev) => !prev)}
-                    aria-haspopup="listbox"
-                    aria-expanded={ctaOpen}
-                  >
-                    <span className={styles.dropdownText}>{cta}</span>
-                    <span className={`${styles.dropdownChevron} ${ctaOpen ? styles.dropdownChevronOpen : ""}`}>
-                      <ChevronDownIcon />
-                    </span>
-                  </button>
-                  {ctaOpen ? (
-                    <div className={styles.dropdownMenu} role="listbox" aria-label="CTA button">
-                      {CTA_OPTIONS.map((item) => {
-                        const active = item === cta;
-                        return (
-                          <button
-                            key={item}
-                            type="button"
-                            role="option"
-                            aria-selected={active}
-                            className={`${styles.dropdownOption} ${active ? styles.dropdownOptionActive : ""}`}
-                            onClick={() => {
-                              setCta(item);
-                              setCtaOpen(false);
-                            }}
-                          >
-                            <span>{item}</span>
-                            <span className={`${styles.dropdownCheck} ${active ? styles.dropdownCheckActive : ""}`}>
-                              {active ? "✓" : ""}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </div>
+                <CustomSelect
+                  value={cta}
+                  options={ctaOptions}
+                  onChange={(value) => setCta(value as Cta)}
+                  placeholder="Select CTA"
+                />
               </label>
             </div>
 
@@ -635,7 +1077,7 @@ export default function AdsCreatePage() {
               />
             </label>
 
-            <label className={styles.fieldLabel}>
+            <label className={styles.fieldLabel} ref={destinationUrlFieldRef}>
               Destination URL
               <input
                 className={styles.input}
@@ -654,7 +1096,7 @@ export default function AdsCreatePage() {
               <p className={styles.uploadError}>{publishValidationErrors.destinationUrl}</p>
             ) : null}
 
-            <div className={styles.mediaPlaceholder}>
+            <div className={styles.mediaPlaceholder} ref={mediaFieldRef}>
               <div className={styles.mediaIcon}>+</div>
               <div>
                 <p className={styles.mediaTitle}>Upload media</p>
@@ -715,11 +1157,12 @@ export default function AdsCreatePage() {
             <div className={styles.twoCols}>
               <label className={styles.fieldLabel}>
                 Location
-                <input
-                  className={styles.input}
+                <CustomSelect
                   value={locationText}
-                  onChange={(e) => setLocationText(e.target.value)}
-                  placeholder="Country or city"
+                  options={locationOptions}
+                  onChange={(value) => setLocationText(value)}
+                  placeholder="Select location"
+                  disabled={countriesLoading && locationOptions.length <= 1}
                 />
               </label>
 
@@ -892,10 +1335,26 @@ export default function AdsCreatePage() {
 
             <div className={styles.previewPost}>
               <div className={styles.previewAuthorRow}>
-                <span className={styles.previewAvatar}>A</span>
+                {currentProfile?.avatarUrl ? (
+                  <img
+                    className={styles.previewAvatar}
+                    src={currentProfile.avatarUrl}
+                    alt={currentProfile.displayName || currentProfile.username || "User avatar"}
+                  />
+                ) : (
+                  <span className={styles.previewAvatar}>
+                    {(currentProfile?.displayName || currentProfile?.username || "U")
+                      .charAt(0)
+                      .toUpperCase()}
+                  </span>
+                )}
                 <div>
-                  <p className={styles.previewName}>Your brand</p>
-                  <p className={styles.previewMeta}>Sponsored • {audienceSummary}</p>
+                  <p className={styles.previewName}>
+                    {currentProfile?.displayName || "Display name"}
+                  </p>
+                  <p className={styles.previewMeta}>
+                    @{currentProfile?.username || "username"} • Sponsored
+                  </p>
                 </div>
               </div>
 

@@ -107,6 +107,7 @@ export type UpdatePostRequest = {
 export type CreatePostResponse = {
   kind: "post" | "reel";
   id: string;
+  repostOf?: string | null;
   content: string;
   media: Array<{
     type: "image" | "video";
@@ -177,6 +178,14 @@ export type CreateReelRequest = {
 };
 
 export type FeedItem = CreatePostResponse & {
+  repostOf?: string | null;
+  sponsored?: boolean;
+  repostSourceContent?: string | null;
+  repostSourceMedia?: Array<{
+    type: "image" | "video";
+    url: string;
+    metadata?: Record<string, unknown> | null;
+  }> | null;
   spamScore?: number;
   qualityScore?: number;
   liked?: boolean;
@@ -3290,6 +3299,8 @@ export async function getMyVote(opts: {
 }
 
 export type CreateStripeCheckoutSessionRequest = {
+  actionType?: "campaign_create" | "campaign_upgrade";
+  targetCampaignId?: string;
   amount: number;
   currency?: string;
   campaignName?: string;
@@ -3298,6 +3309,18 @@ export type CreateStripeCheckoutSessionRequest = {
   adFormat?: string;
   boostPackageId: string;
   durationPackageId: string;
+  promotedPostId?: string;
+  primaryText?: string;
+  headline?: string;
+  adDescription?: string;
+  destinationUrl?: string;
+  cta?: string;
+  interests?: string[];
+  locationText?: string;
+  ageMin?: number;
+  ageMax?: number;
+  placement?: string;
+  mediaUrls?: string[];
 };
 
 export type StripeCheckoutSessionResponse = {
@@ -3366,6 +3389,231 @@ export async function getMyAdsCreationStatus(opts: {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+  });
+}
+
+export type AdsEventType = "impression" | "dwell" | "cta_click";
+
+export async function trackAdsEvent(opts: {
+  token: string;
+  promotedPostId: string;
+  renderedPostId?: string;
+  eventType: AdsEventType;
+  sessionId: string;
+  durationMs?: number;
+  source?: string;
+}): Promise<{ tracked: boolean; deduped?: boolean }> {
+  const {
+    token,
+    promotedPostId,
+    renderedPostId,
+    eventType,
+    sessionId,
+    durationMs,
+    source,
+  } = opts;
+
+  return apiFetch<{ tracked: boolean; deduped?: boolean }>({
+    path: "/payments/ads/track",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      promotedPostId,
+      renderedPostId,
+      eventType,
+      sessionId,
+      durationMs: typeof durationMs === "number" ? durationMs : undefined,
+      source: source ?? "home_feed",
+    }),
+  });
+}
+
+export type AdsDashboardCampaign = {
+  id: string;
+  promotedPostId: string;
+  campaignName: string;
+  status: "active" | "hidden" | "paused" | "canceled" | "completed";
+  budget: number;
+  spent: number;
+  startsAt: string;
+  expiresAt: string;
+  impressions: number;
+  reach: number;
+  clicks: number;
+  ctr: number;
+  views: number;
+  likes: number;
+  comments: number;
+  reposts: number;
+  engagements: number;
+  averageDwellMs: number;
+  totalDwellMs: number;
+  dwellSamples: number;
+  engagementRate: number;
+};
+
+export type AdsDashboardSummary = {
+  totalBudget: number;
+  totalSpent: number;
+  impressions: number;
+  reach: number;
+  clicks: number;
+  views: number;
+  likes: number;
+  comments: number;
+  reposts: number;
+  engagements: number;
+  totalDwellMs: number;
+  dwellSamples: number;
+  activeCount: number;
+  ctr: number;
+  averageDwellMs: number;
+  engagementRate: number;
+};
+
+export type AdsDashboardResponse = {
+  summary: AdsDashboardSummary;
+  campaigns: AdsDashboardCampaign[];
+  trend: Array<{
+    day: string;
+    impressions: number;
+    clicks: number;
+  }>;
+};
+
+export async function getAdsDashboard(opts: {
+  token: string;
+}): Promise<AdsDashboardResponse> {
+  const { token } = opts;
+  return apiFetch<AdsDashboardResponse>({
+    path: "/payments/ads/dashboard",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export type AdsCampaignDetail = AdsDashboardCampaign & {
+  objective?: string;
+  adFormat?: string;
+  primaryText?: string;
+  headline?: string;
+  adDescription?: string;
+  destinationUrl?: string;
+  cta?: string;
+  interests?: string[];
+  locationText?: string;
+  ageMin?: number | null;
+  ageMax?: number | null;
+  placement?: string;
+  mediaUrls?: string[];
+  boostPackageId?: string;
+  durationPackageId?: string;
+  durationDays?: number;
+  boostWeight?: number;
+  hiddenReason?: string | null;
+  actions?: {
+    canChangeBoost: boolean;
+    canExtend: boolean;
+    canPause: boolean;
+    canResume: boolean;
+    canCancel: boolean;
+    requiresExtendBeforeResume?: boolean;
+  };
+};
+
+export async function getAdsCampaignDetail(opts: {
+  token: string;
+  campaignId: string;
+}): Promise<AdsCampaignDetail> {
+  const { token, campaignId } = opts;
+  return apiFetch<AdsCampaignDetail>({
+    path: `/payments/ads/campaigns/${encodeURIComponent(campaignId)}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export type AdsCampaignAction =
+  | "change_boost"
+  | "extend_days"
+  | "pause_campaign"
+  | "resume_campaign"
+  | "cancel_campaign"
+  | "update_details";
+
+export async function performAdsCampaignAction(opts: {
+  token: string;
+  campaignId: string;
+  action: AdsCampaignAction;
+  boostPackageId?: string;
+  extendDays?: number;
+  campaignName?: string;
+  objective?: string;
+  adFormat?: string;
+  primaryText?: string;
+  headline?: string;
+  adDescription?: string;
+  destinationUrl?: string;
+  cta?: string;
+  interests?: string[];
+  locationText?: string;
+  ageMin?: number | null;
+  ageMax?: number | null;
+  placement?: string;
+  mediaUrls?: string[];
+}): Promise<AdsCampaignDetail> {
+  const {
+    token,
+    campaignId,
+    action,
+    boostPackageId,
+    extendDays,
+    campaignName,
+    objective,
+    adFormat,
+    primaryText,
+    headline,
+    adDescription,
+    destinationUrl,
+    cta,
+    interests,
+    locationText,
+    ageMin,
+    ageMax,
+    placement,
+    mediaUrls,
+  } = opts;
+  return apiFetch<AdsCampaignDetail>({
+    path: `/payments/ads/campaigns/${encodeURIComponent(campaignId)}/action`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      action,
+      boostPackageId,
+      extendDays,
+      campaignName,
+      objective,
+      adFormat,
+      primaryText,
+      headline,
+      adDescription,
+      destinationUrl,
+      cta,
+      interests,
+      locationText,
+      ageMin,
+      ageMax,
+      placement,
+      mediaUrls,
+    }),
   });
 }
 

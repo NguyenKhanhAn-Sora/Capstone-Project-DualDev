@@ -26,6 +26,7 @@ import {
   deletePost,
   fetchPostDetail,
   reportPost,
+  trackAdsEvent,
   viewPost,
   blockUser,
   followUser,
@@ -33,6 +34,7 @@ import {
   updatePostVisibility,
   updatePost,
   fetchCurrentProfile,
+  getAdsDashboard,
   searchProfiles,
   searchPosts,
   type ProfileSearchItem,
@@ -107,6 +109,16 @@ const FEED_POLL_MS = 4000;
 const FEED_CACHE_KEY = "feedCache:v1";
 const FEED_CACHE_INTENT_KEY = "feedCache:intent";
 const QUOTE_CHAR_LIMIT = 500;
+const ADS_TRACK_SESSION_KEY = "ads:track:session";
+
+const getAdsTrackSessionId = () => {
+  if (typeof window === "undefined") return "";
+  const existing = sessionStorage.getItem(ADS_TRACK_SESSION_KEY);
+  if (existing) return existing;
+  const next = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  sessionStorage.setItem(ADS_TRACK_SESSION_KEY, next);
+  return next;
+};
 
 const normalizeHashtag = (value: string) =>
   value
@@ -148,6 +160,91 @@ const extractMentionsFromCaption = (value: string) => {
     handles.add(match[1].toLowerCase());
   }
   return Array.from(handles);
+};
+
+const parseSponsoredCreative = (value: string) => {
+  const raw = (value || "").replace(/\r/g, "").trim();
+  if (!raw) return null;
+
+  const extractBlock = (name: string) => {
+    const pattern = new RegExp(
+      `\\[\\[AD_${name}\\]\\]([\\s\\S]*?)\\[\\[\\/AD_${name}\\]\\]`,
+      "i",
+    );
+    const matched = pattern.exec(raw);
+    if (!matched) return "";
+    return matched[1]?.replace(/^\n+|\n+$/g, "") ?? "";
+  };
+
+  const structuredPrimaryText = extractBlock("PRIMARY_TEXT");
+  const structuredHeadline = extractBlock("HEADLINE");
+  const structuredDescription = extractBlock("DESCRIPTION");
+  const structuredDestinationUrl = extractBlock("URL");
+  const structuredCta = extractBlock("CTA");
+
+  if (
+    structuredPrimaryText ||
+    structuredHeadline ||
+    structuredDescription ||
+    structuredDestinationUrl ||
+    structuredCta
+  ) {
+    return {
+      primaryText: structuredPrimaryText,
+      headline: structuredHeadline,
+      description: structuredDescription,
+      destinationUrl: structuredDestinationUrl || null,
+      cta: structuredCta,
+    };
+  }
+
+  const blocks = raw
+    .split(/\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!blocks.length) return null;
+
+  const primaryText = blocks[0];
+  const details = blocks
+    .slice(1)
+    .join("\n")
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  let destinationUrl: string | null = null;
+  let destinationIndex = -1;
+  for (let idx = details.length - 1; idx >= 0; idx -= 1) {
+    if (/^https?:\/\//i.test(details[idx])) {
+      destinationUrl = details[idx];
+      destinationIndex = idx;
+      break;
+    }
+  }
+
+  const metaLines =
+    destinationIndex >= 0
+      ? details.filter((_, idx) => idx !== destinationIndex)
+      : details;
+
+  let cta = "";
+  const metaLinesWithoutCta: string[] = [];
+  metaLines.forEach((line) => {
+    const matched = /^cta\s*:\s*(.+)$/i.exec(line);
+    if (matched && !cta) {
+      cta = matched[1]?.trim() ?? "";
+      return;
+    }
+    metaLinesWithoutCta.push(line);
+  });
+
+  return {
+    primaryText,
+    headline: metaLinesWithoutCta[0] ?? "",
+    description: metaLinesWithoutCta.slice(1).join(" "),
+    destinationUrl,
+    cta,
+  };
 };
 
 const findActiveMention = (value: string, caret: number) => {
@@ -908,8 +1005,16 @@ export default function HomePage({
       return;
     }
     const shouldHydrate = sessionStorage.getItem(FEED_CACHE_INTENT_KEY);
-    if (shouldHydrate && tryHydrateFromCache()) return;
-    if (tryHydrateFromCache()) return;
+    if (shouldHydrate && tryHydrateFromCache()) {
+      // Keep instant render from cache but sync with latest feed in the background.
+      void loadRef.current(1);
+      return;
+    }
+    if (tryHydrateFromCache()) {
+      // Ensure new items (including sponsored posts) are not missed due to stale cache.
+      void loadRef.current(1);
+      return;
+    }
     void loadRef.current(1);
   }, [canRender, isSearchMode, tryHydrateFromCache]);
 
@@ -1810,18 +1915,50 @@ function FeedCard({
     repostOfAuthorUsername,
     repostOfAuthorDisplayName,
     repostOfAuthorAvatarUrl,
+    repostSourceContent,
+    repostSourceMedia,
     notificationsMutedUntil,
     notificationsMutedIndefinitely,
+    sponsored,
   } = data;
 
   const displayAt = publishedAt || createdAt;
+  const isSponsoredRepost = Boolean(sponsored && repostOf);
+  const promotedAdPostId = sponsored ? (repostOf || id) : null;
+  const sourceCreativeContent =
+    isSponsoredRepost && repostSourceContent ? repostSourceContent : "";
+  const sourceSponsoredCreative = useMemo(() => {
+    if (!isSponsoredRepost) return null;
+    return parseSponsoredCreative(sourceCreativeContent);
+  }, [isSponsoredRepost, sourceCreativeContent]);
+  const sponsoredCreative = useMemo(() => {
+    if (!sponsored || isSponsoredRepost) return null;
+    return parseSponsoredCreative(content || "");
+  }, [content, sponsored, isSponsoredRepost]);
+  const adCtaLabel = ((data as any)?.cta ?? "").toString().trim();
+  const sourceSponsoredCtaLabel =
+    (sourceSponsoredCreative?.cta ?? "").toString().trim() ||
+    adCtaLabel ||
+    "Shop Now";
+  const sponsoredCtaLabel =
+    (sponsoredCreative?.cta ?? "").toString().trim() ||
+    adCtaLabel ||
+    "Shop Now";
+  const renderedContent =
+    sponsoredCreative?.primaryText || (isSponsoredRepost ? content : content);
+  const sourceMedia =
+    isSponsoredRepost && Array.isArray(repostSourceMedia)
+      ? repostSourceMedia
+      : [];
+
+  const effectiveMedia = isSponsoredRepost && sourceMedia.length ? sourceMedia : media;
 
   const mediaKey = useMemo(() => {
-    if (!Array.isArray(media) || media.length === 0) return "";
-    return media
+    if (!Array.isArray(effectiveMedia) || effectiveMedia.length === 0) return "";
+    return effectiveMedia
       .map((item) => `${item?.type ?? ""}:${item?.url ?? ""}`)
       .join("|");
-  }, [media]);
+  }, [effectiveMedia]);
 
   const hashtagsKey = Array.isArray(hashtags) ? hashtags.join("\u0001") : "";
   const mentionsKey = Array.isArray(mentions) ? mentions.join("\u0001") : "";
@@ -1852,6 +1989,30 @@ function FeedCard({
   const lastViewAt = useRef<number>(0);
   const router = useRouter();
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const adsSessionIdRef = useRef<string>("");
+
+  const sendAdsEvent = useCallback(
+    (eventType: "impression" | "dwell" | "cta_click", durationMs?: number) => {
+      if (!token || !promotedAdPostId || !sponsored) return;
+      if (!adsSessionIdRef.current) {
+        adsSessionIdRef.current = getAdsTrackSessionId();
+      }
+      void trackAdsEvent({
+        token,
+        promotedPostId: promotedAdPostId,
+        renderedPostId: id,
+        eventType,
+        sessionId: adsSessionIdRef.current,
+        durationMs,
+        source: "home_feed",
+      }).catch(() => undefined);
+    },
+    [id, promotedAdPostId, sponsored, token],
+  );
+
+  const onSponsoredCtaClick = useCallback(() => {
+    sendAdsEvent("cta_click");
+  }, [sendAdsEvent]);
 
   const mentionLookupKey = useMemo(() => {
     const handles = new Set<string>();
@@ -1859,10 +2020,12 @@ function FeedCard({
       const handle = m.toString().trim().replace(/^@/, "").toLowerCase();
       if (handle) handles.add(handle);
     });
-    extractMentionsFromCaption(content || "").forEach((h) => handles.add(h));
+    extractMentionsFromCaption(renderedContent || "").forEach((h) =>
+      handles.add(h),
+    );
     if (!handles.size) return "";
     return Array.from(handles).sort().join("|");
-  }, [mentionsKey, content]);
+  }, [mentionsKey, renderedContent]);
 
   useEffect(() => {
     if (!mentionLookupKey) {
@@ -1948,6 +2111,13 @@ function FeedCard({
   }, [id, onRemoteUpdate, token]);
 
   useEffect(() => {
+    if (!sponsored) return;
+    if (!adsSessionIdRef.current) {
+      adsSessionIdRef.current = getAdsTrackSessionId();
+    }
+  }, [sponsored]);
+
+  useEffect(() => {
     const el = cardRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -1958,6 +2128,9 @@ function FeedCard({
             dwellTimer.current = setTimeout(() => {
               lastViewAt.current = Date.now();
               onView(id);
+              if (sponsored) {
+                sendAdsEvent("impression");
+              }
             }, VIEW_DWELL_MS);
           } else if (dwellTimer.current) {
             clearTimeout(dwellTimer.current);
@@ -1974,7 +2147,47 @@ function FeedCard({
       }
       observer.disconnect();
     };
-  }, [id, onView]);
+  }, [id, onView, sendAdsEvent, sponsored]);
+
+  useEffect(() => {
+    if (!sponsored) return;
+    const el = cardRef.current;
+    if (!el) return;
+
+    let visibleSince: number | null = null;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.target !== el) return;
+          if (entry.isIntersecting) {
+            if (visibleSince === null) {
+              visibleSince = Date.now();
+            }
+            return;
+          }
+          if (visibleSince !== null) {
+            const durationMs = Date.now() - visibleSince;
+            visibleSince = null;
+            if (durationMs >= 1000) {
+              sendAdsEvent("dwell", durationMs);
+            }
+          }
+        });
+      },
+      { threshold: 0.5 },
+    );
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      if (visibleSince !== null) {
+        const durationMs = Date.now() - visibleSince;
+        if (durationMs >= 1000) {
+          sendAdsEvent("dwell", durationMs);
+        }
+      }
+    };
+  }, [sendAdsEvent, sponsored]);
 
   useEffect(() => {
     const el = cardRef.current;
@@ -2618,6 +2831,26 @@ function FeedCard({
     }
   }, [targetPostId, router, persistResume, onPersistFeedCache]);
 
+  const openAdsDetail = useCallback(async () => {
+    setMenuOpen(false);
+    if (!token || !promotedAdPostId) return;
+    try {
+      const dashboard = await getAdsDashboard({ token });
+      const matchedCampaign = (dashboard.campaigns ?? []).find(
+        (item) => item.promotedPostId === promotedAdPostId,
+      );
+      if (!matchedCampaign?.id) return;
+      const href = `/ads/campaigns/${matchedCampaign.id}`;
+      if (typeof window !== "undefined") {
+        window.location.href = href;
+      } else {
+        router.push(href);
+      }
+    } catch {
+      // Ignore transient errors for menu action.
+    }
+  }, [promotedAdPostId, router, token]);
+
   const quickOpenPost = useCallback(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem(FEED_CACHE_INTENT_KEY, "1");
@@ -2653,7 +2886,7 @@ function FeedCard({
   }, [id]);
 
   useEffect(() => {
-    const mediaCount = media?.length ?? 0;
+    const mediaCount = effectiveMedia?.length ?? 0;
     if (mediaCount === 0) {
       setMediaIndex(0);
       setSoundOn(false);
@@ -2675,7 +2908,7 @@ function FeedCard({
         time?: number;
         soundOn?: boolean;
       };
-      const mediaCount = media?.length ?? 0;
+      const mediaCount = effectiveMedia?.length ?? 0;
       if (
         typeof data.mediaIndex === "number" &&
         data.mediaIndex >= 0 &&
@@ -2690,7 +2923,7 @@ function FeedCard({
       resumeAppliedRef.current = true;
     } catch {}
     sessionStorage.removeItem(key);
-  }, [id, mediaKey]);
+  }, [id, mediaKey, effectiveMedia]);
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -2789,7 +3022,7 @@ function FeedCard({
   }, []);
 
   const captionNodes = useMemo(() => {
-    if (!content) return null;
+    if (!renderedContent) return null;
     const parts: Array<string | JSX.Element> = [];
     const normalizedMentions = new Set(
       (stableMentions || []).map((m) => m.toLowerCase()),
@@ -2810,10 +3043,10 @@ function FeedCard({
     const regex = /(@[a-zA-Z0-9_.]+|#[a-zA-Z0-9_]+)/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
-    while ((match = regex.exec(content))) {
+    while ((match = regex.exec(renderedContent))) {
       const start = match.index;
       if (start > lastIndex) {
-        pushText(content.slice(lastIndex, start), `text-${start}`);
+        pushText(renderedContent.slice(lastIndex, start), `text-${start}`);
       }
       const token = match[0];
       if (token.startsWith("@")) {
@@ -2864,15 +3097,15 @@ function FeedCard({
       }
       lastIndex = regex.lastIndex;
     }
-    if (lastIndex < content.length) {
-      pushText(content.slice(lastIndex), `text-tail-${lastIndex}`);
+    if (lastIndex < renderedContent.length) {
+      pushText(renderedContent.slice(lastIndex), `text-tail-${lastIndex}`);
     }
     return parts;
-  }, [content, mentionsKey, hashtagsKey, captionMentionMap]);
+  }, [renderedContent, mentionsKey, hashtagsKey, captionMentionMap]);
 
   const captionMeasureKey = useMemo(
-    () => `${content}\u0001${mentionsKey}\u0001${hashtagsKey}`,
-    [content, mentionsKey, hashtagsKey],
+    () => `${renderedContent}\u0001${mentionsKey}\u0001${hashtagsKey}`,
+    [renderedContent, mentionsKey, hashtagsKey],
   );
   const lastCaptionMeasureKeyRef = useRef<string>("");
 
@@ -2905,6 +3138,13 @@ function FeedCard({
 
   const authorOwnerId = authorId || author?.id;
   const isSelf = Boolean(viewerId && authorOwnerId === viewerId);
+  const isRepostSourceAuthor = Boolean(
+    (viewerId && repostOfAuthorId && viewerId === repostOfAuthorId) ||
+      (viewerUsername &&
+        repostOfAuthorUsername &&
+        viewerUsername.toLowerCase() === repostOfAuthorUsername.toLowerCase()),
+  );
+  const showAdsOwnerMenu = Boolean(sponsored && (isSelf || isRepostSourceAuthor));
   const shouldHideLikeStat = Boolean(hideLikeCount) && !isSelf;
   const displayHearts =
     (stats.hearts ?? 0) + (repostOf ? 0 : (repostHeartsBoost ?? 0));
@@ -2914,6 +3154,9 @@ function FeedCard({
   const repostSourceLabel =
     repostOfAuthorDisplayName ||
     (repostOfAuthorUsername ? `@${repostOfAuthorUsername}` : null);
+  const repostSourceSubtitle = repostOfAuthorUsername
+    ? `@${repostOfAuthorUsername} • Sponsored`
+    : `${repostSourceLabel || t("repost.original")} • Sponsored`;
   const commentsToggleLabel = allowComments
     ? t("menu.turnOffComments")
     : t("menu.turnOnComments");
@@ -3544,7 +3787,7 @@ function FeedCard({
 
   return (
     <article
-      className={`${styles.feedCard} ${cardClassName ?? ""}`}
+      className={`${styles.feedCard} ${sponsored ? styles.sponsoredCard : ""} ${cardClassName ?? ""}`}
       ref={cardRef}
     >
       {repostOf ? (
@@ -3613,8 +3856,12 @@ function FeedCard({
                 </>
               ) : null}
             </div>
-            <span className={styles.authorSub}>
-              {formatDistanceToNow(new Date(displayAt), { addSuffix: true })}
+            <span
+              className={`${styles.authorSub} ${sponsored ? styles.authorSubSponsored : ""}`}
+            >
+              {sponsored && !isSponsoredRepost
+                ? `@${username || authorLine} • Sponsored`
+                : formatDistanceToNow(new Date(displayAt), { addSuffix: true })}
             </span>
           </div>
         </div>
@@ -3653,7 +3900,25 @@ function FeedCard({
             </button>
             {menuOpen ? (
               <div className={styles.menuPopover} role="menu">
-                {isSelf ? (
+                {showAdsOwnerMenu ? (
+                  <div className={styles.menuContent}>
+                    <button className={styles.menuItem} onClick={goToPost}>
+                      Go to ads
+                    </button>
+                    <button
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onCopyLink(id);
+                      }}
+                    >
+                      {t("menu.copyLink")}
+                    </button>
+                    <button className={styles.menuItem} onClick={openAdsDetail}>
+                      Ads detail
+                    </button>
+                  </div>
+                ) : isSelf ? (
                   <div className={styles.menuContent}>
                     <button
                       className={styles.menuItem}
@@ -3712,7 +3977,7 @@ function FeedCard({
                     </button>
                     {repostOf ? (
                       <button className={styles.menuItem} onClick={goToPost}>
-                        {t("menu.goToPost")}
+                        Go to ads
                       </button>
                     ) : null}
                     <button
@@ -3738,7 +4003,7 @@ function FeedCard({
                   <div className={styles.menuContent}>
                     {repostOf ? (
                       <button className={styles.menuItem} onClick={goToPost}>
-                        {t("menu.goToPost")}
+                        Go to ads
                       </button>
                     ) : null}
                     <button
@@ -3815,7 +4080,7 @@ function FeedCard({
         </div>
       </header>
 
-      {content && (
+      {renderedContent && (
         <div className={styles.contentSection}>
           <div
             ref={contentRef}
@@ -3875,7 +4140,94 @@ function FeedCard({
         </div>
       )}
 
-      {media?.length ? (
+      {isSponsoredRepost ? (
+        <div className={styles.repostAdEmbed}>
+          <div className={styles.repostAdHeader}>
+            {repostOfAuthorAvatarUrl ? (
+              <img
+                src={repostOfAuthorAvatarUrl}
+                alt={repostSourceLabel || "Original author"}
+                className={styles.repostAdAvatar}
+              />
+            ) : (
+              <div className={styles.repostAdAvatarFallback}>A</div>
+            )}
+            <div className={styles.repostAdMeta}>
+              <p className={styles.repostAdName}>
+                {repostSourceLabel || t("repost.original")}
+              </p>
+              <p className={styles.repostAdSub}>{repostSourceSubtitle}</p>
+            </div>
+          </div>
+
+          {sourceSponsoredCreative?.primaryText ? (
+            <p className={styles.repostAdPrimary}>{sourceSponsoredCreative.primaryText}</p>
+          ) : null}
+
+          {sourceMedia.length ? (
+            <div className={styles.mediaCarousel}>
+              {(() => {
+                const current = sourceMedia[mediaIndex];
+                if (!current) return null;
+                if (current.type === "video") {
+                  return (
+                    <video
+                      key={`${id}-source-${mediaIndex}`}
+                      ref={videoRef}
+                      src={current.url}
+                      controls
+                      controlsList="nodownload noremoteplayback"
+                      muted={!soundOn}
+                      playsInline
+                      preload="metadata"
+                      onContextMenu={(e) => e.preventDefault()}
+                      onPlay={() => onView(id, 1000)}
+                      className={styles.mediaVisual}
+                    />
+                  );
+                }
+                return (
+                  <img
+                    key={`${id}-source-${mediaIndex}`}
+                    src={current.url}
+                    alt={t("media.alt")}
+                    className={styles.mediaVisual}
+                    onContextMenu={(e) => e.preventDefault()}
+                    onClick={() => setImageViewerOpen(true)}
+                  />
+                );
+              })()}
+            </div>
+          ) : null}
+
+          {sourceSponsoredCreative &&
+          (sourceSponsoredCreative.headline ||
+            sourceSponsoredCreative.description ||
+            sourceSponsoredCreative.destinationUrl) ? (
+            <div className={styles.sponsoredMetaRow}>
+              <div className={styles.sponsoredMetaText}>
+                {sourceSponsoredCreative.headline ? (
+                  <p className={styles.sponsoredHeadline}>{sourceSponsoredCreative.headline}</p>
+                ) : null}
+                {sourceSponsoredCreative.description ? (
+                  <p className={styles.sponsoredDescription}>{sourceSponsoredCreative.description}</p>
+                ) : null}
+              </div>
+              {sourceSponsoredCreative.destinationUrl ? (
+                <a
+                  className={styles.sponsoredCta}
+                  href={sourceSponsoredCreative.destinationUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={onSponsoredCtaClick}
+                >
+                  {sourceSponsoredCtaLabel}
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : media?.length ? (
         <div className={styles.mediaCarousel}>
           {(() => {
             const current = media[mediaIndex];
@@ -3969,32 +4321,64 @@ function FeedCard({
         </div>
       ) : null}
 
-      {imageViewerOpen && media?.[mediaIndex] ? (
+      {!isSponsoredRepost &&
+      sponsoredCreative &&
+      (sponsoredCreative.headline ||
+        sponsoredCreative.description ||
+        sponsoredCreative.destinationUrl) ? (
+        <div className={styles.sponsoredMetaRow}>
+          <div className={styles.sponsoredMetaText}>
+            {sponsoredCreative.headline ? (
+              <p className={styles.sponsoredHeadline}>{sponsoredCreative.headline}</p>
+            ) : null}
+            {sponsoredCreative.description ? (
+              <p className={styles.sponsoredDescription}>{sponsoredCreative.description}</p>
+            ) : null}
+          </div>
+          {sponsoredCreative.destinationUrl ? (
+            <a
+              className={styles.sponsoredCta}
+              href={sponsoredCreative.destinationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={onSponsoredCtaClick}
+            >
+              {sponsoredCtaLabel}
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+
+      {imageViewerOpen && effectiveMedia?.[mediaIndex] ? (
         <ImageViewerOverlay
-          url={media[mediaIndex].url}
-          mediaType={media[mediaIndex].type}
+          url={effectiveMedia[mediaIndex].url}
+          mediaType={effectiveMedia[mediaIndex].type}
           alt={t("media.overlayAlt")}
           onClose={() => setImageViewerOpen(false)}
           onPrevious={
-            media.length > 1
+            effectiveMedia.length > 1
               ? () =>
                   setMediaIndex((prev) =>
-                    media.length ? (prev - 1 + media.length) % media.length : 0,
+                    effectiveMedia.length
+                      ? (prev - 1 + effectiveMedia.length) % effectiveMedia.length
+                      : 0,
                   )
               : undefined
           }
           onNext={
-            media.length > 1
+            effectiveMedia.length > 1
               ? () =>
                   setMediaIndex((prev) =>
-                    media.length ? (prev + 1) % media.length : 0,
+                    effectiveMedia.length ? (prev + 1) % effectiveMedia.length : 0,
                   )
               : undefined
           }
           previousLabel={t("media.previous")}
           nextLabel={t("media.next")}
           counterText={
-            media.length > 1 ? `${mediaIndex + 1}/${media.length}` : undefined
+            effectiveMedia.length > 1
+              ? `${mediaIndex + 1}/${effectiveMedia.length}`
+              : undefined
           }
         />
       ) : null}

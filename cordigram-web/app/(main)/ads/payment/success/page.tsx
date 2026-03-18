@@ -28,16 +28,51 @@ export default function AdsPaymentSuccessPage() {
       return;
     }
 
-    getStripeCheckoutSessionStatus({ token, sessionId })
-      .then((result) => {
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const isPaymentFinalized = (result: StripeCheckoutSessionStatus) =>
+      result.paymentStatus === "paid" ||
+      result.paymentStatus === "no_payment_required" ||
+      result.status === "complete";
+
+    const fetchStatus = async (attempt: number) => {
+      try {
+        const result = await getStripeCheckoutSessionStatus({ token, sessionId });
+        if (cancelled) return;
+
         setStatus(result);
-      })
-      .catch((err) => {
+        setError("");
+
+        if (isPaymentFinalized(result) || attempt >= 6) {
+          setLoading(false);
+          return;
+        }
+
+        retryTimer = setTimeout(() => {
+          void fetchStatus(attempt + 1);
+        }, 2000);
+      } catch (err) {
+        if (cancelled) return;
+
+        if (attempt < 3) {
+          retryTimer = setTimeout(() => {
+            void fetchStatus(attempt + 1);
+          }, 2000);
+          return;
+        }
+
         setError(err instanceof Error ? err.message : "Failed to load payment status.");
-      })
-      .finally(() => {
         setLoading(false);
-      });
+      }
+    };
+
+    void fetchStatus(0);
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [sessionId]);
 
   return (

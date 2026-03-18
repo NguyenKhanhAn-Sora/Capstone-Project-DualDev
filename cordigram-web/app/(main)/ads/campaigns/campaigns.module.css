@@ -1,0 +1,397 @@
+.page {
+  min-height: 100%;
+  padding: 24px;
+  background: var(--color-bg-home);
+  color: var(--color-text);
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.container {
+  width: min(1320px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+}
+
+.secondaryBtn {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.secondaryBtn:hover {
+  border-color: color-mix(in srgb, var(--color-border) 45%, var(--color-primary) 55%);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.statCard {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  padding: 10px 12px;
+}
+
+.statLabel {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.statValue {
+  margin: 5px 0 0;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.card {
+  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  overflow: visible;
+}
+
+.helper {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.filterBar {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 30;
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filtersRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 31;
+}
+
+.filterInput {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.searchInput {
+  width: min(420px, 100%);
+  flex: 1 1 320px;
+}
+
+.filterInlineField {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.filterInlineLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.filterDropdown {
+  position: relative;
+  width: 190px;
+}
+
+.filterDropdownButton {
+  width: 100%;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.filterDropdownButton:hover {
+  border-color: color-mix(in srgb, var(--color-border) 45%, var(--color-primary) 55%);
+}
+
+.filterDropdownButtonOpen {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.filterDropdownText {
+  font-size: 15px;
+  color: var(--color-text);
+}
+
+.filterDropdownChevron {
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.16s ease;
+}
+
+.filterDropdownChevron svg {
+  width: 16px;
+  height: 16px;
+}
+
+.filterDropdownChevronOpen {
+  transform: rotate(180deg);
+}
+
+.filterDropdownMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 120;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.12);
+  display: grid;
+  gap: 4px;
+}
+
+.filterDropdownOption {
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 15px;
+  text-align: left;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.filterDropdownOption:hover {
+  background: var(--color-surface-muted);
+}
+
+.filterDropdownOptionActive {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--color-primary) 18%, var(--color-surface) 82%);
+  color: color-mix(in srgb, var(--color-primary) 72%, var(--color-text) 28%);
+  font-weight: 600;
+}
+
+.dateSelectWrap {
+  width: 280px;
+}
+
+.filterInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+.filterCount {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.clearFilterBtn {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  height: 40px;
+  padding: 0 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+.clearFilterBtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-border) 45%, var(--color-primary) 55%);
+  background: var(--color-surface-muted);
+}
+
+.clearFilterBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.tableWrap {
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  position: relative;
+  z-index: 1;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.table th,
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0.06em;
+}
+
+.table td {
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status_active {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+}
+
+.status_paused {
+  background: rgba(148, 163, 184, 0.2);
+  color: #334155;
+}
+
+.status_hidden {
+  background: rgba(100, 116, 139, 0.2);
+  color: #1f2937;
+}
+
+.status_canceled {
+  background: rgba(220, 38, 38, 0.14);
+  color: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  .status_active {
+    background: rgba(16, 185, 129, 0.25);
+    color: #86efac;
+  }
+
+  .status_paused {
+    background: rgba(148, 163, 184, 0.32);
+    color: #e2e8f0;
+  }
+
+  .status_hidden {
+    background: rgba(100, 116, 139, 0.38);
+    color: #f1f5f9;
+  }
+
+  .status_canceled {
+    background: rgba(220, 38, 38, 0.26);
+    color: #fecaca;
+  }
+}
+
+@media (max-width: 860px) {
+  .headerRow {
+    flex-direction: column;
+  }
+
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filterBar {
+    gap: 8px;
+  }
+
+  .searchRow {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .filtersRow {
+    gap: 8px;
+  }
+
+  .filterInlineField {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .filterDropdown,
+  .dateSelectWrap {
+    width: min(300px, 78%);
+  }
+
+  .filterCount {
+    margin-left: 0;
+  }
+
+  .clearFilterBtn {
+    width: 100%;
+  }
+}

@@ -32,6 +32,10 @@ import {
   ModerationAction,
   ModerationActionSchema,
 } from '../moderation/moderation-action.schema';
+import {
+  PaymentTransaction,
+  PaymentTransactionSchema,
+} from '../payments/payment-transaction.schema';
 
 @Module({
   imports: [
@@ -50,6 +54,7 @@ import {
       { name: PostImpressionEvent.name, schema: PostImpressionEventSchema },
       { name: User.name, schema: UserSchema },
       { name: ModerationAction.name, schema: ModerationActionSchema },
+      { name: PaymentTransaction.name, schema: PaymentTransactionSchema },
     ]),
   ],
   controllers: [PostsController, ReelsController, ExploreController],

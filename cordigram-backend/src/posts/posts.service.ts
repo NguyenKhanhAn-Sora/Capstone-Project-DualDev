@@ -32,6 +32,7 @@ import { PostSchedulerService } from './post-scheduler.service';
 import { User } from '../users/user.schema';
 import { MediaModerationService } from './media-moderation.service';
 import { ModerationAction } from '../moderation/moderation-action.schema';
+import { PaymentTransaction } from '../payments/payment-transaction.schema';
 type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
@@ -43,6 +44,19 @@ const REEL_MAX_DURATION_SECONDS = 90;
 
 @Injectable()
 export class PostsService {
+  private readonly sponsoredDurationDaysByPackage: Record<string, number> = {
+    d3: 3,
+    d7: 7,
+    d14: 14,
+    d30: 30,
+  };
+
+  private readonly sponsoredBoostWeightByPackage: Record<string, number> = {
+    light: 0.15,
+    standard: 0.3,
+    strong: 0.6,
+  };
+
   constructor(
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
@@ -57,6 +71,8 @@ export class PostsService {
     private readonly tasteProfileModel: Model<UserTasteProfile>,
     @InjectModel(PostImpressionEvent.name)
     private readonly impressionEventModel: Model<PostImpressionEvent>,
+    @InjectModel(PaymentTransaction.name)
+    private readonly paymentTransactionModel: Model<PaymentTransaction>,
     private readonly blocksService: BlocksService,
     private readonly cloudinary: CloudinaryService,
     private readonly config: ConfigService,
@@ -618,6 +634,10 @@ export class PostsService {
       username?: string;
       avatarUrl?: string;
     } | null,
+    repostSourcePost?: {
+      content?: string;
+      media?: Post['media'];
+    } | null,
   ) {
     return {
       kind: doc.kind,
@@ -674,6 +694,8 @@ export class PostsService {
             avatarUrl: repostSourceProfile.avatarUrl,
           }
         : undefined,
+      repostSourceContent: repostSourcePost?.content ?? null,
+      repostSourceMedia: repostSourcePost?.media ?? null,
       flags: {
         liked: userFlags?.liked ?? false,
         saved: userFlags?.saved ?? false,
@@ -683,6 +705,291 @@ export class PostsService {
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     };
+  }
+
+  private async getSponsoredBoostByPostId(postIds: string[], now: Date) {
+    if (!postIds.length) {
+      return new Map<string, number>();
+    }
+
+    await this.paymentTransactionModel
+      .updateMany(
+        {
+          promotedPostId: { $in: postIds },
+          isExpiredHidden: { $ne: true },
+          expiresAt: { $lte: now },
+        },
+        {
+          $set: {
+            isExpiredHidden: true,
+            hiddenAt: now,
+            hiddenReason: 'expired',
+          },
+        },
+      )
+      .exec();
+
+    const activeSponsored = await this.paymentTransactionModel
+      .find({
+        promotedPostId: { $in: postIds },
+        isExpiredHidden: { $ne: true },
+        startsAt: { $lte: now },
+        expiresAt: { $gt: now },
+        $or: [
+          { paymentStatus: 'paid' },
+          { paymentStatus: 'no_payment_required' },
+          { checkoutStatus: 'complete' },
+        ],
+      })
+      .select('promotedPostId boostWeight')
+      .lean();
+
+    const boostByPostId = new Map<string, number>();
+    activeSponsored.forEach((item) => {
+      const postId = item.promotedPostId?.toString?.();
+      if (!postId) return;
+      const weight =
+        typeof item.boostWeight === 'number' && Number.isFinite(item.boostWeight)
+          ? Math.max(0, item.boostWeight)
+          : 0;
+      const current = boostByPostId.get(postId) ?? 0;
+      if (weight > current) {
+        boostByPostId.set(postId, weight);
+      }
+    });
+
+    return boostByPostId;
+  }
+
+  private async getSponsoredCtaByPostId(postIds: string[], now: Date) {
+    if (!postIds.length) {
+      return new Map<string, string>();
+    }
+
+    const activeSponsored = await this.paymentTransactionModel
+      .find({
+        promotedPostId: { $in: postIds },
+        isExpiredHidden: { $ne: true },
+        startsAt: { $lte: now },
+        expiresAt: { $gt: now },
+        $or: [
+          { paymentStatus: 'paid' },
+          { paymentStatus: 'no_payment_required' },
+          { checkoutStatus: 'complete' },
+        ],
+      })
+      .select('promotedPostId ctaLabel paidAt createdAt')
+      .sort({ paidAt: -1, createdAt: -1 })
+      .lean();
+
+    const ctaByPostId = new Map<string, string>();
+    activeSponsored.forEach((item) => {
+      const postId = item.promotedPostId?.toString?.();
+      if (!postId || ctaByPostId.has(postId)) return;
+      const cta = (item.ctaLabel ?? '').toString().trim();
+      if (cta) {
+        ctaByPostId.set(postId, cta);
+      }
+    });
+
+    return ctaByPostId;
+  }
+
+  private deriveSponsoredDurationDays(
+    durationPackageId?: string | null,
+    existingDurationDays?: number | null,
+  ) {
+    if (
+      typeof existingDurationDays === 'number' &&
+      Number.isFinite(existingDurationDays) &&
+      existingDurationDays > 0
+    ) {
+      return Math.floor(existingDurationDays);
+    }
+    return this.sponsoredDurationDaysByPackage[durationPackageId ?? ''] ?? 7;
+  }
+
+  private deriveSponsoredBoostWeight(
+    boostPackageId?: string | null,
+    existingBoostWeight?: number | null,
+  ) {
+    if (
+      typeof existingBoostWeight === 'number' &&
+      Number.isFinite(existingBoostWeight) &&
+      existingBoostWeight > 0
+    ) {
+      return existingBoostWeight;
+    }
+    return this.sponsoredBoostWeightByPackage[boostPackageId ?? ''] ?? 0.3;
+  }
+
+  private async normalizeSponsoredCampaigns(now: Date, limit = 200) {
+    const needingBackfill = await this.paymentTransactionModel
+      .find({
+        isExpiredHidden: { $ne: true },
+        $and: [
+          {
+            $or: [
+              { paymentStatus: 'paid' },
+              { paymentStatus: 'no_payment_required' },
+              { checkoutStatus: 'complete' },
+            ],
+          },
+          {
+            $or: [
+              { promotedPostId: null },
+              { startsAt: null },
+              { expiresAt: null },
+              { durationDays: { $exists: false } },
+              { durationDays: { $lte: 0 } },
+              { boostWeight: { $exists: false } },
+              { boostWeight: { $lte: 0 } },
+            ],
+          },
+        ],
+      })
+      .select(
+        'userId promotedPostId startsAt expiresAt paidAt createdAt durationDays durationPackageId boostWeight boostPackageId',
+      )
+      .sort({ paidAt: -1, createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    for (const tx of needingBackfill) {
+      let promotedPostId = tx.promotedPostId?.toString?.() ?? null;
+      if (!promotedPostId && Types.ObjectId.isValid(tx.userId)) {
+        const latestPublishedPost = await this.postModel
+          .findOne({
+            authorId: new Types.ObjectId(tx.userId),
+            status: 'published',
+            visibility: { $ne: 'private' },
+            moderationState: { $in: ['normal', 'restricted', null] },
+            deletedAt: null,
+            publishedAt: { $ne: null },
+          })
+          .sort({ publishedAt: -1, createdAt: -1 })
+          .select('_id')
+          .lean();
+        promotedPostId = latestPublishedPost?._id?.toString?.() ?? null;
+      }
+
+      const durationDays = this.deriveSponsoredDurationDays(
+        tx.durationPackageId,
+        tx.durationDays,
+      );
+      const boostWeight = this.deriveSponsoredBoostWeight(
+        tx.boostPackageId,
+        tx.boostWeight,
+      );
+      const startsAt = tx.startsAt ?? tx.paidAt ?? tx.createdAt ?? now;
+      const expiresAt =
+        tx.expiresAt ??
+        new Date(startsAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
+      const expired = expiresAt.getTime() <= now.getTime();
+
+      await this.paymentTransactionModel
+        .updateOne(
+          { _id: tx._id },
+          {
+            $set: {
+              promotedPostId,
+              durationDays,
+              boostWeight,
+              startsAt,
+              expiresAt,
+              isExpiredHidden: expired,
+              hiddenAt: expired ? now : null,
+              hiddenReason: expired ? 'expired' : null,
+            },
+          },
+        )
+        .exec();
+    }
+  }
+
+  private async getActiveSponsoredPostIds(now: Date, limit = 200) {
+    await this.normalizeSponsoredCampaigns(now, limit);
+
+    await this.paymentTransactionModel
+      .updateMany(
+        {
+          isExpiredHidden: { $ne: true },
+          expiresAt: { $lte: now },
+        },
+        {
+          $set: {
+            isExpiredHidden: true,
+            hiddenAt: now,
+            hiddenReason: 'expired',
+          },
+        },
+      )
+      .exec();
+
+    const activeSponsored = await this.paymentTransactionModel
+      .find({
+        promotedPostId: { $ne: null },
+        isExpiredHidden: { $ne: true },
+        startsAt: { $lte: now },
+        expiresAt: { $gt: now },
+        $or: [
+          { paymentStatus: 'paid' },
+          { paymentStatus: 'no_payment_required' },
+          { checkoutStatus: 'complete' },
+        ],
+      })
+      .select('promotedPostId')
+      .sort({ paidAt: -1, createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    return Array.from(
+      new Set(
+        activeSponsored
+          .map((item) => item.promotedPostId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+  }
+
+  private applySponsoredSpacing(
+    scored: Array<{ post: Post; score: number }>,
+    sponsoredPostIds: Set<string>,
+    pageSize: number,
+  ) {
+    if (!scored.length || !sponsoredPostIds.size) {
+      return scored;
+    }
+
+    const minSpacing = 5;
+    const maxSponsored = Math.max(1, Math.floor(pageSize / minSpacing));
+
+    const arranged: Array<{ post: Post; score: number }> = [];
+    const overflowSponsored: Array<{ post: Post; score: number }> = [];
+    let sponsoredCount = 0;
+    let lastSponsoredIndex = -minSpacing;
+
+    scored.forEach((item) => {
+      const postId = item.post._id?.toString?.() ?? '';
+      const isSponsored = sponsoredPostIds.has(postId);
+      if (!isSponsored) {
+        arranged.push(item);
+        return;
+      }
+
+      const canPlaceBySpacing = arranged.length - lastSponsoredIndex >= minSpacing;
+      if (sponsoredCount < maxSponsored && canPlaceBySpacing) {
+        arranged.push(item);
+        sponsoredCount += 1;
+        lastSponsoredIndex = arranged.length - 1;
+        return;
+      }
+
+      overflowSponsored.push(item);
+    });
+
+    // Keep stable output length by appending overflow campaigns after normal posts.
+    return [...arranged, ...overflowSponsored];
   }
 
   private extractVideoDuration(
@@ -1015,6 +1322,7 @@ export class PostsService {
     const hiddenIds = new Set(
       hidden.map((h) => h.postId?.toString?.()).filter(Boolean),
     );
+    const hiddenObjectIds = Array.from(hiddenIds, (id) => new Types.ObjectId(id));
 
     const followees = await this.followModel
       .find({ followerId: userObjectId })
@@ -1026,6 +1334,13 @@ export class PostsService {
     const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
 
     const now = new Date();
+    const activeSponsoredPostIds = await this.getActiveSponsoredPostIds(
+      now,
+      candidateLimit,
+    );
+    const sponsoredObjectIds = activeSponsoredPostIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
 
     const { blockedIds, blockedByIds } =
       await this.blocksService.getBlockLists(userObjectId);
@@ -1042,7 +1357,7 @@ export class PostsService {
         moderationState: followerVisibleModerationFilter,
         deletedAt: null,
         publishedAt: { $ne: null },
-        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
+        _id: { $nin: hiddenObjectIds },
       })
       .sort({ createdAt: -1 })
       .limit(candidateLimit)
@@ -1057,7 +1372,7 @@ export class PostsService {
         moderationState: followerVisibleModerationFilter,
         deletedAt: null,
         publishedAt: { $ne: null },
-        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
+        _id: { $nin: hiddenObjectIds },
       })
       .sort({ createdAt: -1 })
       .limit(candidateLimit)
@@ -1072,16 +1387,34 @@ export class PostsService {
         moderationState: publicDiscoveryModerationFilter,
         deletedAt: null,
         publishedAt: { $ne: null },
-        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
+        _id: { $nin: hiddenObjectIds },
       })
       .sort({ 'stats.hearts': -1, 'stats.comments': -1, createdAt: -1 })
       .limit(candidateLimit)
       .lean();
 
+    const sponsoredCandidates = sponsoredObjectIds.length
+      ? await this.postModel
+          .find({
+            _id: { $in: sponsoredObjectIds, $nin: hiddenObjectIds },
+            authorId: { $nin: excludedAuthorIds },
+            kind: { $in: allowedKinds },
+            status: 'published',
+            visibility: 'public',
+            moderationState: publicDiscoveryModerationFilter,
+            deletedAt: null,
+            publishedAt: { $ne: null },
+          })
+          .sort({ createdAt: -1 })
+          .limit(candidateLimit)
+          .lean()
+      : [];
+
     const bannedAuthorIds = await this.getBannedAuthorIdSet([
       ...ownedCandidates.map((item) => item.authorId),
       ...followCandidates.map((item) => item.authorId),
       ...exploreCandidates.map((item) => item.authorId),
+      ...sponsoredCandidates.map((item) => item.authorId),
     ]);
 
     const merged: Post[] = [];
@@ -1104,13 +1437,25 @@ export class PostsService {
       seen.add(id);
     };
 
-    [...ownedCandidates, ...followCandidates, ...exploreCandidates].forEach(
-      (raw) => pushCandidate(raw),
-    );
+    [
+      ...ownedCandidates,
+      ...followCandidates,
+      ...exploreCandidates,
+      ...sponsoredCandidates,
+    ].forEach((raw) => pushCandidate(raw));
 
     const mergedIds = merged
       .map((p) => p._id?.toString?.())
       .filter((id): id is string => Boolean(id));
+
+    const sponsoredBoostByPostId = await this.getSponsoredBoostByPostId(
+      mergedIds,
+      now,
+    );
+    const sponsoredCtaByPostId = await this.getSponsoredCtaByPostId(
+      mergedIds,
+      now,
+    );
 
     const viewed = await this.postInteractionModel
       .find({
@@ -1126,7 +1471,13 @@ export class PostsService {
     );
 
     const scored = merged
-      .map((post) => ({ post, score: this.scorePost(post, followeeSet, now) }))
+      .map((post) => {
+        const boost = sponsoredBoostByPostId.get(post._id?.toString?.() ?? '') ?? 0;
+        return {
+          post,
+          score: this.scorePost(post, followeeSet, now, boost),
+        };
+      })
       .sort((a, b) => b.score - a.score);
 
     const prioritizedAll = [
@@ -1138,7 +1489,11 @@ export class PostsService {
       ),
     ];
 
-    let prioritized = prioritizedAll;
+    let prioritized = this.applySponsoredSpacing(
+      prioritizedAll,
+      new Set(sponsoredBoostByPostId.keys()),
+      safeLimit,
+    );
 
     // If mixing post + reel, keep a reasonable ratio so home doesn't become all reels.
     // (Still keeps internal order/score within each kind.)
@@ -1217,6 +1572,10 @@ export class PostsService {
       string,
       (typeof profiles)[number] | null
     >();
+    let repostSourcePostMap = new Map<
+      string,
+      { content?: string; media?: Post['media'] }
+    >();
 
     if (repostSourceIds.length) {
       const repostSources = await this.postModel
@@ -1225,8 +1584,26 @@ export class PostsService {
           deletedAt: null,
           moderationState: 'normal',
         })
-        .select('authorId')
+        .select('authorId content media')
         .lean();
+
+      repostSourcePostMap = new Map(
+        repostSources
+          .map((src) => {
+            const key = src._id?.toString?.();
+            if (!key) return null;
+            return [
+              key,
+              {
+                content: (src as { content?: string }).content ?? '',
+                media: (src as { media?: Post['media'] }).media ?? [],
+              },
+            ] as [string, { content?: string; media?: Post['media'] }];
+          })
+          .filter(Boolean) as Array<
+          [string, { content?: string; media?: Post['media'] }]
+        >,
+      );
 
       const repostAuthorIds = Array.from(
         new Set(
@@ -1286,6 +1663,8 @@ export class PostsService {
       interactionMap.set(key, current);
     });
 
+    const sponsoredPostIdSet = new Set(sponsoredBoostByPostId.keys());
+
     return pagePosts.map((post) => {
       const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
       const baseFlags = interactionMap.get(post._id?.toString?.() ?? '') || {};
@@ -1295,12 +1674,31 @@ export class PostsService {
       const repostProfile = post.repostOf
         ? repostSourceProfileMap.get(post.repostOf.toString()) || null
         : null;
-      return this.toResponse(
+      const repostSourcePost = post.repostOf
+        ? repostSourcePostMap.get(post.repostOf.toString()) || null
+        : null;
+      const response = this.toResponse(
         post,
         profile,
         { ...baseFlags, following },
         repostProfile,
+        repostSourcePost,
       );
+      const postId = post._id?.toString?.() ?? '';
+      const repostSourceId = post.repostOf?.toString?.() ?? '';
+      const isSponsoredPost =
+        sponsoredPostIdSet.has(postId) ||
+        (repostSourceId ? sponsoredPostIdSet.has(repostSourceId) : false);
+      const promotedId = sponsoredPostIdSet.has(postId)
+        ? postId
+        : repostSourceId && sponsoredPostIdSet.has(repostSourceId)
+          ? repostSourceId
+          : '';
+      return {
+        ...response,
+        sponsored: isSponsoredPost,
+        cta: promotedId ? sponsoredCtaByPostId.get(promotedId) ?? '' : '',
+      };
     });
   }
 
@@ -1340,10 +1738,6 @@ export class PostsService {
 
     const followeeIds = followees.map((f) => f.followeeId.toString());
     const followeeSet = new Set(followeeIds);
-    if (!followeeIds.length) {
-      return [];
-    }
-
     const followeeObjectIds = followeeIds.map((id) => new Types.ObjectId(id));
 
     const { blockedIds, blockedByIds } =
@@ -1352,6 +1746,16 @@ export class PostsService {
       new Set([...blockedIds, ...blockedByIds]),
       (id) => new Types.ObjectId(id),
     );
+
+    const now = new Date();
+    const hiddenObjectIds = Array.from(hiddenIds, (id) => new Types.ObjectId(id));
+    const activeSponsoredPostIds = await this.getActiveSponsoredPostIds(
+      now,
+      candidateLimit,
+    );
+    const sponsoredObjectIds = activeSponsoredPostIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
 
     const followCandidates = await this.postModel
       .find({
@@ -1362,14 +1766,34 @@ export class PostsService {
         moderationState: followerVisibleModerationFilter,
         deletedAt: null,
         publishedAt: { $ne: null },
-        _id: { $nin: Array.from(hiddenIds, (id) => new Types.ObjectId(id)) },
+        _id: { $nin: hiddenObjectIds },
       })
       .sort({ createdAt: -1 })
       .limit(candidateLimit)
       .lean();
 
+    const sponsoredCandidates = sponsoredObjectIds.length
+      ? await this.postModel
+          .find({
+            _id: { $in: sponsoredObjectIds, $nin: hiddenObjectIds },
+            authorId: { $nin: excludedAuthorIds },
+            kind: { $in: allowedKinds },
+            status: 'published',
+            visibility: 'public',
+            moderationState: followerVisibleModerationFilter,
+            deletedAt: null,
+            publishedAt: { $ne: null },
+          })
+          .sort({ createdAt: -1 })
+          .limit(candidateLimit)
+          .lean()
+      : [];
+
     const bannedFollowingAuthors = await this.getBannedAuthorIdSet(
-      followCandidates.map((item) => item.authorId),
+      [
+        ...followCandidates.map((item) => item.authorId),
+        ...sponsoredCandidates.map((item) => item.authorId),
+      ],
     );
 
     const merged: Post[] = [];
@@ -1391,9 +1815,39 @@ export class PostsService {
       seen.add(id);
     };
 
-    followCandidates.forEach((raw) => pushCandidate(raw));
+    [...followCandidates, ...sponsoredCandidates].forEach((raw) =>
+      pushCandidate(raw),
+    );
 
-    const topPosts = merged.slice(sliceStart, sliceEnd);
+    const mergedIds = merged
+      .map((p) => p._id?.toString?.())
+      .filter((id): id is string => Boolean(id));
+    const sponsoredBoostByPostId = await this.getSponsoredBoostByPostId(
+      mergedIds,
+      now,
+    );
+    const sponsoredCtaByPostId = await this.getSponsoredCtaByPostId(
+      mergedIds,
+      now,
+    );
+
+    const scored = merged
+      .map((post) => {
+        const boost = sponsoredBoostByPostId.get(post._id?.toString?.() ?? '') ?? 0;
+        return {
+          post,
+          score: this.scorePost(post, followeeSet, now, boost),
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const prioritized = this.applySponsoredSpacing(
+      scored,
+      new Set(sponsoredBoostByPostId.keys()),
+      safeLimit,
+    );
+
+    const topPosts = prioritized.slice(sliceStart, sliceEnd).map((item) => item.post);
 
     const authorIds = Array.from(
       new Set(
@@ -1422,6 +1876,10 @@ export class PostsService {
       string,
       (typeof profiles)[number] | null
     >();
+    let repostSourcePostMap = new Map<
+      string,
+      { content?: string; media?: Post['media'] }
+    >();
 
     if (repostSourceIds.length) {
       const repostSources = await this.postModel
@@ -1430,8 +1888,26 @@ export class PostsService {
           deletedAt: null,
           moderationState: 'normal',
         })
-        .select('authorId')
+        .select('authorId content media')
         .lean();
+
+      repostSourcePostMap = new Map(
+        repostSources
+          .map((src) => {
+            const key = src._id?.toString?.();
+            if (!key) return null;
+            return [
+              key,
+              {
+                content: (src as { content?: string }).content ?? '',
+                media: (src as { media?: Post['media'] }).media ?? [],
+              },
+            ] as [string, { content?: string; media?: Post['media'] }];
+          })
+          .filter(Boolean) as Array<
+          [string, { content?: string; media?: Post['media'] }]
+        >,
+      );
 
       const repostAuthorIds = Array.from(
         new Set(
@@ -1491,6 +1967,8 @@ export class PostsService {
       interactionMap.set(key, current);
     });
 
+    const sponsoredPostIdSet = new Set(sponsoredBoostByPostId.keys());
+
     return topPosts.map((post) => {
       const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
       const baseFlags = interactionMap.get(post._id?.toString?.() ?? '') || {};
@@ -1500,12 +1978,31 @@ export class PostsService {
       const repostProfile = post.repostOf
         ? repostSourceProfileMap.get(post.repostOf.toString()) || null
         : null;
-      return this.toResponse(
+      const repostSourcePost = post.repostOf
+        ? repostSourcePostMap.get(post.repostOf.toString()) || null
+        : null;
+      const response = this.toResponse(
         post,
         profile,
         { ...baseFlags, following },
         repostProfile,
+        repostSourcePost,
       );
+      const postId = post._id?.toString?.() ?? '';
+      const repostSourceId = post.repostOf?.toString?.() ?? '';
+      const isSponsoredPost =
+        sponsoredPostIdSet.has(postId) ||
+        (repostSourceId ? sponsoredPostIdSet.has(repostSourceId) : false);
+      const promotedId = sponsoredPostIdSet.has(postId)
+        ? postId
+        : repostSourceId && sponsoredPostIdSet.has(repostSourceId)
+          ? repostSourceId
+          : '';
+      return {
+        ...response,
+        sponsored: isSponsoredPost,
+        cta: promotedId ? sponsoredCtaByPostId.get(promotedId) ?? '' : '',
+      };
     });
   }
 
@@ -3486,7 +3983,12 @@ export class PostsService {
     };
   }
 
-  private scorePost(post: Post, followeeSet: Set<string>, now: Date) {
+  private scorePost(
+    post: Post,
+    followeeSet: Set<string>,
+    now: Date,
+    sponsoredBoostWeight = 0,
+  ) {
     const createdAt = post.createdAt ? new Date(post.createdAt) : now;
     const ageHours = Math.max(
       0.1,
@@ -3509,7 +4011,9 @@ export class PostsService {
       ? 1.3
       : 1;
 
-    return (engagement + 1) * freshness * qualityBoost * relationshipBoost;
+    const baseScore = (engagement + 1) * freshness * qualityBoost * relationshipBoost;
+    const sponsoredBoost = 1 + Math.max(0, sponsoredBoostWeight);
+    return baseScore * sponsoredBoost;
   }
 
   private async upsertUniqueInteraction(

@@ -35,6 +35,7 @@ import {
   updatePostNotificationMute,
   pinComment,
   unpinComment,
+  getAdsDashboard,
   searchProfiles,
   uploadCommentMedia,
   type CommentItem,
@@ -229,6 +230,91 @@ const extractMentionsFromCaption = (value: string) => {
   return Array.from(handles);
 };
 
+const parseSponsoredCreative = (value: string) => {
+  const raw = (value || "").replace(/\r/g, "").trim();
+  if (!raw) return null;
+
+  const extractBlock = (name: string) => {
+    const pattern = new RegExp(
+      `\\[\\[AD_${name}\\]\\]([\\s\\S]*?)\\[\\[\\/AD_${name}\\]\\]`,
+      "i",
+    );
+    const matched = pattern.exec(raw);
+    if (!matched) return "";
+    return matched[1]?.replace(/^\n+|\n+$/g, "") ?? "";
+  };
+
+  const structuredPrimaryText = extractBlock("PRIMARY_TEXT");
+  const structuredHeadline = extractBlock("HEADLINE");
+  const structuredDescription = extractBlock("DESCRIPTION");
+  const structuredDestinationUrl = extractBlock("URL");
+  const structuredCta = extractBlock("CTA");
+
+  if (
+    structuredPrimaryText ||
+    structuredHeadline ||
+    structuredDescription ||
+    structuredDestinationUrl ||
+    structuredCta
+  ) {
+    return {
+      primaryText: structuredPrimaryText,
+      headline: structuredHeadline,
+      description: structuredDescription,
+      destinationUrl: structuredDestinationUrl || null,
+      cta: structuredCta,
+    };
+  }
+
+  const blocks = raw
+    .split(/\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!blocks.length) return null;
+
+  const primaryText = blocks[0];
+  const details = blocks
+    .slice(1)
+    .join("\n")
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  let destinationUrl: string | null = null;
+  let destinationIndex = -1;
+  for (let idx = details.length - 1; idx >= 0; idx -= 1) {
+    if (/^https?:\/\//i.test(details[idx])) {
+      destinationUrl = details[idx];
+      destinationIndex = idx;
+      break;
+    }
+  }
+
+  const metaLines =
+    destinationIndex >= 0
+      ? details.filter((_, idx) => idx !== destinationIndex)
+      : details;
+
+  let cta = "";
+  const metaLinesWithoutCta: string[] = [];
+  metaLines.forEach((line) => {
+    const matched = /^cta\s*:\s*(.+)$/i.exec(line);
+    if (matched && !cta) {
+      cta = matched[1]?.trim() ?? "";
+      return;
+    }
+    metaLinesWithoutCta.push(line);
+  });
+
+  return {
+    primaryText,
+    headline: metaLinesWithoutCta[0] ?? "",
+    description: metaLinesWithoutCta.slice(1).join(" "),
+    destinationUrl,
+    cta,
+  };
+};
+
 const findActiveMention = (value: string, caret: number) => {
   const beforeCaret = value.slice(0, caret);
   const match = /(^|[\s([{.,!?])@([a-zA-Z0-9_.]{0,30})$/i.exec(beforeCaret);
@@ -355,6 +441,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   const profileNavProfileId = (searchParams?.get("profileId") || "").trim();
   const [token, setToken] = useState<string | null>(null);
   const [post, setPost] = useState<FeedItem | null>(null);
+  const [adsCampaignIdForPost, setAdsCampaignIdForPost] = useState<string | null>(null);
   const [profilePostIds, setProfilePostIds] = useState<string[]>([]);
   const [captionMentionMap, setCaptionMentionMap] = useState<
     Record<string, string>
@@ -1406,6 +1493,32 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   }, [post?.authorId, post?.authorUsername, router]);
 
   const canonicalPostId = post?.repostOf || postId;
+  const adTargetPostId = post?.repostOf || post?.id || postId;
+
+  useEffect(() => {
+    if (!token || !adTargetPostId) {
+      setAdsCampaignIdForPost(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const dashboard = await getAdsDashboard({ token });
+        if (cancelled) return;
+        const matchedCampaign = (dashboard.campaigns ?? []).find(
+          (item) => item.promotedPostId === adTargetPostId,
+        );
+        setAdsCampaignIdForPost(matchedCampaign?.id ?? null);
+      } catch {
+        if (!cancelled) setAdsCampaignIdForPost(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adTargetPostId, token]);
 
   const profilePostIndex = useMemo(() => {
     if (!profilePostIds.length) return -1;
@@ -1497,6 +1610,19 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     return Boolean(sameId || sameUsername);
   }, [post, viewer, viewerUserId]);
 
+  const isRepostSourceAuthor = useMemo(() => {
+    if (!post || !viewer) return false;
+    const repostAuthorId = post.repostOfAuthorId || post.repostOfAuthor?.id;
+    const repostAuthorUsername =
+      post.repostOfAuthorUsername || post.repostOfAuthor?.username;
+    const sameId = viewerUserId && repostAuthorId && viewerUserId === repostAuthorId;
+    const sameUsername =
+      viewer.username &&
+      repostAuthorUsername &&
+      viewer.username.toLowerCase() === repostAuthorUsername.toLowerCase();
+    return Boolean(sameId || sameUsername);
+  }, [post, viewer, viewerUserId]);
+
   const isReachRestricted = post?.moderationState === "restricted";
 
   const isMutedForPost = useMemo(() => {
@@ -1516,6 +1642,45 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     setToastMessage(message);
     toastTimerRef.current = setTimeout(() => setToastMessage(null), duration);
   }, []);
+
+  const openAdsDetailPage = useCallback(async () => {
+    setShowMoreMenu(false);
+    if (!token) {
+      showToast("Please login to view ads detail");
+      return;
+    }
+
+    if (adsCampaignIdForPost) {
+      const href = `/ads/campaigns/${adsCampaignIdForPost}`;
+      if (typeof window !== "undefined") {
+        window.location.href = href;
+      } else {
+        router.push(href);
+      }
+      return;
+    }
+
+    try {
+      const dashboard = await getAdsDashboard({ token });
+      const matchedCampaign = (dashboard.campaigns ?? []).find(
+        (item) => item.promotedPostId === adTargetPostId,
+      );
+
+      if (!matchedCampaign?.id) {
+        showToast("Ads detail not found for this post");
+        return;
+      }
+
+      const href = `/ads/campaigns/${matchedCampaign.id}`;
+      if (typeof window !== "undefined") {
+        window.location.href = href;
+      } else {
+        router.push(href);
+      }
+    } catch {
+      showToast("Failed to open ads detail");
+    }
+  }, [adTargetPostId, adsCampaignIdForPost, router, showToast, token]);
 
   const openMuteModal = () => {
     setMuteError("");
@@ -2193,6 +2358,52 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     };
   }, []);
 
+  const parsedCreativeFromContent = useMemo(
+    () => parseSponsoredCreative(post?.content || ""),
+    [post?.content],
+  );
+  const adHeadline = ((post as any)?.headline ?? "").toString().trim();
+  const adDescription = ((post as any)?.adDescription ?? "").toString().trim();
+  const adDestinationUrl =
+    ((post as any)?.destinationUrl ?? "").toString().trim() ||
+    (parsedCreativeFromContent?.destinationUrl ?? "").toString().trim();
+  const adCtaLabel =
+    ((post as any)?.cta ?? "").toString().trim() ||
+    (parsedCreativeFromContent?.cta ?? "").toString().trim();
+  const hasStructuredAdContent = Boolean(
+    parsedCreativeFromContent?.destinationUrl &&
+      (parsedCreativeFromContent?.headline || parsedCreativeFromContent?.description),
+  );
+  const isSponsoredPostUi = Boolean(
+    post?.sponsored ||
+      adsCampaignIdForPost ||
+      adHeadline ||
+      adDescription ||
+      adDestinationUrl ||
+      adCtaLabel ||
+      hasStructuredAdContent,
+  );
+  const showAdsOwnerMenu = Boolean(
+    isSponsoredPostUi && (isAuthor || isRepostSourceAuthor),
+  );
+  const sponsoredCreative = isSponsoredPostUi
+    ? {
+        primaryText:
+          parsedCreativeFromContent?.primaryText?.trim() || post?.content || "",
+        headline: adHeadline || parsedCreativeFromContent?.headline || "",
+        description: adDescription || parsedCreativeFromContent?.description || "",
+        destinationUrl: adDestinationUrl || null,
+      }
+    : null;
+  const captionDisplayText =
+    sponsoredCreative?.primaryText?.trim() || post?.content || "";
+  const hasSponsoredMeta = Boolean(
+    sponsoredCreative &&
+      (sponsoredCreative.headline ||
+        sponsoredCreative.description ||
+        sponsoredCreative.destinationUrl),
+  );
+
   useEffect(() => {
     const el = captionRef.current;
     if (!el) return;
@@ -2205,7 +2416,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       setCaptionCollapsed((prev) => (shouldCollapse ? true : prev));
     };
     measure();
-  }, [post?.content]);
+  }, [captionDisplayText]);
 
   useEffect(() => {
     return () => {
@@ -3835,14 +4046,14 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   }, [viewer?.username, viewerUserId]);
 
   const captionNodes = useMemo(() => {
-    if (!post?.content) return null;
-    const content = post.content;
+    const content = captionDisplayText;
+    if (!content) return null;
     const parts: Array<string | JSX.Element> = [];
     const normalizedMentions = new Set(
-      (post.mentions || []).map((m) => m.toLowerCase()),
+      (post?.mentions || []).map((m) => m.toLowerCase()),
     );
     const normalizedHashtags = new Set(
-      (post.hashtags || []).map((tag) => tag.toLowerCase()),
+      (post?.hashtags || []).map((tag) => tag.toLowerCase()),
     );
     const pushText = (text: string, keyBase: string) => {
       const chunks = text.split("\n");
@@ -3905,7 +4116,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       pushText(content.slice(lastIndex), `text-tail-${lastIndex}`);
     }
     return parts;
-  }, [post?.content, post?.mentions, post?.hashtags, captionMentionMap]);
+  }, [captionDisplayText, post?.mentions, post?.hashtags, captionMentionMap]);
 
   useEffect(() => {
     if (commentsLocked) {
@@ -4669,6 +4880,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 </div>
               )
             ) : null}
+            {isSponsoredPostUi ? (
+              <span className={styles.sponsoredMarker}>Sponsored</span>
+            ) : null}
           </span>
           <span>
             {post?.authorId &&
@@ -4740,7 +4954,34 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           </button>
           {showMoreMenu ? (
             <div className={styles.moreMenu} role="menu">
-              {isAuthor ? (
+              {showAdsOwnerMenu ? (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.moreMenuItem}
+                      role="menuitem"
+                      onClick={copyPermalink}
+                    >
+                      Copy link
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.moreMenuItem}
+                      role="menuitem"
+                      onClick={goToPostPage}
+                    >
+                      Go to ads
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.moreMenuItem}
+                      role="menuitem"
+                      onClick={openAdsDetailPage}
+                    >
+                      Ads detail
+                    </button>
+                  </>
+              ) : isAuthor ? (
                 <>
                   <button
                     type="button"
@@ -4806,7 +5047,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       role="menuitem"
                       onClick={goToPostPage}
                     >
-                      Go to post
+                      Go to ads
                     </button>
                   ) : null}
                   <button
@@ -4881,7 +5122,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       role="menuitem"
                       onClick={goToPostPage}
                     >
-                      Go to post
+                      Go to ads
                     </button>
                   ) : null}
                   <button
@@ -5031,25 +5272,54 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               <div className={styles.infoScrollArea}>
                 {header}
                 <div className={styles.infoContent}>
-                  <div
-                    ref={captionRef}
-                    className={`${styles.captionBlock} ${
-                      styles.captionCollapsible
-                    } ${
-                      captionCollapsed && captionCanExpand
-                        ? styles.captionCollapsed
-                        : ""
-                    }`}
-                  >
-                    {captionNodes || post.content}
-                  </div>
-                  {captionCanExpand ? (
-                    <button
-                      className={styles.seeMore}
-                      onClick={() => setCaptionCollapsed((prev) => !prev)}
-                    >
-                      {captionCollapsed ? "See more" : "Collapse"}
-                    </button>
+                  {captionDisplayText ? (
+                    <>
+                      <div
+                        ref={captionRef}
+                        className={`${styles.captionBlock} ${
+                          styles.captionCollapsible
+                        } ${
+                          captionCollapsed && captionCanExpand
+                            ? styles.captionCollapsed
+                            : ""
+                        }`}
+                      >
+                        {captionNodes || captionDisplayText}
+                      </div>
+                      {captionCanExpand ? (
+                        <button
+                          className={styles.seeMore}
+                          onClick={() => setCaptionCollapsed((prev) => !prev)}
+                        >
+                          {captionCollapsed ? "See more" : "Collapse"}
+                        </button>
+                      ) : null}
+                    </>
+                  ) : null}
+
+                  {hasSponsoredMeta && sponsoredCreative ? (
+                    <div className={feedStyles.sponsoredMetaRow}>
+                      <div className={feedStyles.sponsoredMetaText}>
+                        {sponsoredCreative.headline ? (
+                          <p className={feedStyles.sponsoredHeadline}>{sponsoredCreative.headline}</p>
+                        ) : null}
+                        {sponsoredCreative.description ? (
+                          <p className={feedStyles.sponsoredDescription}>
+                            {sponsoredCreative.description}
+                          </p>
+                        ) : null}
+                      </div>
+                      {sponsoredCreative.destinationUrl ? (
+                        <a
+                          className={feedStyles.sponsoredCta}
+                          href={sponsoredCreative.destinationUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {adCtaLabel || "Shop Now"}
+                        </a>
+                      ) : null}
+                    </div>
                   ) : null}
 
                   {(post.location || (post.hashtags?.length || 0) > 0) && (

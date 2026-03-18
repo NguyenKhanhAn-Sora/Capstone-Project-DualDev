@@ -3,70 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { getMyAdsCreationStatus } from "@/lib/api";
+import { getAdsDashboard, type AdsDashboardResponse } from "@/lib/api";
 import styles from "./ads.module.css";
-
-type AdStatus = "active" | "draft" | "review" | "paused";
-
-type AdCampaign = {
-  id: string;
-  name: string;
-  status: AdStatus;
-  budget: number;
-  spent: number;
-  impressions: number;
-  clicks: number;
-  conversions: number;
-};
-
-type DailyMetric = {
-  day: string;
-  spend: number;
-  clicks: number;
-};
-
-const DEMO_CAMPAIGNS: AdCampaign[] = [
-  {
-    id: "ad-01",
-    name: "Summer Combo 2026",
-    status: "active",
-    budget: 2500000,
-    spent: 1240000,
-    impressions: 35200,
-    clicks: 1278,
-    conversions: 102,
-  },
-  {
-    id: "ad-02",
-    name: "App Install - Students",
-    status: "review",
-    budget: 1800000,
-    spent: 420000,
-    impressions: 11300,
-    clicks: 366,
-    conversions: 38,
-  },
-  {
-    id: "ad-03",
-    name: "Retargeting 7 days",
-    status: "paused",
-    budget: 3000000,
-    spent: 910000,
-    impressions: 18900,
-    clicks: 712,
-    conversions: 59,
-  },
-];
-
-const DEMO_TREND: DailyMetric[] = [
-  { day: "Mon", spend: 180000, clicks: 155 },
-  { day: "Tue", spend: 220000, clicks: 193 },
-  { day: "Wed", spend: 200000, clicks: 174 },
-  { day: "Thu", spend: 260000, clicks: 228 },
-  { day: "Fri", spend: 240000, clicks: 216 },
-  { day: "Sat", spend: 110000, clicks: 101 },
-  { day: "Sun", spend: 30000, clicks: 28 },
-];
 
 const money = (value: number) =>
   new Intl.NumberFormat("en-US", {
@@ -79,11 +17,12 @@ const integer = (value: number) => new Intl.NumberFormat("en-US").format(value);
 
 const pct = (value: number) => `${value.toFixed(2)}%`;
 
-function statusLabel(status: AdStatus) {
+function statusLabel(status: "active" | "hidden" | "paused" | "canceled" | "completed") {
   if (status === "active") return "Active";
-  if (status === "review") return "In Review";
+  if (status === "hidden") return "Hidden";
   if (status === "paused") return "Paused";
-  return "Draft";
+  if (status === "canceled") return "Canceled";
+  return "Completed";
 }
 
 function EmptyMegaphoneIcon() {
@@ -151,8 +90,9 @@ function CreativeIcon() {
 export default function AdsPage() {
   const canRender = useRequireAuth();
   const router = useRouter();
-  const [hasCreatedAnyAd, setHasCreatedAnyAd] = useState(false);
-  const [loadingCreationStatus, setLoadingCreationStatus] = useState(true);
+  const [dashboard, setDashboard] = useState<AdsDashboardResponse | null>(null);
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -161,26 +101,28 @@ export default function AdsPage() {
       window.localStorage.getItem("token");
 
     if (!token) {
-      setHasCreatedAnyAd(false);
-      setLoadingCreationStatus(false);
+      setDashboard(null);
+      setLoadingDashboard(false);
       return;
     }
 
     let cancelled = false;
-    setLoadingCreationStatus(true);
+    setLoadingDashboard(true);
+    setLoadError("");
 
-    getMyAdsCreationStatus({ token })
+    getAdsDashboard({ token })
       .then((result) => {
         if (cancelled) return;
-        setHasCreatedAnyAd(result.hasCreatedAds === true);
+        setDashboard(result);
       })
-      .catch(() => {
+      .catch((error) => {
         if (cancelled) return;
-        setHasCreatedAnyAd(false);
+        setDashboard(null);
+        setLoadError(error instanceof Error ? error.message : "Failed to load ads dashboard.");
       })
       .finally(() => {
         if (cancelled) return;
-        setLoadingCreationStatus(false);
+        setLoadingDashboard(false);
       });
 
     return () => {
@@ -188,48 +130,52 @@ export default function AdsPage() {
     };
   }, []);
 
-  const summary = useMemo(() => {
-    if (!hasCreatedAnyAd) {
-      return {
+  const hasCreatedAnyAd = (dashboard?.campaigns?.length ?? 0) > 0;
+
+  const summary = useMemo(
+    () =>
+      dashboard?.summary ?? {
         totalBudget: 0,
         totalSpent: 0,
         impressions: 0,
+        reach: 0,
         clicks: 0,
-        conversions: 0,
-        ctr: 0,
-        cvr: 0,
+        views: 0,
+        likes: 0,
+        comments: 0,
+        reposts: 0,
+        engagements: 0,
+        totalDwellMs: 0,
+        dwellSamples: 0,
         activeCount: 0,
-      };
-    }
+        ctr: 0,
+        averageDwellMs: 0,
+        engagementRate: 0,
+      },
+    [dashboard],
+  );
 
-    const totalBudget = DEMO_CAMPAIGNS.reduce((acc, item) => acc + item.budget, 0);
-    const totalSpent = DEMO_CAMPAIGNS.reduce((acc, item) => acc + item.spent, 0);
-    const impressions = DEMO_CAMPAIGNS.reduce((acc, item) => acc + item.impressions, 0);
-    const clicks = DEMO_CAMPAIGNS.reduce((acc, item) => acc + item.clicks, 0);
-    const conversions = DEMO_CAMPAIGNS.reduce((acc, item) => acc + item.conversions, 0);
-    const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
-    const cvr = clicks > 0 ? (conversions / clicks) * 100 : 0;
-    const activeCount = DEMO_CAMPAIGNS.filter((item) => item.status === "active").length;
-
-    return {
-      totalBudget,
-      totalSpent,
-      impressions,
-      clicks,
-      conversions,
-      ctr,
-      cvr,
-      activeCount,
-    };
-  }, [hasCreatedAnyAd]);
+  const trendData = dashboard?.trend ?? [];
+  const campaigns = dashboard?.campaigns ?? [];
+  const activeCampaignsPreview = useMemo(
+    () =>
+      campaigns
+        .filter((item) => item.status === "active")
+        .sort(
+          (a, b) =>
+            new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime(),
+        )
+        .slice(0, 5),
+    [campaigns],
+  );
 
   const maxTrendSpend = useMemo(
-    () => Math.max(...DEMO_TREND.map((item) => item.spend), 1),
-    [],
+    () => Math.max(...trendData.map((item) => item.impressions), 1),
+    [trendData],
   );
 
   if (!canRender) return null;
-  if (loadingCreationStatus) {
+  if (loadingDashboard) {
     return (
       <div className={styles.page}>
         <div className={styles.backdropShape} aria-hidden />
@@ -248,6 +194,7 @@ export default function AdsPage() {
               <EmptyMegaphoneIcon />
             </div>
             <h2 className={styles.emptyTitle}>No ads yet</h2>
+            {loadError ? <p className={styles.cardSubtitle}>{loadError}</p> : null}
 
             <div className={styles.emptyChecklist}>
               <div className={styles.checkItem}>
@@ -286,7 +233,7 @@ export default function AdsPage() {
           <section className={styles.dashboardTop}>
             <button
               type="button"
-              className={styles.primaryBtn}
+              className={`${styles.primaryBtn} ${styles.primaryBtnCompact}`}
               onClick={() => router.push("/ads/create")}
             >
               Create new ad
@@ -303,21 +250,19 @@ export default function AdsPage() {
             <article className={styles.metricCard}>
               <p className={styles.metricLabel}>Impressions</p>
               <p className={styles.metricValue}>{integer(summary.impressions)}</p>
-              <p className={styles.metricHint}>Clicks: {integer(summary.clicks)}</p>
+              <p className={styles.metricHint}>Reach: {integer(summary.reach)}</p>
             </article>
 
             <article className={styles.metricCard}>
               <p className={styles.metricLabel}>Average CTR</p>
               <p className={styles.metricValue}>{pct(summary.ctr)}</p>
-              <p className={styles.metricHint}>CVR: {pct(summary.cvr)}</p>
+              <p className={styles.metricHint}>Clicks: {integer(summary.clicks)}</p>
             </article>
 
             <article className={styles.metricCard}>
-              <p className={styles.metricLabel}>Running campaigns</p>
+              <p className={styles.metricLabel}>Active campaigns</p>
               <p className={styles.metricValue}>{summary.activeCount}</p>
-              <p className={styles.metricHint}>
-                Total conversions: {integer(summary.conversions)}
-              </p>
+              <p className={styles.metricHint}>Live campaigns currently running</p>
             </article>
           </section>
 
@@ -325,24 +270,24 @@ export default function AdsPage() {
             <article className={styles.chartCard}>
               <div className={styles.cardHead}>
                 <div>
-                  <h3 className={styles.cardTitle}>7-day spend trend</h3>
+                  <h3 className={styles.cardTitle}>7-day impressions trend</h3>
                   <p className={styles.cardSubtitle}>
-                    Track how your budget and clicks have changed recently.
+                    Track ad delivery and CTA clicks over the last 7 days.
                   </p>
                 </div>
               </div>
 
               <div className={styles.chartBars}>
-                {DEMO_TREND.map((item) => (
+                {trendData.map((item) => (
                   <div key={item.day} className={styles.barCol}>
                     <div
                       className={styles.bar}
                       style={{
-                        height: `${Math.max((item.spend / maxTrendSpend) * 100, 8)}%`,
+                        height: `${Math.max((item.impressions / maxTrendSpend) * 100, 8)}%`,
                       }}
-                      title={`${item.day}: ${money(item.spend)} - ${integer(item.clicks)} clicks`}
+                      title={`${item.day}: ${integer(item.impressions)} impressions - ${integer(item.clicks)} clicks`}
                     />
-                    <span className={styles.barLabel}>{item.day}</span>
+                    <span className={styles.barLabel}>{item.day.slice(5)}</span>
                   </div>
                 ))}
               </div>
@@ -353,9 +298,16 @@ export default function AdsPage() {
                 <div>
                   <h3 className={styles.cardTitle}>Ad campaigns</h3>
                   <p className={styles.cardSubtitle}>
-                    Quick view of campaign performance and status.
+                    Quick view of your 5 latest active campaigns.
                   </p>
                 </div>
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  onClick={() => router.push("/ads/campaigns")}
+                >
+                  View all
+                </button>
               </div>
 
               <div className={styles.tableWrap}>
@@ -365,27 +317,45 @@ export default function AdsPage() {
                       <th>Campaign</th>
                       <th>Status</th>
                       <th>Spent</th>
+                      <th>Impr.</th>
                       <th>CTR</th>
                       <th>Clicks</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {DEMO_CAMPAIGNS.map((item) => {
-                      const adCtr = item.impressions > 0 ? (item.clicks / item.impressions) * 100 : 0;
+                    {activeCampaignsPreview.map((item) => {
                       return (
                         <tr key={item.id}>
-                          <td>{item.name}</td>
+                          <td>{item.campaignName}</td>
                           <td>
-                            <span className={`${styles.status} ${styles[`status_${item.status}`]}`}>
+                            <span
+                              className={`${styles.status} ${styles[`status_${item.status === "active" ? "active" : item.status === "hidden" ? "hidden" : item.status === "canceled" ? "canceled" : "paused"}`]}`}
+                            >
                               {statusLabel(item.status)}
                             </span>
                           </td>
                           <td>{money(item.spent)}</td>
-                          <td>{pct(adCtr)}</td>
+                          <td>{integer(item.impressions)}</td>
+                          <td>{pct(item.ctr)}</td>
                           <td>{integer(item.clicks)}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className={styles.secondaryBtn}
+                              onClick={() => router.push(`/ads/campaigns/${item.id}`)}
+                            >
+                              Details
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
+                    {activeCampaignsPreview.length === 0 ? (
+                      <tr>
+                        <td colSpan={8}>No active campaigns right now.</td>
+                      </tr>
+                    ) : null}
                   </tbody>
                 </table>
               </div>
