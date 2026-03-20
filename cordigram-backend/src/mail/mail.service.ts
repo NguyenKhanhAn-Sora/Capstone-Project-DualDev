@@ -31,6 +31,217 @@ export class MailService {
       .replace(/\b\w/g, (char) => char.toUpperCase());
   }
 
+  private escapeHtml(input?: string | null): string {
+    return (input ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  private formatCurrency(amount: number, currency?: string | null): string {
+    const normalized = (currency ?? 'vnd').toUpperCase();
+    const safeAmount = Number.isFinite(amount) ? amount : 0;
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: normalized,
+      maximumFractionDigits: 0,
+    }).format(safeAmount);
+  }
+
+  async sendAdsPaymentSuccessEmail(params: {
+    email: string;
+    campaignName?: string | null;
+    actionType?: string | null;
+    sessionId: string;
+    paymentIntentId?: string | null;
+    paidAt?: Date | null;
+    amountTotal: number;
+    currency?: string | null;
+    objective?: string | null;
+    adFormat?: string | null;
+    placement?: string | null;
+    boostPackageId?: string | null;
+    durationPackageId?: string | null;
+    durationDays?: number | null;
+    targetLocation?: string | null;
+    targetAgeMin?: number | null;
+    targetAgeMax?: number | null;
+    ctaLabel?: string | null;
+    destinationUrl?: string | null;
+    interests?: string[];
+    mediaCount?: number;
+    targetCampaignId?: string | null;
+  }): Promise<void> {
+    const campaignName = params.campaignName?.trim() || 'Cordigram Ads Campaign';
+    const paidAtText = params.paidAt
+      ? new Intl.DateTimeFormat('en-US', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(params.paidAt)
+      : 'Confirmed';
+    const amountText = this.formatCurrency(params.amountTotal, params.currency);
+    const ageRange =
+      Number.isFinite(params.targetAgeMin) && Number.isFinite(params.targetAgeMax)
+        ? `${params.targetAgeMin} - ${params.targetAgeMax}`
+        : 'No limit';
+    const interests = (params.interests ?? []).map((v) => v.trim()).filter(Boolean);
+
+    const boostCatalog: Record<string, { label: string; price: number }> = {
+      light: { label: 'Light Boost', price: 79000 },
+      standard: { label: 'Standard Boost', price: 149000 },
+      strong: { label: 'Strong Boost', price: 299000 },
+    };
+
+    const durationCatalog: Record<string, { label: string; price: number }> = {
+      none: { label: 'No extension', price: 0 },
+      d3: { label: '3 days', price: 29000 },
+      d7: { label: '7 days', price: 59000 },
+      d14: { label: '14 days', price: 99000 },
+      d30: { label: '30 days', price: 179000 },
+    };
+
+    const boostInfo = boostCatalog[params.boostPackageId ?? ''];
+    const durationInfo = durationCatalog[params.durationPackageId ?? ''];
+
+    const boostPackageSummary = boostInfo
+      ? `${boostInfo.label} (${this.formatCurrency(boostInfo.price, params.currency)})`
+      : params.boostPackageId?.trim() || 'N/A';
+
+    const durationLabelFromDays = Number.isFinite(params.durationDays)
+      ? `${params.durationDays} days`
+      : 'N/A';
+    const durationPackageSummary = durationInfo
+      ? `${durationInfo.label} (${this.formatCurrency(durationInfo.price, params.currency)})`
+      : params.durationPackageId?.trim()
+        ? `${params.durationPackageId.trim()} (${durationLabelFromDays})`
+        : 'N/A';
+
+    const subject = `Cordigram Ads - Payment Successful: ${campaignName}`;
+    const text = [
+      'Your ad campaign has been created successfully on Cordigram.',
+      `Campaign: ${campaignName}`,
+      `Total paid: ${amountText}`,
+      `Paid at: ${paidAtText}`,
+      `Boost package: ${boostPackageSummary}`,
+      `Duration package: ${durationPackageSummary}`,
+      params.paymentIntentId ? `Payment Intent: ${params.paymentIntentId}` : null,
+      '',
+      'Invoice details:',
+      `- Objective: ${params.objective || 'N/A'}`,
+      `- Ad format: ${params.adFormat || 'N/A'}`,
+      `- Target location: ${params.targetLocation || 'N/A'}`,
+      `- Target age: ${ageRange}`,
+      `- CTA: ${params.ctaLabel || 'N/A'}`,
+      `- Destination URL: ${params.destinationUrl || 'N/A'}`,
+      `- Media count: ${params.mediaCount ?? 0}`,
+      interests.length ? `- Interests: ${interests.join(', ')}` : null,
+      params.targetCampaignId ? `- Upgraded campaign ID: ${params.targetCampaignId}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const logoUrl =
+      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+
+    const row = (label: string, value?: string | null) => {
+      if (!value?.trim()) return '';
+      return `
+        <tr>
+          <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">${this.escapeHtml(label)}</td>
+          <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:13px;font-weight:600;text-align:right;">${this.escapeHtml(value)}</td>
+        </tr>`;
+    };
+
+    const html = `
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:28px 10px;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
+        <tr>
+          <td align="center">
+            <table width="620" cellpadding="0" cellspacing="0" role="presentation" style="max-width:620px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 14px 34px rgba(15,23,42,0.10);">
+              <tr>
+                <td style="background:linear-gradient(135deg,#0ea5e9,#2563eb);padding:24px 28px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                    <tr>
+                      <td align="left">
+                        <img src="${logoUrl}" alt="Cordigram" height="40" style="display:block;">
+                      </td>
+                      <td align="right" style="color:#e0f2fe;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">Paid Invoice</td>
+                    </tr>
+                  </table>
+                  <div style="margin-top:16px;color:#ffffff;font-size:24px;line-height:1.25;font-weight:800;">Ad Campaign Created Successfully</div>
+                  <div style="margin-top:8px;color:#dbeafe;font-size:14px;line-height:1.6;">Your payment has been confirmed and your ad campaign is now active.</div>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding:18px 24px 8px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #dbeafe;border-radius:14px;background:#f8fbff;padding:14px;">
+                    <tr>
+                      <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;">Total Paid</td>
+                      <td style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.07em;text-align:right;">Paid At</td>
+                    </tr>
+                    <tr>
+                      <td style="padding-top:6px;font-size:24px;font-weight:800;color:#0f172a;">${this.escapeHtml(amountText)}</td>
+                      <td style="padding-top:6px;font-size:14px;font-weight:600;color:#0f172a;text-align:right;">${this.escapeHtml(paidAtText)}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding-top:12px;font-size:12px;color:#64748b;">Boost package</td>
+                      <td style="padding-top:12px;font-size:13px;font-weight:700;color:#0f172a;text-align:right;">${this.escapeHtml(boostPackageSummary)}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding-top:6px;font-size:12px;color:#64748b;">Duration package</td>
+                      <td style="padding-top:6px;font-size:13px;font-weight:700;color:#0f172a;text-align:right;">${this.escapeHtml(durationPackageSummary)}</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding:8px 24px 20px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;">
+                    ${row('Campaign', campaignName)}
+                    ${row('Payment Intent', params.paymentIntentId ?? '')}
+                    ${row('Objective', params.objective ?? 'N/A')}
+                    ${row('Ad format', params.adFormat ?? 'N/A')}
+                    ${row('Target location', params.targetLocation ?? 'N/A')}
+                    ${row('Target age', ageRange)}
+                    ${row('CTA', params.ctaLabel ?? 'N/A')}
+                    ${row('Destination URL', params.destinationUrl ?? 'N/A')}
+                    ${row('Media count', String(params.mediaCount ?? 0))}
+                    ${row('Interests', interests.length ? interests.join(', ') : 'N/A')}
+                    ${row('Target campaign ID', params.targetCampaignId ?? '')}
+                  </table>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding:0 24px 24px;color:#64748b;font-size:13px;line-height:1.6;">
+                  If you did not make this payment, please contact Cordigram support immediately at cordigram@gmail.com.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>`;
+
+    try {
+      await this.transporter.sendMail({
+        from: this.config.mailFrom,
+        to: params.email,
+        subject,
+        text,
+        html,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Failed to send ads payment success email to ${params.email}`,
+        err as Error,
+      );
+      throw err;
+    }
+  }
+
   async sendOtpEmail(
     email: string,
     code: string,

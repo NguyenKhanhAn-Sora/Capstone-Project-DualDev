@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -17,9 +18,11 @@ import {
 import { PostInteraction } from '../posts/post-interaction.schema';
 import { Comment } from '../comment/comment.schema';
 import { CampaignExpirySchedulerService } from './campaign-expiry-scheduler.service';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
   private readonly stripe: Stripe;
   private readonly durationDaysByPackage: Record<string, number> = {
     none: 0,
@@ -257,6 +260,7 @@ export class PaymentsService {
     @InjectModel(Comment.name)
     private readonly commentModel: Model<Comment>,
     private readonly campaignExpiryScheduler: CampaignExpirySchedulerService,
+    private readonly mailService: MailService,
   ) {
     this.stripe = new Stripe(this.config.stripeSecretKey);
   }
@@ -651,6 +655,112 @@ export class PaymentsService {
     );
   }
 
+  private async sendAdsPaymentSuccessEmailIfNeeded(sessionId: string) {
+    const lockedTx = await this.paymentTransactions.findOneAndUpdate(
+      {
+        sessionId,
+        adsReceiptEmailSentAt: null,
+        adsReceiptEmailSendingAt: null,
+      },
+      {
+        $set: {
+          adsReceiptEmailSendingAt: new Date(),
+          adsReceiptEmailError: null,
+        },
+      },
+      { new: true },
+    );
+
+    if (!lockedTx) return;
+
+    const email = (lockedTx.customerEmail ?? '').trim();
+    if (!email) {
+      await this.paymentTransactions
+        .updateOne(
+          { _id: lockedTx._id },
+          {
+            $set: { adsReceiptEmailError: 'Missing customer email' },
+            $unset: { adsReceiptEmailSendingAt: 1 },
+          },
+        )
+        .exec();
+      return;
+    }
+
+    if (
+      !this.isPaidState({
+        paymentStatus: lockedTx.paymentStatus,
+        checkoutStatus: lockedTx.checkoutStatus,
+      })
+    ) {
+      await this.paymentTransactions
+        .updateOne(
+          { _id: lockedTx._id },
+          {
+            $set: { adsReceiptEmailError: 'Payment not in paid state' },
+            $unset: { adsReceiptEmailSendingAt: 1 },
+          },
+        )
+        .exec();
+      return;
+    }
+
+    try {
+      await this.mailService.sendAdsPaymentSuccessEmail({
+        email,
+        campaignName: lockedTx.campaignName,
+        actionType: lockedTx.actionType,
+        sessionId: lockedTx.sessionId,
+        paymentIntentId: lockedTx.paymentIntentId,
+        paidAt: lockedTx.paidAt ?? new Date(),
+        amountTotal: Number(lockedTx.amountTotal ?? 0),
+        currency: lockedTx.currency,
+        objective: lockedTx.objective,
+        adFormat: lockedTx.adFormat,
+        placement: lockedTx.placement,
+        boostPackageId: lockedTx.boostPackageId,
+        durationPackageId: lockedTx.durationPackageId,
+        durationDays: lockedTx.durationDays,
+        targetLocation: lockedTx.targetLocation,
+        targetAgeMin: lockedTx.targetAgeMin,
+        targetAgeMax: lockedTx.targetAgeMax,
+        ctaLabel: lockedTx.ctaLabel,
+        destinationUrl: lockedTx.destinationUrl,
+        interests: lockedTx.interests ?? [],
+        mediaCount: Array.isArray(lockedTx.mediaUrls) ? lockedTx.mediaUrls.length : 0,
+        targetCampaignId: lockedTx.targetCampaignId,
+      });
+
+      await this.paymentTransactions
+        .updateOne(
+          { _id: lockedTx._id },
+          {
+            $set: {
+              adsReceiptEmailSentAt: new Date(),
+              adsReceiptEmailError: null,
+            },
+            $unset: { adsReceiptEmailSendingAt: 1 },
+          },
+        )
+        .exec();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown email sending error';
+      this.logger.error(
+        `Failed sending ads receipt email for session ${sessionId}: ${message}`,
+      );
+      await this.paymentTransactions
+        .updateOne(
+          { _id: lockedTx._id },
+          {
+            $set: { adsReceiptEmailError: message.slice(0, 500) },
+            $unset: { adsReceiptEmailSendingAt: 1 },
+          },
+        )
+        .exec();
+    }
+  }
+
   private async upsertAdLifecycleForSession(params: {
     sessionId: string;
     userId?: string | null;
@@ -976,6 +1086,8 @@ export class PaymentsService {
           userId: session.metadata?.userId ?? userId ?? null,
         });
       }
+
+      await this.sendAdsPaymentSuccessEmailIfNeeded(session.id);
     }
 
     return {
@@ -1064,6 +1176,8 @@ export class PaymentsService {
           userId: metadata.userId ?? null,
         });
       }
+
+      await this.sendAdsPaymentSuccessEmailIfNeeded(session.id);
     }
   }
 

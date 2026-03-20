@@ -1155,6 +1155,37 @@
   font-weight: 700;
 }
 
+.paymentTermsRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.paymentTermsCheckbox {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.paymentTermsText {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.paymentTermsLink {
+  color: var(--color-primary);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.paymentTermsLink:hover {
+  color: #0284c7;
+}
+
 .paymentActions {
   display: flex;
   justify-content: flex-end;
@@ -1275,8 +1306,17 @@
 :global([data-theme="dark"]) .mediaHint,
 :global([data-theme="dark"]) .subtitle,
 :global([data-theme="dark"]) .previewMeta,
-:global([data-theme="dark"]) .forecastNote {
+:global([data-theme="dark"]) .forecastNote,
+:global([data-theme="dark"]) .paymentTermsText {
   color: #94a3b8;
+}
+
+:global([data-theme="dark"]) .paymentTermsLink {
+  color: #7dd3fc;
+}
+
+:global([data-theme="dark"]) .paymentTermsLink:hover {
+  color: #bae6fd;
 }
 
 :global([data-theme="dark"]) .carouselNavBtn {

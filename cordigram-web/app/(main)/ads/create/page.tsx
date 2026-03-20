@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import EmojiPicker from "emoji-picker-react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
@@ -334,6 +335,7 @@ export default function AdsCreatePage() {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [isCreatingCheckout, setIsCreatingCheckout] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+  const [hasAcceptedPaymentTerms, setHasAcceptedPaymentTerms] = useState(false);
   const [currentProfile, setCurrentProfile] = useState<CurrentProfileResponse | null>(null);
   const [hasCreatedAdsBefore, setHasCreatedAdsBefore] = useState(false);
   const [preparedAdPostId, setPreparedAdPostId] = useState<string | null>(null);
@@ -666,6 +668,7 @@ export default function AdsCreatePage() {
     }
 
     setPaymentError("");
+    setHasAcceptedPaymentTerms(false);
     setPaymentModalOpen(true);
   };
 
@@ -675,6 +678,11 @@ export default function AdsCreatePage() {
   };
 
   const handleStartCheckout = async () => {
+    if (!hasAcceptedPaymentTerms) {
+      setPaymentError("Please accept the terms before continuing to payment.");
+      return;
+    }
+
     const token =
       typeof window !== "undefined"
         ? window.localStorage.getItem("accessToken") || window.localStorage.getItem("token")
@@ -1475,6 +1483,31 @@ export default function AdsCreatePage() {
               </div>
             </div>
 
+            <label className={styles.paymentTermsRow}>
+              <input
+                type="checkbox"
+                className={styles.paymentTermsCheckbox}
+                checked={hasAcceptedPaymentTerms}
+                onChange={(event) => {
+                  setHasAcceptedPaymentTerms(event.target.checked);
+                  if (event.target.checked) setPaymentError("");
+                }}
+                disabled={isCreatingCheckout}
+              />
+              <span className={styles.paymentTermsText}>
+                I agree to the{" "}
+                <Link
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.paymentTermsLink}
+                >
+                  Term
+                </Link>{" "}
+                and advertising rules of Cordigram.
+              </span>
+            </label>
+
             {paymentError ? <p className={styles.paymentError}>{paymentError}</p> : null}
 
             <div className={styles.paymentActions}>
@@ -1490,7 +1523,7 @@ export default function AdsCreatePage() {
                 type="button"
                 className={styles.primaryBtn}
                 onClick={handleStartCheckout}
-                disabled={isCreatingCheckout}
+                disabled={isCreatingCheckout || !hasAcceptedPaymentTerms}
               >
                 {isCreatingCheckout ? "Creating checkout..." : "Pay with Stripe"}
               </button>

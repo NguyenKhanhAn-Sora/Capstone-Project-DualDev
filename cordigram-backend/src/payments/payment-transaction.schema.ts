@@ -111,6 +111,15 @@ export class PaymentTransaction extends Document {
   @Prop({ type: Date, default: null, index: true })
   paidAt?: Date | null;
 
+  @Prop({ type: Date, default: null })
+  adsReceiptEmailSentAt?: Date | null;
+
+  @Prop({ type: Date, default: null })
+  adsReceiptEmailSendingAt?: Date | null;
+
+  @Prop({ type: String, default: null })
+  adsReceiptEmailError?: string | null;
+
   @Prop({ type: Date })
   createdAt: Date;
 
