@@ -119,6 +119,13 @@ export class ConfigService {
     return String(process.env.MODERATION_ENABLED ?? 'true').toLowerCase() === 'true';
   }
 
+  get moderationProvider(): 'rekognition' | 'service' {
+    const value = (process.env.MODERATION_PROVIDER ?? 'rekognition')
+      .trim()
+      .toLowerCase();
+    return value === 'service' ? 'service' : 'rekognition';
+  }
+
   get moderationServiceUrl(): string | null {
     const value = process.env.MODERATION_SERVICE_URL?.trim() ?? '';
     return value ? value.replace(/\/$/, '') : null;
@@ -130,6 +137,34 @@ export class ConfigService {
 
   get moderationFailOpen(): boolean {
     return String(process.env.MODERATION_FAIL_OPEN ?? 'true').toLowerCase() === 'true';
+  }
+
+  get moderationBlurThreshold(): number {
+    return Number(process.env.MODERATION_BLUR_THRESHOLD ?? 0.55);
+  }
+
+  get moderationRejectThreshold(): number {
+    return Number(process.env.MODERATION_REJECT_THRESHOLD ?? 0.82);
+  }
+
+  get moderationVideoMaxWaitMs(): number {
+    return Number(process.env.MODERATION_VIDEO_MAX_WAIT_MS ?? 30000);
+  }
+
+  get moderationVideoPollIntervalMs(): number {
+    return Number(process.env.MODERATION_VIDEO_POLL_INTERVAL_MS ?? 2000);
+  }
+
+  get awsRegion(): string {
+    return this.require('AWS_REGION');
+  }
+
+  get moderationS3Bucket(): string {
+    return this.require('MODERATION_S3_BUCKET');
+  }
+
+  get moderationS3Prefix(): string {
+    return (process.env.MODERATION_S3_PREFIX ?? 'moderation-inputs').trim();
   }
 
   get googleClientId(): string {

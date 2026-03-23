@@ -927,7 +927,7 @@ export default function ReelComments({
     });
 
     const parts: JSX.Element[] = [];
-    const regex = /@([a-zA-Z0-9_.]{1,30})/g;
+  const regex = /(https?:\/\/[^\s<>()\[\]{}"']+)|@([a-zA-Z0-9_.]{1,30})/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
 
@@ -941,24 +941,55 @@ export default function ReelComments({
         );
       }
 
-      const handle = match[1];
-      const lower = handle.toLowerCase();
-      const meta = mentionMap.get(lower);
-      const hasId = Boolean(meta?.userId);
+      const urlMatch = match[1];
+      const mentionMatch = match[2];
 
-      parts.push(
-        hasId ? (
-          <Link
-            key={`mention-${comment.id}-${start}`}
-            href={`/profile/${meta?.userId}`}
-            className={feedStyles.mentionLink}
+      if (urlMatch) {
+        const url = urlMatch.replace(/[),.;!?]+$/g, "");
+        const trailing = urlMatch.slice(url.length);
+
+        parts.push(
+          <a
+            key={`url-${comment.id}-${start}`}
+            href={url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className={postStyles.commentUrlLink}
           >
-            @{handle}
-          </Link>
-        ) : (
-          <span key={`mention-${comment.id}-${start}`}>@{handle}</span>
-        ),
-      );
+            {url}
+          </a>,
+        );
+
+        if (trailing) {
+          parts.push(
+            <span key={`url-trailing-${comment.id}-${start}`}>{trailing}</span>,
+          );
+        }
+
+        lastIndex = start + urlMatch.length;
+        continue;
+      }
+
+      const handle = mentionMatch;
+      if (handle) {
+        const lower = handle.toLowerCase();
+        const meta = mentionMap.get(lower);
+        const hasId = Boolean(meta?.userId);
+
+        parts.push(
+          hasId ? (
+            <Link
+              key={`mention-${comment.id}-${start}`}
+              href={`/profile/${meta?.userId}`}
+              className={feedStyles.mentionLink}
+            >
+              @{handle}
+            </Link>
+          ) : (
+            <span key={`mention-${comment.id}-${start}`}>@{handle}</span>
+          ),
+        );
+      }
 
       lastIndex = start + match[0].length;
     }
@@ -1145,6 +1176,106 @@ export default function ReelComments({
           {comment.content ? (
             <div className={postStyles.commentText}>
               {renderCommentContent(comment)}
+            </div>
+          ) : null}
+          {Array.isArray(comment.linkPreviews) && comment.linkPreviews.length ? (
+            <div className={postStyles.commentLinkPreviewList}>
+              {comment.linkPreviews.slice(0, 3).map((preview, index) => {
+                const href =
+                  preview?.canonicalUrl?.trim() || preview?.url?.trim() || "";
+                if (!href) return null;
+
+                const title =
+                  preview?.title?.trim() ||
+                  preview?.siteName?.trim() ||
+                  preview?.domain?.trim() ||
+                  "Open link";
+
+                const subtitle =
+                  preview?.caption?.trim() ||
+                  preview?.description?.trim() ||
+                  preview?.domain?.trim() ||
+                  "";
+
+                const provider =
+                  preview?.provider?.trim() ||
+                  preview?.siteName?.trim() ||
+                  preview?.domain?.trim() ||
+                  "";
+
+                const authorLabel =
+                  preview?.authorUsername?.trim() ||
+                  preview?.authorName?.trim() ||
+                  "";
+
+                let fallbackDomain = "";
+                try {
+                  fallbackDomain = new URL(href).hostname;
+                } catch {
+                  fallbackDomain = "";
+                }
+
+                return (
+                  <a
+                    key={`${comment.id}-preview-${index}-${href}`}
+                    className={postStyles.commentLinkPreview}
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    {preview?.image ? (
+                      <img
+                        className={postStyles.commentLinkPreviewImage}
+                        src={preview.image}
+                        alt={title}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className={postStyles.commentLinkPreviewImageFallback}>
+                        {preview?.favicon ? (
+                          <img
+                            className={postStyles.commentLinkPreviewFavicon}
+                            src={preview.favicon}
+                            alt=""
+                            loading="lazy"
+                          />
+                        ) : null}
+                      </div>
+                    )}
+
+                    <div className={postStyles.commentLinkPreviewBody}>
+                      {(provider || authorLabel) && (
+                        <span className={postStyles.commentLinkPreviewProviderRow}>
+                          {provider ? (
+                            <span className={postStyles.commentLinkPreviewProvider}>
+                              {provider}
+                            </span>
+                          ) : null}
+                          {authorLabel ? (
+                            <span className={postStyles.commentLinkPreviewAuthor}>
+                              {authorLabel}
+                            </span>
+                          ) : null}
+                        </span>
+                      )}
+
+                      <span className={postStyles.commentLinkPreviewTitle}>
+                        {title}
+                      </span>
+
+                      {subtitle ? (
+                        <span className={postStyles.commentLinkPreviewDesc}>
+                          {subtitle}
+                        </span>
+                      ) : null}
+
+                      <span className={postStyles.commentLinkPreviewDomain}>
+                        {preview?.domain || fallbackDomain}
+                      </span>
+                    </div>
+                  </a>
+                );
+              })}
             </div>
           ) : null}
           {comment.media ? (
@@ -1908,6 +2039,7 @@ export default function ReelComments({
           ...c,
           content: updated.content,
           mentions: updated.mentions,
+          linkPreviews: updated.linkPreviews ?? c.linkPreviews ?? [],
           media: updated.media ?? uploadedMedia ?? null,
           updatedAt: updated.updatedAt ?? c.updatedAt,
         }));

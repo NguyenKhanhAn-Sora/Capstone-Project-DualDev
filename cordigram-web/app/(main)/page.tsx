@@ -3041,7 +3041,7 @@ function FeedCard({
       });
     };
 
-    const regex = /(@[a-zA-Z0-9_.]+|#[a-zA-Z0-9_]+)/g;
+    const regex = /(https?:\/\/[^\s<>()\[\]{}"']+|@[a-zA-Z0-9_.]+|#[a-zA-Z0-9_]+)/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = regex.exec(renderedContent))) {
@@ -3050,7 +3050,26 @@ function FeedCard({
         pushText(renderedContent.slice(lastIndex, start), `text-${start}`);
       }
       const token = match[0];
-      if (token.startsWith("@")) {
+      if (token.startsWith("http://") || token.startsWith("https://")) {
+        const url = token.replace(/[),.;!?]+$/g, "");
+        const trailing = token.slice(url.length);
+
+        parts.push(
+          <a
+            key={`url-${start}`}
+            href={url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className={styles.mentionLink}
+          >
+            {url}
+          </a>,
+        );
+
+        if (trailing) {
+          pushText(trailing, `text-${start}-url-tail`);
+        }
+      } else if (token.startsWith("@")) {
         const handle = token.slice(1);
         const display = `@${handle}`;
         const handleKey = handle.toLowerCase();

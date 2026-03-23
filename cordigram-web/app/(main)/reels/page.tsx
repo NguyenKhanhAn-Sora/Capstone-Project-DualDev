@@ -550,6 +550,62 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
 
   const percent = duration ? Math.min(100, (current / duration) * 100) : 0;
   const hashtags = useMemo(() => item.hashtags ?? [], [item.hashtags]);
+  const captionContentNodes = useMemo(() => {
+    const content = (item.content || "").toString();
+    if (!content) return null;
+
+    const parts: Array<string | React.ReactNode> = [];
+    const pushText = (text: string, keyBase: string) => {
+      const chunks = text.split("\n");
+      chunks.forEach((chunk, idx) => {
+        if (idx > 0) {
+          parts.push(<br key={`${keyBase}-br-${idx}`} />);
+        }
+        if (chunk) parts.push(chunk);
+      });
+    };
+
+    const regex = /https?:\/\/[^\s<>()\[\]{}"']+/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(content))) {
+      const start = match.index;
+      if (start > lastIndex) {
+        pushText(content.slice(lastIndex, start), `text-${start}`);
+      }
+
+      const token = match[0];
+      const url = token.replace(/[),.;!?]+$/g, "");
+      const trailing = token.slice(url.length);
+
+      parts.push(
+        <a
+          key={`url-${start}`}
+          href={url}
+          target="_blank"
+          rel="noreferrer noopener"
+          className={styles.captionUrlInline}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {url}
+        </a>,
+      );
+
+      if (trailing) {
+        pushText(trailing, `tail-${start}`);
+      }
+
+      lastIndex = start + token.length;
+    }
+
+    if (lastIndex < content.length) {
+      pushText(content.slice(lastIndex), `text-tail-${lastIndex}`);
+    }
+
+    return parts;
+  }, [item.content]);
   const shellClass = [
     styles.videoShell,
     !isPlaying ? styles.videoShellPaused : "",
@@ -693,7 +749,7 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
             if (canExpand) setExpanded((v) => !v);
           }}
         >
-          <span>{item.content || ""}</span>
+          <span>{captionContentNodes || item.content || ""}</span>
           {hashtags.length ? " " : ""}
           {hashtags.map((tag) => (
             <Link

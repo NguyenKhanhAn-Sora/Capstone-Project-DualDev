@@ -1018,6 +1018,16 @@
   font-size: 14px;
 }
 
+.captionUrlInline {
+  color: #7dd3fc;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.captionUrlInline:hover {
+  text-decoration: underline;
+}
+
 .hashtags span:hover {
   text-decoration: underline;
   cursor: pointer;
