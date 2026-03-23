@@ -69,6 +69,50 @@ export class ServersController {
     return this.serversService.getCurrentUserPermissions(serverId, req.user.userId);
   }
 
+  @Get(':id/interaction-settings')
+  async getInteractionSettings(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getInteractionSettings(serverId, req.user.userId);
+  }
+
+  @Patch(':id/interaction-settings')
+  async updateInteractionSettings(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      systemMessagesEnabled?: boolean;
+      welcomeMessageEnabled?: boolean;
+      setupTipsEnabled?: boolean;
+      activityFeedEnabled?: boolean;
+      defaultNotificationLevel?: 'all' | 'mentions';
+      systemChannelId?: string | null;
+    },
+    @Request() req: any,
+  ) {
+    return this.serversService.updateInteractionSettings(
+      serverId,
+      req.user.userId,
+      body ?? {},
+    );
+  }
+
+  @Post(':id/role-notifications')
+  async createRoleNotification(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      title: string;
+      content: string;
+      targetType: 'everyone' | 'role';
+      roleId?: string | null;
+    },
+    @Request() req: any,
+  ) {
+    return this.serversService.createRoleNotification(serverId, req.user.userId, body);
+  }
+
   // =====================================================
   // MODERATION ENDPOINTS
   // =====================================================

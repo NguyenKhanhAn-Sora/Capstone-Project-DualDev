@@ -26,6 +26,15 @@ export interface BannedUser {
   reason: string | null;
 }
 
+export interface ServerInteractionSettings {
+  systemMessagesEnabled: boolean;
+  welcomeMessageEnabled: boolean;
+  setupTipsEnabled: boolean;
+  activityFeedEnabled: boolean;
+  defaultNotificationLevel: 'all' | 'mentions';
+  systemChannelId?: Types.ObjectId | null;
+}
+
 @Schema({ timestamps: true })
 export class Server extends Document {
   @Prop({ required: true, trim: true })
@@ -103,6 +112,30 @@ export class Server extends Document {
 
   @Prop({ type: Boolean, default: true })
   isPublic: boolean;
+
+  @Prop({
+    type: {
+      systemMessagesEnabled: { type: Boolean, default: true },
+      welcomeMessageEnabled: { type: Boolean, default: true },
+      setupTipsEnabled: { type: Boolean, default: true },
+      activityFeedEnabled: { type: Boolean, default: true },
+      defaultNotificationLevel: {
+        type: String,
+        enum: ['all', 'mentions'],
+        default: 'all',
+      },
+      systemChannelId: { type: Types.ObjectId, ref: 'Channel', default: null },
+    },
+    default: () => ({
+      systemMessagesEnabled: true,
+      welcomeMessageEnabled: true,
+      setupTipsEnabled: true,
+      activityFeedEnabled: true,
+      defaultNotificationLevel: 'all',
+      systemChannelId: null,
+    }),
+  })
+  interactionSettings: ServerInteractionSettings;
 }
 
 export const ServerSchema = SchemaFactory.createForClass(Server);

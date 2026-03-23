@@ -66,6 +66,7 @@ import ServerContextMenu from "@/components/ServerContextMenu/ServerContextMenu"
 import ServerSettingsPanel from "@/components/ServerSettingsPanel/ServerSettingsPanel";
 import ServerMembersSection from "@/components/ServerMembersSection/ServerMembersSection";
 import RolesSection from "@/components/RolesSection/RolesSection";
+import ServerInteractionsSection from "@/components/ServerInteractionsSection/ServerInteractionsSection";
 import { fetchInboxForYou } from "@/lib/inbox-api";
 
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
@@ -877,6 +878,8 @@ export default function MessagesPage() {
     server: BackendServer;
     permissions?: serversApi.CurrentUserServerPermissions;
   } | null>(null);
+  const [serverSettingsPermissions, setServerSettingsPermissions] =
+    useState<serversApi.CurrentUserServerPermissions | null>(null);
   const [showServerSettingsPanel, setShowServerSettingsPanel] = useState(false);
   const [serverSettingsTarget, setServerSettingsTarget] = useState<{
     serverId: string;
@@ -3739,6 +3742,7 @@ export default function MessagesPage() {
                       String((server as any).ownerId?._id ?? (server as any).ownerId) === currentUserId;
                     permissions = {
                       isOwner,
+                      hasCustomRole: isOwner, // Fallback: chỉ owner có quyền
                       canKick: isOwner,
                       canBan: isOwner,
                       canTimeout: isOwner,
@@ -3748,6 +3752,21 @@ export default function MessagesPage() {
                       canCreateInvite: true,
                     };
                   }
+                  
+                  // Nếu backend chưa trả field `hasCustomRole` (response cũ) => fallback suy ra từ members-with-roles
+                  if (permissions && typeof (permissions as any).hasCustomRole !== "boolean") {
+                    try {
+                      const membersResp = await serversApi.getServerMembersWithRoles(server._id);
+                      const me = membersResp.members.find((m) => m.userId === currentUserId);
+                      (permissions as any).hasCustomRole = Boolean(me?.roles?.length);
+                    } catch {
+                      // ignore - giữ nguyên giá trị đang có
+                    }
+                  }
+
+                  // Chỉ hiện context menu nếu là owner hoặc có vai trò custom (role != @everyone)
+                  if (!permissions.isOwner && !permissions.hasCustomRole) return;
+                  
                   setServerContextMenu({
                     x: e.clientX,
                     y: e.clientY,
@@ -5457,6 +5476,8 @@ export default function MessagesPage() {
           permissions={serverContextMenu.permissions ?? {
             isOwner: currentUserId !== "" &&
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
+            hasCustomRole: currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
             canKick: false,
             canBan: false,
             canTimeout: false,
@@ -5490,6 +5511,7 @@ export default function MessagesPage() {
               serverId: serverContextMenu.server._id,
               serverName: serverContextMenu.server.name || "Máy chủ",
             });
+            setServerSettingsPermissions(serverContextMenu.permissions ?? null);
             setShowServerSettingsPanel(true);
             setServerContextMenu(null);
           }}
@@ -5533,6 +5555,7 @@ export default function MessagesPage() {
         onClose={() => {
           setShowServerSettingsPanel(false);
           setServerSettingsTarget(null);
+          setServerSettingsPermissions(null);
         }}
         serverName={serverSettingsTarget?.serverName ?? ""}
         serverId={serverSettingsTarget?.serverId ?? ""}
@@ -5598,6 +5621,18 @@ export default function MessagesPage() {
                     servers.find((s) => s._id === serverSettingsTarget?.serverId)?.ownerId === currentUserId
                   )
                 }
+              />
+            );
+          }
+          if (section === "interactions" && serverSettingsTarget?.serverId) {
+            return (
+              <ServerInteractionsSection
+                serverId={serverSettingsTarget.serverId}
+                canManageSettings={
+                  Boolean(serverSettingsPermissions?.isOwner) ||
+                  Boolean(serverSettingsPermissions?.canManageServer)
+                }
+                textChannels={textChannels}
               />
             );
           }

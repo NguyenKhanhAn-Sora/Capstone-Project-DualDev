@@ -39,7 +39,23 @@ export interface InboxServerInviteItem {
   seen?: boolean;
 }
 
-export type InboxForYouItem = InboxEventItem | InboxServerInviteItem;
+export interface InboxServerNotificationItem {
+  type: 'server_notification';
+  _id: string;
+  serverId: string;
+  serverName: string;
+  serverAvatarUrl?: string | null;
+  title: string;
+  content: string;
+  targetRoleName?: string | null;
+  createdAt: string;
+  seen?: boolean;
+}
+
+export type InboxForYouItem =
+  | InboxEventItem
+  | InboxServerInviteItem
+  | InboxServerNotificationItem;
 
 export interface InboxUnreadDmItem {
   type: 'dm';
@@ -79,9 +95,11 @@ export class InboxService {
   /** Dành cho bạn: sự kiện từ server + lời mời vào máy chủ (gộp, sắp xếp, đánh dấu đã xem). */
   async getForYou(userId: string): Promise<InboxForYouItem[]> {
     const userObjectId = new Types.ObjectId(userId);
-    const [eventItems, pendingInvites, seenDocs] = await Promise.all([
+    const [eventItems, pendingInvites, serverNotifications, seenDocs] =
+      await Promise.all([
       this.getForYouEvents(userId),
       this.serverInvitesService.getPendingForUser(userId),
+      this.serversService.getForYouRoleNotifications(userId),
       this.inboxSeenModel.find({ userId: userObjectId }).select('sourceType sourceId').lean().exec(),
     ]);
     const seenSet = new Set(
@@ -109,6 +127,10 @@ export class InboxService {
     );
     const combined: InboxForYouItem[] = [
       ...eventItems.map((e) => ({ ...e, seen: seenSet.has(`event:${e._id}`) })),
+      ...serverNotifications.map((n) => ({
+        ...n,
+        seen: seenSet.has(`server_notification:${n._id}`),
+      })),
       ...inviteItems,
     ];
     combined.sort((a, b) => {

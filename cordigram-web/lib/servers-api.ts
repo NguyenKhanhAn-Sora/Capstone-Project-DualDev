@@ -697,6 +697,16 @@ export interface CurrentUserServerPermissions {
   canCreateInvite: boolean;
 }
 
+export interface ServerInteractionSettings {
+  systemMessagesEnabled: boolean;
+  welcomeMessageEnabled: boolean;
+  setupTipsEnabled: boolean;
+  activityFeedEnabled: boolean;
+  defaultNotificationLevel: "all" | "mentions";
+  systemChannelId: string | null;
+  canEdit: boolean;
+}
+
 /**
  * Lấy permissions của user hiện tại trong server
  */
@@ -713,6 +723,7 @@ export async function getCurrentUserPermissions(
       const membersResponse = await getServerMembersWithRoles(serverId);
       return {
         isOwner: membersResponse.currentUserPermissions.isOwner,
+        hasCustomRole: membersResponse.currentUserPermissions.isOwner, // Fallback: chỉ owner có quyền
         canKick: membersResponse.currentUserPermissions.canKick,
         canBan: membersResponse.currentUserPermissions.canBan,
         canTimeout: membersResponse.currentUserPermissions.canTimeout,
@@ -724,6 +735,7 @@ export async function getCurrentUserPermissions(
     } catch {
       return {
         isOwner: false,
+        hasCustomRole: false,
         canKick: false,
         canBan: false,
         canTimeout: false,
@@ -733,6 +745,73 @@ export async function getCurrentUserPermissions(
         canCreateInvite: true,
       };
     }
+  }
+  return response.json();
+}
+
+export async function getInteractionSettings(
+  serverId: string,
+): Promise<ServerInteractionSettings> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/interaction-settings`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được cài đặt tương tác");
+  }
+  return response.json();
+}
+
+export async function updateInteractionSettings(
+  serverId: string,
+  payload: Partial<
+    Pick<
+      ServerInteractionSettings,
+      | "systemMessagesEnabled"
+      | "welcomeMessageEnabled"
+      | "setupTipsEnabled"
+      | "activityFeedEnabled"
+      | "defaultNotificationLevel"
+      | "systemChannelId"
+    >
+  >,
+): Promise<ServerInteractionSettings> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/interaction-settings`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không lưu được cài đặt tương tác");
+  }
+  return response.json();
+}
+
+export async function createRoleNotification(
+  serverId: string,
+  payload: {
+    title: string;
+    content: string;
+    targetType: "everyone" | "role";
+    roleId?: string | null;
+  },
+): Promise<{ success: boolean; recipients: number; notificationId: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/role-notifications`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không gửi được thông báo theo vai trò");
   }
   return response.json();
 }

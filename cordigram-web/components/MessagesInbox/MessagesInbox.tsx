@@ -134,10 +134,11 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
     };
   }, [authToken]);
 
-  /** Chỉ dùng cho event: ấn vào = đã đọc + đi tới trang sự kiện. */
+  /** Mở item trong tab Dành cho bạn và đánh dấu đã xem. */
   const handleForYouClick = async (item: InboxForYouItem) => {
-    if (item.type !== "event") return;
-    const sourceType = "event";
+    if (item.type === "server_invite") return;
+    const sourceType =
+      item.type === "event" ? "event" : "server_notification";
     try {
       await markInboxSeen(sourceType, item._id);
       setForYouItems((prev) =>
@@ -147,7 +148,11 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
       );
       onMarkSeen?.();
     } catch (_) {}
-    router.push(`/messages?server=${item.serverId}&event=${item._id}`);
+    if (item.type === "event") {
+      router.push(`/messages?server=${item.serverId}&event=${item._id}`);
+    } else {
+      router.push(`/messages?server=${item.serverId}`);
+    }
     onClose();
   };
 
@@ -253,7 +258,7 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                 <div className={styles.loading}>Đang tải...</div>
               ) : forYouItems.length === 0 ? (
                 <div className={styles.empty}>
-                  Không có sự kiện hay lời mời nào từ các máy chủ của bạn.
+                  Không có sự kiện, lời mời hoặc thông báo vai trò nào từ các máy chủ của bạn.
                 </div>
               ) : (
                 forYouItems.map((item) =>
@@ -288,6 +293,38 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                           đã bắt đầu trong Máy chủ của {item.serverName}.
                         </p>
                         <p className={styles.eventTime}>{formatTimeAgo(item.startAt)}</p>
+                      </div>
+                    </button>
+                  ) : item.type === "server_notification" ? (
+                    <button
+                      key={`server-notification-${item._id}`}
+                      type="button"
+                      className={styles.eventItem}
+                      onClick={() => handleForYouClick(item)}
+                    >
+                      <div className={styles.eventItemAvatarWrap}>
+                        <div
+                          className={styles.eventAvatar}
+                          style={
+                            item.serverAvatarUrl
+                              ? { backgroundImage: `url(${item.serverAvatarUrl})` }
+                              : undefined
+                          }
+                        >
+                          {!item.serverAvatarUrl && item.serverName.charAt(0).toUpperCase()}
+                        </div>
+                        {item.seen !== true && <span className={styles.eventItemUnreadDot} aria-hidden />}
+                      </div>
+                      <div className={styles.eventBody}>
+                        <p className={styles.eventTitle}>{item.title}</p>
+                        <p className={styles.eventMeta}>
+                          {item.serverName}
+                          {item.targetRoleName ? ` • ${item.targetRoleName}` : ""}
+                        </p>
+                        <p className={styles.unreadPreview}>
+                          {item.content}
+                        </p>
+                        <p className={styles.eventTime}>{formatTimeAgo(item.createdAt)}</p>
                       </div>
                     </button>
                   ) : (

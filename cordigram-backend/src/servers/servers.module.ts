@@ -3,6 +3,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ServersService } from './servers.service';
 import { ServersController } from './servers.controller';
 import { Server, ServerSchema } from './server.schema';
+import {
+  ServerNotification,
+  ServerNotificationSchema,
+} from './server-notification.schema';
 import { Channel, ChannelSchema } from '../channels/channel.schema';
 import { User, UserSchema } from '../users/user.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
@@ -17,6 +21,7 @@ import { RolesModule } from '../roles/roles.module';
       { name: User.name, schema: UserSchema },
       { name: Profile.name, schema: ProfileSchema },
       { name: ServerInvite.name, schema: ServerInviteSchema },
+      { name: ServerNotification.name, schema: ServerNotificationSchema },
     ]),
     forwardRef(() => RolesModule),
   ],

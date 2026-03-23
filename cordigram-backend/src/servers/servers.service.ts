@@ -16,6 +16,7 @@ import { User } from '../users/user.schema';
 import { Profile } from '../profiles/profile.schema';
 import { ServerInvite } from '../server-invites/server-invite.schema';
 import { RolesService } from '../roles/roles.service';
+import { ServerNotification } from './server-notification.schema';
 
 @Injectable()
 export class ServersService {
@@ -25,6 +26,8 @@ export class ServersService {
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
     @InjectModel(ServerInvite.name) private serverInviteModel: Model<ServerInvite>,
+    @InjectModel(ServerNotification.name)
+    private serverNotificationModel: Model<ServerNotification>,
     @Inject(forwardRef(() => RolesService))
     private rolesService: RolesService,
   ) {}
@@ -514,6 +517,224 @@ export class ServersService {
   // =====================================================
   // USER PERMISSIONS
   // =====================================================
+
+  private async canManageServer(serverId: string, userId: string): Promise<boolean> {
+    const server = await this.serverModel.findById(serverId).select('ownerId').lean().exec();
+    if (!server) return false;
+    if (server.ownerId.toString() === userId) return true;
+    return this.rolesService.hasPermission(serverId, userId, 'manageServer');
+  }
+
+  private async assertCanManageServer(serverId: string, userId: string): Promise<void> {
+    const allowed = await this.canManageServer(serverId, userId);
+    if (!allowed) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới được thực hiện',
+      );
+    }
+  }
+
+  async getInteractionSettings(serverId: string, requesterUserId: string): Promise<{
+    systemMessagesEnabled: boolean;
+    welcomeMessageEnabled: boolean;
+    setupTipsEnabled: boolean;
+    activityFeedEnabled: boolean;
+    defaultNotificationLevel: 'all' | 'mentions';
+    systemChannelId: string | null;
+    canEdit: boolean;
+  }> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+    const isMember = server.members.some(
+      (m) => m.userId.toString() === requesterUserId,
+    );
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không phải thành viên của server này');
+    }
+    const canEdit = await this.canManageServer(serverId, requesterUserId);
+    const s = (server as any).interactionSettings ?? {};
+    return {
+      systemMessagesEnabled: s.systemMessagesEnabled ?? true,
+      welcomeMessageEnabled: s.welcomeMessageEnabled ?? true,
+      setupTipsEnabled: s.setupTipsEnabled ?? true,
+      activityFeedEnabled: s.activityFeedEnabled ?? true,
+      defaultNotificationLevel:
+        s.defaultNotificationLevel === 'mentions' ? 'mentions' : 'all',
+      systemChannelId: s.systemChannelId ? s.systemChannelId.toString() : null,
+      canEdit,
+    };
+  }
+
+  async updateInteractionSettings(
+    serverId: string,
+    userId: string,
+    payload: {
+      systemMessagesEnabled?: boolean;
+      welcomeMessageEnabled?: boolean;
+      setupTipsEnabled?: boolean;
+      activityFeedEnabled?: boolean;
+      defaultNotificationLevel?: 'all' | 'mentions';
+      systemChannelId?: string | null;
+    },
+  ): Promise<{
+    systemMessagesEnabled: boolean;
+    welcomeMessageEnabled: boolean;
+    setupTipsEnabled: boolean;
+    activityFeedEnabled: boolean;
+    defaultNotificationLevel: 'all' | 'mentions';
+    systemChannelId: string | null;
+    canEdit: boolean;
+  }> {
+    await this.assertCanManageServer(serverId, userId);
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    const next = {
+      ...(server as any).interactionSettings,
+    } as any;
+
+    if (payload.systemMessagesEnabled !== undefined) {
+      next.systemMessagesEnabled = Boolean(payload.systemMessagesEnabled);
+    }
+    if (payload.welcomeMessageEnabled !== undefined) {
+      next.welcomeMessageEnabled = Boolean(payload.welcomeMessageEnabled);
+    }
+    if (payload.setupTipsEnabled !== undefined) {
+      next.setupTipsEnabled = Boolean(payload.setupTipsEnabled);
+    }
+    if (payload.activityFeedEnabled !== undefined) {
+      next.activityFeedEnabled = Boolean(payload.activityFeedEnabled);
+    }
+    if (payload.defaultNotificationLevel !== undefined) {
+      next.defaultNotificationLevel =
+        payload.defaultNotificationLevel === 'mentions' ? 'mentions' : 'all';
+    }
+    if (payload.systemChannelId !== undefined) {
+      next.systemChannelId = payload.systemChannelId
+        ? new Types.ObjectId(payload.systemChannelId)
+        : null;
+    }
+
+    (server as any).interactionSettings = next;
+    await server.save();
+    return this.getInteractionSettings(serverId, userId);
+  }
+
+  async createRoleNotification(
+    serverId: string,
+    actorId: string,
+    payload: {
+      title: string;
+      content: string;
+      targetType: 'everyone' | 'role';
+      roleId?: string | null;
+    },
+  ): Promise<{ success: boolean; recipients: number; notificationId: string }> {
+    await this.assertCanManageServer(serverId, actorId);
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    const title = payload.title?.trim?.() ?? '';
+    const content = payload.content?.trim?.() ?? '';
+    if (!title || !content) {
+      throw new BadRequestException('title và content là bắt buộc');
+    }
+
+    let recipients: Types.ObjectId[] = [];
+    let targetRoleName: string | null = null;
+    let targetRoleObjectId: Types.ObjectId | null = null;
+
+    if (payload.targetType === 'everyone') {
+      recipients = server.members.map((m) => new Types.ObjectId(m.userId));
+      targetRoleName = '@everyone';
+    } else {
+      if (!payload.roleId) {
+        throw new BadRequestException('roleId là bắt buộc khi targetType=role');
+      }
+      const role = await this.rolesService.getRoleById(serverId, payload.roleId);
+      targetRoleName = role.name;
+      targetRoleObjectId = new Types.ObjectId(role._id as any);
+      recipients = role.isDefault
+        ? server.members.map((m) => new Types.ObjectId(m.userId))
+        : role.memberIds.map((id) => new Types.ObjectId(id));
+    }
+
+    const uniqueRecipientIds = Array.from(
+      new Set(recipients.map((id) => id.toString())),
+    ).map((id) => new Types.ObjectId(id));
+
+    const notification = await this.serverNotificationModel.create({
+      serverId: new Types.ObjectId(serverId),
+      createdBy: new Types.ObjectId(actorId),
+      title,
+      content,
+      targetType: payload.targetType,
+      targetRoleId: targetRoleObjectId,
+      targetRoleName,
+      recipientUserIds: uniqueRecipientIds,
+    });
+
+    return {
+      success: true,
+      recipients: uniqueRecipientIds.length,
+      notificationId: notification._id.toString(),
+    };
+  }
+
+  async getForYouRoleNotifications(userId: string): Promise<
+    Array<{
+      type: 'server_notification';
+      _id: string;
+      serverId: string;
+      serverName: string;
+      serverAvatarUrl?: string | null;
+      title: string;
+      content: string;
+      targetRoleName?: string | null;
+      createdAt: string;
+    }>
+  > {
+    const docs = await this.serverNotificationModel
+      .find({ recipientUserIds: new Types.ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean()
+      .exec();
+
+    if (!docs.length) return [];
+    const serverIds = Array.from(new Set(docs.map((d: any) => d.serverId.toString()))).map(
+      (id) => new Types.ObjectId(id),
+    );
+    const servers = await this.serverModel
+      .find({ _id: { $in: serverIds } })
+      .select('_id name avatarUrl')
+      .lean()
+      .exec();
+    const serverMap = new Map(
+      (servers as any[]).map((s) => [s._id.toString(), s]),
+    );
+
+    return (docs as any[]).map((d) => {
+      const server = serverMap.get(d.serverId.toString());
+      return {
+        type: 'server_notification' as const,
+        _id: d._id.toString(),
+        serverId: d.serverId.toString(),
+        serverName: server?.name ?? 'Máy chủ',
+        serverAvatarUrl: server?.avatarUrl ?? null,
+        title: d.title ?? '',
+        content: d.content ?? '',
+        targetRoleName: d.targetRoleName ?? null,
+        createdAt: d.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      };
+    });
+  }
 
   /**
    * Lấy permissions của user hiện tại trong server
