@@ -102,7 +102,9 @@ export class ProfilesController {
 
     const userDoc = await this.userModel
       .findById(user.userId)
-      .select('status signupStage accountLimitedUntil accountLimitedIndefinitely')
+      .select(
+        'status signupStage accountLimitedUntil accountLimitedIndefinitely isCreatorVerified',
+      )
       .lean();
 
     return {
@@ -112,6 +114,7 @@ export class ProfilesController {
       username: profile.username,
       avatarUrl: profile.avatarUrl,
       status: userDoc?.status ?? 'active',
+      isCreatorVerified: Boolean(userDoc?.isCreatorVerified),
       signupStage: userDoc?.signupStage ?? 'completed',
       accountLimitedUntil: userDoc?.accountLimitedUntil ?? null,
       accountLimitedIndefinitely: Boolean(userDoc?.accountLimitedIndefinitely),

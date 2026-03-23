@@ -207,6 +207,9 @@
 }
 
 .displayName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 800;
   font-size: 14px;
   color: var(--color-title-primary);

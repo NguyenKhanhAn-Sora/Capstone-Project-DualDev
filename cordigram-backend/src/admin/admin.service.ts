@@ -142,7 +142,16 @@ export class AdminService {
     action: string,
     severity: 'low' | 'medium' | 'high' | null,
   ): number {
-    if (['warn', 'mute_interaction', 'no_violation'].includes(action)) {
+    if (
+      [
+        'warn',
+        'mute_interaction',
+        'no_violation',
+        'creator_verification_approved',
+        'creator_verification_rejected',
+        'creator_verification_revoked',
+      ].includes(action)
+    ) {
       return 0;
     }
     if (action === 'suspend_user') {
@@ -2441,6 +2450,9 @@ export class AdminService {
           'suspend_user',
           'limit_account',
           'violation',
+          'creator_verification_approved',
+          'creator_verification_rejected',
+          'creator_verification_revoked',
         ],
       },
     };
@@ -2652,16 +2664,30 @@ export class AdminService {
 
     const items = rows.map((row) => {
       const strikeDelta =
-        row.action === 'no_violation' || row.action === 'rollback_moderation'
+        [
+          'no_violation',
+          'rollback_moderation',
+          'creator_verification_approved',
+          'creator_verification_rejected',
+          'creator_verification_revoked',
+        ].includes(row.action)
           ? null
           : this.getStrikeIncrement(row.action, row.severity ?? null);
+
+      const actionLabelMap: Record<string, string> = {
+        creator_verification_approved: 'CREATOR VERIFICATION APPROVED',
+        creator_verification_rejected: 'CREATOR VERIFICATION REJECTED',
+        creator_verification_revoked: 'CREATOR VERIFICATION REVOKED',
+      };
 
       return {
         actionId: row._id.toString(),
         actor: getActor(row.moderatorId ?? null),
         action: {
           code: row.action,
-          label: row.action.replace(/[_-]+/g, ' ').trim().toUpperCase(),
+          label:
+            actionLabelMap[row.action] ??
+            row.action.replace(/[_-]+/g, ' ').trim().toUpperCase(),
           strikeDelta,
         },
         target: {

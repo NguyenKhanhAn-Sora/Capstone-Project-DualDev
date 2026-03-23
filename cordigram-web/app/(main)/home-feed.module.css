@@ -1,19 +1,26 @@
 .page {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  justify-content: stretch;
+  align-items: start;
   gap: 24px;
   width: 100%;
-  /* max-width: 1268px; */
-  padding: 24px 0 24px 24px;
+  margin: 0 auto;
+  padding: 24px 18px;
+  box-sizing: border-box;
   min-height: 100vh;
   background: var(--color-bg-home);
   color: #e8ecf8;
 }
 
 .centerColumn {
-  grid-column: 2;
+  grid-column: 1;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  max-width: 760px;
+  justify-self: center;
 }
 
 .embedded {
@@ -24,11 +31,12 @@
 }
 
 .rightColumn {
-  grid-column: 3;
+  grid-column: 2;
+  width: 320px;
   align-self: start;
   justify-self: end;
   position: sticky;
-  top: 0;
+  top: 24px;
   right: 0;
   height: calc(100vh - 48px);
   overflow: auto;
@@ -43,11 +51,23 @@
 
 @media (max-width: 1100px) {
   .page {
-    grid-template-columns: 1fr minmax(320px, 640px);
-    padding: 24px;
+    grid-template-columns: minmax(0, 760px);
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  .centerColumn {
+    grid-column: 1;
+    width: min(100%, 760px);
   }
   .rightColumn {
     display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 16px 10px 24px;
+    gap: 16px;
   }
 }
 
@@ -251,6 +271,12 @@
 .authorName {
   font-weight: 700;
   color: var(--color-text);
+}
+
+.nameWithBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .authorNameLink {
@@ -1796,7 +1822,7 @@
 }
 
 .skeletonCard {
-  height: 260px;
+  width: 100%;
   padding: 16px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.02);
@@ -1806,6 +1832,12 @@
 .loaderRow {
   display: grid;
   gap: 12px;
+}
+
+.skeletonBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .topBar {
@@ -1826,15 +1858,62 @@
   border-radius: 6px;
 }
 
+.topBarLineLong {
+  width: 160px;
+}
+
+.topBarLineShort {
+  width: 112px;
+}
+
 .contentLine {
   height: 12px;
   border-radius: 6px;
 }
 
+.contentLineFull {
+  width: 92%;
+}
+
+.contentLineMid {
+  width: 68%;
+}
+
+.contentLineShort {
+  width: 52%;
+}
+
 .mediaPh {
-  height: 140px;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  min-height: 260px;
+  max-height: 520px;
   border-radius: 12px;
-  margin-top: 12px;
+  margin-top: 4px;
+}
+
+.skeletonActionRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.skeletonActionPh {
+  height: 14px;
+  border-radius: 999px;
+}
+
+.skeletonActionPhWide {
+  width: 84px;
+}
+
+.skeletonActionPhMid {
+  width: 76px;
+}
+
+.skeletonActionPhShort {
+  width: 68px;
 }
 
 .loadMore {

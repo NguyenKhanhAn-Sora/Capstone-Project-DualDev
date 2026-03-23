@@ -48,6 +48,7 @@ import {
   getInteractionMutedMessage,
   INTERACTION_MUTED_FALLBACK_MESSAGE,
 } from "@/lib/interaction-mute";
+import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 
 function LocationPinIcon() {
   return (
@@ -610,11 +611,19 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
                     href={`/profile/${item.repostOfAuthorId}`}
                     className={styles.captionRepostLink}
                   >
-                    @{item.repostOfAuthorUsername}
+                    <span className={styles.nameWithBadge}>
+                      @{item.repostOfAuthorUsername}
+                      <VerifiedBadge
+                        visible={Boolean(item.repostOfAuthorIsCreatorVerified)}
+                      />
+                    </span>
                   </Link>
                 ) : (
-                  <span className={styles.captionRepostLink}>
+                  <span className={`${styles.captionRepostLink} ${styles.nameWithBadge}`}>
                     @{item.repostOfAuthorUsername}
+                    <VerifiedBadge
+                      visible={Boolean(item.repostOfAuthorIsCreatorVerified)}
+                    />
                   </span>
                 )}
               </span>
@@ -647,10 +656,28 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
                 href={`/profile/${item.authorId}`}
                 className={`${styles.captionHandle} ${styles.captionHandleLink}`}
               >
-                @{item.authorUsername}
+                <span className={styles.nameWithBadge}>
+                  @{item.authorUsername}
+                  <VerifiedBadge
+                    visible={Boolean(
+                      (item as any).authorIsCreatorVerified ??
+                        item.author?.isCreatorVerified,
+                    )}
+                  />
+                </span>
               </Link>
             ) : (
-              <div className={styles.captionHandle}>@{item.authorUsername}</div>
+              <div className={styles.captionHandle}>
+                <span className={styles.nameWithBadge}>
+                  @{item.authorUsername}
+                  <VerifiedBadge
+                    visible={Boolean(
+                      (item as any).authorIsCreatorVerified ??
+                        item.author?.isCreatorVerified,
+                    )}
+                  />
+                </span>
+              </div>
             )
           ) : null}
         </div>

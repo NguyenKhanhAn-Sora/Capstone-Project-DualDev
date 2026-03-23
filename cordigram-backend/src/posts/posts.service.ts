@@ -44,6 +44,50 @@ const REEL_MAX_DURATION_SECONDS = 90;
 
 @Injectable()
 export class PostsService {
+  private mapProfilesByUserId<
+    T extends { userId?: Types.ObjectId; isCreatorVerified?: boolean },
+  >(profiles: T[]) {
+    const profileMap = new Map<string, T>();
+    profiles.forEach((profile) => {
+      const id = profile.userId?.toString?.();
+      if (!id) return;
+      profileMap.set(id, profile);
+    });
+    return profileMap;
+  }
+
+  private async getProfilesWithCreatorVerification(userIds: Types.ObjectId[]) {
+    if (!userIds.length) return [] as Array<{
+      userId?: Types.ObjectId;
+      displayName?: string;
+      username?: string;
+      avatarUrl?: string;
+      isCreatorVerified?: boolean;
+    }>;
+
+    const profiles = await this.profileModel
+      .find({ userId: { $in: userIds } })
+      .select('userId displayName username avatarUrl')
+      .lean();
+
+    const users = await this.userModel
+      .find({ _id: { $in: userIds } })
+      .select('_id isCreatorVerified')
+      .lean();
+
+    const verifiedMap = new Map<string, boolean>();
+    users.forEach((user) => {
+      const id = user._id?.toString?.();
+      if (!id) return;
+      verifiedMap.set(id, Boolean(user.isCreatorVerified));
+    });
+
+    return profiles.map((profile) => ({
+      ...profile,
+      isCreatorVerified: verifiedMap.get(profile.userId?.toString?.() ?? '') ?? false,
+    }));
+  }
+
   private readonly sponsoredDurationDaysByPackage: Record<string, number> = {
     d3: 3,
     d7: 7,
@@ -621,6 +665,7 @@ export class PostsService {
       displayName?: string;
       username?: string;
       avatarUrl?: string;
+      isCreatorVerified?: boolean;
     } | null,
     userFlags?: {
       liked?: boolean;
@@ -633,6 +678,7 @@ export class PostsService {
       displayName?: string;
       username?: string;
       avatarUrl?: string;
+      isCreatorVerified?: boolean;
     } | null,
     repostSourcePost?: {
       content?: string;
@@ -646,12 +692,14 @@ export class PostsService {
       authorDisplayName: profile?.displayName,
       authorUsername: profile?.username,
       authorAvatarUrl: profile?.avatarUrl,
+      authorIsCreatorVerified: Boolean(profile?.isCreatorVerified),
       author: profile
         ? {
             id: profile.userId?.toString?.(),
             displayName: profile.displayName,
             username: profile.username,
             avatarUrl: profile.avatarUrl,
+            isCreatorVerified: Boolean(profile.isCreatorVerified),
           }
         : undefined,
       content: doc.content,
@@ -686,12 +734,18 @@ export class PostsService {
       repostOfAuthorDisplayName: repostSourceProfile?.displayName,
       repostOfAuthorUsername: repostSourceProfile?.username,
       repostOfAuthorAvatarUrl: repostSourceProfile?.avatarUrl,
+      repostOfAuthorIsCreatorVerified: Boolean(
+        repostSourceProfile?.isCreatorVerified,
+      ),
       repostOfAuthor: repostSourceProfile
         ? {
             id: repostSourceProfile.userId?.toString?.(),
             displayName: repostSourceProfile.displayName,
             username: repostSourceProfile.username,
             avatarUrl: repostSourceProfile.avatarUrl,
+            isCreatorVerified: Boolean(
+              repostSourceProfile.isCreatorVerified,
+            ),
           }
         : undefined,
       repostSourceContent: repostSourcePost?.content ?? null,
@@ -1553,12 +1607,9 @@ export class PostsService {
       ),
     ).map((id) => new Types.ObjectId(id));
 
-    const profiles = await this.profileModel
-      .find({ userId: { $in: authorIds } })
-      .select('userId displayName username avatarUrl')
-      .lean();
+    const profiles = await this.getProfilesWithCreatorVerification(authorIds);
 
-    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+    const profileMap = this.mapProfilesByUserId(profiles);
 
     const repostSourceIds = Array.from(
       new Set(
@@ -1614,12 +1665,12 @@ export class PostsService {
       ).map((id) => new Types.ObjectId(id));
 
       if (repostAuthorIds.length) {
-        const repostProfiles = await this.profileModel
-          .find({ userId: { $in: repostAuthorIds } })
-          .select('userId displayName username avatarUrl')
-          .lean();
+        const repostProfiles =
+          await this.getProfilesWithCreatorVerification(repostAuthorIds);
 
-        repostProfiles.forEach((p) => profileMap.set(p.userId.toString(), p));
+        this.mapProfilesByUserId(repostProfiles).forEach((profile, id) =>
+          profileMap.set(id, profile),
+        );
 
         repostSourceProfileMap = new Map(
           repostSources
@@ -1857,12 +1908,9 @@ export class PostsService {
       ),
     ).map((id) => new Types.ObjectId(id));
 
-    const profiles = await this.profileModel
-      .find({ userId: { $in: authorIds } })
-      .select('userId displayName username avatarUrl')
-      .lean();
+    const profiles = await this.getProfilesWithCreatorVerification(authorIds);
 
-    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+    const profileMap = this.mapProfilesByUserId(profiles);
 
     const repostSourceIds = Array.from(
       new Set(
@@ -1918,12 +1966,12 @@ export class PostsService {
       ).map((id) => new Types.ObjectId(id));
 
       if (repostAuthorIds.length) {
-        const repostProfiles = await this.profileModel
-          .find({ userId: { $in: repostAuthorIds } })
-          .select('userId displayName username avatarUrl')
-          .lean();
+        const repostProfiles =
+          await this.getProfilesWithCreatorVerification(repostAuthorIds);
 
-        repostProfiles.forEach((p) => profileMap.set(p.userId.toString(), p));
+        this.mapProfilesByUserId(repostProfiles).forEach((profile, id) =>
+          profileMap.set(id, profile),
+        );
 
         repostSourceProfileMap = new Map(
           repostSources
@@ -2207,11 +2255,8 @@ export class PostsService {
       ),
     ).map((id) => new Types.ObjectId(id));
 
-    const profiles = await this.profileModel
-      .find({ userId: { $in: authorIds } })
-      .select('userId displayName username avatarUrl')
-      .lean();
-    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+    const profiles = await this.getProfilesWithCreatorVerification(authorIds);
+    const profileMap = this.mapProfilesByUserId(profiles);
 
     const postIds = pagePosts.map((p) => p._id);
     const interactions = await this.postInteractionModel
@@ -2539,12 +2584,9 @@ export class PostsService {
       ),
     ).map((id) => new Types.ObjectId(id));
 
-    const profiles = await this.profileModel
-      .find({ userId: { $in: authorIds } })
-      .select('userId displayName username avatarUrl')
-      .lean();
+    const profiles = await this.getProfilesWithCreatorVerification(authorIds);
 
-    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+    const profileMap = this.mapProfilesByUserId(profiles);
 
     const postIds = pagePosts.map((p) => p._id);
     const interactions = await this.postInteractionModel
@@ -2703,12 +2745,9 @@ export class PostsService {
       ),
     ).map((id) => new Types.ObjectId(id));
 
-    const profiles = await this.profileModel
-      .find({ userId: { $in: authorIds } })
-      .select('userId displayName username avatarUrl')
-      .lean();
+    const profiles = await this.getProfilesWithCreatorVerification(authorIds);
 
-    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+    const profileMap = this.mapProfilesByUserId(profiles);
 
     const postIds = pageReels.map((p) => p._id);
     const interactions = await this.postInteractionModel
@@ -2944,12 +2983,9 @@ export class PostsService {
       ),
     ).map((id) => new Types.ObjectId(id));
 
-    const profiles = await this.profileModel
-      .find({ userId: { $in: authorIds } })
-      .select('userId displayName username avatarUrl')
-      .lean();
+    const profiles = await this.getProfilesWithCreatorVerification(authorIds);
 
-    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+    const profileMap = this.mapProfilesByUserId(profiles);
 
     return limited.map((post) => {
       const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
@@ -3031,12 +3067,9 @@ export class PostsService {
       ),
     ).map((id) => new Types.ObjectId(id));
 
-    const profiles = await this.profileModel
-      .find({ userId: { $in: authorIds } })
-      .select('userId displayName username avatarUrl')
-      .lean();
+    const profiles = await this.getProfilesWithCreatorVerification(authorIds);
 
-    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+    const profileMap = this.mapProfilesByUserId(profiles);
 
     const items: Array<
       ReturnType<typeof this.toResponse> & {
@@ -3140,12 +3173,9 @@ export class PostsService {
       ),
     ).map((id) => new Types.ObjectId(id));
 
-    const profiles = await this.profileModel
-      .find({ userId: { $in: authorIds } })
-      .select('userId displayName username avatarUrl')
-      .lean();
+    const profiles = await this.getProfilesWithCreatorVerification(authorIds);
 
-    const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
+    const profileMap = this.mapProfilesByUserId(profiles);
 
     return results.map((post) => {
       const profile = profileMap.get(post.authorId?.toString?.() ?? '') || null;
@@ -3213,10 +3243,10 @@ export class PostsService {
 
     await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
 
-    const profile = await this.profileModel
-      .findOne({ userId: post.authorId })
-      .select('userId displayName username avatarUrl')
-      .lean();
+    const profiles = await this.getProfilesWithCreatorVerification([
+      post.authorId,
+    ]);
+    const profile = profiles[0] ?? null;
 
     const interactions = await this.postInteractionModel
       .find({
@@ -4089,3 +4119,4 @@ export class PostsService {
     return { userObjectId, postObjectId };
   }
 }
+

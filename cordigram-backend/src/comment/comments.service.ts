@@ -51,6 +51,22 @@ export class CommentsService {
     private readonly activityLogService: ActivityLogService,
   ) {}
 
+  private async getCreatorVerifiedMap(userIds: Types.ObjectId[]) {
+    if (!userIds.length) return new Map<string, boolean>();
+    const users = await this.userModel
+      .find({ _id: { $in: userIds } })
+      .select('_id isCreatorVerified')
+      .lean()
+      .exec();
+    const entries: Array<[string, boolean]> = [];
+    users.forEach((user: any) => {
+      const id = user._id?.toString?.();
+      if (!id) return;
+      entries.push([id, Boolean(user.isCreatorVerified)]);
+    });
+    return new Map<string, boolean>(entries);
+  }
+
   async create(userId: string, postId: string, dto: CreateCommentDto) {
     const userObjectId = this.asObjectId(userId, 'userId');
     const postObjectId = this.asObjectId(postId, 'postId');
@@ -194,10 +210,14 @@ export class CommentsService {
       },
     });
 
+    const creatorVerifiedMap = await this.getCreatorVerifiedMap([userObjectId]);
+
     return this.toResponse(created, profile || null, {
       repliesCount: 0,
       likesCount: 0,
       liked: false,
+      authorIsCreatorVerified:
+        creatorVerifiedMap.get(userObjectId.toString()) ?? false,
     });
   }
 
@@ -504,6 +524,8 @@ export class CommentsService {
       .select('userId displayName username avatarUrl')
       .lean();
 
+    const creatorVerifiedMap = await this.getCreatorVerifiedMap(authorIds);
+
     const profileMap = new Map(profiles.map((p) => [p.userId.toString(), p]));
 
     return {
@@ -521,6 +543,8 @@ export class CommentsService {
           repliesCount,
           likesCount,
           liked,
+          authorIsCreatorVerified:
+            creatorVerifiedMap.get(item.authorId?.toString?.() ?? '') ?? false,
         });
       }),
     };
@@ -1006,6 +1030,8 @@ export class CommentsService {
       .select('userId displayName username avatarUrl')
       .lean();
 
+    const creatorVerifiedMap = await this.getCreatorVerifiedMap([userObjectId]);
+
     return this.toResponse(
       {
         ...comment,
@@ -1019,6 +1045,8 @@ export class CommentsService {
         repliesCount: 0,
         likesCount: 0,
         liked: false,
+        authorIsCreatorVerified:
+          creatorVerifiedMap.get(userObjectId.toString()) ?? false,
       },
     );
   }
@@ -1125,7 +1153,12 @@ export class CommentsService {
   private toResponse(
     comment: Comment | Record<string, any>,
     profile: Profile | Record<string, any> | null,
-    extras?: { repliesCount?: number; likesCount?: number; liked?: boolean },
+    extras?: {
+      repliesCount?: number;
+      likesCount?: number;
+      liked?: boolean;
+      authorIsCreatorVerified?: boolean;
+    },
   ) {
     return {
       id:
@@ -1139,8 +1172,10 @@ export class CommentsService {
             displayName: profile.displayName,
             username: profile.username,
             avatarUrl: profile.avatarUrl,
+            isCreatorVerified: extras?.authorIsCreatorVerified ?? false,
           }
         : undefined,
+      authorIsCreatorVerified: extras?.authorIsCreatorVerified ?? false,
       content: comment.content,
       mentions: Array.isArray(comment.mentions)
         ? comment.mentions.map((m) => {

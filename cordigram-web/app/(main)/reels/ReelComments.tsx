@@ -25,6 +25,7 @@ import {
 import postStyles from "../post/post.module.css";
 import styles from "./reel.module.css";
 import feedStyles from "../home-feed.module.css";
+import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 
 const COMMENT_POLL_INTERVAL = 4000;
 const COMMENT_PAGE_SIZE = 20;
@@ -1106,10 +1107,26 @@ export default function ReelComments({
                   href={`/profile/${authorId}`}
                   className={postStyles.commentAuthorLink}
                 >
-                  @{fallbackLabel || "user"}
+                  <span className={postStyles.nameWithBadge}>
+                    @{fallbackLabel || "user"}
+                    {Boolean(
+                      comment.authorIsCreatorVerified ??
+                        comment.author?.isCreatorVerified,
+                    ) ? (
+                      <VerifiedBadge />
+                    ) : null}
+                  </span>
                 </Link>
               ) : (
-                <>@{fallbackLabel || "user"}</>
+                <span className={postStyles.nameWithBadge}>
+                  @{fallbackLabel || "user"}
+                  {Boolean(
+                    comment.authorIsCreatorVerified ??
+                      comment.author?.isCreatorVerified,
+                  ) ? (
+                    <VerifiedBadge />
+                  ) : null}
+                </span>
               )}
             </span>
             {isPostAuthorComment ? (

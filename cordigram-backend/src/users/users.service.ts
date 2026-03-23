@@ -199,6 +199,7 @@ export class UsersService {
       username: string;
       displayName: string;
       avatarUrl: string;
+      isCreatorVerified: boolean;
       isFollowing: boolean;
     }>;
     nextCursor: string | null;
@@ -274,7 +275,7 @@ export class UsersService {
       return { items: [], nextCursor };
     }
 
-    const [profiles, viewerFollowing] = await Promise.all([
+    const [profiles, viewerFollowing, users] = await Promise.all([
       this.profileModel
         .find({ userId: { $in: userIds.map((id) => new Types.ObjectId(id)) } })
         .select('userId username displayName avatarUrl')
@@ -286,6 +287,11 @@ export class UsersService {
           followeeId: { $in: userIds.map((id) => new Types.ObjectId(id)) },
         })
         .select('followeeId')
+        .lean()
+        .exec(),
+      this.userModel
+        .find({ _id: { $in: userIds.map((id) => new Types.ObjectId(id)) } })
+        .select('_id isCreatorVerified')
         .lean()
         .exec(),
     ]);
@@ -302,6 +308,13 @@ export class UsersService {
       if (id) followingSet.add(id);
     });
 
+    const creatorVerifiedMap = new Map<string, boolean>();
+    users.forEach((u: any) => {
+      const id = u._id?.toString?.();
+      if (!id) return;
+      creatorVerifiedMap.set(id, Boolean(u.isCreatorVerified));
+    });
+
     const items = userIds
       .map((id) => {
         const p = profileByUserId.get(id);
@@ -311,6 +324,7 @@ export class UsersService {
           username: p.username ?? '',
           displayName: p.displayName ?? p.username ?? '',
           avatarUrl: p.avatarUrl ?? '',
+          isCreatorVerified: creatorVerifiedMap.get(id) ?? false,
           isFollowing: followingSet.has(id),
         };
       })
@@ -319,6 +333,7 @@ export class UsersService {
       username: string;
       displayName: string;
       avatarUrl: string;
+      isCreatorVerified: boolean;
       isFollowing: boolean;
     }>;
 
@@ -336,6 +351,7 @@ export class UsersService {
       username: string;
       displayName: string;
       avatarUrl: string;
+      isCreatorVerified: boolean;
       isFollowing: boolean;
     }>;
     nextCursor: string | null;
@@ -411,7 +427,7 @@ export class UsersService {
       return { items: [], nextCursor };
     }
 
-    const [profiles, viewerFollowing] = await Promise.all([
+    const [profiles, viewerFollowing, users] = await Promise.all([
       this.profileModel
         .find({ userId: { $in: userIds.map((id) => new Types.ObjectId(id)) } })
         .select('userId username displayName avatarUrl')
@@ -423,6 +439,11 @@ export class UsersService {
           followeeId: { $in: userIds.map((id) => new Types.ObjectId(id)) },
         })
         .select('followeeId')
+        .lean()
+        .exec(),
+      this.userModel
+        .find({ _id: { $in: userIds.map((id) => new Types.ObjectId(id)) } })
+        .select('_id isCreatorVerified')
         .lean()
         .exec(),
     ]);
@@ -439,6 +460,13 @@ export class UsersService {
       if (id) followingSet.add(id);
     });
 
+    const creatorVerifiedMap = new Map<string, boolean>();
+    users.forEach((u: any) => {
+      const id = u._id?.toString?.();
+      if (!id) return;
+      creatorVerifiedMap.set(id, Boolean(u.isCreatorVerified));
+    });
+
     const items = userIds
       .map((id) => {
         const p = profileByUserId.get(id);
@@ -448,6 +476,7 @@ export class UsersService {
           username: p.username ?? '',
           displayName: p.displayName ?? p.username ?? '',
           avatarUrl: p.avatarUrl ?? '',
+          isCreatorVerified: creatorVerifiedMap.get(id) ?? false,
           isFollowing: followingSet.has(id),
         };
       })
@@ -456,6 +485,7 @@ export class UsersService {
       username: string;
       displayName: string;
       avatarUrl: string;
+      isCreatorVerified: boolean;
       isFollowing: boolean;
     }>;
 

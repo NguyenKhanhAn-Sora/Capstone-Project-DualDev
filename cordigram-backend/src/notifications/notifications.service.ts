@@ -969,6 +969,46 @@ export class NotificationsService {
     return response;
   }
 
+  async createSystemNoticeNotification(params: {
+    recipientId: string;
+    title?: string | null;
+    body: string;
+    level?: SystemNoticeLevel;
+    actionUrl?: string | null;
+  }): Promise<NotificationItem> {
+    const recipientObjectId = new Types.ObjectId(params.recipientId);
+
+    const doc = await this.notificationModel
+      .create({
+        recipientId: recipientObjectId,
+        actorId: recipientObjectId,
+        postId: null,
+        commentId: null,
+        postKind: 'post',
+        type: 'system_notice' as NotificationType,
+        systemNoticeTitle: params.title ?? null,
+        systemNoticeBody: params.body,
+        systemNoticeLevel: params.level ?? 'info',
+        systemNoticeActionUrl: params.actionUrl ?? null,
+        readAt: null,
+      })
+      .then((created) => created.toObject() as NotificationDoc);
+
+    const response = this.toResponse(doc, null, {
+      recipientId: params.recipientId,
+    });
+    const { unreadCount } = await this.getUnreadCount(params.recipientId);
+
+    if (await this.canEmitNotification(params.recipientId)) {
+      this.gateway.emitToUser(params.recipientId, 'notification:new', {
+        notification: response,
+        unreadCount,
+      } satisfies NotificationRealtimePayload);
+    }
+
+    return response;
+  }
+
   async broadcastSystemNotice(params: {
     adminId: string;
     title?: string | null;
@@ -1329,6 +1369,7 @@ export class NotificationsService {
       } | null;
     },
   ): NotificationItem {
+    const isSystemNotice = doc.type === 'system_notice';
     const actorId = doc.actorId?.toString() ?? '';
     const createdAt =
       doc.createdAt?.toISOString?.() ?? new Date().toISOString();
@@ -1351,13 +1392,14 @@ export class NotificationsService {
       id: doc._id.toString(),
       type: doc.type,
       actor: {
-        id: profile?.userId?.toString() ?? actorId,
-        displayName: profile?.displayName ?? 'Unknown user',
-        username: profile?.username ?? '',
-        avatarUrl:
-          doc.type === 'system_notice'
-            ? CORDIGRAM_LOGO_AVATAR_URL
-            : (profile?.avatarUrl ?? DEFAULT_AVATAR_URL),
+        id: isSystemNotice ? 'system:cordigram' : (profile?.userId?.toString() ?? actorId),
+        displayName: isSystemNotice
+          ? 'Cordigram'
+          : (profile?.displayName ?? 'Unknown user'),
+        username: isSystemNotice ? 'cordigram' : (profile?.username ?? ''),
+        avatarUrl: isSystemNotice
+          ? CORDIGRAM_LOGO_AVATAR_URL
+          : (profile?.avatarUrl ?? DEFAULT_AVATAR_URL),
       },
       postId: doc.postId ? doc.postId.toString() : null,
       commentId: doc.commentId ? doc.commentId.toString() : null,

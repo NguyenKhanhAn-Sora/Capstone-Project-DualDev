@@ -356,6 +356,7 @@ export class ProfilesService {
       displayName: string;
       avatarUrl: string;
       followersCount: number;
+      isCreatorVerified: boolean;
     }>
   > {
     const term = params.query?.trim();
@@ -431,6 +432,7 @@ export class ProfilesService {
       displayName: string;
       avatarUrl: string;
       followersCount: number;
+      isCreatorVerified?: boolean;
     }>;
 
     if (!items.length) return [];
@@ -442,7 +444,7 @@ export class ProfilesService {
 
     const activeUsers = await this.userModel
       .find({ _id: { $in: userIds }, status: { $ne: 'banned' } })
-      .select('_id')
+      .select('_id isCreatorVerified')
       .lean();
 
     const activeUserIdSet = new Set(
@@ -451,7 +453,19 @@ export class ProfilesService {
         .filter((id): id is string => Boolean(id)),
     );
 
-    return items.filter((item) => activeUserIdSet.has(item.userId));
+    const creatorVerifiedMap = new Map<string, boolean>();
+    activeUsers.forEach((item: any) => {
+      const id = item._id?.toString?.();
+      if (!id) return;
+      creatorVerifiedMap.set(id, Boolean(item.isCreatorVerified));
+    });
+
+    return items
+      .filter((item) => activeUserIdSet.has(item.userId))
+      .map((item) => ({
+        ...item,
+        isCreatorVerified: creatorVerifiedMap.get(item.userId) ?? false,
+      }));
   }
 
   async getProfileDetails(params: {
@@ -478,6 +492,7 @@ export class ProfilesService {
       followers: number;
       following: number;
     };
+    isCreatorVerified?: boolean;
     isFollowing?: boolean;
   }> {
     const raw = params.usernameOrId?.toString().trim();
@@ -510,7 +525,7 @@ export class ProfilesService {
 
     const ownerUser = await this.userModel
       .findById(ownerId)
-      .select('status')
+      .select('status isCreatorVerified')
       .lean();
 
     if (!ownerUser || ownerUser.status === 'banned') {
@@ -599,6 +614,7 @@ export class ProfilesService {
         followers: followersCount,
         following: followingCount,
       },
+      isCreatorVerified: Boolean(ownerUser?.isCreatorVerified),
       isFollowing: Boolean(viewerFollow),
     };
   }

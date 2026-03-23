@@ -28,6 +28,7 @@ import {
   IconClear,
   IconView,
 } from "./_components/search-shared";
+import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 
 const DEFAULT_AVATAR_URL =
   "https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg";
@@ -268,7 +269,12 @@ export default function SearchAllPage() {
                       className={styles.avatar}
                     />
                     <div className={styles.meta}>
-                      <div className={styles.label}>{p.displayName}</div>
+                      <div className={styles.label}>
+                        <span className={styles.nameWithBadge}>
+                          {p.displayName}
+                          <VerifiedBadge visible={p.isCreatorVerified} />
+                        </span>
+                      </div>
                       <div className={styles.subtitle}>@{p.username}</div>
                     </div>
                   </div>

@@ -13,7 +13,10 @@ export type ModerationActionType =
   | 'mute_interaction'
   | 'suspend_user'
   | 'limit_account'
-  | 'violation';
+  | 'violation'
+  | 'creator_verification_approved'
+  | 'creator_verification_rejected'
+  | 'creator_verification_revoked';
 export type ModerationSeverity = 'low' | 'medium' | 'high';
 
 @Schema({ timestamps: true })
@@ -38,6 +41,9 @@ export class ModerationAction extends Document {
       'suspend_user',
       'limit_account',
       'violation',
+      'creator_verification_approved',
+      'creator_verification_rejected',
+      'creator_verification_revoked',
     ],
     required: true,
   })

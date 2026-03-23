@@ -45,6 +45,7 @@ import {
   type ProfileTabsState,
 } from "./profile-context";
 import Cropper, { Area } from "react-easy-crop";
+import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 
 const compactFormatter = new Intl.NumberFormat("en", {
   notation: "compact",
@@ -1330,6 +1331,10 @@ export default function ProfileLayout({
                   <div className={styles.identity}>
                     <h1 className={styles.displayName}>
                       {profile.displayName}
+                      <VerifiedBadge
+                        visible={profile.isCreatorVerified}
+                        size={22}
+                      />
                     </h1>
                     <div className={styles.username}>@{profile.username}</div>
                   </div>

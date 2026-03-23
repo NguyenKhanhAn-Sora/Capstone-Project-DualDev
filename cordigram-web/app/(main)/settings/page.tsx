@@ -39,9 +39,12 @@ import {
   fetchNotificationSettings,
   updateNotificationSettings,
   fetchViolationHistory,
+  fetchCreatorVerificationStatus,
+  submitCreatorVerificationRequest,
   type NotificationCategoryKey,
   type NotificationSettingsResponse,
   type ViolationHistoryItem,
+  type CreatorEligibilityResponse,
   upsertRecentAccount,
   removeRecentAccount,
   type ProfileDetailResponse,
@@ -76,6 +79,15 @@ const SETTINGS_SECTIONS = [
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 13a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 13Zm0 2.2c-4 0-7.5 2.1-7.5 5v1h15v-1c0-2.9-3.5-5-7.5-5Z" />
+      </svg>
+    ),
+  },
+  {
+    key: "verification",
+    label: "Creator verification",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m12 2.8 2.7 5.4 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.1l6-.9Z" />
       </svg>
     ),
   },
@@ -620,6 +632,26 @@ export default function SettingsPage() {
   );
   const [categorySaving, setCategorySaving] = useState(false);
   const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [creatorStatus, setCreatorStatus] =
+    useState<CreatorEligibilityResponse | null>(null);
+  const [creatorLoading, setCreatorLoading] = useState(false);
+  const [creatorError, setCreatorError] = useState<string | null>(null);
+  const [creatorSubmitting, setCreatorSubmitting] = useState(false);
+  const [creatorNote, setCreatorNote] = useState("");
+  const [creatorSuccess, setCreatorSuccess] = useState<string | null>(null);
+
+  const formatRequirementLabel = (value: string) => {
+    const map: Record<string, string> = {
+      account_age: "Account age",
+      followers_count: "Followers",
+      posts_count: "Posts",
+      active_posting_days_30d: "Active posting days (30d)",
+      engagement_per_post_30d: "Average engagement/post (30d)",
+      recent_violations_90d: "Recent violations (90d)",
+      score: "Creator score",
+    };
+    return map[value] ?? value;
+  };
 
   const renderOtpStep = (params: {
     label: string;
@@ -924,6 +956,23 @@ export default function SettingsPage() {
     }
   }, [token]);
 
+  const loadCreatorVerificationStatus = useCallback(async () => {
+    if (!token) return;
+    setCreatorLoading(true);
+    setCreatorError(null);
+    try {
+      const res = await fetchCreatorVerificationStatus({ token });
+      setCreatorStatus(res);
+    } catch (err) {
+      const apiErr = err as ApiError | undefined;
+      setCreatorError(
+        apiErr?.message || "Unable to load creator verification status.",
+      );
+    } finally {
+      setCreatorLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => {
     if (!token || activeKey !== "content") return;
     loadContentSettings();
@@ -938,6 +987,11 @@ export default function SettingsPage() {
     if (!token || activeKey !== "violations") return;
     loadViolationCenter();
   }, [token, activeKey, loadViolationCenter]);
+
+  useEffect(() => {
+    if (!token || activeKey !== "verification") return;
+    loadCreatorVerificationStatus();
+  }, [token, activeKey, loadCreatorVerificationStatus]);
 
   useEffect(() => {
     if (activeKey !== "violations") return;
@@ -1062,6 +1116,32 @@ export default function SettingsPage() {
       setHiddenPostsError(apiErr?.message || "Unable to unhide this post.");
     } finally {
       setUnhideSubmitting((prev) => ({ ...prev, [postId]: false }));
+    }
+  };
+
+  const handleSubmitCreatorVerification = async () => {
+    if (!token) {
+      setCreatorError("You need to sign in to continue.");
+      return;
+    }
+    setCreatorSubmitting(true);
+    setCreatorError(null);
+    setCreatorSuccess(null);
+    try {
+      await submitCreatorVerificationRequest({
+        token,
+        note: creatorNote.trim() || undefined,
+      });
+      setCreatorNote("");
+      setCreatorSuccess("Your creator verification request has been submitted.");
+      await loadCreatorVerificationStatus();
+    } catch (err) {
+      const apiErr = err as ApiError | undefined;
+      setCreatorError(
+        apiErr?.message || "Unable to submit creator verification request.",
+      );
+    } finally {
+      setCreatorSubmitting(false);
     }
   };
 
@@ -2755,6 +2835,210 @@ export default function SettingsPage() {
 
                   {visibilityError ? (
                     <p className={styles.error}>{visibilityError}</p>
+                  ) : null}
+                </div>
+              </>
+            ) : activeKey === "verification" ? (
+              <>
+                <div className={styles.sectionHeader}>
+                  <h2 className={styles.sectionTitle}>Creator verification</h2>
+                  <p className={styles.sectionDesc}>
+                    Apply for the blue creator badge and unlock creator
+                    privileges once your account meets quality requirements.
+                  </p>
+                </div>
+
+                <div className={styles.sectionCard}>
+                  {creatorLoading ? (
+                    <p className={styles.hint}>Loading creator eligibility...</p>
+                  ) : null}
+
+                  {creatorStatus ? (
+                    <>
+                      <div className={styles.verificationScoreCard}>
+                        <p className={styles.infoTitle}>Creator score</p>
+                        <p className={styles.verificationScoreValue}>
+                          {creatorStatus.eligibility.score} /{" "}
+                          {creatorStatus.eligibility.minimumScore}
+                        </p>
+                        <p className={styles.hint}>
+                          {creatorStatus.eligibility.eligible
+                            ? "Your account currently meets all conditions."
+                            : "Improve the missing conditions below to become eligible."}
+                        </p>
+                      </div>
+
+                      <ul className={styles.infoList}>
+                        <li className={styles.infoItem}>
+                          <div className={styles.infoText}>
+                            <p className={styles.infoTitle}>Account age</p>
+                            <p className={styles.infoValue}>
+                              {creatorStatus.eligibility.accountAgeDays} days
+                            </p>
+                          </div>
+                          <p className={styles.hint}>
+                            Minimum {creatorStatus.criteria.minAccountAgeDays} days
+                          </p>
+                        </li>
+                        <li className={styles.infoItem}>
+                          <div className={styles.infoText}>
+                            <p className={styles.infoTitle}>Followers</p>
+                            <p className={styles.infoValue}>
+                              {creatorStatus.eligibility.followersCount}
+                            </p>
+                          </div>
+                          <p className={styles.hint}>
+                            Minimum {creatorStatus.criteria.minFollowersCount}
+                          </p>
+                        </li>
+                        <li className={styles.infoItem}>
+                          <div className={styles.infoText}>
+                            <p className={styles.infoTitle}>Published posts</p>
+                            <p className={styles.infoValue}>
+                              {creatorStatus.eligibility.postsCount}
+                            </p>
+                          </div>
+                          <p className={styles.hint}>
+                            Minimum {creatorStatus.criteria.minPostsCount}
+                          </p>
+                        </li>
+                        <li className={styles.infoItem}>
+                          <div className={styles.infoText}>
+                            <p className={styles.infoTitle}>Active posting days (30d)</p>
+                            <p className={styles.infoValue}>
+                              {creatorStatus.eligibility.activePostingDays30d}
+                            </p>
+                          </div>
+                          <p className={styles.hint}>
+                            Minimum {creatorStatus.criteria.minActivePostingDays30d}
+                          </p>
+                        </li>
+                        <li className={styles.infoItem}>
+                          <div className={styles.infoText}>
+                            <p className={styles.infoTitle}>Avg engagement/post (30d)</p>
+                            <p className={styles.infoValue}>
+                              {creatorStatus.eligibility.engagementPerPost30d}
+                            </p>
+                          </div>
+                          <p className={styles.hint}>
+                            Minimum {creatorStatus.criteria.minEngagementPerPost30d}
+                          </p>
+                        </li>
+                        <li className={styles.infoItem}>
+                          <div className={styles.infoText}>
+                            <p className={styles.infoTitle}>Recent violations (90d)</p>
+                            <p className={styles.infoValue}>
+                              {creatorStatus.eligibility.recentViolations90d}
+                            </p>
+                          </div>
+                          <p className={styles.hint}>
+                            Maximum {creatorStatus.criteria.maxRecentViolations90d}
+                          </p>
+                        </li>
+                      </ul>
+
+                      {creatorStatus.eligibility.failedRequirements.length ? (
+                        <p className={styles.error}>
+                          Missing requirements: {" "}
+                          {creatorStatus.eligibility.failedRequirements
+                            .map(formatRequirementLabel)
+                            .join(", ")}
+                        </p>
+                      ) : null}
+
+                      {creatorStatus.latestRequest ? (
+                        <div className={styles.verificationStatusCard}>
+                          <p className={styles.infoTitle}>Latest request</p>
+                          <p className={styles.infoValue}>
+                            Status: {creatorStatus.latestRequest.status}
+                          </p>
+                          {creatorStatus.latestRequest.createdAt ? (
+                            <p className={styles.hint}>
+                              Submitted {" "}
+                              {formatRelativeTime(
+                                creatorStatus.latestRequest.createdAt,
+                              )}
+                            </p>
+                          ) : null}
+                          {creatorStatus.latestRequest.reviewedAt ? (
+                            <p className={styles.hint}>
+                              Reviewed {" "}
+                              {formatRelativeTime(
+                                creatorStatus.latestRequest.reviewedAt,
+                              )}
+                            </p>
+                          ) : null}
+                          {creatorStatus.latestRequest.decisionReason ? (
+                            <p className={styles.hint}>
+                              Reason: {creatorStatus.latestRequest.decisionReason}
+                            </p>
+                          ) : null}
+                          {creatorStatus.latestRequest.cooldownUntil ? (
+                            <p className={styles.hint}>
+                              You can request again {" "}
+                              {formatRelativeTime(
+                                creatorStatus.latestRequest.cooldownUntil,
+                              )}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {creatorStatus.account.isCreatorVerified ? (
+                        <div className={styles.successBox}>
+                          Your account is creator verified.
+                        </div>
+                      ) : (
+                        <div className={styles.form}>
+                          <label className={styles.label}>
+                            Request note (optional)
+                            <textarea
+                              className={`${styles.input} ${styles.textarea}`}
+                              rows={4}
+                              placeholder="Share details that help admin understand your creator journey."
+                              value={creatorNote}
+                              onChange={(event) =>
+                                setCreatorNote(event.target.value)
+                              }
+                            />
+                          </label>
+                          {creatorError ? (
+                            <p className={styles.error}>{creatorError}</p>
+                          ) : null}
+                          {creatorSuccess ? (
+                            <p className={styles.successBox}>{creatorSuccess}</p>
+                          ) : null}
+                          <div className={styles.actions}>
+                            <button
+                              type="button"
+                              className={styles.secondary}
+                              onClick={loadCreatorVerificationStatus}
+                              disabled={creatorLoading || creatorSubmitting}
+                            >
+                              Refresh status
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.primary}
+                              onClick={handleSubmitCreatorVerification}
+                              disabled={
+                                creatorSubmitting ||
+                                creatorLoading ||
+                                !creatorStatus.canRequest
+                              }
+                            >
+                              {creatorSubmitting
+                                ? "Submitting..."
+                                : "Request creator verification"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : null}
+
+                  {creatorError && !creatorStatus ? (
+                    <p className={styles.error}>{creatorError}</p>
                   ) : null}
                 </div>
               </>

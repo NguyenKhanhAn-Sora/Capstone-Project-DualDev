@@ -51,7 +51,6 @@
   line-height: 1.1;
   color: var(--cm-text-strong);
 }
-
 .subtitle {
   margin: 8px 0 0;
   color: var(--cm-text);
@@ -101,7 +100,7 @@
 }
 
 .filters {
-    gap: 36px;
+  gap: 36px;
 }
 
 .tabs {
@@ -148,59 +147,52 @@
 }
 
 .customSelectTrigger {
-  border: 1px solid #cad7ea;
-  border-radius: 10px;
-  background: linear-gradient(180deg, #fcfeff, #f2f7ff);
-  color: var(--cm-text-strong);
-  font: inherit;
   width: 100%;
-  min-height: 42px;
-  padding: 10px 38px 10px 12px;
-  display: flex;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #cad7ea;
+  background: #f8fbff;
+  color: var(--cm-text-strong);
+  padding: 0 10px 0 12px;
+  font-size: 13px;
+  display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  text-align: left;
+  gap: 10px;
   cursor: pointer;
-  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
-}
-
-.customSelectTrigger:hover {
-  border-color: #9eb7d8;
-  background: linear-gradient(180deg, #ffffff, #edf4ff);
 }
 
 .customSelectOpen .customSelectTrigger,
-.customSelect:focus-within .customSelectTrigger {
-  border-color: #2f70c2;
-  box-shadow: 0 0 0 3px rgba(47, 112, 194, 0.2);
+.customSelectTrigger:focus {
   outline: none;
+  border-color: #2f70c2;
+  box-shadow: 0 0 0 3px rgba(74, 163, 228, 0.18);
 }
 
 .customSelectMenu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   left: 0;
-  width: 100%;
+  right: 0;
   z-index: 40;
-  border: 1px solid #c5d4e8;
   border-radius: 10px;
+  border: 1px solid #cad7ea;
   background: #ffffff;
-  box-shadow: 0 14px 28px rgba(11, 26, 46, 0.2);
+  box-shadow: 0 14px 30px rgba(15, 22, 41, 0.18);
   padding: 6px;
   display: grid;
   gap: 4px;
-  max-height: 220px;
-  overflow: auto;
 }
 
 .customSelectOption {
+  height: 34px;
   border: none;
+  border-radius: 8px;
   background: transparent;
-  border-radius: 7px;
   color: var(--cm-text-strong);
-  font: inherit;
-  padding: 9px 10px;
+  padding: 0 10px;
   text-align: left;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -209,22 +201,24 @@
 }
 
 .customSelectOptionActive {
-  background: #1f5fac;
-  color: #ffffff;
+  background: #dbeafe;
+  color: #3470a2;
+  font-weight: 700;
 }
 
 .selectCaret {
-  position: absolute;
-  right: 11px;
-  width: 16px;
-  height: 16px;
-  color: #55749a;
-  pointer-events: none;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #627d98;
+  flex: 0 0 18px;
 }
 
 .selectCaret svg {
-  width: 100%;
-  height: 100%;
+  width: 16px;
+  height: 16px;
 }
 
 .filterItem {

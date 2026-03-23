@@ -161,6 +161,13 @@
   text-overflow: ellipsis;
 }
 
+.nameWithBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
 .subtitle {
   color: var(--color-muted);
   white-space: nowrap;

@@ -42,6 +42,7 @@ import {
   getInteractionMutedMessage,
   INTERACTION_MUTED_FALLBACK_MESSAGE,
 } from "@/lib/interaction-mute";
+import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 
 const REPORT_ANIMATION_MS = 200;
 const QUOTE_CHAR_LIMIT = 500;
@@ -1647,7 +1648,15 @@ function HashtagPostCard({
               className={`${feedStyles.authorName} ${feedStyles.authorNameLink}`}
               href={`/profile/${item.authorId}`}
             >
-              {item.authorDisplayName || item.author?.displayName || "User"}
+              <span className={feedStyles.nameWithBadge}>
+                {item.authorDisplayName || item.author?.displayName || "User"}
+                {Boolean(
+                  (item as any).authorIsCreatorVerified ??
+                    item.author?.isCreatorVerified,
+                ) ? (
+                  <VerifiedBadge />
+                ) : null}
+              </span>
             </a>
             <span className={feedStyles.authorSub}>
               {formatDistanceToNow(new Date(item.createdAt), {

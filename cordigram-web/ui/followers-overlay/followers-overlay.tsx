@@ -11,6 +11,7 @@ import {
   type FollowListItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 
 export type FollowersOverlayTab = "followers" | "following";
 
@@ -388,6 +389,7 @@ export default function FollowersOverlay(props: Props) {
               <div className={styles.identity}>
                 <Link href={toProfileHref(item)} className={styles.displayName}>
                   {item.displayName || item.username}
+                  <VerifiedBadge visible={item.isCreatorVerified} />
                 </Link>
                 <div className={styles.username}>@{item.username}</div>
               </div>

@@ -1,0 +1,9 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1d9bf0;
+  line-height: 0;
+  vertical-align: middle;
+  filter: drop-shadow(0 1px 3px rgba(21, 112, 239, 0.35));
+}

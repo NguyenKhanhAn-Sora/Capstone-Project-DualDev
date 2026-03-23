@@ -34,7 +34,6 @@ import {
   updatePostVisibility,
   updatePost,
   fetchCurrentProfile,
-  getAdsDashboard,
   searchProfiles,
   searchPosts,
   type ProfileSearchItem,
@@ -52,6 +51,7 @@ import {
   getInteractionMutedMessage,
   INTERACTION_MUTED_FALLBACK_MESSAGE,
 } from "@/lib/interaction-mute";
+import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 import styles from "./home-feed.module.css";
 
 type LocalFlags = {
@@ -712,6 +712,33 @@ export default function HomePage({
       .then(setViewerProfile)
       .catch(() => setViewerProfile(null));
   }, [token]);
+
+  useEffect(() => {
+    if (!viewerId) return;
+    if (!viewerProfile?.isCreatorVerified) return;
+
+    setItems((prev) =>
+      prev.map((entry) => {
+        if (entry.item.authorId !== viewerId) return entry;
+
+        const nextItem: FeedItem = {
+          ...entry.item,
+          authorIsCreatorVerified: true,
+          author: entry.item.author
+            ? {
+                ...entry.item.author,
+                isCreatorVerified: true,
+              }
+            : entry.item.author,
+        };
+
+        return {
+          ...entry,
+          item: nextItem,
+        };
+      }),
+    );
+  }, [viewerId, viewerProfile?.isCreatorVerified]);
 
   useScrollRestoration(
     "feed-scroll",
@@ -1558,6 +1585,7 @@ export default function HomePage({
             onView={onView}
             onBlockUser={onBlockIntent}
             viewerId={viewerId}
+            viewerIsCreatorVerified={Boolean(viewerProfile?.isCreatorVerified)}
             viewerUsername={viewerProfile?.username}
             onFollow={onFollow}
             token={token}
@@ -1858,6 +1886,7 @@ function FeedCard({
   onView,
   onBlockUser,
   viewerId,
+  viewerIsCreatorVerified,
   viewerUsername,
   onFollow,
   token,
@@ -1882,6 +1911,7 @@ function FeedCard({
   onView: (postId: string, durationMs?: number) => void;
   onBlockUser: (userId?: string, label?: string) => void | Promise<void>;
   viewerId?: string;
+  viewerIsCreatorVerified?: boolean;
   viewerUsername?: string;
   onFollow: (authorId: string, nextFollow: boolean) => void;
   token: string | null;
@@ -1935,15 +1965,6 @@ function FeedCard({
     if (!sponsored || isSponsoredRepost) return null;
     return parseSponsoredCreative(content || "");
   }, [content, sponsored, isSponsoredRepost]);
-  const adCtaLabel = ((data as any)?.cta ?? "").toString().trim();
-  const sourceSponsoredCtaLabel =
-    (sourceSponsoredCreative?.cta ?? "").toString().trim() ||
-    adCtaLabel ||
-    "Shop Now";
-  const sponsoredCtaLabel =
-    (sponsoredCreative?.cta ?? "").toString().trim() ||
-    adCtaLabel ||
-    "Shop Now";
   const renderedContent =
     sponsoredCreative?.primaryText || (isSponsoredRepost ? content : content);
   const sourceMedia =
@@ -2831,26 +2852,6 @@ function FeedCard({
     }
   }, [targetPostId, router, persistResume, onPersistFeedCache]);
 
-  const openAdsDetail = useCallback(async () => {
-    setMenuOpen(false);
-    if (!token || !promotedAdPostId) return;
-    try {
-      const dashboard = await getAdsDashboard({ token });
-      const matchedCampaign = (dashboard.campaigns ?? []).find(
-        (item) => item.promotedPostId === promotedAdPostId,
-      );
-      if (!matchedCampaign?.id) return;
-      const href = `/ads/campaigns/${matchedCampaign.id}`;
-      if (typeof window !== "undefined") {
-        window.location.href = href;
-      } else {
-        router.push(href);
-      }
-    } catch {
-      // Ignore transient errors for menu action.
-    }
-  }, [promotedAdPostId, router, token]);
-
   const quickOpenPost = useCallback(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem(FEED_CACHE_INTENT_KEY, "1");
@@ -3138,13 +3139,6 @@ function FeedCard({
 
   const authorOwnerId = authorId || author?.id;
   const isSelf = Boolean(viewerId && authorOwnerId === viewerId);
-  const isRepostSourceAuthor = Boolean(
-    (viewerId && repostOfAuthorId && viewerId === repostOfAuthorId) ||
-      (viewerUsername &&
-        repostOfAuthorUsername &&
-        viewerUsername.toLowerCase() === repostOfAuthorUsername.toLowerCase()),
-  );
-  const showAdsOwnerMenu = Boolean(sponsored && (isSelf || isRepostSourceAuthor));
   const shouldHideLikeStat = Boolean(hideLikeCount) && !isSelf;
   const displayHearts =
     (stats.hearts ?? 0) + (repostOf ? 0 : (repostHeartsBoost ?? 0));
@@ -3154,6 +3148,14 @@ function FeedCard({
   const repostSourceLabel =
     repostOfAuthorDisplayName ||
     (repostOfAuthorUsername ? `@${repostOfAuthorUsername}` : null);
+  const isAuthorCreatorVerified = Boolean(
+    (data as any).authorIsCreatorVerified ??
+      author?.isCreatorVerified ??
+      (isSelf && viewerIsCreatorVerified),
+  );
+  const isRepostAuthorCreatorVerified = Boolean(
+    (data as any).repostOfAuthorIsCreatorVerified,
+  );
   const repostSourceSubtitle = repostOfAuthorUsername
     ? `@${repostOfAuthorUsername} • Sponsored`
     : `${repostSourceLabel || t("repost.original")} • Sponsored`;
@@ -3828,10 +3830,18 @@ function FeedCard({
                   href={`/profile/${authorOwnerId}`}
                   className={`${styles.authorName} ${styles.authorNameLink}`}
                 >
-                  {authorLine}
+                  <span className={styles.nameWithBadge}>
+                    {authorLine}
+                    {isAuthorCreatorVerified ? <VerifiedBadge /> : null}
+                  </span>
                 </Link>
               ) : (
-                <span className={styles.authorName}>{authorLine}</span>
+                <span className={styles.authorName}>
+                  <span className={styles.nameWithBadge}>
+                    {authorLine}
+                    {isAuthorCreatorVerified ? <VerifiedBadge /> : null}
+                  </span>
+                </span>
               )}
 
               {showInlineFollow ? (
@@ -3900,25 +3910,7 @@ function FeedCard({
             </button>
             {menuOpen ? (
               <div className={styles.menuPopover} role="menu">
-                {showAdsOwnerMenu ? (
-                  <div className={styles.menuContent}>
-                    <button className={styles.menuItem} onClick={goToPost}>
-                      Go to ads
-                    </button>
-                    <button
-                      className={styles.menuItem}
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onCopyLink(id);
-                      }}
-                    >
-                      {t("menu.copyLink")}
-                    </button>
-                    <button className={styles.menuItem} onClick={openAdsDetail}>
-                      Ads detail
-                    </button>
-                  </div>
-                ) : isSelf ? (
+                {isSelf ? (
                   <div className={styles.menuContent}>
                     <button
                       className={styles.menuItem}
@@ -3977,7 +3969,7 @@ function FeedCard({
                     </button>
                     {repostOf ? (
                       <button className={styles.menuItem} onClick={goToPost}>
-                        Go to ads
+                        {t("menu.goToPost")}
                       </button>
                     ) : null}
                     <button
@@ -4003,7 +3995,7 @@ function FeedCard({
                   <div className={styles.menuContent}>
                     {repostOf ? (
                       <button className={styles.menuItem} onClick={goToPost}>
-                        Go to ads
+                        {t("menu.goToPost")}
                       </button>
                     ) : null}
                     <button
@@ -4154,7 +4146,10 @@ function FeedCard({
             )}
             <div className={styles.repostAdMeta}>
               <p className={styles.repostAdName}>
-                {repostSourceLabel || t("repost.original")}
+                <span className={styles.nameWithBadge}>
+                  {repostSourceLabel || t("repost.original")}
+                  {isRepostAuthorCreatorVerified ? <VerifiedBadge /> : null}
+                </span>
               </p>
               <p className={styles.repostAdSub}>{repostSourceSubtitle}</p>
             </div>
@@ -4221,7 +4216,7 @@ function FeedCard({
                   rel="noopener noreferrer"
                   onClick={onSponsoredCtaClick}
                 >
-                  {sourceSponsoredCtaLabel}
+                  {sourceSponsoredCreative.cta || "Shop Now"}
                 </a>
               ) : null}
             </div>
@@ -4343,7 +4338,7 @@ function FeedCard({
               rel="noopener noreferrer"
               onClick={onSponsoredCtaClick}
             >
-              {sponsoredCtaLabel}
+              {sponsoredCreative.cta || "Shop Now"}
             </a>
           ) : null}
         </div>
@@ -4478,22 +4473,41 @@ function SkeletonList({ count }: { count: number }) {
     <div className={styles.loaderRow}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className={`${styles.skeleton} ${styles.skeletonCard}`}>
-          <div className={styles.topBar}>
-            <div className={`${styles.skeleton} ${styles.topBarCircle}`} />
+          <div className={styles.skeletonBody}>
+            <div className={styles.topBar}>
+              <div className={`${styles.skeleton} ${styles.topBarCircle}`} />
+              <div>
+                <div
+                  className={`${styles.skeleton} ${styles.topBarLine} ${styles.topBarLineLong}`}
+                />
+                <div
+                  className={`${styles.skeleton} ${styles.topBarLine} ${styles.topBarLineShort}`}
+                  style={{ marginTop: 8 }}
+                />
+              </div>
+            </div>
             <div
-              className={`${styles.skeleton} ${styles.topBarLine}`}
-              style={{ width: "120px" }}
+              className={`${styles.skeleton} ${styles.contentLine} ${styles.contentLineFull}`}
             />
+            <div
+              className={`${styles.skeleton} ${styles.contentLine} ${styles.contentLineMid}`}
+            />
+            <div
+              className={`${styles.skeleton} ${styles.contentLine} ${styles.contentLineShort}`}
+            />
+            <div className={`${styles.skeleton} ${styles.mediaPh}`} />
+            <div className={styles.skeletonActionRow}>
+              <div
+                className={`${styles.skeleton} ${styles.skeletonActionPh} ${styles.skeletonActionPhWide}`}
+              />
+              <div
+                className={`${styles.skeleton} ${styles.skeletonActionPh} ${styles.skeletonActionPhMid}`}
+              />
+              <div
+                className={`${styles.skeleton} ${styles.skeletonActionPh} ${styles.skeletonActionPhShort}`}
+              />
+            </div>
           </div>
-          <div
-            className={`${styles.skeleton} ${styles.contentLine}`}
-            style={{ width: "90%" }}
-          />
-          <div
-            className={`${styles.skeleton} ${styles.contentLine}`}
-            style={{ width: "70%" }}
-          />
-          <div className={`${styles.skeleton} ${styles.mediaPh}`} />
         </div>
       ))}
     </div>

@@ -50,6 +50,108 @@ export class MailService {
     }).format(safeAmount);
   }
 
+  async sendCreatorVerificationApprovedEmail(params: {
+    email: string;
+    displayName?: string | null;
+  }): Promise<void> {
+    const greeting = params.displayName?.trim() || 'Creator';
+    const subject = 'Cordigram creator verification approved';
+    const text = [
+      `Hello ${greeting},`,
+      '',
+      'Your creator verification request has been approved.',
+      'Your account now has the blue check creator badge and creator privileges.',
+      '',
+      'Thanks for contributing quality content to Cordigram.',
+    ].join('\n');
+
+    const html = `
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:28px 10px;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
+        <tr>
+          <td align="center">
+            <table width="620" cellpadding="0" cellspacing="0" role="presentation" style="max-width:620px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 14px 34px rgba(15,23,42,0.10);">
+              <tr>
+                <td style="background:linear-gradient(135deg,#0ea5e9,#2563eb);padding:26px 28px;">
+                  <div style="font-size:24px;line-height:1.3;font-weight:800;color:#ffffff;">Creator verification approved</div>
+                  <div style="margin-top:8px;font-size:14px;color:#dbeafe;line-height:1.6;">You now have the blue check creator badge on Cordigram.</div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:22px 26px 26px;">
+                  <p style="margin:0 0 10px;color:#0f172a;font-size:15px;">Hello ${this.escapeHtml(greeting)},</p>
+                  <p style="margin:0 0 12px;color:#334155;font-size:14px;line-height:1.7;">Your creator verification request has been approved. You can now access creator-level privileges and selected benefits.</p>
+                  <p style="margin:0;color:#334155;font-size:14px;line-height:1.7;">Thank you for building a high-quality community experience.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>`;
+
+    await this.transporter.sendMail({
+      from: this.config.mailFrom,
+      to: params.email,
+      subject,
+      text,
+      html,
+    });
+  }
+
+  async sendCreatorVerificationRejectedEmail(params: {
+    email: string;
+    reason?: string | null;
+    cooldownUntil?: Date | null;
+  }): Promise<void> {
+    const reason = params.reason?.trim() || 'Your account does not currently meet the creator verification requirements.';
+    const nextDate = params.cooldownUntil
+      ? new Intl.DateTimeFormat('en-US', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(params.cooldownUntil)
+      : null;
+
+    const subject = 'Cordigram creator verification update';
+    const text = [
+      'Your creator verification request was not approved this time.',
+      `Reason: ${reason}`,
+      nextDate ? `You can submit a new request after: ${nextDate}` : null,
+      '',
+      'Please keep building consistent, high-quality engagement and try again.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const html = `
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:28px 10px;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
+        <tr>
+          <td align="center">
+            <table width="620" cellpadding="0" cellspacing="0" role="presentation" style="max-width:620px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 14px 34px rgba(15,23,42,0.10);">
+              <tr>
+                <td style="background:linear-gradient(135deg,#f59e0b,#ea580c);padding:26px 28px;">
+                  <div style="font-size:24px;line-height:1.3;font-weight:800;color:#ffffff;">Creator verification update</div>
+                  <div style="margin-top:8px;font-size:14px;color:#ffedd5;line-height:1.6;">This request was not approved yet.</div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:22px 26px 26px;">
+                  <p style="margin:0 0 10px;color:#334155;font-size:14px;line-height:1.7;">Reason: ${this.escapeHtml(reason)}</p>
+                  ${nextDate ? `<p style="margin:0;color:#334155;font-size:14px;line-height:1.7;">You can submit a new request after <strong>${this.escapeHtml(nextDate)}</strong>.</p>` : ''}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>`;
+
+    await this.transporter.sendMail({
+      from: this.config.mailFrom,
+      to: params.email,
+      subject,
+      text,
+      html,
+    });
+  }
+
   async sendAdsPaymentSuccessEmail(params: {
     email: string;
     campaignName?: string | null;

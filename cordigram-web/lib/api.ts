@@ -149,7 +149,10 @@ export type CreatePostResponse = {
     displayName?: string;
     username?: string;
     avatarUrl?: string;
+    isCreatorVerified?: boolean;
   };
+  authorIsCreatorVerified?: boolean;
+  repostOfAuthorIsCreatorVerified?: boolean;
   serverId?: string | null;
   channelId?: string | null;
   createdAt: string;
@@ -200,6 +203,7 @@ export type FeedItem = CreatePostResponse & {
     displayName?: string;
     username?: string;
     avatarUrl?: string;
+    isCreatorVerified?: boolean;
   };
   reposted?: boolean;
   authorId?: string;
@@ -211,7 +215,10 @@ export type FeedItem = CreatePostResponse & {
     username?: string;
     displayName?: string;
     avatarUrl?: string;
+    isCreatorVerified?: boolean;
   };
+  authorIsCreatorVerified?: boolean;
+  repostOfAuthorIsCreatorVerified?: boolean;
   flags?: {
     liked?: boolean;
     saved?: boolean;
@@ -261,7 +268,9 @@ export type CommentItem = {
     displayName?: string;
     username?: string;
     avatarUrl?: string;
+    isCreatorVerified?: boolean;
   };
+  authorIsCreatorVerified?: boolean;
   content: string;
   media?: CommentMedia | null;
   mentions?: Array<
@@ -1246,6 +1255,7 @@ export type FollowListItem = {
   username: string;
   displayName: string;
   avatarUrl: string;
+  isCreatorVerified?: boolean;
   isFollowing: boolean;
 };
 
@@ -1392,6 +1402,7 @@ export type CurrentProfileResponse = {
   displayName: string;
   username: string;
   avatarUrl: string;
+  isCreatorVerified?: boolean;
   status?: "active" | "pending" | "banned";
   signupStage?: "otp_pending" | "info_pending" | "completed";
   accountLimitedUntil?: string | null;
@@ -1515,6 +1526,59 @@ export type ViolationHistoryItem = {
 export type ViolationHistoryResponse = {
   currentStrikeTotal: number;
   items: ViolationHistoryItem[];
+};
+
+export type CreatorEligibilityResponse = {
+  criteria: {
+    minScore: number;
+    minAccountAgeDays: number;
+    minFollowersCount: number;
+    minPostsCount: number;
+    minActivePostingDays30d: number;
+    minEngagementPerPost30d: number;
+    maxRecentViolations90d: number;
+    cooldownDaysAfterRejected: number;
+  };
+  eligibility: {
+    score: number;
+    minimumScore: number;
+    accountAgeDays: number;
+    minAccountAgeDays: number;
+    followersCount: number;
+    minFollowersCount: number;
+    postsCount: number;
+    minPostsCount: number;
+    activePostingDays30d: number;
+    minActivePostingDays30d: number;
+    engagementPerPost30d: number;
+    minEngagementPerPost30d: number;
+    recentViolations90d: number;
+    maxRecentViolations90d: number;
+    eligible: boolean;
+    failedRequirements: string[];
+  };
+  account: {
+    isCreatorVerified: boolean;
+    creatorVerifiedAt: string | null;
+    roles: string[];
+  };
+  latestRequest: {
+    id: string;
+    status: "pending" | "approved" | "rejected";
+    requestNote: string;
+    decisionReason: string | null;
+    reviewedAt: string | null;
+    cooldownUntil: string | null;
+    createdAt: string | null;
+  } | null;
+  canRequest: boolean;
+};
+
+export type CreatorVerificationSubmitResponse = {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string | null;
+  requestNote: string;
 };
 
 export type NotificationUnreadCountResponse = {
@@ -1683,6 +1747,34 @@ export async function fetchViolationHistory(opts: {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+  });
+}
+
+export async function fetchCreatorVerificationStatus(opts: {
+  token: string;
+}): Promise<CreatorEligibilityResponse> {
+  const { token } = opts;
+  return apiFetch<CreatorEligibilityResponse>({
+    path: "/creator-verification/me",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function submitCreatorVerificationRequest(opts: {
+  token: string;
+  note?: string;
+}): Promise<CreatorVerificationSubmitResponse> {
+  const { token, note } = opts;
+  return apiFetch<CreatorVerificationSubmitResponse>({
+    path: "/creator-verification/request",
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ note }),
   });
 }
 
@@ -2082,6 +2174,7 @@ export type ProfileSearchItem = {
   displayName: string;
   avatarUrl: string;
   followersCount: number;
+  isCreatorVerified?: boolean;
 };
 
 export type ProfileFieldVisibility = "public" | "followers" | "private";
@@ -2121,6 +2214,7 @@ export type ProfileDetailResponse = {
     followers: number;
     following: number;
   };
+  isCreatorVerified?: boolean;
   isFollowing?: boolean;
 };
 

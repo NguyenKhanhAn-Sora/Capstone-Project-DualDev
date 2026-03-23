@@ -31,6 +31,7 @@ import { EventsModule } from './events/events.module';
 import { InboxModule } from './inbox/inbox.module';
 import { ServerInvitesModule } from './server-invites/server-invites.module';
 import { PaymentsModule } from './payments/payments.module';
+import { CreatorVerificationModule } from './creator-verification/creator-verification.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { PaymentsModule } from './payments/payments.module';
     InboxModule,
     ServerInvitesModule,
     PaymentsModule,
+    CreatorVerificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

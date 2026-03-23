@@ -137,6 +137,12 @@ export class User extends Document {
   @Prop({ type: Boolean, default: false })
   isVerified: boolean;
 
+  @Prop({ type: Boolean, default: false })
+  isCreatorVerified: boolean;
+
+  @Prop({ type: Date, default: null })
+  creatorVerificationApprovedAt?: Date | null;
+
   @Prop({ type: String, default: 'otp_pending' })
   signupStage: 'otp_pending' | 'info_pending' | 'completed';
 

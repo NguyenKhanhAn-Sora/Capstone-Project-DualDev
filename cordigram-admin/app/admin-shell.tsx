@@ -9,7 +9,7 @@ import styles from "./admin-shell.module.css";
 type NavItem = {
   href: string;
   label: string;
-  icon: "dashboard" | "report" | "resolved" | "moderation" | "content" | "audit" | "broadcast";
+  icon: "dashboard" | "report" | "resolved" | "moderation" | "content" | "audit" | "broadcast" | "verification";
   matcher: (pathname: string) => boolean;
 };
 
@@ -68,6 +68,14 @@ function NavIcon({ icon }: { icon: NavItem["icon"] }) {
     );
   }
 
+  if (icon === "verification") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m12 2.8 2.7 5.4 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.1l6-.9Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
@@ -118,6 +126,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Broadcast Notice",
     icon: "broadcast",
     matcher: (pathname) => pathname === "/broadcast-notice" || pathname.startsWith("/broadcast-notice/"),
+  },
+  {
+    href: "/creator-verification",
+    label: "Creator Verification",
+    icon: "verification",
+    matcher: (pathname) => pathname === "/creator-verification" || pathname.startsWith("/creator-verification/"),
   },
 ];
 

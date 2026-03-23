@@ -52,6 +52,7 @@ import {
   getInteractionMutedMessage,
   INTERACTION_MUTED_FALLBACK_MESSAGE,
 } from "@/lib/interaction-mute";
+import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 
 function upsertById(list: CommentItem[], incoming: CommentItem): CommentItem[] {
   const idx = list.findIndex((c) => c.id === incoming.id);
@@ -3620,10 +3621,26 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                     href={`/profile/${commentProfileId}`}
                     className={`${styles.commentAuthorLink}`}
                   >
-                    @{comment.author?.username || "User"}
+                    <span className={styles.nameWithBadge}>
+                      @{comment.author?.username || "User"}
+                      {Boolean(
+                        comment.authorIsCreatorVerified ??
+                          comment.author?.isCreatorVerified,
+                      ) ? (
+                        <VerifiedBadge />
+                      ) : null}
+                    </span>
                   </Link>
                 ) : (
-                  <>@{comment.author?.username || "User"}</>
+                  <span className={styles.nameWithBadge}>
+                    @{comment.author?.username || "User"}
+                    {Boolean(
+                      comment.authorIsCreatorVerified ??
+                        comment.author?.isCreatorVerified,
+                    ) ? (
+                      <VerifiedBadge />
+                    ) : null}
+                  </span>
                 )}
               </div>
               {isPostAuthorComment || isPostAuthorUsername ? (
@@ -4872,11 +4889,27 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                   href={`/profile/${authorProfileId}`}
                   className={`${styles.authorHandle} ${styles.authorHandleLink}`}
                 >
-                  @{post.authorUsername}
+                  <span className={styles.nameWithBadge}>
+                    @{post.authorUsername}
+                    {Boolean(
+                      (post as any).authorIsCreatorVerified ??
+                        post.author?.isCreatorVerified,
+                    ) ? (
+                      <VerifiedBadge />
+                    ) : null}
+                  </span>
                 </Link>
               ) : (
                 <div className={styles.authorHandle}>
-                  @{post.authorUsername}
+                  <span className={styles.nameWithBadge}>
+                    @{post.authorUsername}
+                    {Boolean(
+                      (post as any).authorIsCreatorVerified ??
+                        post.author?.isCreatorVerified,
+                    ) ? (
+                      <VerifiedBadge />
+                    ) : null}
+                  </span>
                 </div>
               )
             ) : null}

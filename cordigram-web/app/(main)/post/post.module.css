@@ -392,6 +392,12 @@
   font-weight: 700;
 }
 
+.nameWithBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .sponsoredMarker {
   display: inline-flex;
   align-items: center;
