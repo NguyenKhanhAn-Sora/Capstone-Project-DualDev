@@ -2713,6 +2713,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           content: updated.content,
           mentions: updated.mentions,
           media: updated.media ?? uploadedMedia ?? null,
+          linkPreviews: updated.linkPreviews ?? [],
           updatedAt: updated.updatedAt ?? c.updatedAt,
         }));
 
@@ -3661,6 +3662,71 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                 {renderCommentContent(comment)}
               </div>
             ) : null}
+            {Array.isArray(comment.linkPreviews) && comment.linkPreviews.length ? (
+              <div className={styles.commentLinkPreviewList}>
+                {comment.linkPreviews.slice(0, 3).map((preview, index) => {
+                  const href =
+                    preview?.canonicalUrl?.trim() || preview?.url?.trim() || "";
+                  if (!href) return null;
+                  const title =
+                    preview?.title?.trim() ||
+                    preview?.siteName?.trim() ||
+                    preview?.domain?.trim() ||
+                    "Open link";
+                  const subtitle =
+                    preview?.description?.trim() ||
+                    preview?.domain?.trim() ||
+                    "";
+                  let fallbackDomain = "";
+                  try {
+                    fallbackDomain = new URL(href).hostname;
+                  } catch {
+                    fallbackDomain = "";
+                  }
+
+                  return (
+                    <a
+                      key={`${comment.id}-preview-${index}-${href}`}
+                      className={styles.commentLinkPreview}
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      {preview?.image ? (
+                        <img
+                          className={styles.commentLinkPreviewImage}
+                          src={preview.image}
+                          alt={title}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className={styles.commentLinkPreviewImageFallback}>
+                          {preview?.favicon ? (
+                            <img
+                              className={styles.commentLinkPreviewFavicon}
+                              src={preview.favicon}
+                              alt=""
+                              loading="lazy"
+                            />
+                          ) : null}
+                        </div>
+                      )}
+                      <div className={styles.commentLinkPreviewBody}>
+                        <span className={styles.commentLinkPreviewTitle}>{title}</span>
+                        {subtitle ? (
+                          <span className={styles.commentLinkPreviewDesc}>
+                            {subtitle}
+                          </span>
+                        ) : null}
+                        <span className={styles.commentLinkPreviewDomain}>
+                          {preview?.domain || fallbackDomain}
+                        </span>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            ) : null}
             {comment.media ? (
               <div
                 className={`${styles.commentMedia} ${
@@ -3917,7 +3983,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       }
     });
     const parts: JSX.Element[] = [];
-    const regex = /@([a-zA-Z0-9_.]{1,30})/g;
+    const regex = /(https?:\/\/[^\s<>()\[\]{}"']+)|@([a-zA-Z0-9_.]{1,30})/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
 
@@ -3931,25 +3997,56 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         );
       }
 
-      const handle = match[1];
-      const lower = handle.toLowerCase();
-      const meta = mentionMap.get(lower);
-      const hasId = Boolean(meta?.userId);
-      const isKnown = hasId;
+      const urlMatch = match[1];
+      const mentionMatch = match[2];
 
-      parts.push(
-        isKnown ? (
-          <Link
-            key={`mention-${comment.id}-${start}`}
-            href={`/profile/${meta?.userId}`}
-            className={feedStyles.mentionLink}
+      if (urlMatch) {
+        const url = urlMatch.replace(/[),.;!?]+$/g, "");
+        const trailing = urlMatch.slice(url.length);
+
+        parts.push(
+          <a
+            key={`url-${comment.id}-${start}`}
+            href={url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className={styles.commentUrlLink}
           >
-            @{handle}
-          </Link>
-        ) : (
-          <span key={`mention-${comment.id}-${start}`}>@{handle}</span>
-        ),
-      );
+            {url}
+          </a>,
+        );
+
+        if (trailing) {
+          parts.push(
+            <span key={`url-trailing-${comment.id}-${start}`}>{trailing}</span>,
+          );
+        }
+
+        lastIndex = start + urlMatch.length;
+        continue;
+      }
+
+      const handle = mentionMatch;
+      if (handle) {
+        const lower = handle.toLowerCase();
+        const meta = mentionMap.get(lower);
+        const hasId = Boolean(meta?.userId);
+        const isKnown = hasId;
+
+        parts.push(
+          isKnown ? (
+            <Link
+              key={`mention-${comment.id}-${start}`}
+              href={`/profile/${meta?.userId}`}
+              className={feedStyles.mentionLink}
+            >
+              @{handle}
+            </Link>
+          ) : (
+            <span key={`mention-${comment.id}-${start}`}>@{handle}</span>
+          ),
+        );
+      }
 
       lastIndex = start + match[0].length;
     }

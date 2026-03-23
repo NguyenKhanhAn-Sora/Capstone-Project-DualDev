@@ -259,6 +259,17 @@ export type CommentMedia = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type CommentLinkPreview = {
+  url: string;
+  canonicalUrl?: string | null;
+  domain?: string | null;
+  siteName?: string | null;
+  title?: string | null;
+  description?: string | null;
+  image?: string | null;
+  favicon?: string | null;
+};
+
 export type CommentItem = {
   id: string;
   postId: string;
@@ -273,6 +284,7 @@ export type CommentItem = {
   authorIsCreatorVerified?: boolean;
   content: string;
   media?: CommentMedia | null;
+  linkPreviews?: CommentLinkPreview[];
   mentions?: Array<
     | string
     | {

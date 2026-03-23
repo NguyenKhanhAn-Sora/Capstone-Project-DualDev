@@ -21,6 +21,7 @@ import { ConfigService } from '../config/config.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ActivityLogService } from '../activity/activity.service';
 import { User } from '../users/user.schema';
+import { LinkPreviewService } from './link-preview.service';
 
 type UploadedFile = {
   originalname: string;
@@ -49,6 +50,7 @@ export class CommentsService {
     private readonly config: ConfigService,
     private readonly notificationsService: NotificationsService,
     private readonly activityLogService: ActivityLogService,
+    private readonly linkPreviewService: LinkPreviewService,
   ) {}
 
   private async getCreatorVerifiedMap(userIds: Types.ObjectId[]) {
@@ -126,6 +128,7 @@ export class CommentsService {
     }
 
     const mentions = this.normalizeMentions(dto.mentions, content);
+    const linkPreviews = await this.linkPreviewService.extractFromText(content);
 
     const created = await this.commentModel.create({
       postId: postObjectId,
@@ -133,6 +136,7 @@ export class CommentsService {
       content,
       mentions,
       media,
+      linkPreviews,
       parentId,
       rootCommentId,
       deletedAt: null,
@@ -997,6 +1001,9 @@ export class CommentsService {
       dto.mentions ?? comment.mentions ?? [],
       nextContent,
     );
+    const linkPreviews = await this.linkPreviewService.extractFromText(
+      nextContent,
+    );
     const nextMentionNames = mentions.map((m) => m.username);
     const addedMentions = nextMentionNames.filter(
       (m) => !prevMentionNames.includes(m),
@@ -1010,6 +1017,7 @@ export class CommentsService {
             content: nextContent,
             mentions,
             media: nextMedia,
+            linkPreviews,
             updatedAt: new Date(),
           },
         },
@@ -1038,6 +1046,7 @@ export class CommentsService {
         content: nextContent,
         mentions,
         media: nextMedia,
+        linkPreviews,
         updatedAt: new Date(),
       },
       profile || null,
@@ -1195,6 +1204,18 @@ export class CommentsService {
             metadata: (comment as any).media?.metadata ?? null,
           }
         : null,
+      linkPreviews: Array.isArray((comment as any).linkPreviews)
+        ? (comment as any).linkPreviews.map((item: any) => ({
+            url: item?.url ?? null,
+            canonicalUrl: item?.canonicalUrl ?? null,
+            domain: item?.domain ?? null,
+            siteName: item?.siteName ?? null,
+            title: item?.title ?? null,
+            description: item?.description ?? null,
+            image: item?.image ?? null,
+            favicon: item?.favicon ?? null,
+          }))
+        : [],
       parentId: comment.parentId?.toString?.() ?? null,
       rootCommentId: comment.rootCommentId?.toString?.() ?? null,
       pinnedAt: comment.pinnedAt ?? null,

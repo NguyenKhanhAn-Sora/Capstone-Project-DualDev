@@ -10,6 +10,7 @@ import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { Follow, FollowSchema } from '../users/follow.schema';
 import { CommentsController } from './comments.controller';
 import { CommentsService } from './comments.service';
+import { LinkPreviewService } from './link-preview.service';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ActivityModule } from '../activity/activity.module';
@@ -33,7 +34,7 @@ import { User, UserSchema } from '../users/user.schema';
     ]),
   ],
   controllers: [CommentsController],
-  providers: [CommentsService],
+  providers: [CommentsService, LinkPreviewService],
   exports: [CommentsService],
 })
 export class CommentsModule {}

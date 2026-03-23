@@ -8,6 +8,33 @@ export type CommentModerationState =
   | 'removed';
 
 @Schema({ _id: false })
+export class CommentLinkPreview {
+  @Prop({ type: String, required: true, trim: true })
+  url: string;
+
+  @Prop({ type: String, required: true, trim: true })
+  canonicalUrl: string;
+
+  @Prop({ type: String, required: true, trim: true })
+  domain: string;
+
+  @Prop({ type: String, default: null, trim: true })
+  siteName?: string | null;
+
+  @Prop({ type: String, default: null, trim: true })
+  title?: string | null;
+
+  @Prop({ type: String, default: null, trim: true })
+  description?: string | null;
+
+  @Prop({ type: String, default: null, trim: true })
+  image?: string | null;
+
+  @Prop({ type: String, default: null, trim: true })
+  favicon?: string | null;
+}
+
+@Schema({ _id: false })
 export class CommentMedia {
   @Prop({ type: String, enum: ['image', 'video'], required: true })
   type: 'image' | 'video';
@@ -20,6 +47,7 @@ export class CommentMedia {
 }
 
 const CommentMediaSchema = SchemaFactory.createForClass(CommentMedia);
+const CommentLinkPreviewSchema = SchemaFactory.createForClass(CommentLinkPreview);
 
 @Schema({ timestamps: true })
 export class Comment extends Document {
@@ -44,6 +72,9 @@ export class Comment extends Document {
 
   @Prop({ type: CommentMediaSchema, default: null })
   media?: CommentMedia | null;
+
+  @Prop({ type: [CommentLinkPreviewSchema], default: [] })
+  linkPreviews?: CommentLinkPreview[];
 
   @Prop({
     type: [
