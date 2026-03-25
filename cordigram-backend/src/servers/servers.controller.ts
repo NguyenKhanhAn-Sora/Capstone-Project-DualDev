@@ -343,4 +343,23 @@ export class ServersController {
       body.newOwnerId,
     );
   }
+
+  @Post(':id/categories')
+  async createCategory(
+    @Param('id') serverId: string,
+    @Body() body: { name: string; isPrivate?: boolean },
+    @Request() req: any,
+  ) {
+    return this.serversService.createCategory(
+      serverId,
+      req.user.userId,
+      body.name,
+      body.isPrivate ?? false,
+    );
+  }
+
+  @Get(':id/categories')
+  async getCategories(@Param('id') serverId: string) {
+    return this.serversService.getCategories(serverId);
+  }
 }

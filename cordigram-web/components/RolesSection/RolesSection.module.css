@@ -7,17 +7,17 @@
 .error {
   padding: 40px;
   text-align: center;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .error {
-  color: #ed4245;
+  color: var(--color-panel-danger);
 }
 
 .retryBtn {
   margin-top: 12px;
   padding: 8px 16px;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: white;
   border: none;
   border-radius: 4px;
@@ -26,7 +26,7 @@
 }
 
 .retryBtn:hover {
-  background: #4752c4;
+  background: var(--color-panel-accent-hover);
 }
 
 /* Banner */
@@ -77,8 +77,8 @@
 
 .createBtn {
   padding: 10px 20px;
-  background: white;
-  color: #5865f2;
+  background: var(--color-panel-bg);
+  color: var(--color-panel-accent);
   border: none;
   border-radius: 4px;
   font-size: 14px;
@@ -88,7 +88,7 @@
 }
 
 .createBtn:hover {
-  background: #f2f3f5;
+  background: var(--color-panel-hover);
 }
 
 /* Roles List */
@@ -103,14 +103,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.15s;
 }
 
 .roleItem:hover {
-  background: #35373c;
+  background: var(--color-panel-hover);
 }
 
 .roleInfo {
@@ -130,27 +130,27 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #3f4147;
+  background: var(--color-panel-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   flex-shrink: 0;
 }
 
 .roleName {
   font-size: 16px;
   font-weight: 500;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .defaultRole {
   margin-top: 16px;
-  background: #1e1f22;
+  background: var(--color-panel-deep);
 }
 
 .defaultRole:hover {
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
 }
 
 .defaultRoleText {
@@ -161,11 +161,11 @@
 
 .roleDesc {
   font-size: 12px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .roleArrow {
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   display: flex;
   align-items: center;
 }

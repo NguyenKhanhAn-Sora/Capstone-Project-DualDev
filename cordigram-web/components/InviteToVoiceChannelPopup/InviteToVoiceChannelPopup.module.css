@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -16,7 +16,7 @@
 
 .modal {
   position: relative;
-  background: #313338;
+  background: var(--color-panel-bg);
   border-radius: 12px;
   width: 90%;
   max-width: 440px;
@@ -24,6 +24,7 @@
   display: flex;
   flex-direction: column;
   padding: 24px;
+  border: 1px solid var(--color-panel-border);
   animation: slideUp 0.3s ease-out;
 }
 
@@ -34,11 +35,10 @@
 
 .closeBtn {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 16px; right: 16px;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 24px;
   cursor: pointer;
   padding: 0;
@@ -51,22 +51,22 @@
 }
 
 .closeBtn:hover {
-  color: #f2f3f5;
-  background: #1e1f22;
+  color: var(--color-panel-text);
+  background: var(--color-panel-hover);
 }
 
 .headerTitle {
   margin: 0 0 4px;
   font-size: 18px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   padding-right: 36px;
 }
 
 .headerSub {
   margin: 0 0 16px;
   font-size: 13px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -74,21 +74,23 @@
 
 .searchWrap {
   margin-bottom: 12px;
+  position: relative;
 }
 
 .searchInput {
   width: 100%;
   padding: 10px 12px 10px 36px;
   border-radius: 4px;
-  border: none;
-  background: #1e1f22;
-  color: #f2f3f5;
+  border: 1px solid var(--color-panel-deep-border);
+  background: var(--color-panel-deep);
+  color: var(--color-panel-text);
   font-size: 14px;
   box-sizing: border-box;
+  outline: none;
 }
 
-.searchWrap {
-  position: relative;
+.searchInput:focus {
+  border-color: var(--color-panel-accent);
 }
 
 .searchWrap svg {
@@ -96,7 +98,7 @@
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   pointer-events: none;
 }
 
@@ -106,7 +108,7 @@
   gap: 4px;
   font-size: 12px;
   font-weight: 600;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.02em;
   margin-bottom: 8px;
@@ -127,14 +129,14 @@
 }
 
 .friendRow:hover {
-  background: #36373d;
+  background: var(--color-panel-hover);
 }
 
 .friendAvatar {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -155,19 +157,19 @@
 .friendDisplayName {
   font-size: 14px;
   font-weight: 500;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .friendUsername {
   font-size: 12px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .inviteFriendBtn {
   padding: 6px 14px;
   border-radius: 4px;
   border: none;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: #fff;
   font-size: 13px;
   font-weight: 500;
@@ -176,7 +178,7 @@
 }
 
 .inviteFriendBtn:hover {
-  background: #4752c4;
+  background: var(--color-panel-accent-hover);
 }
 
 .dividerWrap {
@@ -186,7 +188,7 @@
 
 .dividerText {
   font-size: 13px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   margin: 0 0 12px;
 }
 
@@ -200,17 +202,18 @@
   flex: 1;
   padding: 10px 12px;
   border-radius: 4px;
-  border: none;
-  background: #1e1f22;
-  color: #f2f3f5;
+  border: 1px solid var(--color-panel-deep-border);
+  background: var(--color-panel-deep);
+  color: var(--color-panel-text);
   font-size: 13px;
+  outline: none;
 }
 
 .copyBtn {
   padding: 10px 20px;
   border-radius: 4px;
   border: none;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: #fff;
   font-size: 14px;
   font-weight: 500;
@@ -219,21 +222,21 @@
 }
 
 .copyBtn:hover {
-  background: #4752c4;
+  background: var(--color-panel-accent-hover);
 }
 
 .copyBtn.copied {
-  background: #248046;
+  background: var(--color-panel-success);
 }
 
 .expireNote {
   margin: 0;
   font-size: 12px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .expireNote a {
-  color: #00a8fc;
+  color: var(--color-panel-accent);
   text-decoration: none;
 }
 
@@ -244,5 +247,5 @@
 .emptyFriends {
   padding: 12px 0;
   font-size: 13px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }

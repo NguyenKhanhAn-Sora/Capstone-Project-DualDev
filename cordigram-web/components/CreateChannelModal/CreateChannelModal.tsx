@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import styles from "./CreateChannelModal.module.css";
+import ChatEmojiPicker from "@/components/ChatEmojiPicker/ChatEmojiPicker";
 
 export type ChannelTypeForCreate = "text" | "voice";
 
@@ -9,7 +10,6 @@ interface CreateChannelModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultType?: ChannelTypeForCreate;
-  sectionLabel?: string;
   onCreateChannel: (name: string, type: "text" | "voice", isPrivate: boolean) => Promise<void>;
 }
 
@@ -17,21 +17,37 @@ export default function CreateChannelModal({
   isOpen,
   onClose,
   defaultType = "text",
-  sectionLabel,
   onCreateChannel,
 }: CreateChannelModalProps) {
   const [channelType, setChannelType] = useState<ChannelTypeForCreate>(defaultType);
   const [channelName, setChannelName] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setChannelType(defaultType);
       setChannelName("");
       setIsPrivate(false);
+      setShowEmojiPicker(false);
     }
   }, [isOpen, defaultType]);
+
+  const insertText = (text: string) => {
+    const input = inputRef.current;
+    if (!input) return;
+    const start = input.selectionStart ?? channelName.length;
+    const end = input.selectionEnd ?? channelName.length;
+    const newVal = channelName.slice(0, start) + text + channelName.slice(end);
+    setChannelName(newVal);
+    setShowEmojiPicker(false);
+    setTimeout(() => {
+      input.focus();
+      input.setSelectionRange(start + text.length, start + text.length);
+    }, 0);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,21 +66,14 @@ export default function CreateChannelModal({
 
   if (!isOpen) return null;
 
-  const subtitle = sectionLabel
-    ? `trong ${sectionLabel}`
-    : channelType === "text"
-      ? "trong Kênh Chat"
-      : "trong Kênh đàm thoại";
-
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Đóng">
-          ×
+          &times;
         </button>
         <form onSubmit={handleSubmit}>
           <h2 className={styles.title}>Tạo kênh</h2>
-          <p className={styles.subtitle}>{subtitle}</p>
 
           <div className={styles.section}>
             <label className={styles.sectionLabel}>Loại Kênh</label>
@@ -80,9 +89,7 @@ export default function CreateChannelModal({
                 <span className={styles.typeIcon}>#</span>
                 <div>
                   <span className={styles.typeName}>Văn bản</span>
-                  <p className={styles.typeDesc}>
-                    Gửi tin nhắn, hình ảnh, ảnh GIF, emoji, ý kiến, và chơi chữ
-                  </p>
+                  <p className={styles.typeDesc}>Gửi tin nhắn, hình ảnh, ảnh GIF, emoji, ý kiến, và chơi chữ</p>
                 </div>
               </label>
               <label className={styles.typeOption}>
@@ -102,10 +109,8 @@ export default function CreateChannelModal({
                   </svg>
                 </span>
                 <div>
-                  <span className={styles.typeName}>Giọng nói</span>
-                  <p className={styles.typeDesc}>
-                    Cùng gặp mặt bằng gọi thoại, video, và chia sẻ màn hình
-                  </p>
+                  <span className={styles.typeName}>Giọ ng nói</span>
+                  <p className={styles.typeDesc}>Cùng gặp mặt bằng gọi thoại, video, và chia sẻ màn hình</p>
                 </div>
               </label>
             </div>
@@ -116,6 +121,7 @@ export default function CreateChannelModal({
             <div className={styles.nameInputWrap}>
               <span className={styles.namePrefix}>#</span>
               <input
+                ref={inputRef}
                 type="text"
                 className={styles.nameInput}
                 value={channelName}
@@ -123,6 +129,23 @@ export default function CreateChannelModal({
                 placeholder="kênh-mới"
                 maxLength={100}
               />
+              <div className={styles.emojiWrapper}>
+                <button
+                  type="button"
+                  className={styles.emojiBtn}
+                  onClick={() => setShowEmojiPicker((p) => !p)}
+                  title="Thêm emoji / kaomoji"
+                >
+                  &#128522;
+                </button>
+                {showEmojiPicker && (
+                  <ChatEmojiPicker
+                    onSelect={insertText}
+                    onClose={() => setShowEmojiPicker(false)}
+                    position="bottom"
+                  />
+                )}
+              </div>
             </div>
           </div>
 
@@ -130,9 +153,7 @@ export default function CreateChannelModal({
             <div className={styles.privateRow}>
               <div>
                 <span className={styles.privateLabel}>Kênh Riêng</span>
-                <p className={styles.privateDesc}>
-                  Chỉ có thành viên và vai trò được chọn mới có thể nhìn thấy kênh này.
-                </p>
+                <p className={styles.privateDesc}>Chỉ có thành viên và vai trò được chọn mới có thể nhìn thấy kênh này.</p>
               </div>
               <button
                 type="button"
@@ -147,9 +168,7 @@ export default function CreateChannelModal({
           </div>
 
           <div className={styles.footer}>
-            <button type="button" className={styles.cancelBtn} onClick={onClose}>
-              Hủy bỏ
-            </button>
+            <button type="button" className={styles.cancelBtn} onClick={onClose}>Hủy bỏ</button>
             <button type="submit" className={styles.submitBtn} disabled={isSubmitting}>
               {isSubmitting ? "Đang tạo..." : "Tạo kênh"}
             </button>

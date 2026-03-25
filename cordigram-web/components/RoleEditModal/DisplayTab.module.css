@@ -14,32 +14,33 @@
 .label {
   font-size: 12px;
   font-weight: 700;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   text-transform: uppercase;
 }
 
 .required {
-  color: #ed4245;
+  color: var(--color-panel-danger);
 }
 
 .hint {
   font-size: 14px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   margin: 0;
 }
 
 .input {
   padding: 10px 12px;
-  background: #1e1f22;
-  border: none;
+  background: var(--color-panel-deep);
+  border: 1px solid var(--color-panel-deep-border);
   border-radius: 4px;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 16px;
   outline: none;
 }
 
 .input:focus {
-  box-shadow: 0 0 0 2px #5865f2;
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
 }
 
 .input:disabled {
@@ -58,7 +59,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border-radius: 8px;
   border: 2px solid transparent;
   min-width: 200px;
@@ -68,7 +69,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #1e1f22;
+  background: var(--color-panel-deep);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -87,13 +88,13 @@
 
 .previewRole {
   font-size: 12px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .previewBadge {
   margin-left: auto;
   padding: 4px 8px;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   border-radius: 4px;
   font-size: 10px;
   font-weight: 600;
@@ -108,7 +109,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px 0;
-  border-bottom: 1px solid #3f4147;
+  border-bottom: 1px solid var(--color-panel-border);
 }
 
 .toggleInfo {
@@ -121,19 +122,19 @@
 .toggleLabel {
   font-size: 16px;
   font-weight: 500;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .toggleHint {
   font-size: 14px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .toggle {
   width: 44px;
   height: 24px;
   border-radius: 12px;
-  background: #4e5058;
+  background: var(--color-panel-neutral);
   border: none;
   cursor: pointer;
   padding: 2px;
@@ -147,7 +148,7 @@
 }
 
 .toggleOn {
-  background: #23a55a;
+  background: var(--color-panel-success);
 }
 
 .toggleThumb {
@@ -170,7 +171,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border-radius: 8px;
 }
 
@@ -184,12 +185,12 @@
 .viewAsRoleTitle {
   font-size: 16px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .viewAsRoleDesc {
   font-size: 14px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .viewAsRoleBtn {
@@ -198,9 +199,9 @@
   gap: 8px;
   padding: 10px 16px;
   background: transparent;
-  border: 1px solid #4e5058;
+  border: 1px solid var(--color-panel-border);
   border-radius: 4px;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -208,7 +209,7 @@
 }
 
 .viewAsRoleBtn:hover:not(:disabled) {
-  background: #35373c;
+  background: var(--color-panel-hover);
 }
 
 .viewAsRoleBtn:disabled {
@@ -226,14 +227,15 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px;
-  background: #111214;
+  background: var(--color-panel-context);
+  border-top: 1px solid var(--color-panel-border);
   border-radius: 4px 4px 0 0;
   z-index: 10;
 }
 
 .saveBarText {
   font-size: 14px;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .saveBarActions {
@@ -245,7 +247,7 @@
   padding: 8px 16px;
   background: transparent;
   border: none;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -257,7 +259,7 @@
 
 .saveBtn {
   padding: 8px 16px;
-  background: #23a55a;
+  background: var(--color-panel-success);
   border: none;
   border-radius: 4px;
   color: white;
@@ -267,7 +269,7 @@
 }
 
 .saveBtn:hover:not(:disabled) {
-  background: #1a7d45;
+  background: var(--color-panel-success-hover);
 }
 
 .saveBtn:disabled {

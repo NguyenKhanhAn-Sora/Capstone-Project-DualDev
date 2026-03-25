@@ -2861,6 +2861,7 @@ export async function sendDirectMessage(
     giphyId?: string;
     voiceUrl?: string;
     voiceDuration?: number;
+    replyTo?: string;
   },
 ): Promise<any> {
   const token =
@@ -2881,6 +2882,7 @@ export async function sendDirectMessage(
       giphyId: opts.giphyId || undefined,
       voiceUrl: opts.voiceUrl || undefined,
       voiceDuration: opts.voiceDuration || undefined,
+      replyTo: opts.replyTo || undefined,
     }),
   });
 }

@@ -15,27 +15,28 @@
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   pointer-events: none;
 }
 
 .searchInput {
   width: 100%;
   padding: 10px 12px 10px 40px;
-  background: #1e1f22;
-  border: none;
+  background: var(--color-panel-deep);
+  border: 1px solid var(--color-panel-deep-border);
   border-radius: 4px;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 14px;
   outline: none;
 }
 
 .searchInput::placeholder {
-  color: #6d6f78;
+  color: var(--color-panel-text-faint);
 }
 
 .searchInput:focus {
-  box-shadow: 0 0 0 2px #5865f2;
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
 }
 
 /* Section */
@@ -48,7 +49,7 @@
 .sectionTitle {
   font-size: 12px;
   font-weight: 700;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   text-transform: uppercase;
   margin: 0;
   padding: 16px 0 8px;
@@ -66,7 +67,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px 0;
-  border-bottom: 1px solid #3f4147;
+  border-bottom: 1px solid var(--color-panel-border);
 }
 
 .permissionItem:last-child {
@@ -83,12 +84,12 @@
 .permissionLabel {
   font-size: 16px;
   font-weight: 500;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .permissionDesc {
   font-size: 14px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   line-height: 1.4;
 }
 
@@ -114,7 +115,7 @@
   width: 44px;
   height: 24px;
   border-radius: 12px;
-  background: #4e5058;
+  background: var(--color-panel-neutral);
   border: none;
   cursor: pointer;
   padding: 2px;
@@ -128,7 +129,7 @@
 }
 
 .toggleOn {
-  background: #23a55a;
+  background: var(--color-panel-success);
 }
 
 .toggleThumb {
@@ -148,7 +149,7 @@
 .noResults {
   padding: 40px;
   text-align: center;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 14px;
 }
 
@@ -162,14 +163,15 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px;
-  background: #111214;
+  background: var(--color-panel-context);
+  border-top: 1px solid var(--color-panel-border);
   border-radius: 4px 4px 0 0;
   z-index: 10;
 }
 
 .saveBarText {
   font-size: 14px;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .saveBarActions {
@@ -181,7 +183,7 @@
   padding: 8px 16px;
   background: transparent;
   border: none;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -193,7 +195,7 @@
 
 .saveBtn {
   padding: 8px 16px;
-  background: #23a55a;
+  background: var(--color-panel-success);
   border: none;
   border-radius: 4px;
   color: white;
@@ -203,7 +205,7 @@
 }
 
 .saveBtn:hover:not(:disabled) {
-  background: #1a7d45;
+  background: var(--color-panel-success-hover);
 }
 
 .saveBtn:disabled {

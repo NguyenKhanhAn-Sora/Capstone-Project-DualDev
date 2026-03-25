@@ -26,6 +26,13 @@ export interface BannedUser {
   reason: string | null;
 }
 
+export interface ServerCategory {
+  _id: Types.ObjectId;
+  name: string;
+  position: number;
+  isPrivate: boolean;
+}
+
 export interface ServerInteractionSettings {
   systemMessagesEnabled: boolean;
   welcomeMessageEnabled: boolean;
@@ -103,6 +110,19 @@ export class Server extends Document {
 
   @Prop({ type: [Types.ObjectId], ref: 'Channel', default: [] })
   channels: Types.ObjectId[];
+
+  @Prop({
+    type: [
+      {
+        _id: { type: Types.ObjectId, auto: true },
+        name: { type: String, required: true },
+        position: { type: Number, default: 0 },
+        isPrivate: { type: Boolean, default: false },
+      },
+    ],
+    default: [],
+  })
+  serverCategories: ServerCategory[];
 
   @Prop({ type: Number, default: 0 })
   memberCount: number;

@@ -7,7 +7,7 @@
 .loading {
   padding: 40px;
   text-align: center;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 /* Default Role Message */
@@ -18,7 +18,7 @@
   justify-content: center;
   text-align: center;
   padding: 60px 20px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .defaultRoleMessage svg {
@@ -29,7 +29,7 @@
 .defaultRoleMessage h3 {
   font-size: 20px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   margin: 0 0 8px 0;
 }
 
@@ -42,9 +42,9 @@
 
 .memberCount {
   font-size: 14px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   padding: 8px 16px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border-radius: 4px;
 }
 
@@ -65,32 +65,33 @@
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   pointer-events: none;
 }
 
 .searchInput {
   width: 100%;
   padding: 10px 12px 10px 40px;
-  background: #1e1f22;
-  border: none;
+  background: var(--color-panel-deep);
+  border: 1px solid var(--color-panel-deep-border);
   border-radius: 4px;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 14px;
   outline: none;
 }
 
 .searchInput::placeholder {
-  color: #6d6f78;
+  color: var(--color-panel-text-faint);
 }
 
 .searchInput:focus {
-  box-shadow: 0 0 0 2px #5865f2;
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
 }
 
 .addBtn {
   padding: 10px 16px;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   border: none;
   border-radius: 4px;
   color: white;
@@ -101,7 +102,7 @@
 }
 
 .addBtn:hover:not(:disabled) {
-  background: #4752c4;
+  background: var(--color-panel-accent-hover);
 }
 
 .addBtn:disabled {
@@ -123,7 +124,7 @@
   justify-content: center;
   text-align: center;
   padding: 60px 20px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .emptyState svg {
@@ -139,16 +140,16 @@
 .addBtnSecondary {
   padding: 10px 16px;
   background: transparent;
-  border: 1px solid #4e5058;
+  border: 1px solid var(--color-panel-border);
   border-radius: 4px;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
 }
 
 .addBtnSecondary:hover {
-  background: #35373c;
+  background: var(--color-panel-hover);
 }
 
 /* Member Item */
@@ -157,12 +158,12 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border-radius: 4px;
 }
 
 .memberItem:hover {
-  background: #35373c;
+  background: var(--color-panel-hover);
 }
 
 .memberInfo {
@@ -182,7 +183,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -200,12 +201,12 @@
 .memberName {
   font-size: 14px;
   font-weight: 500;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .memberUsername {
   font-size: 12px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .removeBtn {
@@ -216,14 +217,14 @@
   justify-content: center;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   cursor: pointer;
   border-radius: 4px;
 }
 
 .removeBtn:hover:not(:disabled) {
   background: rgba(237, 66, 69, 0.1);
-  color: #ed4245;
+  color: var(--color-panel-danger);
 }
 
 .removeBtn:disabled {
@@ -235,7 +236,7 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -246,11 +247,12 @@
   width: 90%;
   max-width: 440px;
   max-height: 80vh;
-  background: #313338;
+  background: var(--color-panel-bg);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border: 1px solid var(--color-panel-border);
 }
 
 .modalHeader {
@@ -258,13 +260,13 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  border-bottom: 1px solid #3f4147;
+  border-bottom: 1px solid var(--color-panel-border);
 }
 
 .modalHeader h3 {
   font-size: 16px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   margin: 0;
 }
 
@@ -276,14 +278,14 @@
   justify-content: center;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   cursor: pointer;
   border-radius: 4px;
 }
 
 .modalCloseBtn:hover {
-  color: #f2f3f5;
-  background: #35373c;
+  color: var(--color-panel-text);
+  background: var(--color-panel-hover);
 }
 
 .modalBody {
@@ -308,18 +310,18 @@
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border-radius: 4px;
   cursor: pointer;
 }
 
 .availableMemberItem:hover {
-  background: #35373c;
+  background: var(--color-panel-hover);
 }
 
 .noMembers {
   padding: 20px;
   text-align: center;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 14px;
 }

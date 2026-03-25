@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15,13 +15,15 @@
 }
 
 .modal {
-  background: #313338;
+  background: var(--color-panel-bg);
   border-radius: 8px;
   width: 90%;
   max-width: 440px;
   padding: 24px;
   text-align: center;
   animation: slideUp 0.3s ease-out;
+  position: relative;
+  border: 1px solid var(--color-panel-border);
 }
 
 @keyframes slideUp {
@@ -31,16 +33,14 @@
 
 .closeBtn {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 16px; right: 16px;
   background: transparent;
   border: none;
-  color: #fff;
+  color: var(--color-panel-text);
   font-size: 24px;
   cursor: pointer;
   padding: 0;
-  width: 32px;
-  height: 32px;
+  width: 32px; height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -48,14 +48,14 @@
 }
 
 .closeBtn:hover {
-  background: #1e1f22;
+  background: var(--color-panel-hover);
 }
 
 .iconWrap {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -64,20 +64,20 @@
 }
 
 .iconWrap svg {
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .title {
   margin: 0 0 12px;
   font-size: 20px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .desc {
   margin: 0 0 20px;
   font-size: 14px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   line-height: 1.4;
 }
 
@@ -91,9 +91,9 @@
   flex: 1;
   padding: 10px 12px;
   border-radius: 4px;
-  border: none;
-  background: #1e1f22;
-  color: #f2f3f5;
+  border: 1px solid var(--color-panel-border);
+  background: var(--color-panel-deep);
+  color: var(--color-panel-text);
   font-size: 13px;
 }
 
@@ -101,7 +101,7 @@
   padding: 10px 20px;
   border-radius: 4px;
   border: none;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: #fff;
   font-size: 14px;
   font-weight: 500;
@@ -110,15 +110,15 @@
 }
 
 .copyBtn:hover {
-  background: #4752c4;
+  background: var(--color-panel-accent-hover);
 }
 
 .copyBtn.copied {
-  background: #248046;
+  background: var(--color-panel-success);
 }
 
 .expireNote {
   margin: 0;
   font-size: 12px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }

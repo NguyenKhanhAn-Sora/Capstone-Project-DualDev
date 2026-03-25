@@ -157,38 +157,136 @@ export class ServersService {
 
     const savedServer = await server.save();
 
-    // Create default text channel "general"
-    const textChannel = new this.channelModel({
-      name: 'general',
-      type: 'text',
-      description: 'General chat channel',
-      serverId: savedServer._id,
-      createdBy: userObjectId,
-      isDefault: true,
-    });
+    // Template channel definitions
+    const template = createServerDto.template || 'custom';
+    interface ChannelDef {
+      name: string;
+      type: 'text' | 'voice';
+      category?: string | null;
+      isDefault?: boolean;
+    }
+    const templateChannels: Record<string, ChannelDef[]> = {
+      custom: [
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'general', type: 'voice', isDefault: true },
+      ],
+      gaming: [
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'khoảnh-khắc-đỉnh-cao', type: 'text' },
+        { name: 'Sảnh', type: 'voice', isDefault: true },
+        { name: 'Gaming', type: 'voice' },
+      ],
+      friends: [
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'trò-chơi', type: 'text' },
+        { name: 'âm-nhạc', type: 'text' },
+        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
+        { name: 'Phòng Stream', type: 'voice' },
+      ],
+      'study-group': [
+        { name: 'chào-mừng-và-nội-quy', type: 'text', category: 'info' },
+        { name: 'ghi-chú-tài-nguyên', type: 'text', category: 'info' },
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'trợ-giúp-làm-bài-tập-về-nhà', type: 'text' },
+        { name: 'lên-kế-hoạch-phiên', type: 'text' },
+        { name: 'lạc-đề', type: 'text' },
+        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
+        { name: 'Phòng Học 1', type: 'voice' },
+        { name: 'Phòng Học 2', type: 'voice' },
+      ],
+      'school-club': [
+        { name: 'chào-mừng-và-nội-quy', type: 'text', category: 'info' },
+        { name: 'thông-báo', type: 'text', category: 'info' },
+        { name: 'tài-nguyên', type: 'text', category: 'info' },
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'kế-hoạch-buổi-họp', type: 'text' },
+        { name: 'lạc-đề', type: 'text' },
+        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
+        { name: 'Phòng Họp 1', type: 'voice' },
+        { name: 'Phòng Họp 2', type: 'voice' },
+      ],
+      'local-community': [
+        { name: 'chào-mừng-và-nội-quy', type: 'text', category: 'info' },
+        { name: 'thông-báo', type: 'text', category: 'info' },
+        { name: 'tài-nguyên', type: 'text', category: 'info' },
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'kế-hoạch-buổi-họp', type: 'text' },
+        { name: 'lạc-đề', type: 'text' },
+        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
+        { name: 'Phòng Họp 1', type: 'voice' },
+        { name: 'Phòng Họp 2', type: 'voice' },
+      ],
+      'artists-creators': [
+        { name: 'chào-mừng-và-nội-quy', type: 'text', category: 'info' },
+        { name: 'thông-báo', type: 'text', category: 'info' },
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'sự-kiện', type: 'text' },
+        { name: 'ý-kiến-và-phản-hồi', type: 'text' },
+        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
+        { name: 'Nơi Tập Trung Cộng Đồng', type: 'voice' },
+        { name: 'Phòng Stream', type: 'voice' },
+      ],
+    };
 
-    const savedTextChannel = await textChannel.save();
+    const channelDefs = templateChannels[template] ?? templateChannels['custom'];
+    const savedChannelIds: Types.ObjectId[] = [];
 
-    // Create default voice channel "general"
-    const voiceChannel = new this.channelModel({
-      name: 'general',
-      type: 'voice',
-      description: 'General voice channel',
-      serverId: savedServer._id,
-      createdBy: userObjectId,
-      isDefault: true,
-    });
-
-    const savedVoiceChannel = await voiceChannel.save();
+    for (const def of channelDefs) {
+      const channel = new this.channelModel({
+        name: def.name,
+        type: def.type,
+        description: null,
+        serverId: savedServer._id,
+        createdBy: userObjectId,
+        isDefault: def.isDefault ?? false,
+        category: def.category ?? null,
+      });
+      const saved = await channel.save();
+      savedChannelIds.push(saved._id as Types.ObjectId);
+    }
 
     // Update server with channels
-    savedServer.channels = [savedTextChannel._id, savedVoiceChannel._id];
+    savedServer.channels = savedChannelIds;
     await savedServer.save();
 
     // Create default @everyone role for the server
     await this.rolesService.createDefaultRole(savedServer._id.toString());
 
     return savedServer;
+  }
+
+  async createCategory(
+    serverId: string,
+    userId: string,
+    name: string,
+    isPrivate: boolean = false,
+  ) {
+    const server = await this.serverModel.findById(serverId);
+    if (!server) throw new NotFoundException('Server not found');
+
+    const member = server.members.find((m) => m.userId.toString() === userId);
+    if (!member || member.role === 'member') {
+      throw new ForbiddenException('Only owner or moderator can create categories');
+    }
+
+    const position = server.serverCategories?.length ?? 0;
+    const category = {
+      _id: new Types.ObjectId(),
+      name,
+      position,
+      isPrivate,
+    };
+
+    server.serverCategories = [...(server.serverCategories ?? []), category as any];
+    await server.save();
+
+    return category;
+  }
+
+  async getCategories(serverId: string) {
+    const server = await this.serverModel.findById(serverId).lean();
+    if (!server) throw new NotFoundException('Server not found');
+    return (server.serverCategories ?? []).sort((a: any, b: any) => a.position - b.position);
   }
 
   async getServersByUserId(userId: string): Promise<Server[]> {

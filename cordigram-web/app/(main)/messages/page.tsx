@@ -54,6 +54,8 @@ import CreateServerModal from "@/components/CreateServerModal/CreateServerModal"
 import CreateChannelModal, {
   type ChannelTypeForCreate,
 } from "@/components/CreateChannelModal/CreateChannelModal";
+import CreateCategoryModal from "@/components/CreateCategoryModal/CreateCategoryModal";
+import ChatEmojiPicker from "@/components/ChatEmojiPicker/ChatEmojiPicker";
 import EventsPopup from "@/components/ServerEvents/EventsPopup";
 import CreateEventWizard from "@/components/ServerEvents/CreateEventWizard";
 import EventImageEditor from "@/components/ServerEvents/EventImageEditor";
@@ -74,8 +76,10 @@ const CallRoom = dynamic(() => import("@/components/CallRoom"), { ssr: false });
 const VoiceChannelCall = dynamic(() => import("@/components/VoiceChannelCall"), { ssr: false });
 
 interface BackendServer extends serversApi.Server {
+  infoChannels?: serversApi.Channel[];
   textChannels?: serversApi.Channel[];
   voiceChannels?: serversApi.Channel[];
+  serverCategories?: serversApi.ServerCategory[];
 }
 
 interface MessageReaction {
@@ -857,8 +861,11 @@ export default function MessagesPage() {
   const searchParams = useSearchParams();
   const [servers, setServers] = useState<BackendServer[]>([]);
   const [selectedServer, setSelectedServer] = useState<string | null>(null);
+  const [infoChannels, setInfoChannels] = useState<serversApi.Channel[]>([]);
   const [textChannels, setTextChannels] = useState<serversApi.Channel[]>([]);
   const [voiceChannels, setVoiceChannels] = useState<serversApi.Channel[]>([]);
+  const [serverCategories, setServerCategories] = useState<serversApi.ServerCategory[]>([]);
+  const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   // Map userId -> displayColor (màu role cao nhất) cho server hiện tại
   const [memberRoleColors, setMemberRoleColors] = useState<Record<string, string>>({});
@@ -1037,8 +1044,9 @@ export default function MessagesPage() {
     messagesRead,
     reactionUpdate,
     markAsRead,
+    markAllAsRead,
     callEvent,
-    callEnded, // ✅ Added to handle when caller cancels
+    callEnded,
     messageDeleted,
     initiateCall,
     answerCall,
@@ -1696,8 +1704,10 @@ export default function MessagesPage() {
           setMemberRoleColors({});
         });
     } else {
+      setInfoChannels([]);
       setTextChannels([]);
       setVoiceChannels([]);
+      setServerCategories([]);
       setSelectedChannel(null);
       setActiveServerEvents([]);
       setServerEventsTotalCount(0);
@@ -2173,10 +2183,12 @@ export default function MessagesPage() {
       const serversWithChannels: BackendServer[] = await Promise.all(
         serversList.map(async (server) => {
           const channels = server.channels as serversApi.Channel[];
-          const textChannels = channels.filter((c) => c.type === "text");
+          const infoChannels = channels.filter((c) => c.type === "text" && c.category === "info");
+          const textChannels = channels.filter((c) => c.type === "text" && c.category !== "info");
           const voiceChannels = channels.filter((c) => c.type === "voice");
           return {
             ...server,
+            infoChannels,
             textChannels,
             voiceChannels,
           };
@@ -2209,13 +2221,22 @@ export default function MessagesPage() {
 
   const loadChannels = async (serverId: string) => {
     try {
-      const channels = await serversApi.getChannels(serverId);
-      const text = (channels || []).filter((c) => c.type === "text");
-      const voice = (channels || []).filter((c) => c.type === "voice");
+      const [channels, cats] = await Promise.all([
+        serversApi.getChannels(serverId),
+        serversApi.getCategories(serverId).catch(() => [] as serversApi.ServerCategory[]),
+      ]);
+      const all = channels || [];
+      const info = all.filter((c) => c.type === "text" && c.category === "info");
+      const text = all.filter((c) => c.type === "text" && c.category !== "info");
+      const voice = all.filter((c) => c.type === "voice");
+      setInfoChannels(info);
       setTextChannels(text);
       setVoiceChannels(voice);
+      setServerCategories(cats);
       if (text.length > 0) {
         setSelectedChannel(text[0]._id);
+      } else if (info.length > 0) {
+        setSelectedChannel(info[0]._id);
       } else {
         setSelectedChannel(null);
       }
@@ -3068,14 +3089,12 @@ export default function MessagesPage() {
     try {
       const newServer = await serversApi.createServer(serverName);
 
+      const allCh = newServer.channels as serversApi.Channel[];
       const serverWithChannels: BackendServer = {
         ...newServer,
-        textChannels: (newServer.channels as serversApi.Channel[]).filter(
-          (c) => c.type === "text",
-        ),
-        voiceChannels: (newServer.channels as serversApi.Channel[]).filter(
-          (c) => c.type === "voice",
-        ),
+        infoChannels: allCh.filter((c) => c.type === "text" && c.category === "info"),
+        textChannels: allCh.filter((c) => c.type === "text" && c.category !== "info"),
+        voiceChannels: allCh.filter((c) => c.type === "voice"),
       };
 
       setServers([...servers, serverWithChannels]);
@@ -3092,15 +3111,13 @@ export default function MessagesPage() {
     try {
       // Fetch the newly created server with its channels
       const newServer = await serversApi.getServer(serverId);
+      const allChannels = newServer.channels as serversApi.Channel[];
 
       const serverWithChannels: BackendServer = {
         ...newServer,
-        textChannels: (newServer.channels as serversApi.Channel[]).filter(
-          (c) => c.type === "text",
-        ),
-        voiceChannels: (newServer.channels as serversApi.Channel[]).filter(
-          (c) => c.type === "voice",
-        ),
+        infoChannels: allChannels.filter((c) => c.type === "text" && c.category === "info"),
+        textChannels: allChannels.filter((c) => c.type === "text" && c.category !== "info"),
+        voiceChannels: allChannels.filter((c) => c.type === "voice"),
       };
 
       setServers([...servers, serverWithChannels]);
@@ -3116,9 +3133,9 @@ export default function MessagesPage() {
     }
   };
 
-  const openCreateChannelModal = (type: ChannelTypeForCreate, sectionLabel: string) => {
+  const openCreateChannelModal = (type: ChannelTypeForCreate, sectionLabel?: string) => {
     setCreateChannelDefaultType(type);
-    setCreateChannelSectionLabel(sectionLabel);
+    setCreateChannelSectionLabel(sectionLabel ?? "");
     setShowCreateChannelModal(true);
   };
 
@@ -3129,6 +3146,12 @@ export default function MessagesPage() {
   ) => {
     if (!selectedServer) return;
     await serversApi.createChannel(selectedServer, name, type, undefined, isPrivate);
+    await loadChannels(selectedServer);
+  };
+
+  const handleCreateCategory = async (name: string, isPrivate: boolean) => {
+    if (!selectedServer) return;
+    await serversApi.createCategory(selectedServer, name, isPrivate);
     await loadChannels(selectedServer);
   };
 
@@ -3764,9 +3787,8 @@ export default function MessagesPage() {
                     }
                   }
 
-                  // Chỉ hiện context menu nếu là owner hoặc có vai trò custom (role != @everyone)
-                  if (!permissions.isOwner && !permissions.hasCustomRole) return;
-                  
+                  // Hiện context menu cho tất cả thành viên (kể cả member thường)
+                  // Component ServerContextMenu tự xử lý ẩn/hiện options theo quyền hạn
                   setServerContextMenu({
                     x: e.clientX,
                     y: e.clientY,
@@ -4179,22 +4201,13 @@ export default function MessagesPage() {
                   </svg>
                   <span>Nâng Cấp Máy Chủ</span>
                 </button>
-                <div className={styles.section}>
-                  <div className={styles.sectionHeader}>
-                    <h3 className={styles.sectionTitle}>Kênh Chat</h3>
-                    <button
-                      type="button"
-                      className={styles.addChannelBtn}
-                      title="Tạo kênh chat"
-                      onClick={() => openCreateChannelModal("text", "Kênh Chat")}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 5v14M5 12h14" />
-                      </svg>
-                    </button>
-                  </div>
-                  {textChannels.length > 0 ? (
-                    textChannels.map((channel) => (
+                {/* Thông Tin section - only shown when info channels exist */}
+                {infoChannels.length > 0 && (
+                  <div className={styles.section}>
+                    <div className={styles.sectionHeader}>
+                      <h3 className={styles.sectionTitle}>Thông Tin</h3>
+                    </div>
+                    {infoChannels.map((channel) => (
                       <div
                         key={channel._id}
                         className={`${styles.conversationItem} ${
@@ -4202,48 +4215,128 @@ export default function MessagesPage() {
                         }`}
                         onClick={() => setSelectedChannel(channel._id)}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            width: "100%",
-                          }}
-                        >
-                          <span style={{ fontSize: "18px" }}>
-                            #{channel.name}
-                          </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+                          <span style={{ fontSize: "18px" }}>#{channel.name}</span>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div
-                      style={{
-                        padding: "12px 16px",
-                        fontSize: "12px",
-                        color: "var(--color-text-muted)",
-                      }}
-                    >
-                      Chưa có kênh chat
+                    ))}
+                  </div>
+                )}
+
+                {/* Kênh Chat: uncategorized text channels */}
+                {(() => {
+                  const uncategorizedText = textChannels.filter((c) => !c.categoryId);
+                  return (
+                    <div className={styles.section}>
+                      <div className={styles.sectionHeader}>
+                        <h3 className={styles.sectionTitle}>Kênh Chat</h3>
+                        <button
+                          type="button"
+                          className={styles.addChannelBtn}
+                          title="Tạo kênh chat"
+                          onClick={() => openCreateChannelModal("text")}
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 5v14M5 12h14" />
+                          </svg>
+                        </button>
+                      </div>
+                      {uncategorizedText.length > 0 ? (
+                        uncategorizedText.map((channel) => (
+                          <div
+                            key={channel._id}
+                            className={`${styles.conversationItem} ${
+                              selectedChannel === channel._id ? styles.active : ""
+                            }`}
+                            onClick={() => setSelectedChannel(channel._id)}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+                              <span style={{ fontSize: "18px" }}>#{channel.name}</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ padding: "12px 16px", fontSize: "12px", color: "var(--color-text-muted)" }}>
+                          Chưa có kênh chat
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
+
+                {/* User-created categories */}
+                {serverCategories.map((cat) => {
+                  const catTextChannels = textChannels.filter((c) => c.categoryId === cat._id);
+                  const catVoiceChannels = voiceChannels.filter((c) => c.categoryId === cat._id);
+                  return (
+                    <div key={cat._id} className={styles.section}>
+                      <div className={styles.sectionHeader}>
+                        <h3 className={styles.sectionTitle}>{cat.name}</h3>
+                        <button
+                          type="button"
+                          className={styles.addChannelBtn}
+                          title="Tạo kênh trong danh mục"
+                          onClick={() => openCreateChannelModal("text")}
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 5v14M5 12h14" />
+                          </svg>
+                        </button>
+                      </div>
+                      {catTextChannels.map((channel) => (
+                        <div
+                          key={channel._id}
+                          className={`${styles.conversationItem} ${selectedChannel === channel._id ? styles.active : ""}`}
+                          onClick={() => setSelectedChannel(channel._id)}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+                            <span style={{ fontSize: "18px" }}>#{channel.name}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {catVoiceChannels.map((channel) => (
+                        <div
+                          key={channel._id}
+                          className={`${styles.conversationItem} ${selectedChannel === channel._id ? styles.active : ""}`}
+                          onClick={() => setSelectedChannel(channel._id)}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, opacity: 0.7 }}>
+                              <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+                              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            </svg>
+                            <span style={{ fontSize: "14px" }}>{channel.name}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {catTextChannels.length === 0 && catVoiceChannels.length === 0 && (
+                        <div style={{ padding: "8px 16px", fontSize: "12px", color: "var(--color-text-muted)" }}>
+                          Chưa có kênh
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {/* Kênh Thoại: uncategorized voice channels */}
+                {(() => {
+                  const uncategorizedVoice = voiceChannels.filter((c) => !c.categoryId);
+                  return (
                 <div className={styles.section}>
                   <div className={styles.sectionHeader}>
-                    <h3 className={styles.sectionTitle}>Kênh đàm thoại</h3>
+                    <h3 className={styles.sectionTitle}>Kênh Thoại</h3>
                     <button
                       type="button"
                       className={styles.addChannelBtn}
-                      title="Tạo kênh đàm thoại"
-                      onClick={() => openCreateChannelModal("voice", "Kênh đàm thoại")}
+                      title="Tạo kênh thoại"
+                      onClick={() => openCreateChannelModal("voice")}
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M12 5v14M5 12h14" />
                       </svg>
                     </button>
                   </div>
-                  {voiceChannels.length > 0 ? (
-                    voiceChannels.map((channel) => {
+                  {uncategorizedVoice.length > 0 ? (
+                    uncategorizedVoice.map((channel) => {
                       const isSelected = selectedChannel === channel._id;
                       const canInviteToVoice = currentServer && (currentServer.ownerId === currentUserId || currentServer.isPublic);
                       const showInviteBar = isSelected && canInviteToVoice && !voiceInviteDismissed.has(channel._id);
@@ -4377,7 +4470,9 @@ export default function MessagesPage() {
                     </div>
                   )}
                 </div>
-                </div>
+                );
+                })()}
+                </div>{/* end conversationsScrollArea */}
 
                 {/* Voice Controls Footer - cùng vị trí như bên DM */}
                 <div className={styles.voiceControls}>
@@ -5107,133 +5202,13 @@ export default function MessagesPage() {
 
                           {showEmojiPicker && (
                             <div className={styles.emojiPickerWrapper}>
-                              <div className={styles.emojiPickerContent}>
-                                {/* Simple emoji grid - will be replaced with emoji-picker-react once installed */}
-                                <div className={styles.emojiGrid}>
-                                  {[
-                                    "😀",
-                                    "😃",
-                                    "😄",
-                                    "😁",
-                                    "😆",
-                                    "😅",
-                                    "🤣",
-                                    "😂",
-                                    "🙂",
-                                    "🙃",
-                                    "😉",
-                                    "😊",
-                                    "😇",
-                                    "🥰",
-                                    "😍",
-                                    "🤩",
-                                    "😘",
-                                    "😗",
-                                    "😚",
-                                    "😙",
-                                    "🥲",
-                                    "😋",
-                                    "😛",
-                                    "😜",
-                                    "🤪",
-                                    "😝",
-                                    "🤑",
-                                    "🤗",
-                                    "🤭",
-                                    "🤫",
-                                    "🤔",
-                                    "🤐",
-                                    "🤨",
-                                    "😐",
-                                    "😑",
-                                    "😶",
-                                    "😏",
-                                    "😒",
-                                    "🙄",
-                                    "😬",
-                                    "🤥",
-                                    "😌",
-                                    "😔",
-                                    "😪",
-                                    "🤤",
-                                    "😴",
-                                    "😷",
-                                    "🤒",
-                                    "🤕",
-                                    "🤢",
-                                    "🤮",
-                                    "🤧",
-                                    "🥵",
-                                    "🥶",
-                                    "🥴",
-                                    "😵",
-                                    "🤯",
-                                    "🤠",
-                                    "🥳",
-                                    "🥸",
-                                    "😎",
-                                    "🤓",
-                                    "🧐",
-                                    "😕",
-                                    "😟",
-                                    "🙁",
-                                    "☹️",
-                                    "😮",
-                                    "😯",
-                                    "😲",
-                                    "😳",
-                                    "🥺",
-                                    "😦",
-                                    "😧",
-                                    "😨",
-                                    "😰",
-                                    "😥",
-                                    "😢",
-                                    "😭",
-                                    "😱",
-                                    "😖",
-                                    "😣",
-                                    "😞",
-                                    "😓",
-                                    "😩",
-                                    "😫",
-                                    "🥱",
-                                    "😤",
-                                    "😡",
-                                    "😠",
-                                    "🤬",
-                                    "👍",
-                                    "👎",
-                                    "👏",
-                                    "🙏",
-                                    "❤️",
-                                    "💔",
-                                    "💕",
-                                    "💖",
-                                    "💗",
-                                    "💓",
-                                    "💞",
-                                    "💘",
-                                    "💝",
-                                    "🔥",
-                                    "✨",
-                                    "🎉",
-                                    "🎊",
-                                    "🎈",
-                                  ].map((emoji) => (
-                                    <button
-                                      key={emoji}
-                                      className={styles.emojiButton}
-                                      onClick={() => {
-                                        setMessageText((prev) => prev + emoji);
-                                        setShowEmojiPicker(false);
-                                      }}
-                                    >
-                                      {emoji}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
+                              <ChatEmojiPicker
+                                onSelect={(text) => {
+                                  setMessageText((prev) => prev + text);
+                                }}
+                                onClose={() => setShowEmojiPicker(false)}
+                                position="top"
+                              />
                             </div>
                           )}
                         </div>
@@ -5429,8 +5404,13 @@ export default function MessagesPage() {
         isOpen={showCreateChannelModal}
         onClose={() => setShowCreateChannelModal(false)}
         defaultType={createChannelDefaultType}
-        sectionLabel={createChannelSectionLabel}
         onCreateChannel={handleCreateChannel}
+      />
+
+      <CreateCategoryModal
+        isOpen={showCreateCategoryModal}
+        onClose={() => setShowCreateCategoryModal(false)}
+        onCreateCategory={handleCreateCategory}
       />
 
       <EventsPopup
@@ -5520,11 +5500,15 @@ export default function MessagesPage() {
           onCreateChannel={() => {
             setSelectedServer(serverContextMenu.server._id);
             setCreateChannelDefaultType("text");
-            setCreateChannelSectionLabel("Kênh Chat");
+            setCreateChannelSectionLabel("");
             setShowCreateChannelModal(true);
             setServerContextMenu(null);
           }}
-          onCreateCategory={() => setServerContextMenu(null)}
+          onCreateCategory={() => {
+            setSelectedServer(serverContextMenu.server._id);
+            setShowCreateCategoryModal(true);
+            setServerContextMenu(null);
+          }}
           onCreateEvent={() => {
             setSelectedServer(serverContextMenu.server._id);
             setShowEventsPopup(true);

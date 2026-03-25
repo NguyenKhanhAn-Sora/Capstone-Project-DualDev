@@ -1,10 +1,7 @@
 .modalOverlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -18,7 +15,7 @@
 }
 
 .modalContent {
-  background: #313338;
+  background: var(--color-panel-bg);
   border-radius: 8px;
   width: 90%;
   max-width: 440px;
@@ -26,6 +23,7 @@
   overflow-y: auto;
   position: relative;
   padding: 24px;
+  border: 1px solid var(--color-panel-border);
   animation: slideUp 0.3s ease-out;
 }
 
@@ -36,11 +34,10 @@
 
 .closeButton {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 16px; right: 16px;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 28px;
   cursor: pointer;
   padding: 0;
@@ -55,21 +52,21 @@
 }
 
 .closeButton:hover {
-  background: #1e1f22;
-  color: #fff;
+  background: var(--color-panel-hover);
+  color: var(--color-panel-text);
 }
 
 .title {
   margin: 0 0 4px;
   font-size: 20px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .subtitle {
   margin: 0 0 20px;
   font-size: 13px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .section {
@@ -80,7 +77,7 @@
   display: block;
   font-size: 12px;
   font-weight: 600;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   margin-bottom: 8px;
   text-transform: uppercase;
 }
@@ -98,28 +95,28 @@
   padding: 12px;
   border-radius: 4px;
   cursor: pointer;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border: 1px solid transparent;
   transition: background 0.2s, border-color 0.2s;
 }
 
 .typeOption:hover {
-  background: #36373d;
+  background: var(--color-panel-hover);
 }
 
 .typeOption input {
   margin-top: 4px;
-  accent-color: #5865f2;
+  accent-color: var(--color-panel-accent);
 }
 
 .typeIcon {
   font-size: 20px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   flex-shrink: 0;
 }
 
 .typeIconVoice {
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -129,27 +126,27 @@
 .typeName {
   font-size: 14px;
   font-weight: 500;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .typeDesc {
   margin: 4px 0 0;
   font-size: 12px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   line-height: 1.4;
 }
 
 .nameInputWrap {
   display: flex;
   align-items: center;
-  background: #1e1f22;
+  background: var(--color-panel-deep);
+  border: 1px solid var(--color-panel-deep-border);
   border-radius: 4px;
-  border: none;
 }
 
 .namePrefix {
   padding: 10px 0 10px 12px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 14px;
 }
 
@@ -158,13 +155,13 @@
   background: transparent;
   border: none;
   padding: 10px 12px;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 14px;
   outline: none;
 }
 
 .nameInput::placeholder {
-  color: #6d6f78;
+  color: var(--color-panel-text-faint);
 }
 
 .privateRow {
@@ -173,20 +170,20 @@
   justify-content: space-between;
   gap: 16px;
   padding: 12px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border-radius: 4px;
 }
 
 .privateLabel {
   font-size: 14px;
   font-weight: 500;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .privateDesc {
   margin: 4px 0 0;
   font-size: 12px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   line-height: 1.4;
 }
 
@@ -194,7 +191,7 @@
   width: 44px;
   height: 24px;
   border-radius: 12px;
-  background: #4e5058;
+  background: var(--color-panel-neutral);
   border: none;
   cursor: pointer;
   padding: 2px;
@@ -202,16 +199,12 @@
   transition: background 0.2s;
 }
 
-.toggle:hover {
-  background: #5d5f68;
-}
-
 .toggleOn {
-  background: #5865f2;
+  background: var(--color-panel-accent);
 }
 
 .toggleOn:hover {
-  background: #4752c4;
+  background: var(--color-panel-accent-hover);
 }
 
 .toggleThumb {
@@ -233,7 +226,7 @@
   gap: 12px;
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid #2b2d31;
+  border-top: 1px solid var(--color-panel-border);
 }
 
 .cancelBtn {
@@ -241,21 +234,21 @@
   border-radius: 4px;
   border: none;
   background: transparent;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 14px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .cancelBtn:hover {
-  background: #2b2d31;
+  background: var(--color-panel-hover);
 }
 
 .submitBtn {
   padding: 10px 20px;
   border-radius: 4px;
   border: none;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: #fff;
   font-size: 14px;
   font-weight: 500;
@@ -264,10 +257,67 @@
 }
 
 .submitBtn:hover:not(:disabled) {
-  background: #4752c4;
+  background: var(--color-panel-accent-hover);
 }
 
 .submitBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Emoji picker for channel name */
+.emojiWrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.emojiBtn {
+  background: transparent;
+  border: none;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-panel-text-muted);
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.emojiBtn:hover {
+  background: var(--color-panel-hover);
+  color: var(--color-panel-text);
+}
+
+.emojiPicker {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: var(--color-panel-context);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 8px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  min-width: 180px;
+}
+
+.emojiItem {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  text-align: center;
+  line-height: 1.2;
+  transition: background 0.1s;
+}
+
+.emojiItem:hover {
+  background: var(--color-panel-hover);
 }

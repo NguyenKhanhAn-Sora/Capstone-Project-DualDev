@@ -1,12 +1,12 @@
 /* =====================================================
-   SERVER MEMBERS SIDEBAR - DISCORD-LIKE DESIGN
+   SERVER MEMBERS SIDEBAR
    ===================================================== */
 
 .container {
   width: 240px;
   height: 100%;
-  background: #2b2d31;
-  border-left: 1px solid #1e1f22;
+  background: var(--color-panel-sidebar);
+  border-left: 1px solid var(--color-panel-sidebar-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -18,7 +18,7 @@
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
-  color: #8e9297;
+  color: var(--color-panel-text-faint);
   letter-spacing: 0.02em;
 }
 
@@ -26,12 +26,12 @@
 .error {
   padding: 16px;
   text-align: center;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 14px;
 }
 
 .error {
-  color: #f23f43;
+  color: var(--color-panel-danger);
 }
 
 /* =====================================================
@@ -53,7 +53,7 @@
 }
 
 .groupsContainer::-webkit-scrollbar-thumb {
-  background: #1e1f22;
+  background: var(--color-panel-sidebar-border);
   border-radius: 4px;
 }
 
@@ -73,7 +73,7 @@
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
-  color: #8e9297;
+  color: var(--color-panel-text-faint);
   letter-spacing: 0.02em;
 }
 
@@ -93,7 +93,7 @@
 
 .memberCount {
   font-weight: 400;
-  color: #6d6f78;
+  color: var(--color-panel-text-faint);
 }
 
 /* =====================================================
@@ -117,12 +117,12 @@
 }
 
 .memberItem:hover {
-  background: #35373c;
+  background: var(--color-panel-hover);
 }
 
 .memberItem:focus {
   outline: none;
-  background: #35373c;
+  background: var(--color-panel-hover);
 }
 
 /* Avatar */
@@ -147,7 +147,7 @@
   bottom: -2px;
   right: -2px;
   font-size: 10px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border-radius: 50%;
   padding: 1px;
 }
@@ -165,7 +165,7 @@
 
 .selfBadge {
   font-size: 12px;
-  color: #8e9297;
+  color: var(--color-panel-text-faint);
   font-weight: 400;
 }
 
@@ -178,9 +178,10 @@
   z-index: 1000;
   min-width: 200px;
   max-width: 280px;
-  background: #111214;
+  background: var(--color-panel-context);
   border-radius: 4px;
   padding: 6px 8px;
+  border: 1px solid var(--color-panel-border);
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.24);
   animation: fadeIn 0.1s ease;
 }
@@ -204,7 +205,7 @@
   padding: 8px 10px;
   border: none;
   background: transparent;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 14px;
   text-align: left;
   border-radius: 2px;
@@ -213,7 +214,7 @@
 }
 
 .contextMenuItem:hover {
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: #fff;
 }
 
@@ -222,26 +223,26 @@
 }
 
 .contextMenuItemWarning {
-  color: #fee75c;
+  color: var(--color-panel-warning);
 }
 
 .contextMenuItemWarning:hover {
-  background: #fee75c;
+  background: var(--color-panel-warning);
   color: #000;
 }
 
 .contextMenuItemDanger {
-  color: #f23f43;
+  color: var(--color-panel-danger);
 }
 
 .contextMenuItemDanger:hover {
-  background: #f23f43;
+  background: var(--color-panel-danger);
   color: #fff;
 }
 
 .contextMenuDivider {
   height: 1px;
-  background: #2e3035;
+  background: var(--color-panel-border);
   margin: 6px 0;
 }
 
@@ -250,7 +251,7 @@
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
-  color: #8e9297;
+  color: var(--color-panel-text-faint);
   letter-spacing: 0.02em;
 }
 
@@ -283,7 +284,7 @@
   right: 0;
   bottom: 0;
   z-index: 1001;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -293,23 +294,24 @@
 .modalContent {
   width: 100%;
   max-width: 440px;
-  background: #313338;
+  background: var(--color-panel-bg);
   border-radius: 8px;
   padding: 24px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--color-panel-border);
 }
 
 .modalTitle {
   margin: 0 0 8px;
   font-size: 20px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .modalDescription {
   margin: 0 0 20px;
   font-size: 14px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   line-height: 1.4;
 }
 
@@ -324,33 +326,34 @@
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   letter-spacing: 0.02em;
 }
 
 .formSelect {
   width: 100%;
   padding: 10px 12px;
-  background: #1e1f22;
-  border: none;
+  background: var(--color-panel-deep);
+  border: 1px solid var(--color-panel-deep-border);
   border-radius: 4px;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 14px;
   cursor: pointer;
 }
 
 .formSelect:focus {
   outline: none;
-  box-shadow: 0 0 0 2px #5865f2;
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
 }
 
 .formTextarea {
   width: 100%;
   padding: 10px 12px;
-  background: #1e1f22;
-  border: none;
+  background: var(--color-panel-deep);
+  border: 1px solid var(--color-panel-deep-border);
   border-radius: 4px;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 14px;
   resize: vertical;
   min-height: 80px;
@@ -359,11 +362,12 @@
 
 .formTextarea:focus {
   outline: none;
-  box-shadow: 0 0 0 2px #5865f2;
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
 }
 
 .formTextarea::placeholder {
-  color: #6d6f78;
+  color: var(--color-panel-text-faint);
 }
 
 /* Modal actions */
@@ -379,7 +383,7 @@
   background: transparent;
   border: none;
   border-radius: 4px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -387,8 +391,8 @@
 }
 
 .btnCancel:hover {
-  background: #4e5058;
-  color: #f2f3f5;
+  background: var(--color-panel-neutral);
+  color: var(--color-panel-text);
 }
 
 .btnCancel:disabled {
@@ -398,7 +402,7 @@
 
 .btnDanger {
   padding: 10px 20px;
-  background: #f23f43;
+  background: var(--color-panel-danger);
   border: none;
   border-radius: 4px;
   color: #fff;
@@ -409,7 +413,7 @@
 }
 
 .btnDanger:hover {
-  background: #da373c;
+  background: var(--color-panel-danger-hover);
 }
 
 .btnDanger:disabled {
@@ -419,7 +423,7 @@
 
 .btnWarning {
   padding: 10px 20px;
-  background: #fee75c;
+  background: var(--color-panel-warning);
   border: none;
   border-radius: 4px;
   color: #000;
@@ -430,7 +434,7 @@
 }
 
 .btnWarning:hover {
-  background: #ffd83d;
+  filter: brightness(0.9);
 }
 
 .btnWarning:disabled {

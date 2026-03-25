@@ -7,12 +7,12 @@
 
 .menu {
   position: fixed;
-  background: #2b2d31;
+  background: var(--color-panel-context);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   padding: 6px 0;
   min-width: 200px;
-  border: 1px solid #3f4147;
+  border: 1px solid var(--color-panel-border);
   z-index: 9999;
 }
 
@@ -24,18 +24,18 @@
   padding: 10px 14px;
   cursor: pointer;
   text-align: left;
-  color: #dbdee1;
+  color: var(--color-panel-text);
   font-size: 14px;
   font-weight: 500;
   box-sizing: border-box;
 }
 
 .menuItem:hover {
-  background: #404249;
+  background: var(--color-panel-hover);
 }
 
 .menuItem.danger {
-  color: #f23f42;
+  color: var(--color-panel-danger);
 }
 
 .menuItem.danger:hover {
@@ -43,7 +43,7 @@
 }
 
 .menuItem.warning {
-  color: #fee75c;
+  color: var(--color-panel-warning);
 }
 
 .menuItem.warning:hover {
@@ -57,6 +57,6 @@
 
 .divider {
   height: 1px;
-  background: #3f4147;
+  background: var(--color-panel-border);
   margin: 4px 0;
 }

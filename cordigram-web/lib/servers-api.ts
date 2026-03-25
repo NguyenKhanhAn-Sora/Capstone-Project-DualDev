@@ -54,6 +54,13 @@ export interface Server {
   updatedAt: string;
 }
 
+export interface ServerCategory {
+  _id: string;
+  name: string;
+  position: number;
+  isPrivate: boolean;
+}
+
 export interface Channel {
   _id: string;
   name: string;
@@ -67,6 +74,10 @@ export interface Channel {
   threads?: string[];
   messageCount: number;
   isActive: boolean;
+  /** null = bình thường, 'info' = Thông Tin */
+  category?: string | null;
+  /** ID danh mục người dùng tạo */
+  categoryId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -916,17 +927,41 @@ export async function createChannel(
   type: "text" | "voice",
   description?: string,
   isPrivate?: boolean,
+  categoryId?: string,
 ): Promise<Channel> {
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}/channels`, {
     method: "POST",
     headers: getHeaders(),
-    body: JSON.stringify({ name, type, description, isPrivate }),
+    body: JSON.stringify({ name, type, description, isPrivate, categoryId }),
   });
 
   if (!response.ok) {
     throw new Error("Không tạo được kênh");
   }
 
+  return response.json();
+}
+
+// Categories
+export async function createCategory(
+  serverId: string,
+  name: string,
+  isPrivate?: boolean,
+): Promise<ServerCategory> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/categories`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ name, isPrivate }),
+  });
+  if (!response.ok) throw new Error("Không tạo được danh mục");
+  return response.json();
+}
+
+export async function getCategories(serverId: string): Promise<ServerCategory[]> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/categories`, {
+    headers: getHeaders(),
+  });
+  if (!response.ok) throw new Error("Không tải được danh mục");
   return response.json();
 }
 

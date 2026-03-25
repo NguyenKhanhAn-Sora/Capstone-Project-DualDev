@@ -152,7 +152,7 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #f23f43;
+  background: var(--color-panel-danger);
   border: 2px solid var(--color-surface);
 }
 
@@ -182,7 +182,7 @@
   border: none;
   border-radius: 8px;
   background: rgba(35, 165, 90, 0.2);
-  color: #23a55a;
+  color: var(--color-panel-success);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -192,17 +192,17 @@
 
 .inviteActionBtn:hover {
   background: rgba(35, 165, 90, 0.35);
-  color: #23a55a;
+  color: var(--color-panel-success);
 }
 
 .inviteActionBtnDecline {
   background: rgba(242, 63, 67, 0.15);
-  color: #f23f43;
+  color: var(--color-panel-danger);
 }
 
 .inviteActionBtnDecline:hover {
   background: rgba(242, 63, 67, 0.3);
-  color: #f23f43;
+  color: var(--color-panel-danger);
 }
 
 .eventBody {

@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -14,7 +14,7 @@
   max-width: 900px;
   height: 80vh;
   max-height: 700px;
-  background: #313338;
+  background: var(--color-panel-bg);
   border-radius: 8px;
   overflow: hidden;
   position: relative;
@@ -23,7 +23,7 @@
 /* Sidebar */
 .sidebar {
   width: 220px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -34,7 +34,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  border-bottom: 1px solid #3f4147;
+  border-bottom: 1px solid var(--color-panel-border);
 }
 
 .backBtn {
@@ -43,7 +43,7 @@
   gap: 8px;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -52,8 +52,8 @@
 }
 
 .backBtn:hover {
-  color: #f2f3f5;
-  background: #35373c;
+  color: var(--color-panel-text);
+  background: var(--color-panel-hover);
 }
 
 .addRoleBtn {
@@ -64,14 +64,14 @@
   justify-content: center;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   cursor: pointer;
   border-radius: 4px;
 }
 
 .addRoleBtn:hover {
-  color: #f2f3f5;
-  background: #35373c;
+  color: var(--color-panel-text);
+  background: var(--color-panel-hover);
 }
 
 .rolesList {
@@ -94,11 +94,11 @@
 }
 
 .roleItem:hover {
-  background: #35373c;
+  background: var(--color-panel-hover);
 }
 
 .roleItemActive {
-  background: #404249;
+  background: var(--color-panel-active);
 }
 
 .roleColor {
@@ -110,7 +110,7 @@
 
 .roleName {
   font-size: 14px;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -130,22 +130,22 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 60px 16px 24px;
-  border-bottom: 1px solid #3f4147;
+  border-bottom: 1px solid var(--color-panel-border);
 }
 
 .headerTitle {
   font-size: 12px;
   font-weight: 600;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   text-transform: uppercase;
 }
 
 .editLabel {
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .roleNameHeader {
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .headerActions {
@@ -161,13 +161,13 @@
   justify-content: center;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   cursor: pointer;
   border-radius: 4px;
 }
 
 .moreBtn:hover {
-  color: #ed4245;
+  color: var(--color-panel-danger);
   background: rgba(237, 66, 69, 0.1);
 }
 
@@ -176,14 +176,14 @@
   display: flex;
   gap: 24px;
   padding: 0 24px;
-  border-bottom: 1px solid #3f4147;
+  border-bottom: 1px solid var(--color-panel-border);
 }
 
 .tab {
   padding: 16px 0;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -191,11 +191,11 @@
 }
 
 .tab:hover {
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .tabActive {
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .tabActive::after {
@@ -205,7 +205,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: #5865f2;
+  background: var(--color-panel-accent);
 }
 
 /* Close Button */
@@ -219,13 +219,13 @@
   gap: 4px;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   cursor: pointer;
   padding: 0;
 }
 
 .closeBtn:hover {
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .escLabel {
@@ -242,11 +242,12 @@
 
 /* Context Menu */
 .contextMenu {
-  background: #111214;
+  background: var(--color-panel-context);
   border-radius: 4px;
   padding: 6px 8px;
   min-width: 180px;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.24);
+  border: 1px solid var(--color-panel-border);
   z-index: 10001;
 }
 
@@ -260,14 +261,14 @@
   background: transparent;
   border: none;
   border-radius: 2px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 14px;
   cursor: pointer;
   text-align: left;
 }
 
 .contextMenuItem:hover:not(:disabled) {
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: #fff;
 }
 
@@ -277,10 +278,10 @@
 }
 
 .contextMenuItemDanger {
-  color: #ed4245;
+  color: var(--color-panel-danger);
 }
 
 .contextMenuItemDanger:hover:not(:disabled) {
-  background: #ed4245;
+  background: var(--color-panel-danger);
   color: #fff;
 }

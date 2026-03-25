@@ -3,14 +3,14 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: #2b2d31;
-  border-top: 1px solid #3f4147;
+  background: var(--color-chat-received);
+  border-top: 1px solid var(--color-chat-modal-border);
 }
 
 .replyLine {
   width: 3px;
   height: 40px;
-  background: #00a8fc;
+  background: var(--color-chat-accent);
   border-radius: 2px;
   flex-shrink: 0;
 }
@@ -28,19 +28,19 @@
 }
 
 .label {
-  color: #00a8fc;
+  color: var(--color-chat-accent);
   font-size: 12px;
   font-weight: 600;
 }
 
 .senderName {
-  color: #b5bac1;
+  color: var(--color-chat-text-secondary);
   font-size: 12px;
   font-weight: 500;
 }
 
 .previewText {
-  color: #b5bac1;
+  color: var(--color-chat-text-secondary);
   font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
@@ -50,7 +50,7 @@
 .closeButton {
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-chat-text-secondary);
   font-size: 20px;
   cursor: pointer;
   padding: 4px;
@@ -60,5 +60,5 @@
 }
 
 .closeButton:hover {
-  color: #dbdee1;
+  color: var(--color-chat-text-strong);
 }

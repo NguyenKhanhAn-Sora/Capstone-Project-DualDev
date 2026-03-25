@@ -115,27 +115,27 @@ export default function ServerInteractionsSection({
   };
 
   if (loading) {
-    return <div style={{ color: "#b5bac1" }}>Đang tải cài đặt tương tác...</div>;
+    return <div style={{ color: "var(--color-panel-text-muted)" }}>Đang tải cài đặt tương tác...</div>;
   }
 
   if (!settings) {
-    return <div style={{ color: "#f87171" }}>{error || "Không tải được dữ liệu"}</div>;
+    return <div style={{ color: "var(--color-panel-danger)" }}>{error || "Không tải được dữ liệu"}</div>;
   }
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
       {error && (
-        <div style={{ color: "#f87171", fontSize: 13 }}>{error}</div>
+        <div style={{ color: "var(--color-panel-danger)", fontSize: 13 }}>{error}</div>
       )}
 
       <section>
         <h3 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Tương Tác</h3>
-        <p style={{ marginTop: 4, color: "#b5bac1", fontSize: 13 }}>
+        <p style={{ marginTop: 4, color: "var(--color-panel-text-muted)", fontSize: 13 }}>
           Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới có thể thay đổi các cài đặt này.
         </p>
       </section>
 
-      <section style={{ borderTop: "1px solid #3f4147", paddingTop: 16 }}>
+      <section style={{ borderTop: "1px solid var(--color-panel-border)", paddingTop: 16 }}>
         <h4 style={{ margin: 0, fontSize: 20 }}>Tin Nhắn Hệ Thống</h4>
         <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
           <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -212,9 +212,9 @@ export default function ServerInteractionsSection({
         </div>
       </section>
 
-      <section style={{ borderTop: "1px solid #3f4147", paddingTop: 16 }}>
+      <section style={{ borderTop: "1px solid var(--color-panel-border)", paddingTop: 16 }}>
         <h4 style={{ margin: 0, fontSize: 20 }}>Role Notification (Dành cho bạn)</h4>
-        <p style={{ marginTop: 4, color: "#b5bac1", fontSize: 13 }}>
+        <p style={{ marginTop: 4, color: "var(--color-panel-text-muted)", fontSize: 13 }}>
           Gửi thông báo theo vai trò, thành viên nhận được sẽ thấy trong tab Dành cho bạn.
         </p>
         <div style={{ marginTop: 12, display: "grid", gap: 8 }}>

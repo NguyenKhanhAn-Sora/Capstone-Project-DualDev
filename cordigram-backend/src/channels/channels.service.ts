@@ -48,6 +48,10 @@ export class ChannelsService {
       serverId: new Types.ObjectId(serverId),
       createdBy: userObjectId,
       isDefault: false,
+      isPrivate: createChannelDto.isPrivate ?? false,
+      categoryId: createChannelDto.categoryId
+        ? new Types.ObjectId(createChannelDto.categoryId)
+        : null,
     });
 
     const savedChannel = await channel.save();

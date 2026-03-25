@@ -11,13 +11,13 @@
 }
 
 .voiceMessage.sent {
-  background: #5865f2;
+  background: var(--color-voice-sent);
   color: #ffffff;
 }
 
 .voiceMessage.received {
-  background: #2b2d31;
-  color: #ffffff;
+  background: var(--color-voice-received);
+  color: var(--color-voice-received-text);
 }
 
 /* Play Button */
@@ -135,13 +135,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ed4245;
+  color: var(--color-chat-danger);
   flex-shrink: 0;
 }
 
 .errorText {
   font-size: 13px;
-  color: #ed4245;
+  color: var(--color-chat-danger);
 }
 
 /* Mobile Responsive */
@@ -178,9 +178,9 @@
 }
 
 .voiceMessage.sent:hover {
-  background: #4752c4;
+  background: var(--color-voice-sent-hover);
 }
 
 .voiceMessage.received:hover {
-  background: #32353b;
+  background: var(--color-voice-received-hover);
 }
