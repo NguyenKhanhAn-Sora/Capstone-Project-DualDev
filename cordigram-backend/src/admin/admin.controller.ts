@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -40,6 +41,99 @@ export class AdminController {
     const parsedLimit = Number(limitRaw);
     const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
     return this.adminService.getRecentAdminActivity(limit);
+  }
+
+  @Get('ads/overview')
+  async getAdsOverview(@Req() req: Request & { user?: AuthenticatedUser }) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    return this.adminService.getAdsOverview();
+  }
+
+  @Get('ads/campaigns')
+  async getAdsCampaigns(
+    @Query('q') q: string | undefined,
+    @Query('status') status: string | undefined,
+    @Query('limit') limitRaw: string | undefined,
+    @Query('offset') offsetRaw: string | undefined,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+
+    const parsedLimit = Number(limitRaw);
+    const parsedOffset = Number(offsetRaw);
+    const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
+    const offset = Number.isFinite(parsedOffset) ? parsedOffset : undefined;
+
+    const normalizedStatus =
+      status === 'active' ||
+      status === 'hidden' ||
+      status === 'canceled' ||
+      status === 'completed'
+        ? status
+        : status === 'paused'
+          ? 'hidden'
+          : 'all';
+
+    return this.adminService.getAdsCampaigns({
+      q,
+      status: normalizedStatus,
+      limit,
+      offset,
+    });
+  }
+
+  @Get('ads/campaigns/:campaignId')
+  async getAdsCampaignDetail(
+    @Param('campaignId') campaignId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+
+    return this.adminService.getAdsCampaignDetail(campaignId);
+  }
+
+  @Post('ads/campaigns/:campaignId/action')
+  async performAdsCampaignAdminAction(
+    @Param('campaignId') campaignId: string,
+    @Body()
+    body: {
+      action?: 'cancel_campaign' | 'reopen_canceled_campaign';
+      reason?: string;
+    },
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+
+    if (!body?.action) {
+      throw new BadRequestException('Missing action');
+    }
+
+    if (!['cancel_campaign', 'reopen_canceled_campaign'].includes(body.action)) {
+      throw new BadRequestException('Invalid action');
+    }
+
+    if (body.action === 'cancel_campaign' && !body.reason?.trim()) {
+      throw new BadRequestException('Missing cancellation reason');
+    }
+
+    return this.adminService.performAdsCampaignAdminAction({
+      campaignId,
+      action: body.action,
+      reason: body.reason,
+      adminId: req.user?.userId ?? '',
+    });
   }
 
   @Get('activity/logs')
@@ -327,6 +421,40 @@ export class AdminController {
       throw new ForbiddenException('Admin access required');
     }
     return this.adminService.getMediaModerationDetail(postId);
+  }
+
+  @Post('moderation/media/:postId/items/:mediaIndex/action')
+  async applyMediaModerationAction(
+    @Param('postId') postId: string,
+    @Param('mediaIndex') mediaIndexRaw: string,
+    @Body()
+    body: {
+      decision?: 'blur' | 'reject';
+    },
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+
+    const mediaIndex = Number(mediaIndexRaw);
+    if (!Number.isInteger(mediaIndex) || mediaIndex < 0) {
+      throw new BadRequestException('Invalid media index');
+    }
+
+    const decision = body.decision;
+    if (decision !== 'blur' && decision !== 'reject') {
+      throw new BadRequestException('Invalid decision');
+    }
+
+    const adminId = req.user?.userId ?? '';
+    return this.adminService.applyMediaModerationAction({
+      postId,
+      mediaIndex,
+      decision,
+      adminId,
+    });
   }
 
   @Post('reports/:type/:targetId/violation')

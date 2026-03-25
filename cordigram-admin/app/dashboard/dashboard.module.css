@@ -218,6 +218,21 @@
   height: fit-content;
 }
 
+.tagReject {
+  color: #b42323;
+  background: #feeaea;
+}
+
+.tagBlur {
+  color: #8b5a13;
+  background: #fff3dc;
+}
+
+.tagApprove {
+  color: #0f766e;
+  background: #dff5f0;
+}
+
 .status {
   display: inline-flex;
   align-items: center;
@@ -230,9 +245,56 @@
   height: fit-content;
 }
 
+.statusHigh {
+  color: #b42323;
+  background: #feeaea;
+}
+
+.statusMedium {
+  color: #8b5a13;
+  background: #fff3dc;
+}
+
 .statusLow {
-  background: rgba(15, 118, 110, 0.16);
   color: #0f766e;
+  background: #dff5f0;
+}
+
+.adsMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.adsMetricCard {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(53, 114, 162, 0.22);
+  background:
+    linear-gradient(170deg, rgba(186, 230, 253, 0.34), rgba(255, 255, 255, 0.9)),
+    var(--color-surface-muted);
+  display: grid;
+  gap: 6px;
+}
+
+.adsMetricLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #537799;
+  font-weight: 700;
+}
+
+.adsMetricValue {
+  font-size: 24px;
+  line-height: 1.1;
+  color: #123b61;
+  font-weight: 800;
+}
+
+.adsMetricHint {
+  font-size: 12px;
+  color: #3f6385;
 }
 
 .alerts {
@@ -316,13 +378,18 @@
   justify-content: center;
   padding: 8px 12px;
   border-radius: 10px;
-  border: none;
-  background: rgba(74, 163, 228, 0.12);
-  color: var(--color-primary-strong);
+  border: 1px solid #c9ddf1;
+  background: #f6fbff;
+  color: #2f6898;
   font-weight: 700;
   font-size: 12px;
   text-decoration: none;
   cursor: pointer;
+}
+
+.quickButton:hover {
+  border-color: #7fb4dc;
+  background: #edf6ff;
 }
 
 .quickToast {
@@ -384,6 +451,10 @@
 @media (max-width: 1100px) {
   .kpiGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .adsMetricGrid {
+    grid-template-columns: 1fr;
   }
 
   .grid {

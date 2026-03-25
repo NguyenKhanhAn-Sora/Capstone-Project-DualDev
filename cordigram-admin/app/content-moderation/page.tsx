@@ -58,6 +58,7 @@ type UserItem = {
   displayName: string | null;
   username: string | null;
   avatarUrl: string | null;
+  isCreatorVerified: boolean;
 };
 
 type ListState<T> = {
@@ -277,6 +278,120 @@ const getSuggestedSeverity = (category: string | null): "low" | "medium" | "high
 const getMediaDisplayUrl = (item: PostMediaItem | undefined) => {
   if (!item) return "";
   return (item.originalUrl || item.url || "").trim();
+};
+
+type ParsedModerationAdCreative = {
+  primaryText: string;
+  headline: string;
+  description: string;
+  cta: string;
+  destinationUrl: string;
+};
+
+const parseModerationAdCreative = (
+  content: string | null | undefined,
+): ParsedModerationAdCreative | null => {
+  const raw = (content ?? "").replace(/\r/g, "").trim();
+  if (!raw) return null;
+
+  const extractBlock = (name: string) => {
+    const pattern = new RegExp(
+      `\\[\\[AD_${name}\\]\\]([\\s\\S]*?)\\[\\[\\/AD_${name}\\]\\]`,
+      "i",
+    );
+    const matched = pattern.exec(raw);
+    if (!matched) return "";
+    return matched[1]?.replace(/^\n+|\n+$/g, "").trim() ?? "";
+  };
+
+  const markerPrimary = extractBlock("PRIMARY_TEXT");
+  const markerHeadline = extractBlock("HEADLINE");
+  const markerDescription = extractBlock("DESCRIPTION");
+  const markerCta = extractBlock("CTA");
+  const markerUrl = extractBlock("URL");
+
+  if (
+    markerPrimary ||
+    markerHeadline ||
+    markerDescription ||
+    markerCta ||
+    markerUrl
+  ) {
+    return {
+      primaryText: markerPrimary,
+      headline: markerHeadline,
+      description: markerDescription,
+      cta: markerCta,
+      destinationUrl: markerUrl,
+    };
+  }
+
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!lines.length) return null;
+
+  let destinationUrl = "";
+  const lastLine = lines[lines.length - 1];
+  if (/^https?:\/\//i.test(lastLine)) {
+    destinationUrl = lastLine;
+    lines.pop();
+  }
+
+  let cta = "";
+  const contentLines: string[] = [];
+  lines.forEach((line) => {
+    const matched = /^cta\s*:\s*(.+)$/i.exec(line);
+    if (matched && !cta) {
+      cta = matched[1]?.trim() ?? "";
+      return;
+    }
+    contentLines.push(line);
+  });
+
+  const primaryText = contentLines[0] ?? "";
+  const headline = contentLines.length > 1 ? contentLines[1] : "";
+  const description =
+    contentLines.length > 2 ? contentLines.slice(2).join(" ") : "";
+
+  const likelyAd =
+    Boolean(cta || destinationUrl) ||
+    (Boolean(headline) && Boolean(description));
+  if (!likelyAd) {
+    return null;
+  }
+
+  return {
+    primaryText,
+    headline,
+    description,
+    cta,
+    destinationUrl,
+  };
+};
+
+const toSafeDestinationUrl = (rawUrl: string | null | undefined): string | null => {
+  const trimmed = (rawUrl ?? "").trim();
+  if (!trimmed) return null;
+
+  const candidates = /^https?:\/\//i.test(trimmed)
+    ? [trimmed]
+    : [`https://${trimmed}`];
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = new URL(candidate);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        return parsed.toString();
+      }
+    } catch {
+      // Try next candidate.
+    }
+  }
+
+  return null;
 };
 
 const mergeUniqueById = <T,>(
@@ -699,6 +814,16 @@ export default function ContentModerationPage() {
 
   const currentState =
     activeType === "post" ? postState : activeType === "comment" ? commentState : userState;
+
+  const reviewPost =
+    reviewOverlay.type === "post" ? ((reviewOverlay.detail as any)?.post ?? null) : null;
+  const reviewPostMedia = Array.isArray(reviewPost?.media)
+    ? (reviewPost.media as PostMediaItem[])
+    : [];
+  const reviewPostAd = parseModerationAdCreative(reviewPost?.caption);
+  const reviewPostAdDestinationUrl = toSafeDestinationUrl(
+    reviewPostAd?.destinationUrl,
+  );
 
   const requiresSeverity = useMemo(
     () => !["no_violation", "warn", "mute_interaction", "suspend_user"].includes(action),
@@ -1233,7 +1358,51 @@ export default function ContentModerationPage() {
                             )}
                           </div>
                           <div>
-                            <p className={`${styles.mainText} ${styles.ownerName}`}>{item.displayName || item.email || "Unknown"}</p>
+                            <p className={`${styles.mainText} ${styles.ownerName}`}>
+                              <span>{item.displayName || item.email || "Unknown"}</span>
+                              {item.isCreatorVerified ? (
+                                <span
+                                  className={styles.creatorVerifiedBadge}
+                                  aria-label="Creator verified"
+                                  title="Creator verified"
+                                >
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 20 20"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    aria-hidden="true"
+                                  >
+                                    <defs>
+                                      <linearGradient
+                                        id="cm-creator-verified-gradient"
+                                        x1="2"
+                                        y1="2"
+                                        x2="18"
+                                        y2="18"
+                                        gradientUnits="userSpaceOnUse"
+                                      >
+                                        <stop stopColor="#52B6FF" />
+                                        <stop offset="1" stopColor="#1570EF" />
+                                      </linearGradient>
+                                    </defs>
+                                    <path
+                                      d="M10 1.6 12.2 3.1 14.8 3.1 16.1 5.4 18.4 6.8 18.4 9.4 19.9 11.6 18.4 13.8 18.4 16.4 16.1 17.8 14.8 20.1 12.2 20.1 10 21.6 7.8 20.1 5.2 20.1 3.9 17.8 1.6 16.4 1.6 13.8 0.1 11.6 1.6 9.4 1.6 6.8 3.9 5.4 5.2 3.1 7.8 3.1 10 1.6Z"
+                                      transform="scale(0.9) translate(1.1 0.1)"
+                                      fill="url(#cm-creator-verified-gradient)"
+                                    />
+                                    <path
+                                      d="M6.8 10.3 9.1 12.6 13.6 8.1"
+                                      stroke="#ffffff"
+                                      strokeWidth="2.2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
+                                </span>
+                              ) : null}
+                            </p>
                             <p className={styles.subText}>{item.userId}</p>
                           </div>
                         </div>
@@ -1320,23 +1489,137 @@ export default function ContentModerationPage() {
                       </div>
                     </div>
 
-                    <div className={styles.reviewInfoBlock}>
-                      <p className={styles.reviewInfoLabel}>Caption</p>
-                      <p className={styles.reviewInfoValue}>{(reviewOverlay.detail as any)?.post?.caption || "(No caption)"}</p>
-                    </div>
+                    {reviewPostAd ? (
+                      <article className={styles.reviewAdCard}>
+                        <p className={styles.reviewAdPrimaryText}>
+                          {reviewPostAd.primaryText || "(No caption)"}
+                        </p>
 
-                    {Array.isArray((reviewOverlay.detail as any)?.post?.media) &&
-                    (reviewOverlay.detail as any).post.media.length > 0 ? (
+                        {reviewPostMedia.length > 0 ? (
+                          <div className={styles.reviewMediaCarousel}>
+                            <div className={styles.reviewMediaViewport}>
+                              {reviewPostMedia.length > 1 ? (
+                                <button
+                                  type="button"
+                                  className={`${styles.reviewMediaNav} ${styles.reviewMediaNavLeft}`}
+                                  onClick={() =>
+                                    setReviewPostMediaIndex((prev) =>
+                                      (prev - 1 + reviewPostMedia.length) %
+                                      reviewPostMedia.length,
+                                    )
+                                  }
+                                  aria-label="Previous post media"
+                                >
+                                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                </button>
+                              ) : null}
+
+                              <button
+                                type="button"
+                                className={styles.reviewMediaStageButton}
+                                onClick={() =>
+                                  setMediaViewer({
+                                    open: true,
+                                    postId: reviewOverlay.targetId,
+                                    media: reviewPostMedia,
+                                    index: reviewPostMediaIndex,
+                                  })
+                                }
+                              >
+                                {reviewPostMedia[reviewPostMediaIndex]?.type === "video" ? (
+                                  <video
+                                    src={getMediaDisplayUrl(reviewPostMedia[reviewPostMediaIndex])}
+                                    muted
+                                    playsInline
+                                    className={styles.reviewMediaImageLarge}
+                                  />
+                                ) : (
+                                  <img
+                                    src={getMediaDisplayUrl(reviewPostMedia[reviewPostMediaIndex])}
+                                    alt="Post media"
+                                    className={styles.reviewMediaImageLarge}
+                                  />
+                                )}
+                              </button>
+
+                              {reviewPostMedia.length > 1 ? (
+                                <button
+                                  type="button"
+                                  className={`${styles.reviewMediaNav} ${styles.reviewMediaNavRight}`}
+                                  onClick={() =>
+                                    setReviewPostMediaIndex((prev) =>
+                                      (prev + 1) % reviewPostMedia.length,
+                                    )
+                                  }
+                                  aria-label="Next post media"
+                                >
+                                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                </button>
+                              ) : null}
+                            </div>
+                            <p className={styles.reviewMediaPager}>
+                              {reviewPostMediaIndex + 1}/{reviewPostMedia.length}
+                            </p>
+                          </div>
+                        ) : null}
+
+                        <div className={styles.reviewAdMetaCard}>
+                          <div>
+                            <p className={styles.reviewAdHeadline}>
+                              {reviewPostAd.headline || "Sponsored content"}
+                            </p>
+                            {reviewPostAd.description ? (
+                              <p className={styles.reviewAdDescription}>
+                                {reviewPostAd.description}
+                              </p>
+                            ) : null}
+                            {reviewPostAdDestinationUrl ? (
+                              <p className={styles.reviewAdUrl}>{reviewPostAdDestinationUrl}</p>
+                            ) : null}
+                          </div>
+                          {reviewPostAdDestinationUrl ? (
+                            <a
+                              href={reviewPostAdDestinationUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={styles.reviewAdCtaButton}
+                            >
+                              {reviewPostAd.cta || "Open destination"}
+                            </a>
+                          ) : reviewPostAd.cta ? (
+                            <button
+                              type="button"
+                              className={`${styles.reviewAdCtaButton} ${styles.reviewAdCtaButtonDisabled}`}
+                              disabled
+                              title="Destination URL is missing or invalid"
+                            >
+                              {reviewPostAd.cta}
+                            </button>
+                          ) : null}
+                        </div>
+                      </article>
+                    ) : (
+                      <div className={styles.reviewInfoBlock}>
+                        <p className={styles.reviewInfoLabel}>Caption</p>
+                        <p className={styles.reviewInfoValue}>{reviewPost?.caption || "(No caption)"}</p>
+                      </div>
+                    )}
+
+                    {reviewPostMedia.length > 0 && !reviewPostAd ? (
                       <div className={styles.reviewMediaCarousel}>
                         <div className={styles.reviewMediaViewport}>
-                          {(reviewOverlay.detail as any).post.media.length > 1 ? (
+                          {reviewPostMedia.length > 1 ? (
                             <button
                               type="button"
                               className={`${styles.reviewMediaNav} ${styles.reviewMediaNavLeft}`}
                               onClick={() =>
                                 setReviewPostMediaIndex((prev) =>
-                                  (prev - 1 + (reviewOverlay.detail as any).post.media.length) %
-                                  (reviewOverlay.detail as any).post.media.length,
+                                  (prev - 1 + reviewPostMedia.length) %
+                                  reviewPostMedia.length,
                                 )
                               }
                               aria-label="Previous post media"
@@ -1354,34 +1637,34 @@ export default function ContentModerationPage() {
                               setMediaViewer({
                                 open: true,
                                 postId: reviewOverlay.targetId,
-                                media: ((reviewOverlay.detail as any)?.post?.media || []) as PostMediaItem[],
+                                media: reviewPostMedia,
                                 index: reviewPostMediaIndex,
                               })
                             }
                           >
-                            {((reviewOverlay.detail as any).post.media[reviewPostMediaIndex] as PostMediaItem).type === "video" ? (
+                            {reviewPostMedia[reviewPostMediaIndex]?.type === "video" ? (
                               <video
-                                src={getMediaDisplayUrl((reviewOverlay.detail as any).post.media[reviewPostMediaIndex] as PostMediaItem)}
+                                src={getMediaDisplayUrl(reviewPostMedia[reviewPostMediaIndex])}
                                 muted
                                 playsInline
                                 className={styles.reviewMediaImageLarge}
                               />
                             ) : (
                               <img
-                                src={getMediaDisplayUrl((reviewOverlay.detail as any).post.media[reviewPostMediaIndex] as PostMediaItem)}
+                                src={getMediaDisplayUrl(reviewPostMedia[reviewPostMediaIndex])}
                                 alt="Post media"
                                 className={styles.reviewMediaImageLarge}
                               />
                             )}
                           </button>
 
-                          {(reviewOverlay.detail as any).post.media.length > 1 ? (
+                          {reviewPostMedia.length > 1 ? (
                             <button
                               type="button"
                               className={`${styles.reviewMediaNav} ${styles.reviewMediaNavRight}`}
                               onClick={() =>
                                 setReviewPostMediaIndex((prev) =>
-                                  (prev + 1) % (reviewOverlay.detail as any).post.media.length,
+                                  (prev + 1) % reviewPostMedia.length,
                                 )
                               }
                               aria-label="Next post media"
@@ -1393,7 +1676,7 @@ export default function ContentModerationPage() {
                           ) : null}
                         </div>
                         <p className={styles.reviewMediaPager}>
-                          {reviewPostMediaIndex + 1}/{(reviewOverlay.detail as any).post.media.length}
+                          {reviewPostMediaIndex + 1}/{reviewPostMedia.length}
                         </p>
                       </div>
                     ) : null}

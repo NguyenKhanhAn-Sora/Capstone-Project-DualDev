@@ -36,6 +36,11 @@ import {
   PaymentTransaction,
   PaymentTransactionSchema,
 } from '../payments/payment-transaction.schema';
+import { ReportPost, ReportPostSchema } from '../reportpost/reportpost.schema';
+import {
+  AdEngagementEvent,
+  AdEngagementEventSchema,
+} from '../payments/ad-engagement-event.schema';
 
 @Module({
   imports: [
@@ -55,6 +60,8 @@ import {
       { name: User.name, schema: UserSchema },
       { name: ModerationAction.name, schema: ModerationActionSchema },
       { name: PaymentTransaction.name, schema: PaymentTransactionSchema },
+      { name: ReportPost.name, schema: ReportPostSchema },
+      { name: AdEngagementEvent.name, schema: AdEngagementEventSchema },
     ]),
   ],
   controllers: [PostsController, ReelsController, ExploreController],

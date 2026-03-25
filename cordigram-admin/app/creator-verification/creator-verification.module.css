@@ -101,14 +101,19 @@
 }
 
 .refreshButton {
-  border: 1px solid #c5d3e4;
-  background: linear-gradient(135deg, #f9fbff, #eef4ff);
-  color: #1f3f67;
+  border: 1px solid #c9ddf1;
+  background: #f6fbff;
+  color: #2f6898;
   border-radius: 11px;
   height: 36px;
   padding: 0 13px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.refreshButton:hover {
+  border-color: #7fb4dc;
+  background: #edf6ff;
 }
 
 .refreshButton:disabled {
@@ -317,9 +322,9 @@
 }
 
 .filterButton {
-  border: 1px solid #c9d8eb;
-  background: #f5f8fd;
-  color: #334e68;
+  border: 1px solid #c9ddf1;
+  background: #f6fbff;
+  color: #2f6898;
   min-width: 84px;
   height: 34px;
   padding: 0 12px;
@@ -332,13 +337,13 @@
 }
 
 .filterButton:hover {
-  border-color: #93b0d6;
-  background: #ecf3fb;
+  border-color: #7fb4dc;
+  background: #edf6ff;
 }
 
 .filterButtonActive {
-  background: linear-gradient(120deg, #2c69c7, #4182eb);
-  border-color: #2c69c7;
+  background: linear-gradient(135deg, #7ec3e9, #5caedd);
+  border-color: #5caedd;
   color: #ffffff;
 }
 
@@ -528,17 +533,17 @@
   height: 36px;
   padding: 0 14px;
   border-radius: 10px;
-  border: 1px solid #c7d7ea;
-  background: linear-gradient(135deg, #f8fbff, #edf4ff);
-  color: #1c4f8f;
+  border: 1px solid #c9ddf1;
+  background: #f6fbff;
+  color: #2f6898;
   font-size: 12px;
   font-weight: 700;
   text-decoration: none;
 }
 
 .detailButton:hover {
-  border-color: #9ebce0;
-  background: linear-gradient(135deg, #edf4ff, #e5efff);
+  border-color: #7fb4dc;
+  background: #edf6ff;
 }
 
 .textarea {

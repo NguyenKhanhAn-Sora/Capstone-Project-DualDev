@@ -344,6 +344,120 @@ export class MailService {
     }
   }
 
+  async sendAdsCampaignCanceledByAdminEmail(params: {
+    email: string;
+    displayName?: string | null;
+    campaignName?: string | null;
+    reason: string;
+  }): Promise<void> {
+    const greeting = params.displayName?.trim() || 'Advertiser';
+    const campaignName = params.campaignName?.trim() || 'your ads campaign';
+    const reason = params.reason.trim();
+
+    const subject = 'Cordigram Ads campaign canceled by admin';
+    const text = [
+      `Hello ${greeting},`,
+      '',
+      `Your campaign "${campaignName}" has been canceled by our admin team and is no longer delivering.`,
+      '',
+      `Reason from admin: ${reason}`,
+      '',
+      'No strike has been added to your account for this action.',
+      'If you believe this is a mistake, please contact cordigram@gmail.com.',
+      '',
+      'Cordigram Trust & Safety Team',
+    ].join('\n');
+
+    const html = `
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:28px 10px;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
+        <tr>
+          <td align="center">
+            <table width="620" cellpadding="0" cellspacing="0" role="presentation" style="max-width:620px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 14px 34px rgba(15,23,42,0.10);">
+              <tr>
+                <td style="background:linear-gradient(135deg,#ef4444,#b91c1c);padding:24px 28px;">
+                  <div style="font-size:23px;line-height:1.3;font-weight:800;color:#ffffff;">Ads campaign canceled by admin</div>
+                  <div style="margin-top:8px;font-size:14px;color:#fee2e2;line-height:1.6;">Your campaign is no longer delivering.</div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:22px 26px 24px;">
+                  <p style="margin:0 0 10px;color:#0f172a;font-size:15px;">Hello ${this.escapeHtml(greeting)},</p>
+                  <p style="margin:0 0 10px;color:#334155;font-size:14px;line-height:1.7;">Your campaign <strong>${this.escapeHtml(campaignName)}</strong> has been canceled by our admin team and is no longer delivering.</p>
+                  <div style="margin:12px 0;padding:12px 14px;border-radius:12px;border:1px solid #fecaca;background:#fef2f2;color:#7f1d1d;font-size:13px;line-height:1.6;">
+                    <strong>Reason from admin:</strong><br />
+                    ${this.escapeHtml(reason)}
+                  </div>
+                  <p style="margin:0 0 8px;color:#334155;font-size:14px;line-height:1.7;">No strike has been added to your account for this action.</p>
+                  <p style="margin:0;color:#334155;font-size:14px;line-height:1.7;">If you believe this is a mistake, please contact <strong>cordigram@gmail.com</strong>.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>`;
+
+    await this.transporter.sendMail({
+      from: this.config.mailFrom,
+      to: params.email,
+      subject,
+      text,
+      html,
+    });
+  }
+
+  async sendAdsCampaignReopenedByAdminEmail(params: {
+    email: string;
+    displayName?: string | null;
+    campaignName?: string | null;
+  }): Promise<void> {
+    const greeting = params.displayName?.trim() || 'Advertiser';
+    const campaignName = params.campaignName?.trim() || 'your ads campaign';
+
+    const subject = 'Cordigram Ads campaign reopened by admin';
+    const text = [
+      `Hello ${greeting},`,
+      '',
+      `Good news. Your campaign "${campaignName}" has been reopened by our admin team and can deliver again.`,
+      '',
+      'No strike has been added to your account for this action.',
+      'You can review campaign status in your Ads dashboard.',
+      '',
+      'Cordigram Trust & Safety Team',
+    ].join('\n');
+
+    const html = `
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:28px 10px;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
+        <tr>
+          <td align="center">
+            <table width="620" cellpadding="0" cellspacing="0" role="presentation" style="max-width:620px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 14px 34px rgba(15,23,42,0.10);">
+              <tr>
+                <td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:24px 28px;">
+                  <div style="font-size:23px;line-height:1.3;font-weight:800;color:#ffffff;">Ads campaign reopened by admin</div>
+                  <div style="margin-top:8px;font-size:14px;color:#dcfce7;line-height:1.6;">Your campaign can deliver again.</div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:22px 26px 24px;">
+                  <p style="margin:0 0 10px;color:#0f172a;font-size:15px;">Hello ${this.escapeHtml(greeting)},</p>
+                  <p style="margin:0 0 10px;color:#334155;font-size:14px;line-height:1.7;">Good news. Your campaign <strong>${this.escapeHtml(campaignName)}</strong> has been reopened by our admin team and can deliver again.</p>
+                  <p style="margin:0 0 8px;color:#334155;font-size:14px;line-height:1.7;">No strike has been added to your account for this action.</p>
+                  <p style="margin:0;color:#334155;font-size:14px;line-height:1.7;">You can review campaign status in your Ads dashboard.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>`;
+
+    await this.transporter.sendMail({
+      from: this.config.mailFrom,
+      to: params.email,
+      subject,
+      text,
+      html,
+    });
+  }
+
   async sendOtpEmail(
     email: string,
     code: string,

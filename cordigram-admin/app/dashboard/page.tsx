@@ -44,6 +44,17 @@ export default function AdminDashboardPage() {
     apiUptimeSeconds: number;
     openReportsCount: number;
     highRiskReportsCount: number;
+    adsGrossRevenue30d?: number | null;
+    adsSpend30d?: number | null;
+    adsGrossRevenue24h?: number | null;
+    adsSpend24h?: number | null;
+    adsActiveCampaigns?: number | null;
+    adsImpressions30d?: number | null;
+    adsClicks30d?: number | null;
+    adsCtr30dPct?: number | null;
+    adsImpressions24h?: number | null;
+    adsClicks24h?: number | null;
+    adsCtr24hPct?: number | null;
     reportQueue: Array<{
       type: "post" | "comment" | "user";
       targetId: string;
@@ -131,6 +142,17 @@ export default function AdminDashboardPage() {
           apiUptimeSeconds: number;
           openReportsCount: number;
           highRiskReportsCount: number;
+          adsGrossRevenue30d?: number | null;
+          adsSpend30d?: number | null;
+          adsGrossRevenue24h?: number | null;
+          adsSpend24h?: number | null;
+          adsActiveCampaigns?: number | null;
+          adsImpressions30d?: number | null;
+          adsClicks30d?: number | null;
+          adsCtr30dPct?: number | null;
+          adsImpressions24h?: number | null;
+          adsClicks24h?: number | null;
+          adsCtr24hPct?: number | null;
           reportQueue: Array<{
             type: "post" | "comment" | "user";
             targetId: string;
@@ -329,6 +351,18 @@ export default function AdminDashboardPage() {
     return `${sign}${value.toFixed(1)}%`;
   };
 
+  const formatCurrencyCompact = (value?: number | null) => {
+    if (typeof value !== "number") return "--";
+    return `${new Intl.NumberFormat("vi-VN", {
+      maximumFractionDigits: 0,
+    }).format(Math.round(value))} VND`;
+  };
+
+  const formatPercentCompact = (value?: number | null) => {
+    if (typeof value !== "number") return "--";
+    return `${value.toFixed(2)}%`;
+  };
+
   const formatStorage = (
     usedBytes?: number,
     limitBytes?: number | null,
@@ -394,11 +428,59 @@ export default function AdminDashboardPage() {
     return "Low priority";
   };
 
+  const getModerationDecisionClass = (
+    decision: "approve" | "blur" | "reject",
+  ) => {
+    if (decision === "reject") return styles.tagReject;
+    if (decision === "blur") return styles.tagBlur;
+    return styles.tagApprove;
+  };
+
+  const getReportStatusClass = (
+    autoHideSuggested: boolean,
+    severity: "low" | "medium" | "high",
+  ) => {
+    if (autoHideSuggested || severity === "high") return styles.statusHigh;
+    if (severity === "medium") return styles.statusMedium;
+    return styles.statusLow;
+  };
+
   const isPostDeltaNegative =
     typeof stats?.postsCreatedDeltaPct === "number" &&
     stats.postsCreatedDeltaPct < 0;
   const isNewUsersDeltaNegative =
     typeof stats?.newUsersDeltaPct === "number" && stats.newUsersDeltaPct < 0;
+
+  const adsGrossRevenue =
+    typeof stats?.adsGrossRevenue30d === "number"
+      ? stats.adsGrossRevenue30d
+      : stats?.adsGrossRevenue24h ?? null;
+
+  const adsSpend =
+    typeof stats?.adsSpend30d === "number"
+      ? stats.adsSpend30d
+      : stats?.adsSpend24h ?? null;
+
+  const adsClicks =
+    typeof stats?.adsClicks30d === "number"
+      ? stats.adsClicks30d
+      : stats?.adsClicks24h ?? null;
+
+  const adsImpressions =
+    typeof stats?.adsImpressions30d === "number"
+      ? stats.adsImpressions30d
+      : stats?.adsImpressions24h ?? null;
+
+  const adsCtr =
+    typeof stats?.adsCtr30dPct === "number"
+      ? stats.adsCtr30dPct
+      : typeof stats?.adsCtr24hPct === "number"
+        ? stats.adsCtr24hPct
+        : typeof adsClicks === "number" &&
+            typeof adsImpressions === "number" &&
+            adsImpressions > 0
+          ? (adsClicks / adsImpressions) * 100
+        : null;
 
   const handleReviewContentQuickAction = () => {
     const queue = stats?.reportQueue ?? [];
@@ -521,7 +603,11 @@ export default function AdminDashboardPage() {
                     {item.authorUsername ? ` (@${item.authorUsername})` : ''}
                   </span>
                   <div className={styles.queueMeta}>
-                    <span className={styles.tag}>
+                    <span
+                      className={`${styles.tag} ${getModerationDecisionClass(
+                        item.moderationDecision,
+                      )}`}
+                    >
                       {item.moderationDecision.toUpperCase()}
                     </span>
                     {item.reasons?.[0] ? <span>{item.reasons[0]}</span> : null}
@@ -563,7 +649,10 @@ export default function AdminDashboardPage() {
                     </span>
                     <span
                       className={`${styles.status} ${
-                        item.severity === "low" ? styles.statusLow : ""
+                        getReportStatusClass(
+                          item.autoHideSuggested,
+                          item.severity,
+                        )
                       }`}
                     >
                       {formatReportStatus(
@@ -584,26 +673,37 @@ export default function AdminDashboardPage() {
 
           <div className={styles.panel}>
             <div className={styles.panelHeader}>
-              <h2 className={styles.panelTitle}>Safety Alerts</h2>
-              <Link href="/alerts" className={styles.panelAction}>
-                Review
+              <h2 className={styles.panelTitle}>Ads & Revenue</h2>
+              <Link href="/ads-management" className={styles.panelAction}>
+                Monitor
               </Link>
             </div>
-            <div className={styles.alerts}>
-              <div className={styles.alertCard}>
-                <span className={styles.alertTitle}>
-                  Reports spike in #nightfeed
-                </span>
-                <span className={styles.alertNote}>
-                  24 reports in the last hour. Consider manual review.
-                </span>
+            <div className={styles.adsMetricGrid}>
+              <div className={styles.adsMetricCard}>
+                <span className={styles.adsMetricLabel}>Gross Revenue (Last 30 Days)</span>
+                <span className={styles.adsMetricValue}>{formatCurrencyCompact(adsGrossRevenue)}</span>
+                <span className={styles.adsMetricHint}>All completed ad charges</span>
               </div>
-              <div className={styles.alertCard}>
-                <span className={styles.alertTitle}>
-                  High repeat offender detected
-                </span>
-                <span className={styles.alertNote}>
-                  User has 5 reports in 24h across multiple posts.
+
+              <div className={styles.adsMetricCard}>
+                <span className={styles.adsMetricLabel}>Ad Spend (Last 30 Days)</span>
+                <span className={styles.adsMetricValue}>{formatCurrencyCompact(adsSpend)}</span>
+                <span className={styles.adsMetricHint}>Running campaign burn</span>
+              </div>
+
+              <div className={styles.adsMetricCard}>
+                <span className={styles.adsMetricLabel}>Active Campaigns</span>
+                <span className={styles.adsMetricValue}>{formatNumber(stats?.adsActiveCampaigns ?? undefined)}</span>
+                <span className={styles.adsMetricHint}>Currently delivering</span>
+              </div>
+
+              <div className={styles.adsMetricCard}>
+                <span className={styles.adsMetricLabel}>CTR (Last 30 Days)</span>
+                <span className={styles.adsMetricValue}>{formatPercentCompact(adsCtr)}</span>
+                <span className={styles.adsMetricHint}>
+                  {typeof adsClicks === "number" && typeof adsImpressions === "number"
+                    ? `${formatNumber(adsClicks)} clicks / ${formatNumber(adsImpressions)} impressions`
+                    : "No campaign telemetry yet"}
                 </span>
               </div>
             </div>

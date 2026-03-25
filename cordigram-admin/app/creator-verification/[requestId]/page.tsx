@@ -575,6 +575,11 @@ export default function CreatorVerificationDetailPage() {
                             </Link>
                           </div>
 
+                          <div className={styles.postCaptionBlock}>
+                            <h3 className={styles.postTitle}>Content overview</h3>
+                            <p className={styles.postCaption}>{post.content || "No caption"}</p>
+                          </div>
+
                           <div className={styles.postBodyGrid}>
                             <div className={styles.mediaPanel}>
                               <div className={styles.mediaViewport}>
@@ -656,8 +661,7 @@ export default function CreatorVerificationDetailPage() {
                             </div>
 
                             <div className={styles.postContentPanel}>
-                              <h3 className={styles.postTitle}>Content overview</h3>
-                              <p className={styles.postCaption}>{post.content || "No caption"}</p>
+                              <h3 className={styles.postTitle}>Post performance</h3>
                               <div className={styles.postStatsGrid}>
                                 <div className={styles.postStatItem}><span>Hearts</span><strong>{post.stats.hearts}</strong></div>
                                 <div className={styles.postStatItem}><span>Comments</span><strong>{post.stats.comments}</strong></div>

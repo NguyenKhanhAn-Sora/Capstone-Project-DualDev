@@ -33,6 +33,8 @@ import { User } from '../users/user.schema';
 import { MediaModerationService } from './media-moderation.service';
 import { ModerationAction } from '../moderation/moderation-action.schema';
 import { PaymentTransaction } from '../payments/payment-transaction.schema';
+import { ReportPost } from '../reportpost/reportpost.schema';
+import { AdEngagementEvent } from '../payments/ad-engagement-event.schema';
 type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
@@ -41,6 +43,9 @@ type UploadedFile = {
 };
 
 const REEL_MAX_DURATION_SECONDS = 90;
+const SPONSORED_REPUTATION_WINDOW_DAYS = 30;
+const ADS_FREQUENCY_COOLDOWN_MINUTES = 30;
+const ADS_FREQUENCY_MAX_IMPRESSIONS_24H = 3;
 
 @Injectable()
 export class PostsService {
@@ -117,6 +122,10 @@ export class PostsService {
     private readonly impressionEventModel: Model<PostImpressionEvent>,
     @InjectModel(PaymentTransaction.name)
     private readonly paymentTransactionModel: Model<PaymentTransaction>,
+    @InjectModel(ReportPost.name)
+    private readonly reportPostModel: Model<ReportPost>,
+    @InjectModel(AdEngagementEvent.name)
+    private readonly adEngagementEventModel: Model<AdEngagementEvent>,
     private readonly blocksService: BlocksService,
     private readonly cloudinary: CloudinaryService,
     private readonly config: ConfigService,
@@ -125,6 +134,178 @@ export class PostsService {
     private readonly postScheduler: PostSchedulerService,
     private readonly mediaModerationService: MediaModerationService,
   ) {}
+
+  private normalizeSponsoredAuthorReputation(params: {
+    strikeCount?: number | null;
+    accountLimitedUntil?: Date | null;
+    accountLimitedIndefinitely?: boolean | null;
+    suspendedUntil?: Date | null;
+    suspendedIndefinitely?: boolean | null;
+    status?: string | null;
+    reportsOpen30d?: number;
+    reportsTotal30d?: number;
+    now: Date;
+  }) {
+    const {
+      strikeCount,
+      accountLimitedUntil,
+      accountLimitedIndefinitely,
+      suspendedUntil,
+      suspendedIndefinitely,
+      status,
+      reportsOpen30d = 0,
+      reportsTotal30d = 0,
+      now,
+    } = params;
+
+    const nowMs = now.getTime();
+    const activeLimited =
+      Boolean(accountLimitedIndefinitely) ||
+      Boolean(accountLimitedUntil && accountLimitedUntil.getTime() > nowMs);
+    const activeSuspended =
+      Boolean(suspendedIndefinitely) ||
+      Boolean(suspendedUntil && suspendedUntil.getTime() > nowMs) ||
+      status === 'banned';
+
+    // 0..1 scale: higher is more trusted.
+    let trust = 1;
+    trust -= Math.min(0.55, Math.max(0, Number(strikeCount ?? 0)) * 0.08);
+    if (activeLimited) trust -= 0.22;
+    if (activeSuspended) trust -= 0.35;
+
+    const reportPenalty =
+      Math.min(0.35, reportsOpen30d * 0.03 + reportsTotal30d * 0.008);
+    trust -= reportPenalty;
+
+    return Math.max(0, Math.min(1, trust));
+  }
+
+  private async buildSponsoredRankingSignals(
+    posts: Post[],
+    sponsoredBoostByPostId: Map<string, number>,
+    now: Date,
+  ) {
+    const sponsoredPosts = posts.filter((post) =>
+      sponsoredBoostByPostId.has(post._id?.toString?.() ?? ''),
+    );
+
+    const creatorVerifiedByAuthorId = new Map<string, boolean>();
+    const reputationByAuthorId = new Map<string, number>();
+
+    if (!sponsoredPosts.length) {
+      return { creatorVerifiedByAuthorId, reputationByAuthorId };
+    }
+
+    const sponsoredPostIds = sponsoredPosts
+      .map((post) => post._id)
+      .filter((id): id is Types.ObjectId => Boolean(id));
+
+    const sponsoredAuthorIds = Array.from(
+      new Set(
+        sponsoredPosts
+          .map((post) => post.authorId?.toString?.())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ).map((id) => new Types.ObjectId(id));
+
+    if (!sponsoredAuthorIds.length) {
+      return { creatorVerifiedByAuthorId, reputationByAuthorId };
+    }
+
+    const users = await this.userModel
+      .find({ _id: { $in: sponsoredAuthorIds } })
+      .select(
+        '_id isCreatorVerified strikeCount accountLimitedUntil accountLimitedIndefinitely suspendedUntil suspendedIndefinitely status',
+      )
+      .lean();
+
+    const reportWindowStart = new Date(
+      now.getTime() - SPONSORED_REPUTATION_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+    );
+
+    const reportRows = sponsoredPostIds.length
+      ? await this.reportPostModel
+          .aggregate<{
+            _id: Types.ObjectId;
+            totalReports: number;
+            openReports: number;
+          }>([
+            {
+              $match: {
+                postId: { $in: sponsoredPostIds },
+                createdAt: { $gte: reportWindowStart },
+              },
+            },
+            {
+              $group: {
+                _id: '$postId',
+                totalReports: { $sum: 1 },
+                openReports: {
+                  $sum: {
+                    $cond: [{ $eq: ['$status', 'open'] }, 1, 0],
+                  },
+                },
+              },
+            },
+          ])
+          .exec()
+      : [];
+
+    const reportByPostId = new Map<
+      string,
+      { totalReports: number; openReports: number }
+    >();
+    reportRows.forEach((item) => {
+      const postId = item._id?.toString?.();
+      if (!postId) return;
+      reportByPostId.set(postId, {
+        totalReports: Math.max(0, Number(item.totalReports ?? 0)),
+        openReports: Math.max(0, Number(item.openReports ?? 0)),
+      });
+    });
+
+    const reportByAuthorId = new Map<
+      string,
+      { totalReports: number; openReports: number }
+    >();
+    sponsoredPosts.forEach((post) => {
+      const postId = post._id?.toString?.();
+      const authorId = post.authorId?.toString?.();
+      if (!postId || !authorId) return;
+      const report = reportByPostId.get(postId);
+      const current = reportByAuthorId.get(authorId) ?? {
+        totalReports: 0,
+        openReports: 0,
+      };
+      reportByAuthorId.set(authorId, {
+        totalReports: current.totalReports + (report?.totalReports ?? 0),
+        openReports: current.openReports + (report?.openReports ?? 0),
+      });
+    });
+
+    users.forEach((user) => {
+      const authorId = user._id?.toString?.();
+      if (!authorId) return;
+
+      creatorVerifiedByAuthorId.set(authorId, Boolean(user.isCreatorVerified));
+
+      const reportStats = reportByAuthorId.get(authorId);
+      const trust = this.normalizeSponsoredAuthorReputation({
+        strikeCount: user.strikeCount,
+        accountLimitedUntil: user.accountLimitedUntil,
+        accountLimitedIndefinitely: user.accountLimitedIndefinitely,
+        suspendedUntil: user.suspendedUntil,
+        suspendedIndefinitely: user.suspendedIndefinitely,
+        status: user.status,
+        reportsOpen30d: reportStats?.openReports ?? 0,
+        reportsTotal30d: reportStats?.totalReports ?? 0,
+        now,
+      });
+      reputationByAuthorId.set(authorId, trust);
+    });
+
+    return { creatorVerifiedByAuthorId, reputationByAuthorId };
+  }
 
   async create(authorId: string, dto: CreatePostDto) {
     await this.assertInteractionNotMuted(authorId);
@@ -787,6 +968,7 @@ export class PostsService {
       .find({
         promotedPostId: { $in: postIds },
         isExpiredHidden: { $ne: true },
+        hiddenReason: { $nin: ['paused', 'canceled', 'expired'] },
         startsAt: { $lte: now },
         expiresAt: { $gt: now },
         $or: [
@@ -824,6 +1006,7 @@ export class PostsService {
       .find({
         promotedPostId: { $in: postIds },
         isExpiredHidden: { $ne: true },
+        hiddenReason: { $nin: ['paused', 'canceled', 'expired'] },
         startsAt: { $lte: now },
         expiresAt: { $gt: now },
         $or: [
@@ -847,6 +1030,26 @@ export class PostsService {
     });
 
     return ctaByPostId;
+  }
+
+  private async isPostCurrentlySponsored(postId: string, now: Date) {
+    const active = await this.paymentTransactionModel
+      .findOne({
+        promotedPostId: postId,
+        isExpiredHidden: { $ne: true },
+        hiddenReason: { $nin: ['paused', 'canceled', 'expired'] },
+        startsAt: { $lte: now },
+        expiresAt: { $gt: now },
+        $or: [
+          { paymentStatus: 'paid' },
+          { paymentStatus: 'no_payment_required' },
+          { checkoutStatus: 'complete' },
+        ],
+      })
+      .select('_id')
+      .lean();
+
+    return Boolean(active?._id);
   }
 
   private deriveSponsoredDurationDays(
@@ -984,6 +1187,7 @@ export class PostsService {
       .find({
         promotedPostId: { $ne: null },
         isExpiredHidden: { $ne: true },
+        hiddenReason: { $nin: ['paused', 'canceled', 'expired'] },
         startsAt: { $lte: now },
         expiresAt: { $gt: now },
         $or: [
@@ -1076,6 +1280,156 @@ export class PostsService {
       }
     }
     return null;
+  }
+
+  private async getRecentAdImpressionSignals(params: {
+    userObjectId: Types.ObjectId;
+    promotedIds: string[];
+    now: Date;
+  }) {
+    const { userObjectId, promotedIds, now } = params;
+    const signals = new Map<
+      string,
+      {
+        dailyImpressions: number;
+        lastImpressionAt: Date | null;
+      }
+    >();
+
+    if (!promotedIds.length) {
+      return signals;
+    }
+
+    const promotedObjectIds = promotedIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    if (!promotedObjectIds.length) {
+      return signals;
+    }
+
+    const rollingWindowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const [dailyRows, latestRows] = await Promise.all([
+      this.adEngagementEventModel
+        .aggregate<{
+          _id: Types.ObjectId;
+          count: number;
+        }>([
+          {
+            $match: {
+              userId: userObjectId,
+              eventType: 'impression',
+              promotedPostId: { $in: promotedObjectIds },
+              createdAt: { $gte: rollingWindowStart },
+            },
+          },
+          {
+            $group: {
+              _id: '$promotedPostId',
+              count: { $sum: 1 },
+            },
+          },
+        ])
+        .exec(),
+      this.adEngagementEventModel
+        .aggregate<{
+          _id: Types.ObjectId;
+          lastImpressionAt: Date;
+        }>([
+          {
+            $match: {
+              userId: userObjectId,
+              eventType: 'impression',
+              promotedPostId: { $in: promotedObjectIds },
+            },
+          },
+          {
+            $group: {
+              _id: '$promotedPostId',
+              lastImpressionAt: { $max: '$createdAt' },
+            },
+          },
+        ])
+        .exec(),
+    ]);
+
+    dailyRows.forEach((item) => {
+      const promotedId = item._id?.toString?.();
+      if (!promotedId) return;
+      signals.set(promotedId, {
+        dailyImpressions: Math.max(0, Number(item.count ?? 0)),
+        lastImpressionAt: null,
+      });
+    });
+
+    latestRows.forEach((item) => {
+      const promotedId = item._id?.toString?.();
+      if (!promotedId) return;
+      const current = signals.get(promotedId) ?? {
+        dailyImpressions: 0,
+        lastImpressionAt: null,
+      };
+      signals.set(promotedId, {
+        ...current,
+        lastImpressionAt:
+          item.lastImpressionAt instanceof Date ? item.lastImpressionAt : null,
+      });
+    });
+
+    return signals;
+  }
+
+  private applyAdFrequencyCap(
+    scored: Array<{ post: Post; score: number }>,
+    sponsoredPostIds: Set<string>,
+    signals: Map<
+      string,
+      {
+        dailyImpressions: number;
+        lastImpressionAt: Date | null;
+      }
+    >,
+    now: Date,
+  ) {
+    if (!scored.length || !sponsoredPostIds.size) {
+      return scored;
+    }
+
+    const cooldownMs = ADS_FREQUENCY_COOLDOWN_MINUTES * 60 * 1000;
+    const shownInThisResponse = new Map<string, number>();
+
+    return scored.filter((item) => {
+      const postId = item.post._id?.toString?.() ?? '';
+      const repostSourceId = item.post.repostOf?.toString?.() ?? '';
+      const promotedId = sponsoredPostIds.has(postId)
+        ? postId
+        : repostSourceId && sponsoredPostIds.has(repostSourceId)
+          ? repostSourceId
+          : '';
+
+      if (!promotedId) {
+        return true;
+      }
+
+      const signal = signals.get(promotedId);
+      const alreadyShown = shownInThisResponse.get(promotedId) ?? 0;
+      const dailyImpressions = (signal?.dailyImpressions ?? 0) + alreadyShown;
+      if (dailyImpressions >= ADS_FREQUENCY_MAX_IMPRESSIONS_24H) {
+        return false;
+      }
+
+      const lastMs = signal?.lastImpressionAt?.getTime?.();
+      if (typeof lastMs === 'number' && Number.isFinite(lastMs)) {
+        const elapsed = now.getTime() - lastMs;
+        if (elapsed >= 0 && elapsed < cooldownMs) {
+          return false;
+        }
+      }
+
+      shownInThisResponse.set(promotedId, alreadyShown + 1);
+      return true;
+    });
   }
 
   private async assertInteractionNotMuted(userId: string): Promise<void> {
@@ -1524,15 +1878,48 @@ export class PostsService {
       viewed.map((v) => v.postId?.toString?.()).filter(Boolean),
     );
 
+    const sponsoredSignals = await this.buildSponsoredRankingSignals(
+      merged,
+      sponsoredBoostByPostId,
+      now,
+    );
+
     const scored = merged
       .map((post) => {
-        const boost = sponsoredBoostByPostId.get(post._id?.toString?.() ?? '') ?? 0;
+        const postId = post._id?.toString?.() ?? '';
+        const authorId = post.authorId?.toString?.() ?? '';
+        const boost = sponsoredBoostByPostId.get(postId) ?? 0;
+        const isSponsored = sponsoredBoostByPostId.has(postId);
+        const creatorPriority = isSponsored
+          ? Number(
+              sponsoredSignals.creatorVerifiedByAuthorId.get(authorId) ?? false,
+            )
+          : 0;
+        const reputationPriority = isSponsored
+          ? sponsoredSignals.reputationByAuthorId.get(authorId) ?? 0
+          : 0;
         return {
           post,
           score: this.scorePost(post, followeeSet, now, boost),
+          isSponsored,
+          boost,
+          creatorPriority,
+          reputationPriority,
         };
       })
-      .sort((a, b) => b.score - a.score);
+      .sort((a, b) => {
+        if (a.isSponsored && b.isSponsored) {
+          // Sponsored priority order: boost package -> creator verified -> reputation.
+          if (b.boost !== a.boost) return b.boost - a.boost;
+          if (b.creatorPriority !== a.creatorPriority) {
+            return b.creatorPriority - a.creatorPriority;
+          }
+          if (b.reputationPriority !== a.reputationPriority) {
+            return b.reputationPriority - a.reputationPriority;
+          }
+        }
+        return b.score - a.score;
+      });
 
     const prioritizedAll = [
       ...scored.filter((item) =>
@@ -1543,9 +1930,23 @@ export class PostsService {
       ),
     ];
 
-    let prioritized = this.applySponsoredSpacing(
+    const sponsoredPlacementSet = new Set(sponsoredBoostByPostId.keys());
+    const impressionSignals = await this.getRecentAdImpressionSignals({
+      userObjectId,
+      promotedIds: Array.from(sponsoredPlacementSet),
+      now,
+    });
+
+    const cappedPrioritized = this.applyAdFrequencyCap(
       prioritizedAll,
-      new Set(sponsoredBoostByPostId.keys()),
+      sponsoredPlacementSet,
+      impressionSignals,
+      now,
+    );
+
+    let prioritized = this.applySponsoredSpacing(
+      cappedPrioritized,
+      sponsoredPlacementSet,
       safeLimit,
     );
 
@@ -1800,13 +2201,6 @@ export class PostsService {
 
     const now = new Date();
     const hiddenObjectIds = Array.from(hiddenIds, (id) => new Types.ObjectId(id));
-    const activeSponsoredPostIds = await this.getActiveSponsoredPostIds(
-      now,
-      candidateLimit,
-    );
-    const sponsoredObjectIds = activeSponsoredPostIds
-      .filter((id) => Types.ObjectId.isValid(id))
-      .map((id) => new Types.ObjectId(id));
 
     const followCandidates = await this.postModel
       .find({
@@ -1823,28 +2217,8 @@ export class PostsService {
       .limit(candidateLimit)
       .lean();
 
-    const sponsoredCandidates = sponsoredObjectIds.length
-      ? await this.postModel
-          .find({
-            _id: { $in: sponsoredObjectIds, $nin: hiddenObjectIds },
-            authorId: { $nin: excludedAuthorIds },
-            kind: { $in: allowedKinds },
-            status: 'published',
-            visibility: 'public',
-            moderationState: followerVisibleModerationFilter,
-            deletedAt: null,
-            publishedAt: { $ne: null },
-          })
-          .sort({ createdAt: -1 })
-          .limit(candidateLimit)
-          .lean()
-      : [];
-
     const bannedFollowingAuthors = await this.getBannedAuthorIdSet(
-      [
-        ...followCandidates.map((item) => item.authorId),
-        ...sponsoredCandidates.map((item) => item.authorId),
-      ],
+      followCandidates.map((item) => item.authorId),
     );
 
     const merged: Post[] = [];
@@ -1866,25 +2240,17 @@ export class PostsService {
       seen.add(id);
     };
 
-    [...followCandidates, ...sponsoredCandidates].forEach((raw) =>
-      pushCandidate(raw),
-    );
+    followCandidates.forEach((raw) => pushCandidate(raw));
 
     const mergedIds = merged
       .map((p) => p._id?.toString?.())
       .filter((id): id is string => Boolean(id));
-    const sponsoredBoostByPostId = await this.getSponsoredBoostByPostId(
-      mergedIds,
-      now,
-    );
-    const sponsoredCtaByPostId = await this.getSponsoredCtaByPostId(
-      mergedIds,
-      now,
-    );
+    const sponsoredBoostByPostId = new Map<string, number>();
+    const sponsoredCtaByPostId = new Map<string, string>();
 
     const scored = merged
       .map((post) => {
-        const boost = sponsoredBoostByPostId.get(post._id?.toString?.() ?? '') ?? 0;
+        const boost = 0;
         return {
           post,
           score: this.scorePost(post, followeeSet, now, boost),
@@ -3703,6 +4069,53 @@ export class PostsService {
       postId,
     );
     await this.assertPostAccessible(userObjectId, postObjectId);
+
+    const now = new Date();
+    const post = await this.postModel
+      .findOne({ _id: postObjectId, deletedAt: null })
+      .select('repostOf')
+      .lean();
+
+    const repostSourceId = post?.repostOf?.toString?.() ?? '';
+    if (repostSourceId) {
+      const isSponsoredRepost = await this.isPostCurrentlySponsored(
+        repostSourceId,
+        now,
+      );
+
+      if (isSponsoredRepost) {
+        const existing = await this.postInteractionModel
+          .findOne({
+            userId: userObjectId,
+            type: 'view',
+            'metadata.promotedPostId': repostSourceId,
+          })
+          .select('_id')
+          .lean();
+
+        if (existing?._id) {
+          return { viewed: true, deduped: true };
+        }
+
+        await this.postInteractionModel.create({
+          userId: userObjectId,
+          postId: postObjectId,
+          type: 'view',
+          durationMs: durationMs ?? null,
+          metadata: {
+            promotedPostId: repostSourceId,
+            dedupeScope: 'sponsored_repost',
+          },
+        });
+
+        await this.bumpCounters(postObjectId, {
+          'stats.views': 1,
+          'stats.impressions': 1,
+        });
+
+        return { viewed: true, deduped: false };
+      }
+    }
 
     await this.postInteractionModel.create({
       userId: userObjectId,

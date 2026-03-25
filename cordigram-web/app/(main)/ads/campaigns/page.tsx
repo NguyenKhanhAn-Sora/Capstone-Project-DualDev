@@ -389,10 +389,15 @@ export default function AdsCampaignsPage() {
                         <td>{item.campaignName}</td>
                         <td>
                           <span
-                            className={`${styles.status} ${styles[`status_${item.status === "active" ? "active" : item.status === "hidden" ? "hidden" : item.status === "canceled" ? "canceled" : "paused"}`]}`}
+                            className={`${styles.status} ${styles[`status_${item.status === "active" ? "active" : item.status === "hidden" ? "hidden" : item.status === "canceled" ? "canceled" : item.status === "completed" ? "completed" : "paused"}`]}`}
                           >
                             {statusLabel(item.status)}
                           </span>
+                          {item.status === "canceled" && item.adminCancelReason?.trim() ? (
+                            <p className={styles.cancelReasonText}>
+                              Admin reason: {item.adminCancelReason.trim()}
+                            </p>
+                          ) : null}
                         </td>
                         <td>{new Date(item.startsAt).toLocaleDateString()}</td>
                         <td>{new Date(item.expiresAt).toLocaleDateString()}</td>

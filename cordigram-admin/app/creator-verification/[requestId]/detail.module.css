@@ -72,14 +72,14 @@
 
 .primaryButton {
   color: #ffffff;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.24);
+  background: linear-gradient(135deg, #7ec3e9, #5caedd);
+  box-shadow: 0 8px 18px rgba(92, 174, 221, 0.24);
 }
 
 .ghostButton {
-  border: 1px solid #c8d7e8;
-  color: #1f3f67;
-  background: #ffffff;
+  border: 1px solid #c9ddf1;
+  color: #2f6898;
+  background: #f6fbff;
 }
 
 .summaryGrid {
@@ -516,6 +516,11 @@
   gap: 10px;
 }
 
+.postCaptionBlock {
+  display: grid;
+  gap: 8px;
+}
+
 .mediaViewport {
   position: relative;
   min-height: 340px;
@@ -620,6 +625,8 @@
   font-size: 14px;
   line-height: 1.65;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .postStatsGrid {
@@ -710,7 +717,7 @@
 }
 
 .revokeButton {
-  background: linear-gradient(130deg, #1d4ed8, #2563eb);
+  background: linear-gradient(135deg, #7ec3e9, #5caedd);
   color: #ffffff;
 }
 

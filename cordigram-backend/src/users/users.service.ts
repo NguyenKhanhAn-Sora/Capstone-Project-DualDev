@@ -2429,6 +2429,35 @@ export class UsersService {
           new Date(b.createdAt ?? 0).getTime(),
       );
 
+    const pickPreviewMedia = (
+      media:
+        | {
+            type?: 'image' | 'video';
+            url?: string;
+            metadata?: Record<string, unknown> | null;
+          }
+        | null
+        | undefined,
+    ): { type: 'image' | 'video'; url: string } | null => {
+      if (!media?.url || (media.type !== 'image' && media.type !== 'video')) {
+        return null;
+      }
+      const metadata = media.metadata ?? null;
+      const originalSecureUrl =
+        metadata && typeof metadata.originalSecureUrl === 'string'
+          ? metadata.originalSecureUrl
+          : null;
+      const originalUrl =
+        metadata && typeof metadata.originalUrl === 'string'
+          ? metadata.originalUrl
+          : null;
+      const resolvedUrl = originalSecureUrl ?? originalUrl ?? media.url;
+      return {
+        type: media.type,
+        url: resolvedUrl,
+      };
+    };
+
     let runningStrike = 0;
     const withTotals = orderedAsc.map((item) => {
       const strikeDelta =
@@ -2459,7 +2488,9 @@ export class UsersService {
         item.targetType === 'comment'
           ? commentMap.get(item.targetId.toString())?.media
           : null;
-      const previewMedia = postPreviewMedia ?? commentPreviewMedia ?? null;
+      const previewMedia = pickPreviewMedia(
+        postPreviewMedia ?? commentPreviewMedia ?? null,
+      );
 
       const relatedPostId =
         item.targetType === 'post'
@@ -2474,13 +2505,7 @@ export class UsersService {
         item.targetType === 'comment'
           ? {
               text: relatedPost?.content?.trim()?.slice(0, 220) ?? null,
-              media:
-                relatedPost?.media?.[0] && relatedPost.media[0].url
-                  ? {
-                      type: relatedPost.media[0].type,
-                      url: relatedPost.media[0].url,
-                    }
-                  : null,
+              media: pickPreviewMedia(relatedPost?.media?.[0]),
             }
           : null;
 
@@ -2498,13 +2523,7 @@ export class UsersService {
           ? new Date(item.expiresAt).toISOString()
           : null,
         previewText,
-        previewMedia:
-          previewMedia && previewMedia.url
-            ? {
-                type: previewMedia.type,
-                url: previewMedia.url,
-              }
-            : null,
+        previewMedia,
         relatedPostId,
         relatedPostPreview,
         createdAt: item.createdAt

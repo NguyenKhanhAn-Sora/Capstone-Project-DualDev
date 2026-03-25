@@ -3541,6 +3541,7 @@ export type AdsDashboardCampaign = {
   promotedPostId: string;
   campaignName: string;
   status: "active" | "hidden" | "paused" | "canceled" | "completed";
+  adminCancelReason?: string | null;
   budget: number;
   spent: number;
   startsAt: string;
@@ -3621,6 +3622,7 @@ export type AdsCampaignDetail = AdsDashboardCampaign & {
   durationDays?: number;
   boostWeight?: number;
   hiddenReason?: string | null;
+  adminCancelReason?: string | null;
   actions?: {
     canChangeBoost: boolean;
     canExtend: boolean;

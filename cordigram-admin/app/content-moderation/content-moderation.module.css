@@ -109,9 +109,9 @@
 }
 
 .tab {
-  border: 1px solid #cbd8eb;
-  background: #f7faff;
-  color: #1f3d64;
+  border: 1px solid #c9ddf1;
+  background: #f6fbff;
+  color: #2f6898;
   border-radius: 999px;
   padding: 8px 14px;
   font-weight: 700;
@@ -119,9 +119,14 @@
   cursor: pointer;
 }
 
+.tab:hover {
+  border-color: #7fb4dc;
+  background: #edf6ff;
+}
+
 .tabActive {
-  background: linear-gradient(135deg, var(--cm-primary), var(--cm-primary-deep));
-  border-color: var(--cm-primary-deep);
+  background: linear-gradient(135deg, #7ec3e9, #5caedd);
+  border-color: #5caedd;
   color: #fff;
 }
 
@@ -282,6 +287,37 @@
   width: 100%;
   border-collapse: collapse;
   min-width: 980px;
+  table-layout: fixed;
+}
+
+.table th:nth-child(1),
+.table td:nth-child(1) {
+  width: 44%;
+}
+
+.table th:nth-child(2),
+.table td:nth-child(2) {
+  width: 20%;
+}
+
+.table th:nth-child(3),
+.table td:nth-child(3) {
+  width: 7%;
+}
+
+.table th:nth-child(4),
+.table td:nth-child(4) {
+  width: 10%;
+}
+
+.table th:nth-child(5),
+.table td:nth-child(5) {
+  width: 11%;
+}
+
+.table th:nth-child(6),
+.table td:nth-child(6) {
+  width: 8%;
 }
 
 .table th {
@@ -319,9 +355,12 @@
   margin: 0;
   color: var(--cm-text-strong);
   font-weight: 600;
+  display: block;
+  max-width: min(64ch, 100%);
   white-space: pre-wrap;
   line-height: 1.42;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .captionCollapsed {
@@ -362,10 +401,24 @@
 }
 
 .ownerName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
   -webkit-line-clamp: 1;
   line-clamp: 1;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.creatorVerifiedBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  color: #1d9bf0;
+  filter: drop-shadow(0 1px 3px rgba(21, 112, 239, 0.35));
+  flex: 0 0 auto;
 }
 
 .subText {
@@ -413,9 +466,9 @@
 }
 
 .rowActionButton {
-  border: 1px solid #3375c8;
-  background: #eff6ff;
-  color: #1d5cad;
+  border: 1px solid #c9ddf1;
+  background: #f6fbff;
+  color: #2f6898;
   border-radius: 8px;
   padding: 6px 10px;
   font-weight: 700;
@@ -424,14 +477,20 @@
 }
 
 .reviewActionButton {
-  border: 1px solid #2f70c2;
-  background: #eaf3ff;
-  color: #124a90;
+  border: 1px solid #c9ddf1;
+  background: #f6fbff;
+  color: #2f6898;
   border-radius: 8px;
   padding: 6px 11px;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.rowActionButton:hover,
+.reviewActionButton:hover {
+  border-color: #7fb4dc;
+  background: #edf6ff;
 }
 
 .reviewOverlay {
@@ -518,6 +577,80 @@
   color: var(--cm-text-strong);
   font-size: 13px;
   line-height: 1.45;
+}
+
+.reviewAdCard {
+  border: 1px solid #cbdcf1;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.reviewAdPrimaryText {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.34;
+  color: #213754;
+  font-weight: 500;
+  white-space: pre-wrap;
+}
+
+.reviewAdMetaCard {
+  border: 1px solid #b9d4eb;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #c9e2f5, #b7d6ee);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.reviewAdHeadline {
+  margin: 0;
+  color: #1f334a;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.22;
+}
+
+.reviewAdDescription {
+  margin: 6px 0 0;
+  color: #405972;
+  font-size: 14px;
+  line-height: 1.34;
+}
+
+.reviewAdUrl {
+  margin: 8px 0 0;
+  color: #3b5672;
+  font-size: 11px;
+  line-height: 1.3;
+  word-break: break-all;
+}
+
+.reviewAdCtaButton {
+  border: 1px solid #5caedd;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #7ec3e9, #5caedd);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 38px;
+  padding: 6px 14px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.reviewAdCtaButtonDisabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .reviewMediaGrid {
@@ -1236,6 +1369,29 @@
 
   .reviewStatsGrid {
     grid-template-columns: 1fr;
+  }
+
+  .reviewAdPrimaryText {
+    font-size: 15px;
+  }
+
+  .reviewAdMetaCard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .reviewAdHeadline {
+    font-size: 18px;
+  }
+
+  .reviewAdDescription {
+    font-size: 13px;
+  }
+
+  .reviewAdCtaButton {
+    font-size: 13px;
+    min-height: 34px;
+    padding: 6px 12px;
   }
 
   .reviewMediaViewport,

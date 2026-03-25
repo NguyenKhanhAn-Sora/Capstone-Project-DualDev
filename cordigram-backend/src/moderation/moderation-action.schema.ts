@@ -16,7 +16,9 @@ export type ModerationActionType =
   | 'violation'
   | 'creator_verification_approved'
   | 'creator_verification_rejected'
-  | 'creator_verification_revoked';
+  | 'creator_verification_revoked'
+  | 'cancel_ads_campaign'
+  | 'reopen_ads_campaign';
 export type ModerationSeverity = 'low' | 'medium' | 'high';
 
 @Schema({ timestamps: true })
@@ -44,6 +46,8 @@ export class ModerationAction extends Document {
       'creator_verification_approved',
       'creator_verification_rejected',
       'creator_verification_revoked',
+      'cancel_ads_campaign',
+      'reopen_ads_campaign',
     ],
     required: true,
   })

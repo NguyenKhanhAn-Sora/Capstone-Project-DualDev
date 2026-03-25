@@ -9,7 +9,7 @@ import styles from "./admin-shell.module.css";
 type NavItem = {
   href: string;
   label: string;
-  icon: "dashboard" | "report" | "resolved" | "moderation" | "content" | "audit" | "broadcast" | "verification";
+  icon: "dashboard" | "report" | "resolved" | "moderation" | "content" | "ads" | "audit" | "broadcast" | "verification";
   matcher: (pathname: string) => boolean;
 };
 
@@ -46,6 +46,15 @@ function NavIcon({ icon }: { icon: NavItem["icon"] }) {
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z" fill="none" stroke="currentColor" strokeWidth="1.8" />
         <path d="M8 9h8M8 12h8M8 15h5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (icon === "ads") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M8 10h8M8 14h5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     );
   }
@@ -114,6 +123,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Content Moderation",
     icon: "content",
     matcher: (pathname) => pathname === "/content-moderation" || pathname.startsWith("/content-moderation/"),
+  },
+  {
+    href: "/ads-management",
+    label: "Ads Management",
+    icon: "ads",
+    matcher: (pathname) => pathname === "/ads-management" || pathname.startsWith("/ads-management/"),
   },
   {
     href: "/audit",

@@ -208,10 +208,10 @@
 }
 
 .levelChip {
-  border: 1px solid #c7d3e3;
+  border: 1px solid #c9ddf1;
   border-radius: 999px;
-  background: #f8fafc;
-  color: #334e68;
+  background: #f6fbff;
+  color: #2f6898;
   font-weight: 700;
   font-size: 12px;
   padding: 8px 12px;
@@ -221,13 +221,13 @@
 }
 
 .levelChip:hover {
-  border-color: #2f6fdd;
+  border-color: #7fb4dc;
 }
 
 .levelChipActive {
-  border-color: #1b57b8;
+  border-color: #5caedd;
   color: #ffffff;
-  background: linear-gradient(135deg, #1b57b8, #2f6fdd);
+  background: linear-gradient(135deg, #7ec3e9, #5caedd);
 }
 
 .actions {
@@ -237,15 +237,15 @@
 }
 
 .sendButton {
-  border: none;
+  border: 1px solid #5caedd;
   border-radius: 10px;
-  background: linear-gradient(135deg, #1456b8, #0e7ccf);
+  background: linear-gradient(135deg, #7ec3e9, #5caedd);
   color: #ffffff;
   font-weight: 700;
   font-size: 14px;
   padding: 10px 16px;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(14, 124, 207, 0.25);
+  box-shadow: 0 8px 18px rgba(92, 174, 221, 0.25);
 }
 
 .sendButton:disabled {
@@ -280,10 +280,10 @@
 }
 
 .filterChip {
-  border: 1px solid #c7d3e3;
+  border: 1px solid #c9ddf1;
   border-radius: 999px;
-  background: #f8fafc;
-  color: #334e68;
+  background: #f6fbff;
+  color: #2f6898;
   font-weight: 700;
   font-size: 12px;
   padding: 7px 11px;
@@ -292,13 +292,13 @@
 }
 
 .filterChip:hover {
-  border-color: #2f6fdd;
+  border-color: #7fb4dc;
 }
 
 .filterChipActive {
-  border-color: #1b57b8;
+  border-color: #5caedd;
   color: #ffffff;
-  background: linear-gradient(135deg, #1b57b8, #2f6fdd);
+  background: linear-gradient(135deg, #7ec3e9, #5caedd);
 }
 
 .sectionTitle {

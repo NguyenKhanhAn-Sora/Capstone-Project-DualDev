@@ -2809,6 +2809,9 @@ function FeedCard({
   };
   const [mediaIndex, setMediaIndex] = useState(0);
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [revealedMediaMap, setRevealedMediaMap] = useState<
+    Record<string, boolean>
+  >({});
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [soundOn, setSoundOn] = useState(false);
   const lastTimeRef = useRef(0);
@@ -2836,6 +2839,31 @@ function FeedCard({
   }, [id, mediaIndex, soundOn]);
 
   const targetPostId = repostOf || id;
+  const currentFeedMedia = effectiveMedia?.[mediaIndex];
+  const currentFeedMediaKey = currentFeedMedia?.url || `media-${mediaIndex}`;
+  const currentFeedMediaMetadata =
+    currentFeedMedia?.metadata && typeof currentFeedMedia.metadata === "object"
+      ? (currentFeedMedia.metadata as Record<string, unknown>)
+      : null;
+  const currentFeedModerationDecision =
+    currentFeedMediaMetadata?.moderationDecision;
+  const currentFeedOriginalUrlRaw =
+    currentFeedMediaMetadata?.originalSecureUrl ??
+    currentFeedMediaMetadata?.originalUrl;
+  const currentFeedOriginalUrl =
+    typeof currentFeedOriginalUrlRaw === "string" &&
+    currentFeedOriginalUrlRaw.trim()
+      ? currentFeedOriginalUrlRaw
+      : null;
+  const isCurrentFeedMediaBlurredByModeration =
+    currentFeedModerationDecision === "blur" && Boolean(currentFeedOriginalUrl);
+  const shouldRevealCurrentFeedMedia =
+    Boolean(revealedMediaMap[currentFeedMediaKey]) &&
+    Boolean(currentFeedOriginalUrl);
+  const currentFeedMediaDisplayUrl =
+    shouldRevealCurrentFeedMedia && currentFeedOriginalUrl
+      ? currentFeedOriginalUrl
+      : currentFeedMedia?.url;
 
   const goToPost = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -2884,6 +2912,7 @@ function FeedCard({
     setMediaIndex(0);
     setSoundOn(false);
     setImageViewerOpen(false);
+    setRevealedMediaMap({});
   }, [id]);
 
   useEffect(() => {
@@ -2892,10 +2921,12 @@ function FeedCard({
       setMediaIndex(0);
       setSoundOn(false);
       setImageViewerOpen(false);
+      setRevealedMediaMap({});
       return;
     }
     setMediaIndex((prev) => (prev >= mediaCount ? 0 : prev));
     setSoundOn(false);
+    setRevealedMediaMap({});
   }, [mediaKey]);
 
   useEffect(() => {
@@ -4188,7 +4219,7 @@ function FeedCard({
                     <video
                       key={`${id}-source-${mediaIndex}`}
                       ref={videoRef}
-                      src={current.url}
+                      src={currentFeedMediaDisplayUrl || current.url}
                       controls
                       controlsList="nodownload noremoteplayback"
                       muted={!soundOn}
@@ -4203,7 +4234,7 @@ function FeedCard({
                 return (
                   <img
                     key={`${id}-source-${mediaIndex}`}
-                    src={current.url}
+                    src={currentFeedMediaDisplayUrl || current.url}
                     alt={t("media.alt")}
                     className={styles.mediaVisual}
                     onContextMenu={(e) => e.preventDefault()}
@@ -4211,6 +4242,30 @@ function FeedCard({
                   />
                 );
               })()}
+
+              {isCurrentFeedMediaBlurredByModeration &&
+              !shouldRevealCurrentFeedMedia ? (
+                <div className={styles.moderationRevealOverlay}>
+                  <div className={styles.moderationRevealBox}>
+                    <p className={styles.moderationRevealNote}>
+                      This image has been blurred due to violation of our
+                      standards.
+                    </p>
+                    <button
+                      type="button"
+                      className={styles.moderationRevealButton}
+                      onClick={() =>
+                        setRevealedMediaMap((prev) => ({
+                          ...prev,
+                          [currentFeedMediaKey]: true,
+                        }))
+                      }
+                    >
+                      View image
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -4252,7 +4307,7 @@ function FeedCard({
                   <video
                     key={`${id}-${mediaIndex}`}
                     ref={videoRef}
-                    src={current.url}
+                    src={currentFeedMediaDisplayUrl || current.url}
                     controls
                     controlsList="nodownload noremoteplayback"
                     muted={!soundOn}
@@ -4278,7 +4333,7 @@ function FeedCard({
             return (
               <img
                 key={`${id}-${mediaIndex}`}
-                src={current.url}
+                src={currentFeedMediaDisplayUrl || current.url}
                 alt={t("media.alt")}
                 className={styles.mediaVisual}
                 onContextMenu={(e) => e.preventDefault()}
@@ -4286,6 +4341,30 @@ function FeedCard({
               />
             );
           })()}
+
+          {isCurrentFeedMediaBlurredByModeration &&
+          !shouldRevealCurrentFeedMedia ? (
+            <div className={styles.moderationRevealOverlay}>
+              <div className={styles.moderationRevealBox}>
+                <p className={styles.moderationRevealNote}>
+                  This image has been blurred due to violation of our
+                  standards.
+                </p>
+                <button
+                  type="button"
+                  className={styles.moderationRevealButton}
+                  onClick={() =>
+                    setRevealedMediaMap((prev) => ({
+                      ...prev,
+                      [currentFeedMediaKey]: true,
+                    }))
+                  }
+                >
+                  View image
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {media.length > 1 ? (
             <>
@@ -4365,7 +4444,7 @@ function FeedCard({
 
       {imageViewerOpen && effectiveMedia?.[mediaIndex] ? (
         <ImageViewerOverlay
-          url={effectiveMedia[mediaIndex].url}
+          url={currentFeedMediaDisplayUrl || effectiveMedia[mediaIndex].url}
           mediaType={effectiveMedia[mediaIndex].type}
           alt={t("media.overlayAlt")}
           onClose={() => setImageViewerOpen(false)}

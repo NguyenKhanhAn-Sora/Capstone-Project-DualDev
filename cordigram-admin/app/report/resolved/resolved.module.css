@@ -51,12 +51,12 @@
 
 .ghostButton {
   text-decoration: none;
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
+  border: 1px solid #c9ddf1;
+  color: #2f6898;
   padding: 10px 16px;
   border-radius: 12px;
   font-weight: 600;
-  background: var(--color-surface);
+  background: #f6fbff;
 }
 
 .panel {
@@ -106,20 +106,25 @@
 }
 
 .filterChip {
-  border: 1px solid var(--color-border);
+  border: 1px solid #c9ddf1;
   border-radius: 999px;
   padding: 6px 12px;
-  background: var(--color-surface-muted);
-  color: var(--color-text);
+  background: #f6fbff;
+  color: #2f6898;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 
+.filterChip:hover {
+  border-color: #7fb4dc;
+  background: #edf6ff;
+}
+
 .filterChipActive {
-  background: #d8e8ff;
-  border-color: rgba(52, 112, 162, 0.42);
-  color: #1e3a5f;
+  background: linear-gradient(135deg, #7ec3e9, #5caedd);
+  border-color: #5caedd;
+  color: #ffffff;
 }
 
 .summary {
@@ -259,8 +264,8 @@
 }
 
 .inlineButton {
-  border: none;
-  background: var(--color-button-x);
+  border: 1px solid #5caedd;
+  background: linear-gradient(135deg, #7ec3e9, #5caedd);
   color: #fff;
   text-decoration: none;
 }

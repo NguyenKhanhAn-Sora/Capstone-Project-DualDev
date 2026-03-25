@@ -980,6 +980,16 @@ export default function CampaignDetailPage() {
                   <strong>{detail.durationDays ? `${detail.durationDays} days` : "N/A"}</strong>
                 </div>
                 <div className={styles.detailRow}>
+                  <span>Delivery state reason</span>
+                  <strong>{hiddenReasonLabel(detail.hiddenReason)}</strong>
+                </div>
+                {detail.status === "canceled" && detail.adminCancelReason?.trim() ? (
+                  <div className={styles.detailRow}>
+                    <span>Admin cancellation reason</span>
+                    <strong>{detail.adminCancelReason.trim()}</strong>
+                  </div>
+                ) : null}
+                <div className={styles.detailRow}>
                   <span>Elapsed / total</span>
                   <strong>{performance.elapsedDays} / {performance.totalDays} days</strong>
                 </div>
@@ -1542,37 +1552,39 @@ export default function CampaignDetailPage() {
                 </div>
               </div>
 
-              <div className={styles.actionRow}>
-                <div>
-                  <p className={styles.actionTitle}>Lifecycle Management</p>
-                  <p className={styles.actionHint}>
-                    Hide the campaign temporarily or reopen it when delivery should resume.
-                  </p>
-                </div>
-                <div className={styles.actionControls}>
-                  {detail.actions?.canPause ? (
-                    <button
-                      type="button"
-                      className={styles.secondaryBtn}
-                      disabled={saving}
-                      onClick={() => setIsHideConfirmOpen(true)}
-                    >
-                      Hide Campaign
-                    </button>
-                  ) : null}
+              {detail.status !== "canceled" ? (
+                <div className={styles.actionRow}>
+                  <div>
+                    <p className={styles.actionTitle}>Lifecycle Management</p>
+                    <p className={styles.actionHint}>
+                      Hide the campaign temporarily or reopen it when delivery should resume.
+                    </p>
+                  </div>
+                  <div className={styles.actionControls}>
+                    {detail.actions?.canPause ? (
+                      <button
+                        type="button"
+                        className={styles.secondaryBtn}
+                        disabled={saving}
+                        onClick={() => setIsHideConfirmOpen(true)}
+                      >
+                        Hide Campaign
+                      </button>
+                    ) : null}
 
-                  {!detail.actions?.canPause && detail.actions?.canResume ? (
-                    <button
-                      type="button"
-                      className={styles.primaryBtn}
-                      disabled={saving}
-                      onClick={() => void runAction("resume_campaign")}
-                    >
-                      Reopen Campaign
-                    </button>
-                  ) : null}
+                    {!detail.actions?.canPause && detail.actions?.canResume ? (
+                      <button
+                        type="button"
+                        className={styles.primaryBtn}
+                        disabled={saving}
+                        onClick={() => void runAction("resume_campaign")}
+                      >
+                        Reopen Campaign
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               {success ? <p className={styles.success}>{success}</p> : null}
               {error ? <p className={styles.error}>{error}</p> : null}

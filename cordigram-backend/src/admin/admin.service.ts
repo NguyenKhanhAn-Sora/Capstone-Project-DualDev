@@ -7,6 +7,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 import { User } from '../users/user.schema';
 import { Post } from '../posts/post.schema';
+import { PostInteraction } from '../posts/post-interaction.schema';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { LivekitService } from '../livekit/livekit.service';
 import { ReportPost } from '../reportpost/reportpost.schema';
@@ -20,6 +21,11 @@ import { InteractionMuteSchedulerService } from './interaction-mute-scheduler.se
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
 import { CommentsService } from '../comment/comments.service';
+import { PaymentTransaction } from '../payments/payment-transaction.schema';
+import {
+  AdEngagementEvent,
+  AdEngagementEventType,
+} from '../payments/ad-engagement-event.schema';
 
 @Injectable()
 export class AdminService {
@@ -38,6 +44,12 @@ export class AdminService {
     private readonly commentModel: Model<Comment>,
     @InjectModel(ModerationAction.name)
     private readonly moderationActionModel: Model<ModerationAction>,
+    @InjectModel(PostInteraction.name)
+    private readonly postInteractionModel: Model<PostInteraction>,
+    @InjectModel(PaymentTransaction.name)
+    private readonly paymentTransactionModel: Model<PaymentTransaction>,
+    @InjectModel(AdEngagementEvent.name)
+    private readonly adEngagementEventModel: Model<AdEngagementEvent>,
     private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
     private readonly mailService: MailService,
@@ -47,6 +59,128 @@ export class AdminService {
     private readonly livekit: LivekitService,
     @InjectConnection() private readonly connection: Connection,
   ) {}
+
+  private async getAdsRevenueStats(params: {
+    since: Date;
+    now: Date;
+  }): Promise<{
+    adsGrossRevenue30d: number;
+    adsSpend30d: number;
+    adsActiveCampaigns: number;
+    adsImpressions30d: number;
+    adsClicks30d: number;
+    adsCtr30dPct: number | null;
+  }> {
+    const { since, now } = params;
+
+    const paidWindowQuery = {
+      promotedPostId: { $ne: null },
+      $and: [
+        {
+          $or: [
+            { paymentStatus: 'paid' },
+            { paymentStatus: 'no_payment_required' },
+            { checkoutStatus: 'complete' },
+          ],
+        },
+        {
+          $or: [
+            { paidAt: { $gte: since, $lte: now } },
+            { paidAt: null, createdAt: { $gte: since, $lte: now } },
+          ],
+        },
+      ],
+    };
+
+    const activeCampaignQuery = {
+      promotedPostId: { $ne: null },
+      $or: [
+        { paymentStatus: 'paid' },
+        { paymentStatus: 'no_payment_required' },
+        { checkoutStatus: 'complete' },
+      ],
+      $and: [
+        {
+          $or: [{ hiddenReason: null }, { hiddenReason: { $nin: ['canceled', 'paused'] } }],
+        },
+        {
+          $or: [{ isExpiredHidden: { $ne: true } }, { isExpiredHidden: null }],
+        },
+        {
+          $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+        },
+      ],
+    };
+
+    const adEventCounts = await this.adEngagementEventModel
+      .aggregate([
+        {
+          $match: {
+            createdAt: { $gte: since, $lte: now },
+            eventType: { $in: ['impression', 'cta_click'] as AdEngagementEventType[] },
+          },
+        },
+        {
+          $group: {
+            _id: '$eventType',
+            count: { $sum: 1 },
+          },
+        },
+      ])
+      .exec();
+
+    const [paidWindowRows, activeCampaigns] = await Promise.all([
+      this.paymentTransactionModel
+        .aggregate([
+          { $match: paidWindowQuery },
+          {
+            $group: {
+              _id: null,
+              totalAmount: { $sum: '$amountTotal' },
+            },
+          },
+        ])
+        .exec(),
+      this.paymentTransactionModel.countDocuments(activeCampaignQuery).exec(),
+    ]);
+
+    const adEventMap = new Map<string, number>();
+    adEventCounts.forEach((row: { _id?: string; count?: number }) => {
+      if (!row?._id) return;
+      adEventMap.set(row._id, row.count ?? 0);
+    });
+
+    const adsImpressions30d = adEventMap.get('impression') ?? 0;
+    const adsClicks30d = adEventMap.get('cta_click') ?? 0;
+    const adsGrossRevenue30d = Number(paidWindowRows?.[0]?.totalAmount ?? 0);
+    const adsSpend30d = adsGrossRevenue30d;
+    const adsCtr30dPct =
+      adsImpressions30d > 0 ? (adsClicks30d / adsImpressions30d) * 100 : null;
+
+    return {
+      adsGrossRevenue30d,
+      adsSpend30d,
+      adsActiveCampaigns: activeCampaigns,
+      adsImpressions30d,
+      adsClicks30d,
+      adsCtr30dPct,
+    };
+  }
+
+  private getCampaignLifecycleStatus(
+    tx: Pick<PaymentTransaction, 'isExpiredHidden' | 'hiddenReason' | 'expiresAt'>,
+    now: Date,
+  ): 'active' | 'hidden' | 'canceled' | 'completed' {
+    if (tx.hiddenReason === 'canceled') return 'canceled';
+    if (tx.hiddenReason === 'paused') return 'hidden';
+
+    const expiresAt = tx.expiresAt ? new Date(tx.expiresAt) : null;
+    if (tx.isExpiredHidden || (expiresAt && expiresAt.getTime() <= now.getTime())) {
+      return 'completed';
+    }
+
+    return 'active';
+  }
 
   private getCategoryWeight(category: string): number {
     const weights: Record<string, number> = {
@@ -150,6 +284,8 @@ export class AdminService {
         'creator_verification_approved',
         'creator_verification_rejected',
         'creator_verification_revoked',
+        'cancel_ads_campaign',
+        'reopen_ads_campaign',
       ].includes(action)
     ) {
       return 0;
@@ -160,6 +296,111 @@ export class AdminService {
     if (severity === 'high') return 3;
     if (severity === 'medium') return 2;
     return 1;
+  }
+
+  private parseAdCreativeContent(content?: string | null): {
+    primaryText: string;
+    headline: string;
+    adDescription: string;
+    destinationUrl: string;
+    cta: string;
+  } | null {
+    const raw = (content ?? '').replace(/\r/g, '').trim();
+    if (!raw) {
+      return null;
+    }
+
+    const extractBlock = (name: string) => {
+      const pattern = new RegExp(
+        `\\[\\[AD_${name}\\]\\]([\\s\\S]*?)\\[\\[\\/AD_${name}\\]\\]`,
+        'i',
+      );
+      const matched = pattern.exec(raw);
+      if (!matched) return '';
+      return matched[1]?.replace(/^\n+|\n+$/g, '').trim() ?? '';
+    };
+
+    const structuredPrimaryText = extractBlock('PRIMARY_TEXT');
+    const structuredHeadline = extractBlock('HEADLINE');
+    const structuredDescription = extractBlock('DESCRIPTION');
+    const structuredDestinationUrl = extractBlock('URL');
+    const structuredCta = extractBlock('CTA');
+
+    if (
+      structuredPrimaryText ||
+      structuredHeadline ||
+      structuredDescription ||
+      structuredDestinationUrl ||
+      structuredCta
+    ) {
+      return {
+        primaryText: structuredPrimaryText,
+        headline: structuredHeadline,
+        adDescription: structuredDescription,
+        destinationUrl: structuredDestinationUrl,
+        cta: structuredCta,
+      };
+    }
+
+    // Legacy plain-text ad drafts: first lines are text blocks, optional CTA line, optional trailing URL.
+    const lines = raw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (!lines.length) {
+      return null;
+    }
+
+    let destinationUrl = '';
+    const last = lines[lines.length - 1];
+    if (/^https?:\/\//i.test(last)) {
+      destinationUrl = last;
+      lines.pop();
+    }
+
+    let cta = '';
+    const metaLines: string[] = [];
+    lines.forEach((line) => {
+      const matched = /^cta\s*:\s*(.+)$/i.exec(line);
+      if (matched && !cta) {
+        cta = matched[1]?.trim() ?? '';
+        return;
+      }
+      metaLines.push(line);
+    });
+
+    return {
+      primaryText: metaLines[0] ?? '',
+      headline: metaLines.length > 1 ? metaLines[1] : '',
+      adDescription: metaLines.length > 2 ? metaLines.slice(2).join(' ') : '',
+      destinationUrl,
+      cta,
+    };
+  }
+
+  private getModerationDisplayContent(content?: string | null): string {
+    const raw = typeof content === 'string' ? content : '';
+    if (!raw) return '';
+
+    const parsedCreative = this.parseAdCreativeContent(raw);
+    if (!parsedCreative) {
+      return raw;
+    }
+
+    const sections = [
+      parsedCreative.primaryText,
+      parsedCreative.headline,
+      parsedCreative.adDescription,
+      parsedCreative.cta ? `CTA: ${parsedCreative.cta}` : '',
+      parsedCreative.destinationUrl,
+    ].filter((value) => Boolean(value));
+
+    if (!sections.length) {
+      return raw;
+    }
+
+    return sections.join('\n');
   }
 
   private async resolveOffenderIdByTarget(params: {
@@ -2013,6 +2254,12 @@ export class AdminService {
     apiUptimeSeconds: number;
     openReportsCount: number;
     highRiskReportsCount: number;
+    adsGrossRevenue30d: number;
+    adsSpend30d: number;
+    adsActiveCampaigns: number;
+    adsImpressions30d: number;
+    adsClicks30d: number;
+    adsCtr30dPct: number | null;
     medianReportScore: number | null;
     avgReportReviewMinutes: number | null;
     reviewSlaTargetMinutes: number;
@@ -2052,6 +2299,7 @@ export class AdminService {
       realtimeStats,
       reportStats,
       avgReportReviewMinutes,
+      adsRevenueStats,
     ] = await Promise.all([
       this.userModel.countDocuments({}).exec(),
       this.postModel.countDocuments({ deletedAt: null }).exec(),
@@ -2088,6 +2336,7 @@ export class AdminService {
       })),
       this.getReportStats(),
       this.getAvgReportReviewMinutes(since30d),
+      this.getAdsRevenueStats({ since: since30d, now: new Date(now) }),
     ]);
 
     const postsCreatedDeltaPct = postsCreatedPrev7d
@@ -2121,10 +2370,947 @@ export class AdminService {
       apiUptimeSeconds,
       openReportsCount: reportStats.openReportsCount,
       highRiskReportsCount: reportStats.highRiskCount,
+      adsGrossRevenue30d: adsRevenueStats.adsGrossRevenue30d,
+      adsSpend30d: adsRevenueStats.adsSpend30d,
+      adsActiveCampaigns: adsRevenueStats.adsActiveCampaigns,
+      adsImpressions30d: adsRevenueStats.adsImpressions30d,
+      adsClicks30d: adsRevenueStats.adsClicks30d,
+      adsCtr30dPct:
+        typeof adsRevenueStats.adsCtr30dPct === 'number'
+          ? Number(adsRevenueStats.adsCtr30dPct.toFixed(2))
+          : null,
       medianReportScore: reportStats.medianScore,
       avgReportReviewMinutes,
       reviewSlaTargetMinutes: 20,
       reportQueue: reportStats.reportQueue,
+    };
+  }
+
+  async getAdsOverview(): Promise<{
+    adsGrossRevenue30d: number;
+    adsSpend30d: number;
+    adsActiveCampaigns: number;
+    adsImpressions30d: number;
+    adsClicks30d: number;
+    adsCtr30dPct: number | null;
+    totalCampaigns: number;
+    pausedCampaigns: number;
+    canceledCampaigns: number;
+    completedCampaigns: number;
+  }> {
+    const now = new Date();
+    const since30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const baseCampaignQuery = {
+      promotedPostId: { $ne: null },
+    };
+
+    const completedCampaignQuery = {
+      ...baseCampaignQuery,
+      hiddenReason: { $nin: ['paused', 'canceled'] },
+      $or: [{ isExpiredHidden: true }, { expiresAt: { $lte: now } }],
+    };
+
+    const [adsRevenueStats, totalCampaigns, pausedCampaigns, canceledCampaigns, completedCampaigns] =
+      await Promise.all([
+        this.getAdsRevenueStats({ since: since30d, now }),
+        this.paymentTransactionModel.countDocuments(baseCampaignQuery).exec(),
+        this.paymentTransactionModel
+          .countDocuments({ ...baseCampaignQuery, hiddenReason: 'paused' })
+          .exec(),
+        this.paymentTransactionModel
+          .countDocuments({ ...baseCampaignQuery, hiddenReason: 'canceled' })
+          .exec(),
+        this.paymentTransactionModel.countDocuments(completedCampaignQuery).exec(),
+      ]);
+
+    return {
+      adsGrossRevenue30d: adsRevenueStats.adsGrossRevenue30d,
+      adsSpend30d: adsRevenueStats.adsSpend30d,
+      adsActiveCampaigns: adsRevenueStats.adsActiveCampaigns,
+      adsImpressions30d: adsRevenueStats.adsImpressions30d,
+      adsClicks30d: adsRevenueStats.adsClicks30d,
+      adsCtr30dPct:
+        typeof adsRevenueStats.adsCtr30dPct === 'number'
+          ? Number(adsRevenueStats.adsCtr30dPct.toFixed(2))
+          : null,
+      totalCampaigns,
+      pausedCampaigns,
+      canceledCampaigns,
+      completedCampaigns,
+    };
+  }
+
+  async getAdsCampaigns(params?: {
+    q?: string;
+    status?: 'all' | 'active' | 'hidden' | 'canceled' | 'completed';
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    items: Array<{
+      campaignId: string;
+      promotedPostId: string;
+      campaignName: string;
+      status: 'active' | 'hidden' | 'canceled' | 'completed';
+      owner: {
+        userId: string;
+        displayName: string | null;
+        username: string | null;
+        avatarUrl: string | null;
+      };
+      createdAt: Date | null;
+      startsAt: Date | null;
+      expiresAt: Date | null;
+      amountTotal: number;
+      boostWeight: number;
+      placement: string;
+      paymentStatus: string | null;
+      checkoutStatus: string | null;
+      headline: string;
+      primaryText: string;
+      adDescription: string;
+      ctaLabel: string;
+      destinationUrl: string;
+      post: {
+        visibility: string;
+        deleted: boolean;
+      };
+      metrics: {
+        impressions: number;
+        clicks: number;
+        ctrPct: number | null;
+        avgDwellSeconds: number | null;
+      };
+    }>;
+    offset: number;
+    limit: number;
+    hasMore: boolean;
+  }> {
+    type CampaignPostLite = {
+      _id: Types.ObjectId;
+      content?: string | null;
+      visibility?: string | null;
+      deletedAt?: Date | null;
+    };
+
+    type CampaignEventAggRow = {
+      _id?: {
+        promotedPostId?: Types.ObjectId;
+        eventType?: AdEngagementEventType;
+      };
+      count?: number;
+      totalDurationMs?: number;
+    };
+
+    const safeLimit = Math.min(Math.max(params?.limit ?? 30, 1), 100);
+    const safeOffset = Math.max(params?.offset ?? 0, 0);
+    const statusFilter = params?.status ?? 'all';
+    const q = (params?.q ?? '').trim();
+
+    const query: Record<string, any> = {
+      promotedPostId: { $ne: null },
+    };
+
+    if (q) {
+      const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const orFilters: Array<Record<string, any>> = [
+        { campaignName: regex },
+        { promotedPostId: regex },
+        { userId: regex },
+        { sessionId: regex },
+        { paymentIntentId: regex },
+      ];
+
+      const matchedProfiles = await this.profileModel
+        .find({ $or: [{ username: regex }, { displayName: regex }] })
+        .select('userId')
+        .lean();
+
+      const matchedUserIds = matchedProfiles
+        .map((profile: any) => profile?.userId?.toString?.())
+        .filter((id: any): id is string => Boolean(id));
+
+      if (matchedUserIds.length) {
+        orFilters.push({ userId: { $in: matchedUserIds } });
+      }
+
+      query.$or = orFilters;
+    }
+
+    const docs = await this.paymentTransactionModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .skip(safeOffset)
+      .limit(safeLimit + 1)
+      .select(
+        '_id userId promotedPostId campaignName isExpiredHidden hiddenReason expiresAt startsAt amountTotal boostWeight placement paymentStatus checkoutStatus adHeadline adPrimaryText adDescription ctaLabel destinationUrl createdAt',
+      )
+      .lean();
+
+    const hasMoreRaw = docs.length > safeLimit;
+    const slicedDocs = hasMoreRaw ? docs.slice(0, safeLimit) : docs;
+    const now = new Date();
+
+    const docsWithStatus = slicedDocs.map((doc: any) => ({
+      ...doc,
+      _status: this.getCampaignLifecycleStatus(doc, now),
+    }));
+
+    const filteredDocs =
+      statusFilter === 'all'
+        ? docsWithStatus
+        : docsWithStatus.filter((doc: any) => doc._status === statusFilter);
+
+    const userIds = Array.from(
+      new Set(
+        filteredDocs
+          .map((doc: any) => String(doc.userId ?? ''))
+          .filter((id: string) => id.length > 0),
+      ),
+    );
+
+    const profileUserObjectIds = userIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const profiles = profileUserObjectIds.length
+      ? await this.profileModel
+          .find({ userId: { $in: profileUserObjectIds } })
+          .select('userId displayName username avatarUrl')
+          .lean()
+      : [];
+
+    const profileMap = new Map(
+      profiles.map((profile: any) => [profile.userId.toString(), profile]),
+    );
+
+    const promotedPostIds = Array.from(
+      new Set(
+        filteredDocs
+          .map((doc: any) => String(doc.promotedPostId ?? ''))
+          .filter((id: string) => Types.ObjectId.isValid(id)),
+      ),
+    );
+
+    const promotedPostObjectIds = promotedPostIds.map((id) => new Types.ObjectId(id));
+
+    const [posts, eventRows]: [CampaignPostLite[], CampaignEventAggRow[]] =
+      await Promise.all([
+      promotedPostObjectIds.length
+        ? (this.postModel
+            .find({ _id: { $in: promotedPostObjectIds } })
+            .select('_id content visibility deletedAt')
+            .lean()
+            .exec() as Promise<CampaignPostLite[]>)
+        : Promise.resolve([]),
+      promotedPostObjectIds.length
+        ? (this.adEngagementEventModel
+            .aggregate([
+              {
+                $match: {
+                  promotedPostId: { $in: promotedPostObjectIds },
+                  eventType: {
+                    $in: ['impression', 'cta_click', 'dwell'] as AdEngagementEventType[],
+                  },
+                },
+              },
+              {
+                $group: {
+                  _id: {
+                    promotedPostId: '$promotedPostId',
+                    eventType: '$eventType',
+                  },
+                  count: { $sum: 1 },
+                  totalDurationMs: {
+                    $sum: {
+                      $cond: [
+                        { $eq: ['$eventType', 'dwell'] },
+                        { $ifNull: ['$durationMs', 0] },
+                        0,
+                      ],
+                    },
+                  },
+                },
+              },
+            ])
+            .exec() as Promise<CampaignEventAggRow[]>)
+        : Promise.resolve([]),
+      ]);
+
+    const postMap = new Map<string, CampaignPostLite>(
+      posts.map((post) => [post._id.toString(), post] as [string, CampaignPostLite]),
+    );
+
+    const metricsMap = new Map<
+      string,
+      { impressions: number; clicks: number; dwellCount: number; dwellDurationMs: number }
+    >();
+    eventRows.forEach((row) => {
+      const postId = row?._id?.promotedPostId?.toString?.();
+      const eventType = row?._id?.eventType;
+      if (!postId || !eventType) return;
+
+      const current = metricsMap.get(postId) ?? {
+        impressions: 0,
+        clicks: 0,
+        dwellCount: 0,
+        dwellDurationMs: 0,
+      };
+
+      if (eventType === 'impression') {
+        current.impressions = Number(row.count ?? 0);
+      } else if (eventType === 'cta_click') {
+        current.clicks = Number(row.count ?? 0);
+      } else if (eventType === 'dwell') {
+        current.dwellCount = Number(row.count ?? 0);
+        current.dwellDurationMs = Number(row.totalDurationMs ?? 0);
+      }
+
+      metricsMap.set(postId, current);
+    });
+
+    const items = filteredDocs.map((doc: any) => {
+      const userId = String(doc.userId ?? '');
+      const promotedPostId = String(doc.promotedPostId ?? '');
+      const profile = profileMap.get(userId);
+      const promotedPost = postMap.get(promotedPostId);
+      const parsedPostCreative = this.parseAdCreativeContent(promotedPost?.content);
+      const metric = metricsMap.get(promotedPostId) ?? {
+        impressions: 0,
+        clicks: 0,
+        dwellCount: 0,
+        dwellDurationMs: 0,
+      };
+
+      const ctrPct =
+        metric.impressions > 0
+          ? Number(((metric.clicks / metric.impressions) * 100).toFixed(2))
+          : null;
+      const avgDwellSeconds =
+        metric.dwellCount > 0
+          ? Number((metric.dwellDurationMs / metric.dwellCount / 1000).toFixed(2))
+          : null;
+
+      return {
+        campaignId: doc._id.toString(),
+        promotedPostId,
+        campaignName: doc.campaignName || 'Ads Campaign',
+        status: doc._status,
+        owner: {
+          userId,
+          displayName: profile?.displayName ?? null,
+          username: profile?.username ?? null,
+          avatarUrl: profile?.avatarUrl ?? null,
+        },
+        createdAt: doc.createdAt ?? null,
+        startsAt: doc.startsAt ?? null,
+        expiresAt: doc.expiresAt ?? null,
+        amountTotal: Number(doc.amountTotal ?? 0),
+        boostWeight: Number(doc.boostWeight ?? 0),
+        placement: typeof doc.placement === 'string' ? doc.placement : 'home_feed',
+        paymentStatus:
+          typeof doc.paymentStatus === 'string' ? doc.paymentStatus : null,
+        checkoutStatus:
+          typeof doc.checkoutStatus === 'string' ? doc.checkoutStatus : null,
+        headline:
+          (typeof doc.adHeadline === 'string' && doc.adHeadline.trim()) ||
+          parsedPostCreative?.headline ||
+          '',
+        primaryText:
+          (typeof doc.adPrimaryText === 'string' && doc.adPrimaryText.trim()) ||
+          parsedPostCreative?.primaryText ||
+          '',
+        adDescription:
+          (typeof doc.adDescription === 'string' && doc.adDescription.trim()) ||
+          parsedPostCreative?.adDescription ||
+          '',
+        ctaLabel:
+          (typeof doc.ctaLabel === 'string' && doc.ctaLabel.trim()) ||
+          parsedPostCreative?.cta ||
+          '',
+        destinationUrl:
+          (typeof doc.destinationUrl === 'string' && doc.destinationUrl.trim()) ||
+          parsedPostCreative?.destinationUrl ||
+          '',
+        post: {
+          visibility:
+            typeof promotedPost?.visibility === 'string'
+              ? promotedPost.visibility
+              : 'public',
+          deleted: Boolean(promotedPost?.deletedAt),
+        },
+        metrics: {
+          impressions: metric.impressions,
+          clicks: metric.clicks,
+          ctrPct,
+          avgDwellSeconds,
+        },
+      };
+    });
+
+    return {
+      items,
+      offset: safeOffset,
+      limit: safeLimit,
+      hasMore: hasMoreRaw,
+    };
+  }
+
+  async getAdsCampaignDetail(campaignId: string): Promise<{
+    campaignId: string;
+    promotedPostId: string;
+    campaignName: string;
+    status: 'active' | 'hidden' | 'canceled' | 'completed';
+    owner: {
+      userId: string;
+      displayName: string | null;
+      username: string | null;
+      avatarUrl: string | null;
+    };
+    createdAt: Date | null;
+    startsAt: Date | null;
+    expiresAt: Date | null;
+    amountTotal: number;
+    boostWeight: number;
+    placement: string;
+    paymentStatus: string | null;
+    checkoutStatus: string | null;
+    objective: string;
+    adFormat: string;
+    primaryText: string;
+    headline: string;
+    adDescription: string;
+    destinationUrl: string;
+    ctaLabel: string;
+    interests: string[];
+    targetLocation: string;
+    targetAgeMin: number | null;
+    targetAgeMax: number | null;
+    mediaUrls: string[];
+    boostPackageId: string;
+    durationPackageId: string;
+    durationDays: number;
+    hiddenReason: string | null;
+    adminCancelReason: string | null;
+    post: {
+      visibility: string;
+      deleted: boolean;
+    };
+    metrics: {
+      impressions: number;
+      reach: number;
+      clicks: number;
+      ctrPct: number | null;
+      views: number;
+      likes: number;
+      comments: number;
+      reposts: number;
+      engagements: number;
+      avgDwellSeconds: number | null;
+      totalDwellSeconds: number;
+      dwellSamples: number;
+      engagementRatePct: number | null;
+    };
+    actions: {
+      canCancel: boolean;
+      canReopen: boolean;
+    };
+  }> {
+    if (!Types.ObjectId.isValid(campaignId)) {
+      throw new BadRequestException('Invalid campaignId');
+    }
+
+    const tx = await this.paymentTransactionModel
+      .findOne({
+        _id: new Types.ObjectId(campaignId),
+        promotedPostId: { $ne: null },
+      })
+      .select(
+        '_id userId promotedPostId campaignName isExpiredHidden hiddenReason adminCancelReason expiresAt startsAt amountTotal boostWeight placement paymentStatus checkoutStatus adHeadline adPrimaryText adDescription destinationUrl ctaLabel objective adFormat interests targetLocation targetAgeMin targetAgeMax mediaUrls boostPackageId durationPackageId durationDays createdAt paidAt',
+      )
+      .lean();
+
+    if (!tx) {
+      throw new NotFoundException('Campaign not found');
+    }
+
+    const userId = String(tx.userId ?? '');
+    const promotedPostId = String(tx.promotedPostId ?? '');
+    if (!Types.ObjectId.isValid(promotedPostId)) {
+      throw new BadRequestException('Invalid promotedPostId');
+    }
+    const now = new Date();
+    const startsAt = tx.startsAt ?? tx.paidAt ?? tx.createdAt ?? now;
+    const expiresAt = tx.expiresAt ?? now;
+
+    const profile = Types.ObjectId.isValid(userId)
+      ? await this.profileModel
+          .findOne({ userId: new Types.ObjectId(userId) })
+          .select('displayName username avatarUrl')
+          .lean()
+      : null;
+
+    const promotedPost = Types.ObjectId.isValid(promotedPostId)
+      ? await this.postModel
+          .findOne({ _id: new Types.ObjectId(promotedPostId) })
+          .select('content media visibility deletedAt')
+          .lean()
+      : null;
+
+    const parsedPostCreative = this.parseAdCreativeContent(promotedPost?.content);
+
+    const postMediaUrls = Array.isArray(promotedPost?.media)
+      ? promotedPost.media
+          .map((item: { url?: string | null }) => item?.url?.toString?.() ?? '')
+          .filter((url: string) => Boolean(url))
+      : [];
+
+    const related = Types.ObjectId.isValid(promotedPostId)
+      ? await this.postModel
+          .find({
+            $or: [
+              { _id: new Types.ObjectId(promotedPostId) },
+              { repostOf: new Types.ObjectId(promotedPostId) },
+            ],
+            deletedAt: null,
+          })
+          .select('_id')
+          .lean()
+      : [];
+
+    const relatedPostIds = related
+      .map((item: { _id?: Types.ObjectId }) => item._id?.toString?.())
+      .filter((id): id is string => Boolean(id));
+
+    const [impressionCount, reachUserIds, ctaClickCount, dwellAgg, interactionAgg, viewUserIds, commentCount] =
+      await Promise.all([
+        this.adEngagementEventModel
+          .countDocuments({
+            promotedPostId: new Types.ObjectId(promotedPostId),
+            eventType: 'impression',
+            createdAt: { $gte: startsAt, $lte: expiresAt },
+          })
+          .exec(),
+        this.adEngagementEventModel
+          .distinct('userId', {
+            promotedPostId: new Types.ObjectId(promotedPostId),
+            eventType: 'impression',
+            createdAt: { $gte: startsAt, $lte: expiresAt },
+          })
+          .exec(),
+        this.adEngagementEventModel
+          .countDocuments({
+            promotedPostId: new Types.ObjectId(promotedPostId),
+            eventType: 'cta_click',
+            createdAt: { $gte: startsAt, $lte: expiresAt },
+          })
+          .exec(),
+        this.adEngagementEventModel
+          .aggregate([
+            {
+              $match: {
+                promotedPostId: new Types.ObjectId(promotedPostId),
+                eventType: 'dwell',
+                durationMs: { $gt: 0 },
+                createdAt: { $gte: startsAt, $lte: expiresAt },
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                avgDurationMs: { $avg: '$durationMs' },
+                totalDurationMs: { $sum: '$durationMs' },
+                samples: { $sum: 1 },
+              },
+            },
+          ])
+          .exec(),
+        relatedPostIds.length
+          ? this.postInteractionModel
+              .aggregate([
+                {
+                  $match: {
+                    postId: {
+                      $in: relatedPostIds.map((id) => new Types.ObjectId(id)),
+                    },
+                    type: { $in: ['like', 'repost'] },
+                    createdAt: { $gte: startsAt, $lte: expiresAt },
+                  },
+                },
+                {
+                  $group: {
+                    _id: '$type',
+                    count: { $sum: 1 },
+                  },
+                },
+              ])
+              .exec()
+          : Promise.resolve([]),
+        relatedPostIds.length
+          ? this.postInteractionModel
+              .distinct('userId', {
+                postId: {
+                  $in: relatedPostIds.map((id) => new Types.ObjectId(id)),
+                },
+                type: 'view',
+                createdAt: { $gte: startsAt, $lte: expiresAt },
+              })
+              .exec()
+          : Promise.resolve([]),
+        relatedPostIds.length
+          ? this.commentModel
+              .countDocuments({
+                postId: {
+                  $in: relatedPostIds.map((id) => new Types.ObjectId(id)),
+                },
+                deletedAt: null,
+                createdAt: { $gte: startsAt, $lte: expiresAt },
+              })
+              .exec()
+          : Promise.resolve(0),
+      ]);
+
+    const interactionMap = new Map<string, number>();
+    (interactionAgg as Array<{ _id?: string; count?: number }>).forEach((row) => {
+      if (!row?._id) return;
+      interactionMap.set(row._id, row.count ?? 0);
+    });
+
+    const dwell = dwellAgg?.[0] as
+      | { avgDurationMs?: number; totalDurationMs?: number; samples?: number }
+      | undefined;
+    const likes = interactionMap.get('like') ?? 0;
+    const reposts = interactionMap.get('repost') ?? 0;
+    const views = viewUserIds.length;
+    const impressions = impressionCount ?? 0;
+    const clicks = ctaClickCount ?? 0;
+    const engagements = likes + commentCount + reposts;
+    const ctrPct =
+      impressions > 0 ? Number(((clicks / impressions) * 100).toFixed(2)) : null;
+    const engagementRatePct =
+      impressions > 0
+        ? Number(((engagements / impressions) * 100).toFixed(2))
+        : null;
+
+    const status = this.getCampaignLifecycleStatus(tx, now);
+
+    return {
+      campaignId: tx._id.toString(),
+      promotedPostId,
+      campaignName: tx.campaignName || 'Ads Campaign',
+      status,
+      owner: {
+        userId,
+        displayName: profile?.displayName ?? null,
+        username: profile?.username ?? null,
+        avatarUrl: profile?.avatarUrl ?? null,
+      },
+      createdAt: tx.createdAt ?? null,
+      startsAt,
+      expiresAt,
+      amountTotal: Number(tx.amountTotal ?? 0),
+      boostWeight: Number(tx.boostWeight ?? 0),
+      placement: typeof tx.placement === 'string' ? tx.placement : 'home_feed',
+      paymentStatus: typeof tx.paymentStatus === 'string' ? tx.paymentStatus : null,
+      checkoutStatus:
+        typeof tx.checkoutStatus === 'string' ? tx.checkoutStatus : null,
+      objective: tx.objective ?? '',
+      adFormat: tx.adFormat ?? '',
+      primaryText:
+        (typeof tx.adPrimaryText === 'string' && tx.adPrimaryText.trim()) ||
+        parsedPostCreative?.primaryText ||
+        '',
+      headline:
+        (typeof tx.adHeadline === 'string' && tx.adHeadline.trim()) ||
+        parsedPostCreative?.headline ||
+        '',
+      adDescription:
+        (typeof tx.adDescription === 'string' && tx.adDescription.trim()) ||
+        parsedPostCreative?.adDescription ||
+        '',
+      destinationUrl:
+        (typeof tx.destinationUrl === 'string' && tx.destinationUrl.trim()) ||
+        parsedPostCreative?.destinationUrl ||
+        '',
+      ctaLabel:
+        (typeof tx.ctaLabel === 'string' && tx.ctaLabel.trim()) ||
+        parsedPostCreative?.cta ||
+        '',
+      interests: Array.isArray(tx.interests) ? tx.interests : [],
+      targetLocation: tx.targetLocation ?? '',
+      targetAgeMin:
+        typeof tx.targetAgeMin === 'number' ? tx.targetAgeMin : null,
+      targetAgeMax:
+        typeof tx.targetAgeMax === 'number' ? tx.targetAgeMax : null,
+      mediaUrls:
+        Array.isArray(tx.mediaUrls) && tx.mediaUrls.length > 0
+          ? tx.mediaUrls
+          : postMediaUrls,
+      boostPackageId: tx.boostPackageId ?? '',
+      durationPackageId: tx.durationPackageId ?? '',
+      durationDays: tx.durationDays ?? 0,
+      hiddenReason:
+        typeof tx.hiddenReason === 'string' ? tx.hiddenReason : null,
+      adminCancelReason:
+        typeof tx.adminCancelReason === 'string' ? tx.adminCancelReason : null,
+      post: {
+        visibility:
+          typeof promotedPost?.visibility === 'string'
+            ? promotedPost.visibility
+            : 'public',
+        deleted: Boolean(promotedPost?.deletedAt),
+      },
+      metrics: {
+        impressions,
+        reach: reachUserIds.length,
+        clicks,
+        ctrPct,
+        views,
+        likes,
+        comments: commentCount,
+        reposts,
+        engagements,
+        avgDwellSeconds:
+          typeof dwell?.avgDurationMs === 'number'
+            ? Number((dwell.avgDurationMs / 1000).toFixed(2))
+            : null,
+        totalDwellSeconds:
+          typeof dwell?.totalDurationMs === 'number'
+            ? Number((dwell.totalDurationMs / 1000).toFixed(2))
+            : 0,
+        dwellSamples: dwell?.samples ?? 0,
+        engagementRatePct,
+      },
+      actions: {
+        canCancel: status !== 'canceled' && status !== 'completed',
+        canReopen: status === 'canceled',
+      },
+    };
+  }
+
+  async performAdsCampaignAdminAction(params: {
+    campaignId: string;
+    action: 'cancel_campaign' | 'reopen_canceled_campaign';
+    reason?: string;
+    adminId: string;
+  }): Promise<{
+    campaignId: string;
+    status: 'active' | 'hidden' | 'canceled' | 'completed';
+    hiddenReason: string | null;
+  }> {
+    const campaignId = params.campaignId?.trim();
+    if (!Types.ObjectId.isValid(campaignId)) {
+      throw new BadRequestException('Invalid campaignId');
+    }
+
+    if (!Types.ObjectId.isValid(params.adminId)) {
+      throw new BadRequestException('Invalid adminId');
+    }
+
+    const adminObjectId = new Types.ObjectId(params.adminId);
+    const cancelReason = (params.reason ?? '').trim();
+
+    const tx = await this.paymentTransactionModel
+      .findOne({
+        _id: new Types.ObjectId(campaignId),
+        promotedPostId: { $ne: null },
+      })
+      .select(
+        '_id userId promotedPostId campaignName customerEmail hiddenReason isExpiredHidden expiresAt',
+      )
+      .lean();
+
+    if (!tx) {
+      throw new NotFoundException('Campaign not found');
+    }
+
+    const now = new Date();
+    const updates: Record<string, any> = {};
+
+    if (params.action === 'cancel_campaign') {
+      if (!cancelReason) {
+        throw new BadRequestException('Cancellation reason is required');
+      }
+      const expiresAt = tx.expiresAt ? new Date(tx.expiresAt) : null;
+      if (tx.isExpiredHidden || (expiresAt && expiresAt.getTime() <= now.getTime())) {
+        throw new BadRequestException('Completed campaign cannot be canceled');
+      }
+      updates.hiddenReason = 'canceled';
+      updates.hiddenAt = now;
+      updates.isExpiredHidden = true;
+      updates.adminCancelReason = cancelReason;
+    } else if (params.action === 'reopen_canceled_campaign') {
+      if (tx.hiddenReason !== 'canceled') {
+        throw new BadRequestException('Only canceled campaigns can be reopened');
+      }
+      const expiresAt = tx.expiresAt ? new Date(tx.expiresAt) : null;
+      if (expiresAt && expiresAt.getTime() <= now.getTime()) {
+        throw new BadRequestException('Expired campaign cannot be reopened');
+      }
+      updates.hiddenReason = null;
+      updates.hiddenAt = null;
+      updates.isExpiredHidden = false;
+      updates.adminCancelReason = null;
+    }
+
+    if (Object.keys(updates).length) {
+      await this.paymentTransactionModel
+        .updateOne({ _id: tx._id }, { $set: updates })
+        .exec();
+    }
+
+    if (params.action === 'cancel_campaign') {
+      const ownerUserId = tx.userId?.trim();
+      const promotedPostId = tx.promotedPostId?.trim();
+
+      if (ownerUserId && Types.ObjectId.isValid(ownerUserId)) {
+        const noticeBody = [
+          `Your ads campaign \"${tx.campaignName?.trim() || 'Ads Campaign'}\" was canceled by admin.`,
+          `Reason: ${cancelReason}`,
+          'No strike was added to your account for this action.',
+        ].join(' ');
+
+        try {
+          await this.notificationsService.createSystemNoticeNotification({
+            recipientId: ownerUserId,
+            title: 'Ads campaign canceled by admin',
+            body: noticeBody,
+            level: 'warning',
+            actionUrl: '/ads/campaigns',
+          });
+        } catch {
+          // Keep admin action successful even if realtime delivery fails.
+        }
+
+        const ownerUser = await this.userModel
+          .findById(ownerUserId)
+          .select('_id email')
+          .lean();
+
+        const ownerProfile = await this.profileModel
+          .findOne({ userId: new Types.ObjectId(ownerUserId) })
+          .select('displayName')
+          .lean();
+
+        const recipientEmail =
+          tx.customerEmail?.trim() || ownerUser?.email?.trim() || '';
+
+        if (recipientEmail) {
+          try {
+            await this.mailService.sendAdsCampaignCanceledByAdminEmail({
+              email: recipientEmail,
+              displayName: ownerProfile?.displayName ?? null,
+              campaignName: tx.campaignName ?? null,
+              reason: cancelReason,
+            });
+          } catch {
+            // Keep admin action successful even if email delivery fails.
+          }
+        }
+      }
+
+      if (promotedPostId && Types.ObjectId.isValid(promotedPostId)) {
+        await this.moderationActionModel.create({
+          targetType: 'post',
+          targetId: new Types.ObjectId(promotedPostId),
+          action: 'cancel_ads_campaign',
+          category: 'ads_policy',
+          reason: 'Admin canceled ads campaign',
+          severity: 'medium',
+          note: [
+            `CampaignId: ${tx._id.toString()}`,
+            `CampaignName: ${tx.campaignName?.trim() || 'Ads Campaign'}`,
+            `OwnerUserId: ${tx.userId}`,
+            `AdminReason: ${cancelReason}`,
+            'StrikeDelta: +0',
+          ].join(' | '),
+          moderatorId: adminObjectId,
+        });
+      }
+    }
+
+    if (params.action === 'reopen_canceled_campaign') {
+      const ownerUserId = tx.userId?.trim();
+      const promotedPostId = tx.promotedPostId?.trim();
+
+      if (ownerUserId && Types.ObjectId.isValid(ownerUserId)) {
+        const noticeBody = [
+          `Your ads campaign \"${tx.campaignName?.trim() || 'Ads Campaign'}\" was reopened by admin.`,
+          'Your campaign can deliver again.',
+          'No strike was added to your account for this action.',
+        ].join(' ');
+
+        try {
+          await this.notificationsService.createSystemNoticeNotification({
+            recipientId: ownerUserId,
+            title: 'Ads campaign reopened by admin',
+            body: noticeBody,
+            level: 'info',
+            actionUrl: '/ads/campaigns',
+          });
+        } catch {
+          // Keep admin action successful even if realtime delivery fails.
+        }
+
+        const ownerUser = await this.userModel
+          .findById(ownerUserId)
+          .select('_id email')
+          .lean();
+
+        const ownerProfile = await this.profileModel
+          .findOne({ userId: new Types.ObjectId(ownerUserId) })
+          .select('displayName')
+          .lean();
+
+        const recipientEmail =
+          tx.customerEmail?.trim() || ownerUser?.email?.trim() || '';
+
+        if (recipientEmail) {
+          try {
+            await this.mailService.sendAdsCampaignReopenedByAdminEmail({
+              email: recipientEmail,
+              displayName: ownerProfile?.displayName ?? null,
+              campaignName: tx.campaignName ?? null,
+            });
+          } catch {
+            // Keep admin action successful even if email delivery fails.
+          }
+        }
+      }
+
+      if (promotedPostId && Types.ObjectId.isValid(promotedPostId)) {
+        await this.moderationActionModel.create({
+          targetType: 'post',
+          targetId: new Types.ObjectId(promotedPostId),
+          action: 'reopen_ads_campaign',
+          category: 'ads_policy',
+          reason: 'Admin reopened canceled ads campaign',
+          severity: null,
+          note: [
+            `CampaignId: ${tx._id.toString()}`,
+            `CampaignName: ${tx.campaignName?.trim() || 'Ads Campaign'}`,
+            `OwnerUserId: ${tx.userId}`,
+            'StrikeDelta: +0',
+          ].join(' | '),
+          moderatorId: adminObjectId,
+        });
+      }
+    }
+
+    const refreshed = await this.paymentTransactionModel
+      .findById(tx._id)
+      .select('_id hiddenReason isExpiredHidden expiresAt')
+      .lean();
+
+    if (!refreshed) {
+      throw new NotFoundException('Campaign not found after update');
+    }
+
+    return {
+      campaignId: refreshed._id.toString(),
+      status: this.getCampaignLifecycleStatus(refreshed, new Date()),
+      hiddenReason:
+        typeof refreshed.hiddenReason === 'string' ? refreshed.hiddenReason : null,
     };
   }
 
@@ -2162,6 +3348,8 @@ export class AdminService {
             'suspend_user',
             'limit_account',
             'violation',
+            'cancel_ads_campaign',
+            'reopen_ads_campaign',
           ],
         },
       })
@@ -2453,6 +3641,8 @@ export class AdminService {
           'creator_verification_approved',
           'creator_verification_rejected',
           'creator_verification_revoked',
+          'cancel_ads_campaign',
+          'reopen_ads_campaign',
         ],
       },
     };
@@ -2678,6 +3868,8 @@ export class AdminService {
         creator_verification_approved: 'CREATOR VERIFICATION APPROVED',
         creator_verification_rejected: 'CREATOR VERIFICATION REJECTED',
         creator_verification_revoked: 'CREATOR VERIFICATION REVOKED',
+        cancel_ads_campaign: 'ADS CAMPAIGN CANCELED',
+        reopen_ads_campaign: 'ADS CAMPAIGN REOPENED',
       };
 
       return {
@@ -2910,6 +4102,47 @@ export class AdminService {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
+  private extractCloudinaryPublicIdFromUrl(url: string | null | undefined): string | null {
+    if (!url || typeof url !== 'string') return null;
+
+    try {
+      const normalized = url.split('?')[0] ?? '';
+      const marker = '/upload/';
+      const markerIndex = normalized.indexOf(marker);
+      if (markerIndex < 0) return null;
+
+      const afterUpload = normalized.slice(markerIndex + marker.length);
+      if (!afterUpload) return null;
+
+      const segments = afterUpload.split('/').filter(Boolean);
+      if (!segments.length) return null;
+
+      // Drop optional transformation/version segments and keep the publicId path.
+      let startIndex = 0;
+      for (let i = 0; i < segments.length; i += 1) {
+        const part = segments[i];
+        if (/^v\d+$/.test(part)) {
+          startIndex = i + 1;
+          break;
+        }
+      }
+
+      const publicSegments = segments.slice(startIndex);
+      if (!publicSegments.length) return null;
+
+      const last = publicSegments[publicSegments.length - 1];
+      const dotIndex = last.lastIndexOf('.');
+      if (dotIndex > 0) {
+        publicSegments[publicSegments.length - 1] = last.slice(0, dotIndex);
+      }
+
+      const publicId = publicSegments.join('/').trim();
+      return publicId || null;
+    } catch {
+      return null;
+    }
+  }
+
   async getMediaModerationQueue(limit = 20): Promise<{
     items: Array<{
       postId: string;
@@ -2929,17 +4162,90 @@ export class AdminService {
       blur: number;
       reject: number;
     };
+    comparison: {
+      current: {
+        approve: number;
+        blur: number;
+        reject: number;
+      };
+      previous: {
+        approve: number;
+        blur: number;
+        reject: number;
+      };
+    };
   }> {
     const safeLimit = Math.min(Math.max(limit, 1), 50);
 
+    const previousWindowEnd = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const previousWindowStart = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
+    const decisionRank: Record<'approve' | 'blur' | 'reject', number> = {
+      approve: 1,
+      blur: 2,
+      reject: 3,
+    };
+
+    const resolvePrimaryModeration = (media: any[]): {
+      decision: 'approve' | 'blur' | 'reject';
+      provider: string | null;
+      reasons: string[];
+      url: string | null;
+      moderatedCount: number;
+    } | null => {
+      const moderated = media.filter((item: any) => {
+        const decision = item?.metadata?.moderationDecision;
+        return (
+          decision === 'approve' || decision === 'blur' || decision === 'reject'
+        );
+      });
+
+      if (!moderated.length) {
+        return null;
+      }
+
+      const primary = moderated
+        .map((item: any) => ({
+          decision: item?.metadata?.moderationDecision as
+            | 'approve'
+            | 'blur'
+            | 'reject',
+          provider:
+            typeof item?.metadata?.moderationProvider === 'string'
+              ? item.metadata.moderationProvider
+              : null,
+          reasons: Array.isArray(item?.metadata?.moderationReasons)
+            ? item.metadata.moderationReasons.filter((x: any) => typeof x === 'string')
+            : [],
+          url: typeof item?.url === 'string' ? item.url : null,
+        }))
+        .sort((a, b) => decisionRank[b.decision] - decisionRank[a.decision])[0];
+
+      return {
+        decision: primary.decision,
+        provider: primary.provider,
+        reasons: primary.reasons,
+        url: primary.url,
+        moderatedCount: moderated.length,
+      };
+    };
+
     const docs = await this.postModel
       .find({
-        deletedAt: null,
+        createdAt: { $gte: previousWindowEnd },
         'media.metadata.moderationDecision': { $in: ['approve', 'blur', 'reject'] },
       })
       .sort({ createdAt: -1 })
       .limit(safeLimit)
       .select('authorId createdAt visibility kind media')
+      .lean();
+
+    const statsDocs = await this.postModel
+      .find({
+        createdAt: { $gte: previousWindowStart },
+        'media.metadata.moderationDecision': { $in: ['approve', 'blur', 'reject'] },
+      })
+      .select('createdAt media')
       .lean();
 
     const authorIds = Array.from(
@@ -2965,11 +4271,32 @@ export class AdminService {
       profiles.map((profile) => [profile.userId.toString(), profile]),
     );
 
-    const counts = {
+    const currentCounts = {
       approve: 0,
       blur: 0,
       reject: 0,
     };
+
+    const previousCounts = {
+      approve: 0,
+      blur: 0,
+      reject: 0,
+    };
+
+    for (const doc of statsDocs) {
+      const media = Array.isArray(doc.media) ? doc.media : [];
+      const primary = resolvePrimaryModeration(media);
+      if (!primary) continue;
+
+      const createdAt = doc.createdAt ? new Date(doc.createdAt) : null;
+      if (!createdAt || Number.isNaN(createdAt.getTime())) continue;
+
+      if (createdAt >= previousWindowEnd) {
+        currentCounts[primary.decision] += 1;
+      } else {
+        previousCounts[primary.decision] += 1;
+      }
+    }
 
     const items: Array<{
       postId: string;
@@ -2987,39 +4314,8 @@ export class AdminService {
 
     for (const doc of docs) {
       const media = Array.isArray(doc.media) ? doc.media : [];
-      const moderated = media.filter((item: any) => {
-        const decision = item?.metadata?.moderationDecision;
-        return (
-          decision === 'approve' || decision === 'blur' || decision === 'reject'
-        );
-      });
-
-      if (!moderated.length) continue;
-
-      const decisionRank: Record<'approve' | 'blur' | 'reject', number> = {
-        approve: 1,
-        blur: 2,
-        reject: 3,
-      };
-
-      const primary = moderated
-        .map((item: any) => ({
-          decision: item?.metadata?.moderationDecision as
-            | 'approve'
-            | 'blur'
-            | 'reject',
-          provider:
-            typeof item?.metadata?.moderationProvider === 'string'
-              ? item.metadata.moderationProvider
-              : null,
-          reasons: Array.isArray(item?.metadata?.moderationReasons)
-            ? item.metadata.moderationReasons.filter((x: any) => typeof x === 'string')
-            : [],
-          url: typeof item?.url === 'string' ? item.url : null,
-        }))
-        .sort((a, b) => decisionRank[b.decision] - decisionRank[a.decision])[0];
-
-      counts[primary.decision] += 1;
+      const primary = resolvePrimaryModeration(media);
+      if (!primary) continue;
 
       const profile = profileMap.get(doc.authorId?.toString?.() ?? '');
 
@@ -3032,13 +4328,20 @@ export class AdminService {
         kind: (doc.kind ?? 'post') as 'post' | 'reel',
         moderationDecision: primary.decision,
         moderationProvider: primary.provider,
-        moderatedMediaCount: moderated.length,
+        moderatedMediaCount: primary.moderatedCount,
         previewUrl: primary.url,
         reasons: primary.reasons,
       });
     }
 
-    return { items, counts };
+    return {
+      items,
+      counts: currentCounts,
+      comparison: {
+        current: currentCounts,
+        previous: previousCounts,
+      },
+    };
   }
 
   async getMediaModerationDetail(postId: string): Promise<{
@@ -3056,6 +4359,7 @@ export class AdminService {
       index: number;
       type: 'image' | 'video';
       url: string;
+      originalUrl: string | null;
       moderationDecision: 'approve' | 'blur' | 'reject' | 'unknown';
       moderationProvider: string | null;
       moderationReasons: string[];
@@ -3063,7 +4367,7 @@ export class AdminService {
     }>;
   }> {
     const doc = await this.postModel
-      .findOne({ _id: postId, deletedAt: null })
+      .findOne({ _id: postId })
       .select('authorId content createdAt visibility kind media')
       .lean();
 
@@ -3112,6 +4416,12 @@ export class AdminService {
           index,
           type: mediaType,
           url: typeof item?.url === 'string' ? item.url : '',
+          originalUrl:
+            typeof item?.metadata?.originalSecureUrl === 'string'
+              ? item.metadata.originalSecureUrl
+              : typeof item?.metadata?.originalUrl === 'string'
+                ? item.metadata.originalUrl
+                : null,
           moderationDecision,
           moderationProvider:
             typeof item?.metadata?.moderationProvider === 'string'
@@ -3135,6 +4445,279 @@ export class AdminService {
         avatarUrl: profile?.avatarUrl ?? null,
       },
       media: mediaItems,
+    };
+  }
+
+  async applyMediaModerationAction(params: {
+    postId: string;
+    mediaIndex: number;
+    decision: 'blur' | 'reject';
+    adminId: string;
+  }): Promise<{
+    status: 'ok';
+    outcome: 'media_blurred' | 'post_removed';
+    updatedMedia?: {
+      index: number;
+      type: 'image' | 'video';
+      url: string;
+      originalUrl: string | null;
+      moderationDecision: 'approve' | 'blur' | 'reject' | 'unknown';
+      moderationProvider: string | null;
+      moderationReasons: string[];
+      moderationScores: Record<string, number>;
+    };
+  }> {
+    if (!Types.ObjectId.isValid(params.postId)) {
+      throw new BadRequestException('Invalid post id');
+    }
+    if (!Types.ObjectId.isValid(params.adminId)) {
+      throw new BadRequestException('Invalid admin id');
+    }
+    if (!Number.isInteger(params.mediaIndex) || params.mediaIndex < 0) {
+      throw new BadRequestException('Invalid media index');
+    }
+
+    const postObjectId = new Types.ObjectId(params.postId);
+    const adminObjectId = new Types.ObjectId(params.adminId);
+
+    const doc = await this.postModel
+      .findById(postObjectId)
+      .select('authorId kind media deletedAt')
+      .lean();
+
+    if (!doc?._id) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (doc.deletedAt) {
+      throw new BadRequestException('Post is already removed');
+    }
+
+    const media = Array.isArray(doc.media) ? [...doc.media] : [];
+    if (params.mediaIndex >= media.length) {
+      throw new BadRequestException('Media index out of range');
+    }
+
+    const target = media[params.mediaIndex] as any;
+    const metadata =
+      target?.metadata && typeof target.metadata === 'object'
+        ? { ...(target.metadata as Record<string, unknown>) }
+        : {};
+
+    const currentDecisionRaw = metadata['moderationDecision'];
+    const currentDecision: 'approve' | 'blur' | 'reject' | 'unknown' =
+      currentDecisionRaw === 'approve' ||
+      currentDecisionRaw === 'blur' ||
+      currentDecisionRaw === 'reject'
+        ? currentDecisionRaw
+        : 'unknown';
+
+    if (params.decision === 'blur') {
+      if (currentDecision === 'blur') {
+        throw new BadRequestException('Media is already blurred');
+      }
+
+      const publicId =
+        typeof metadata['publicId'] === 'string'
+          ? metadata['publicId']
+          : this.extractCloudinaryPublicIdFromUrl(
+              typeof metadata['originalSecureUrl'] === 'string'
+                ? metadata['originalSecureUrl']
+                : typeof metadata['originalUrl'] === 'string'
+                  ? metadata['originalUrl']
+                  : typeof target?.url === 'string'
+                    ? target.url
+                    : null,
+            );
+      if (!publicId) {
+        throw new BadRequestException(
+          'Cannot blur media because Cloudinary publicId is missing or invalid',
+        );
+      }
+
+      const isVideo = target?.type === 'video';
+      const blurredUrl = isVideo
+        ? this.cloudinary.buildBlurVideoUrl({ publicId, secure: false })
+        : this.cloudinary.buildBlurImageUrl({ publicId, secure: false });
+      const blurredSecureUrl = isVideo
+        ? this.cloudinary.buildBlurVideoUrl({ publicId, secure: true })
+        : this.cloudinary.buildBlurImageUrl({ publicId, secure: true });
+
+      const existingReasons = Array.isArray(metadata['moderationReasons'])
+        ? (metadata['moderationReasons'] as unknown[]).filter(
+            (value): value is string => typeof value === 'string',
+          )
+        : [];
+      const manualReason = `Admin manual blur on media #${params.mediaIndex + 1}`;
+      const nextReasons = Array.from(new Set([...existingReasons, manualReason]));
+
+      const originalUrl =
+        typeof metadata['originalUrl'] === 'string'
+          ? (metadata['originalUrl'] as string)
+          : typeof target?.url === 'string'
+            ? (target.url as string)
+            : null;
+      const originalSecureUrl =
+        typeof metadata['originalSecureUrl'] === 'string'
+          ? (metadata['originalSecureUrl'] as string)
+          : originalUrl;
+
+      media[params.mediaIndex] = {
+        ...target,
+        url: blurredUrl,
+        metadata: {
+          ...metadata,
+          originalUrl,
+          originalSecureUrl,
+          blurredSecureUrl,
+          moderationDecision: 'blur',
+          moderationProvider: 'admin_manual',
+          moderationReasons: nextReasons,
+          moderatedByAdminAt: new Date().toISOString(),
+        },
+      };
+
+      await this.postModel
+        .updateOne(
+          { _id: postObjectId },
+          {
+            $set: {
+              media,
+              moderationState: 'normal',
+            },
+          },
+        )
+        .exec();
+
+      await this.moderationActionModel.create({
+        targetType: 'post',
+        targetId: postObjectId,
+        action: 'violation',
+        category: 'manual_media_moderation',
+        reason: manualReason,
+        severity: 'low',
+        note: `Manual media action: BLUR | mediaIndex=${params.mediaIndex} | previousDecision=${currentDecision} | providerBefore=${
+          typeof metadata['moderationProvider'] === 'string'
+            ? metadata['moderationProvider']
+            : 'unknown'
+        }`,
+        moderatorId: adminObjectId,
+      });
+
+      const rawScores =
+        media[params.mediaIndex]?.metadata &&
+        typeof media[params.mediaIndex].metadata === 'object' &&
+        typeof (media[params.mediaIndex].metadata as Record<string, unknown>)[
+          'moderationScores'
+        ] === 'object'
+          ? ((media[params.mediaIndex].metadata as Record<string, unknown>)[
+              'moderationScores'
+            ] as Record<string, unknown>)
+          : {};
+
+      const moderationScores = Object.entries(rawScores).reduce(
+        (acc, [key, value]) => {
+          if (typeof value === 'number' && Number.isFinite(value)) {
+            acc[key] = value;
+          }
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
+
+      return {
+        status: 'ok',
+        outcome: 'media_blurred',
+        updatedMedia: {
+          index: params.mediaIndex,
+          type: media[params.mediaIndex]?.type === 'video' ? 'video' : 'image',
+          url:
+            typeof media[params.mediaIndex]?.url === 'string'
+              ? media[params.mediaIndex].url
+              : '',
+          originalUrl,
+          moderationDecision: 'blur',
+          moderationProvider: 'admin_manual',
+          moderationReasons: nextReasons,
+          moderationScores,
+        },
+      };
+    }
+
+    if (currentDecision === 'reject') {
+      throw new BadRequestException('Media is already rejected');
+    }
+
+    const existingReasons = Array.isArray(metadata['moderationReasons'])
+      ? (metadata['moderationReasons'] as unknown[]).filter(
+          (value): value is string => typeof value === 'string',
+        )
+      : [];
+    const rejectReason =
+      existingReasons[0] ??
+      `Admin rejected media #${params.mediaIndex + 1} after manual review`;
+
+    media[params.mediaIndex] = {
+      ...target,
+      metadata: {
+        ...metadata,
+        moderationDecision: 'reject',
+        moderationProvider: 'admin_manual',
+        moderationReasons: Array.from(
+          new Set([
+            ...existingReasons,
+            `Admin manual reject on media #${params.mediaIndex + 1}`,
+          ]),
+        ),
+        moderatedByAdminAt: new Date().toISOString(),
+      },
+    };
+
+    await this.moderationActionModel.create({
+      targetType: 'post',
+      targetId: postObjectId,
+      action: 'remove_post',
+      category: 'automated_content_moderation',
+      reason: rejectReason,
+      severity: 'low',
+      note: `Manual media action: REJECT_POST | mediaIndex=${params.mediaIndex} | previousDecision=${currentDecision} | triggerMediaType=${
+        target?.type === 'video' ? 'video' : 'image'
+      }`,
+      moderatorId: adminObjectId,
+    });
+
+    await this.postModel
+      .updateOne(
+        { _id: postObjectId },
+        {
+          $set: {
+            media,
+            moderationState: 'removed',
+            deletedAt: new Date(),
+            deletedBy: adminObjectId,
+            deletedSource: 'system',
+            deletedReason: rejectReason,
+          },
+        },
+      )
+      .exec();
+
+    const authorObjectId = new Types.ObjectId(doc.authorId);
+    await this.userModel
+      .updateOne({ _id: authorObjectId }, { $inc: { strikeCount: 1 } })
+      .exec();
+
+    await this.notificationsService.createPostModerationResultNotification({
+      recipientId: authorObjectId.toString(),
+      postId: postObjectId.toString(),
+      postKind: (doc.kind ?? 'post') as 'post' | 'reel',
+      decision: 'reject',
+      reasons: [rejectReason],
+    });
+
+    return {
+      status: 'ok',
+      outcome: 'post_removed',
     };
   }
 
@@ -3171,9 +4754,24 @@ export class AdminService {
     const safeOffset = Math.max(params.offset ?? 0, 0);
     const q = (params.q ?? '').trim();
 
+    const promotedPostIdsRaw = await this.paymentTransactionModel
+      .distinct('promotedPostId', { promotedPostId: { $ne: null } })
+      .exec();
+    const promotedPostObjectIds = promotedPostIdsRaw
+      .map((id) => String(id ?? ''))
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
     const query: Record<string, any> = {
       deletedAt: null,
     };
+
+    if (promotedPostObjectIds.length) {
+      query.$nor = [
+        { _id: { $in: promotedPostObjectIds } },
+        { repostOf: { $in: promotedPostObjectIds } },
+      ];
+    }
 
     if (params.state && params.state !== 'all') {
       query.moderationState = params.state;
@@ -3263,7 +4861,7 @@ export class AdminService {
         authorId: authorKey,
         authorDisplayName: profile?.displayName ?? null,
         authorUsername: profile?.username ?? null,
-        contentPreview: rawContent,
+        contentPreview: this.getModerationDisplayContent(rawContent),
         media: Array.isArray(doc.media)
           ? doc.media
               .map((item: any) => ({
@@ -3448,6 +5046,7 @@ export class AdminService {
       displayName: string | null;
       username: string | null;
       avatarUrl: string | null;
+      isCreatorVerified: boolean;
     }>;
     offset: number;
     limit: number;
@@ -3526,7 +5125,7 @@ export class AdminService {
       .skip(safeOffset)
       .limit(safeLimit + 1)
       .select(
-        '_id email status strikeCount interactionMutedUntil interactionMutedIndefinitely accountLimitedUntil accountLimitedIndefinitely suspendedUntil suspendedIndefinitely createdAt',
+        '_id email status strikeCount interactionMutedUntil interactionMutedIndefinitely accountLimitedUntil accountLimitedIndefinitely suspendedUntil suspendedIndefinitely createdAt isCreatorVerified',
       )
       .lean();
 
@@ -3565,6 +5164,7 @@ export class AdminService {
         displayName: profile?.displayName ?? null,
         username: profile?.username ?? null,
         avatarUrl: profile?.avatarUrl ?? null,
+        isCreatorVerified: Boolean(doc.isCreatorVerified),
       };
     });
 
@@ -3610,7 +5210,9 @@ export class AdminService {
           avatarUrl: profile?.avatarUrl ?? null,
         },
         post: {
-          caption: typeof post.content === 'string' ? post.content : '',
+          caption: this.getModerationDisplayContent(
+            typeof post.content === 'string' ? post.content : '',
+          ),
           visibility: post.visibility ?? 'public',
           moderationState: post.moderationState ?? 'normal',
           autoHiddenPendingReview: Boolean(post.autoHiddenPendingReview),
@@ -3689,7 +5291,11 @@ export class AdminService {
         contextPost: parentPost
           ? {
               postId: parentPost._id.toString(),
-              caption: typeof parentPost.content === 'string' ? parentPost.content : '',
+              caption: this.getModerationDisplayContent(
+                typeof parentPost.content === 'string'
+                  ? parentPost.content
+                  : '',
+              ),
               media: Array.isArray((parentPost as any).media)
                 ? (parentPost as any).media
                     .map((item: any) => ({

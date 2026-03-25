@@ -333,6 +333,20 @@
   color: #b91c1c;
 }
 
+.status_completed {
+  background: rgba(56, 189, 248, 0.16);
+  color: #0f4c81;
+}
+
+.cancelReasonText {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 @media (prefers-color-scheme: dark) {
   .status_active {
     background: rgba(16, 185, 129, 0.25);
@@ -352,6 +366,11 @@
   .status_canceled {
     background: rgba(220, 38, 38, 0.26);
     color: #fecaca;
+  }
+
+  .status_completed {
+    background: rgba(56, 189, 248, 0.24);
+    color: #bae6fd;
   }
 }
 

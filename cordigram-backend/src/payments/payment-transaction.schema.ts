@@ -108,6 +108,9 @@ export class PaymentTransaction extends Document {
   @Prop({ type: String, default: null })
   hiddenReason?: string | null;
 
+  @Prop({ type: String, default: null })
+  adminCancelReason?: string | null;
+
   @Prop({ type: Date, default: null, index: true })
   paidAt?: Date | null;
 

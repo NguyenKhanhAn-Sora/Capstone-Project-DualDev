@@ -214,9 +214,6 @@ export default function ReportPage() {
             <Link href="/report/resolved" className={styles.ghostButton}>
               Resolved reports
             </Link>
-            <button className={styles.primaryButton} type="button">
-              Open triage mode
-            </button>
           </div>
         </header>
 

@@ -22,6 +22,8 @@ import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class PaymentsService {
+  private readonly adClickCooldownMs = 60 * 1000;
+
   private readonly logger = new Logger(PaymentsService.name);
   private readonly stripe: Stripe;
   private readonly durationDaysByPackage: Record<string, number> = {
@@ -316,6 +318,37 @@ export class PaymentsService {
       }
     }
 
+    if (eventType === 'cta_click') {
+      const sameSessionClick = await this.adEngagementEventModel
+        .findOne({
+          userId: payload.userId,
+          promotedPostId: payload.promotedPostId,
+          sessionId: payload.sessionId,
+          eventType: 'cta_click',
+        })
+        .select('_id')
+        .lean();
+
+      if (sameSessionClick?._id) {
+        return { tracked: true, deduped: true };
+      }
+
+      const cooldownFrom = new Date(Date.now() - this.adClickCooldownMs);
+      const recentClick = await this.adEngagementEventModel
+        .findOne({
+          userId: payload.userId,
+          promotedPostId: payload.promotedPostId,
+          eventType: 'cta_click',
+          createdAt: { $gte: cooldownFrom },
+        })
+        .select('_id')
+        .lean();
+
+      if (recentClick?._id) {
+        return { tracked: true, deduped: true };
+      }
+    }
+
     await this.adEngagementEventModel.create(payload);
     return { tracked: true, deduped: false };
   }
@@ -368,6 +401,7 @@ export class PaymentsService {
             ctaClickCount,
             dwellAgg,
             interactionAgg,
+            viewUserIds,
             commentCount,
           ] = await Promise.all([
             this.adEngagementEventModel
@@ -419,7 +453,7 @@ export class PaymentsService {
                         postId: {
                           $in: relatedPostIds.map((id) => new Types.ObjectId(id)),
                         },
-                        type: { $in: ['like', 'repost', 'view'] },
+                        type: { $in: ['like', 'repost'] },
                         createdAt: { $gte: startsAt, $lte: expiresAt },
                       },
                     },
@@ -430,6 +464,17 @@ export class PaymentsService {
                       },
                     },
                   ])
+                  .exec()
+              : Promise.resolve([]),
+            relatedPostIds.length
+              ? this.postInteractionModel
+                  .distinct('userId', {
+                    postId: {
+                      $in: relatedPostIds.map((id) => new Types.ObjectId(id)),
+                    },
+                    type: 'view',
+                    createdAt: { $gte: startsAt, $lte: expiresAt },
+                  })
                   .exec()
               : Promise.resolve([]),
             relatedPostIds.length
@@ -454,7 +499,7 @@ export class PaymentsService {
           const dwell = dwellAgg?.[0] ?? null;
           const likes = interactionMap.get('like') ?? 0;
           const reposts = interactionMap.get('repost') ?? 0;
-          const views = interactionMap.get('view') ?? 0;
+          const views = viewUserIds.length;
           const engagements = likes + commentCount + reposts;
           const clicks = ctaClickCount ?? 0;
           const impressions = impressionCount ?? 0;
@@ -467,6 +512,10 @@ export class PaymentsService {
             promotedPostId,
             campaignName: tx.campaignName || 'Ads Campaign',
             status: this.getCampaignStatus(tx, now),
+            adminCancelReason:
+              typeof tx.adminCancelReason === 'string'
+                ? tx.adminCancelReason
+                : null,
             budget: tx.amountTotal ?? 0,
             spent: tx.amountTotal ?? 0,
             startsAt,
@@ -1303,7 +1352,7 @@ export class PaymentsService {
     const tx = await this.paymentTransactions
       .findOne({ _id: new Types.ObjectId(campaignId), userId })
       .select(
-        'objective adFormat adPrimaryText adHeadline adDescription destinationUrl ctaLabel interests targetLocation targetAgeMin targetAgeMax placement mediaUrls boostPackageId durationPackageId durationDays boostWeight hiddenReason isExpiredHidden startsAt expiresAt promotedPostId',
+        'objective adFormat adPrimaryText adHeadline adDescription destinationUrl ctaLabel interests targetLocation targetAgeMin targetAgeMax placement mediaUrls boostPackageId durationPackageId durationDays boostWeight hiddenReason adminCancelReason isExpiredHidden startsAt expiresAt promotedPostId',
       )
       .lean();
 
@@ -1351,6 +1400,8 @@ export class PaymentsService {
       durationDays: tx.durationDays ?? 0,
       boostWeight: tx.boostWeight ?? 0,
       hiddenReason: tx.hiddenReason ?? null,
+      adminCancelReason:
+        typeof tx.adminCancelReason === 'string' ? tx.adminCancelReason : null,
       actions: {
         canChangeBoost: tx.hiddenReason !== 'canceled',
         canExtend: tx.hiddenReason !== 'canceled',
@@ -1460,6 +1511,7 @@ export class PaymentsService {
         }
         tx.isExpiredHidden = true;
         tx.hiddenReason = 'paused';
+        tx.adminCancelReason = null;
         tx.hiddenAt = now;
         await this.mergeRepostMetricsAndDeleteReposts({
           userId,
@@ -1490,6 +1542,7 @@ export class PaymentsService {
 
         tx.isExpiredHidden = false;
         tx.hiddenReason = null;
+        tx.adminCancelReason = null;
         tx.hiddenAt = null;
         break;
       }
@@ -1497,6 +1550,7 @@ export class PaymentsService {
       case 'cancel_campaign': {
         tx.isExpiredHidden = true;
         tx.hiddenReason = 'canceled';
+        tx.adminCancelReason = null;
         tx.hiddenAt = now;
         tx.expiresAt = now;
         break;
