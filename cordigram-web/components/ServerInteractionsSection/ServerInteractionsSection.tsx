@@ -65,8 +65,7 @@ export default function ServerInteractionsSection({
         serversApi.ServerInteractionSettings,
         | "systemMessagesEnabled"
         | "welcomeMessageEnabled"
-        | "setupTipsEnabled"
-        | "activityFeedEnabled"
+        | "stickerReplyWelcomeEnabled"
         | "defaultNotificationLevel"
         | "systemChannelId"
       >
@@ -157,21 +156,12 @@ export default function ServerInteractionsSection({
             />
           </label>
           <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>Hiển thị mẹo thiết lập máy chủ</span>
+            <span>Giúp thành viên trả lời thông báo chào mừng bằng sticker</span>
             <input
               type="checkbox"
-              checked={settings.setupTipsEnabled}
-              disabled={!canEdit || saving}
-              onChange={(e) => updateSetting({ setupTipsEnabled: e.target.checked })}
-            />
-          </label>
-          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>Hiển thị danh sách cập nhật hoạt động</span>
-            <input
-              type="checkbox"
-              checked={settings.activityFeedEnabled}
-              disabled={!canEdit || saving}
-              onChange={(e) => updateSetting({ activityFeedEnabled: e.target.checked })}
+              checked={settings.stickerReplyWelcomeEnabled}
+              disabled={!canEdit || saving || !settings.welcomeMessageEnabled}
+              onChange={(e) => updateSetting({ stickerReplyWelcomeEnabled: e.target.checked })}
             />
           </label>
           <label style={{ display: "grid", gap: 6 }}>

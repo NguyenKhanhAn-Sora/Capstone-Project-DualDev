@@ -84,8 +84,7 @@ export class ServersController {
     body: {
       systemMessagesEnabled?: boolean;
       welcomeMessageEnabled?: boolean;
-      setupTipsEnabled?: boolean;
-      activityFeedEnabled?: boolean;
+      stickerReplyWelcomeEnabled?: boolean;
       defaultNotificationLevel?: 'all' | 'mentions';
       systemChannelId?: string | null;
     },

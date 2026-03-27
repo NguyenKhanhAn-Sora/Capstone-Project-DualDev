@@ -8,6 +8,7 @@ import { Model, Types } from 'mongoose';
 import { Message } from './message.schema';
 import { Channel } from '../channels/channel.schema';
 import { Profile } from '../profiles/profile.schema';
+import { Server } from '../servers/server.schema';
 import { ChannelReadState } from './channel-read-state.schema';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { IgnoredService } from '../users/ignored.service';
@@ -18,6 +19,7 @@ export class MessagesService {
     @InjectModel(Message.name) private messageModel: Model<Message>,
     @InjectModel(Channel.name) private channelModel: Model<Channel>,
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
+    @InjectModel(Server.name) private serverModel: Model<Server>,
     @InjectModel(ChannelReadState.name)
     private channelReadStateModel: Model<ChannelReadState>,
     private readonly ignoredService: IgnoredService,
@@ -36,6 +38,13 @@ export class MessagesService {
 
     const userObjectId = new Types.ObjectId(userId);
 
+    const mentionIds = await this.resolveMentions(
+      channel.serverId.toString(),
+      userId,
+      createMessageDto.content,
+      createMessageDto.mentions,
+    );
+
     const message = new this.messageModel({
       channelId: new Types.ObjectId(channelId),
       senderId: userObjectId,
@@ -44,16 +53,236 @@ export class MessagesService {
       replyTo: createMessageDto.replyTo
         ? new Types.ObjectId(createMessageDto.replyTo)
         : null,
+      mentions: mentionIds.map((id) => new Types.ObjectId(id)),
+      messageType: createMessageDto.messageType || 'text',
+      giphyId: createMessageDto.giphyId || null,
     });
 
     const savedMessage = await message.save();
 
-    // Update channel message count
     channel.messageCount = (channel.messageCount || 0) + 1;
     await channel.save();
 
     const enriched = await this.getMessageByIdEnriched(savedMessage._id.toString());
     return enriched as any;
+  }
+
+  async createWaveStickerMessage(
+    channelId: string,
+    userId: string,
+    replyTo?: string,
+    giphyId?: string,
+  ): Promise<Message> {
+    const channel = await this.channelModel.findById(channelId);
+    if (!channel) {
+      throw new NotFoundException(`Channel with id ${channelId} not found`);
+    }
+
+    const message = new this.messageModel({
+      channelId: new Types.ObjectId(channelId),
+      senderId: new Types.ObjectId(userId),
+      content: 'Vẫy tay chào!',
+      messageType: 'sticker',
+      giphyId: giphyId || null,
+      attachments: [],
+      replyTo: replyTo ? new Types.ObjectId(replyTo) : null,
+      mentions: [],
+    });
+
+    const saved = await message.save();
+
+    channel.messageCount = (channel.messageCount || 0) + 1;
+    await channel.save();
+
+    const enriched = await this.getMessageByIdEnriched(saved._id.toString());
+    return enriched as any;
+  }
+
+  /**
+   * Parse @username from content + merge with explicit mention IDs from DTO.
+   * Returns deduplicated user IDs (excluding the sender).
+   */
+  private async resolveMentions(
+    serverId: string,
+    senderId: string,
+    content: string,
+    explicitMentionIds?: string[],
+  ): Promise<string[]> {
+    const mentionSet = new Set<string>();
+
+    if (explicitMentionIds?.length) {
+      for (const id of explicitMentionIds) {
+        if (id !== senderId) mentionSet.add(id);
+      }
+    }
+
+    const mentionPattern = /@([a-zA-Z0-9._-]+)/g;
+    const usernames: string[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = mentionPattern.exec(content)) !== null) {
+      usernames.push(match[1].toLowerCase());
+    }
+
+    if (usernames.length > 0) {
+      const server = await this.serverModel
+        .findById(serverId)
+        .select('members')
+        .lean()
+        .exec();
+      if (server) {
+        const memberUserIds = server.members.map((m) =>
+          m.userId.toString(),
+        );
+        const profiles = await this.profileModel
+          .find({
+            userId: { $in: memberUserIds.map((id) => new Types.ObjectId(id)) },
+            $or: [
+              { username: { $in: usernames } },
+              {
+                username: {
+                  $in: usernames.map((u) => new RegExp(`^${u}$`, 'i')),
+                },
+              },
+            ],
+          })
+          .select('userId username')
+          .lean()
+          .exec();
+
+        for (const profile of profiles) {
+          const uid = profile.userId.toString();
+          if (uid !== senderId) mentionSet.add(uid);
+        }
+      }
+    }
+
+    return Array.from(mentionSet);
+  }
+
+  /**
+   * Get notification context for a channel message: server info, notification level,
+   * member list, and resolved mentions.
+   */
+  async getMessageNotificationContext(
+    channelId: string,
+    senderId: string,
+    mentionIds: string[],
+  ): Promise<{
+    serverId: string;
+    serverName: string;
+    channelName: string;
+    defaultNotificationLevel: 'all' | 'mentions';
+    memberUserIds: string[];
+    mentionedUserIds: string[];
+  } | null> {
+    const channel = await this.channelModel.findById(channelId).lean().exec();
+    if (!channel) return null;
+
+    const server = await this.serverModel
+      .findById(channel.serverId)
+      .select('name members interactionSettings')
+      .lean()
+      .exec();
+    if (!server) return null;
+
+    const level =
+      (server as any).interactionSettings?.defaultNotificationLevel === 'mentions'
+        ? 'mentions'
+        : 'all';
+
+    const memberUserIds = (server as any).members
+      .map((m: any) => m.userId.toString())
+      .filter((uid: string) => uid !== senderId);
+
+    return {
+      serverId: (server as any)._id.toString(),
+      serverName: (server as any).name,
+      channelName: channel.name,
+      defaultNotificationLevel: level,
+      memberUserIds,
+      mentionedUserIds: mentionIds,
+    };
+  }
+
+  /**
+   * Get channel mentions for a user (for the Inbox "Đề cập" tab).
+   */
+  async getChannelMentionsForUser(
+    userId: string,
+    limit = 50,
+  ): Promise<
+    Array<{
+      id: string;
+      channelId: string;
+      channelName: string;
+      serverId: string;
+      serverName: string;
+      messageId: string;
+      actorName: string;
+      excerpt: string;
+      createdAt: string;
+    }>
+  > {
+    const userObjectId = new Types.ObjectId(userId);
+    const messages = await this.messageModel
+      .find({ mentions: userObjectId, isDeleted: false })
+      .populate('channelId', 'name type serverId')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean()
+      .exec();
+
+    if (messages.length === 0) return [];
+
+    const serverIds = [
+      ...new Set(
+        messages
+          .map((m: any) => m.channelId?.serverId?.toString())
+          .filter(Boolean),
+      ),
+    ];
+    const servers = await this.serverModel
+      .find({ _id: { $in: serverIds.map((id) => new Types.ObjectId(id)) } })
+      .select('name')
+      .lean()
+      .exec();
+    const serverMap = new Map(
+      servers.map((s: any) => [s._id.toString(), s.name]),
+    );
+
+    const senderIds = [
+      ...new Set(messages.map((m: any) => m.senderId.toString())),
+    ];
+    const profiles = await this.profileModel
+      .find({
+        userId: { $in: senderIds.map((id) => new Types.ObjectId(id)) },
+      })
+      .select('userId displayName username')
+      .lean()
+      .exec();
+    const profileMap = new Map(
+      profiles.map((p: any) => [
+        p.userId.toString(),
+        p.displayName || p.username || 'Ai đó',
+      ]),
+    );
+
+    return messages.map((msg: any) => {
+      const ch = msg.channelId as any;
+      const serverId = ch?.serverId?.toString() ?? '';
+      return {
+        id: msg._id.toString(),
+        channelId: ch?._id?.toString() ?? '',
+        channelName: ch?.name ?? 'general',
+        serverId,
+        serverName: serverMap.get(serverId) ?? 'Máy chủ',
+        messageId: msg._id.toString(),
+        actorName: profileMap.get(msg.senderId.toString()) ?? 'Ai đó',
+        excerpt: (msg.content ?? '').slice(0, 200),
+        createdAt:
+          msg.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      };
+    });
   }
 
   async getMessageByIdEnriched(messageId: string): Promise<any> {
@@ -193,6 +422,29 @@ export class MessagesService {
       }),
     );
 
+    const hasWelcome = enriched.some((m: any) => m.messageType === 'welcome');
+    if (hasWelcome) {
+      const channel = await this.channelModel
+        .findById(channelId)
+        .select('serverId')
+        .lean()
+        .exec();
+      if (channel) {
+        const server = await this.serverModel
+          .findById(channel.serverId)
+          .select('interactionSettings')
+          .lean()
+          .exec();
+        const stickerReply =
+          (server as any)?.interactionSettings?.stickerReplyWelcomeEnabled ?? true;
+        for (const m of enriched) {
+          if ((m as any).messageType === 'welcome') {
+            (m as any).stickerReplyWelcomeEnabled = stickerReply;
+          }
+        }
+      }
+    }
+
     return enriched;
   }
 
@@ -316,7 +568,108 @@ export class MessagesService {
       channelId: channelObjectId,
       isDeleted: false,
       createdAt: { $gt: lastReadAt },
-      senderId: { $ne: userObjectId }, // không đếm tin mình gửi
+      senderId: { $ne: userObjectId },
     });
+  }
+
+  async searchMessages(params: {
+    serverId?: string;
+    channelId?: string;
+    q?: string;
+    senderId?: string;
+    before?: string;
+    after?: string;
+    hasFile?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ results: any[]; totalCount: number }> {
+    const {
+      serverId,
+      channelId,
+      q,
+      senderId,
+      before,
+      after,
+      hasFile,
+      limit = 25,
+      offset = 0,
+    } = params;
+
+    const match: any = { isDeleted: false };
+
+    if (channelId) {
+      match.channelId = new Types.ObjectId(channelId);
+    } else if (serverId) {
+      const channels = await this.channelModel
+        .find({ serverId: new Types.ObjectId(serverId) })
+        .select('_id')
+        .lean()
+        .exec();
+      const channelIds = channels.map((c) => c._id);
+      if (channelIds.length === 0) return { results: [], totalCount: 0 };
+      match.channelId = { $in: channelIds };
+    }
+
+    if (q && q.trim()) {
+      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      match.content = { $regex: escaped, $options: 'i' };
+    }
+
+    if (senderId) {
+      match.senderId = new Types.ObjectId(senderId);
+    }
+
+    if (before) {
+      match.createdAt = { ...(match.createdAt || {}), $lt: new Date(before) };
+    }
+    if (after) {
+      match.createdAt = { ...(match.createdAt || {}), $gt: new Date(after) };
+    }
+
+    if (hasFile) {
+      match['attachments.0'] = { $exists: true };
+    }
+
+    const [totalCount, messages] = await Promise.all([
+      this.messageModel.countDocuments(match),
+      this.messageModel
+        .find(match)
+        .populate('senderId', 'email')
+        .populate('channelId', 'name type serverId')
+        .sort({ createdAt: -1 })
+        .skip(offset)
+        .limit(limit)
+        .lean()
+        .exec(),
+    ]);
+
+    const results = await Promise.all(
+      messages.map(async (msg: any) => {
+        const sid = msg.senderId?._id ?? msg.senderId;
+        const senderUserId =
+          sid != null ? new Types.ObjectId(sid.toString()) : null;
+        const senderProfile = senderUserId
+          ? await this.profileModel
+              .findOne({ userId: senderUserId })
+              .select('username displayName avatarUrl')
+              .lean()
+              .exec()
+          : null;
+
+        return {
+          ...msg,
+          senderId: {
+            ...(typeof msg.senderId === 'object'
+              ? msg.senderId
+              : { _id: msg.senderId, email: '' }),
+            displayName: senderProfile?.displayName ?? undefined,
+            username: senderProfile?.username ?? undefined,
+            avatarUrl: senderProfile?.avatarUrl ?? undefined,
+          },
+        };
+      }),
+    );
+
+    return { results, totalCount };
   }
 }

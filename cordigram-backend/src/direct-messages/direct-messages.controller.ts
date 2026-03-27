@@ -26,6 +26,28 @@ export class DirectMessagesController {
     private readonly directMessagesGateway: DirectMessagesGateway,
   ) {}
 
+  @Get('search')
+  async searchDirectMessages(
+    @CurrentUser() user: any,
+    @Query('q') q?: string,
+    @Query('userId') otherUserId?: string,
+    @Query('before') before?: string,
+    @Query('after') after?: string,
+    @Query('hasFile') hasFile?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.directMessagesService.searchDirectMessages(user.userId, {
+      q,
+      otherUserId,
+      before,
+      after,
+      hasFile: hasFile === 'true',
+      limit: limit ? parseInt(limit, 10) : 25,
+      offset: offset ? parseInt(offset, 10) : 0,
+    });
+  }
+
   @Post(':receiverId')
   async createDirectMessage(
     @Param('receiverId') receiverId: string,

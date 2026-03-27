@@ -105,6 +105,7 @@
   overflow-x: auto;
   padding: 24px 32px;
   min-width: 0;
+  color: var(--color-panel-text);
 }
 
 .contentHeader {
@@ -123,6 +124,42 @@
   font-size: 14px;
   color: var(--color-panel-text-muted);
   line-height: 1.4;
+}
+
+.content input:not([type="checkbox"]),
+.content textarea,
+.content select {
+  width: 100%;
+  background: var(--color-panel-deep);
+  color: var(--color-panel-text);
+  border: 1px solid var(--color-panel-deep-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.content textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.content input:not([type="checkbox"])::placeholder,
+.content textarea::placeholder {
+  color: var(--color-panel-text-faint);
+}
+
+.content input:not([type="checkbox"]):focus,
+.content textarea:focus,
+.content select:focus {
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
+}
+
+.content select option {
+  color: var(--color-panel-text);
+  background: var(--color-panel-bg);
 }
 
 .placeholderNote {

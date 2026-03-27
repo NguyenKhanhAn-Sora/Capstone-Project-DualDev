@@ -59,6 +59,7 @@ export interface ServerCategory {
   name: string;
   position: number;
   isPrivate: boolean;
+  type?: "text" | "voice" | "mixed";
 }
 
 export interface Channel {
@@ -78,6 +79,7 @@ export interface Channel {
   category?: string | null;
   /** ID danh mục người dùng tạo */
   categoryId?: string | null;
+  position?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -108,6 +110,10 @@ export interface Message {
     content: string;
     senderId?: { _id: string; email?: string; displayName?: string; username?: string };
   };
+  mentions?: string[];
+  messageType?: string;
+  giphyId?: string;
+  stickerReplyWelcomeEnabled?: boolean;
 }
 
 export interface Friend {
@@ -711,8 +717,7 @@ export interface CurrentUserServerPermissions {
 export interface ServerInteractionSettings {
   systemMessagesEnabled: boolean;
   welcomeMessageEnabled: boolean;
-  setupTipsEnabled: boolean;
-  activityFeedEnabled: boolean;
+  stickerReplyWelcomeEnabled: boolean;
   defaultNotificationLevel: "all" | "mentions";
   systemChannelId: string | null;
   canEdit: boolean;
@@ -781,8 +786,7 @@ export async function updateInteractionSettings(
       ServerInteractionSettings,
       | "systemMessagesEnabled"
       | "welcomeMessageEnabled"
-      | "setupTipsEnabled"
-      | "activityFeedEnabled"
+      | "stickerReplyWelcomeEnabled"
       | "defaultNotificationLevel"
       | "systemChannelId"
     >
@@ -947,22 +951,58 @@ export async function createCategory(
   serverId: string,
   name: string,
   isPrivate?: boolean,
+  type?: "text" | "voice" | "mixed",
 ): Promise<ServerCategory> {
-  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/categories`, {
-    method: "POST",
-    headers: getHeaders(),
-    body: JSON.stringify({ name, isPrivate }),
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/channels/categories`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ name, type: type || "mixed" }),
+    },
+  );
   if (!response.ok) throw new Error("Không tạo được danh mục");
   return response.json();
 }
 
 export async function getCategories(serverId: string): Promise<ServerCategory[]> {
-  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/categories`, {
-    headers: getHeaders(),
-  });
-  if (!response.ok) throw new Error("Không tải được danh mục");
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/channels/categories/list`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) return [];
   return response.json();
+}
+
+export async function reorderCategories(
+  serverId: string,
+  orderedIds: string[],
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/channels/reorder/categories`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify({ orderedIds }),
+    },
+  );
+  if (!response.ok) throw new Error("Không sắp xếp được danh mục");
+}
+
+export async function reorderChannels(
+  serverId: string,
+  categoryId: string | null,
+  orderedChannelIds: string[],
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/channels/reorder/channels`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify({ categoryId, orderedChannelIds }),
+    },
+  );
+  if (!response.ok) throw new Error("Không sắp xếp được kênh");
 }
 
 export async function getChannels(
@@ -1231,11 +1271,17 @@ export async function createMessage(
   content: string,
   attachments?: string[],
   replyTo?: string,
+  mentions?: string[],
+  messageType?: string,
+  giphyId?: string,
 ): Promise<Message> {
-  const body: { content: string; attachments?: string[]; replyTo?: string } = {
+  const body: Record<string, unknown> = {
     content,
     ...(attachments?.length ? { attachments } : {}),
     ...(replyTo ? { replyTo } : {}),
+    ...(mentions?.length ? { mentions } : {}),
+    ...(messageType && messageType !== "text" ? { messageType } : {}),
+    ...(giphyId ? { giphyId } : {}),
   };
   const response = await fetch(
     `${API_BASE_URL}/channels/${channelId}/messages`,
@@ -1250,6 +1296,28 @@ export async function createMessage(
     throw new Error("Không tạo được tin nhắn");
   }
 
+  return response.json();
+}
+
+export async function sendWaveSticker(
+  channelId: string,
+  replyTo?: string,
+  giphyId?: string,
+): Promise<Message> {
+  const body: Record<string, string> = {};
+  if (replyTo) body.replyTo = replyTo;
+  if (giphyId) body.giphyId = giphyId;
+  const response = await fetch(
+    `${API_BASE_URL}/channels/${channelId}/messages/wave-sticker`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(body),
+    },
+  );
+  if (!response.ok) {
+    throw new Error("Không gửi được sticker vẫy tay");
+  }
   return response.json();
 }
 
@@ -1340,6 +1408,55 @@ export async function addMessageReaction(
     throw new Error("Không thêm được cảm xúc");
   }
 
+  return response.json();
+}
+
+// Message Search
+export interface SearchMessageResult {
+  _id: string;
+  channelId: { _id: string; name: string; type: string; serverId: string } | string;
+  senderId: {
+    _id: string;
+    email: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+  };
+  content: string;
+  attachments: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SearchResponse {
+  results: SearchMessageResult[];
+  totalCount: number;
+}
+
+export async function searchMessages(params: {
+  q?: string;
+  serverId?: string;
+  channelId?: string;
+  senderId?: string;
+  before?: string;
+  after?: string;
+  hasFile?: boolean;
+  limit?: number;
+  offset?: number;
+}): Promise<SearchResponse> {
+  const url = new URL(`${API_BASE_URL}/messages/search`);
+  if (params.q) url.searchParams.append("q", params.q);
+  if (params.serverId) url.searchParams.append("serverId", params.serverId);
+  if (params.channelId) url.searchParams.append("channelId", params.channelId);
+  if (params.senderId) url.searchParams.append("senderId", params.senderId);
+  if (params.before) url.searchParams.append("before", params.before);
+  if (params.after) url.searchParams.append("after", params.after);
+  if (params.hasFile) url.searchParams.append("hasFile", "true");
+  if (params.limit) url.searchParams.append("limit", params.limit.toString());
+  if (params.offset) url.searchParams.append("offset", params.offset.toString());
+
+  const response = await fetch(url.toString(), { headers: getHeaders() });
+  if (!response.ok) throw new Error("Không tìm kiếm được tin nhắn");
   return response.json();
 }
 

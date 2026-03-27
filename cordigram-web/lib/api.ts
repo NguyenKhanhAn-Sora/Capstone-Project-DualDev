@@ -3325,3 +3325,57 @@ export async function markDmConversationRead(opts: {
     },
   });
 }
+
+export interface DmSearchResult {
+  _id: string;
+  senderId: {
+    _id: string;
+    email: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+  };
+  receiverId: {
+    _id: string;
+    email: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+  };
+  content: string;
+  attachments: string[];
+  createdAt: string;
+}
+
+export interface DmSearchResponse {
+  results: DmSearchResult[];
+  totalCount: number;
+}
+
+export async function searchDirectMessages(opts: {
+  token: string;
+  q?: string;
+  userId?: string;
+  before?: string;
+  after?: string;
+  hasFile?: boolean;
+  limit?: number;
+  offset?: number;
+}): Promise<DmSearchResponse> {
+  const params = new URLSearchParams();
+  if (opts.q) params.append("q", opts.q);
+  if (opts.userId) params.append("userId", opts.userId);
+  if (opts.before) params.append("before", opts.before);
+  if (opts.after) params.append("after", opts.after);
+  if (opts.hasFile) params.append("hasFile", "true");
+  if (opts.limit) params.append("limit", opts.limit.toString());
+  if (opts.offset) params.append("offset", opts.offset.toString());
+
+  return apiFetch<DmSearchResponse>({
+    path: `/direct-messages/search?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+    },
+  });
+}

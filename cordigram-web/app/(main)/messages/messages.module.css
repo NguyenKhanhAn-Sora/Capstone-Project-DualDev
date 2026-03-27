@@ -3030,3 +3030,48 @@
     transform: translateX(-50%) translateY(0);
   }
 }
+
+/* ── Drag & Drop ── */
+
+.dragging {
+  opacity: 0.4 !important;
+  border: 1px dashed var(--color-primary) !important;
+  border-radius: 4px;
+}
+
+.dropIndicator {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 1px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.dropIndicator::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.channelDragItem {
+  position: relative;
+  transition: transform 0.15s ease;
+}
+
+.channelDragItem:hover {
+  background: var(--color-bg-hover);
+  border-radius: 4px;
+}
+
+.categoryChannelList {
+  min-height: 2px;
+  transition: background 0.15s ease;
+}

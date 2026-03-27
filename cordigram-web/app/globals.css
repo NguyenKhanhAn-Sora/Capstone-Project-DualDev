@@ -192,3 +192,7 @@ body {
   background: var(--color-scrollbar-thumb);
   border-radius: 8px;
 }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

@@ -19,6 +19,72 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class ChannelsController {
   constructor(private readonly channelsService: ChannelsService) {}
 
+  // ── Categories (MUST be before :id routes) ──
+
+  @Post('categories')
+  async createCategory(
+    @Param('serverId') serverId: string,
+    @Body() body: { name: string; type?: 'text' | 'voice' | 'mixed' },
+  ) {
+    return this.channelsService.createCategory(
+      serverId,
+      body.name,
+      body.type,
+    );
+  }
+
+  @Get('categories/list')
+  async getCategories(@Param('serverId') serverId: string) {
+    return this.channelsService.getCategories(serverId);
+  }
+
+  @Patch('categories/:categoryId')
+  async updateCategory(
+    @Param('categoryId') categoryId: string,
+    @Body() body: { name: string },
+  ) {
+    return this.channelsService.updateCategory(categoryId, body.name);
+  }
+
+  @Delete('categories/:categoryId')
+  async deleteCategory(@Param('categoryId') categoryId: string) {
+    await this.channelsService.deleteCategory(categoryId);
+    return { message: 'Category deleted successfully' };
+  }
+
+  // ── Reorder (MUST be before :id routes) ──
+
+  @Patch('reorder/categories')
+  async reorderCategories(
+    @Param('serverId') serverId: string,
+    @Body() body: { orderedIds: string[] },
+    @Request() req: any,
+  ) {
+    await this.channelsService.reorderCategories(
+      serverId,
+      body.orderedIds,
+      req.user.userId,
+    );
+    return { message: 'Categories reordered' };
+  }
+
+  @Patch('reorder/channels')
+  async reorderChannels(
+    @Param('serverId') serverId: string,
+    @Body() body: { categoryId: string | null; orderedChannelIds: string[] },
+    @Request() req: any,
+  ) {
+    await this.channelsService.reorderChannels(
+      serverId,
+      body.categoryId,
+      body.orderedChannelIds,
+      req.user.userId,
+    );
+    return { message: 'Channels reordered' };
+  }
+
+  // ── Base channel CRUD ──
+
   @Post()
   async createChannel(
     @Param('serverId') serverId: string,

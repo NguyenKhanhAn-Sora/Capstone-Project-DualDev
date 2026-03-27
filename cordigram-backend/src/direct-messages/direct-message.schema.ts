@@ -86,7 +86,7 @@ export class DirectMessage extends Document {
 
 export const DirectMessageSchema = SchemaFactory.createForClass(DirectMessage);
 
-// Create indexes for faster queries
 DirectMessageSchema.index({ senderId: 1, receiverId: 1 });
 DirectMessageSchema.index({ receiverId: 1, isRead: 1 });
 DirectMessageSchema.index({ createdAt: -1 });
+DirectMessageSchema.index({ content: 'text' });

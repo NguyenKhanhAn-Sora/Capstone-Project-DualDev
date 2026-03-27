@@ -10,6 +10,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Server } from './server.schema';
 import { Channel } from '../channels/channel.schema';
+import { ChannelCategory } from '../channels/channel-category.schema';
 import { CreateServerDto } from './dto/create-server.dto';
 import { UpdateServerDto } from './dto/update-server.dto';
 import { User } from '../users/user.schema';
@@ -17,19 +18,25 @@ import { Profile } from '../profiles/profile.schema';
 import { ServerInvite } from '../server-invites/server-invite.schema';
 import { RolesService } from '../roles/roles.service';
 import { ServerNotification } from './server-notification.schema';
+import { Message } from '../messages/message.schema';
+import { ChannelMessagesGateway } from '../messages/channel-messages.gateway';
 
 @Injectable()
 export class ServersService {
   constructor(
     @InjectModel(Server.name) private serverModel: Model<Server>,
     @InjectModel(Channel.name) private channelModel: Model<Channel>,
+    @InjectModel(ChannelCategory.name)
+    private channelCategoryModel: Model<ChannelCategory>,
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
     @InjectModel(ServerInvite.name) private serverInviteModel: Model<ServerInvite>,
     @InjectModel(ServerNotification.name)
     private serverNotificationModel: Model<ServerNotification>,
+    @InjectModel(Message.name) private messageModel: Model<Message>,
     @Inject(forwardRef(() => RolesService))
     private rolesService: RolesService,
+    private readonly channelMessagesGateway: ChannelMessagesGateway,
   ) {}
 
   /**
@@ -231,7 +238,65 @@ export class ServersService {
     const channelDefs = templateChannels[template] ?? templateChannels['custom'];
     const savedChannelIds: Types.ObjectId[] = [];
 
+    const hasInfoChannels = channelDefs.some((d) => d.category === 'info');
+    const hasTextChannels = channelDefs.some(
+      (d) => d.type === 'text' && d.category !== 'info',
+    );
+    const hasVoiceChannels = channelDefs.some((d) => d.type === 'voice');
+
+    let infoCatId: Types.ObjectId | null = null;
+    let textCatId: Types.ObjectId | null = null;
+    let voiceCatId: Types.ObjectId | null = null;
+    let catPosition = 0;
+
+    if (hasInfoChannels) {
+      const infoCat = new this.channelCategoryModel({
+        name: 'Thông Tin',
+        serverId: savedServer._id,
+        position: catPosition++,
+        type: 'text',
+      });
+      const saved = await infoCat.save();
+      infoCatId = saved._id as Types.ObjectId;
+    }
+    if (hasTextChannels) {
+      const textCat = new this.channelCategoryModel({
+        name: 'Kênh Chat',
+        serverId: savedServer._id,
+        position: catPosition++,
+        type: 'text',
+      });
+      const saved = await textCat.save();
+      textCatId = saved._id as Types.ObjectId;
+    }
+    if (hasVoiceChannels) {
+      const voiceCat = new this.channelCategoryModel({
+        name: 'Kênh Thoại',
+        serverId: savedServer._id,
+        position: catPosition++,
+        type: 'voice',
+      });
+      const saved = await voiceCat.save();
+      voiceCatId = saved._id as Types.ObjectId;
+    }
+
+    let textPos = 0;
+    let voicePos = 0;
+    let infoPos = 0;
     for (const def of channelDefs) {
+      let assignedCatId: Types.ObjectId | null = null;
+      let pos = 0;
+      if (def.category === 'info') {
+        assignedCatId = infoCatId;
+        pos = infoPos++;
+      } else if (def.type === 'text') {
+        assignedCatId = textCatId;
+        pos = textPos++;
+      } else {
+        assignedCatId = voiceCatId;
+        pos = voicePos++;
+      }
+
       const channel = new this.channelModel({
         name: def.name,
         type: def.type,
@@ -240,13 +305,31 @@ export class ServersService {
         createdBy: userObjectId,
         isDefault: def.isDefault ?? false,
         category: def.category ?? null,
+        categoryId: assignedCatId,
+        position: pos,
       });
       const saved = await channel.save();
       savedChannelIds.push(saved._id as Types.ObjectId);
     }
 
-    // Update server with channels
     savedServer.channels = savedChannelIds;
+
+    // Auto-set systemChannelId to the first info text channel or default text channel
+    const allCreatedChannels = await this.channelModel
+      .find({ serverId: savedServer._id, type: 'text' })
+      .sort({ position: 1 })
+      .lean()
+      .exec();
+    const infoChannel = allCreatedChannels.find((c: any) => c.category === 'info');
+    const defaultTextChannel = allCreatedChannels.find((c: any) => (c as any).isDefault);
+    const autoSystemChannel = infoChannel || defaultTextChannel || allCreatedChannels[0];
+    if (autoSystemChannel) {
+      (savedServer as any).interactionSettings = {
+        ...((savedServer as any).interactionSettings ?? {}),
+        systemChannelId: autoSystemChannel._id,
+      };
+    }
+
     await savedServer.save();
 
     // Create default @everyone role for the server
@@ -378,7 +461,6 @@ export class ServersService {
 
     const memberObjectId = new Types.ObjectId(memberId);
 
-    // Check if member already exists
     const memberExists = server.members.some(
       (m) => m.userId.toString() === memberId,
     );
@@ -395,7 +477,108 @@ export class ServersService {
 
     server.memberCount = server.members.length;
 
-    return server.save();
+    const saved = await server.save();
+
+    this.sendWelcomeMessage(serverId, memberId).catch((err) => {
+      console.error('[sendWelcomeMessage] Failed:', err?.message || err);
+    });
+
+    return saved;
+  }
+
+  /**
+   * Create a single welcome message when a user joins.
+   * The frontend renders it as a special block (text + wave button).
+   */
+  private async sendWelcomeMessage(
+    serverId: string,
+    newMemberId: string,
+  ): Promise<void> {
+    console.log('[sendWelcomeMessage] serverId:', serverId, 'newMemberId:', newMemberId);
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('interactionSettings')
+      .lean()
+      .exec();
+    if (!server) { console.log('[sendWelcomeMessage] Server not found'); return; }
+
+    const settings = (server as any).interactionSettings ?? {};
+    console.log('[sendWelcomeMessage] settings:', JSON.stringify(settings));
+    if (!settings.systemMessagesEnabled) { console.log('[sendWelcomeMessage] systemMessagesEnabled=false, skip'); return; }
+    if (!settings.welcomeMessageEnabled) { console.log('[sendWelcomeMessage] welcomeMessageEnabled=false, skip'); return; }
+
+    const systemChannelId = settings.systemChannelId;
+    if (!systemChannelId) { console.log('[sendWelcomeMessage] No systemChannelId, skip'); return; }
+
+    const channel = await this.channelModel.findById(systemChannelId).exec();
+    if (!channel || channel.type !== 'text') { console.log('[sendWelcomeMessage] Channel not found or not text, type:', channel?.type); return; }
+    console.log('[sendWelcomeMessage] Sending to channel:', channel.name, channel._id);
+
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(newMemberId) })
+      .select('displayName username')
+      .lean()
+      .exec();
+    const displayName =
+      profile?.displayName || profile?.username || 'Ai đó';
+
+    const welcomeMsg = new this.messageModel({
+      channelId: new Types.ObjectId(systemChannelId.toString()),
+      senderId: new Types.ObjectId(newMemberId),
+      content: `Rất vui được gặp bạn, ${displayName}!`,
+      messageType: 'welcome',
+      giphyId: null,
+      attachments: [],
+      replyTo: null,
+      mentions: [],
+    });
+    const saved = await welcomeMsg.save();
+
+    channel.messageCount = (channel.messageCount || 0) + 1;
+    await channel.save();
+
+    const stickerReply = settings.stickerReplyWelcomeEnabled ?? true;
+    const enriched = await this.enrichWelcomeMessage(saved);
+    if (enriched) {
+      enriched.stickerReplyWelcomeEnabled = stickerReply;
+      this.channelMessagesGateway.emitNewMessage(
+        systemChannelId.toString(),
+        enriched,
+      );
+    }
+  }
+
+  private async enrichWelcomeMessage(msg: any): Promise<any> {
+    const senderId = msg.senderId;
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(senderId.toString()) })
+      .select('username displayName avatarUrl')
+      .lean()
+      .exec();
+
+    return {
+      _id: msg._id,
+      channelId: msg.channelId,
+      senderId: {
+        _id: senderId,
+        email: '',
+        displayName: profile?.displayName ?? undefined,
+        username: profile?.username ?? undefined,
+        avatarUrl: profile?.avatarUrl ?? undefined,
+      },
+      content: msg.content,
+      messageType: msg.messageType,
+      giphyId: msg.giphyId,
+      attachments: msg.attachments,
+      reactions: [],
+      replyTo: null,
+      mentions: [],
+      isEdited: false,
+      editedAt: null,
+      isDeleted: false,
+      createdAt: msg.createdAt,
+      updatedAt: msg.updatedAt,
+    };
   }
 
   /** Join a public server (used from event link). Fails if server is private. */
@@ -635,8 +818,7 @@ export class ServersService {
   async getInteractionSettings(serverId: string, requesterUserId: string): Promise<{
     systemMessagesEnabled: boolean;
     welcomeMessageEnabled: boolean;
-    setupTipsEnabled: boolean;
-    activityFeedEnabled: boolean;
+    stickerReplyWelcomeEnabled: boolean;
     defaultNotificationLevel: 'all' | 'mentions';
     systemChannelId: string | null;
     canEdit: boolean;
@@ -656,8 +838,7 @@ export class ServersService {
     return {
       systemMessagesEnabled: s.systemMessagesEnabled ?? true,
       welcomeMessageEnabled: s.welcomeMessageEnabled ?? true,
-      setupTipsEnabled: s.setupTipsEnabled ?? true,
-      activityFeedEnabled: s.activityFeedEnabled ?? true,
+      stickerReplyWelcomeEnabled: s.stickerReplyWelcomeEnabled ?? true,
       defaultNotificationLevel:
         s.defaultNotificationLevel === 'mentions' ? 'mentions' : 'all',
       systemChannelId: s.systemChannelId ? s.systemChannelId.toString() : null,
@@ -671,16 +852,14 @@ export class ServersService {
     payload: {
       systemMessagesEnabled?: boolean;
       welcomeMessageEnabled?: boolean;
-      setupTipsEnabled?: boolean;
-      activityFeedEnabled?: boolean;
+      stickerReplyWelcomeEnabled?: boolean;
       defaultNotificationLevel?: 'all' | 'mentions';
       systemChannelId?: string | null;
     },
   ): Promise<{
     systemMessagesEnabled: boolean;
     welcomeMessageEnabled: boolean;
-    setupTipsEnabled: boolean;
-    activityFeedEnabled: boolean;
+    stickerReplyWelcomeEnabled: boolean;
     defaultNotificationLevel: 'all' | 'mentions';
     systemChannelId: string | null;
     canEdit: boolean;
@@ -701,11 +880,8 @@ export class ServersService {
     if (payload.welcomeMessageEnabled !== undefined) {
       next.welcomeMessageEnabled = Boolean(payload.welcomeMessageEnabled);
     }
-    if (payload.setupTipsEnabled !== undefined) {
-      next.setupTipsEnabled = Boolean(payload.setupTipsEnabled);
-    }
-    if (payload.activityFeedEnabled !== undefined) {
-      next.activityFeedEnabled = Boolean(payload.activityFeedEnabled);
+    if (payload.stickerReplyWelcomeEnabled !== undefined) {
+      next.stickerReplyWelcomeEnabled = Boolean(payload.stickerReplyWelcomeEnabled);
     }
     if (payload.defaultNotificationLevel !== undefined) {
       next.defaultNotificationLevel =

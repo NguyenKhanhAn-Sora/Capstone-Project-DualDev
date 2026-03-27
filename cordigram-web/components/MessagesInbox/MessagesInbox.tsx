@@ -102,28 +102,43 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
     };
   }, []);
 
-  // Realtime refresh for "Chưa đọc" tab (DM) – no reload needed.
+  // Realtime refresh for "Chưa đọc" tab (DM) + "Đề cập" tab (channel mentions).
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!authToken) return;
 
     dmSocketRef.current?.disconnect();
-    const socket = io(`${getApiBaseUrl()}/direct-messages`, {
+    const dmSocket = io(`${getApiBaseUrl()}/direct-messages`, {
       auth: { token: authToken },
       transports: ["websocket"],
     });
 
-    socket.on("new-message", () => {
+    dmSocket.on("new-message", () => {
       scheduleRefreshUnread();
     });
-    socket.on("dm-unread-count", () => {
+    dmSocket.on("dm-unread-count", () => {
       scheduleRefreshUnread();
     });
-    socket.on("messages-read", () => {
+    dmSocket.on("messages-read", () => {
       scheduleRefreshUnread();
     });
 
-    dmSocketRef.current = socket;
+    dmSocketRef.current = dmSocket;
+
+    const chSocket = io(`${getApiBaseUrl()}/channel-messages`, {
+      auth: { token: authToken },
+      transports: ["websocket"],
+    });
+
+    chSocket.on("channel-notification", (data: any) => {
+      if (data?.isMention) {
+        fetchInboxMentions()
+          .then((res) => setMentionItems(res.items ?? []))
+          .catch(() => undefined);
+      }
+      scheduleRefreshUnread();
+    });
+
     return () => {
       if (unreadRefreshTimerRef.current != null) {
         window.clearTimeout(unreadRefreshTimerRef.current);
@@ -131,6 +146,7 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
       }
       dmSocketRef.current?.disconnect();
       dmSocketRef.current = null;
+      chSocket.disconnect();
     };
   }, [authToken]);
 

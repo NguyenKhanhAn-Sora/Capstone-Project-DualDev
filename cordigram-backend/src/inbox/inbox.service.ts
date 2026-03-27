@@ -259,8 +259,8 @@ export class InboxService {
     return result.slice(0, 50);
   }
 
-  /** Đề cập trong kênh - placeholder, sẽ triển khai khi có mention trong message */
-  async getMentions(_userId: string): Promise<unknown[]> {
-    return [];
+  /** Đề cập trong kênh — trả về các tin nhắn mà user bị @mention. */
+  async getMentions(userId: string): Promise<unknown[]> {
+    return this.messagesService.getChannelMentionsForUser(userId);
   }
 }

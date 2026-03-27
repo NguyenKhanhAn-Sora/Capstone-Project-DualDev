@@ -36,8 +36,7 @@ export interface ServerCategory {
 export interface ServerInteractionSettings {
   systemMessagesEnabled: boolean;
   welcomeMessageEnabled: boolean;
-  setupTipsEnabled: boolean;
-  activityFeedEnabled: boolean;
+  stickerReplyWelcomeEnabled: boolean;
   defaultNotificationLevel: 'all' | 'mentions';
   systemChannelId?: Types.ObjectId | null;
 }
@@ -137,8 +136,7 @@ export class Server extends Document {
     type: {
       systemMessagesEnabled: { type: Boolean, default: true },
       welcomeMessageEnabled: { type: Boolean, default: true },
-      setupTipsEnabled: { type: Boolean, default: true },
-      activityFeedEnabled: { type: Boolean, default: true },
+      stickerReplyWelcomeEnabled: { type: Boolean, default: true },
       defaultNotificationLevel: {
         type: String,
         enum: ['all', 'mentions'],
@@ -149,8 +147,7 @@ export class Server extends Document {
     default: () => ({
       systemMessagesEnabled: true,
       welcomeMessageEnabled: true,
-      setupTipsEnabled: true,
-      activityFeedEnabled: true,
+      stickerReplyWelcomeEnabled: true,
       defaultNotificationLevel: 'all',
       systemChannelId: null,
     }),
