@@ -1,5 +1,5 @@
 const DEFAULT_BASE_URL = "http://localhost:9999";
-const DEFAULT_WEB_BASE_URL = "http://localhost:3000";
+const DEFAULT_WEB_BASE_URL = "http://localhost:3001";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? DEFAULT_BASE_URL;

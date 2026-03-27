@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.9);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15,12 +15,13 @@
 }
 
 .modal {
-  background: #313338;
+  background: var(--color-panel-bg);
   border-radius: 8px;
   width: 90%;
   max-width: 520px;
   padding: 24px;
   animation: slideUp 0.3s ease-out;
+  border: 1px solid var(--color-panel-border);
 }
 
 @keyframes slideUp {
@@ -39,13 +40,13 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .closeBtn {
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 24px;
   cursor: pointer;
   padding: 0;
@@ -58,15 +59,15 @@
 }
 
 .closeBtn:hover {
-  background: #1e1f22;
-  color: #fff;
+  background: var(--color-panel-hover);
+  color: var(--color-panel-text);
 }
 
 .previewWrap {
   width: 100%;
   min-height: 200px;
   max-height: 360px;
-  background: #1e1f22;
+  background: var(--color-panel-deep);
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -97,7 +98,7 @@
 
 .zoomSlider input[type="range"] {
   flex: 1;
-  accent-color: #5865f2;
+  accent-color: var(--color-panel-accent);
 }
 
 .rotateBtn {
@@ -105,8 +106,8 @@
   height: 40px;
   border-radius: 6px;
   border: none;
-  background: #2b2d31;
-  color: #b5bac1;
+  background: var(--color-panel-sidebar);
+  color: var(--color-panel-text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -115,8 +116,8 @@
 }
 
 .rotateBtn:hover {
-  background: #36373d;
-  color: #f2f3f5;
+  background: var(--color-panel-hover);
+  color: var(--color-panel-text);
 }
 
 .footer {
@@ -124,20 +125,20 @@
   align-items: center;
   justify-content: space-between;
   padding-top: 16px;
-  border-top: 1px solid #2b2d31;
+  border-top: 1px solid var(--color-panel-border);
 }
 
 .resetBtn {
   background: none;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 14px;
   cursor: pointer;
   padding: 0;
 }
 
 .resetBtn:hover {
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .footerRight {
@@ -149,21 +150,21 @@
   padding: 10px 20px;
   border-radius: 4px;
   border: none;
-  background: #2b2d31;
-  color: #f2f3f5;
+  background: var(--color-panel-sidebar);
+  color: var(--color-panel-text);
   font-size: 14px;
   cursor: pointer;
 }
 
 .btnSecondary:hover {
-  background: #36373d;
+  background: var(--color-panel-hover);
 }
 
 .btnPrimary {
   padding: 10px 20px;
   border-radius: 4px;
   border: none;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: #fff;
   font-size: 14px;
   font-weight: 500;
@@ -171,7 +172,7 @@
 }
 
 .btnPrimary:hover:not(:disabled) {
-  background: #4752c4;
+  background: var(--color-panel-accent-hover);
 }
 
 .btnPrimary:disabled {

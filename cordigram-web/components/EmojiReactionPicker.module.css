@@ -4,9 +4,10 @@
 }
 
 .picker {
-  background: #2b2d31;
+  background: var(--color-panel-context);
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--color-panel-border);
   width: 340px;
   max-height: 420px;
   display: flex;
@@ -16,22 +17,22 @@
 
 .header {
   padding: 12px;
-  border-bottom: 1px solid #3f4147;
+  border-bottom: 1px solid var(--color-panel-border);
 }
 
 .searchInput {
   width: 100%;
-  background: #1e1f22;
-  border: none;
+  background: var(--color-panel-deep);
+  border: 1px solid var(--color-panel-deep-border);
   border-radius: 8px;
   padding: 10px 12px;
-  color: #dbdee1;
+  color: var(--color-panel-text);
   font-size: 14px;
   outline: none;
 }
 
 .searchInput::placeholder {
-  color: #80848e;
+  color: var(--color-panel-text-faint);
 }
 
 .mainEmotions {
@@ -39,17 +40,17 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #3f4147;
+  border-bottom: 1px solid var(--color-panel-border);
 }
 
 .categoryTitle {
-  color: #dbdee1;
+  color: var(--color-panel-text);
   font-size: 13px;
   font-weight: 600;
 }
 
 .customizeButton {
-  color: #00a8fc;
+  color: var(--color-panel-accent);
   font-size: 12px;
   cursor: pointer;
   font-weight: 500;
@@ -84,7 +85,7 @@
 }
 
 .emojiButton:hover {
-  background: #404249;
+  background: var(--color-panel-hover);
   transform: scale(1.1);
 }
 
@@ -92,8 +93,8 @@
   display: flex;
   justify-content: space-around;
   padding: 8px;
-  border-top: 1px solid #3f4147;
-  background: #2b2d31;
+  border-top: 1px solid var(--color-panel-border);
+  background: var(--color-panel-sidebar);
 }
 
 .categoryButton {
@@ -108,12 +109,12 @@
 }
 
 .categoryButton:hover {
-  background: #404249;
+  background: var(--color-panel-hover);
   opacity: 1;
 }
 
 .categoryButton.active {
-  background: #404249;
+  background: var(--color-panel-active);
   opacity: 1;
 }
 
@@ -123,15 +124,15 @@
 }
 
 .emojiGrid::-webkit-scrollbar-track {
-  background: #1e1f22;
+  background: var(--color-panel-deep);
   border-radius: 4px;
 }
 
 .emojiGrid::-webkit-scrollbar-thumb {
-  background: #3f4147;
+  background: var(--color-panel-border);
   border-radius: 4px;
 }
 
 .emojiGrid::-webkit-scrollbar-thumb:hover {
-  background: #4e5058;
+  background: var(--color-panel-active);
 }

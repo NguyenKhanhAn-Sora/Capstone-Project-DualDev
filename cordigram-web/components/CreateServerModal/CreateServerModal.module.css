@@ -1,10 +1,7 @@
 .modalOverlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -13,43 +10,33 @@
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modalContent {
-  background: #313338;
+  background: var(--color-panel-bg);
   border-radius: 8px;
   width: 90%;
   max-width: 440px;
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
+  border: 1px solid var(--color-panel-border);
   animation: slideUp 0.3s ease-out;
 }
 
 @keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 .closeButton {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 16px; right: 16px;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 28px;
   cursor: pointer;
   padding: 0;
@@ -64,8 +51,8 @@
 }
 
 .closeButton:hover {
-  background: #1e1f22;
-  color: #fff;
+  background: var(--color-panel-hover);
+  color: var(--color-panel-text);
 }
 
 /* Scrollbar styling */
@@ -74,14 +61,14 @@
 }
 
 .modalContent::-webkit-scrollbar-track {
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
 }
 
 .modalContent::-webkit-scrollbar-thumb {
-  background: #1e1f22;
+  background: var(--color-panel-deep);
   border-radius: 4px;
 }
 
 .modalContent::-webkit-scrollbar-thumb:hover {
-  background: #4e5058;
+  background: var(--color-panel-neutral);
 }

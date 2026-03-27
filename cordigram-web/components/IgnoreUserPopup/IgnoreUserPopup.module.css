@@ -2,19 +2,20 @@
   position: fixed;
   inset: 0;
   z-index: 10010;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .popup {
-  background: #313338;
+  background: var(--color-panel-bg);
   border-radius: 12px;
   width: 100%;
   max-width: 440px;
   padding: 24px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--color-panel-border);
 }
 
 .iconWrap {
@@ -30,14 +31,14 @@
   margin: 0 0 4px;
   font-size: 20px;
   font-weight: 700;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   text-align: center;
 }
 
 .subtitle {
   margin: 0 0 20px;
   font-size: 14px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   text-align: center;
 }
 
@@ -53,19 +54,19 @@
   margin-top: 2px;
   width: 18px;
   height: 18px;
-  accent-color: #5865f2;
+  accent-color: var(--color-panel-accent);
 }
 
 .checkLabel {
   font-size: 14px;
-  color: #dbdee1;
+  color: var(--color-panel-text);
   font-weight: 500;
 }
 
 .checkDesc {
   margin: 0 0 16px 30px;
   font-size: 13px;
-  color: #949ba4;
+  color: var(--color-panel-text-faint);
 }
 
 .info {
@@ -74,10 +75,10 @@
   gap: 8px;
   margin: 16px 0;
   padding: 12px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border-radius: 8px;
   font-size: 13px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .infoIcon {
@@ -88,41 +89,41 @@
 .blockSection {
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px solid #3f4147;
+  border-top: 1px solid var(--color-panel-border);
 }
 
 .blockTitle {
   margin: 0 0 12px;
   font-size: 14px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .blockBox {
   padding: 12px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border-radius: 8px;
-  border: 1px solid #3f4147;
+  border: 1px solid var(--color-panel-border);
 }
 
 .blockText {
   margin: 0 0 4px;
   font-size: 14px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .blockDesc {
   margin: 0 0 12px;
   font-size: 13px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .blockBtn {
   padding: 8px 16px;
   background: transparent;
-  color: #f23f42;
-  border: 1px solid #f23f42;
+  color: var(--color-panel-danger);
+  border: 1px solid var(--color-panel-danger);
   border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
@@ -142,8 +143,8 @@
 
 .btnCancel {
   padding: 10px 20px;
-  background: #4e5058;
-  color: #fff;
+  background: var(--color-panel-neutral);
+  color: var(--color-panel-text);
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -152,12 +153,12 @@
 }
 
 .btnCancel:hover {
-  background: #5d6069;
+  background: var(--color-panel-neutral-hover);
 }
 
 .btnIgnore {
   padding: 10px 20px;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -167,12 +168,12 @@
 }
 
 .btnIgnore:hover {
-  background: #4752c4;
+  background: var(--color-panel-accent-hover);
 }
 
 .loading {
   text-align: center;
   padding: 24px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 14px;
 }

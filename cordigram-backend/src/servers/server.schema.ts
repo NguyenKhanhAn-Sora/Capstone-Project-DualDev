@@ -16,6 +16,29 @@ export interface ServerMember {
   userId: Types.ObjectId;
   role: 'owner' | 'moderator' | 'member';
   joinedAt: Date;
+  timeoutUntil?: Date | null; // Thời điểm hết timeout (null = không bị timeout)
+}
+
+export interface BannedUser {
+  userId: Types.ObjectId;
+  bannedAt: Date;
+  bannedBy: Types.ObjectId;
+  reason: string | null;
+}
+
+export interface ServerCategory {
+  _id: Types.ObjectId;
+  name: string;
+  position: number;
+  isPrivate: boolean;
+}
+
+export interface ServerInteractionSettings {
+  systemMessagesEnabled: boolean;
+  welcomeMessageEnabled: boolean;
+  stickerReplyWelcomeEnabled: boolean;
+  defaultNotificationLevel: 'all' | 'mentions';
+  systemChannelId?: Types.ObjectId | null;
 }
 
 @Schema({ timestamps: true })
@@ -64,14 +87,41 @@ export class Server extends Document {
           default: 'member',
         },
         joinedAt: { type: Date, default: Date.now },
+        timeoutUntil: { type: Date, default: null }, // Thời điểm hết timeout
       },
     ],
     default: [],
   })
   members: ServerMember[];
 
+  @Prop({
+    type: [
+      {
+        userId: { type: Types.ObjectId, ref: 'User' },
+        bannedAt: { type: Date, default: Date.now },
+        bannedBy: { type: Types.ObjectId, ref: 'User' },
+        reason: { type: String, default: null },
+      },
+    ],
+    default: [],
+  })
+  bannedUsers: BannedUser[];
+
   @Prop({ type: [Types.ObjectId], ref: 'Channel', default: [] })
   channels: Types.ObjectId[];
+
+  @Prop({
+    type: [
+      {
+        _id: { type: Types.ObjectId, auto: true },
+        name: { type: String, required: true },
+        position: { type: Number, default: 0 },
+        isPrivate: { type: Boolean, default: false },
+      },
+    ],
+    default: [],
+  })
+  serverCategories: ServerCategory[];
 
   @Prop({ type: Number, default: 0 })
   memberCount: number;
@@ -81,6 +131,28 @@ export class Server extends Document {
 
   @Prop({ type: Boolean, default: true })
   isPublic: boolean;
+
+  @Prop({
+    type: {
+      systemMessagesEnabled: { type: Boolean, default: true },
+      welcomeMessageEnabled: { type: Boolean, default: true },
+      stickerReplyWelcomeEnabled: { type: Boolean, default: true },
+      defaultNotificationLevel: {
+        type: String,
+        enum: ['all', 'mentions'],
+        default: 'all',
+      },
+      systemChannelId: { type: Types.ObjectId, ref: 'Channel', default: null },
+    },
+    default: () => ({
+      systemMessagesEnabled: true,
+      welcomeMessageEnabled: true,
+      stickerReplyWelcomeEnabled: true,
+      defaultNotificationLevel: 'all',
+      systemChannelId: null,
+    }),
+  })
+  interactionSettings: ServerInteractionSettings;
 }
 
 export const ServerSchema = SchemaFactory.createForClass(Server);

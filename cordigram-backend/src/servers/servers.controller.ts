@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
   BadRequestException,
@@ -33,12 +34,241 @@ export class ServersController {
     return this.serversService.getServersByUserId(req.user.userId);
   }
 
+  /**
+   * Lấy danh sách thành viên (chỉ owner - API cũ)
+   */
   @Get(':id/members')
   async getServerMembers(
     @Param('id') serverId: string,
     @Request() req: any,
   ) {
     return this.serversService.getServerMembers(serverId, req.user.userId);
+  }
+
+  /**
+   * Lấy danh sách thành viên với thông tin role (PUBLIC - cho tất cả members)
+   * Trả về members với role info + quyền của user hiện tại
+   */
+  @Get(':id/members-with-roles')
+  async getServerMembersWithRoles(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getServerMembersWithRoles(serverId, req.user.userId);
+  }
+
+  /**
+   * Lấy permissions của user hiện tại trong server
+   * GET /servers/:id/my-permissions
+   */
+  @Get(':id/my-permissions')
+  async getMyPermissions(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getCurrentUserPermissions(serverId, req.user.userId);
+  }
+
+  @Get(':id/interaction-settings')
+  async getInteractionSettings(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getInteractionSettings(serverId, req.user.userId);
+  }
+
+  @Patch(':id/interaction-settings')
+  async updateInteractionSettings(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      systemMessagesEnabled?: boolean;
+      welcomeMessageEnabled?: boolean;
+      stickerReplyWelcomeEnabled?: boolean;
+      defaultNotificationLevel?: 'all' | 'mentions';
+      systemChannelId?: string | null;
+    },
+    @Request() req: any,
+  ) {
+    return this.serversService.updateInteractionSettings(
+      serverId,
+      req.user.userId,
+      body ?? {},
+    );
+  }
+
+  @Post(':id/role-notifications')
+  async createRoleNotification(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      title: string;
+      content: string;
+      targetType: 'everyone' | 'role';
+      roleId?: string | null;
+    },
+    @Request() req: any,
+  ) {
+    return this.serversService.createRoleNotification(serverId, req.user.userId, body);
+  }
+
+  // =====================================================
+  // MODERATION ENDPOINTS
+  // =====================================================
+
+  /**
+   * Kick thành viên
+   * POST /servers/:id/kick/:memberId
+   */
+  @Post(':id/kick/:memberId')
+  async kickMember(
+    @Param('id') serverId: string,
+    @Param('memberId') memberId: string,
+    @Body() body: { reason?: string },
+    @Request() req: any,
+  ) {
+    return this.serversService.kickMember(
+      serverId,
+      req.user.userId,
+      memberId,
+      body?.reason,
+    );
+  }
+
+  /**
+   * Ban thành viên
+   * POST /servers/:id/ban/:memberId
+   */
+  @Post(':id/ban/:memberId')
+  async banMember(
+    @Param('id') serverId: string,
+    @Param('memberId') memberId: string,
+    @Body() body: { reason?: string; deleteMessageDays?: number },
+    @Request() req: any,
+  ) {
+    return this.serversService.banMember(
+      serverId,
+      req.user.userId,
+      memberId,
+      body?.reason,
+      body?.deleteMessageDays,
+    );
+  }
+
+  /**
+   * Unban thành viên
+   * POST /servers/:id/unban/:memberId
+   */
+  @Post(':id/unban/:memberId')
+  async unbanMember(
+    @Param('id') serverId: string,
+    @Param('memberId') memberId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.unbanMember(
+      serverId,
+      req.user.userId,
+      memberId,
+    );
+  }
+
+  /**
+   * Lấy danh sách người bị ban
+   * GET /servers/:id/bans
+   */
+  @Get(':id/bans')
+  async getBannedUsers(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getBannedUsers(serverId, req.user.userId);
+  }
+
+  /**
+   * Timeout thành viên
+   * POST /servers/:id/timeout/:memberId
+   */
+  @Post(':id/timeout/:memberId')
+  async timeoutMember(
+    @Param('id') serverId: string,
+    @Param('memberId') memberId: string,
+    @Body() body: { durationSeconds: number; reason?: string },
+    @Request() req: any,
+  ) {
+    if (!body?.durationSeconds || body.durationSeconds <= 0) {
+      throw new BadRequestException('durationSeconds must be a positive number');
+    }
+    return this.serversService.timeoutMember(
+      serverId,
+      req.user.userId,
+      memberId,
+      body.durationSeconds,
+      body?.reason,
+    );
+  }
+
+  /**
+   * Gỡ timeout thành viên
+   * POST /servers/:id/remove-timeout/:memberId
+   */
+  @Post(':id/remove-timeout/:memberId')
+  async removeTimeout(
+    @Param('id') serverId: string,
+    @Param('memberId') memberId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.removeTimeout(
+      serverId,
+      req.user.userId,
+      memberId,
+    );
+  }
+
+  /**
+   * Preview prune count (bulk kick) based on inactivity days + optional role filter.
+   * Example: GET /servers/:id/prune/count?days=30&role=none
+   */
+  @Get(':id/prune/count')
+  async getPruneCount(
+    @Param('id') serverId: string,
+    @Query('days') daysRaw: string,
+    @Request() req: any,
+    @Query('role') role?: 'moderator' | 'member' | 'none' | 'all',
+  ) {
+    const days = Number(daysRaw);
+    if (!Number.isFinite(days) || days <= 0) {
+      throw new BadRequestException('days must be a positive number');
+    }
+    const count = await this.serversService.getPruneCount({
+      serverId,
+      requesterUserId: req.user.userId,
+      days,
+      roleFilter: role,
+    });
+    return { count };
+  }
+
+  /**
+   * Execute prune members (bulk kick).
+   * Example: POST /servers/:id/prune  { days: 30, role: "none" }
+   */
+  @Post(':id/prune')
+  async pruneMembers(
+    @Param('id') serverId: string,
+    @Body() body: { days: number; role?: 'moderator' | 'member' | 'none' | 'all' },
+    @Request() req: any,
+  ) {
+    const days = Number(body?.days);
+    if (!Number.isFinite(days) || days <= 0) {
+      throw new BadRequestException('days must be a positive number');
+    }
+    const removed = await this.serversService.pruneMembers({
+      serverId,
+      requesterUserId: req.user.userId,
+      days,
+      roleFilter: body?.role,
+    });
+    return { removed };
   }
 
   @Get(':id')
@@ -111,5 +341,24 @@ export class ServersController {
       req.user.userId,
       body.newOwnerId,
     );
+  }
+
+  @Post(':id/categories')
+  async createCategory(
+    @Param('id') serverId: string,
+    @Body() body: { name: string; isPrivate?: boolean },
+    @Request() req: any,
+  ) {
+    return this.serversService.createCategory(
+      serverId,
+      req.user.userId,
+      body.name,
+      body.isPrivate ?? false,
+    );
+  }
+
+  @Get(':id/categories')
+  async getCategories(@Param('id') serverId: string) {
+    return this.serversService.getCategories(serverId);
   }
 }

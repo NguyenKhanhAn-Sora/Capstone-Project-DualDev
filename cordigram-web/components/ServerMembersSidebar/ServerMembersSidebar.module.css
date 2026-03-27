@@ -1,0 +1,462 @@
+/* =====================================================
+   SERVER MEMBERS SIDEBAR
+   ===================================================== */
+
+.container {
+  width: 240px;
+  height: 100%;
+  background: var(--color-panel-sidebar);
+  border-left: 1px solid var(--color-panel-sidebar-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebarTitle {
+  padding: 12px 16px 8px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-panel-text-faint);
+  letter-spacing: 0.02em;
+}
+
+.loading,
+.error {
+  padding: 16px;
+  text-align: center;
+  color: var(--color-panel-text-muted);
+  font-size: 14px;
+}
+
+.error {
+  color: var(--color-panel-danger);
+}
+
+/* =====================================================
+   GROUPS CONTAINER
+   ===================================================== */
+
+.groupsContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+}
+
+.groupsContainer::-webkit-scrollbar {
+  width: 8px;
+}
+
+.groupsContainer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.groupsContainer::-webkit-scrollbar-thumb {
+  background: var(--color-panel-sidebar-border);
+  border-radius: 4px;
+}
+
+/* =====================================================
+   ROLE GROUP
+   ===================================================== */
+
+.roleGroup {
+  margin-bottom: 8px;
+}
+
+.roleHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-panel-text-faint);
+  letter-spacing: 0.02em;
+}
+
+.roleColorDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.roleName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberCount {
+  font-weight: 400;
+  color: var(--color-panel-text-faint);
+}
+
+/* =====================================================
+   MEMBER ITEM
+   ===================================================== */
+
+.membersList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.memberItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.memberItem:hover {
+  background: var(--color-panel-hover);
+}
+
+.memberItem:focus {
+  outline: none;
+  background: var(--color-panel-hover);
+}
+
+/* Avatar */
+.avatar {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.ownerBadge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  font-size: 10px;
+  background: var(--color-panel-sidebar);
+  border-radius: 50%;
+  padding: 1px;
+}
+
+/* Name */
+.memberName {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.selfBadge {
+  font-size: 12px;
+  color: var(--color-panel-text-faint);
+  font-weight: 400;
+}
+
+/* =====================================================
+   CONTEXT MENU
+   ===================================================== */
+
+.contextMenu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 200px;
+  max-width: 280px;
+  background: var(--color-panel-context);
+  border-radius: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-panel-border);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.24);
+  animation: fadeIn 0.1s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.contextMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: var(--color-panel-text-muted);
+  font-size: 14px;
+  text-align: left;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.contextMenuItem:hover {
+  background: var(--color-panel-accent);
+  color: #fff;
+}
+
+.contextMenuItem svg {
+  flex-shrink: 0;
+}
+
+.contextMenuItemWarning {
+  color: var(--color-panel-warning);
+}
+
+.contextMenuItemWarning:hover {
+  background: var(--color-panel-warning);
+  color: #000;
+}
+
+.contextMenuItemDanger {
+  color: var(--color-panel-danger);
+}
+
+.contextMenuItemDanger:hover {
+  background: var(--color-panel-danger);
+  color: #fff;
+}
+
+.contextMenuDivider {
+  height: 1px;
+  background: var(--color-panel-border);
+  margin: 6px 0;
+}
+
+.contextMenuLabel {
+  padding: 6px 10px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-panel-text-faint);
+  letter-spacing: 0.02em;
+}
+
+/* Role badges in context menu */
+.roleBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 10px 8px;
+}
+
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+}
+
+/* =====================================================
+   MODERATION MODAL
+   ===================================================== */
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  background: var(--color-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.15s ease;
+}
+
+.modalContent {
+  width: 100%;
+  max-width: 440px;
+  background: var(--color-panel-bg);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--color-panel-border);
+}
+
+.modalTitle {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-panel-text);
+}
+
+.modalDescription {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: var(--color-panel-text-muted);
+  line-height: 1.4;
+}
+
+/* Form elements */
+.formGroup {
+  margin-bottom: 16px;
+}
+
+.formLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-panel-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.formSelect {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--color-panel-deep);
+  border: 1px solid var(--color-panel-deep-border);
+  border-radius: 4px;
+  color: var(--color-panel-text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.formSelect:focus {
+  outline: none;
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
+}
+
+.formTextarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--color-panel-deep);
+  border: 1px solid var(--color-panel-deep-border);
+  border-radius: 4px;
+  color: var(--color-panel-text);
+  font-size: 14px;
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+.formTextarea:focus {
+  outline: none;
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
+}
+
+.formTextarea::placeholder {
+  color: var(--color-panel-text-faint);
+}
+
+/* Modal actions */
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btnCancel {
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--color-panel-text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.btnCancel:hover {
+  background: var(--color-panel-neutral);
+  color: var(--color-panel-text);
+}
+
+.btnCancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnDanger {
+  padding: 10px 20px;
+  background: var(--color-panel-danger);
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btnDanger:hover {
+  background: var(--color-panel-danger-hover);
+}
+
+.btnDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnWarning {
+  padding: 10px 20px;
+  background: var(--color-panel-warning);
+  border: none;
+  border-radius: 4px;
+  color: #000;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btnWarning:hover {
+  filter: brightness(0.9);
+}
+
+.btnWarning:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* =====================================================
+   RESPONSIVE
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .container {
+    width: 200px;
+  }
+
+  .contextMenu {
+    min-width: 180px;
+  }
+
+  .modalContent {
+    margin: 16px;
+    max-width: calc(100% - 32px);
+  }
+}

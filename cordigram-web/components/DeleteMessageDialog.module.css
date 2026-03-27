@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--color-chat-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -22,13 +22,14 @@
 }
 
 .dialog {
-  background: #2b2d31;
+  background: var(--color-chat-modal);
   border-radius: 12px;
   width: 90%;
   max-width: 500px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--color-chat-modal-border);
   animation: slideUp 0.2s ease;
 }
 
@@ -48,11 +49,11 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #3f4147;
+  border-bottom: 1px solid var(--color-chat-modal-border);
 }
 
 .title {
-  color: #dbdee1;
+  color: var(--color-chat-text-strong);
   font-size: 18px;
   font-weight: 600;
   margin: 0;
@@ -62,7 +63,7 @@
 .closeButton {
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-chat-text-secondary);
   font-size: 24px;
   cursor: pointer;
   padding: 4px;
@@ -73,7 +74,7 @@
 }
 
 .closeButton:hover {
-  color: #dbdee1;
+  color: var(--color-chat-text-strong);
 }
 
 .content {
@@ -94,12 +95,12 @@
 }
 
 .option:hover {
-  background: #2f3136;
+  background: var(--color-chat-hover);
 }
 
 .option:has(.radio:checked) {
-  background: #2f3136;
-  border-color: #00a8fc;
+  background: var(--color-chat-hover);
+  border-color: var(--color-chat-accent);
 }
 
 .radio {
@@ -108,7 +109,7 @@
   width: 20px;
   height: 20px;
   cursor: pointer;
-  accent-color: #00a8fc;
+  accent-color: var(--color-chat-accent);
 }
 
 .optionContent {
@@ -116,14 +117,14 @@
 }
 
 .optionTitle {
-  color: #dbdee1;
+  color: var(--color-chat-text-strong);
   font-size: 15px;
   font-weight: 600;
   margin-bottom: 6px;
 }
 
 .optionDescription {
-  color: #b5bac1;
+  color: var(--color-chat-text-secondary);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -133,7 +134,7 @@
   justify-content: flex-end;
   gap: 12px;
   padding: 20px 24px;
-  border-top: 1px solid #3f4147;
+  border-top: 1px solid var(--color-chat-modal-border);
 }
 
 .cancelButton,
@@ -149,18 +150,18 @@
 
 .cancelButton {
   background: transparent;
-  color: #dbdee1;
+  color: var(--color-chat-text-strong);
 }
 
 .cancelButton:hover {
-  background: #404249;
+  background: var(--color-chat-hover);
 }
 
 .confirmButton {
-  background: #f23f43;
+  background: var(--color-chat-danger);
   color: #fff;
 }
 
 .confirmButton:hover {
-  background: #d93438;
+  background: var(--color-chat-danger-hover);
 }

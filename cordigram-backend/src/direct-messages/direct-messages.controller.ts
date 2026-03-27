@@ -26,6 +26,28 @@ export class DirectMessagesController {
     private readonly directMessagesGateway: DirectMessagesGateway,
   ) {}
 
+  @Get('search')
+  async searchDirectMessages(
+    @CurrentUser() user: any,
+    @Query('q') q?: string,
+    @Query('userId') otherUserId?: string,
+    @Query('before') before?: string,
+    @Query('after') after?: string,
+    @Query('hasFile') hasFile?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.directMessagesService.searchDirectMessages(user.userId, {
+      q,
+      otherUserId,
+      before,
+      after,
+      hasFile: hasFile === 'true',
+      limit: limit ? parseInt(limit, 10) : 25,
+      offset: offset ? parseInt(offset, 10) : 0,
+    });
+  }
+
   @Post(':receiverId')
   async createDirectMessage(
     @Param('receiverId') receiverId: string,
@@ -99,6 +121,34 @@ export class DirectMessagesController {
       userId,
     );
     return { unreadCount: count };
+  }
+
+  @Post('conversation/:userId/read')
+  async markConversationAsRead(
+    @Param('userId') fromUserId: string,
+    @CurrentUser() user: any,
+  ) {
+    await this.directMessagesService.markConversationAsRead(
+      user.userId,
+      fromUserId,
+    );
+    // Best-effort: push realtime unread update to this user
+    try {
+      const socketId = this.directMessagesGateway.getSocketIdByUserId(
+        user.userId,
+      );
+      if (socketId) {
+        const count = await this.directMessagesService.getUnreadCount(user.userId);
+        (this.directMessagesGateway as any).server
+          ?.to(socketId)
+          ?.emit?.('dm-unread-count', {
+            totalUnread: count,
+            fromUserId,
+            conversationUnread: 0,
+          });
+      }
+    } catch (_e) {}
+    return { success: true };
   }
 
   @Patch(':messageId')

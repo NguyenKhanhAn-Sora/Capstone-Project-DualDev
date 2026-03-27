@@ -4,12 +4,12 @@
 }
 
 .menu {
-  background: #2b2d31;
+  background: var(--color-chat-modal);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   padding: 6px;
   min-width: 200px;
-  border: 1px solid #3f4147;
+  border: 1px solid var(--color-chat-modal-border);
 }
 
 .menuItem {
@@ -23,18 +23,18 @@
   padding: 10px 12px;
   cursor: pointer;
   transition: background 0.15s ease;
-  color: #dbdee1;
+  color: var(--color-chat-text-strong);
   font-size: 14px;
   text-align: left;
   font-weight: 500;
 }
 
 .menuItem:hover {
-  background: #404249;
+  background: var(--color-chat-hover);
 }
 
 .menuItem.danger {
-  color: #f23f43;
+  color: var(--color-chat-danger);
 }
 
 .menuItem.danger:hover {

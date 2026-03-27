@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15,7 +15,7 @@
 }
 
 .modal {
-  background: #313338;
+  background: var(--color-panel-bg);
   border-radius: 8px;
   width: 90%;
   max-width: 480px;
@@ -23,6 +23,7 @@
   overflow-y: auto;
   position: relative;
   padding: 24px;
+  border: 1px solid var(--color-panel-border);
   animation: slideUp 0.3s ease-out;
 }
 
@@ -48,18 +49,18 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .calendarIcon {
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .createBtn {
   padding: 10px 20px;
   border-radius: 4px;
   border: none;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: #fff;
   font-size: 14px;
   font-weight: 500;
@@ -68,7 +69,7 @@
 }
 
 .createBtn:hover {
-  background: #4752c4;
+  background: var(--color-panel-accent-hover);
 }
 
 .closeBtn {
@@ -77,7 +78,7 @@
   right: 16px;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 24px;
   cursor: pointer;
   padding: 0;
@@ -90,15 +91,15 @@
 }
 
 .closeBtn:hover {
-  background: #1e1f22;
-  color: #fff;
+  background: var(--color-panel-hover);
+  color: var(--color-panel-text);
 }
 
 .emptyIconWrap {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -107,7 +108,7 @@
 }
 
 .emptyIconWrap svg {
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .star {
@@ -130,14 +131,14 @@
   margin: 0 0 8px;
   font-size: 18px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   text-align: center;
 }
 
 .emptyDesc {
   margin: 0 0 8px;
   font-size: 14px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   text-align: center;
   line-height: 1.4;
 }
@@ -145,13 +146,13 @@
 .emptyHint {
   margin: 0;
   font-size: 13px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   text-align: center;
   line-height: 1.4;
 }
 
 .emptyHint a {
-  color: #5b7cff;
+  color: var(--color-panel-accent);
   text-decoration: none;
 }
 
@@ -167,7 +168,7 @@
 
 .eventItem {
   padding: 12px 0;
-  border-bottom: 1px solid #2b2d31;
+  border-bottom: 1px solid var(--color-panel-border);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -181,7 +182,7 @@
   width: 48px;
   height: 48px;
   border-radius: 6px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   object-fit: cover;
 }
 
@@ -189,11 +190,11 @@
   margin: 0 0 4px;
   font-size: 14px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .eventInfo p {
   margin: 0;
   font-size: 12px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }

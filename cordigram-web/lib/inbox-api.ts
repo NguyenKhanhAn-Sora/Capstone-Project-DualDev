@@ -37,7 +37,23 @@ export interface InboxServerInviteItem {
   seen?: boolean;
 }
 
-export type InboxForYouItem = InboxEventItem | InboxServerInviteItem;
+export interface InboxServerNotificationItem {
+  type: "server_notification";
+  _id: string;
+  serverId: string;
+  serverName: string;
+  serverAvatarUrl?: string | null;
+  title: string;
+  content: string;
+  targetRoleName?: string | null;
+  createdAt: string;
+  seen?: boolean;
+}
+
+export type InboxForYouItem =
+  | InboxEventItem
+  | InboxServerInviteItem
+  | InboxServerNotificationItem;
 
 export interface InboxForYouResponse {
   items: InboxForYouItem[];
@@ -94,7 +110,7 @@ export async function fetchInboxForYou(): Promise<InboxForYouResponse> {
 
 /** Đánh dấu một mục (event hoặc server_invite) trong Dành cho Bạn là đã xem. */
 export async function markInboxSeen(
-  sourceType: "event" | "server_invite",
+  sourceType: "event" | "server_invite" | "server_notification",
   sourceId: string,
 ): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/inbox/seen`, {

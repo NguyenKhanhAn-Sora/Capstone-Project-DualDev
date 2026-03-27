@@ -23,6 +23,22 @@ export class MessagesController {
     private readonly channelMessagesGateway: ChannelMessagesGateway,
   ) {}
 
+  @Post('wave-sticker')
+  async sendWaveSticker(
+    @Param('channelId') channelId: string,
+    @Body() body: { replyTo?: string; giphyId?: string },
+    @Request() req: any,
+  ) {
+    const result = await this.messagesService.createWaveStickerMessage(
+      channelId,
+      req.user.userId,
+      body?.replyTo,
+      body?.giphyId,
+    );
+    this.channelMessagesGateway.emitNewMessage(channelId, result);
+    return result;
+  }
+
   @Post()
   async createMessage(
     @Param('channelId') channelId: string,
@@ -35,7 +51,77 @@ export class MessagesController {
       req.user.userId,
     );
     this.channelMessagesGateway.emitNewMessage(channelId, result);
+
+    const mentionIds: string[] = ((result as any).mentions ?? []).map(
+      (id: any) => id?.toString?.() ?? id,
+    );
+    this.pushNotifications(channelId, req.user.userId, mentionIds, result);
+
     return result;
+  }
+
+  /**
+   * Push real-time notifications based on server's defaultNotificationLevel.
+   * - "all"      → notify all members (except sender); @mentioned also flagged as mention
+   * - "mentions" → notify only @mentioned users
+   */
+  private async pushNotifications(
+    channelId: string,
+    senderId: string,
+    mentionIds: string[],
+    message: any,
+  ) {
+    try {
+      const ctx =
+        await this.messagesService.getMessageNotificationContext(
+          channelId,
+          senderId,
+          mentionIds,
+        );
+      if (!ctx) return;
+
+      const senderName =
+        message.senderId?.displayName ??
+        message.senderId?.username ??
+        'Ai đó';
+
+      const mentionSet = new Set(ctx.mentionedUserIds);
+
+      const payload = (userId: string) => ({
+        type: 'channel_message' as const,
+        serverId: ctx.serverId,
+        serverName: ctx.serverName,
+        channelId,
+        channelName: ctx.channelName,
+        messageId: message._id?.toString?.() ?? '',
+        senderName,
+        excerpt: (message.content ?? '').slice(0, 200),
+        isMention: mentionSet.has(userId),
+        createdAt: message.createdAt ?? new Date().toISOString(),
+      });
+
+      if (ctx.defaultNotificationLevel === 'all') {
+        for (const uid of ctx.memberUserIds) {
+          this.channelMessagesGateway.emitToUser(
+            uid,
+            'channel-notification',
+            payload(uid),
+          );
+        }
+      } else {
+        for (const uid of ctx.mentionedUserIds) {
+          if (uid !== senderId) {
+            this.channelMessagesGateway.emitToUser(
+              uid,
+              'channel-notification',
+              payload(uid),
+            );
+          }
+        }
+      }
+    } catch (_) {
+      // non-critical: don't fail the request if notification push fails
+    }
   }
 
   @Get()
@@ -47,6 +133,15 @@ export class MessagesController {
   ) {
     const viewerId = req.user?.userId;
     return this.messagesService.getMessagesByChannelId(channelId, limit, skip, viewerId);
+  }
+
+  @Post('read')
+  async markChannelAsRead(
+    @Param('channelId') channelId: string,
+    @Request() req: any,
+  ) {
+    await this.messagesService.markChannelAsRead(req.user.userId, channelId);
+    return { success: true };
   }
 
   @Get(':id')

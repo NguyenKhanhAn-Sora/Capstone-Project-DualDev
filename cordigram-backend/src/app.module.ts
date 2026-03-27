@@ -32,6 +32,7 @@ import { InboxModule } from './inbox/inbox.module';
 import { ServerInvitesModule } from './server-invites/server-invites.module';
 import { PaymentsModule } from './payments/payments.module';
 import { CreatorVerificationModule } from './creator-verification/creator-verification.module';
+import { RolesModule } from './roles/roles.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { CreatorVerificationModule } from './creator-verification/creator-verifi
     ServerInvitesModule,
     PaymentsModule,
     CreatorVerificationModule,
+    RolesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

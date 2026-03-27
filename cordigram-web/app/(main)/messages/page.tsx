@@ -34,6 +34,7 @@ import {
   pinDirectMessage,
   reportDirectMessage,
   deleteDirectMessage,
+  markDmConversationRead,
 } from "@/lib/api";
 import { getLiveKitToken, getDMRoomName, getVoiceChannelParticipants } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
@@ -41,7 +42,7 @@ import OutgoingCallPopup from "@/components/OutgoingCallPopup";
 import GiphyPicker from "@/components/GiphyPicker";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import VoiceMessage from "@/components/VoiceMessage";
-import { getGifById, type GiphyGif } from "@/lib/giphy-api";
+import { getGifById, getRandomWaveSticker, type GiphyGif } from "@/lib/giphy-api";
 import QuickReactionBar from "@/components/QuickReactionBar";
 import EmojiReactionPicker from "@/components/EmojiReactionPicker";
 import MessageReactions from "@/components/MessageReactions";
@@ -53,6 +54,8 @@ import CreateServerModal from "@/components/CreateServerModal/CreateServerModal"
 import CreateChannelModal, {
   type ChannelTypeForCreate,
 } from "@/components/CreateChannelModal/CreateChannelModal";
+import CreateCategoryModal from "@/components/CreateCategoryModal/CreateCategoryModal";
+import ChatEmojiPicker from "@/components/ChatEmojiPicker/ChatEmojiPicker";
 import EventsPopup from "@/components/ServerEvents/EventsPopup";
 import CreateEventWizard from "@/components/ServerEvents/CreateEventWizard";
 import EventImageEditor from "@/components/ServerEvents/EventImageEditor";
@@ -62,8 +65,12 @@ import InviteToVoiceChannelPopup from "@/components/InviteToVoiceChannelPopup/In
 import InviteToServerPopup from "@/components/InviteToServerPopup/InviteToServerPopup";
 import MessagesInbox from "@/components/MessagesInbox/MessagesInbox";
 import ServerContextMenu from "@/components/ServerContextMenu/ServerContextMenu";
+import ChannelContextMenu from "@/components/ChannelContextMenu/ChannelContextMenu";
 import ServerSettingsPanel from "@/components/ServerSettingsPanel/ServerSettingsPanel";
 import ServerMembersSection from "@/components/ServerMembersSection/ServerMembersSection";
+import RolesSection from "@/components/RolesSection/RolesSection";
+import ServerInteractionsSection from "@/components/ServerInteractionsSection/ServerInteractionsSection";
+import MessageSearchPanel from "@/components/MessageSearchPanel/MessageSearchPanel";
 import { fetchInboxForYou } from "@/lib/inbox-api";
 
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
@@ -71,8 +78,10 @@ const CallRoom = dynamic(() => import("@/components/CallRoom"), { ssr: false });
 const VoiceChannelCall = dynamic(() => import("@/components/VoiceChannelCall"), { ssr: false });
 
 interface BackendServer extends serversApi.Server {
+  infoChannels?: serversApi.Channel[];
   textChannels?: serversApi.Channel[];
   voiceChannels?: serversApi.Channel[];
+  serverCategories?: serversApi.ServerCategory[];
 }
 
 interface MessageReaction {
@@ -94,19 +103,20 @@ interface UIMessage {
   isFromCurrentUser: boolean;
   type: "server" | "direct"; // Thêm field để phân biệt loại chat
   isRead?: boolean; // Trạng thái đã đọc
-  messageType?: "text" | "gif" | "sticker" | "voice"; // Loại nội dung message
-  giphyId?: string; // ID của GIF/Sticker từ Giphy
-  voiceUrl?: string; // URL của voice message
-  voiceDuration?: number; // Duration của voice message (seconds)
-  reactions?: MessageReaction[]; // Reactions của message
-  isPinned?: boolean; // Whether the message is pinned
-  replyTo?: string; // ID of the message being replied to
+  messageType?: "text" | "gif" | "sticker" | "voice" | "system" | "welcome";
+  giphyId?: string;
+  voiceUrl?: string;
+  voiceDuration?: number;
+  reactions?: MessageReaction[];
+  isPinned?: boolean;
+  replyTo?: string;
+  stickerReplyWelcomeEnabled?: boolean;
   replyToMessage?: {
     id: string;
     senderId?: string;
     senderDisplayName?: string;
     senderName?: string;
-    messageType?: "text" | "gif" | "sticker" | "voice";
+    messageType?: "text" | "gif" | "sticker" | "voice" | "system" | "welcome";
     text: string;
   } | null;
 }
@@ -145,9 +155,9 @@ const GiphyMessage = memo(
 
     if (!gifData) {
       return (
-        <span style={{ color: "#ff6b6b", fontSize: "12px" }}>
-          Unable to load {messageType}
-        </span>
+        <div style={{ fontSize: messageType === "sticker" ? 64 : 48, padding: "8px", lineHeight: 1 }}>
+          👋
+        </div>
       );
     }
 
@@ -339,13 +349,17 @@ function areMessagesEqual(
     message: UIMessage;
     renderMessageContent: (message: UIMessage) => React.ReactNode;
     onVisible?: (messageId: string, isVisible: boolean) => void;
+    senderColor?: string;
   },
   nextProps: {
     message: UIMessage;
     renderMessageContent: (message: UIMessage) => React.ReactNode;
     onVisible?: (messageId: string, isVisible: boolean) => void;
+    senderColor?: string;
   },
 ) {
+  // Re-render if senderColor changed (role color)
+  if (prevProps.senderColor !== nextProps.senderColor) return false;
   // Re-render if message ID changed (different message)
   if (prevProps.message.id !== nextProps.message.id) return false;
 
@@ -395,6 +409,7 @@ const MessageItem = memo(
     onDelete,
     scrollContainerRef,
     dmPartnerDisplayName,
+    senderColor,
   }: {
     message: UIMessage;
     renderMessageContent: (message: UIMessage) => React.ReactNode;
@@ -407,6 +422,7 @@ const MessageItem = memo(
     onDelete?: (messageId: string) => void;
     scrollContainerRef?: React.RefObject<HTMLElement | null>;
     dmPartnerDisplayName?: string;
+    senderColor?: string; // Màu hiển thị từ role cao nhất
   }) => {
     const messageRef = useRef<HTMLDivElement>(null);
     const [isHovered, setIsHovered] = useState(false);
@@ -517,7 +533,10 @@ const MessageItem = memo(
         <div className={styles.messageContent}>
           {/* Name and timestamp */}
           <div className={styles.messageHeader}>
-            <span className={styles.messageSenderName}>
+            <span 
+              className={styles.messageSenderName}
+              style={senderColor ? { color: senderColor } : undefined}
+            >
               {message.senderDisplayName ||
                 message.senderName ||
                 message.senderEmail ||
@@ -845,9 +864,26 @@ export default function MessagesPage() {
   const searchParams = useSearchParams();
   const [servers, setServers] = useState<BackendServer[]>([]);
   const [selectedServer, setSelectedServer] = useState<string | null>(null);
+  const [infoChannels, setInfoChannels] = useState<serversApi.Channel[]>([]);
   const [textChannels, setTextChannels] = useState<serversApi.Channel[]>([]);
   const [voiceChannels, setVoiceChannels] = useState<serversApi.Channel[]>([]);
+  const [serverCategories, setServerCategories] = useState<serversApi.ServerCategory[]>([]);
+  const [allChannels, setAllChannels] = useState<serversApi.Channel[]>([]);
+  const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+
+  // Permission: can this user reorder channels/categories?
+  const [canDragChannels, setCanDragChannels] = useState(false);
+
+  // Drag-and-drop state
+  const [dragType, setDragType] = useState<"category" | "channel" | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
+  const [dragPosition, setDragPosition] = useState<"before" | "after" | "inside">("after");
+  const [serverInteractionSettings, setServerInteractionSettings] = useState<serversApi.ServerInteractionSettings | null>(null);
+  // Map userId -> displayColor (màu role cao nhất) cho server hiện tại
+  const [memberRoleColors, setMemberRoleColors] = useState<Record<string, string>>({});
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [messageText, setMessageText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -858,11 +894,20 @@ export default function MessagesPage() {
   const [createChannelDefaultType, setCreateChannelDefaultType] =
     useState<ChannelTypeForCreate>("text");
   const [createChannelSectionLabel, setCreateChannelSectionLabel] = useState<string>("Kênh Chat");
+  const [createChannelCategoryId, setCreateChannelCategoryId] = useState<string | undefined>(undefined);
   const [serverContextMenu, setServerContextMenu] = useState<{
     x: number;
     y: number;
     server: BackendServer;
+    permissions?: serversApi.CurrentUserServerPermissions;
   } | null>(null);
+  const [channelContextMenu, setChannelContextMenu] = useState<{
+    x: number;
+    y: number;
+    channel: { _id: string; name: string; isDefault?: boolean };
+  } | null>(null);
+  const [serverSettingsPermissions, setServerSettingsPermissions] =
+    useState<serversApi.CurrentUserServerPermissions | null>(null);
   const [showServerSettingsPanel, setShowServerSettingsPanel] = useState(false);
   const [serverSettingsTarget, setServerSettingsTarget] = useState<{
     serverId: string;
@@ -871,6 +916,7 @@ export default function MessagesPage() {
   const [hideMutedChannels, setHideMutedChannels] = useState(false);
   const [showAllChannels, setShowAllChannels] = useState(false);
   const [serverNotificationLevel, setServerNotificationLevel] = useState<"all" | "mentions" | "none">("all");
+  const [wavingIds, setWavingIds] = useState<Set<string>>(new Set());
   const [showEventsPopup, setShowEventsPopup] = useState(false);
   const [showCreateEventWizard, setShowCreateEventWizard] = useState(false);
   const [showEventImageEditor, setShowEventImageEditor] = useState(false);
@@ -879,6 +925,7 @@ export default function MessagesPage() {
   const [shareEventLink, setShareEventLink] = useState<string>("");
   const [showShareEventPopup, setShowShareEventPopup] = useState(false);
   const [showMessagesInbox, setShowMessagesInbox] = useState(false);
+  const [showMessageSearch, setShowMessageSearch] = useState(false);
   /** Có lời mời hoặc nội dung mới trong Hộp thư (Dành cho Bạn) → hiển thị chấm đỏ trên nút hộp thư. */
   const [hasInboxNotification, setHasInboxNotification] = useState(false);
   const [createdEventDetail, setCreatedEventDetail] = useState<serversApi.ServerEvent | null>(null);
@@ -1020,8 +1067,9 @@ export default function MessagesPage() {
     messagesRead,
     reactionUpdate,
     markAsRead,
+    markAllAsRead,
     callEvent,
-    callEnded, // ✅ Added to handle when caller cancels
+    callEnded,
     messageDeleted,
     initiateCall,
     answerCall,
@@ -1098,6 +1146,9 @@ export default function MessagesPage() {
       timestamp: new Date(msg.createdAt),
       isFromCurrentUser: false,
       type: "server",
+      messageType: msg.messageType || "text",
+      giphyId: msg.giphyId || undefined,
+      stickerReplyWelcomeEnabled: msg.stickerReplyWelcomeEnabled,
       reactions: normalizeReactions(msg.reactions),
       replyTo: msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo._id : typeof msg.replyTo === "string" ? msg.replyTo : undefined,
       replyToMessage: mapReplyToMessage(msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo : null),
@@ -1662,12 +1713,42 @@ export default function MessagesPage() {
       loadChannels(selectedServer);
       loadActiveEvents(selectedServer);
       setSelectedDirectMessageFriend(null); // Clear selected DM friend when selecting server
+      
+      // Fetch member role colors cho server
+      serversApi.getServerMembersWithRoles(selectedServer)
+        .then((response) => {
+          const colorMap: Record<string, string> = {};
+          response.members.forEach((member) => {
+            if (member.displayColor && member.displayColor !== "#99AAB5") {
+              colorMap[member.userId] = member.displayColor;
+            }
+          });
+          setMemberRoleColors(colorMap);
+        })
+        .catch((err) => {
+          console.error("[MessagesPage] Failed to fetch member role colors:", err);
+          setMemberRoleColors({});
+        });
+      // Fetch permissions to determine if user can drag channels
+      serversApi.getCurrentUserPermissions(selectedServer)
+        .then((perms) => setCanDragChannels(perms.isOwner || perms.canManageChannels))
+        .catch(() => setCanDragChannels(false));
+      // Fetch interaction settings for welcome banner
+      serversApi.getInteractionSettings(selectedServer)
+        .then((s) => setServerInteractionSettings(s))
+        .catch(() => setServerInteractionSettings(null));
     } else {
+      setInfoChannels([]);
       setTextChannels([]);
       setVoiceChannels([]);
+      setAllChannels([]);
+      setServerCategories([]);
       setSelectedChannel(null);
       setActiveServerEvents([]);
       setServerEventsTotalCount(0);
+      setMemberRoleColors({});
+      setCanDragChannels(false);
+      setServerInteractionSettings(null);
     }
   }, [selectedServer, loadActiveEvents]);
 
@@ -1770,6 +1851,10 @@ export default function MessagesPage() {
         list.forEach((c) => {
           if (c.userId) counts[c.userId] = c.unreadCount ?? 0;
         });
+        // If user is currently viewing a DM conversation, keep its unread at 0
+        // to avoid race where the list fetch completes before mark-as-read does.
+        const activeDmId = selectedDirectMessageFriend?._id;
+        if (activeDmId) counts[activeDmId] = 0;
         setDmUnreadCounts(counts);
       })
       .catch(() => {
@@ -2032,6 +2117,8 @@ export default function MessagesPage() {
       prevChannelRef.current = selectedChannel;
       joinChannel(selectedChannel);
       loadMessages(selectedChannel);
+      // Đánh dấu kênh đã đọc để thông báo chưa đọc trong Hộp thư biến mất
+      serversApi.markChannelAsRead(selectedChannel).catch(() => {});
     }
   }, [selectedChannel, selectedTextChannel?._id, joinChannel, leaveChannel]);
 
@@ -2133,10 +2220,12 @@ export default function MessagesPage() {
       const serversWithChannels: BackendServer[] = await Promise.all(
         serversList.map(async (server) => {
           const channels = server.channels as serversApi.Channel[];
-          const textChannels = channels.filter((c) => c.type === "text");
+          const infoChannels = channels.filter((c) => c.type === "text" && c.category === "info");
+          const textChannels = channels.filter((c) => c.type === "text" && c.category !== "info");
           const voiceChannels = channels.filter((c) => c.type === "voice");
           return {
             ...server,
+            infoChannels,
             textChannels,
             voiceChannels,
           };
@@ -2169,13 +2258,25 @@ export default function MessagesPage() {
 
   const loadChannels = async (serverId: string) => {
     try {
-      const channels = await serversApi.getChannels(serverId);
-      const text = (channels || []).filter((c) => c.type === "text");
-      const voice = (channels || []).filter((c) => c.type === "voice");
+      const [channels, cats] = await Promise.all([
+        serversApi.getChannels(serverId),
+        serversApi.getCategories(serverId).catch(() => [] as serversApi.ServerCategory[]),
+      ]);
+      const sorted = (channels || []).sort(
+        (a: serversApi.Channel, b: serversApi.Channel) => (a.position ?? 0) - (b.position ?? 0),
+      );
+      setAllChannels(sorted);
+      const info = sorted.filter((c: serversApi.Channel) => c.type === "text" && c.category === "info");
+      const text = sorted.filter((c: serversApi.Channel) => c.type === "text" && c.category !== "info");
+      const voice = sorted.filter((c: serversApi.Channel) => c.type === "voice");
+      setInfoChannels(info);
       setTextChannels(text);
       setVoiceChannels(voice);
+      setServerCategories(cats);
       if (text.length > 0) {
         setSelectedChannel(text[0]._id);
+      } else if (info.length > 0) {
+        setSelectedChannel(info[0]._id);
       } else {
         setSelectedChannel(null);
       }
@@ -2213,6 +2314,9 @@ export default function MessagesPage() {
             ? msg.senderId
             : (msg.senderId as any)._id) === currentUserId,
         type: "server",
+        messageType: (msg as any).messageType || "text",
+        giphyId: (msg as any).giphyId || undefined,
+        stickerReplyWelcomeEnabled: (msg as any).stickerReplyWelcomeEnabled,
         reactions: normalizeReactions(msg.reactions),
         replyTo:
           msg.replyTo && typeof msg.replyTo === "object"
@@ -2397,6 +2501,13 @@ export default function MessagesPage() {
     setSelectedServer(null);
     setSelectedChannel(null);
     setDmUnreadCounts((prev) => ({ ...prev, [friend._id]: 0 })); // Clear unread indicator when opening chat
+    // Ensure backend read-state is updated immediately when opening the conversation
+    try {
+      // Fire socket for realtime (fast)
+      markAllAsRead?.(friend._id);
+      // Also call REST to avoid race with getConversationList refresh
+      if (token) await markDmConversationRead({ token, userId: friend._id });
+    } catch (_err) {}
     shouldAutoScrollRef.current = true; // ✅ Enable auto-scroll when switching conversations
     // Pre-scroll to bottom BEFORE loading (prevents visual jump)
     if (messagesContainerRef.current) {
@@ -2635,6 +2746,8 @@ export default function MessagesPage() {
         timestamp: new Date(newMessage.createdAt),
         isFromCurrentUser: true,
         type: "server",
+        messageType: (newMessage as any).messageType || "text",
+        giphyId: (newMessage as any).giphyId || undefined,
         replyTo: replyingTo?.id ?? (newMessage.replyTo && typeof newMessage.replyTo === "object" ? (newMessage.replyTo as any)._id : typeof newMessage.replyTo === "string" ? newMessage.replyTo : undefined),
         replyToMessage:
           mapReplyToMessage(
@@ -2788,17 +2901,51 @@ export default function MessagesPage() {
     }
   };
 
-  // Handle sending GIF or Sticker
   const handleSendGiphy = async (gif: GiphyGif, type: "gif" | "sticker") => {
-    if (!selectedDirectMessageFriend) return;
+    setShowGiphyPicker(false);
 
+    if (selectedChannel && !selectedDirectMessageFriend) {
+      try {
+        shouldAutoScrollRef.current = true;
+        const newMsg = await serversApi.createMessage(
+          selectedChannel,
+          gif.title || `Sent a ${type}`,
+          undefined,
+          replyingTo?.id,
+          undefined,
+          type,
+          gif.id,
+        );
+
+        const uiMsg: UIMessage = {
+          id: newMsg._id,
+          text: newMsg.content,
+          senderId: typeof newMsg.senderId === "string" ? newMsg.senderId : newMsg.senderId._id,
+          senderEmail: "",
+          senderName: currentUserProfile?.username || "",
+          senderDisplayName: currentUserProfile?.displayName || undefined,
+          senderAvatar: currentUserProfile?.avatar,
+          timestamp: new Date(newMsg.createdAt),
+          isFromCurrentUser: true,
+          type: "server",
+          messageType: type,
+          giphyId: gif.id,
+          replyTo: replyingTo?.id,
+          reactions: [],
+        };
+        setMessages((prev) => [...prev, uiMsg]);
+        setReplyingTo(null);
+      } catch (err) {
+        console.error(`Failed to send ${type}:`, err);
+        setError(`Không gửi được ${type}`);
+      }
+      return;
+    }
+
+    if (!selectedDirectMessageFriend) return;
     const friendId = selectedDirectMessageFriend._id;
 
     try {
-      // Close picker
-      setShowGiphyPicker(false);
-
-      // ✅ Create optimistic message
       const optimisticMessage: UIMessage = {
         id: `temp-${Date.now()}-${Math.random()}`,
         text: gif.title || `Sent a ${type}`,
@@ -2815,10 +2962,8 @@ export default function MessagesPage() {
         giphyId: gif.id,
       };
 
-      // ✅ Enable auto-scroll
       shouldAutoScrollRef.current = true;
 
-      // ✅ OPTIMISTIC UPDATE
       setConversations((prev) => {
         const newMap = new Map(prev);
         const currentMessages = newMap.get(friendId) || [];
@@ -2826,7 +2971,6 @@ export default function MessagesPage() {
         return newMap;
       });
 
-      // Send to API directly
       await sendDirectMessage(friendId, {
         token,
         content: gif.title || `Sent a ${type}`,
@@ -2835,7 +2979,6 @@ export default function MessagesPage() {
         replyTo: replyingTo?.id,
       });
 
-      // Clear reply preview
       setReplyingTo(null);
     } catch (err) {
       console.error(`Failed to send ${type}:`, err);
@@ -3021,14 +3164,12 @@ export default function MessagesPage() {
     try {
       const newServer = await serversApi.createServer(serverName);
 
+      const allCh = newServer.channels as serversApi.Channel[];
       const serverWithChannels: BackendServer = {
         ...newServer,
-        textChannels: (newServer.channels as serversApi.Channel[]).filter(
-          (c) => c.type === "text",
-        ),
-        voiceChannels: (newServer.channels as serversApi.Channel[]).filter(
-          (c) => c.type === "voice",
-        ),
+        infoChannels: allCh.filter((c) => c.type === "text" && c.category === "info"),
+        textChannels: allCh.filter((c) => c.type === "text" && c.category !== "info"),
+        voiceChannels: allCh.filter((c) => c.type === "voice"),
       };
 
       setServers([...servers, serverWithChannels]);
@@ -3045,15 +3186,13 @@ export default function MessagesPage() {
     try {
       // Fetch the newly created server with its channels
       const newServer = await serversApi.getServer(serverId);
+      const allChannels = newServer.channels as serversApi.Channel[];
 
       const serverWithChannels: BackendServer = {
         ...newServer,
-        textChannels: (newServer.channels as serversApi.Channel[]).filter(
-          (c) => c.type === "text",
-        ),
-        voiceChannels: (newServer.channels as serversApi.Channel[]).filter(
-          (c) => c.type === "voice",
-        ),
+        infoChannels: allChannels.filter((c) => c.type === "text" && c.category === "info"),
+        textChannels: allChannels.filter((c) => c.type === "text" && c.category !== "info"),
+        voiceChannels: allChannels.filter((c) => c.type === "voice"),
       };
 
       setServers([...servers, serverWithChannels]);
@@ -3069,9 +3208,10 @@ export default function MessagesPage() {
     }
   };
 
-  const openCreateChannelModal = (type: ChannelTypeForCreate, sectionLabel: string) => {
+  const openCreateChannelModal = (type: ChannelTypeForCreate, sectionLabel?: string, categoryId?: string) => {
     setCreateChannelDefaultType(type);
-    setCreateChannelSectionLabel(sectionLabel);
+    setCreateChannelSectionLabel(sectionLabel ?? "");
+    setCreateChannelCategoryId(categoryId);
     setShowCreateChannelModal(true);
   };
 
@@ -3081,9 +3221,220 @@ export default function MessagesPage() {
     isPrivate: boolean,
   ) => {
     if (!selectedServer) return;
-    await serversApi.createChannel(selectedServer, name, type, undefined, isPrivate);
+    await serversApi.createChannel(selectedServer, name, type, undefined, isPrivate, createChannelCategoryId);
     await loadChannels(selectedServer);
   };
+
+  const handleEditChannel = async (channelId: string, newName: string) => {
+    if (!selectedServer) return;
+    await serversApi.updateChannel(selectedServer, channelId, newName);
+    await loadChannels(selectedServer);
+  };
+
+  const handleDeleteChannel = async (channelId: string) => {
+    if (!selectedServer) return;
+    await serversApi.deleteChannel(selectedServer, channelId);
+    if (selectedChannel === channelId) {
+      const remaining = textChannels.filter((c) => c._id !== channelId);
+      setSelectedChannel(remaining.length > 0 ? remaining[0]._id : null);
+    }
+    await loadChannels(selectedServer);
+  };
+
+  const handleCreateCategory = async (name: string, isPrivate: boolean) => {
+    if (!selectedServer) return;
+    await serversApi.createCategory(selectedServer, name, isPrivate);
+    await loadChannels(selectedServer);
+  };
+
+  // ── Drag-and-drop helpers ──
+
+  const getChannelsForCategory = useCallback(
+    (categoryId: string) =>
+      allChannels
+        .filter((c) => c.categoryId === categoryId && c.category !== "info")
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    [allChannels],
+  );
+
+  const resetDragState = useCallback(() => {
+    setDragType(null);
+    setDragId(null);
+    setDragOverId(null);
+    setDragOverCategoryId(null);
+    setDragPosition("after");
+  }, []);
+
+  // ── Category drag ──
+
+  const handleCategoryDragStart = useCallback(
+    (e: React.DragEvent, catId: string) => {
+      if (!canDragChannels) return;
+      setDragType("category");
+      setDragId(catId);
+      e.dataTransfer.effectAllowed = "move";
+      if (e.currentTarget instanceof HTMLElement) {
+        e.currentTarget.style.opacity = "0.4";
+      }
+    },
+    [canDragChannels],
+  );
+
+  const handleCategoryDragOver = useCallback(
+    (e: React.DragEvent, targetCatId: string) => {
+      if (dragType !== "category" || dragId === targetCatId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      setDragOverId(targetCatId);
+      setDragPosition(e.clientY < midY ? "before" : "after");
+    },
+    [dragType, dragId],
+  );
+
+  const handleCategoryDrop = useCallback(
+    async (e: React.DragEvent, targetCatId: string) => {
+      e.preventDefault();
+      if (dragType !== "category" || !dragId || dragId === targetCatId || !selectedServer) {
+        resetDragState();
+        return;
+      }
+      const ordered = [...serverCategories];
+      const fromIdx = ordered.findIndex((c) => c._id === dragId);
+      let toIdx = ordered.findIndex((c) => c._id === targetCatId);
+      if (fromIdx === -1 || toIdx === -1) { resetDragState(); return; }
+      const [moved] = ordered.splice(fromIdx, 1);
+      if (dragPosition === "after") toIdx = Math.min(toIdx + 1, ordered.length);
+      if (fromIdx < toIdx) toIdx = Math.max(0, toIdx);
+      ordered.splice(toIdx, 0, moved);
+      setServerCategories(ordered);
+      resetDragState();
+      try {
+        await serversApi.reorderCategories(selectedServer, ordered.map((c) => c._id));
+      } catch {
+        await loadChannels(selectedServer);
+      }
+    },
+    [dragType, dragId, dragPosition, serverCategories, selectedServer, loadChannels, resetDragState],
+  );
+
+  // ── Channel drag (cross-category supported) ──
+
+  const handleChannelDragStart = useCallback(
+    (e: React.DragEvent, channelId: string) => {
+      if (!canDragChannels) return;
+      e.stopPropagation();
+      setDragType("channel");
+      setDragId(channelId);
+      e.dataTransfer.effectAllowed = "move";
+      if (e.currentTarget instanceof HTMLElement) {
+        e.currentTarget.style.opacity = "0.4";
+      }
+    },
+    [canDragChannels],
+  );
+
+  const handleChannelDragOver = useCallback(
+    (e: React.DragEvent, targetChannelId: string, targetCatId: string) => {
+      if (dragType !== "channel" || dragId === targetChannelId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "move";
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      setDragOverId(targetChannelId);
+      setDragOverCategoryId(targetCatId);
+      setDragPosition(e.clientY < midY ? "before" : "after");
+    },
+    [dragType, dragId],
+  );
+
+  const handleChannelDrop = useCallback(
+    async (e: React.DragEvent, targetChannelId: string, targetCatId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (dragType !== "channel" || !dragId || dragId === targetChannelId || !selectedServer) {
+        resetDragState();
+        return;
+      }
+      const draggedChannel = allChannels.find((c) => c._id === dragId);
+      if (!draggedChannel) { resetDragState(); return; }
+
+      const sourceCatId = draggedChannel.categoryId || "";
+      const targetChannels = getChannelsForCategory(targetCatId).filter((c) => c._id !== dragId);
+      const dropIdx = targetChannels.findIndex((c) => c._id === targetChannelId);
+      const insertIdx = dragPosition === "after" ? dropIdx + 1 : dropIdx;
+      targetChannels.splice(insertIdx, 0, { ...draggedChannel, categoryId: targetCatId });
+
+      // Optimistic update
+      const updated = allChannels.map((c) => {
+        if (c._id === dragId) return { ...c, categoryId: targetCatId };
+        return c;
+      });
+      setAllChannels(updated);
+      setTextChannels(updated.filter((c) => c.type === "text"));
+      setVoiceChannels(updated.filter((c) => c.type === "voice"));
+      resetDragState();
+
+      try {
+        await serversApi.reorderChannels(
+          selectedServer,
+          targetCatId,
+          targetChannels.map((c) => c._id),
+        );
+      } catch {
+        await loadChannels(selectedServer);
+      }
+    },
+    [dragType, dragId, dragPosition, selectedServer, allChannels, getChannelsForCategory, loadChannels, resetDragState],
+  );
+
+  // Drop channel on empty category area
+  const handleCategoryBodyDrop = useCallback(
+    async (e: React.DragEvent, targetCatId: string) => {
+      e.preventDefault();
+      if (dragType !== "channel" || !dragId || !selectedServer) {
+        resetDragState();
+        return;
+      }
+      const draggedChannel = allChannels.find((c) => c._id === dragId);
+      if (!draggedChannel) { resetDragState(); return; }
+
+      const targetChannels = getChannelsForCategory(targetCatId).filter((c) => c._id !== dragId);
+      targetChannels.push({ ...draggedChannel, categoryId: targetCatId });
+
+      const updated = allChannels.map((c) => {
+        if (c._id === dragId) return { ...c, categoryId: targetCatId };
+        return c;
+      });
+      setAllChannels(updated);
+      setTextChannels(updated.filter((c) => c.type === "text"));
+      setVoiceChannels(updated.filter((c) => c.type === "voice"));
+      resetDragState();
+
+      try {
+        await serversApi.reorderChannels(
+          selectedServer,
+          targetCatId,
+          targetChannels.map((c) => c._id),
+        );
+      } catch {
+        await loadChannels(selectedServer);
+      }
+    },
+    [dragType, dragId, selectedServer, allChannels, getChannelsForCategory, loadChannels, resetDragState],
+  );
+
+  const handleDragEnd = useCallback(
+    (e: React.DragEvent) => {
+      if (e.currentTarget instanceof HTMLElement) {
+        e.currentTarget.style.opacity = "1";
+      }
+      resetDragState();
+    },
+    [resetDragState],
+  );
 
   const handleOpenEventImageEditor = useCallback((currentImageUrl: string | null) => {
     return new Promise<string | null>((resolve) => {
@@ -3115,14 +3466,218 @@ export default function MessagesPage() {
     setShowCreateEventWizard(true);
   }, []);
 
-  // ✅ Memoized render function to prevent unnecessary re-renders
+  const handleWaveSticker = useCallback(
+    async (
+      channelId: string,
+      welcomeMessageId: string,
+      welcomeSenderId: string,
+    ) => {
+      if (!channelId) return;
+      setWavingIds((prev) => new Set(prev).add(welcomeMessageId));
+      try {
+        const isNewMember = welcomeSenderId === currentUserId;
+
+        const waveSticker = await getRandomWaveSticker();
+        const giphyId = waveSticker?.id;
+
+        const newMsg = await serversApi.sendWaveSticker(
+          channelId,
+          isNewMember ? undefined : welcomeMessageId,
+          giphyId,
+        );
+
+        const replyRaw = newMsg.replyTo;
+        let replyToMessage: UIMessage["replyToMessage"] = null;
+        if (!isNewMember && replyRaw && typeof replyRaw === "object") {
+          const rt = replyRaw as any;
+          replyToMessage = {
+            id: rt._id,
+            senderId: rt.senderId?._id ?? rt.senderId,
+            senderDisplayName: rt.senderId?.displayName,
+            senderName: rt.senderId?.username || rt.senderId?.email,
+            messageType: rt.messageType || "welcome",
+            text: rt.content,
+          };
+        }
+
+        const uiMsg: UIMessage = {
+          id: newMsg._id,
+          text: newMsg.content,
+          senderId:
+            typeof newMsg.senderId === "string"
+              ? newMsg.senderId
+              : newMsg.senderId._id,
+          senderEmail: "",
+          senderName: currentUserProfile?.username || "",
+          senderDisplayName: currentUserProfile?.displayName || undefined,
+          senderAvatar: currentUserProfile?.avatar,
+          timestamp: new Date(newMsg.createdAt),
+          isFromCurrentUser: true,
+          type: "server",
+          messageType: (newMsg as any).messageType || "sticker",
+          giphyId: (newMsg as any).giphyId || undefined,
+          replyTo: isNewMember ? undefined : welcomeMessageId,
+          replyToMessage,
+          reactions: [],
+        };
+        setMessages((prev) => [...prev, uiMsg]);
+        shouldAutoScrollRef.current = true;
+      } catch (e) {
+        console.error("Wave sticker failed", e);
+      } finally {
+        setWavingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(welcomeMessageId);
+          return next;
+        });
+      }
+    },
+    [currentUserId, currentUserProfile],
+  );
+
   const renderMessageContent = useCallback(
     (message: UIMessage) => {
       const { text, messageType, giphyId, voiceUrl, voiceDuration } = message;
 
-      // Debug log for all messages
+      if (messageType === "system") {
+        return (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "4px 16px",
+            margin: "2px 0",
+          }}>
+            <div style={{
+              flex: 1,
+              height: 1,
+              background: "var(--color-border)",
+            }} />
+            <span style={{
+              fontSize: 13,
+              color: "var(--color-text-muted)",
+              whiteSpace: "nowrap",
+            }}>
+              <span style={{ color: "var(--color-panel-success)", marginRight: 4 }}>→</span>
+              {text}
+            </span>
+            <span style={{
+              fontSize: 12,
+              color: "var(--color-text-muted)",
+              whiteSpace: "nowrap",
+              opacity: 0.7,
+            }}>
+              {formatMessageTime(message.timestamp)}
+            </span>
+            <div style={{
+              flex: 1,
+              height: 1,
+              background: "var(--color-border)",
+            }} />
+          </div>
+        );
+      }
+
+      if (messageType === "welcome") {
+        const isWaving = wavingIds.has(message.id);
+        const showWaveButton = message.stickerReplyWelcomeEnabled !== false;
+        const displayName =
+          message.senderDisplayName || message.senderName || "Ai đó";
+        return (
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 0,
+            padding: "8px 16px",
+            margin: "4px 0",
+          }}>
+            <div style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+            }}>
+              <span style={{
+                color: "var(--color-panel-success)",
+                fontSize: 20,
+                lineHeight: "24px",
+                flexShrink: 0,
+              }}>→</span>
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                minWidth: 0,
+              }}>
+                <div>
+                  <span style={{ color: "var(--color-text)", fontSize: 14 }}>{text}</span>
+                  <span style={{
+                    color: "var(--color-text-muted)",
+                    fontSize: 12,
+                    marginLeft: 8,
+                  }}>
+                    {formatMessageTime(message.timestamp)}
+                  </span>
+                </div>
+                {showWaveButton && (
+                  <button
+                    type="button"
+                    disabled={isWaving}
+                    onClick={() => {
+                      if (selectedChannel) {
+                        handleWaveSticker(selectedChannel, message.id, message.senderId);
+                      }
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "5px 12px",
+                      background: isWaving
+                        ? "var(--color-surface-muted)"
+                        : "var(--color-panel-hover)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 6,
+                      color: isWaving
+                        ? "var(--color-text-muted)"
+                        : "var(--color-text)",
+                      cursor: isWaving ? "not-allowed" : "pointer",
+                      fontSize: 13,
+                      width: "fit-content",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    {isWaving ? (
+                      <>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: 14,
+                            height: 14,
+                            border: "2px solid var(--color-text-muted)",
+                            borderTopColor: "transparent",
+                            borderRadius: "50%",
+                            animation: "spin 0.6s linear infinite",
+                          }}
+                        />
+                        Đang gửi...
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ fontSize: 15 }}>👋</span>
+                        Vẫy tay chào {displayName}!
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       if (messageType === "voice" || voiceUrl) {
-        console.log("🎤 [RENDER-DEBUG] Voice message check:", {
+        console.log("[RENDER-DEBUG] Voice message check:", {
           messageType,
           voiceUrl,
           voiceDuration,
@@ -3133,7 +3688,6 @@ export default function MessagesPage() {
         });
       }
 
-      // Check if message is Voice Message (allow missing voiceDuration for older messages)
       if (messageType === "voice" && voiceUrl) {
         return (
           <VoiceMessage
@@ -3149,6 +3703,14 @@ export default function MessagesPage() {
         return (
           <div className={styles.mediaMessage}>
             <GiphyMessage giphyId={giphyId} messageType={messageType} />
+          </div>
+        );
+      }
+
+      if (messageType === "sticker" && !giphyId) {
+        return (
+          <div style={{ fontSize: 64, padding: "8px", lineHeight: 1 }}>
+            👋
           </div>
         );
       }
@@ -3229,7 +3791,7 @@ export default function MessagesPage() {
       // Regular text message
       return <span>{text}</span>;
     },
-    [token],
+    [token, wavingIds, selectedChannel, handleWaveSticker],
   );
 
   // Handle emoji selection
@@ -3683,12 +4245,47 @@ export default function MessagesPage() {
                 key={server._id}
                 className={styles.navBtn}
                 onClick={() => setSelectedServer(server._id)}
-                onContextMenu={(e) => {
+                onContextMenu={async (e) => {
                   e.preventDefault();
+                  // Fetch permissions cho server này
+                  let permissions: serversApi.CurrentUserServerPermissions | undefined;
+                  try {
+                    permissions = await serversApi.getCurrentUserPermissions(server._id);
+                  } catch {
+                    // Fallback: tính toán từ isOwner
+                    const isOwner = currentUserId !== "" && 
+                      String((server as any).ownerId?._id ?? (server as any).ownerId) === currentUserId;
+                    permissions = {
+                      isOwner,
+                      hasCustomRole: isOwner, // Fallback: chỉ owner có quyền
+                      canKick: isOwner,
+                      canBan: isOwner,
+                      canTimeout: isOwner,
+                      canManageServer: isOwner,
+                      canManageChannels: isOwner,
+                      canManageEvents: isOwner,
+                      canCreateInvite: true,
+                    };
+                  }
+                  
+                  // Nếu backend chưa trả field `hasCustomRole` (response cũ) => fallback suy ra từ members-with-roles
+                  if (permissions && typeof (permissions as any).hasCustomRole !== "boolean") {
+                    try {
+                      const membersResp = await serversApi.getServerMembersWithRoles(server._id);
+                      const me = membersResp.members.find((m) => m.userId === currentUserId);
+                      (permissions as any).hasCustomRole = Boolean(me?.roles?.length);
+                    } catch {
+                      // ignore - giữ nguyên giá trị đang có
+                    }
+                  }
+
+                  // Hiện context menu cho tất cả thành viên (kể cả member thường)
+                  // Component ServerContextMenu tự xử lý ẩn/hiện options theo quyền hạn
                   setServerContextMenu({
                     x: e.clientX,
                     y: e.clientY,
                     server,
+                    permissions,
                   });
                 }}
                 title={server.name}
@@ -4096,205 +4693,263 @@ export default function MessagesPage() {
                   </svg>
                   <span>Nâng Cấp Máy Chủ</span>
                 </button>
-                <div className={styles.section}>
-                  <div className={styles.sectionHeader}>
-                    <h3 className={styles.sectionTitle}>Kênh Chat</h3>
-                    <button
-                      type="button"
-                      className={styles.addChannelBtn}
-                      title="Tạo kênh chat"
-                      onClick={() => openCreateChannelModal("text", "Kênh Chat")}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 5v14M5 12h14" />
-                      </svg>
-                    </button>
-                  </div>
-                  {textChannels.length > 0 ? (
-                    textChannels.map((channel) => (
+                {/* Thông Tin section - only shown when info channels exist */}
+                {infoChannels.length > 0 && (
+                  <div className={styles.section}>
+                    <div className={styles.sectionHeader}>
+                      <h3 className={styles.sectionTitle}>Thông Tin</h3>
+                    </div>
+                    {infoChannels.map((channel) => (
                       <div
                         key={channel._id}
                         className={`${styles.conversationItem} ${
                           selectedChannel === channel._id ? styles.active : ""
                         }`}
                         onClick={() => setSelectedChannel(channel._id)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault } });
+                        }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            width: "100%",
-                          }}
-                        >
-                          <span style={{ fontSize: "18px" }}>
-                            #{channel.name}
-                          </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+                          <span style={{ fontSize: "18px" }}>#{channel.name}</span>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div
-                      style={{
-                        padding: "12px 16px",
-                        fontSize: "12px",
-                        color: "var(--color-text-muted)",
-                      }}
-                    >
-                      Chưa có kênh chat
-                    </div>
-                  )}
-                </div>
-                <div className={styles.section}>
-                  <div className={styles.sectionHeader}>
-                    <h3 className={styles.sectionTitle}>Kênh đàm thoại</h3>
-                    <button
-                      type="button"
-                      className={styles.addChannelBtn}
-                      title="Tạo kênh đàm thoại"
-                      onClick={() => openCreateChannelModal("voice", "Kênh đàm thoại")}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 5v14M5 12h14" />
-                      </svg>
-                    </button>
+                    ))}
                   </div>
-                  {voiceChannels.length > 0 ? (
-                    voiceChannels.map((channel) => {
-                      const isSelected = selectedChannel === channel._id;
-                      const canInviteToVoice = currentServer && (currentServer.ownerId === currentUserId || currentServer.isPublic);
-                      const showInviteBar = isSelected && canInviteToVoice && !voiceInviteDismissed.has(channel._id);
-                      const participantsInChannel = voiceChannelParticipants[channel._id] ?? [];
-                      return (
-                        <div key={channel._id} className={styles.voiceChannelWrap}>
-                          <div
-                            className={`${styles.conversationItem} ${isSelected ? styles.active : ""}`}
-                            onClick={() => setSelectedChannel(channel._id)}
+                )}
+
+                {/* Dynamic categories with drag-and-drop */}
+                {serverCategories.length > 0 ? (
+                  serverCategories.map((cat) => {
+                    const channelsInCat = getChannelsForCategory(cat._id);
+                    const isVoiceCategory = cat.type === "voice";
+                    const isCatDragging = dragType === "category" && dragId === cat._id;
+                    const isCatDropTarget = dragType === "category" && dragOverId === cat._id && dragId !== cat._id;
+                    const isChannelDropOnCat = dragType === "channel" && dragOverCategoryId === cat._id;
+                    return (
+                      <div
+                        key={cat._id}
+                        className={`${styles.section} ${isCatDragging ? styles.dragging : ""}`}
+                        draggable={canDragChannels}
+                        onDragStart={(e) => { e.stopPropagation(); handleCategoryDragStart(e, cat._id); }}
+                        onDragOver={(e) => {
+                          handleCategoryDragOver(e, cat._id);
+                          if (dragType === "channel") { e.preventDefault(); setDragOverCategoryId(cat._id); }
+                        }}
+                        onDrop={(e) => {
+                          if (dragType === "category") handleCategoryDrop(e, cat._id);
+                          else if (dragType === "channel") handleCategoryBodyDrop(e, cat._id);
+                        }}
+                        onDragEnd={handleDragEnd}
+                        style={{ position: "relative" }}
+                      >
+                        {isCatDropTarget && dragPosition === "before" && (
+                          <div className={styles.dropIndicator} style={{ top: 0 }} />
+                        )}
+                        <div className={styles.sectionHeader} style={{ cursor: canDragChannels ? "grab" : "default" }}>
+                          <h3 className={styles.sectionTitle}>{cat.name}</h3>
+                          <button
+                            type="button"
+                            className={styles.addChannelBtn}
+                            title={isVoiceCategory ? "Tạo kênh đàm thoại" : "Tạo kênh chat"}
+                            onClick={() => openCreateChannelModal(isVoiceCategory ? "voice" : "text", cat.name, cat._id)}
                           >
-                            <div className={styles.voiceChannelRow}>
-                              <span className={`${styles.voiceChannelIconSidebar} ${isSelected ? styles.voiceChannelIconActive : ""}`}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                  <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
-                                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                                  <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" />
-                                  <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" />
-                                </svg>
-                              </span>
-                              <span>{channel.name}</span>
-                            </div>
-                            {isSelected && (
-                              <div className={styles.voiceChannelActions}>
-                                <button type="button" className={styles.voiceChannelActionIcon} title="Chat">
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                                  </svg>
-                                </button>
-                                <button type="button" className={styles.voiceChannelActionIcon} title="Mời">
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                                    <circle cx="9" cy="7" r="4" />
-                                    <line x1="19" y1="8" x2="19" y2="14" />
-                                    <line x1="22" y1="11" x2="16" y2="11" />
-                                  </svg>
-                                </button>
-                                <button type="button" className={styles.voiceChannelActionIcon} title="Cài đặt">
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <circle cx="12" cy="12" r="3" />
-                                    <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6m-16.78 7.78l4.24-4.24m3.08-3.08l4.24-4.24" />
-                                  </svg>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                          {showInviteBar && (
-                            <div className={styles.voiceInviteBar}>
-                              <button
-                                type="button"
-                                className={styles.voiceInviteBarClickable}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (currentServer && canInviteToVoice)
-                                    setInviteToVoiceTarget({
-                                      serverId: currentServer._id,
-                                      serverName: currentServer.name || "Máy chủ",
-                                      channelId: channel._id,
-                                      channelName: channel.name,
-                                    });
-                                }}
-                              >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                                  <circle cx="9" cy="7" r="4" />
-                                  <line x1="19" y1="8" x2="19" y2="14" />
-                                  <line x1="22" y1="11" x2="16" y2="11" />
-                                </svg>
-                                <span>Mời vào Kênh thoại</span>
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.voiceInviteDismiss}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setVoiceInviteDismissed((prev) => new Set(prev).add(channel._id));
-                                }}
-                                aria-label="Đóng"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          )}
-                          {participantsInChannel.length > 0 && (
-                            <div className={styles.voiceChannelParticipants} aria-label="Người đang trong kênh thoại">
-                              <div className={styles.voiceChannelParticipantsLabel}>Đang trong kênh</div>
-                              {participantsInChannel.map((p) => (
-                                <div key={p.identity} className={styles.voiceChannelParticipant}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M12 5v14M5 12h14" />
+                            </svg>
+                          </button>
+                        </div>
+                        <div
+                          className={styles.categoryChannelList}
+                          style={{
+                            minHeight: isChannelDropOnCat && channelsInCat.length === 0 ? "32px" : undefined,
+                            background: isChannelDropOnCat && channelsInCat.length === 0 ? "var(--color-bg-hover)" : undefined,
+                            borderRadius: "4px",
+                            transition: "background 0.15s ease",
+                          }}
+                        >
+                          {channelsInCat.map((channel) => {
+                            const isVoice = channel.type === "voice";
+                            const isSelected = selectedChannel === channel._id;
+                            const isChDragging = dragType === "channel" && dragId === channel._id;
+                            const isChDropTarget = dragType === "channel" && dragOverId === channel._id && dragId !== channel._id;
+                            if (isVoice) {
+                              const canInviteToVoice = currentServer && (currentServer.ownerId === currentUserId || currentServer.isPublic);
+                              const showInviteBar = isSelected && canInviteToVoice && !voiceInviteDismissed.has(channel._id);
+                              const participantsInChannel = voiceChannelParticipants[channel._id] ?? [];
+                              return (
+                                <div
+                                  key={channel._id}
+                                  className={`${styles.voiceChannelWrap} ${isChDragging ? styles.dragging : ""}`}
+                                  draggable={canDragChannels}
+                                  onDragStart={(e) => { e.stopPropagation(); handleChannelDragStart(e, channel._id); }}
+                                  onDragOver={(e) => { e.stopPropagation(); handleChannelDragOver(e, channel._id, cat._id); }}
+                                  onDrop={(e) => handleChannelDrop(e, channel._id, cat._id)}
+                                  onDragEnd={handleDragEnd}
+                                  style={{ position: "relative" }}
+                                >
+                                  {isChDropTarget && dragPosition === "before" && <div className={styles.dropIndicator} style={{ top: 0 }} />}
                                   <div
-                                    className={styles.voiceChannelParticipantAvatar}
-                                    style={{
-                                      backgroundColor: "var(--color-primary)",
-                                      backgroundSize: "cover",
-                                      backgroundPosition: "center",
+                                    className={`${styles.conversationItem} ${isSelected ? styles.active : ""}`}
+                                    onClick={() => setSelectedChannel(channel._id)}
+                                    onContextMenu={(e) => {
+                                      e.preventDefault();
+                                      setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault } });
                                     }}
                                   >
-                                    <span>{(p.name || "?").charAt(0).toUpperCase()}</span>
+                                    <div className={styles.voiceChannelRow}>
+                                      <span className={`${styles.voiceChannelIconSidebar} ${isSelected ? styles.voiceChannelIconActive : ""}`}>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                          <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
+                                          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                          <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" />
+                                          <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" />
+                                        </svg>
+                                      </span>
+                                      <span>{channel.name}</span>
+                                    </div>
+                                    {isSelected && (
+                                      <div className={styles.voiceChannelActions}>
+                                        <button type="button" className={styles.voiceChannelActionIcon} title="Chat">
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+                                        </button>
+                                        <button type="button" className={styles.voiceChannelActionIcon} title="Mời">
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" /></svg>
+                                        </button>
+                                        <button type="button" className={styles.voiceChannelActionIcon} title="Cài đặt">
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6m-16.78 7.78l4.24-4.24m3.08-3.08l4.24-4.24" /></svg>
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
-                                  <span className={styles.voiceChannelParticipantName}>{p.name}</span>
-                                  <div className={styles.voiceChannelParticipantIcons}>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-label="Micro tắt (mute)" role="img">
-                                      <title>Micro tắt (mute)</title>
-                                      <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
-                                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                                      <line x1="12" y1="19" x2="12" y2="23" />
-                                      <line x1="8" y1="23" x2="16" y2="23" />
-                                      <line x1="2" y1="2" x2="22" y2="22" />
-                                    </svg>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-label="Tai nghe tắt (deafen)" role="img">
-                                      <title>Tai nghe tắt (deafen)</title>
-                                      <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-                                      <path d="M21 19a2 2 0 0 1-2 2h-1v-4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v4H5a2 2 0 0 1-2-2v-5" />
-                                      <line x1="2" y1="2" x2="22" y2="22" />
-                                    </svg>
+                                  {showInviteBar && (
+                                    <div className={styles.voiceInviteBar}>
+                                      <button type="button" className={styles.voiceInviteBarClickable} onClick={(e) => { e.stopPropagation(); if (currentServer && canInviteToVoice) setInviteToVoiceTarget({ serverId: currentServer._id, serverName: currentServer.name || "Máy chủ", channelId: channel._id, channelName: channel.name }); }}>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" /></svg>
+                                        <span>Mời vào Kênh thoại</span>
+                                      </button>
+                                      <button type="button" className={styles.voiceInviteDismiss} onClick={(e) => { e.stopPropagation(); setVoiceInviteDismissed((prev) => new Set(prev).add(channel._id)); }} aria-label="Đóng">×</button>
+                                    </div>
+                                  )}
+                                  {participantsInChannel.length > 0 && (
+                                    <div className={styles.voiceChannelParticipants} aria-label="Người đang trong kênh thoại">
+                                      <div className={styles.voiceChannelParticipantsLabel}>Đang trong kênh</div>
+                                      {participantsInChannel.map((p) => (
+                                        <div key={p.identity} className={styles.voiceChannelParticipant}>
+                                          <div className={styles.voiceChannelParticipantAvatar} style={{ backgroundColor: "var(--color-primary)", backgroundSize: "cover", backgroundPosition: "center" }}>
+                                            <span>{(p.name || "?").charAt(0).toUpperCase()}</span>
+                                          </div>
+                                          <span className={styles.voiceChannelParticipantName}>{p.name}</span>
+                                          <div className={styles.voiceChannelParticipantIcons}>
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /><line x1="2" y1="2" x2="22" y2="22" /></svg>
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6" /><path d="M21 19a2 2 0 0 1-2 2h-1v-4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v4H5a2 2 0 0 1-2-2v-5" /><line x1="2" y1="2" x2="22" y2="22" /></svg>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {isChDropTarget && dragPosition === "after" && <div className={styles.dropIndicator} style={{ bottom: 0 }} />}
+                                </div>
+                              );
+                            }
+                            return (
+                              <div
+                                key={channel._id}
+                                className={`${styles.channelDragItem} ${isChDragging ? styles.dragging : ""}`}
+                                draggable={canDragChannels}
+                                onDragStart={(e) => { e.stopPropagation(); handleChannelDragStart(e, channel._id); }}
+                                onDragOver={(e) => { e.stopPropagation(); handleChannelDragOver(e, channel._id, cat._id); }}
+                                onDrop={(e) => handleChannelDrop(e, channel._id, cat._id)}
+                                onDragEnd={handleDragEnd}
+                                style={{ position: "relative" }}
+                              >
+                                {isChDropTarget && dragPosition === "before" && <div className={styles.dropIndicator} style={{ top: 0 }} />}
+                                <div
+                                  className={`${styles.conversationItem} ${isSelected ? styles.active : ""}`}
+                                  onClick={() => setSelectedChannel(channel._id)}
+                                  onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault } });
+                                  }}
+                                  style={{ cursor: canDragChannels ? "grab" : "pointer" }}
+                                >
+                                  <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+                                    <span style={{ fontSize: "18px" }}>#{channel.name}</span>
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                          )}
+                                {isChDropTarget && dragPosition === "after" && <div className={styles.dropIndicator} style={{ bottom: 0 }} />}
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })
-                  ) : (
-                    <div
-                      style={{
-                        padding: "12px 16px",
-                        fontSize: "12px",
-                        color: "var(--color-text-muted)",
-                      }}
-                    >
-                      Chưa có kênh đàm thoại
+                        {channelsInCat.length === 0 && (
+                          <div style={{ padding: "12px 16px", fontSize: "12px", color: "var(--color-text-muted)" }}>
+                            Chưa có kênh
+                          </div>
+                        )}
+                        {isCatDropTarget && dragPosition === "after" && (
+                          <div className={styles.dropIndicator} style={{ bottom: 0 }} />
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <>
+                    <div className={styles.section}>
+                      <div className={styles.sectionHeader}>
+                        <h3 className={styles.sectionTitle}>Kênh Chat</h3>
+                        <button type="button" className={styles.addChannelBtn} title="Tạo kênh chat" onClick={() => openCreateChannelModal("text")}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
+                        </button>
+                      </div>
+                      {textChannels.length > 0 ? textChannels.map((channel) => (
+                        <div
+                          key={channel._id}
+                          className={`${styles.conversationItem} ${selectedChannel === channel._id ? styles.active : ""}`}
+                          onClick={() => setSelectedChannel(channel._id)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault } });
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+                            <span style={{ fontSize: "18px" }}>#{channel.name}</span>
+                          </div>
+                        </div>
+                      )) : (
+                        <div style={{ padding: "12px 16px", fontSize: "12px", color: "var(--color-text-muted)" }}>Chưa có kênh chat</div>
+                      )}
                     </div>
-                  )}
-                </div>
-                </div>
+                    <div className={styles.section}>
+                      <div className={styles.sectionHeader}>
+                        <h3 className={styles.sectionTitle}>Kênh Thoại</h3>
+                        <button type="button" className={styles.addChannelBtn} title="Tạo kênh thoại" onClick={() => openCreateChannelModal("voice")}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
+                        </button>
+                      </div>
+                      {voiceChannels.length > 0 ? voiceChannels.map((channel) => (
+                        <div
+                          key={channel._id}
+                          className={`${styles.conversationItem} ${selectedChannel === channel._id ? styles.active : ""}`}
+                          onClick={() => setSelectedChannel(channel._id)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault } });
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, opacity: 0.7 }}><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+                            <span style={{ fontSize: "14px" }}>{channel.name}</span>
+                          </div>
+                        </div>
+                      )) : (
+                        <div style={{ padding: "12px 16px", fontSize: "12px", color: "var(--color-text-muted)" }}>Chưa có kênh đàm thoại</div>
+                      )}
+                    </div>
+                  </>
+                )}
+                </div>{/* end conversationsScrollArea */}
 
                 {/* Voice Controls Footer - cùng vị trí như bên DM */}
                 <div className={styles.voiceControls}>
@@ -4468,10 +5123,8 @@ export default function MessagesPage() {
                         ? selectedDirectMessageFriend.displayName ||
                           selectedDirectMessageFriend.username
                         : "#" +
-                          (textChannels.find((c) => c._id === selectedChannel)
+                          (allChannels.find((c) => c._id === selectedChannel)
                             ?.name ||
-                            voiceChannels.find((c) => c._id === selectedChannel)
-                              ?.name ||
                             "channel")}
                     </h2>
                   </div>
@@ -4523,6 +5176,16 @@ export default function MessagesPage() {
                         </button>
                       </>
                     )}
+                    <button
+                      className={styles.chatIconBtn}
+                      title="Tìm kiếm tin nhắn"
+                      onClick={() => setShowMessageSearch(true)}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                    </button>
                     <button className={styles.chatIconBtn} title="Tùy chọn khác">
                       <svg
                         width="20"
@@ -4616,39 +5279,93 @@ export default function MessagesPage() {
                     >
                       <p>Đang tải tin nhắn...</p>
                     </div>
-                  ) : messages.length === 0 ? (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        height: "100%",
-                        color: "var(--color-text-muted)",
-                      }}
-                    >
-                      <p>Chưa có tin nhắn. Hãy bắt đầu trò chuyện!</p>
-                    </div>
                   ) : (
-                    messages.map((message) => (
-                      <div
-                        key={message.id}
-                        data-message-id={message.id}
-                        data-has-reactions={message.reactions?.length ? "true" : undefined}
-                      >
-                        <MessageItem
-                          message={message}
-                          renderMessageContent={renderMessageContent}
-                          onVisible={handleMessageVisible}
-                          currentUserId={currentUserId}
-                          onReaction={handleReaction}
-                          onReply={handleReplyToMessage}
-                          onPin={handlePinMessage}
-                          onReport={(msgId) => setShowReportDialog(msgId)}
-                          onDelete={(msgId) => setShowDeleteDialog(msgId)}
-                          scrollContainerRef={messagesContainerRef}
-                        />
-                      </div>
-                    ))
+                    <>
+                      {serverInteractionSettings?.welcomeMessageEnabled &&
+                        selectedChannel === serverInteractionSettings?.systemChannelId &&
+                        currentServer && (
+                        <div style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "48px 16px 24px",
+                          textAlign: "center",
+                          borderBottom: "1px solid var(--color-border)",
+                          marginBottom: 8,
+                        }}>
+                          <h1 style={{
+                            fontSize: 28,
+                            fontWeight: 700,
+                            color: "var(--color-text)",
+                            lineHeight: 1.3,
+                            margin: 0,
+                          }}>
+                            Chào mừng đến với
+                            <br />
+                            Máy chủ của {currentServer.name}
+                          </h1>
+                          <p style={{
+                            fontSize: 14,
+                            color: "var(--color-text-muted)",
+                            marginTop: 8,
+                            maxWidth: 480,
+                          }}>
+                            Đây là khởi đầu của kênh{" "}
+                            <strong style={{ color: "var(--color-text)" }}>
+                              #{allChannels.find((c) => c._id === selectedChannel)?.name || "chung"}
+                            </strong>
+                            . Hãy bắt đầu cuộc trò chuyện!
+                          </p>
+                        </div>
+                      )}
+                      {messages.length === 0 &&
+                        !(serverInteractionSettings?.welcomeMessageEnabled &&
+                          selectedChannel === serverInteractionSettings?.systemChannelId) ? (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            height: "100%",
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
+                          <p>Chưa có tin nhắn. Hãy bắt đầu trò chuyện!</p>
+                        </div>
+                      ) : (
+                    messages.map((message) => {
+                      if (message.messageType === "welcome" || message.messageType === "system") {
+                        return (
+                          <div key={message.id} data-message-id={message.id}>
+                            {renderMessageContent(message)}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div
+                          key={message.id}
+                          data-message-id={message.id}
+                          data-has-reactions={message.reactions?.length ? "true" : undefined}
+                        >
+                          <MessageItem
+                            message={message}
+                            renderMessageContent={renderMessageContent}
+                            onVisible={handleMessageVisible}
+                            currentUserId={currentUserId}
+                            onReaction={handleReaction}
+                            onReply={handleReplyToMessage}
+                            onPin={handlePinMessage}
+                            onReport={(msgId) => setShowReportDialog(msgId)}
+                            onDelete={(msgId) => setShowDeleteDialog(msgId)}
+                            scrollContainerRef={messagesContainerRef}
+                            senderColor={memberRoleColors[message.senderId]}
+                          />
+                        </div>
+                      );
+                    })
+                      )}
+                    </>
                   )}
 
                   {/* ✅ Typing Indicator */}
@@ -5023,133 +5740,13 @@ export default function MessagesPage() {
 
                           {showEmojiPicker && (
                             <div className={styles.emojiPickerWrapper}>
-                              <div className={styles.emojiPickerContent}>
-                                {/* Simple emoji grid - will be replaced with emoji-picker-react once installed */}
-                                <div className={styles.emojiGrid}>
-                                  {[
-                                    "😀",
-                                    "😃",
-                                    "😄",
-                                    "😁",
-                                    "😆",
-                                    "😅",
-                                    "🤣",
-                                    "😂",
-                                    "🙂",
-                                    "🙃",
-                                    "😉",
-                                    "😊",
-                                    "😇",
-                                    "🥰",
-                                    "😍",
-                                    "🤩",
-                                    "😘",
-                                    "😗",
-                                    "😚",
-                                    "😙",
-                                    "🥲",
-                                    "😋",
-                                    "😛",
-                                    "😜",
-                                    "🤪",
-                                    "😝",
-                                    "🤑",
-                                    "🤗",
-                                    "🤭",
-                                    "🤫",
-                                    "🤔",
-                                    "🤐",
-                                    "🤨",
-                                    "😐",
-                                    "😑",
-                                    "😶",
-                                    "😏",
-                                    "😒",
-                                    "🙄",
-                                    "😬",
-                                    "🤥",
-                                    "😌",
-                                    "😔",
-                                    "😪",
-                                    "🤤",
-                                    "😴",
-                                    "😷",
-                                    "🤒",
-                                    "🤕",
-                                    "🤢",
-                                    "🤮",
-                                    "🤧",
-                                    "🥵",
-                                    "🥶",
-                                    "🥴",
-                                    "😵",
-                                    "🤯",
-                                    "🤠",
-                                    "🥳",
-                                    "🥸",
-                                    "😎",
-                                    "🤓",
-                                    "🧐",
-                                    "😕",
-                                    "😟",
-                                    "🙁",
-                                    "☹️",
-                                    "😮",
-                                    "😯",
-                                    "😲",
-                                    "😳",
-                                    "🥺",
-                                    "😦",
-                                    "😧",
-                                    "😨",
-                                    "😰",
-                                    "😥",
-                                    "😢",
-                                    "😭",
-                                    "😱",
-                                    "😖",
-                                    "😣",
-                                    "😞",
-                                    "😓",
-                                    "😩",
-                                    "😫",
-                                    "🥱",
-                                    "😤",
-                                    "😡",
-                                    "😠",
-                                    "🤬",
-                                    "👍",
-                                    "👎",
-                                    "👏",
-                                    "🙏",
-                                    "❤️",
-                                    "💔",
-                                    "💕",
-                                    "💖",
-                                    "💗",
-                                    "💓",
-                                    "💞",
-                                    "💘",
-                                    "💝",
-                                    "🔥",
-                                    "✨",
-                                    "🎉",
-                                    "🎊",
-                                    "🎈",
-                                  ].map((emoji) => (
-                                    <button
-                                      key={emoji}
-                                      className={styles.emojiButton}
-                                      onClick={() => {
-                                        setMessageText((prev) => prev + emoji);
-                                        setShowEmojiPicker(false);
-                                      }}
-                                    >
-                                      {emoji}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
+                              <ChatEmojiPicker
+                                onSelect={(text) => {
+                                  setMessageText((prev) => prev + text);
+                                }}
+                                onClose={() => setShowEmojiPicker(false)}
+                                position="top"
+                              />
                             </div>
                           )}
                         </div>
@@ -5341,12 +5938,34 @@ export default function MessagesPage() {
         />
       )}
 
+      <MessageSearchPanel
+        isOpen={showMessageSearch}
+        onClose={() => setShowMessageSearch(false)}
+        mode={selectedServer ? "server" : "dm"}
+        serverId={selectedServer || undefined}
+        channelId={selectedChannel || undefined}
+        channels={allChannels}
+        dmPartnerId={selectedDirectMessageFriend?._id}
+        dmPartnerName={selectedDirectMessageFriend?.displayName || selectedDirectMessageFriend?.username}
+        onResultClick={(messageId, channelId) => {
+          setShowMessageSearch(false);
+          if (channelId && selectedServer) {
+            setSelectedChannel(channelId);
+          }
+        }}
+      />
+
       <CreateChannelModal
         isOpen={showCreateChannelModal}
         onClose={() => setShowCreateChannelModal(false)}
         defaultType={createChannelDefaultType}
-        sectionLabel={createChannelSectionLabel}
         onCreateChannel={handleCreateChannel}
+      />
+
+      <CreateCategoryModal
+        isOpen={showCreateCategoryModal}
+        onClose={() => setShowCreateCategoryModal(false)}
+        onCreateCategory={handleCreateCategory}
       />
 
       <EventsPopup
@@ -5389,10 +6008,22 @@ export default function MessagesPage() {
               (serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId ?? ""
             ),
           }}
-          isOwner={
-            currentUserId !== "" &&
-            String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId
-          }
+          permissions={serverContextMenu.permissions ?? {
+            isOwner: currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
+            hasCustomRole: currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
+            canKick: false,
+            canBan: false,
+            canTimeout: false,
+            canManageServer: currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
+            canManageChannels: currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
+            canManageEvents: currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
+            canCreateInvite: true,
+          }}
           onClose={() => setServerContextMenu(null)}
           onMarkAsRead={() => setServerContextMenu(null)}
           onInviteToServer={() => {
@@ -5415,6 +6046,7 @@ export default function MessagesPage() {
               serverId: serverContextMenu.server._id,
               serverName: serverContextMenu.server.name || "Máy chủ",
             });
+            setServerSettingsPermissions(serverContextMenu.permissions ?? null);
             setShowServerSettingsPanel(true);
             setServerContextMenu(null);
           }}
@@ -5423,11 +6055,16 @@ export default function MessagesPage() {
           onCreateChannel={() => {
             setSelectedServer(serverContextMenu.server._id);
             setCreateChannelDefaultType("text");
-            setCreateChannelSectionLabel("Kênh Chat");
+            setCreateChannelSectionLabel("");
+            setCreateChannelCategoryId(undefined);
             setShowCreateChannelModal(true);
             setServerContextMenu(null);
           }}
-          onCreateCategory={() => setServerContextMenu(null)}
+          onCreateCategory={() => {
+            setSelectedServer(serverContextMenu.server._id);
+            setShowCreateCategoryModal(true);
+            setServerContextMenu(null);
+          }}
           onCreateEvent={() => {
             setSelectedServer(serverContextMenu.server._id);
             setShowEventsPopup(true);
@@ -5453,11 +6090,23 @@ export default function MessagesPage() {
         />
       )}
 
+      {channelContextMenu && (
+        <ChannelContextMenu
+          x={channelContextMenu.x}
+          y={channelContextMenu.y}
+          channel={channelContextMenu.channel}
+          onClose={() => setChannelContextMenu(null)}
+          onEditChannel={handleEditChannel}
+          onDeleteChannel={handleDeleteChannel}
+        />
+      )}
+
       <ServerSettingsPanel
         isOpen={showServerSettingsPanel}
         onClose={() => {
           setShowServerSettingsPanel(false);
           setServerSettingsTarget(null);
+          setServerSettingsPermissions(null);
         }}
         serverName={serverSettingsTarget?.serverName ?? ""}
         serverId={serverSettingsTarget?.serverId ?? ""}
@@ -5510,6 +6159,31 @@ export default function MessagesPage() {
                   setServerSettingsTarget(null);
                   await loadServers();
                 }}
+              />
+            );
+          }
+          if (section === "roles" && serverSettingsTarget?.serverId) {
+            return (
+              <RolesSection
+                serverId={serverSettingsTarget.serverId}
+                isOwner={
+                  !!(
+                    currentUserId &&
+                    servers.find((s) => s._id === serverSettingsTarget?.serverId)?.ownerId === currentUserId
+                  )
+                }
+              />
+            );
+          }
+          if (section === "interactions" && serverSettingsTarget?.serverId) {
+            return (
+              <ServerInteractionsSection
+                serverId={serverSettingsTarget.serverId}
+                canManageSettings={
+                  Boolean(serverSettingsPermissions?.isOwner) ||
+                  Boolean(serverSettingsPermissions?.canManageServer)
+                }
+                textChannels={allChannels.filter((c) => c.type !== "voice")}
               />
             );
           }

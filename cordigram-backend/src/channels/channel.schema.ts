@@ -42,6 +42,20 @@ export class Channel extends Document {
 
   @Prop({ type: Boolean, default: true })
   isActive: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  isPrivate: boolean;
+
+  /** Nhóm hiển thị kênh: null = bình thường, 'info' = Thông Tin */
+  @Prop({ type: String, default: null })
+  category: string | null;
+
+  /** ID của danh mục người dùng tạo (null = không có danh mục) */
+  @Prop({ type: Types.ObjectId, ref: 'ChannelCategory', default: null })
+  categoryId: Types.ObjectId | null;
+
+  @Prop({ type: Number, default: 0 })
+  position: number;
 }
 
 export const ChannelSchema = SchemaFactory.createForClass(Channel);

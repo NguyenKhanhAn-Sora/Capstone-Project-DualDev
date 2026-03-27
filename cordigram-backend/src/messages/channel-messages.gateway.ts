@@ -21,6 +21,8 @@ export class ChannelMessagesGateway
 {
   @WebSocketServer() server: Server;
 
+  private readonly userSockets = new Map<string, Set<string>>();
+
   constructor(private readonly jwtService: JwtService) {}
 
   async handleConnection(socket: Socket) {
@@ -35,12 +37,24 @@ export class ChannelMessagesGateway
       });
       const userId = payload.userId || payload.sub;
       socket.data.userId = userId;
+
+      const sockets = this.userSockets.get(userId) ?? new Set<string>();
+      sockets.add(socket.id);
+      this.userSockets.set(userId, sockets);
     } catch (err) {
       socket.disconnect();
     }
   }
 
-  handleDisconnect(_socket: Socket) {}
+  handleDisconnect(socket: Socket) {
+    const userId = socket.data?.userId as string | undefined;
+    if (!userId) return;
+    const sockets = this.userSockets.get(userId);
+    if (sockets) {
+      sockets.delete(socket.id);
+      if (!sockets.size) this.userSockets.delete(userId);
+    }
+  }
 
   @SubscribeMessage('join-channel')
   handleJoinChannel(
@@ -78,5 +92,17 @@ export class ChannelMessagesGateway
     this.server
       .to(`channel:${channelId}`)
       .emit('reaction-updated', { messageId, reactions });
+  }
+
+  /**
+   * Push a notification event directly to a specific user (by userId),
+   * regardless of which channel rooms they have joined.
+   */
+  emitToUser(userId: string, event: string, payload: any): void {
+    const socketIds = this.userSockets.get(userId);
+    if (!socketIds?.size) return;
+    socketIds.forEach((socketId) => {
+      this.server.to(socketId).emit(event, payload);
+    });
   }
 }

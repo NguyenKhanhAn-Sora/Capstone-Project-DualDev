@@ -2976,6 +2976,7 @@ export async function sendDirectMessage(
     giphyId?: string;
     voiceUrl?: string;
     voiceDuration?: number;
+    replyTo?: string;
   },
 ): Promise<any> {
   const token =
@@ -2996,6 +2997,7 @@ export async function sendDirectMessage(
       giphyId: opts.giphyId || undefined,
       voiceUrl: opts.voiceUrl || undefined,
       voiceDuration: opts.voiceDuration || undefined,
+      replyTo: opts.replyTo || undefined,
     }),
   });
 }
@@ -3727,4 +3729,89 @@ export async function performAdsCampaignAction(opts: {
 
 export function getApiBaseUrl(): string {
   return apiBaseUrl;
+}
+
+export type DmUnreadCountResponse = {
+  unreadCount: number;
+};
+
+export async function fetchDmUnreadCount(opts: {
+  token: string;
+}): Promise<DmUnreadCountResponse> {
+  const { token } = opts;
+  return apiFetch<DmUnreadCountResponse>({
+    path: "/direct-messages/unread/count",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function markDmConversationRead(opts: {
+  token: string;
+  userId: string;
+}): Promise<{ success: boolean }> {
+  const { token, userId } = opts;
+  return apiFetch<{ success: boolean }>({
+    path: `/direct-messages/conversation/${userId}/read`,
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export interface DmSearchResult {
+  _id: string;
+  senderId: {
+    _id: string;
+    email: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+  };
+  receiverId: {
+    _id: string;
+    email: string;
+    displayName?: string;
+    username?: string;
+    avatarUrl?: string;
+  };
+  content: string;
+  attachments: string[];
+  createdAt: string;
+}
+
+export interface DmSearchResponse {
+  results: DmSearchResult[];
+  totalCount: number;
+}
+
+export async function searchDirectMessages(opts: {
+  token: string;
+  q?: string;
+  userId?: string;
+  before?: string;
+  after?: string;
+  hasFile?: boolean;
+  limit?: number;
+  offset?: number;
+}): Promise<DmSearchResponse> {
+  const params = new URLSearchParams();
+  if (opts.q) params.append("q", opts.q);
+  if (opts.userId) params.append("userId", opts.userId);
+  if (opts.before) params.append("before", opts.before);
+  if (opts.after) params.append("after", opts.after);
+  if (opts.hasFile) params.append("hasFile", "true");
+  if (opts.limit) params.append("limit", opts.limit.toString());
+  if (opts.offset) params.append("offset", opts.offset.toString());
+
+  return apiFetch<DmSearchResponse>({
+    path: `/direct-messages/search?${params.toString()}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+    },
+  });
 }

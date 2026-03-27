@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15,7 +15,7 @@
 }
 
 .modal {
-  background: #313338;
+  background: var(--color-panel-bg);
   border-radius: 8px;
   width: 90%;
   max-width: 520px;
@@ -23,6 +23,7 @@
   overflow-y: auto;
   position: relative;
   padding: 24px;
+  border: 1px solid var(--color-panel-border);
   animation: slideUp 0.3s ease-out;
 }
 
@@ -35,7 +36,7 @@
   display: flex;
   gap: 0;
   margin-bottom: 24px;
-  border-bottom: 1px solid #2b2d31;
+  border-bottom: 1px solid var(--color-panel-border);
 }
 
 .stepTab {
@@ -43,7 +44,7 @@
   padding: 12px 0;
   font-size: 13px;
   font-weight: 500;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -52,21 +53,21 @@
 }
 
 .stepTab.active {
-  color: #f2f3f5;
-  border-bottom-color: #5865f2;
+  color: var(--color-panel-text);
+  border-bottom-color: var(--color-panel-accent);
 }
 
 .title {
   margin: 0 0 8px;
   font-size: 18px;
   font-weight: 600;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .hint {
   margin: 0 0 20px;
   font-size: 14px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .section {
@@ -77,13 +78,13 @@
   display: block;
   font-size: 12px;
   font-weight: 600;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   margin-bottom: 8px;
   text-transform: uppercase;
 }
 
 .sectionLabel .required {
-  color: #ed4245;
+  color: var(--color-panel-danger);
 }
 
 .optionCard {
@@ -92,7 +93,7 @@
   gap: 12px;
   padding: 14px;
   border-radius: 4px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border: 1px solid transparent;
   cursor: pointer;
   margin-bottom: 8px;
@@ -100,33 +101,33 @@
 }
 
 .optionCard:hover {
-  background: #36373d;
+  background: var(--color-panel-hover);
 }
 
 .optionCard.selected {
-  border-color: #5865f2;
+  border-color: var(--color-panel-accent);
 }
 
 .optionCard input {
   margin-top: 2px;
-  accent-color: #5865f2;
+  accent-color: var(--color-panel-accent);
 }
 
 .optionIcon {
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   flex-shrink: 0;
 }
 
 .optionTitle {
   font-size: 14px;
   font-weight: 500;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .optionDesc {
   margin: 4px 0 0;
   font-size: 12px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   line-height: 1.4;
 }
 
@@ -134,16 +135,17 @@
   width: 100%;
   padding: 10px 12px;
   border-radius: 4px;
-  border: none;
-  background: #1e1f22;
-  color: #f2f3f5;
+  border: 1px solid var(--color-panel-deep-border);
+  background: var(--color-panel-deep);
+  color: var(--color-panel-text);
   font-size: 14px;
   box-sizing: border-box;
+  outline: none;
 }
 
 .input:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px #5865f2;
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
 }
 
 .textarea {
@@ -160,11 +162,12 @@
   width: 100%;
   padding: 10px 36px 10px 12px;
   border-radius: 4px;
-  border: none;
-  background: #1e1f22;
-  color: #f2f3f5;
+  border: 1px solid var(--color-panel-deep-border);
+  background: var(--color-panel-deep);
+  color: var(--color-panel-text);
   font-size: 14px;
   cursor: pointer;
+  outline: none;
 }
 
 .coverSection {
@@ -178,7 +181,7 @@
   padding: 10px 20px;
   border-radius: 4px;
   border: none;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: #fff;
   font-size: 14px;
   cursor: pointer;
@@ -186,13 +189,13 @@
 }
 
 .coverBtn:hover {
-  background: #4752c4;
+  background: var(--color-panel-accent-hover);
 }
 
 .coverHint {
   margin: 8px 0 0;
   font-size: 12px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .coverPreview {
@@ -220,18 +223,18 @@
 }
 
 .channelItem:hover {
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
 }
 
 .channelItem.selected {
-  background: #36373d;
+  background: var(--color-panel-hover);
 }
 
 .reviewBanner {
   width: 100%;
   height: 120px;
   border-radius: 6px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   object-fit: cover;
   margin-bottom: 16px;
 }
@@ -239,24 +242,24 @@
 .reviewRow {
   margin-bottom: 10px;
   font-size: 14px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .reviewRow strong {
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 16px;
 }
 
 .reviewNote {
   margin: 16px 0 0;
   padding: 12px;
-  background: #2b2d31;
+  background: var(--color-panel-sidebar);
   border-radius: 4px;
   font-size: 13px;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   line-height: 1.4;
 }
 
@@ -266,7 +269,7 @@
   gap: 12px;
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid #2b2d31;
+  border-top: 1px solid var(--color-panel-border);
 }
 
 .footerLeft {
@@ -279,21 +282,21 @@
   border-radius: 4px;
   border: none;
   background: transparent;
-  color: #f2f3f5;
+  color: var(--color-panel-text);
   font-size: 14px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .btnSecondary:hover {
-  background: #2b2d31;
+  background: var(--color-panel-hover);
 }
 
 .btnPrimary {
   padding: 10px 20px;
   border-radius: 4px;
   border: none;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: #fff;
   font-size: 14px;
   font-weight: 500;
@@ -302,7 +305,7 @@
 }
 
 .btnPrimary:hover:not(:disabled) {
-  background: #4752c4;
+  background: var(--color-panel-accent-hover);
 }
 
 .btnPrimary:disabled {
@@ -316,7 +319,7 @@
   right: 16px;
   background: transparent;
   border: none;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   font-size: 24px;
   cursor: pointer;
   padding: 0;
@@ -329,6 +332,6 @@
 }
 
 .closeBtn:hover {
-  background: #1e1f22;
-  color: #fff;
+  background: var(--color-panel-hover);
+  color: var(--color-panel-text);
 }

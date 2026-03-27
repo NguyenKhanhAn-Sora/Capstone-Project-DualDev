@@ -1,0 +1,278 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 60px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-panel-text-muted);
+  text-transform: uppercase;
+}
+
+.required {
+  color: var(--color-panel-danger);
+}
+
+.hint {
+  font-size: 14px;
+  color: var(--color-panel-text-muted);
+  margin: 0;
+}
+
+.input {
+  padding: 10px 12px;
+  background: var(--color-panel-deep);
+  border: 1px solid var(--color-panel-deep-border);
+  border-radius: 4px;
+  color: var(--color-panel-text);
+  font-size: 16px;
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Style Preview */
+.stylePreview {
+  display: flex;
+  gap: 12px;
+}
+
+.previewCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--color-panel-sidebar);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  min-width: 200px;
+}
+
+.previewAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-panel-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.previewInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.previewName {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.previewRole {
+  font-size: 12px;
+  color: var(--color-panel-text-muted);
+}
+
+.previewBadge {
+  margin-left: auto;
+  padding: 4px 8px;
+  background: var(--color-panel-accent);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+}
+
+/* Toggle Section */
+.toggleSection {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-panel-border);
+}
+
+.toggleInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toggleLabel {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-panel-text);
+}
+
+.toggleHint {
+  font-size: 14px;
+  color: var(--color-panel-text-muted);
+}
+
+.toggle {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--color-panel-neutral);
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggleOn {
+  background: var(--color-panel-success);
+}
+
+.toggleThumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.toggleOn .toggleThumb {
+  transform: translateX(20px);
+}
+
+/* View as Role */
+.viewAsRole {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  background: var(--color-panel-sidebar);
+  border-radius: 8px;
+}
+
+.viewAsRoleInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.viewAsRoleTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-panel-text);
+}
+
+.viewAsRoleDesc {
+  font-size: 14px;
+  color: var(--color-panel-text-muted);
+}
+
+.viewAsRoleBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: transparent;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 4px;
+  color: var(--color-panel-text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.viewAsRoleBtn:hover:not(:disabled) {
+  background: var(--color-panel-hover);
+}
+
+.viewAsRoleBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Save Bar */
+.saveBar {
+  position: fixed;
+  bottom: 0;
+  left: 220px;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: var(--color-panel-context);
+  border-top: 1px solid var(--color-panel-border);
+  border-radius: 4px 4px 0 0;
+  z-index: 10;
+}
+
+.saveBarText {
+  font-size: 14px;
+  color: var(--color-panel-text);
+}
+
+.saveBarActions {
+  display: flex;
+  gap: 12px;
+}
+
+.resetBtn {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: var(--color-panel-text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.resetBtn:hover {
+  text-decoration: underline;
+}
+
+.saveBtn {
+  padding: 8px 16px;
+  background: var(--color-panel-success);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.saveBtn:hover:not(:disabled) {
+  background: var(--color-panel-success-hover);
+}
+
+.saveBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

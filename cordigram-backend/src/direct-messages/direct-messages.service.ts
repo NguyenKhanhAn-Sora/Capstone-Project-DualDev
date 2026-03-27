@@ -436,6 +436,21 @@ export class DirectMessagesService {
     );
   }
 
+  async markConversationAsRead(userId: string, fromUserId: string): Promise<void> {
+    await this.directMessageModel.updateMany(
+      {
+        receiverId: new Types.ObjectId(userId),
+        senderId: new Types.ObjectId(fromUserId),
+        isRead: false,
+        isDeleted: false,
+      },
+      {
+        isRead: true,
+        readAt: new Date(),
+      },
+    );
+  }
+
   async getUnreadCount(userId: string): Promise<number> {
     return this.directMessageModel.countDocuments({
       receiverId: new Types.ObjectId(userId),
@@ -799,5 +814,117 @@ export class DirectMessagesService {
       console.error('Error getting pinned messages:', error);
       return [];
     }
+  }
+
+  async searchDirectMessages(
+    currentUserId: string,
+    params: {
+      q?: string;
+      otherUserId?: string;
+      before?: string;
+      after?: string;
+      hasFile?: boolean;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<{ results: any[]; totalCount: number }> {
+    const {
+      q,
+      otherUserId,
+      before,
+      after,
+      hasFile,
+      limit = 25,
+      offset = 0,
+    } = params;
+    const uid = new Types.ObjectId(currentUserId);
+
+    const match: any = {
+      isDeleted: false,
+      $or: [{ senderId: uid }, { receiverId: uid }],
+    };
+
+    if (otherUserId) {
+      const otherId = new Types.ObjectId(otherUserId);
+      match.$or = [
+        { senderId: uid, receiverId: otherId },
+        { senderId: otherId, receiverId: uid },
+      ];
+    }
+
+    if (q && q.trim()) {
+      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      match.content = { $regex: escaped, $options: 'i' };
+    }
+
+    if (before) {
+      match.createdAt = { ...(match.createdAt || {}), $lt: new Date(before) };
+    }
+    if (after) {
+      match.createdAt = { ...(match.createdAt || {}), $gt: new Date(after) };
+    }
+
+    if (hasFile) {
+      match['attachments.0'] = { $exists: true };
+    }
+
+    const [totalCount, messages] = await Promise.all([
+      this.directMessageModel.countDocuments(match),
+      this.directMessageModel
+        .find(match)
+        .populate('senderId', 'email')
+        .populate('receiverId', 'email')
+        .sort({ createdAt: -1 })
+        .skip(offset)
+        .limit(limit)
+        .lean()
+        .exec(),
+    ]);
+
+    const results = await Promise.all(
+      messages.map(async (msg: any) => {
+        const sId = msg.senderId?._id ?? msg.senderId;
+        const rId = msg.receiverId?._id ?? msg.receiverId;
+
+        const [senderProfile, receiverProfile] = await Promise.all([
+          sId
+            ? this.profileModel
+                .findOne({ userId: new Types.ObjectId(sId.toString()) })
+                .select('username displayName avatarUrl')
+                .lean()
+                .exec()
+            : null,
+          rId
+            ? this.profileModel
+                .findOne({ userId: new Types.ObjectId(rId.toString()) })
+                .select('username displayName avatarUrl')
+                .lean()
+                .exec()
+            : null,
+        ]);
+
+        return {
+          ...msg,
+          senderId: {
+            ...(typeof msg.senderId === 'object'
+              ? msg.senderId
+              : { _id: msg.senderId, email: '' }),
+            displayName: senderProfile?.displayName ?? undefined,
+            username: senderProfile?.username ?? undefined,
+            avatarUrl: senderProfile?.avatarUrl ?? undefined,
+          },
+          receiverId: {
+            ...(typeof msg.receiverId === 'object'
+              ? msg.receiverId
+              : { _id: msg.receiverId, email: '' }),
+            displayName: receiverProfile?.displayName ?? undefined,
+            username: receiverProfile?.username ?? undefined,
+            avatarUrl: receiverProfile?.avatarUrl ?? undefined,
+          },
+        };
+      }),
+    );
+
+    return { results, totalCount };
   }
 }

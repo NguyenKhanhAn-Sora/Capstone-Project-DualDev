@@ -2,7 +2,7 @@ import { IsString, IsIn } from 'class-validator';
 
 export class MarkSeenDto {
   @IsString()
-  @IsIn(['event', 'server_invite'])
+  @IsIn(['event', 'server_invite', 'server_notification'])
   sourceType: string;
 
   @IsString()

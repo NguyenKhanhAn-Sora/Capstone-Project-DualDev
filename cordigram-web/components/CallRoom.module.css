@@ -196,7 +196,7 @@
 }
 
 .micOff {
-  color: #ed4245;
+  color: var(--color-panel-danger);
   display: flex;
   align-items: center;
 }

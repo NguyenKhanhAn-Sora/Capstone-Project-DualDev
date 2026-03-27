@@ -134,6 +134,24 @@ export async function getTrendingStickers(
 }
 
 /**
+ * Get a random wave/hello sticker from Giphy search results
+ */
+export async function getRandomWaveSticker(): Promise<GiphyGif | null> {
+  const queries = ["wave hello", "hi wave", "waving hand"];
+  for (const q of queries) {
+    try {
+      const result = await searchStickers(q, 25, 0);
+      if (result.data.length > 0) {
+        return result.data[Math.floor(Math.random() * result.data.length)];
+      }
+    } catch {
+      // try next query
+    }
+  }
+  return null;
+}
+
+/**
  * Get GIF by ID
  */
 export async function getGifById(id: string): Promise<GiphyGif> {

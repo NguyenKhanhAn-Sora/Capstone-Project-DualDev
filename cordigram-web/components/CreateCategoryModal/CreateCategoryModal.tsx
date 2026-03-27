@@ -1,0 +1,134 @@
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+import styles from "./CreateCategoryModal.module.css";
+import ChatEmojiPicker from "@/components/ChatEmojiPicker/ChatEmojiPicker";
+
+interface CreateCategoryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreateCategory: (name: string, isPrivate: boolean) => Promise<void>;
+}
+
+export default function CreateCategoryModal({
+  isOpen,
+  onClose,
+  onCreateCategory,
+}: CreateCategoryModalProps) {
+  const [name, setName] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setName("");
+      setIsPrivate(false);
+      setShowEmojiPicker(false);
+    }
+  }, [isOpen]);
+
+  const insertText = (text: string) => {
+    const input = inputRef.current;
+    if (!input) return;
+    const start = input.selectionStart ?? name.length;
+    const end = input.selectionEnd ?? name.length;
+    const newVal = name.slice(0, start) + text + name.slice(end);
+    setName(newVal);
+    setShowEmojiPicker(false);
+    setTimeout(() => {
+      input.focus();
+      input.setSelectionRange(start + text.length, start + text.length);
+    }, 0);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim() || "Danh Mục Mới";
+    setIsSubmitting(true);
+    try {
+      await onCreateCategory(trimmed, isPrivate);
+      onClose();
+    } catch (err) {
+      console.error("Create category failed:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Đóng">
+          &times;
+        </button>
+        <form onSubmit={handleSubmit}>
+          <h2 className={styles.title}>Tạo Danh Mục</h2>
+
+          <div className={styles.section}>
+            <label className={styles.label}>Tên Danh Mục</label>
+            <div className={styles.inputWrap}>
+              <input
+                ref={inputRef}
+                type="text"
+                className={styles.input}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Danh Mục Mới"
+                maxLength={100}
+                autoFocus
+              />
+              <div className={styles.emojiWrapper}>
+                <button
+                  type="button"
+                  className={styles.emojiBtn}
+                  onClick={() => setShowEmojiPicker((p) => !p)}
+                  title="Thêm emoji / kaomoji"
+                >
+                  &#128522;
+                </button>
+                {showEmojiPicker && (
+                  <ChatEmojiPicker
+                    onSelect={insertText}
+                    onClose={() => setShowEmojiPicker(false)}
+                    position="bottom"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <div className={styles.privateRow}>
+              <div>
+                <span className={styles.privateLabel}>Danh Mục Riêng</span>
+                <p className={styles.privateDesc}>
+                  Chỉ có thành viên và vai trò được chọn mới có thể xem danh mục này.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isPrivate}
+                className={`${styles.toggle} ${isPrivate ? styles.toggleOn : ""}`}
+                onClick={() => setIsPrivate((p) => !p)}
+              >
+                <span className={styles.toggleThumb} />
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.footer}>
+            <button type="button" className={styles.cancelBtn} onClick={onClose}>Hủy bỏ</button>
+            <button type="submit" className={styles.submitBtn} disabled={isSubmitting}>
+              {isSubmitting ? "Đang tạo..." : "Tạo Danh Mục"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

@@ -3,26 +3,139 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Server } from './server.schema';
 import { Channel } from '../channels/channel.schema';
+import { ChannelCategory } from '../channels/channel-category.schema';
 import { CreateServerDto } from './dto/create-server.dto';
 import { UpdateServerDto } from './dto/update-server.dto';
 import { User } from '../users/user.schema';
 import { Profile } from '../profiles/profile.schema';
 import { ServerInvite } from '../server-invites/server-invite.schema';
+import { RolesService } from '../roles/roles.service';
+import { ServerNotification } from './server-notification.schema';
+import { Message } from '../messages/message.schema';
+import { ChannelMessagesGateway } from '../messages/channel-messages.gateway';
 
 @Injectable()
 export class ServersService {
   constructor(
     @InjectModel(Server.name) private serverModel: Model<Server>,
     @InjectModel(Channel.name) private channelModel: Model<Channel>,
+    @InjectModel(ChannelCategory.name)
+    private channelCategoryModel: Model<ChannelCategory>,
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
     @InjectModel(ServerInvite.name) private serverInviteModel: Model<ServerInvite>,
+    @InjectModel(ServerNotification.name)
+    private serverNotificationModel: Model<ServerNotification>,
+    @InjectModel(Message.name) private messageModel: Model<Message>,
+    @Inject(forwardRef(() => RolesService))
+    private rolesService: RolesService,
+    private readonly channelMessagesGateway: ChannelMessagesGateway,
   ) {}
+
+  /**
+   * Prune (bulk kick) members who are inactive for N days.
+   *
+   * "Last active" is derived from the latest login device `lastSeenAt` (if present).
+   * If a user has no loginDevices tracked yet, we fall back to `createdAt`.
+   *
+   * Notes:
+   * - Owner is never pruned.
+   * - `roleFilter` matches the server member role (owner/moderator/member).
+   */
+  private async resolvePrunableMemberIds(params: {
+    serverId: string;
+    requesterUserId: string;
+    days: number;
+    roleFilter?: 'moderator' | 'member' | 'none' | 'all';
+  }): Promise<string[]> {
+    const { serverId, requesterUserId, days, roleFilter } = params;
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) throw new NotFoundException(`Server with id ${serverId} not found`);
+    if (server.ownerId.toString() !== requesterUserId) {
+      throw new ForbiddenException('Chỉ chủ máy chủ mới có thể lược bỏ thành viên');
+    }
+    if (!Number.isFinite(days) || days <= 0) {
+      throw new BadRequestException('days must be a positive number');
+    }
+
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const normalizedRole = roleFilter ?? 'all';
+
+    const members = server.members.filter((m) => {
+      const uid = m.userId.toString();
+      if (uid === server.ownerId.toString()) return false; // never prune owner
+      if (normalizedRole === 'all') return true;
+      if (normalizedRole === 'none') return m.role === 'member';
+      return m.role === normalizedRole;
+    });
+
+    if (members.length === 0) return [];
+
+    const userIds = members.map((m) => m.userId);
+    const users = await this.userModel
+      .find({ _id: { $in: userIds } })
+      .select('_id createdAt loginDevices')
+      .lean()
+      .exec();
+
+    const prunable: string[] = [];
+    for (const u of users as any[]) {
+      const deviceLastSeen: Date | null =
+        Array.isArray(u.loginDevices) && u.loginDevices.length > 0
+          ? u.loginDevices
+              .map((d: any) => (d?.lastSeenAt ? new Date(d.lastSeenAt) : null))
+              .filter(Boolean)
+              .sort((a: Date, b: Date) => b.getTime() - a.getTime())[0] ?? null
+          : null;
+      const lastActive = deviceLastSeen ?? (u.createdAt ? new Date(u.createdAt) : new Date(0));
+      if (lastActive < cutoff) {
+        prunable.push(u._id.toString());
+      }
+    }
+    return prunable;
+  }
+
+  /** Preview count for prune members. */
+  async getPruneCount(params: {
+    serverId: string;
+    requesterUserId: string;
+    days: number;
+    roleFilter?: 'moderator' | 'member' | 'none' | 'all';
+  }): Promise<number> {
+    const ids = await this.resolvePrunableMemberIds(params);
+    return ids.length;
+  }
+
+  /** Execute prune members (bulk kick). Returns number of removed members. */
+  async pruneMembers(params: {
+    serverId: string;
+    requesterUserId: string;
+    days: number;
+    roleFilter?: 'moderator' | 'member' | 'none' | 'all';
+  }): Promise<number> {
+    const { serverId, requesterUserId } = params;
+    const ids = await this.resolvePrunableMemberIds(params);
+    if (ids.length === 0) return 0;
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) throw new NotFoundException(`Server with id ${serverId} not found`);
+    if (server.ownerId.toString() !== requesterUserId) {
+      throw new ForbiddenException('Chỉ chủ máy chủ mới có thể lược bỏ thành viên');
+    }
+
+    const removeSet = new Set(ids);
+    server.members = server.members.filter((m) => !removeSet.has(m.userId.toString()));
+    server.memberCount = server.members.length;
+    await server.save();
+    return ids.length;
+  }
 
   async createServer(
     createServerDto: CreateServerDto,
@@ -51,35 +164,212 @@ export class ServersService {
 
     const savedServer = await server.save();
 
-    // Create default text channel "general"
-    const textChannel = new this.channelModel({
-      name: 'general',
-      type: 'text',
-      description: 'General chat channel',
-      serverId: savedServer._id,
-      createdBy: userObjectId,
-      isDefault: true,
-    });
+    // Template channel definitions
+    const template = createServerDto.template || 'custom';
+    interface ChannelDef {
+      name: string;
+      type: 'text' | 'voice';
+      category?: string | null;
+      isDefault?: boolean;
+    }
+    const templateChannels: Record<string, ChannelDef[]> = {
+      custom: [
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'general', type: 'voice', isDefault: true },
+      ],
+      gaming: [
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'khoảnh-khắc-đỉnh-cao', type: 'text' },
+        { name: 'Sảnh', type: 'voice', isDefault: true },
+        { name: 'Gaming', type: 'voice' },
+      ],
+      friends: [
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'trò-chơi', type: 'text' },
+        { name: 'âm-nhạc', type: 'text' },
+        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
+        { name: 'Phòng Stream', type: 'voice' },
+      ],
+      'study-group': [
+        { name: 'chào-mừng-và-nội-quy', type: 'text', category: 'info' },
+        { name: 'ghi-chú-tài-nguyên', type: 'text', category: 'info' },
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'trợ-giúp-làm-bài-tập-về-nhà', type: 'text' },
+        { name: 'lên-kế-hoạch-phiên', type: 'text' },
+        { name: 'lạc-đề', type: 'text' },
+        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
+        { name: 'Phòng Học 1', type: 'voice' },
+        { name: 'Phòng Học 2', type: 'voice' },
+      ],
+      'school-club': [
+        { name: 'chào-mừng-và-nội-quy', type: 'text', category: 'info' },
+        { name: 'thông-báo', type: 'text', category: 'info' },
+        { name: 'tài-nguyên', type: 'text', category: 'info' },
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'kế-hoạch-buổi-họp', type: 'text' },
+        { name: 'lạc-đề', type: 'text' },
+        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
+        { name: 'Phòng Họp 1', type: 'voice' },
+        { name: 'Phòng Họp 2', type: 'voice' },
+      ],
+      'local-community': [
+        { name: 'chào-mừng-và-nội-quy', type: 'text', category: 'info' },
+        { name: 'thông-báo', type: 'text', category: 'info' },
+        { name: 'tài-nguyên', type: 'text', category: 'info' },
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'kế-hoạch-buổi-họp', type: 'text' },
+        { name: 'lạc-đề', type: 'text' },
+        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
+        { name: 'Phòng Họp 1', type: 'voice' },
+        { name: 'Phòng Họp 2', type: 'voice' },
+      ],
+      'artists-creators': [
+        { name: 'chào-mừng-và-nội-quy', type: 'text', category: 'info' },
+        { name: 'thông-báo', type: 'text', category: 'info' },
+        { name: 'chung', type: 'text', isDefault: true },
+        { name: 'sự-kiện', type: 'text' },
+        { name: 'ý-kiến-và-phản-hồi', type: 'text' },
+        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
+        { name: 'Nơi Tập Trung Cộng Đồng', type: 'voice' },
+        { name: 'Phòng Stream', type: 'voice' },
+      ],
+    };
 
-    const savedTextChannel = await textChannel.save();
+    const channelDefs = templateChannels[template] ?? templateChannels['custom'];
+    const savedChannelIds: Types.ObjectId[] = [];
 
-    // Create default voice channel "general"
-    const voiceChannel = new this.channelModel({
-      name: 'general',
-      type: 'voice',
-      description: 'General voice channel',
-      serverId: savedServer._id,
-      createdBy: userObjectId,
-      isDefault: true,
-    });
+    const hasInfoChannels = channelDefs.some((d) => d.category === 'info');
+    const hasTextChannels = channelDefs.some(
+      (d) => d.type === 'text' && d.category !== 'info',
+    );
+    const hasVoiceChannels = channelDefs.some((d) => d.type === 'voice');
 
-    const savedVoiceChannel = await voiceChannel.save();
+    let infoCatId: Types.ObjectId | null = null;
+    let textCatId: Types.ObjectId | null = null;
+    let voiceCatId: Types.ObjectId | null = null;
+    let catPosition = 0;
 
-    // Update server with channels
-    savedServer.channels = [savedTextChannel._id, savedVoiceChannel._id];
+    if (hasInfoChannels) {
+      const infoCat = new this.channelCategoryModel({
+        name: 'Thông Tin',
+        serverId: savedServer._id,
+        position: catPosition++,
+        type: 'text',
+      });
+      const saved = await infoCat.save();
+      infoCatId = saved._id as Types.ObjectId;
+    }
+    if (hasTextChannels) {
+      const textCat = new this.channelCategoryModel({
+        name: 'Kênh Chat',
+        serverId: savedServer._id,
+        position: catPosition++,
+        type: 'text',
+      });
+      const saved = await textCat.save();
+      textCatId = saved._id as Types.ObjectId;
+    }
+    if (hasVoiceChannels) {
+      const voiceCat = new this.channelCategoryModel({
+        name: 'Kênh Thoại',
+        serverId: savedServer._id,
+        position: catPosition++,
+        type: 'voice',
+      });
+      const saved = await voiceCat.save();
+      voiceCatId = saved._id as Types.ObjectId;
+    }
+
+    let textPos = 0;
+    let voicePos = 0;
+    let infoPos = 0;
+    for (const def of channelDefs) {
+      let assignedCatId: Types.ObjectId | null = null;
+      let pos = 0;
+      if (def.category === 'info') {
+        assignedCatId = infoCatId;
+        pos = infoPos++;
+      } else if (def.type === 'text') {
+        assignedCatId = textCatId;
+        pos = textPos++;
+      } else {
+        assignedCatId = voiceCatId;
+        pos = voicePos++;
+      }
+
+      const channel = new this.channelModel({
+        name: def.name,
+        type: def.type,
+        description: null,
+        serverId: savedServer._id,
+        createdBy: userObjectId,
+        isDefault: def.isDefault ?? false,
+        category: def.category ?? null,
+        categoryId: assignedCatId,
+        position: pos,
+      });
+      const saved = await channel.save();
+      savedChannelIds.push(saved._id as Types.ObjectId);
+    }
+
+    savedServer.channels = savedChannelIds;
+
+    // Auto-set systemChannelId to the first info text channel or default text channel
+    const allCreatedChannels = await this.channelModel
+      .find({ serverId: savedServer._id, type: 'text' })
+      .sort({ position: 1 })
+      .lean()
+      .exec();
+    const infoChannel = allCreatedChannels.find((c: any) => c.category === 'info');
+    const defaultTextChannel = allCreatedChannels.find((c: any) => (c as any).isDefault);
+    const autoSystemChannel = infoChannel || defaultTextChannel || allCreatedChannels[0];
+    if (autoSystemChannel) {
+      (savedServer as any).interactionSettings = {
+        ...((savedServer as any).interactionSettings ?? {}),
+        systemChannelId: autoSystemChannel._id,
+      };
+    }
+
     await savedServer.save();
 
+    // Create default @everyone role for the server
+    await this.rolesService.createDefaultRole(savedServer._id.toString());
+
     return savedServer;
+  }
+
+  async createCategory(
+    serverId: string,
+    userId: string,
+    name: string,
+    isPrivate: boolean = false,
+  ) {
+    const server = await this.serverModel.findById(serverId);
+    if (!server) throw new NotFoundException('Server not found');
+
+    const member = server.members.find((m) => m.userId.toString() === userId);
+    if (!member || member.role === 'member') {
+      throw new ForbiddenException('Only owner or moderator can create categories');
+    }
+
+    const position = server.serverCategories?.length ?? 0;
+    const category = {
+      _id: new Types.ObjectId(),
+      name,
+      position,
+      isPrivate,
+    };
+
+    server.serverCategories = [...(server.serverCategories ?? []), category as any];
+    await server.save();
+
+    return category;
+  }
+
+  async getCategories(serverId: string) {
+    const server = await this.serverModel.findById(serverId).lean();
+    if (!server) throw new NotFoundException('Server not found');
+    return (server.serverCategories ?? []).sort((a: any, b: any) => a.position - b.position);
   }
 
   async getServersByUserId(userId: string): Promise<Server[]> {
@@ -151,6 +441,9 @@ export class ServersService {
     // Delete all channels in server
     await this.channelModel.deleteMany({ serverId });
 
+    // Delete all roles in server
+    await this.rolesService.deleteRolesByServer(serverId);
+
     // Delete server
     await this.serverModel.findByIdAndDelete(serverId);
   }
@@ -168,7 +461,6 @@ export class ServersService {
 
     const memberObjectId = new Types.ObjectId(memberId);
 
-    // Check if member already exists
     const memberExists = server.members.some(
       (m) => m.userId.toString() === memberId,
     );
@@ -185,7 +477,108 @@ export class ServersService {
 
     server.memberCount = server.members.length;
 
-    return server.save();
+    const saved = await server.save();
+
+    this.sendWelcomeMessage(serverId, memberId).catch((err) => {
+      console.error('[sendWelcomeMessage] Failed:', err?.message || err);
+    });
+
+    return saved;
+  }
+
+  /**
+   * Create a single welcome message when a user joins.
+   * The frontend renders it as a special block (text + wave button).
+   */
+  private async sendWelcomeMessage(
+    serverId: string,
+    newMemberId: string,
+  ): Promise<void> {
+    console.log('[sendWelcomeMessage] serverId:', serverId, 'newMemberId:', newMemberId);
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('interactionSettings')
+      .lean()
+      .exec();
+    if (!server) { console.log('[sendWelcomeMessage] Server not found'); return; }
+
+    const settings = (server as any).interactionSettings ?? {};
+    console.log('[sendWelcomeMessage] settings:', JSON.stringify(settings));
+    if (!settings.systemMessagesEnabled) { console.log('[sendWelcomeMessage] systemMessagesEnabled=false, skip'); return; }
+    if (!settings.welcomeMessageEnabled) { console.log('[sendWelcomeMessage] welcomeMessageEnabled=false, skip'); return; }
+
+    const systemChannelId = settings.systemChannelId;
+    if (!systemChannelId) { console.log('[sendWelcomeMessage] No systemChannelId, skip'); return; }
+
+    const channel = await this.channelModel.findById(systemChannelId).exec();
+    if (!channel || channel.type !== 'text') { console.log('[sendWelcomeMessage] Channel not found or not text, type:', channel?.type); return; }
+    console.log('[sendWelcomeMessage] Sending to channel:', channel.name, channel._id);
+
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(newMemberId) })
+      .select('displayName username')
+      .lean()
+      .exec();
+    const displayName =
+      profile?.displayName || profile?.username || 'Ai đó';
+
+    const welcomeMsg = new this.messageModel({
+      channelId: new Types.ObjectId(systemChannelId.toString()),
+      senderId: new Types.ObjectId(newMemberId),
+      content: `Rất vui được gặp bạn, ${displayName}!`,
+      messageType: 'welcome',
+      giphyId: null,
+      attachments: [],
+      replyTo: null,
+      mentions: [],
+    });
+    const saved = await welcomeMsg.save();
+
+    channel.messageCount = (channel.messageCount || 0) + 1;
+    await channel.save();
+
+    const stickerReply = settings.stickerReplyWelcomeEnabled ?? true;
+    const enriched = await this.enrichWelcomeMessage(saved);
+    if (enriched) {
+      enriched.stickerReplyWelcomeEnabled = stickerReply;
+      this.channelMessagesGateway.emitNewMessage(
+        systemChannelId.toString(),
+        enriched,
+      );
+    }
+  }
+
+  private async enrichWelcomeMessage(msg: any): Promise<any> {
+    const senderId = msg.senderId;
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(senderId.toString()) })
+      .select('username displayName avatarUrl')
+      .lean()
+      .exec();
+
+    return {
+      _id: msg._id,
+      channelId: msg.channelId,
+      senderId: {
+        _id: senderId,
+        email: '',
+        displayName: profile?.displayName ?? undefined,
+        username: profile?.username ?? undefined,
+        avatarUrl: profile?.avatarUrl ?? undefined,
+      },
+      content: msg.content,
+      messageType: msg.messageType,
+      giphyId: msg.giphyId,
+      attachments: msg.attachments,
+      reactions: [],
+      replyTo: null,
+      mentions: [],
+      isEdited: false,
+      editedAt: null,
+      isDeleted: false,
+      createdAt: msg.createdAt,
+      updatedAt: msg.updatedAt,
+    };
   }
 
   /** Join a public server (used from event link). Fails if server is private. */
@@ -400,6 +793,711 @@ export class ServersService {
     }
 
     return result;
+  }
+
+  // =====================================================
+  // USER PERMISSIONS
+  // =====================================================
+
+  private async canManageServer(serverId: string, userId: string): Promise<boolean> {
+    const server = await this.serverModel.findById(serverId).select('ownerId').lean().exec();
+    if (!server) return false;
+    if (server.ownerId.toString() === userId) return true;
+    return this.rolesService.hasPermission(serverId, userId, 'manageServer');
+  }
+
+  private async assertCanManageServer(serverId: string, userId: string): Promise<void> {
+    const allowed = await this.canManageServer(serverId, userId);
+    if (!allowed) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới được thực hiện',
+      );
+    }
+  }
+
+  async getInteractionSettings(serverId: string, requesterUserId: string): Promise<{
+    systemMessagesEnabled: boolean;
+    welcomeMessageEnabled: boolean;
+    stickerReplyWelcomeEnabled: boolean;
+    defaultNotificationLevel: 'all' | 'mentions';
+    systemChannelId: string | null;
+    canEdit: boolean;
+  }> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+    const isMember = server.members.some(
+      (m) => m.userId.toString() === requesterUserId,
+    );
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không phải thành viên của server này');
+    }
+    const canEdit = await this.canManageServer(serverId, requesterUserId);
+    const s = (server as any).interactionSettings ?? {};
+    return {
+      systemMessagesEnabled: s.systemMessagesEnabled ?? true,
+      welcomeMessageEnabled: s.welcomeMessageEnabled ?? true,
+      stickerReplyWelcomeEnabled: s.stickerReplyWelcomeEnabled ?? true,
+      defaultNotificationLevel:
+        s.defaultNotificationLevel === 'mentions' ? 'mentions' : 'all',
+      systemChannelId: s.systemChannelId ? s.systemChannelId.toString() : null,
+      canEdit,
+    };
+  }
+
+  async updateInteractionSettings(
+    serverId: string,
+    userId: string,
+    payload: {
+      systemMessagesEnabled?: boolean;
+      welcomeMessageEnabled?: boolean;
+      stickerReplyWelcomeEnabled?: boolean;
+      defaultNotificationLevel?: 'all' | 'mentions';
+      systemChannelId?: string | null;
+    },
+  ): Promise<{
+    systemMessagesEnabled: boolean;
+    welcomeMessageEnabled: boolean;
+    stickerReplyWelcomeEnabled: boolean;
+    defaultNotificationLevel: 'all' | 'mentions';
+    systemChannelId: string | null;
+    canEdit: boolean;
+  }> {
+    await this.assertCanManageServer(serverId, userId);
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    const next = {
+      ...(server as any).interactionSettings,
+    } as any;
+
+    if (payload.systemMessagesEnabled !== undefined) {
+      next.systemMessagesEnabled = Boolean(payload.systemMessagesEnabled);
+    }
+    if (payload.welcomeMessageEnabled !== undefined) {
+      next.welcomeMessageEnabled = Boolean(payload.welcomeMessageEnabled);
+    }
+    if (payload.stickerReplyWelcomeEnabled !== undefined) {
+      next.stickerReplyWelcomeEnabled = Boolean(payload.stickerReplyWelcomeEnabled);
+    }
+    if (payload.defaultNotificationLevel !== undefined) {
+      next.defaultNotificationLevel =
+        payload.defaultNotificationLevel === 'mentions' ? 'mentions' : 'all';
+    }
+    if (payload.systemChannelId !== undefined) {
+      next.systemChannelId = payload.systemChannelId
+        ? new Types.ObjectId(payload.systemChannelId)
+        : null;
+    }
+
+    (server as any).interactionSettings = next;
+    await server.save();
+    return this.getInteractionSettings(serverId, userId);
+  }
+
+  async createRoleNotification(
+    serverId: string,
+    actorId: string,
+    payload: {
+      title: string;
+      content: string;
+      targetType: 'everyone' | 'role';
+      roleId?: string | null;
+    },
+  ): Promise<{ success: boolean; recipients: number; notificationId: string }> {
+    await this.assertCanManageServer(serverId, actorId);
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    const title = payload.title?.trim?.() ?? '';
+    const content = payload.content?.trim?.() ?? '';
+    if (!title || !content) {
+      throw new BadRequestException('title và content là bắt buộc');
+    }
+
+    let recipients: Types.ObjectId[] = [];
+    let targetRoleName: string | null = null;
+    let targetRoleObjectId: Types.ObjectId | null = null;
+
+    if (payload.targetType === 'everyone') {
+      recipients = server.members.map((m) => new Types.ObjectId(m.userId));
+      targetRoleName = '@everyone';
+    } else {
+      if (!payload.roleId) {
+        throw new BadRequestException('roleId là bắt buộc khi targetType=role');
+      }
+      const role = await this.rolesService.getRoleById(serverId, payload.roleId);
+      targetRoleName = role.name;
+      targetRoleObjectId = new Types.ObjectId(role._id as any);
+      recipients = role.isDefault
+        ? server.members.map((m) => new Types.ObjectId(m.userId))
+        : role.memberIds.map((id) => new Types.ObjectId(id));
+    }
+
+    const uniqueRecipientIds = Array.from(
+      new Set(recipients.map((id) => id.toString())),
+    ).map((id) => new Types.ObjectId(id));
+
+    const notification = await this.serverNotificationModel.create({
+      serverId: new Types.ObjectId(serverId),
+      createdBy: new Types.ObjectId(actorId),
+      title,
+      content,
+      targetType: payload.targetType,
+      targetRoleId: targetRoleObjectId,
+      targetRoleName,
+      recipientUserIds: uniqueRecipientIds,
+    });
+
+    return {
+      success: true,
+      recipients: uniqueRecipientIds.length,
+      notificationId: notification._id.toString(),
+    };
+  }
+
+  async getForYouRoleNotifications(userId: string): Promise<
+    Array<{
+      type: 'server_notification';
+      _id: string;
+      serverId: string;
+      serverName: string;
+      serverAvatarUrl?: string | null;
+      title: string;
+      content: string;
+      targetRoleName?: string | null;
+      createdAt: string;
+    }>
+  > {
+    const docs = await this.serverNotificationModel
+      .find({ recipientUserIds: new Types.ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean()
+      .exec();
+
+    if (!docs.length) return [];
+    const serverIds = Array.from(new Set(docs.map((d: any) => d.serverId.toString()))).map(
+      (id) => new Types.ObjectId(id),
+    );
+    const servers = await this.serverModel
+      .find({ _id: { $in: serverIds } })
+      .select('_id name avatarUrl')
+      .lean()
+      .exec();
+    const serverMap = new Map(
+      (servers as any[]).map((s) => [s._id.toString(), s]),
+    );
+
+    return (docs as any[]).map((d) => {
+      const server = serverMap.get(d.serverId.toString());
+      return {
+        type: 'server_notification' as const,
+        _id: d._id.toString(),
+        serverId: d.serverId.toString(),
+        serverName: server?.name ?? 'Máy chủ',
+        serverAvatarUrl: server?.avatarUrl ?? null,
+        title: d.title ?? '',
+        content: d.content ?? '',
+        targetRoleName: d.targetRoleName ?? null,
+        createdAt: d.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      };
+    });
+  }
+
+  /**
+   * Lấy permissions của user hiện tại trong server
+   * Trả về các quyền dựa trên roles của user
+   */
+  async getCurrentUserPermissions(
+    serverId: string,
+    userId: string,
+  ): Promise<{
+    isOwner: boolean;
+    hasCustomRole: boolean; // User có vai trò nào ngoài @everyone không
+    canKick: boolean;
+    canBan: boolean;
+    canTimeout: boolean;
+    canManageServer: boolean;
+    canManageChannels: boolean;
+    canManageEvents: boolean;
+    canCreateInvite: boolean;
+  }> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    // Kiểm tra có phải member không
+    const isMember = server.members.some(
+      (m) => m.userId.toString() === userId,
+    );
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không phải thành viên của server này');
+    }
+
+    const isOwner = server.ownerId.toString() === userId;
+
+    // Kiểm tra user có vai trò nào ngoài @everyone không
+    const memberRoles = await this.rolesService.getMemberRoles(serverId, userId);
+    const hasCustomRole = memberRoles.some((r) => !r.isDefault);
+
+    // Owner có tất cả quyền
+    if (isOwner) {
+      return {
+        isOwner: true,
+        hasCustomRole: true, // Owner luôn có quyền
+        canKick: true,
+        canBan: true,
+        canTimeout: true,
+        canManageServer: true,
+        canManageChannels: true,
+        canManageEvents: true,
+        canCreateInvite: true,
+      };
+    }
+
+    // Lấy permissions từ roles
+    const permissions = await this.rolesService.calculateMemberPermissions(
+      serverId,
+      userId,
+    );
+
+    return {
+      isOwner: false,
+      hasCustomRole,
+      canKick: permissions.kickMembers,
+      canBan: permissions.banMembers,
+      canTimeout: permissions.timeoutMembers,
+      canManageServer: permissions.manageServer,
+      canManageChannels: permissions.manageChannels,
+      canManageEvents: permissions.manageEvents,
+      canCreateInvite: permissions.createInvite,
+    };
+  }
+
+  // =====================================================
+  // PUBLIC MEMBER LIST WITH ROLE INFO
+  // =====================================================
+
+  /**
+   * Lấy danh sách thành viên với thông tin role (PUBLIC - cho tất cả members)
+   * Trả về: thông tin cơ bản + roles + màu hiển thị + quyền của user hiện tại
+   */
+  async getServerMembersWithRoles(
+    serverId: string,
+    requesterUserId: string,
+  ): Promise<{
+    members: Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      joinedAt: Date;
+      isOwner: boolean;
+      roles: Array<{ _id: string; name: string; color: string; position: number }>;
+      highestRolePosition: number;
+      displayColor: string;
+    }>;
+    currentUserPermissions: {
+      canKick: boolean;
+      canBan: boolean;
+      canTimeout: boolean;
+      isOwner: boolean;
+    };
+  }> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    // Kiểm tra người yêu cầu có phải member không
+    const isMember = server.members.some(
+      (m) => m.userId.toString() === requesterUserId,
+    );
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không phải thành viên của server này');
+    }
+
+    const userIds = server.members.map((m) => m.userId);
+
+    // Lấy profiles
+    const profiles = await this.profileModel
+      .find({ userId: { $in: userIds } })
+      .select('userId displayName username avatarUrl')
+      .lean()
+      .exec();
+    const profileByUserId = new Map(
+      profiles.map((p: any) => [p.userId.toString(), p]),
+    );
+
+    // Lấy thông tin role cho từng member
+    const membersResult: Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      joinedAt: Date;
+      isOwner: boolean;
+      roles: Array<{ _id: string; name: string; color: string; position: number }>;
+      highestRolePosition: number;
+      displayColor: string;
+    }> = [];
+
+    for (const m of server.members) {
+      const uid = m.userId.toString();
+      const profile = profileByUserId.get(uid) as
+        | { displayName: string; username: string; avatarUrl: string }
+        | undefined;
+
+      // Lấy role info cho member này
+      const roleInfo = await this.rolesService.getMemberRoleInfo(serverId, uid);
+
+      membersResult.push({
+        userId: uid,
+        displayName: profile?.displayName ?? 'Người dùng',
+        username: profile?.username ?? uid,
+        avatarUrl: profile?.avatarUrl ?? '',
+        joinedAt: m.joinedAt instanceof Date ? m.joinedAt : new Date(m.joinedAt),
+        isOwner: server.ownerId.toString() === uid,
+        roles: roleInfo.roles,
+        highestRolePosition: roleInfo.highestRole?.position ?? 0,
+        displayColor: roleInfo.displayColor,
+      });
+    }
+
+    // Sắp xếp members theo role position (cao nhất lên trước)
+    membersResult.sort((a, b) => {
+      if (a.isOwner !== b.isOwner) return a.isOwner ? -1 : 1;
+      return b.highestRolePosition - a.highestRolePosition;
+    });
+
+    // Lấy quyền của user hiện tại
+    const isOwner = server.ownerId.toString() === requesterUserId;
+    const [canKick, canBan, canTimeout] = await Promise.all([
+      this.rolesService.hasPermission(serverId, requesterUserId, 'kickMembers'),
+      this.rolesService.hasPermission(serverId, requesterUserId, 'banMembers'),
+      this.rolesService.hasPermission(serverId, requesterUserId, 'timeoutMembers'),
+    ]);
+
+    return {
+      members: membersResult,
+      currentUserPermissions: {
+        canKick,
+        canBan,
+        canTimeout,
+        isOwner,
+      },
+    };
+  }
+
+  // =====================================================
+  // MODERATION ACTIONS (KICK, BAN, TIMEOUT)
+  // =====================================================
+
+  /**
+   * Kick thành viên khỏi server
+   * Yêu cầu: quyền kickMembers + role hierarchy cao hơn target
+   */
+  async kickMember(
+    serverId: string,
+    actorId: string,
+    targetId: string,
+    reason?: string,
+  ): Promise<{ success: boolean; message: string }> {
+    // Validate quyền và role hierarchy
+    await this.rolesService.validateModerationAction(
+      serverId,
+      actorId,
+      targetId,
+      'kickMembers',
+    );
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    // Xóa member khỏi server
+    server.members = server.members.filter(
+      (m) => m.userId.toString() !== targetId,
+    );
+    server.memberCount = server.members.length;
+    await server.save();
+
+    // Xóa member khỏi tất cả roles
+    const roles = await this.rolesService.getRolesByServer(serverId);
+    for (const role of roles) {
+      if (!role.isDefault && role.memberIds.some((id) => id.toString() === targetId)) {
+        role.memberIds = role.memberIds.filter((id) => id.toString() !== targetId);
+        await role.save();
+      }
+    }
+
+    return {
+      success: true,
+      message: `Đã kick thành viên${reason ? `. Lý do: ${reason}` : ''}`,
+    };
+  }
+
+  /**
+   * Ban thành viên khỏi server (không cho tham gia lại)
+   * Yêu cầu: quyền banMembers + role hierarchy cao hơn target
+   */
+  async banMember(
+    serverId: string,
+    actorId: string,
+    targetId: string,
+    reason?: string,
+    deleteMessageDays?: number,
+  ): Promise<{ success: boolean; message: string }> {
+    // Validate quyền và role hierarchy
+    await this.rolesService.validateModerationAction(
+      serverId,
+      actorId,
+      targetId,
+      'banMembers',
+    );
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    // Thêm vào danh sách ban (nếu chưa có trường này, sẽ cần update schema)
+    if (!server.bannedUsers) {
+      server.bannedUsers = [];
+    }
+
+    // Kiểm tra đã ban chưa
+    const alreadyBanned = server.bannedUsers.some(
+      (b) => b.userId.toString() === targetId,
+    );
+    if (alreadyBanned) {
+      throw new BadRequestException('Người dùng này đã bị ban');
+    }
+
+    server.bannedUsers.push({
+      userId: new Types.ObjectId(targetId),
+      bannedAt: new Date(),
+      bannedBy: new Types.ObjectId(actorId),
+      reason: reason || null,
+    });
+
+    // Xóa member khỏi server
+    server.members = server.members.filter(
+      (m) => m.userId.toString() !== targetId,
+    );
+    server.memberCount = server.members.length;
+    await server.save();
+
+    // Xóa member khỏi tất cả roles
+    const roles = await this.rolesService.getRolesByServer(serverId);
+    for (const role of roles) {
+      if (!role.isDefault && role.memberIds.some((id) => id.toString() === targetId)) {
+        role.memberIds = role.memberIds.filter((id) => id.toString() !== targetId);
+        await role.save();
+      }
+    }
+
+    return {
+      success: true,
+      message: `Đã ban thành viên${reason ? `. Lý do: ${reason}` : ''}`,
+    };
+  }
+
+  /**
+   * Timeout (tạm khóa) thành viên trong khoảng thời gian
+   * Yêu cầu: quyền timeoutMembers + role hierarchy cao hơn target
+   */
+  async timeoutMember(
+    serverId: string,
+    actorId: string,
+    targetId: string,
+    durationSeconds: number,
+    reason?: string,
+  ): Promise<{ success: boolean; message: string; timeoutUntil: Date }> {
+    // Validate quyền và role hierarchy
+    await this.rolesService.validateModerationAction(
+      serverId,
+      actorId,
+      targetId,
+      'timeoutMembers',
+    );
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    // Tìm member và update timeout
+    const memberIndex = server.members.findIndex(
+      (m) => m.userId.toString() === targetId,
+    );
+    if (memberIndex === -1) {
+      throw new BadRequestException('Người dùng không phải thành viên server');
+    }
+
+    const timeoutUntil = new Date(Date.now() + durationSeconds * 1000);
+    server.members[memberIndex].timeoutUntil = timeoutUntil;
+    await server.save();
+
+    return {
+      success: true,
+      message: `Đã tạm khóa thành viên${reason ? `. Lý do: ${reason}` : ''}`,
+      timeoutUntil,
+    };
+  }
+
+  /**
+   * Gỡ timeout cho thành viên
+   */
+  async removeTimeout(
+    serverId: string,
+    actorId: string,
+    targetId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    // Validate quyền
+    await this.rolesService.validateModerationAction(
+      serverId,
+      actorId,
+      targetId,
+      'timeoutMembers',
+    );
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    const memberIndex = server.members.findIndex(
+      (m) => m.userId.toString() === targetId,
+    );
+    if (memberIndex === -1) {
+      throw new BadRequestException('Người dùng không phải thành viên server');
+    }
+
+    server.members[memberIndex].timeoutUntil = null;
+    await server.save();
+
+    return {
+      success: true,
+      message: 'Đã gỡ tạm khóa cho thành viên',
+    };
+  }
+
+  /**
+   * Unban thành viên
+   */
+  async unbanMember(
+    serverId: string,
+    actorId: string,
+    targetId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    // Chỉ người có quyền ban mới có thể unban
+    const hasBanPermission = await this.rolesService.hasPermission(
+      serverId,
+      actorId,
+      'banMembers',
+    );
+    if (!hasBanPermission) {
+      throw new ForbiddenException('Bạn không có quyền unban thành viên');
+    }
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    if (!server.bannedUsers) {
+      throw new BadRequestException('Người dùng này chưa bị ban');
+    }
+
+    const bannedIndex = server.bannedUsers.findIndex(
+      (b) => b.userId.toString() === targetId,
+    );
+    if (bannedIndex === -1) {
+      throw new BadRequestException('Người dùng này chưa bị ban');
+    }
+
+    server.bannedUsers.splice(bannedIndex, 1);
+    await server.save();
+
+    return {
+      success: true,
+      message: 'Đã gỡ ban cho thành viên',
+    };
+  }
+
+  /**
+   * Lấy danh sách người bị ban
+   */
+  async getBannedUsers(
+    serverId: string,
+    actorId: string,
+  ): Promise<
+    Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+      bannedAt: Date;
+      reason: string | null;
+    }>
+  > {
+    const hasBanPermission = await this.rolesService.hasPermission(
+      serverId,
+      actorId,
+      'banMembers',
+    );
+    if (!hasBanPermission) {
+      throw new ForbiddenException('Bạn không có quyền xem danh sách ban');
+    }
+
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    if (!server.bannedUsers || server.bannedUsers.length === 0) {
+      return [];
+    }
+
+    const bannedUserIds = server.bannedUsers.map((b) => b.userId);
+    const profiles = await this.profileModel
+      .find({ userId: { $in: bannedUserIds } })
+      .select('userId displayName username avatarUrl')
+      .lean()
+      .exec();
+    const profileMap = new Map(
+      profiles.map((p: any) => [p.userId.toString(), p]),
+    );
+
+    return server.bannedUsers.map((b) => {
+      const profile = profileMap.get(b.userId.toString()) as any;
+      return {
+        userId: b.userId.toString(),
+        username: profile?.username ?? 'Người dùng',
+        displayName: profile?.displayName ?? 'Người dùng',
+        avatarUrl: profile?.avatarUrl ?? '',
+        bannedAt: b.bannedAt,
+        reason: b.reason,
+      };
+    });
+  }
+
+  /**
+   * Kiểm tra user có bị ban không
+   */
+  async isUserBanned(serverId: string, userId: string): Promise<boolean> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server || !server.bannedUsers) return false;
+    return server.bannedUsers.some((b) => b.userId.toString() === userId);
   }
 
   /**
