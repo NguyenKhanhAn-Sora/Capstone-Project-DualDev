@@ -27,6 +27,11 @@ import {
   type FeedItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import {
+  addBlockedUserIdLocally,
+  filterFeedItemsByBlockedAuthors,
+  refreshBlockedUserIds,
+} from "@/lib/blocked-users";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import styles from "./hashtag.module.css";
 import feedStyles from "../../home-feed.module.css";
@@ -420,6 +425,7 @@ export default function HashtagPage() {
   const [visibilityError, setVisibilityError] = useState("");
   const [repostTarget, setRepostTarget] = useState<RepostTarget | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [interactionMuteOverlayMessage, setInteractionMuteOverlayMessage] =
     useState<string | null>(null);
 
@@ -650,7 +656,12 @@ export default function HashtagPage() {
     setBlocking(true);
     try {
       await blockUser({ token, userId: blockTarget.userId });
+      const nextBlocked = addBlockedUserIdLocally(blockTarget.userId);
+      setBlockedIds(nextBlocked);
       setPosts((prev) =>
+        prev.filter((item) => item.authorId !== blockTarget.userId),
+      );
+      setReels((prev) =>
         prev.filter((item) => item.authorId !== blockTarget.userId),
       );
       setBlockTarget(undefined);
@@ -854,8 +865,9 @@ export default function HashtagPage() {
         : fetchReelsByHashtag({ token, tag, limit: 36 });
     fetcher
       .then((items) => {
-        if (tab === "posts") setPosts(items);
-        else setReels(items);
+        const filtered = filterFeedItemsByBlockedAuthors(items || [], blockedIds);
+        if (tab === "posts") setPosts(filtered);
+        else setReels(filtered);
       })
       .catch((err: unknown) => {
         const message =
@@ -865,12 +877,21 @@ export default function HashtagPage() {
         setError(message || "Unable to load posts");
       })
       .finally(() => setLoading(false));
-  }, [canRender, tab, tag]);
+  }, [blockedIds, canRender, tab, tag]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     setViewerId(getUserIdFromToken(localStorage.getItem("accessToken")));
     setEditToken(getStoredAccessToken());
+  }, [canRender]);
+
+  useEffect(() => {
+    if (!canRender) return;
+    const token = getStoredAccessToken();
+    if (!token) return;
+    refreshBlockedUserIds(token)
+      .then((ids) => setBlockedIds(ids))
+      .catch(() => undefined);
   }, [canRender]);
 
   if (!canRender) return null;

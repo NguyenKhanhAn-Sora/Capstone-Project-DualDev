@@ -34,6 +34,11 @@ import {
   searchProfiles,
   type ProfileSearchItem,
 } from "@/lib/api";
+import {
+  filterFeedItemsByBlockedAuthors,
+  isBlockedAuthorId,
+  refreshBlockedUserIds,
+} from "@/lib/blocked-users";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import ReelComments from "./ReelComments";
 import styles from "./reel.module.css";
@@ -968,6 +973,7 @@ export default function ReelPage({
     [searchParams],
   );
   const [token, setToken] = useState<string | null>(null);
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string>("");
@@ -1286,6 +1292,30 @@ export default function ReelPage({
     setViewerId(getUserIdFromToken(stored));
   }, [canRender]);
 
+  useEffect(() => {
+    if (!token) {
+      setBlockedIds(new Set());
+      return;
+    }
+    refreshBlockedUserIds(token)
+      .then((ids) => setBlockedIds(ids))
+      .catch(() => undefined);
+  }, [token]);
+
+  const applyBlockedFilter = useCallback(
+    (list: ReelItem[]) =>
+      filterFeedItemsByBlockedAuthors(list, blockedIds) as ReelItem[],
+    [blockedIds],
+  );
+
+  const leaveBlockedContent = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.replace("/");
+  }, [router]);
+
   const loadPage = useCallback(
     async (nextPage: number, opts?: { initial?: boolean }) => {
       if (!token) return;
@@ -1363,7 +1393,7 @@ export default function ReelPage({
           if (owned.length) nextItems = owned;
         }
 
-        nextItems = nextItems.slice(0, limit);
+        nextItems = applyBlockedFilter(nextItems.slice(0, limit));
 
         setItems(nextItems);
         setHasMore(nextHasMore);
@@ -1388,6 +1418,7 @@ export default function ReelPage({
     },
     [
       REELS_PAGE_SIZE,
+      applyBlockedFilter,
       profileMode,
       profileModeUserId,
       requestedReelId,
@@ -1458,6 +1489,10 @@ export default function ReelPage({
           reelId: requestedReelId,
         });
         if (cancelled || !detail) return;
+        if (isBlockedAuthorId(detail.authorId || detail.author?.id, blockedIds)) {
+          leaveBlockedContent();
+          return;
+        }
         setItems([coerceReelKind(detail as ReelItem)]);
         setActiveIndex(0);
         setError("");
@@ -1470,6 +1505,15 @@ export default function ReelPage({
               reelId: originReelId,
             });
             if (cancelled || !fallback) return;
+            if (
+              isBlockedAuthorId(
+                fallback.authorId || fallback.author?.id,
+                blockedIds,
+              )
+            ) {
+              leaveBlockedContent();
+              return;
+            }
             setItems([coerceReelKind(fallback as ReelItem)]);
             setActiveIndex(0);
             setError("");
@@ -1496,7 +1540,7 @@ export default function ReelPage({
     return () => {
       cancelled = true;
     };
-  }, [singleMode, token, requestedReelId, originReelId]);
+  }, [blockedIds, leaveBlockedContent, originReelId, requestedReelId, singleMode, token]);
 
   useEffect(() => {
     if (!token || !viewerId) return;
@@ -1520,7 +1564,7 @@ export default function ReelPage({
           if (cancelled || !detail) return;
           setItems((prev) => {
             if (prev.some((it) => it.id === detail.id)) return prev;
-            const next = [detail, ...prev];
+            const next = applyBlockedFilter([detail as ReelItem, ...prev]);
             return next;
           });
           setActiveIndex((prev) => 0);
@@ -1533,7 +1577,7 @@ export default function ReelPage({
     } catch {
       /* ignore storage parse errors */
     }
-  }, [items, token, viewerId]);
+  }, [applyBlockedFilter, items, token, viewerId]);
 
   useEffect(() => {
     if (!token || !requestedReelId) return;
@@ -1548,7 +1592,7 @@ export default function ReelPage({
         if (cancelled || !detail) return;
         setItems((prev) => {
           if (prev.some((it) => it.id === detail.id)) return prev;
-          return [detail, ...prev];
+          return applyBlockedFilter([detail as ReelItem, ...prev]);
         });
         setActiveIndex(0);
       })
@@ -1562,7 +1606,14 @@ export default function ReelPage({
     return () => {
       cancelled = true;
     };
-  }, [items, requestedReelId, token]);
+  }, [applyBlockedFilter, items, requestedReelId, token]);
+
+  useEffect(() => {
+    if (!singleMode) return;
+    if (!active) return;
+    if (!isBlockedAuthorId(active.authorId || active.author?.id, blockedIds)) return;
+    leaveBlockedContent();
+  }, [active, blockedIds, leaveBlockedContent, singleMode]);
 
   const updateItem = (id: string, patch: Partial<ReelItem>) => {
     setItems((prev) =>
@@ -3364,6 +3415,14 @@ export default function ReelPage({
                   allowComments={commentTarget.allowComments}
                   initialCount={commentTarget.stats?.comments}
                   onTotalChange={handleCommentTotal}
+                  onBlockedUser={(userId) => {
+                    if (!singleMode) return;
+                    if (!commentTarget) return;
+                    const authorId = commentTarget.authorId || commentTarget.author?.id;
+                    if (authorId && userId === authorId) {
+                      leaveBlockedContent();
+                    }
+                  }}
                   style={commentDockStyle}
                   onClose={() => {
                     setCommentsOpen(false);

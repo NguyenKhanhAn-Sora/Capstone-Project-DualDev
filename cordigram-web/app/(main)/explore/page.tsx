@@ -5,6 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FeedItem } from "@/lib/api";
 import { fetchExploreFeed, recordExploreImpression } from "@/lib/api";
+import {
+  filterFeedItemsByBlockedAuthors,
+  refreshBlockedUserIds,
+} from "@/lib/blocked-users";
 import styles from "./explore.module.css";
 
 const PAGE_SIZE = 30;
@@ -73,6 +77,7 @@ export default function ExplorePage() {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
 
   const sessionIdRef = useRef<string>(makeSessionId());
   const sentImpressionsRef = useRef<Set<string>>(new Set());
@@ -81,6 +86,16 @@ export default function ExplorePage() {
   useEffect(() => {
     setToken(getToken());
   }, []);
+
+  useEffect(() => {
+    if (!token) {
+      setBlockedIds(new Set());
+      return;
+    }
+    refreshBlockedUserIds(token)
+      .then((ids) => setBlockedIds(ids))
+      .catch(() => undefined);
+  }, [token]);
 
   const loadPage = useCallback(
     async (nextPage: number) => {
@@ -94,14 +109,15 @@ export default function ExplorePage() {
             limit: PAGE_SIZE,
             page: nextPage,
           })) || [];
+        const filtered = filterFeedItemsByBlockedAuthors(data, blockedIds);
 
-        setHasMore(data.length >= PAGE_SIZE);
+        setHasMore(filtered.length >= PAGE_SIZE);
 
         setItems((prev) => {
-          if (nextPage === 1) return data;
+          if (nextPage === 1) return filtered;
           const seen = new Set(prev.map((it) => it.id));
           const merged = [...prev];
-          data.forEach((it) => {
+          filtered.forEach((it) => {
             if (!seen.has(it.id)) {
               seen.add(it.id);
               merged.push(it);
@@ -121,7 +137,7 @@ export default function ExplorePage() {
         setLoading(false);
       }
     },
-    [token],
+    [blockedIds, token],
   );
 
   useEffect(() => {

@@ -22,6 +22,11 @@ import {
   uploadCommentMedia,
   type ProfileSearchItem,
 } from "@/lib/api";
+import {
+  addBlockedUserIdLocally,
+  filterCommentsByBlockedAuthors,
+  refreshBlockedUserIds,
+} from "@/lib/blocked-users";
 import postStyles from "../post/post.module.css";
 import styles from "./reel.module.css";
 import feedStyles from "../home-feed.module.css";
@@ -47,6 +52,7 @@ type ReelCommentsProps = {
   allowComments?: boolean;
   initialCount?: number;
   onTotalChange?: (postId: string, total: number) => void;
+  onBlockedUser?: (userId: string) => void;
   style?: CSSProperties;
 };
 
@@ -295,6 +301,7 @@ export default function ReelComments({
   allowComments,
   initialCount,
   onTotalChange,
+  onBlockedUser,
   style,
 }: ReelCommentsProps) {
   const [comments, setComments] = useState<CommentItem[]>([]);
@@ -381,6 +388,7 @@ export default function ReelComments({
     label: string;
   } | null>(null);
   const [blocking, setBlocking] = useState(false);
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const lastTotalSentRef = useRef<number | null>(null);
   const [reportCategory, setReportCategory] = useState<
     ReportCategory["key"] | null
@@ -493,6 +501,31 @@ export default function ReelComments({
   const clearStickerSelection = useCallback(() => {
     setCommentMediaExternal(null);
   }, []);
+
+  useEffect(() => {
+    if (!token) {
+      setBlockedIds(new Set());
+      return;
+    }
+    refreshBlockedUserIds(token)
+      .then((ids) => setBlockedIds(ids))
+      .catch(() => undefined);
+  }, [token]);
+
+  useEffect(() => {
+    if (!blockedIds.size) return;
+    setComments((prev) => filterCommentsByBlockedAuthors(prev, blockedIds));
+    setReplyState((prev) => {
+      const next: Record<string, ReplyState> = {};
+      Object.entries(prev).forEach(([parentId, state]) => {
+        next[parentId] = {
+          ...state,
+          items: filterCommentsByBlockedAuthors(state.items, blockedIds),
+        };
+      });
+      return next;
+    });
+  }, [blockedIds]);
 
   useEffect(() => {
     return () => {
@@ -825,6 +858,8 @@ export default function ReelComments({
     let removed = 0;
     try {
       await blockUser({ token, userId: blockTarget.id });
+      const nextBlocked = addBlockedUserIdLocally(blockTarget.id);
+      setBlockedIds(nextBlocked);
       setComments((prev) =>
         prev.filter((c) => {
           const keep = (c.author?.id || c.authorId) !== blockTarget.id;
@@ -847,6 +882,7 @@ export default function ReelComments({
       if (removed > 0) {
         updateTotal((prev) => Math.max(0, prev - removed));
       }
+      onBlockedUser?.(blockTarget.id);
       setBlockTarget(null);
     } catch (err) {
       setError(
@@ -1527,7 +1563,11 @@ export default function ReelComments({
 
     fetchComments({ token, postId, page: 1, limit: COMMENT_PAGE_SIZE })
       .then((res) => {
-        setComments(prioritizeRootComments(res?.items ?? []));
+        setComments(
+          prioritizeRootComments(
+            filterCommentsByBlockedAuthors(res?.items ?? [], blockedIds),
+          ),
+        );
         setPage(res?.page ?? 1);
         setHasMore(Boolean(res?.hasMore));
         const baseTotal =
@@ -1538,7 +1578,7 @@ export default function ReelComments({
       })
       .catch((err) => setError(err?.message || "Failed to load comments"))
       .finally(() => setLoading(false));
-  }, [open, postId, token, updateTotal, prioritizeRootComments]);
+  }, [blockedIds, open, postId, token, updateTotal, prioritizeRootComments]);
 
   useEffect(() => {
     setTotalCount(initialCount ?? 0);
@@ -1639,12 +1679,16 @@ export default function ReelComments({
         page: page + 1,
         limit: COMMENT_PAGE_SIZE,
       });
+      const filtered = filterCommentsByBlockedAuthors(
+        res?.items ?? [],
+        blockedIds,
+      );
       setComments((prev) =>
-        prioritizeRootComments([...prev, ...(res?.items ?? [])]),
+        prioritizeRootComments([...prev, ...filtered]),
       );
       setPage(res?.page ?? page + 1);
       setHasMore(Boolean(res?.hasMore));
-      const added = res?.items?.length ?? 0;
+      const added = filtered.length;
       const newLength = comments.length + added;
       if (typeof res?.total === "number") {
         updateTotal(res.total);
@@ -1690,7 +1734,9 @@ export default function ReelComments({
         const normalize = (items: CommentItem[]) =>
           items.map((c) => ({ ...c, id: ensureId(c) }));
 
-        const latestNormalized = normalize(latest);
+        const latestNormalized = normalize(
+          filterCommentsByBlockedAuthors(latest, blockedIds),
+        );
         const latestMap = new Map(latestNormalized.map((c) => [c.id, c]));
         const prevNormalized = normalize(prev);
 
@@ -1710,7 +1756,7 @@ export default function ReelComments({
         return prioritizeRootComments([...mergedLatest, ...trailing]);
       });
     },
-    [prioritizeRootComments],
+    [blockedIds, prioritizeRootComments],
   );
 
   const loadReplies = useCallback(
@@ -1740,6 +1786,10 @@ export default function ReelComments({
           limit: 10,
           parentId,
         });
+        const filtered = filterCommentsByBlockedAuthors(
+          res.items,
+          blockedIds,
+        );
         setReplyState((prev) => {
           const current = prev[parentId] ?? {
             items: [],
@@ -1752,7 +1802,7 @@ export default function ReelComments({
             ...prev,
             [parentId]: {
               items:
-                nextPage > 1 ? [...current.items, ...res.items] : res.items,
+                nextPage > 1 ? [...current.items, ...filtered] : filtered,
               page: res.page,
               hasMore: res.hasMore,
               loading: false,
@@ -1779,7 +1829,7 @@ export default function ReelComments({
         }));
       }
     },
-    [postId, token],
+    [blockedIds, postId, token],
   );
 
   useEffect(() => {
@@ -1861,12 +1911,16 @@ export default function ReelComments({
               limit: 10,
               parentId,
             });
+            const filtered = filterCommentsByBlockedAuthors(
+              res.items,
+              blockedIds,
+            );
 
             setReplyState((prev) => ({
               ...prev,
               [parentId]: {
                 ...(prev[parentId] ?? state),
-                items: res.items,
+                items: filtered,
                 page: res.page,
                 hasMore: res.hasMore,
                 loading: false,
@@ -1922,7 +1976,7 @@ export default function ReelComments({
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [mergeLatestComments, open, postId, replyState, token, updateTotal]);
+  }, [blockedIds, mergeLatestComments, open, postId, replyState, token, updateTotal]);
 
   const toggleLike = async (commentId: string, liked: boolean) => {
     if (!token || !postId) return;

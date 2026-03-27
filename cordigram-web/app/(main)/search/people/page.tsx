@@ -17,6 +17,10 @@ import {
   type ProfileSearchItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import {
+  filterProfilesByBlockedUsers,
+  refreshBlockedUserIds,
+} from "@/lib/blocked-users";
 import { IconClear } from "../_components/search-shared";
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 
@@ -65,6 +69,18 @@ export default function SearchPeoplePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState<ProfileSearchItem[]>([]);
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const token = getStoredAccessToken();
+    if (!token) {
+      setBlockedIds(new Set());
+      return;
+    }
+    refreshBlockedUserIds(token)
+      .then((ids) => setBlockedIds(ids))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const token = getStoredAccessToken();
@@ -86,7 +102,7 @@ export default function SearchPeoplePage() {
     searchProfiles({ token, query: normalized, limit: 50 })
       .then((res) => {
         if (cancelled) return;
-        setItems(res.items ?? []);
+        setItems(filterProfilesByBlockedUsers(res.items ?? [], blockedIds));
       })
       .catch((err: any) => {
         if (cancelled) return;
@@ -99,7 +115,7 @@ export default function SearchPeoplePage() {
     return () => {
       cancelled = true;
     };
-  }, [normalized]);
+  }, [blockedIds, normalized]);
 
   const qParam = encodeURIComponent(searchParams?.get("q") || normalized);
 

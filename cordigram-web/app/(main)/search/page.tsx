@@ -21,6 +21,11 @@ import {
   type ProfileSearchItem,
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import {
+  filterFeedItemsByBlockedAuthors,
+  filterProfilesByBlockedUsers,
+  refreshBlockedUserIds,
+} from "@/lib/blocked-users";
 import HomePage from "../page";
 import {
   formatCount,
@@ -83,6 +88,18 @@ export default function SearchAllPage() {
   >([]);
   const [posts, setPosts] = useState<FeedItem[]>([]);
   const [reels, setReels] = useState<FeedItem[]>([]);
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const token = getStoredAccessToken();
+    if (!token) {
+      setBlockedIds(new Set());
+      return;
+    }
+    refreshBlockedUserIds(token)
+      .then((ids) => setBlockedIds(ids))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const token = getStoredAccessToken();
@@ -125,10 +142,10 @@ export default function SearchAllPage() {
           }),
         ]);
         if (cancelled) return;
-        setPeople(p.items ?? []);
+        setPeople(filterProfilesByBlockedUsers(p.items ?? [], blockedIds));
         setHashtags((t.items ?? []).slice(0, 10));
-        setPosts(po.items ?? []);
-        setReels(r.items ?? []);
+        setPosts(filterFeedItemsByBlockedAuthors(po.items ?? [], blockedIds));
+        setReels(filterFeedItemsByBlockedAuthors(r.items ?? [], blockedIds));
       } catch (err: any) {
         if (cancelled) return;
         setError(err?.message || "Search failed");
@@ -141,7 +158,7 @@ export default function SearchAllPage() {
     return () => {
       cancelled = true;
     };
-  }, [normalized]);
+  }, [blockedIds, normalized]);
 
   const addToHistory = async (
     item: Parameters<typeof addSearchHistory>[0]["item"],

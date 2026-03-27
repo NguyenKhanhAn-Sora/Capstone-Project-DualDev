@@ -40,6 +40,11 @@ import {
   type FeedItem,
   type CurrentProfileResponse,
 } from "@/lib/api";
+import {
+  addBlockedUserIdLocally,
+  filterFeedItemsByBlockedAuthors,
+  refreshBlockedUserIds,
+} from "@/lib/blocked-users";
 import { DateSelect } from "@/ui/date-select/date-select";
 import { TimeSelect } from "@/ui/time-select/time-select";
 import PeopleYouMayKnow from "@/ui/people-you-may-know/people-you-may-know";
@@ -485,6 +490,7 @@ export default function HomePage({
   const reportHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [viewerId, setViewerId] = useState<string | undefined>(() =>
     typeof window === "undefined"
       ? undefined
@@ -720,6 +726,16 @@ export default function HomePage({
   }, [token]);
 
   useEffect(() => {
+    if (!token) {
+      setBlockedIds(new Set());
+      return;
+    }
+    refreshBlockedUserIds(token)
+      .then((ids) => setBlockedIds(ids))
+      .catch(() => undefined);
+  }, [token]);
+
+  useEffect(() => {
     if (!viewerId) return;
     if (!viewerProfile?.isCreatorVerified) return;
 
@@ -869,7 +885,10 @@ export default function HomePage({
             scope: scopeOverride,
             kinds: kindsOverride,
           });
-      const posts = onlyPostItems(Array.isArray(data) ? data : []);
+      const posts = filterFeedItemsByBlockedAuthors(
+        onlyPostItems(Array.isArray(data) ? data : []),
+        blockedIds,
+      );
       const map = new Map(posts.map((item) => [item.id, item]));
       setItems((prev) =>
         prev.map((p) => {
@@ -888,6 +907,7 @@ export default function HomePage({
       );
     } catch {}
   }, [
+    blockedIds,
     kindsOverride,
     page,
     pageSize,
@@ -924,7 +944,10 @@ export default function HomePage({
             });
 
         const rawItems = Array.isArray(data) ? data : data.items;
-        const posts = onlyPostItems(rawItems);
+        const posts = filterFeedItemsByBlockedAuthors(
+          onlyPostItems(rawItems),
+          blockedIds,
+        );
         const nextHasMore = Array.isArray(data)
           ? rawItems.length >= limit
           : Boolean(data.hasMore);
@@ -959,6 +982,7 @@ export default function HomePage({
       }
     },
     [
+      blockedIds,
       kindsOverride,
       pageSize,
       persistFeedCache,
@@ -1522,6 +1546,8 @@ export default function HomePage({
     setBlocking(true);
     try {
       await blockUser({ token, userId: blockTarget.userId });
+      const nextBlocked = addBlockedUserIdLocally(blockTarget.userId);
+      setBlockedIds(nextBlocked);
       setItems((prev) =>
         prev.filter(
           (p) => p.item.authorId && p.item.authorId !== blockTarget.userId,

@@ -44,6 +44,12 @@ import {
   type FeedItem,
   type ProfileSearchItem,
 } from "@/lib/api";
+import {
+  addBlockedUserIdLocally,
+  filterCommentsByBlockedAuthors,
+  isBlockedAuthorId,
+  refreshBlockedUserIds,
+} from "@/lib/blocked-users";
 import PostLikesOverlay from "@/ui/post-likes-overlay/post-likes-overlay";
 import CommentLikesOverlay from "@/ui/comment-likes-overlay/comment-likes-overlay";
 import { DateSelect } from "@/ui/date-select/date-select";
@@ -495,6 +501,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     label: string;
   } | null>(null);
   const [blocking, setBlocking] = useState(false);
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<CommentItem | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -1786,6 +1793,39 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   }, []);
 
   useEffect(() => {
+    if (!token) {
+      setBlockedIds(new Set());
+      return;
+    }
+    refreshBlockedUserIds(token)
+      .then((ids) => setBlockedIds(ids))
+      .catch(() => undefined);
+  }, [token]);
+
+  useEffect(() => {
+    if (!blockedIds.size) return;
+    setComments((prev) => filterCommentsByBlockedAuthors(prev, blockedIds));
+    setReplyState((prev) => {
+      const next: Record<string, ReplyState> = {};
+      Object.entries(prev).forEach(([parentId, state]) => {
+        next[parentId] = {
+          ...state,
+          items: filterCommentsByBlockedAuthors(state.items, blockedIds),
+        };
+      });
+      return next;
+    });
+  }, [blockedIds]);
+
+  const leaveBlockedContent = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.replace("/");
+  }, [router]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     if (!fromProfile || !profileNavProfileId) {
       setProfilePostIds([]);
@@ -1861,6 +1901,10 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     setPostError("");
     fetchPostDetail({ token, postId })
       .then((data) => {
+        if (isBlockedAuthorId(data.authorId || data.author?.id, blockedIds)) {
+          leaveBlockedContent();
+          return;
+        }
         setPost(data);
         const flagsFollowing = Boolean(
           (data as any)?.flags?.following ?? (data as any)?.following,
@@ -1877,7 +1921,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         setPostError(err?.message || "Failed to load post");
       })
       .finally(() => setLoadingPost(false));
-  }, [postId, token]);
+  }, [blockedIds, leaveBlockedContent, postId, token]);
 
   const openCommentReportModal = (commentId: string) => {
     if (!token) {
@@ -1928,9 +1972,15 @@ export default function PostView({ postId, asModal }: PostViewProps) {
     setBlocking(true);
     try {
       await blockUser({ token, userId: blockTarget.id });
+      const nextBlocked = addBlockedUserIdLocally(blockTarget.id);
+      setBlockedIds(nextBlocked);
       removeCommentsByAuthor(blockTarget.id);
       showToast(`Blocked ${blockTarget.label}`);
       setBlockTarget(null);
+      const postAuthorId = post?.authorId || post?.author?.id;
+      if (postAuthorId && blockTarget.id === postAuthorId) {
+        leaveBlockedContent();
+      }
     } catch (err: any) {
       const message = err?.message || "Failed to block user";
       showToast(message);
@@ -2101,6 +2151,10 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       try {
         const latest = await fetchPostDetail({ token, postId });
         if (cancelled || !latest) return;
+        if (isBlockedAuthorId(latest.authorId || latest.author?.id, blockedIds)) {
+          leaveBlockedContent();
+          return;
+        }
         setPost((prev) =>
           prev
             ? {
@@ -2123,7 +2177,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [postId, token]);
+  }, [blockedIds, leaveBlockedContent, postId, token]);
 
   const loadComments = useCallback(
     async (nextPage: number) => {
@@ -2144,7 +2198,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         setCommentsLoading(false);
       }
     },
-    [postId, token],
+    [blockedIds, postId, token],
   );
 
   useEffect(() => {
@@ -2158,7 +2212,9 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         const normalize = (items: CommentItem[]) =>
           items.map((c) => ({ ...c, id: ensureId(c) }));
 
-        const latestNormalized = normalize(latest);
+        const latestNormalized = normalize(
+          filterCommentsByBlockedAuthors(latest, blockedIds),
+        );
         const latestMap = new Map(latestNormalized.map((c) => [c.id, c]));
         const prevNormalized = normalize(prev);
 
@@ -2177,7 +2233,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         return prioritizeRootComments([...mergedLatest, ...trailing]);
       });
     },
-    [prioritizeRootComments],
+    [blockedIds, prioritizeRootComments],
   );
 
   useEffect(() => {
@@ -2261,12 +2317,16 @@ export default function PostView({ postId, asModal }: PostViewProps) {
               limit: 10,
               parentId,
             });
+            const filtered = filterCommentsByBlockedAuthors(
+              res.items,
+              blockedIds,
+            );
 
             setReplyState((prev) => ({
               ...prev,
               [parentId]: {
                 ...(prev[parentId] ?? state),
-                items: res.items,
+                items: filtered,
                 page: res.page,
                 hasMore: res.hasMore,
                 loading: false,
@@ -2317,7 +2377,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [postId, token, mergeLatestComments, replyState]);
+  }, [blockedIds, postId, token, mergeLatestComments, replyState]);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -2430,7 +2490,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
 
   const applyCommentPage = (res: CommentListResponse, append: boolean) => {
     setComments((prev) => {
-      const next = append ? [...prev, ...res.items] : res.items;
+      const filtered = filterCommentsByBlockedAuthors(res.items, blockedIds);
+      const next = append ? [...prev, ...filtered] : filtered;
       return prioritizeRootComments(next);
     });
     setCommentsPage(res.page);
@@ -2463,6 +2524,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           limit: 10,
           parentId,
         });
+        const filtered = filterCommentsByBlockedAuthors(res.items, blockedIds);
         setReplyState((prev) => {
           const current = prev[parentId] ?? {
             items: [],
@@ -2475,7 +2537,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             ...prev,
             [parentId]: {
               items:
-                nextPage > 1 ? [...current.items, ...res.items] : res.items,
+                nextPage > 1 ? [...current.items, ...filtered] : filtered,
               page: res.page,
               hasMore: res.hasMore,
               loading: false,
@@ -2500,7 +2562,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         }));
       }
     },
-    [postId, token],
+    [blockedIds, postId, token],
   );
 
   const handleCommentChange = (

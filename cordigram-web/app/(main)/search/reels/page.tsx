@@ -12,6 +12,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import styles from "../search.module.css";
 import { addSearchHistory, searchPosts, type FeedItem } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
+import {
+  filterFeedItemsByBlockedAuthors,
+  refreshBlockedUserIds,
+} from "@/lib/blocked-users";
 import { IconClear, IconView, formatCount } from "../_components/search-shared";
 
 function useDebouncedUrlQueryParam(param: string, delayMs: number) {
@@ -58,6 +62,18 @@ export default function SearchReelsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const token = getStoredAccessToken();
+    if (!token) {
+      setBlockedIds(new Set());
+      return;
+    }
+    refreshBlockedUserIds(token)
+      .then((ids) => setBlockedIds(ids))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     setItems([]);
@@ -86,8 +102,12 @@ export default function SearchReelsPage() {
     searchPosts({ token, query: normalized, limit: 24, page, kinds: ["reel"] })
       .then((res) => {
         if (cancelled) return;
+        const filtered = filterFeedItemsByBlockedAuthors(
+          res.items ?? [],
+          blockedIds,
+        );
         setItems((prev) =>
-          page === 1 ? (res.items ?? []) : [...prev, ...(res.items ?? [])],
+          page === 1 ? filtered : [...prev, ...filtered],
         );
         setHasMore(Boolean(res.hasMore));
       })
@@ -102,7 +122,7 @@ export default function SearchReelsPage() {
     return () => {
       cancelled = true;
     };
-  }, [normalized, page]);
+  }, [blockedIds, normalized, page]);
 
   const qParam = encodeURIComponent(searchParams?.get("q") || normalized);
 
