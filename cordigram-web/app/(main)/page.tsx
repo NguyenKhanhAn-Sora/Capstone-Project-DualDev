@@ -515,6 +515,12 @@ export default function HomePage({
     () => (maxItems ? items.slice(0, maxItems) : items),
     [items, maxItems],
   );
+  const showFollowingEmptyState =
+    scopeOverride === "following" &&
+    initialized &&
+    !loading &&
+    !error &&
+    visibleItems.length === 0;
   const showLoadMore = !hideLoadMore && !maxItems;
   const autoLoadEnabled = showLoadMore;
   const showSidebar = !embedded && !hideSidebar;
@@ -1593,6 +1599,10 @@ export default function HomePage({
             onPersistFeedCache={persistFeedCache}
           />
         ))}
+
+        {showFollowingEmptyState ? (
+          <div className={styles.empty}>{t("feed.followingEmpty")}</div>
+        ) : null}
 
         {loading && <SkeletonList count={3} />}
         <div ref={loadMoreRef} style={{ height: 1 }} aria-hidden />

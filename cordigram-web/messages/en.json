@@ -74,6 +74,7 @@
     "feed": {
       "signInToView": "Sign in to view the feed",
       "unableToLoad": "Unable to load feed",
+      "followingEmpty": "You are not following anyone yet, or the people you follow have not posted anything.",
       "loadMore": "Load more",
       "suggestionsAria": "Suggestions"
     },

@@ -916,4 +916,202 @@ export class MailService {
       throw err;
     }
   }
+
+  async sendStrikeThresholdPenaltyEmail(params: {
+    email: string;
+    penaltyType: 'reach_restricted' | 'read_only_limited' | 'account_suspended';
+    strikeTotal: number;
+    threshold: number;
+    expiresAt: Date;
+  }): Promise<void> {
+    const { email, penaltyType, strikeTotal, threshold, expiresAt } = params;
+    const formatter = new Intl.DateTimeFormat('vi-VN', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Asia/Ho_Chi_Minh',
+    });
+    const formattedExpiry = formatter.format(expiresAt);
+
+    const penaltyLabel =
+      penaltyType === 'reach_restricted'
+        ? 'Reach restricted for your posts'
+        : penaltyType === 'read_only_limited'
+          ? 'Read-only restriction enabled'
+          : 'Account suspended';
+
+    const penaltyDetail =
+      penaltyType === 'reach_restricted'
+        ? 'Your post distribution is temporarily reduced. Your content may appear less in feeds and discovery surfaces.'
+        : penaltyType === 'read_only_limited'
+          ? 'Your account is temporarily set to read-only mode. You can view content, but cannot interact or create new content/ads.'
+          : 'Your account is temporarily suspended. You will need to wait until the suspension expires before using the account again.';
+
+    const subject = `Cordigram moderation update: ${penaltyLabel}`;
+    const text = [
+      `A strike-threshold moderation policy has been applied to your account.`,
+      `Penalty: ${penaltyLabel}`,
+      `Current strike total: ${strikeTotal}`,
+      `Triggered threshold: ${threshold}`,
+      `Effective until: ${formattedExpiry}`,
+      '',
+      penaltyDetail,
+      '',
+      'If you believe this was applied in error, please contact support at cordigram@gmail.com.',
+    ].join('\n');
+
+    const logoUrl =
+      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const html = `
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
+        <tr>
+          <td align="center">
+            <table width="560" cellpadding="0" cellspacing="0" role="presentation" style="background:#ffffff;border-radius:18px;box-shadow:0 12px 40px rgba(15,23,42,0.08);padding:32px 36px;">
+              <tr>
+                <td align="center" style="padding-bottom:20px;">
+                  <img src="${logoUrl}" alt="Cordigram" height="46" style="display:block;">
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size:22px;font-weight:700;padding-bottom:10px;color:#0f172a;">Moderation penalty applied</td>
+              </tr>
+              <tr>
+                <td style="font-size:15px;line-height:1.6;padding-bottom:12px;color:#475569;">
+                  A strike-threshold moderation policy has been applied to your account.
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size:14px;line-height:1.7;padding:12px 14px;border-radius:12px;background:#f8fafc;color:#334155;">
+                  <strong>Penalty:</strong> ${penaltyLabel}<br>
+                  <strong>Current strike total:</strong> ${strikeTotal}<br>
+                  <strong>Triggered threshold:</strong> ${threshold}<br>
+                  <strong>Effective until:</strong> ${formattedExpiry}
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size:14px;line-height:1.6;color:#475569;padding-top:14px;">
+                  ${penaltyDetail}
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size:14px;line-height:1.6;color:#475569;padding-top:12px;">
+                  If you believe this was applied in error, contact us at
+                  <a href="mailto:cordigram@gmail.com" style="color:#2563eb;text-decoration:none;">cordigram@gmail.com</a>.
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;line-height:1.5;color:#94a3b8;padding-top:16px;">— Cordigram Team</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>`;
+
+    try {
+      await this.transporter.sendMail({
+        from: this.config.mailFrom,
+        to: email,
+        subject,
+        text,
+        html,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Failed to send strike threshold penalty email to ${email}`,
+        err as Error,
+      );
+      throw err;
+    }
+  }
+
+  async sendStrikeDecayAppliedEmail(params: {
+    email: string;
+    previousStrike: number;
+    nextStrike: number;
+    ruleWindowDays: number;
+    decayAmount?: number;
+    bonusApplied?: boolean;
+  }): Promise<void> {
+    const {
+      email,
+      previousStrike,
+      nextStrike,
+      ruleWindowDays,
+      decayAmount = 1,
+      bonusApplied = false,
+    } = params;
+    const subject = 'Cordigram moderation update: strike reduced';
+    const text = [
+      'Your account maintained a clean behavior streak and your strike score was reduced automatically.',
+      `Previous strike total: ${previousStrike}`,
+      `Current strike total: ${nextStrike}`,
+      `Reduction applied: -${decayAmount} strike${decayAmount > 1 ? 's' : ''}.`,
+      bonusApplied
+        ? `Rule applied: base clean-window decay + bonus for sustained positive behavior (${ruleWindowDays}-day evaluation window).`
+        : `Rule applied: -1 strike after ${ruleWindowDays} clean days (with monthly safety cap).`,
+      '',
+      'Keep following community guidelines to continue improving your moderation standing.',
+    ].join('\n');
+
+    const logoUrl =
+      'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
+    const html = `
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f6f9fc;padding:32px 0;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;">
+        <tr>
+          <td align="center">
+            <table width="560" cellpadding="0" cellspacing="0" role="presentation" style="background:#ffffff;border-radius:18px;box-shadow:0 12px 40px rgba(15,23,42,0.08);padding:32px 36px;">
+              <tr>
+                <td align="center" style="padding-bottom:20px;">
+                  <img src="${logoUrl}" alt="Cordigram" height="46" style="display:block;">
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size:22px;font-weight:700;padding-bottom:10px;color:#0f172a;">Strike score reduced</td>
+              </tr>
+              <tr>
+                <td style="font-size:15px;line-height:1.6;padding-bottom:12px;color:#475569;">
+                  Your account maintained a clean behavior streak, so your strike score was reduced automatically.
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size:14px;line-height:1.7;padding:12px 14px;border-radius:12px;background:#f8fafc;color:#334155;">
+                  <strong>Previous strike total:</strong> ${previousStrike}<br>
+                  <strong>Current strike total:</strong> ${nextStrike}<br>
+                  <strong>Reduction applied:</strong> -${decayAmount} strike${decayAmount > 1 ? 's' : ''}<br>
+                  <strong>Rule applied:</strong>
+                  ${
+                    bonusApplied
+                      ? `base clean-window decay + bonus for sustained positive behavior (${ruleWindowDays}-day evaluation window).`
+                      : `-1 strike after ${ruleWindowDays} clean days (with monthly safety cap).`
+                  }
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size:14px;line-height:1.6;color:#475569;padding-top:14px;">
+                  Keep following community guidelines to continue improving your moderation standing.
+                </td>
+              </tr>
+              <tr>
+                <td style="font-size:13px;line-height:1.5;color:#94a3b8;padding-top:16px;">— Cordigram Team</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>`;
+
+    try {
+      await this.transporter.sendMail({
+        from: this.config.mailFrom,
+        to: email,
+        subject,
+        text,
+        html,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Failed to send strike decay email to ${email}`,
+        err as Error,
+      );
+      throw err;
+    }
+  }
 }

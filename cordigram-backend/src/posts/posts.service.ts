@@ -35,6 +35,7 @@ import { ModerationAction } from '../moderation/moderation-action.schema';
 import { PaymentTransaction } from '../payments/payment-transaction.schema';
 import { ReportPost } from '../reportpost/reportpost.schema';
 import { AdEngagementEvent } from '../payments/ad-engagement-event.schema';
+import { UsersService } from '../users/users.service';
 type UploadedFile = {
   buffer: Buffer;
   mimetype: string;
@@ -46,6 +47,7 @@ const REEL_MAX_DURATION_SECONDS = 90;
 const SPONSORED_REPUTATION_WINDOW_DAYS = 30;
 const ADS_FREQUENCY_COOLDOWN_MINUTES = 30;
 const ADS_FREQUENCY_MAX_IMPRESSIONS_24H = 3;
+const REACH_RESTRICT_SCORE_MULTIPLIER = 0.15;
 
 @Injectable()
 export class PostsService {
@@ -133,6 +135,7 @@ export class PostsService {
     private readonly activityLogService: ActivityLogService,
     private readonly postScheduler: PostSchedulerService,
     private readonly mediaModerationService: MediaModerationService,
+    private readonly usersService: UsersService,
   ) {}
 
   private normalizeSponsoredAuthorReputation(params: {
@@ -1695,9 +1698,25 @@ export class PostsService {
       )
       .exec();
 
-    await this.userModel
-      .updateOne({ _id: authorObjectId }, { $inc: { strikeCount: 1 } })
+    const offenderAfterReject = await this.userModel
+      .findOneAndUpdate(
+        { _id: authorObjectId },
+        { $inc: { strikeCount: 1 } },
+        { new: true },
+      )
+      .select('strikeCount')
+      .lean()
       .exec();
+
+    const strikeAfterReject =
+      typeof offenderAfterReject?.strikeCount === 'number'
+        ? offenderAfterReject.strikeCount
+        : 1;
+    await this.usersService.applyAutoStrikePenaltyOnThresholdCross({
+      userId: authorObjectId,
+      previousStrike: Math.max(0, strikeAfterReject - 1),
+      nextStrike: strikeAfterReject,
+    });
   }
 
   async getFeed(
@@ -1883,6 +1902,10 @@ export class PostsService {
       sponsoredBoostByPostId,
       now,
     );
+    const reachRestrictedAuthorIds = await this.getReachRestrictedAuthorIdSet(
+      merged.map((item) => item.authorId),
+      now,
+    );
 
     const scored = merged
       .map((post) => {
@@ -1900,7 +1923,13 @@ export class PostsService {
           : 0;
         return {
           post,
-          score: this.scorePost(post, followeeSet, now, boost),
+          score: this.scorePost(
+            post,
+            followeeSet,
+            now,
+            boost,
+            reachRestrictedAuthorIds.has(authorId),
+          ),
           isSponsored,
           boost,
           creatorPriority,
@@ -2247,13 +2276,24 @@ export class PostsService {
       .filter((id): id is string => Boolean(id));
     const sponsoredBoostByPostId = new Map<string, number>();
     const sponsoredCtaByPostId = new Map<string, string>();
+    const reachRestrictedAuthorIds = await this.getReachRestrictedAuthorIdSet(
+      merged.map((item) => item.authorId),
+      now,
+    );
 
     const scored = merged
       .map((post) => {
         const boost = 0;
+        const authorId = post.authorId?.toString?.() ?? '';
         return {
           post,
-          score: this.scorePost(post, followeeSet, now, boost),
+          score: this.scorePost(
+            post,
+            followeeSet,
+            now,
+            boost,
+            reachRestrictedAuthorIds.has(authorId),
+          ),
         };
       })
       .sort((a, b) => b.score - a.score);
@@ -2550,6 +2590,10 @@ export class PostsService {
     const candidates = visibleCandidateDocs.map(
       (raw) => this.postModel.hydrate(raw) as Post,
     );
+    const reachRestrictedAuthorIds = await this.getReachRestrictedAuthorIdSet(
+      candidates.map((item) => item.authorId),
+      now,
+    );
 
     const candidateIds = candidates
       .map((p) => p._id?.toString?.())
@@ -2569,7 +2613,14 @@ export class PostsService {
 
     const scored = candidates
       .map((post) => {
-        const base = this.scorePost(post, new Set<string>(), now);
+        const authorId = post.authorId?.toString?.() ?? '';
+        const base = this.scorePost(
+          post,
+          new Set<string>(),
+          now,
+          0,
+          reachRestrictedAuthorIds.has(authorId),
+        );
         const interest = this.scoreInterest(post, taste);
         const interestBoost = Math.min(0.6, Math.max(0, interest / 20));
         const score = base * (1 + interestBoost);
@@ -2921,9 +2972,25 @@ export class PostsService {
     if (!visiblePosts.length) return [] as ReturnType<typeof this.toResponse>[];
 
     const now = new Date();
+    const reachRestrictedAuthorIds = await this.getReachRestrictedAuthorIdSet(
+      visiblePosts.map((item) => item.authorId),
+      now,
+    );
     const ranked = visiblePosts
       .map((raw) => this.postModel.hydrate(raw) as Post)
-      .map((post) => ({ post, score: this.scorePost(post, followeeSet, now) }))
+      .map((post) => {
+        const authorId = post.authorId?.toString?.() ?? '';
+        return {
+          post,
+          score: this.scorePost(
+            post,
+            followeeSet,
+            now,
+            0,
+            reachRestrictedAuthorIds.has(authorId),
+          ),
+        };
+      })
       .sort((a, b) => {
         const byScore = b.score - a.score;
         if (byScore) return byScore;
@@ -3082,9 +3149,25 @@ export class PostsService {
     if (!visibleReels.length) return [] as ReturnType<typeof this.toResponse>[];
 
     const now = new Date();
+    const reachRestrictedAuthorIds = await this.getReachRestrictedAuthorIdSet(
+      visibleReels.map((item) => item.authorId),
+      now,
+    );
     const ranked = visibleReels
       .map((raw) => this.postModel.hydrate(raw) as Post)
-      .map((post) => ({ post, score: this.scorePost(post, followeeSet, now) }))
+      .map((post) => {
+        const authorId = post.authorId?.toString?.() ?? '';
+        return {
+          post,
+          score: this.scorePost(
+            post,
+            followeeSet,
+            now,
+            0,
+            reachRestrictedAuthorIds.has(authorId),
+          ),
+        };
+      })
       .sort((a, b) => {
         const byScore = b.score - a.score;
         if (byScore) return byScore;
@@ -4394,6 +4477,36 @@ export class PostsService {
     );
   }
 
+  private async getReachRestrictedAuthorIdSet(
+    ids: Array<string | Types.ObjectId | null | undefined>,
+    now: Date,
+  ): Promise<Set<string>> {
+    const authorIds = Array.from(
+      new Set(
+        ids
+          .map((id) => id?.toString?.())
+          .filter((id): id is string => Boolean(id))
+          .filter((id) => Types.ObjectId.isValid(id)),
+      ),
+    );
+
+    if (!authorIds.length) return new Set<string>();
+
+    const restrictedUsers = await this.userModel
+      .find({
+        _id: { $in: authorIds.map((id) => new Types.ObjectId(id)) },
+        reachRestrictedUntil: { $gt: now },
+      })
+      .select('_id')
+      .lean();
+
+    return new Set(
+      restrictedUsers
+        .map((item) => item._id?.toString?.())
+        .filter((id): id is string => Boolean(id)),
+    );
+  }
+
   private async buildPostActivityMeta(postId: Types.ObjectId) {
     const post = await this.postModel
       .findOne({ _id: postId, deletedAt: null })
@@ -4431,6 +4544,7 @@ export class PostsService {
     followeeSet: Set<string>,
     now: Date,
     sponsoredBoostWeight = 0,
+    reachRestricted = false,
   ) {
     const createdAt = post.createdAt ? new Date(post.createdAt) : now;
     const ageHours = Math.max(
@@ -4456,7 +4570,8 @@ export class PostsService {
 
     const baseScore = (engagement + 1) * freshness * qualityBoost * relationshipBoost;
     const sponsoredBoost = 1 + Math.max(0, sponsoredBoostWeight);
-    return baseScore * sponsoredBoost;
+    const reachPenalty = reachRestricted ? REACH_RESTRICT_SCORE_MULTIPLIER : 1;
+    return baseScore * sponsoredBoost * reachPenalty;
   }
 
   private async upsertUniqueInteraction(

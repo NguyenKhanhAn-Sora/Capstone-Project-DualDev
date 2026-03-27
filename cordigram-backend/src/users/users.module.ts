@@ -21,6 +21,11 @@ import { ActivityModule } from '../activity/activity.module';
 import { ModerationAction, ModerationActionSchema } from '../moderation/moderation-action.schema';
 import { Post, PostSchema } from '../posts/post.schema';
 import { Comment, CommentSchema } from '../comment/comment.schema';
+import { ActivityLog, ActivityLogSchema } from '../activity/activity.schema';
+import { ReportPost, ReportPostSchema } from '../reportpost/reportpost.schema';
+import { ReportComment, ReportCommentSchema } from '../reportcomment/reportcomment.schema';
+import { ReportUser, ReportUserSchema } from '../reportuser/reportuser.schema';
+import { StrikeDecaySchedulerService } from './strike-decay-scheduler.service';
 
 @Module({
   imports: [
@@ -35,6 +40,10 @@ import { Comment, CommentSchema } from '../comment/comment.schema';
       { name: ModerationAction.name, schema: ModerationActionSchema },
       { name: Post.name, schema: PostSchema },
       { name: Comment.name, schema: CommentSchema },
+      { name: ActivityLog.name, schema: ActivityLogSchema },
+      { name: ReportPost.name, schema: ReportPostSchema },
+      { name: ReportComment.name, schema: ReportCommentSchema },
+      { name: ReportUser.name, schema: ReportUserSchema },
     ]),
     forwardRef(() => AuthModule),
     NotificationsModule,
@@ -42,7 +51,12 @@ import { Comment, CommentSchema } from '../comment/comment.schema';
     ActivityModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService, BlocksService, IgnoredService],
+  providers: [
+    UsersService,
+    BlocksService,
+    IgnoredService,
+    StrikeDecaySchedulerService,
+  ],
   exports: [UsersService, BlocksService, IgnoredService],
 })
 export class UsersModule {}

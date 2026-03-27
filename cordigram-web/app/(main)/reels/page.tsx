@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import EmojiPicker from "emoji-picker-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   fetchReelsFeed,
   fetchReelDetail,
@@ -914,6 +915,7 @@ export default function ReelPage({
 } = {}) {
   const REELS_PAGE_SIZE = 10;
   const canRender = useRequireAuth();
+  const tHome = useTranslations("home");
   const router = useRouter();
   const searchParams = useSearchParams();
   const params = useParams<{ id?: string | string[] }>();
@@ -2986,7 +2988,11 @@ export default function ReelPage({
           ) : error ? (
             <div className={styles.stateCard}>{error}</div>
           ) : !items.length ? (
-            <div className={styles.stateCard}>No reels yet.</div>
+            <div className={styles.stateCard}>
+              {scope === "following"
+                ? tHome("feed.followingEmpty")
+                : "No reels yet."}
+            </div>
           ) : (
             <div className={styles.stageShell}>
               <div

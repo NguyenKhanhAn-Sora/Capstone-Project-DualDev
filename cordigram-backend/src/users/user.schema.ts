@@ -129,6 +129,9 @@ export class User extends Document {
   accountLimitedIndefinitely?: boolean;
 
   @Prop({ type: Date, default: null })
+  reachRestrictedUntil?: Date | null;
+
+  @Prop({ type: Date, default: null })
   suspendedUntil?: Date | null;
 
   @Prop({ type: Boolean, default: false })

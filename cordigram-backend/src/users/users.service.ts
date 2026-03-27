@@ -22,9 +22,13 @@ import { parseDuration } from '../common/time.util';
 import { createHmac } from 'crypto';
 import { Session } from '../auth/session.schema';
 import { ActivityType } from '../activity/activity.schema';
+import { ActivityLog } from '../activity/activity.schema';
 import { ModerationAction } from '../moderation/moderation-action.schema';
 import { Post } from '../posts/post.schema';
 import { Comment } from '../comment/comment.schema';
+import { ReportPost } from '../reportpost/reportpost.schema';
+import { ReportComment } from '../reportcomment/reportcomment.schema';
+import { ReportUser } from '../reportuser/reportuser.schema';
 
 type NotificationCategoryKey = 'follow' | 'comment' | 'like' | 'mentions';
 
@@ -48,6 +52,18 @@ const NOTIFICATION_CATEGORY_KEYS: NotificationCategoryKey[] = [
   'mentions',
 ];
 
+const STRIKE_THRESHOLD_REACH_RESTRICT = 10;
+const STRIKE_THRESHOLD_ACCOUNT_LIMIT = 20;
+const STRIKE_THRESHOLD_SUSPEND = 30;
+const REACH_RESTRICT_DAYS = 7;
+const ACCOUNT_LIMIT_DAYS = 14;
+const SUSPEND_DAYS = 30;
+const STRIKE_DECAY_INTERVAL_DAYS = 7;
+const STRIKE_DECAY_MONTHLY_CAP = 3;
+const STRIKE_DECAY_GOOD_BEHAVIOR_WINDOW_DAYS = 14;
+const STRIKE_DECAY_GOOD_BEHAVIOR_MIN_POSTS = 3;
+const STRIKE_DECAY_GOOD_BEHAVIOR_MIN_POSITIVE_ACTIONS = 20;
+
 @Injectable()
 export class UsersService {
   private readonly passwordChangeWindowMs: number;
@@ -60,8 +76,16 @@ export class UsersService {
     @InjectModel(Profile.name) private readonly profileModel: Model<Profile>,
     @InjectModel(ModerationAction.name)
     private readonly moderationActionModel: Model<ModerationAction>,
+    @InjectModel(ActivityLog.name)
+    private readonly activityLogModel: Model<ActivityLog>,
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
     @InjectModel(Comment.name) private readonly commentModel: Model<Comment>,
+    @InjectModel(ReportPost.name)
+    private readonly reportPostModel: Model<ReportPost>,
+    @InjectModel(ReportComment.name)
+    private readonly reportCommentModel: Model<ReportComment>,
+    @InjectModel(ReportUser.name)
+    private readonly reportUserModel: Model<ReportUser>,
     @InjectModel(UserTasteProfile.name)
     private readonly tasteProfileModel: Model<UserTasteProfile>,
     private readonly blocksService: BlocksService,
@@ -898,6 +922,494 @@ export class UsersService {
       .exec();
 
     return this.findById(userId);
+  }
+
+  async applyAutoStrikePenaltyOnThresholdCross(params: {
+    userId: string | Types.ObjectId;
+    previousStrike: number;
+    nextStrike: number;
+  }): Promise<void> {
+    const previousStrike = Math.max(0, Number(params.previousStrike) || 0);
+    const nextStrike = Math.max(0, Number(params.nextStrike) || 0);
+    if (nextStrike <= previousStrike) return;
+
+    const crossedSuspend =
+      previousStrike < STRIKE_THRESHOLD_SUSPEND &&
+      nextStrike >= STRIKE_THRESHOLD_SUSPEND;
+    const crossedLimit =
+      previousStrike < STRIKE_THRESHOLD_ACCOUNT_LIMIT &&
+      nextStrike >= STRIKE_THRESHOLD_ACCOUNT_LIMIT;
+    const crossedReachRestrict =
+      previousStrike < STRIKE_THRESHOLD_REACH_RESTRICT &&
+      nextStrike >= STRIKE_THRESHOLD_REACH_RESTRICT;
+
+    if (!crossedSuspend && !crossedLimit && !crossedReachRestrict) {
+      return;
+    }
+
+    const userObjectId =
+      params.userId instanceof Types.ObjectId
+        ? params.userId
+        : this.asObjectId(String(params.userId), 'userId');
+
+    const user = await this.userModel
+      .findById(userObjectId)
+      .select(
+        '_id email status signupStage accountLimitedUntil accountLimitedIndefinitely reachRestrictedUntil suspendedUntil suspendedIndefinitely',
+      )
+      .lean();
+
+    if (!user?._id) return;
+
+    const now = new Date();
+    const nowMs = now.getTime();
+
+    const addDays = (days: number) => new Date(nowMs + days * 24 * 60 * 60 * 1000);
+    const maxDate = (a: Date | null, b: Date) => {
+      if (!a) return b;
+      return a.getTime() >= b.getTime() ? a : b;
+    };
+
+    const activeSuspended =
+      Boolean(user.suspendedIndefinitely) ||
+      Boolean(user.suspendedUntil && new Date(user.suspendedUntil).getTime() > nowMs) ||
+      user.status === 'banned';
+
+    if (crossedSuspend) {
+      if (user.suspendedIndefinitely) {
+        return;
+      }
+
+      const targetSuspendedUntil = addDays(SUSPEND_DAYS);
+      const currentSuspendedUntil =
+        user.suspendedUntil && new Date(user.suspendedUntil).getTime() > nowMs
+          ? new Date(user.suspendedUntil)
+          : null;
+      const nextSuspendedUntil = maxDate(currentSuspendedUntil, targetSuspendedUntil);
+
+      await this.userModel
+        .updateOne(
+          { _id: userObjectId },
+          {
+            $set: {
+              status: 'banned',
+              suspendedUntil: nextSuspendedUntil,
+              suspendedIndefinitely: false,
+              accountLimitedUntil: null,
+              accountLimitedIndefinitely: false,
+            },
+          },
+        )
+        .exec();
+
+      await this.logoutAllDevices({ userId: userObjectId.toString() });
+      this.notificationsService.emitForceLogout(userObjectId.toString(), 'suspended');
+
+      const noticeBody = `Your strike total reached ${nextStrike}, so your account has been suspended until ${nextSuspendedUntil.toISOString()}.`;
+      await this.notificationsService
+        .createSystemNoticeNotification({
+          recipientId: userObjectId.toString(),
+          title: 'Strike threshold penalty applied',
+          body: noticeBody,
+          level: 'warning',
+          actionUrl: '/settings?section=violations',
+        })
+        .catch(() => undefined);
+
+      if (user.email?.trim()) {
+        await this.mailService
+          .sendStrikeThresholdPenaltyEmail({
+            email: user.email.trim(),
+            penaltyType: 'account_suspended',
+            strikeTotal: nextStrike,
+            threshold: STRIKE_THRESHOLD_SUSPEND,
+            expiresAt: nextSuspendedUntil,
+          })
+          .catch(() => undefined);
+      }
+      return;
+    }
+
+    if (crossedLimit) {
+      if (activeSuspended || user.accountLimitedIndefinitely) {
+        return;
+      }
+
+      const targetLimitedUntil = addDays(ACCOUNT_LIMIT_DAYS);
+      const currentLimitedUntil =
+        user.accountLimitedUntil && new Date(user.accountLimitedUntil).getTime() > nowMs
+          ? new Date(user.accountLimitedUntil)
+          : null;
+      const nextLimitedUntil = maxDate(currentLimitedUntil, targetLimitedUntil);
+
+      await this.userModel
+        .updateOne(
+          { _id: userObjectId },
+          {
+            $set: {
+              status: 'pending',
+              signupStage: 'completed',
+              accountLimitedUntil: nextLimitedUntil,
+              accountLimitedIndefinitely: false,
+            },
+          },
+        )
+        .exec();
+
+      const noticeBody = `Your strike total reached ${nextStrike}, so your account is now read-only until ${nextLimitedUntil.toISOString()}.`;
+      await this.notificationsService
+        .createSystemNoticeNotification({
+          recipientId: userObjectId.toString(),
+          title: 'Strike threshold penalty applied',
+          body: noticeBody,
+          level: 'warning',
+          actionUrl: '/settings?section=violations',
+        })
+        .catch(() => undefined);
+
+      if (user.email?.trim()) {
+        await this.mailService
+          .sendStrikeThresholdPenaltyEmail({
+            email: user.email.trim(),
+            penaltyType: 'read_only_limited',
+            strikeTotal: nextStrike,
+            threshold: STRIKE_THRESHOLD_ACCOUNT_LIMIT,
+            expiresAt: nextLimitedUntil,
+          })
+          .catch(() => undefined);
+      }
+      return;
+    }
+
+    if (!crossedReachRestrict) {
+      return;
+    }
+
+    const targetReachRestrictedUntil = addDays(REACH_RESTRICT_DAYS);
+    const currentReachRestrictedUntil =
+      user.reachRestrictedUntil && new Date(user.reachRestrictedUntil).getTime() > nowMs
+        ? new Date(user.reachRestrictedUntil)
+        : null;
+    const nextReachRestrictedUntil = maxDate(
+      currentReachRestrictedUntil,
+      targetReachRestrictedUntil,
+    );
+
+    await this.userModel
+      .updateOne(
+        { _id: userObjectId },
+        {
+          $set: {
+            reachRestrictedUntil: nextReachRestrictedUntil,
+          },
+        },
+      )
+      .exec();
+
+    const noticeBody = `Your strike total reached ${nextStrike}, so distribution of your posts is restricted until ${nextReachRestrictedUntil.toISOString()}.`;
+    await this.notificationsService
+      .createSystemNoticeNotification({
+        recipientId: userObjectId.toString(),
+        title: 'Strike threshold penalty applied',
+        body: noticeBody,
+        level: 'warning',
+        actionUrl: '/settings?section=violations',
+      })
+      .catch(() => undefined);
+
+    if (user.email?.trim()) {
+      await this.mailService
+        .sendStrikeThresholdPenaltyEmail({
+          email: user.email.trim(),
+          penaltyType: 'reach_restricted',
+          strikeTotal: nextStrike,
+          threshold: STRIKE_THRESHOLD_REACH_RESTRICT,
+          expiresAt: nextReachRestrictedUntil,
+        })
+        .catch(() => undefined);
+    }
+  }
+
+  async runStrikeDecaySweep(): Promise<{
+    checkedUsers: number;
+    decayedUsers: number;
+  }> {
+    const now = new Date();
+    const nowMs = now.getTime();
+    const decayWindowStart = new Date(
+      nowMs - STRIKE_DECAY_INTERVAL_DAYS * 24 * 60 * 60 * 1000,
+    );
+    const monthStartUtc = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+    );
+
+    const candidates = await this.userModel
+      .find({ strikeCount: { $gt: 0 } })
+      .select(
+        '_id email strikeCount status signupStage interactionMutedUntil interactionMutedIndefinitely accountLimitedUntil accountLimitedIndefinitely reachRestrictedUntil suspendedUntil suspendedIndefinitely createdAt',
+      )
+      .lean();
+
+    if (!candidates.length) {
+      return { checkedUsers: 0, decayedUsers: 0 };
+    }
+
+    const admin = await this.userModel
+      .findOne({ roles: 'admin', status: 'active' })
+      .select('_id')
+      .lean()
+      .exec();
+
+    let decayedUsers = 0;
+
+    for (const user of candidates) {
+      const strikeCount = Number(user.strikeCount ?? 0);
+      if (strikeCount <= 0) continue;
+
+      const isSuspendedActive =
+        user.status === 'banned' ||
+        Boolean(user.suspendedIndefinitely) ||
+        Boolean(user.suspendedUntil && new Date(user.suspendedUntil).getTime() > nowMs);
+      const isLimitedActive =
+        (user.status === 'pending' && user.signupStage === 'completed') ||
+        Boolean(user.accountLimitedIndefinitely) ||
+        Boolean(
+          user.accountLimitedUntil &&
+            new Date(user.accountLimitedUntil).getTime() > nowMs,
+        );
+      const isInteractionMutedActive =
+        Boolean(user.interactionMutedIndefinitely) ||
+        Boolean(
+          user.interactionMutedUntil &&
+            new Date(user.interactionMutedUntil).getTime() > nowMs,
+        );
+      const isReachRestrictedActive = Boolean(
+        user.reachRestrictedUntil &&
+          new Date(user.reachRestrictedUntil).getTime() > nowMs,
+      );
+
+      if (
+        isSuspendedActive ||
+        isLimitedActive ||
+        isInteractionMutedActive ||
+        isReachRestrictedActive
+      ) {
+        continue;
+      }
+
+      const userObjectId = new Types.ObjectId(user._id);
+
+      const [lastViolation, lastDecay, decayCountThisMonth] = await Promise.all([
+        this.moderationActionModel
+          .findOne({
+            targetType: 'user',
+            targetId: userObjectId,
+            invalidatedAt: null,
+            action: {
+              $in: [
+                'remove_post',
+                'restrict_post',
+                'delete_comment',
+                'suspend_user',
+                'limit_account',
+                'violation',
+              ],
+            },
+          })
+          .sort({ createdAt: -1 })
+          .select('createdAt')
+          .lean()
+          .exec(),
+        this.moderationActionModel
+          .findOne({
+            targetType: 'user',
+            targetId: userObjectId,
+            invalidatedAt: null,
+            action: 'strike_decay_auto',
+          })
+          .sort({ createdAt: -1 })
+          .select('createdAt')
+          .lean()
+          .exec(),
+        this.moderationActionModel.countDocuments({
+          targetType: 'user',
+          targetId: userObjectId,
+          invalidatedAt: null,
+          action: 'strike_decay_auto',
+          createdAt: { $gte: monthStartUtc },
+        }),
+      ]);
+
+      if (decayCountThisMonth >= STRIKE_DECAY_MONTHLY_CAP) {
+        continue;
+      }
+
+      const remainingMonthlyDecayBudget = Math.max(
+        0,
+        STRIKE_DECAY_MONTHLY_CAP - decayCountThisMonth,
+      );
+      if (remainingMonthlyDecayBudget <= 0) {
+        continue;
+      }
+
+      const latestBlockingAt =
+        lastViolation?.createdAt ?? lastDecay?.createdAt ?? user.createdAt ?? now;
+      const latestBlockingDate = new Date(latestBlockingAt);
+      if (
+        Number.isNaN(latestBlockingDate.getTime()) ||
+        latestBlockingDate.getTime() > decayWindowStart.getTime()
+      ) {
+        continue;
+      }
+
+      const baseDecay = 1;
+      const bonusDecayEligible =
+        remainingMonthlyDecayBudget > 1 &&
+        (await this.qualifiesForStrikeDecayGoodBehaviorBonus({
+          userObjectId,
+          now,
+        }));
+      const requestedDecay = baseDecay + (bonusDecayEligible ? 1 : 0);
+      const decayAmount = Math.min(
+        strikeCount,
+        remainingMonthlyDecayBudget,
+        requestedDecay,
+      );
+
+      const nextStrike = Math.max(0, strikeCount - decayAmount);
+      if (nextStrike === strikeCount || decayAmount <= 0) continue;
+
+      await this.userModel
+        .updateOne({ _id: userObjectId }, { $set: { strikeCount: nextStrike } })
+        .exec();
+
+      const moderatorId = admin?._id ? new Types.ObjectId(admin._id) : userObjectId;
+      for (let i = 0; i < decayAmount; i += 1) {
+        const decayKind = i === 0 ? 'base' : 'bonus';
+        const reasonText =
+          decayKind === 'base'
+            ? 'Automatic strike decay after clean behavior window'
+            : 'Automatic bonus strike decay after sustained positive behavior';
+
+        await this.moderationActionModel
+          .create({
+            targetType: 'user',
+            targetId: userObjectId,
+            action: 'strike_decay_auto',
+            category: 'automatic_rehabilitation',
+            reason: reasonText,
+            severity: null,
+            note: `Auto decay (${decayKind}): strike ${strikeCount} -> ${nextStrike}`,
+            moderatorId,
+          })
+          .catch(() => undefined);
+      }
+
+      await this.notificationsService
+        .createSystemNoticeNotification({
+          recipientId: userObjectId.toString(),
+          title: 'Your strike score was reduced',
+          body: bonusDecayEligible
+            ? `Great progress. Your strike score decreased from ${strikeCount} to ${nextStrike} (including bonus reduction for sustained positive behavior).`
+            : `You kept a clean behavior streak, so your strike score decreased from ${strikeCount} to ${nextStrike}.`,
+          level: 'info',
+          actionUrl: '/settings?section=violations',
+        })
+        .catch(() => undefined);
+
+      if (user.email?.trim()) {
+        await this.mailService
+          .sendStrikeDecayAppliedEmail({
+            email: user.email.trim(),
+            previousStrike: strikeCount,
+            nextStrike,
+            ruleWindowDays: bonusDecayEligible
+              ? STRIKE_DECAY_GOOD_BEHAVIOR_WINDOW_DAYS
+              : STRIKE_DECAY_INTERVAL_DAYS,
+            decayAmount,
+            bonusApplied: bonusDecayEligible,
+          })
+          .catch(() => undefined);
+      }
+
+      decayedUsers += 1;
+    }
+
+    return {
+      checkedUsers: candidates.length,
+      decayedUsers,
+    };
+  }
+
+  private async qualifiesForStrikeDecayGoodBehaviorBonus(params: {
+    userObjectId: Types.ObjectId;
+    now: Date;
+  }): Promise<boolean> {
+    const { userObjectId, now } = params;
+    const windowStart = new Date(
+      now.getTime() - STRIKE_DECAY_GOOD_BEHAVIOR_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+    );
+
+    const [recentPostIds, recentCommentIds, positiveActionsCount] = await Promise.all([
+      this.postModel
+        .find({
+          authorId: userObjectId,
+          status: 'published',
+          deletedAt: null,
+          createdAt: { $gte: windowStart },
+        })
+        .select('_id')
+        .lean()
+        .exec(),
+      this.commentModel
+        .find({
+          authorId: userObjectId,
+          deletedAt: null,
+          createdAt: { $gte: windowStart },
+        })
+        .select('_id')
+        .lean()
+        .exec(),
+      this.activityLogModel.countDocuments({
+        userId: userObjectId,
+        createdAt: { $gte: windowStart },
+        type: {
+          $in: ['post_like', 'comment_like', 'comment', 'repost', 'save', 'follow'],
+        },
+      }),
+    ]);
+
+    if (recentPostIds.length < STRIKE_DECAY_GOOD_BEHAVIOR_MIN_POSTS) {
+      return false;
+    }
+
+    if (positiveActionsCount < STRIKE_DECAY_GOOD_BEHAVIOR_MIN_POSITIVE_ACTIONS) {
+      return false;
+    }
+
+    const postIdList = recentPostIds.map((item) => item._id).filter(Boolean);
+    const commentIdList = recentCommentIds.map((item) => item._id).filter(Boolean);
+
+    const [openPostReports, openCommentReports, openUserReports] = await Promise.all([
+      postIdList.length
+        ? this.reportPostModel.countDocuments({
+            postId: { $in: postIdList },
+            status: 'open',
+          })
+        : Promise.resolve(0),
+      commentIdList.length
+        ? this.reportCommentModel.countDocuments({
+            commentId: { $in: commentIdList },
+            status: 'open',
+          })
+        : Promise.resolve(0),
+      this.reportUserModel.countDocuments({
+        targetUserId: userObjectId,
+        status: 'open',
+      }),
+    ]);
+
+    return openPostReports + openCommentReports + openUserReports === 0;
   }
 
   async createPending(email: string): Promise<User> {
@@ -2461,14 +2973,22 @@ export class UsersService {
     let runningStrike = 0;
     const withTotals = orderedAsc.map((item) => {
       const strikeDelta =
-        item.action === 'warn' || item.action === 'mute_interaction'
-          ? 0
-          : item.severity === 'high'
-            ? 3
-            : item.severity === 'medium'
-              ? 2
-              : 1;
-      runningStrike += strikeDelta;
+        item.action === 'strike_decay_auto'
+          ? -1
+          : item.action === 'warn' ||
+              item.action === 'mute_interaction' ||
+              item.action === 'creator_verification_approved' ||
+              item.action === 'creator_verification_rejected' ||
+              item.action === 'creator_verification_revoked' ||
+              item.action === 'cancel_ads_campaign' ||
+              item.action === 'reopen_ads_campaign'
+            ? 0
+            : item.severity === 'high'
+              ? 3
+              : item.severity === 'medium'
+                ? 2
+                : 1;
+      runningStrike = Math.max(0, runningStrike + strikeDelta);
 
       const previewText =
         item.targetType === 'post'

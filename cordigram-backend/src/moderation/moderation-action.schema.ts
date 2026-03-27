@@ -4,6 +4,7 @@ import { Document, Types } from 'mongoose';
 export type ModerationTargetType = 'post' | 'comment' | 'user';
 export type ModerationActionType =
   | 'auto_hidden_pending_review'
+  | 'strike_decay_auto'
   | 'rollback_moderation'
   | 'no_violation'
   | 'remove_post'
@@ -33,6 +34,7 @@ export class ModerationAction extends Document {
     type: String,
     enum: [
       'auto_hidden_pending_review',
+      'strike_decay_auto',
       'rollback_moderation',
       'no_violation',
       'remove_post',

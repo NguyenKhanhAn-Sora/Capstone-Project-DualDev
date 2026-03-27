@@ -74,6 +74,7 @@
     "feed": {
       "signInToView": "Đăng nhập để xem bảng tin",
       "unableToLoad": "Không thể tải bảng tin",
+      "followingEmpty": "Bạn chưa theo dõi ai hoặc những người bạn theo dõi chưa có bài viết nào.",
       "loadMore": "Tải thêm",
       "suggestionsAria": "Gợi ý"
     },

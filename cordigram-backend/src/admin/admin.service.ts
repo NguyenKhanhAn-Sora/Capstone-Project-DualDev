@@ -4703,9 +4703,25 @@ export class AdminService {
       .exec();
 
     const authorObjectId = new Types.ObjectId(doc.authorId);
-    await this.userModel
-      .updateOne({ _id: authorObjectId }, { $inc: { strikeCount: 1 } })
+    const offenderAfterReject = await this.userModel
+      .findOneAndUpdate(
+        { _id: authorObjectId },
+        { $inc: { strikeCount: 1 } },
+        { new: true },
+      )
+      .select('strikeCount')
+      .lean()
       .exec();
+
+    const strikeAfterReject =
+      typeof offenderAfterReject?.strikeCount === 'number'
+        ? offenderAfterReject.strikeCount
+        : 1;
+    await this.usersService.applyAutoStrikePenaltyOnThresholdCross({
+      userId: authorObjectId,
+      previousStrike: Math.max(0, strikeAfterReject - 1),
+      nextStrike: strikeAfterReject,
+    });
 
     await this.notificationsService.createPostModerationResultNotification({
       recipientId: authorObjectId.toString(),
@@ -5867,6 +5883,14 @@ export class AdminService {
         .exec();
       strikeTotalAfter =
         typeof offender?.strikeCount === 'number' ? offender.strikeCount : null;
+
+      if (strikeTotalAfter != null) {
+        await this.usersService.applyAutoStrikePenaltyOnThresholdCross({
+          userId: offenderId,
+          previousStrike: Math.max(0, strikeTotalAfter - strikeIncrement),
+          nextStrike: strikeTotalAfter,
+        });
+      }
     }
 
     if (
@@ -6597,6 +6621,14 @@ export class AdminService {
         .exec();
       strikeTotalAfter =
         typeof offender?.strikeCount === 'number' ? offender.strikeCount : null;
+
+      if (strikeTotalAfter != null) {
+        await this.usersService.applyAutoStrikePenaltyOnThresholdCross({
+          userId: offenderId,
+          previousStrike: Math.max(0, strikeTotalAfter - strikeIncrement),
+          nextStrike: strikeTotalAfter,
+        });
+      }
     }
 
     if (

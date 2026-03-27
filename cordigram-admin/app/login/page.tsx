@@ -80,7 +80,7 @@ export default function AdminLoginPage() {
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <label className={styles.field}>
-            <span className={styles.label}>Work Email</span>
+            <span className={styles.label}>Email</span>
             <input
               type="email"
               placeholder="admin@cordigram.com"

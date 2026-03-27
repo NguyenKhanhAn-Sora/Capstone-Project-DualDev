@@ -24,6 +24,7 @@ const money = (value: number) =>
 const integer = (value: number) => new Intl.NumberFormat("en-US").format(value);
 const pct = (value: number) => `${value.toFixed(2)}%`;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MEDIA_EDIT_LOCK_UNIQUE_VIEWS = 100;
 
 function statusLabel(status: AdsCampaignDetail["status"]) {
   if (status === "active") return "Active";
@@ -49,6 +50,23 @@ function placementLabel(value?: string) {
 
 function isVideoUrl(url: string) {
   return /\.(mp4|mov|webm|mkv)(\?|#|$)/i.test(url);
+}
+
+function resolveUniqueViews(detail: AdsCampaignDetail | null): number {
+  if (!detail) return 0;
+  const extended = detail as AdsCampaignDetail & {
+    uniqueViews?: number;
+    uniqueViewCount?: number;
+    uniqueViewers?: number;
+  };
+
+  if (typeof extended.uniqueViews === "number") return extended.uniqueViews;
+  if (typeof extended.uniqueViewCount === "number") return extended.uniqueViewCount;
+  if (typeof extended.uniqueViewers === "number") return extended.uniqueViewers;
+
+  // `reach` is unique audience count in the current metrics model.
+  if (typeof detail.reach === "number") return detail.reach;
+  return detail.views;
 }
 
 type BoostPackage = {
@@ -537,6 +555,8 @@ export default function CampaignDetailPage() {
   }, [countryOptions, countriesLoading, editDraft?.locationText]);
 
   const isUploadingMedia = pendingMediaUploads.length > 0;
+  const uniqueViews = useMemo(() => resolveUniqueViews(detail), [detail]);
+  const isMediaEditLocked = uniqueViews > MEDIA_EDIT_LOCK_UNIQUE_VIEWS;
 
   const currentBoostPackage = useMemo(
     () => BOOST_PACKAGES.find((item) => item.id === detail?.boostPackageId) ?? BOOST_PACKAGES[1],
@@ -680,6 +700,10 @@ export default function CampaignDetailPage() {
 
   const removeMediaUrl = (url: string) => {
     if (!editDraft) return;
+    if (isMediaEditLocked) {
+      setEditError(`Media cannot be edited after unique views exceed ${MEDIA_EDIT_LOCK_UNIQUE_VIEWS}.`);
+      return;
+    }
     setEditDraft({
       ...editDraft,
       mediaUrls: editDraft.mediaUrls.filter((item) => item !== url),
@@ -687,6 +711,10 @@ export default function CampaignDetailPage() {
   };
 
   const openEditMediaPicker = () => {
+    if (isMediaEditLocked) {
+      setEditError(`Media cannot be edited after unique views exceed ${MEDIA_EDIT_LOCK_UNIQUE_VIEWS}.`);
+      return;
+    }
     editMediaInputRef.current?.click();
   };
 
@@ -694,6 +722,10 @@ export default function CampaignDetailPage() {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     if (!editDraft || files.length === 0) return;
+    if (isMediaEditLocked) {
+      setEditError(`Media cannot be edited after unique views exceed ${MEDIA_EDIT_LOCK_UNIQUE_VIEWS}.`);
+      return;
+    }
     if (!token) {
       setEditError("Please login again to upload media.");
       return;
@@ -750,13 +782,15 @@ export default function CampaignDetailPage() {
   };
 
   const saveEditedDetails = async () => {
-    if (!token || !campaignId || !editDraft || !hasEditChanges) return;
+    if (!token || !campaignId || !detail || !editDraft || !hasEditChanges) return;
 
     setEditSaving(true);
     setEditError("");
     setSuccess("");
 
     const normalized = normalizeDraft(editDraft);
+    const originalNormalized = normalizeDraft(buildDraftFromDetail(detail));
+    const effectiveMediaUrls = isMediaEditLocked ? originalNormalized.mediaUrls : normalized.mediaUrls;
 
     try {
       const updated = await performAdsCampaignAction({
@@ -772,11 +806,8 @@ export default function CampaignDetailPage() {
         destinationUrl: normalized.destinationUrl,
         cta: normalized.cta,
         interests: normalized.interests,
-        locationText: normalized.locationText,
-        ageMin: normalized.ageMin ? Number(normalized.ageMin) : null,
-        ageMax: normalized.ageMax ? Number(normalized.ageMax) : null,
         placement: "home_feed",
-        mediaUrls: normalized.mediaUrls,
+        mediaUrls: effectiveMediaUrls,
       });
       setDetail(updated);
       setSuccess("Campaign details updated successfully.");
@@ -1031,10 +1062,6 @@ export default function CampaignDetailPage() {
                   <strong>{detail.destinationUrl?.trim() || "N/A"}</strong>
                 </div>
                 <div className={styles.detailRow}>
-                  <span>Placement</span>
-                  <strong>{placementLabel(detail.placement)}</strong>
-                </div>
-                <div className={styles.detailRow}>
                   <span>Location targeting</span>
                   <strong>{detail.locationText?.trim() || "N/A"}</strong>
                 </div>
@@ -1269,18 +1296,19 @@ export default function CampaignDetailPage() {
                     </label>
 
                     <div className={styles.editTwoCols}>
-                      <label className={styles.editField}>
+                      <label className={`${styles.editField} ${styles.editFieldLocked}`}>
                         Location
                         <CustomSelect
                           value={editDraft.locationText}
                           options={locationOptions}
                           onChange={(value) => setEditDraft({ ...editDraft, locationText: value })}
                           placeholder="Select location"
-                          disabled={countriesLoading && locationOptions.length <= 1}
+                          disabled
                         />
+                        <small className={styles.helper}>Location cannot be edited after ad creation.</small>
                       </label>
 
-                      <div className={styles.editField}>
+                      <div className={`${styles.editField} ${styles.editFieldLocked}`}>
                         Age range
                         <div className={styles.editAgeRow}>
                           <input
@@ -1292,6 +1320,7 @@ export default function CampaignDetailPage() {
                             onChange={(event) =>
                               setEditDraft({ ...editDraft, ageMin: event.target.value })
                             }
+                            disabled
                           />
                           <span className={styles.editAgeSep}>to</span>
                           <input
@@ -1303,8 +1332,10 @@ export default function CampaignDetailPage() {
                             onChange={(event) =>
                               setEditDraft({ ...editDraft, ageMax: event.target.value })
                             }
+                            disabled
                           />
                         </div>
+                        <small className={styles.helper}>Age range cannot be edited after ad creation.</small>
                       </div>
                     </div>
 
@@ -1337,12 +1368,17 @@ export default function CampaignDetailPage() {
 
                     <div className={styles.editField}>
                       Creative media
+                      {isMediaEditLocked ? (
+                        <small className={styles.helper}>
+                          Media is locked because unique views exceeded {MEDIA_EDIT_LOCK_UNIQUE_VIEWS}.
+                        </small>
+                      ) : null}
                       <div className={styles.editMediaControls}>
                         <button
                           type="button"
                           className={styles.secondaryBtn}
                           onClick={openEditMediaPicker}
-                          disabled={editSaving}
+                          disabled={editSaving || isMediaEditLocked}
                         >
                           Choose files
                         </button>
@@ -1353,7 +1389,7 @@ export default function CampaignDetailPage() {
                           accept={editDraft.adFormat === "video" ? "video/*" : "image/*"}
                           multiple={editDraft.adFormat === "carousel"}
                           onChange={handleEditMediaUpload}
-                          disabled={editSaving}
+                          disabled={editSaving || isMediaEditLocked}
                         />
                       </div>
                       <div className={styles.editMediaGrid}>
@@ -1368,7 +1404,7 @@ export default function CampaignDetailPage() {
                               type="button"
                               className={styles.editRemoveMediaBtn}
                               onClick={() => removeMediaUrl(url)}
-                              disabled={editSaving}
+                              disabled={editSaving || isMediaEditLocked}
                             >
                               Remove
                             </button>

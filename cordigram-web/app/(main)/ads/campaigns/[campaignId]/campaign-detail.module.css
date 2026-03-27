@@ -380,6 +380,11 @@
   color: var(--color-text-muted);
 }
 
+.editFieldLocked,
+.editFieldLocked * {
+  cursor: not-allowed !important;
+}
+
 .customSelect {
   position: relative;
 }
