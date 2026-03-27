@@ -4,10 +4,10 @@ import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import styles from "./ChatEmojiPicker.module.css";
 
-const EmojiMart = dynamic(
-  () => import("@emoji-mart/react").then((m) => ({ default: (m as any).default ?? (m as any).Picker ?? m })),
-  { ssr: false, loading: () => <div className={styles.loading}>Đang tải...</div> }
-);
+const EmojiMart = dynamic(() => import("@emoji-mart/react"), {
+  ssr: false,
+  loading: () => <div className={styles.loading}>Đang tải...</div>,
+});
 
 const KAOMOJI_CATEGORIES = [
   {
