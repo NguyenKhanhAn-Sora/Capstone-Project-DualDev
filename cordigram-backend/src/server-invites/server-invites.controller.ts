@@ -38,7 +38,10 @@ export class ServerInvitesController {
     @Body() body: { serverId: string },
     @Request() req: { user: { userId: string } },
   ) {
-    await this.serverInvitesService.acceptByServer(body.serverId, req.user.userId);
+    await this.serverInvitesService.acceptByServer(
+      body.serverId,
+      req.user.userId,
+    );
     return { message: 'Đã chấp nhận lời mời' };
   }
 

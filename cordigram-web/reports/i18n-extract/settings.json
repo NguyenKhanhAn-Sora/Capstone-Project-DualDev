@@ -1,0 +1,557 @@
+{
+  "module": "settings",
+  "scannedPaths": [
+    "app/(main)/settings",
+    "ui",
+    "component"
+  ],
+  "total": 91,
+  "findings": [
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2147,
+      "text": "Please enter your current password.",
+      "key": "settings.please_enter_your_current_password"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2151,
+      "text": "You need to sign in to continue.",
+      "key": "settings.you_need_to_sign_in_to_continue"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2179,
+      "text": "Please enter the OTP.",
+      "key": "settings.please_enter_the_otp"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2183,
+      "text": "You need to sign in to continue.",
+      "key": "settings.you_need_to_sign_in_to_continue_2"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2203,
+      "text": "The new email address is invalid.",
+      "key": "settings.the_new_email_address_is_invalid"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2207,
+      "text": "You need to sign in to continue.",
+      "key": "settings.you_need_to_sign_in_to_continue_3"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2238,
+      "text": "Please enter the OTP.",
+      "key": "settings.please_enter_the_otp_2"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2242,
+      "text": "You need to sign in to continue.",
+      "key": "settings.you_need_to_sign_in_to_continue_4"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2350,
+      "text": "Email updated. Returning to Settings...",
+      "key": "settings.email_updated_returning_to_settings"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2371,
+      "text": "Account & preferences",
+      "key": "settings.account_preferences"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2401,
+      "text": "Account email",
+      "key": "settings.account_email"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2411,
+      "text": "Current email",
+      "key": "settings.current_email"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2637,
+      "text": "Personal info",
+      "key": "settings.personal_info"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2646,
+      "text": "Loading personal info...",
+      "key": "settings.loading_personal_info"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2655,
+      "text": "Display name",
+      "key": "settings.display_name"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2770,
+      "text": "Profile visibility",
+      "key": "settings.profile_visibility"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2781,
+      "text": "Profile page",
+      "key": "settings.profile_page"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2797,
+      "text": "About this user",
+      "key": "settings.about_this_user"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2813,
+      "text": "Followers list",
+      "key": "settings.followers_list"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2829,
+      "text": "Following list",
+      "key": "settings.following_list"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2853,
+      "text": "Creator verification",
+      "key": "settings.creator_verification"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2862,
+      "text": "Loading creator eligibility...",
+      "key": "settings.loading_creator_eligibility"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2868,
+      "text": "Creator score",
+      "key": "settings.creator_score"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2883,
+      "text": "Account age",
+      "key": "settings.account_age"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2905,
+      "text": "Published posts",
+      "key": "settings.published_posts"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2916,
+      "text": "Active posting days (30d)",
+      "key": "settings.active_posting_days_30d"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2927,
+      "text": "Avg engagement/post (30d)",
+      "key": "settings.avg_engagement_post_30d"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2938,
+      "text": "Recent violations (90d)",
+      "key": "settings.recent_violations_90d"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 2960,
+      "text": "Latest request",
+      "key": "settings.latest_request"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 3057,
+      "text": "Password & Security",
+      "key": "settings.password_security"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 3574,
+      "text": "Push notifications",
+      "key": "settings.push_notifications"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 3704,
+      "text": "Activity log",
+      "key": "settings.activity_log"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 3743,
+      "text": "Loading activity...",
+      "key": "settings.loading_activity"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 3858,
+      "text": "No activity yet.",
+      "key": "settings.no_activity_yet"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 3885,
+      "text": "Hidden posts",
+      "key": "settings.hidden_posts"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 3920,
+      "text": "Loading hidden posts...",
+      "key": "settings.loading_hidden_posts"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4006,
+      "text": "No hidden posts.",
+      "key": "settings.no_hidden_posts"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4048,
+      "text": "Loading blocked users...",
+      "key": "settings.loading_blocked_users"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4098,
+      "text": "No blocked users.",
+      "key": "settings.no_blocked_users"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4106,
+      "text": "Violation Center",
+      "key": "settings.violation_center"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4115,
+      "text": "Current strike total",
+      "key": "settings.current_strike_total"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4133,
+      "text": "Loading violation history...",
+      "key": "settings.loading_violation_history"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4217,
+      "text": "No violations found.",
+      "key": "settings.no_violations_found"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4323,
+      "text": "Coming soon",
+      "key": "settings.coming_soon"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4348,
+      "text": "Mute notifications",
+      "key": "settings.mute_notifications"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4542,
+      "text": "Logged-in devices",
+      "key": "settings.logged_in_devices"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4557,
+      "text": "Loading devices...",
+      "key": "settings.loading_devices"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4645,
+      "text": "No devices recorded yet.",
+      "key": "settings.no_devices_recorded_yet"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4660,
+      "text": "Violation Center",
+      "key": "settings.violation_center_2"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4661,
+      "text": "Violated content",
+      "key": "settings.violated_content"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4677,
+      "text": "Your violated comment",
+      "key": "settings.your_violated_comment"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4706,
+      "text": "Parent post context",
+      "key": "settings.parent_post_context"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4749,
+      "text": "Log out this device?",
+      "key": "settings.log_out_this_device"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4779,
+      "text": "Log out all devices?",
+      "key": "settings.log_out_all_devices"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4811,
+      "text": "Unhide this post?",
+      "key": "settings.unhide_this_post"
+    },
+    {
+      "file": "app/(main)/settings/page.tsx",
+      "line": 4850,
+      "text": "Unblock this account?",
+      "key": "settings.unblock_this_account"
+    },
+    {
+      "file": "ui/comment-likes-overlay/comment-likes-overlay.tsx",
+      "line": 263,
+      "text": "Loading…",
+      "key": "settings.loading"
+    },
+    {
+      "file": "ui/comment-likes-overlay/comment-likes-overlay.tsx",
+      "line": 311,
+      "text": "Loading more…",
+      "key": "settings.loading_more"
+    },
+    {
+      "file": "ui/date-select/date-select.tsx",
+      "line": 359,
+      "text": "maxMonth || idx",
+      "key": "settings.maxmonth_idx"
+    },
+    {
+      "file": "ui/followers-overlay/followers-overlay.tsx",
+      "line": 364,
+      "text": "Loading…",
+      "key": "settings.loading_2"
+    },
+    {
+      "file": "ui/followers-overlay/followers-overlay.tsx",
+      "line": 412,
+      "text": "Loading more…",
+      "key": "settings.loading_more_2"
+    },
+    {
+      "file": "ui/notifications-overlay/notifications-overlay.tsx",
+      "line": 386,
+      "text": "You're signing in on a new device",
+      "key": "settings.you_re_signing_in_on_a_new_device"
+    },
+    {
+      "file": "ui/notifications-overlay/notifications-overlay.tsx",
+      "line": 587,
+      "text": "New notification",
+      "key": "settings.new_notification"
+    },
+    {
+      "file": "ui/notifications-overlay/notifications-overlay.tsx",
+      "line": 678,
+      "text": "Session expired. Please sign in again.",
+      "key": "settings.session_expired_please_sign_in_again"
+    },
+    {
+      "file": "ui/notifications-overlay/notifications-overlay.tsx",
+      "line": 1050,
+      "text": "Fetching notifications...",
+      "key": "settings.fetching_notifications"
+    },
+    {
+      "file": "ui/notifications-overlay/notifications-overlay.tsx",
+      "line": 1055,
+      "text": "Unable to load",
+      "key": "settings.unable_to_load"
+    },
+    {
+      "file": "ui/notifications-overlay/notifications-overlay.tsx",
+      "line": 1201,
+      "text": "New device sign-in",
+      "key": "settings.new_device_sign_in"
+    },
+    {
+      "file": "ui/notifications-overlay/notifications-overlay.tsx",
+      "line": 1264,
+      "text": "Secure your account",
+      "key": "settings.secure_your_account"
+    },
+    {
+      "file": "ui/notifications-overlay/notifications-overlay.tsx",
+      "line": 1325,
+      "text": "Mute notifications",
+      "key": "settings.mute_notifications_2"
+    },
+    {
+      "file": "ui/people-you-may-know/people-you-may-know.tsx",
+      "line": 114,
+      "text": "People you may know",
+      "key": "settings.people_you_may_know"
+    },
+    {
+      "file": "ui/people-you-may-know/people-you-may-know.tsx",
+      "line": 140,
+      "text": "No suggestions right now.",
+      "key": "settings.no_suggestions_right_now"
+    },
+    {
+      "file": "ui/post-edit-overlay.tsx",
+      "line": 569,
+      "text": "Edit post",
+      "key": "settings.edit_post"
+    },
+    {
+      "file": "ui/post-edit-overlay.tsx",
+      "line": 600,
+      "text": "Emoji icon",
+      "key": "settings.emoji_icon"
+    },
+    {
+      "file": "ui/post-edit-overlay.tsx",
+      "line": 785,
+      "text": "Allow comments",
+      "key": "settings.allow_comments"
+    },
+    {
+      "file": "ui/post-edit-overlay.tsx",
+      "line": 806,
+      "text": "Allow downloads",
+      "key": "settings.allow_downloads"
+    },
+    {
+      "file": "ui/post-edit-overlay.tsx",
+      "line": 824,
+      "text": "Hide like",
+      "key": "settings.hide_like"
+    },
+    {
+      "file": "ui/post-likes-overlay/post-likes-overlay.tsx",
+      "line": 260,
+      "text": "Loading…",
+      "key": "settings.loading_3"
+    },
+    {
+      "file": "ui/post-likes-overlay/post-likes-overlay.tsx",
+      "line": 309,
+      "text": "Loading more…",
+      "key": "settings.loading_more_3"
+    },
+    {
+      "file": "ui/profile-edit-overlay/profile-edit-overlay.tsx",
+      "line": 733,
+      "text": "Edit profile",
+      "key": "settings.edit_profile"
+    },
+    {
+      "file": "ui/profile-edit-overlay/profile-edit-overlay.tsx",
+      "line": 747,
+      "text": "Display name",
+      "key": "settings.display_name_2"
+    },
+    {
+      "file": "ui/search-overlay/search-overlay.tsx",
+      "line": 263,
+      "text": "Session expired.",
+      "key": "settings.session_expired"
+    },
+    {
+      "file": "ui/search-overlay/search-overlay.tsx",
+      "line": 482,
+      "text": "x.type === \"profile\") as Array",
+      "key": "settings.x_type_profile_as_array"
+    },
+    {
+      "file": "ui/search-overlay/search-overlay.tsx",
+      "line": 485,
+      "text": "x.type === \"hashtag\") as Array",
+      "key": "settings.x_type_hashtag_as_array"
+    },
+    {
+      "file": "ui/search-overlay/search-overlay.tsx",
+      "line": 618,
+      "text": "Loading…",
+      "key": "settings.loading_4"
+    },
+    {
+      "file": "ui/search-overlay/search-overlay.tsx",
+      "line": 625,
+      "text": "No recent searches yet.",
+      "key": "settings.no_recent_searches_yet"
+    },
+    {
+      "file": "ui/search-overlay/search-overlay.tsx",
+      "line": 692,
+      "text": "Searching…",
+      "key": "settings.searching"
+    },
+    {
+      "file": "ui/search-overlay/search-overlay.tsx",
+      "line": 843,
+      "text": "No results.",
+      "key": "settings.no_results"
+    },
+    {
+      "file": "ui/search-overlay/search-overlay.tsx",
+      "line": 881,
+      "text": "No people found.",
+      "key": "settings.no_people_found"
+    },
+    {
+      "file": "ui/search-overlay/search-overlay.tsx",
+      "line": 905,
+      "text": "No hashtags found.",
+      "key": "settings.no_hashtags_found"
+    },
+    {
+      "file": "ui/search-overlay/search-overlay.tsx",
+      "line": 948,
+      "text": "No posts found.",
+      "key": "settings.no_posts_found"
+    },
+    {
+      "file": "ui/search-overlay/search-overlay.tsx",
+      "line": 966,
+      "text": "No reels found.",
+      "key": "settings.no_reels_found"
+    }
+  ]
+}

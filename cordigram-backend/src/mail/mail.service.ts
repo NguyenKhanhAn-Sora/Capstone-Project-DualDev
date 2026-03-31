@@ -102,7 +102,9 @@ export class MailService {
     reason?: string | null;
     cooldownUntil?: Date | null;
   }): Promise<void> {
-    const reason = params.reason?.trim() || 'Your account does not currently meet the creator verification requirements.';
+    const reason =
+      params.reason?.trim() ||
+      'Your account does not currently meet the creator verification requirements.';
     const nextDate = params.cooldownUntil
       ? new Intl.DateTimeFormat('en-US', {
           dateStyle: 'medium',
@@ -176,7 +178,8 @@ export class MailService {
     mediaCount?: number;
     targetCampaignId?: string | null;
   }): Promise<void> {
-    const campaignName = params.campaignName?.trim() || 'Cordigram Ads Campaign';
+    const campaignName =
+      params.campaignName?.trim() || 'Cordigram Ads Campaign';
     const paidAtText = params.paidAt
       ? new Intl.DateTimeFormat('en-US', {
           dateStyle: 'medium',
@@ -185,10 +188,13 @@ export class MailService {
       : 'Confirmed';
     const amountText = this.formatCurrency(params.amountTotal, params.currency);
     const ageRange =
-      Number.isFinite(params.targetAgeMin) && Number.isFinite(params.targetAgeMax)
+      Number.isFinite(params.targetAgeMin) &&
+      Number.isFinite(params.targetAgeMax)
         ? `${params.targetAgeMin} - ${params.targetAgeMax}`
         : 'No limit';
-    const interests = (params.interests ?? []).map((v) => v.trim()).filter(Boolean);
+    const interests = (params.interests ?? [])
+      .map((v) => v.trim())
+      .filter(Boolean);
 
     const boostCatalog: Record<string, { label: string; price: number }> = {
       light: { label: 'Light Boost', price: 79000 },
@@ -228,7 +234,9 @@ export class MailService {
       `Paid at: ${paidAtText}`,
       `Boost package: ${boostPackageSummary}`,
       `Duration package: ${durationPackageSummary}`,
-      params.paymentIntentId ? `Payment Intent: ${params.paymentIntentId}` : null,
+      params.paymentIntentId
+        ? `Payment Intent: ${params.paymentIntentId}`
+        : null,
       '',
       'Invoice details:',
       `- Objective: ${params.objective || 'N/A'}`,
@@ -239,7 +247,9 @@ export class MailService {
       `- Destination URL: ${params.destinationUrl || 'N/A'}`,
       `- Media count: ${params.mediaCount ?? 0}`,
       interests.length ? `- Interests: ${interests.join(', ')}` : null,
-      params.targetCampaignId ? `- Upgraded campaign ID: ${params.targetCampaignId}` : null,
+      params.targetCampaignId
+        ? `- Upgraded campaign ID: ${params.targetCampaignId}`
+        : null,
     ]
       .filter(Boolean)
       .join('\n');

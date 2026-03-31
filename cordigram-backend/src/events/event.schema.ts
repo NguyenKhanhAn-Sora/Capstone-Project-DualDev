@@ -14,7 +14,11 @@ export type EventStatus = 'scheduled' | 'live' | 'ended';
 
 @Schema({ timestamps: true })
 export class ServerEvent extends Document {
-  @Prop({ type: String, enum: ['scheduled', 'live', 'ended'], default: 'scheduled' })
+  @Prop({
+    type: String,
+    enum: ['scheduled', 'live', 'ended'],
+    default: 'scheduled',
+  })
   status: EventStatus;
   @Prop({ type: Types.ObjectId, ref: 'Server', required: true })
   serverId: Types.ObjectId;

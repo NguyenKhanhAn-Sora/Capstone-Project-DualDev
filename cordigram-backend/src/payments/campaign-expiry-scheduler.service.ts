@@ -131,7 +131,9 @@ export class CampaignExpirySchedulerService
     );
 
     this.worker.on('failed', (job, err) => {
-      this.logger.error(`Campaign expire job failed ${job?.id}: ${err?.message}`);
+      this.logger.error(
+        `Campaign expire job failed ${job?.id}: ${err?.message}`,
+      );
     });
   }
 
@@ -157,7 +159,10 @@ export class CampaignExpirySchedulerService
 
     for (const item of activeCampaigns) {
       if (!item?._id || !item.expiresAt) continue;
-      await this.scheduleCampaignExpiry(item._id.toString(), new Date(item.expiresAt));
+      await this.scheduleCampaignExpiry(
+        item._id.toString(),
+        new Date(item.expiresAt),
+      );
     }
   }
 

@@ -38,7 +38,11 @@ export class RolesController {
     @Body() createRoleDto: CreateRoleDto,
     @Request() req: any,
   ) {
-    return this.rolesService.createRole(serverId, req.user.userId, createRoleDto);
+    return this.rolesService.createRole(
+      serverId,
+      req.user.userId,
+      createRoleDto,
+    );
   }
 
   /**
@@ -96,7 +100,11 @@ export class RolesController {
     @Body() reorderDto: ReorderRolesDto,
     @Request() req: any,
   ) {
-    return this.rolesService.reorderRoles(serverId, req.user.userId, reorderDto);
+    return this.rolesService.reorderRoles(
+      serverId,
+      req.user.userId,
+      reorderDto,
+    );
   }
 
   /**

@@ -1,4 +1,8 @@
 import { IsIn, IsOptional } from 'class-validator';
+import {
+  SUPPORTED_LANGUAGES,
+  type SupportedLanguage,
+} from '../language.constants';
 
 export class UpdateSettingsDto {
   @IsOptional()
@@ -6,6 +10,6 @@ export class UpdateSettingsDto {
   theme?: 'light' | 'dark';
 
   @IsOptional()
-  @IsIn(['en', 'vi'])
-  language?: 'en' | 'vi';
+  @IsIn(SUPPORTED_LANGUAGES as unknown as string[])
+  language?: SupportedLanguage;
 }

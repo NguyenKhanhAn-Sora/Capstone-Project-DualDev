@@ -29,6 +29,7 @@ import { Comment } from '../comment/comment.schema';
 import { ReportPost } from '../reportpost/reportpost.schema';
 import { ReportComment } from '../reportcomment/reportcomment.schema';
 import { ReportUser } from '../reportuser/reportuser.schema';
+import { type SupportedLanguage } from './language.constants';
 
 type NotificationCategoryKey = 'follow' | 'comment' | 'like' | 'mentions';
 
@@ -293,7 +294,7 @@ export class UsersService {
 
     const userIds = slice
       .map((doc) => doc.followerId?.toString?.())
-      .filter(Boolean) as string[];
+      .filter(Boolean);
 
     if (!userIds.length) {
       return { items: [], nextCursor };
@@ -445,7 +446,7 @@ export class UsersService {
 
     const userIds = slice
       .map((doc) => doc.followeeId?.toString?.())
-      .filter(Boolean) as string[];
+      .filter(Boolean);
 
     if (!userIds.length) {
       return { items: [], nextCursor };
@@ -876,9 +877,12 @@ export class UsersService {
     if (!user) return null;
 
     const accountLimitedUntil =
-      user.accountLimitedUntil instanceof Date ? user.accountLimitedUntil : null;
+      user.accountLimitedUntil instanceof Date
+        ? user.accountLimitedUntil
+        : null;
     const isExpired =
-      accountLimitedUntil != null && accountLimitedUntil.getTime() <= Date.now();
+      accountLimitedUntil != null &&
+      accountLimitedUntil.getTime() <= Date.now();
     const canAutoRelease =
       user.status === 'pending' &&
       user.signupStage === 'completed' &&
@@ -964,7 +968,8 @@ export class UsersService {
     const now = new Date();
     const nowMs = now.getTime();
 
-    const addDays = (days: number) => new Date(nowMs + days * 24 * 60 * 60 * 1000);
+    const addDays = (days: number) =>
+      new Date(nowMs + days * 24 * 60 * 60 * 1000);
     const maxDate = (a: Date | null, b: Date) => {
       if (!a) return b;
       return a.getTime() >= b.getTime() ? a : b;
@@ -972,7 +977,9 @@ export class UsersService {
 
     const activeSuspended =
       Boolean(user.suspendedIndefinitely) ||
-      Boolean(user.suspendedUntil && new Date(user.suspendedUntil).getTime() > nowMs) ||
+      Boolean(
+        user.suspendedUntil && new Date(user.suspendedUntil).getTime() > nowMs,
+      ) ||
       user.status === 'banned';
 
     if (crossedSuspend) {
@@ -985,7 +992,10 @@ export class UsersService {
         user.suspendedUntil && new Date(user.suspendedUntil).getTime() > nowMs
           ? new Date(user.suspendedUntil)
           : null;
-      const nextSuspendedUntil = maxDate(currentSuspendedUntil, targetSuspendedUntil);
+      const nextSuspendedUntil = maxDate(
+        currentSuspendedUntil,
+        targetSuspendedUntil,
+      );
 
       await this.userModel
         .updateOne(
@@ -1003,7 +1013,10 @@ export class UsersService {
         .exec();
 
       await this.logoutAllDevices({ userId: userObjectId.toString() });
-      this.notificationsService.emitForceLogout(userObjectId.toString(), 'suspended');
+      this.notificationsService.emitForceLogout(
+        userObjectId.toString(),
+        'suspended',
+      );
 
       const noticeBody = `Your strike total reached ${nextStrike}, so your account has been suspended until ${nextSuspendedUntil.toISOString()}.`;
       await this.notificationsService
@@ -1037,7 +1050,8 @@ export class UsersService {
 
       const targetLimitedUntil = addDays(ACCOUNT_LIMIT_DAYS);
       const currentLimitedUntil =
-        user.accountLimitedUntil && new Date(user.accountLimitedUntil).getTime() > nowMs
+        user.accountLimitedUntil &&
+        new Date(user.accountLimitedUntil).getTime() > nowMs
           ? new Date(user.accountLimitedUntil)
           : null;
       const nextLimitedUntil = maxDate(currentLimitedUntil, targetLimitedUntil);
@@ -1087,7 +1101,8 @@ export class UsersService {
 
     const targetReachRestrictedUntil = addDays(REACH_RESTRICT_DAYS);
     const currentReachRestrictedUntil =
-      user.reachRestrictedUntil && new Date(user.reachRestrictedUntil).getTime() > nowMs
+      user.reachRestrictedUntil &&
+      new Date(user.reachRestrictedUntil).getTime() > nowMs
         ? new Date(user.reachRestrictedUntil)
         : null;
     const nextReachRestrictedUntil = maxDate(
@@ -1169,23 +1184,26 @@ export class UsersService {
       const isSuspendedActive =
         user.status === 'banned' ||
         Boolean(user.suspendedIndefinitely) ||
-        Boolean(user.suspendedUntil && new Date(user.suspendedUntil).getTime() > nowMs);
+        Boolean(
+          user.suspendedUntil &&
+          new Date(user.suspendedUntil).getTime() > nowMs,
+        );
       const isLimitedActive =
         (user.status === 'pending' && user.signupStage === 'completed') ||
         Boolean(user.accountLimitedIndefinitely) ||
         Boolean(
           user.accountLimitedUntil &&
-            new Date(user.accountLimitedUntil).getTime() > nowMs,
+          new Date(user.accountLimitedUntil).getTime() > nowMs,
         );
       const isInteractionMutedActive =
         Boolean(user.interactionMutedIndefinitely) ||
         Boolean(
           user.interactionMutedUntil &&
-            new Date(user.interactionMutedUntil).getTime() > nowMs,
+          new Date(user.interactionMutedUntil).getTime() > nowMs,
         );
       const isReachRestrictedActive = Boolean(
         user.reachRestrictedUntil &&
-          new Date(user.reachRestrictedUntil).getTime() > nowMs,
+        new Date(user.reachRestrictedUntil).getTime() > nowMs,
       );
 
       if (
@@ -1199,46 +1217,48 @@ export class UsersService {
 
       const userObjectId = new Types.ObjectId(user._id);
 
-      const [lastViolation, lastDecay, decayCountThisMonth] = await Promise.all([
-        this.moderationActionModel
-          .findOne({
-            targetType: 'user',
-            targetId: userObjectId,
-            invalidatedAt: null,
-            action: {
-              $in: [
-                'remove_post',
-                'restrict_post',
-                'delete_comment',
-                'suspend_user',
-                'limit_account',
-                'violation',
-              ],
-            },
-          })
-          .sort({ createdAt: -1 })
-          .select('createdAt')
-          .lean()
-          .exec(),
-        this.moderationActionModel
-          .findOne({
+      const [lastViolation, lastDecay, decayCountThisMonth] = await Promise.all(
+        [
+          this.moderationActionModel
+            .findOne({
+              targetType: 'user',
+              targetId: userObjectId,
+              invalidatedAt: null,
+              action: {
+                $in: [
+                  'remove_post',
+                  'restrict_post',
+                  'delete_comment',
+                  'suspend_user',
+                  'limit_account',
+                  'violation',
+                ],
+              },
+            })
+            .sort({ createdAt: -1 })
+            .select('createdAt')
+            .lean()
+            .exec(),
+          this.moderationActionModel
+            .findOne({
+              targetType: 'user',
+              targetId: userObjectId,
+              invalidatedAt: null,
+              action: 'strike_decay_auto',
+            })
+            .sort({ createdAt: -1 })
+            .select('createdAt')
+            .lean()
+            .exec(),
+          this.moderationActionModel.countDocuments({
             targetType: 'user',
             targetId: userObjectId,
             invalidatedAt: null,
             action: 'strike_decay_auto',
-          })
-          .sort({ createdAt: -1 })
-          .select('createdAt')
-          .lean()
-          .exec(),
-        this.moderationActionModel.countDocuments({
-          targetType: 'user',
-          targetId: userObjectId,
-          invalidatedAt: null,
-          action: 'strike_decay_auto',
-          createdAt: { $gte: monthStartUtc },
-        }),
-      ]);
+            createdAt: { $gte: monthStartUtc },
+          }),
+        ],
+      );
 
       if (decayCountThisMonth >= STRIKE_DECAY_MONTHLY_CAP) {
         continue;
@@ -1253,7 +1273,10 @@ export class UsersService {
       }
 
       const latestBlockingAt =
-        lastViolation?.createdAt ?? lastDecay?.createdAt ?? user.createdAt ?? now;
+        lastViolation?.createdAt ??
+        lastDecay?.createdAt ??
+        user.createdAt ??
+        now;
       const latestBlockingDate = new Date(latestBlockingAt);
       if (
         Number.isNaN(latestBlockingDate.getTime()) ||
@@ -1283,7 +1306,9 @@ export class UsersService {
         .updateOne({ _id: userObjectId }, { $set: { strikeCount: nextStrike } })
         .exec();
 
-      const moderatorId = admin?._id ? new Types.ObjectId(admin._id) : userObjectId;
+      const moderatorId = admin?._id
+        ? new Types.ObjectId(admin._id)
+        : userObjectId;
       for (let i = 0; i < decayAmount; i += 1) {
         const decayKind = i === 0 ? 'base' : 'bonus';
         const reasonText =
@@ -1347,67 +1372,81 @@ export class UsersService {
   }): Promise<boolean> {
     const { userObjectId, now } = params;
     const windowStart = new Date(
-      now.getTime() - STRIKE_DECAY_GOOD_BEHAVIOR_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+      now.getTime() -
+        STRIKE_DECAY_GOOD_BEHAVIOR_WINDOW_DAYS * 24 * 60 * 60 * 1000,
     );
 
-    const [recentPostIds, recentCommentIds, positiveActionsCount] = await Promise.all([
-      this.postModel
-        .find({
-          authorId: userObjectId,
-          status: 'published',
-          deletedAt: null,
+    const [recentPostIds, recentCommentIds, positiveActionsCount] =
+      await Promise.all([
+        this.postModel
+          .find({
+            authorId: userObjectId,
+            status: 'published',
+            deletedAt: null,
+            createdAt: { $gte: windowStart },
+          })
+          .select('_id')
+          .lean()
+          .exec(),
+        this.commentModel
+          .find({
+            authorId: userObjectId,
+            deletedAt: null,
+            createdAt: { $gte: windowStart },
+          })
+          .select('_id')
+          .lean()
+          .exec(),
+        this.activityLogModel.countDocuments({
+          userId: userObjectId,
           createdAt: { $gte: windowStart },
-        })
-        .select('_id')
-        .lean()
-        .exec(),
-      this.commentModel
-        .find({
-          authorId: userObjectId,
-          deletedAt: null,
-          createdAt: { $gte: windowStart },
-        })
-        .select('_id')
-        .lean()
-        .exec(),
-      this.activityLogModel.countDocuments({
-        userId: userObjectId,
-        createdAt: { $gte: windowStart },
-        type: {
-          $in: ['post_like', 'comment_like', 'comment', 'repost', 'save', 'follow'],
-        },
-      }),
-    ]);
+          type: {
+            $in: [
+              'post_like',
+              'comment_like',
+              'comment',
+              'repost',
+              'save',
+              'follow',
+            ],
+          },
+        }),
+      ]);
 
     if (recentPostIds.length < STRIKE_DECAY_GOOD_BEHAVIOR_MIN_POSTS) {
       return false;
     }
 
-    if (positiveActionsCount < STRIKE_DECAY_GOOD_BEHAVIOR_MIN_POSITIVE_ACTIONS) {
+    if (
+      positiveActionsCount < STRIKE_DECAY_GOOD_BEHAVIOR_MIN_POSITIVE_ACTIONS
+    ) {
       return false;
     }
 
     const postIdList = recentPostIds.map((item) => item._id).filter(Boolean);
-    const commentIdList = recentCommentIds.map((item) => item._id).filter(Boolean);
+    const commentIdList = recentCommentIds
+      .map((item) => item._id)
+      .filter(Boolean);
 
-    const [openPostReports, openCommentReports, openUserReports] = await Promise.all([
-      postIdList.length
-        ? this.reportPostModel.countDocuments({
-            postId: { $in: postIdList },
-            status: 'open',
-          })
-        : Promise.resolve(0),
-      commentIdList.length
-        ? this.reportCommentModel.countDocuments({
-            commentId: { $in: commentIdList },
-            status: 'open',
-          })
-        : Promise.resolve(0),
-      this.reportUserModel.countDocuments({
-        targetUserId: userObjectId,
-        status: 'open',
-      }),
-    ]);
+    const [openPostReports, openCommentReports, openUserReports] =
+      await Promise.all([
+        postIdList.length
+          ? this.reportPostModel.countDocuments({
+              postId: { $in: postIdList },
+              status: 'open',
+            })
+          : Promise.resolve(0),
+        commentIdList.length
+          ? this.reportCommentModel.countDocuments({
+              commentId: { $in: commentIdList },
+              status: 'open',
+            })
+          : Promise.resolve(0),
+        this.reportUserModel.countDocuments({
+          targetUserId: userObjectId,
+          status: 'open',
+        }),
+      ]);
 
     return openPostReports + openCommentReports + openUserReports === 0;
   }
@@ -1482,7 +1521,7 @@ export class UsersService {
 
   async getSettings(userId: string): Promise<{
     theme: 'light' | 'dark';
-    language: 'en' | 'vi';
+    language: SupportedLanguage;
   }> {
     const user = await this.userModel
       .findById(userId)
@@ -1670,7 +1709,7 @@ export class UsersService {
         ? profileMap.get(block.blockedId) || null
         : null;
       return {
-        userId: block.blockedId as string,
+        userId: block.blockedId,
         username: profile?.username,
         displayName: profile?.displayName,
         avatarUrl: profile?.avatarUrl,
@@ -1731,9 +1770,7 @@ export class UsersService {
       .select('passkey passkeyEnabled trustedDevices')
       .lean()
       .exec();
-    const enabled = Boolean(user?.passkey)
-      ? user?.passkeyEnabled !== false
-      : false;
+    const enabled = user?.passkey ? user?.passkeyEnabled !== false : false;
     const hasPasskey = Boolean(user?.passkey) && enabled;
     if (!params.deviceId) {
       return { trusted: false, hasPasskey, enabled };
@@ -2054,8 +2091,8 @@ export class UsersService {
   async updateSettings(params: {
     userId: string;
     theme?: 'light' | 'dark';
-    language?: 'en' | 'vi';
-  }): Promise<{ theme: 'light' | 'dark'; language: 'en' | 'vi' }> {
+    language?: SupportedLanguage;
+  }): Promise<{ theme: 'light' | 'dark'; language: SupportedLanguage }> {
     const update: Record<string, unknown> = {};
     if (params.theme) {
       update['settings.theme'] = params.theme;
@@ -2843,7 +2880,10 @@ export class UsersService {
     return Boolean(follow?._id);
   }
 
-  async getViolationHistory(params: { userId: string; limit?: number }): Promise<{
+  async getViolationHistory(params: {
+    userId: string;
+    limit?: number;
+  }): Promise<{
     currentStrikeTotal: number;
     items: Array<{
       id: string;
@@ -2872,7 +2912,11 @@ export class UsersService {
     const rawActions = await this.moderationActionModel
       .find({
         action: {
-          $nin: ['no_violation', 'rollback_moderation', 'auto_hidden_pending_review'],
+          $nin: [
+            'no_violation',
+            'rollback_moderation',
+            'auto_hidden_pending_review',
+          ],
         },
         invalidatedAt: null,
       })
@@ -2992,11 +3036,14 @@ export class UsersService {
 
       const previewText =
         item.targetType === 'post'
-          ? postMap.get(item.targetId.toString())?.content?.trim()?.slice(0, 160) ||
-            null
+          ? postMap
+              .get(item.targetId.toString())
+              ?.content?.trim()
+              ?.slice(0, 160) || null
           : item.targetType === 'comment'
-            ? commentMap.get(item.targetId.toString())?.content
-                ?.trim()
+            ? commentMap
+                .get(item.targetId.toString())
+                ?.content?.trim()
                 ?.slice(0, 160) || null
             : null;
 
@@ -3016,8 +3063,8 @@ export class UsersService {
         item.targetType === 'post'
           ? item.targetId.toString()
           : item.targetType === 'comment'
-            ? commentMap.get(item.targetId.toString())?.postId?.toString?.() ??
-              null
+            ? (commentMap.get(item.targetId.toString())?.postId?.toString?.() ??
+              null)
             : null;
 
       const relatedPost = relatedPostId ? postMap.get(relatedPostId) : null;

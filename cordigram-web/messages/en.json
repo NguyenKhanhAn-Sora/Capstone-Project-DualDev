@@ -8,7 +8,15 @@
         "description": "Select your preferred display language.",
         "options": {
           "en": "English",
-          "vi": "Vietnamese"
+          "vi": "Vietnamese",
+          "es": "Spanish",
+          "fr": "French",
+          "de": "German",
+          "pt-BR": "Portuguese (Brazil)",
+          "ru": "Russian",
+          "ja": "Japanese",
+          "ko": "Korean",
+          "zh": "Chinese"
         }
       },
       "theme": {

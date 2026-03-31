@@ -110,7 +110,9 @@ export class CreatorVerificationService {
     const [user, profile] = await Promise.all([
       this.userModel
         .findById(userObjectId)
-        .select('createdAt followerCount roles isCreatorVerified creatorVerificationApprovedAt email')
+        .select(
+          'createdAt followerCount roles isCreatorVerified creatorVerificationApprovedAt email',
+        )
         .lean(),
       this.profileModel
         .findOne({ userId: userObjectId })
@@ -122,8 +124,12 @@ export class CreatorVerificationService {
       throw new NotFoundException('User not found');
     }
 
-    const accountAgeMs = Date.now() - new Date(user.createdAt ?? Date.now()).getTime();
-    const accountAgeDays = Math.max(0, Math.floor(accountAgeMs / (24 * 60 * 60 * 1000)));
+    const accountAgeMs =
+      Date.now() - new Date(user.createdAt ?? Date.now()).getTime();
+    const accountAgeDays = Math.max(
+      0,
+      Math.floor(accountAgeMs / (24 * 60 * 60 * 1000)),
+    );
 
     const followersCount = Math.max(
       0,
@@ -190,13 +196,23 @@ export class CreatorVerificationService {
         invalidatedAt: null,
         createdAt: { $gte: since90d },
         action: {
-          $in: ['warn', 'mute_interaction', 'suspend_user', 'limit_account', 'violation'],
+          $in: [
+            'warn',
+            'mute_interaction',
+            'suspend_user',
+            'limit_account',
+            'violation',
+          ],
         },
       })
       .exec();
 
-    const followersScore = clampPercent((followersCount / CRITERIA.minFollowersCount) * 100);
-    const postsScore = clampPercent((postsCount / CRITERIA.minPostsCount) * 100);
+    const followersScore = clampPercent(
+      (followersCount / CRITERIA.minFollowersCount) * 100,
+    );
+    const postsScore = clampPercent(
+      (postsCount / CRITERIA.minPostsCount) * 100,
+    );
     const consistencyScore = clampPercent(
       (activePostingDays30d / CRITERIA.minActivePostingDays30d) * 100,
     );
@@ -204,7 +220,9 @@ export class CreatorVerificationService {
       (engagementPerPost30d / CRITERIA.minEngagementPerPost30d) * 100,
     );
     const trustScore = clampPercent(
-      100 - (recentViolations90d / Math.max(CRITERIA.maxRecentViolations90d, 1)) * 100,
+      100 -
+        (recentViolations90d / Math.max(CRITERIA.maxRecentViolations90d, 1)) *
+          100,
     );
 
     const weightedScore =
@@ -279,15 +297,15 @@ export class CreatorVerificationService {
     const now = Date.now();
     const inCooldown = Boolean(
       latest?.status === 'rejected' &&
-        latest?.cooldownUntil &&
-        new Date(latest.cooldownUntil).getTime() > now,
+      latest?.cooldownUntil &&
+      new Date(latest.cooldownUntil).getTime() > now,
     );
 
     const canRequest = Boolean(
-      !Boolean(user?.isCreatorVerified) &&
-        latest?.status !== 'pending' &&
-        (!CREATOR_VERIFICATION_REQUIRE_ELIGIBILITY ||
-          (snapshot.eligible && !inCooldown)),
+      !user?.isCreatorVerified &&
+      latest?.status !== 'pending' &&
+      (!CREATOR_VERIFICATION_REQUIRE_ELIGIBILITY ||
+        (snapshot.eligible && !inCooldown)),
     );
 
     return {
@@ -322,12 +340,17 @@ export class CreatorVerificationService {
       if (status.latestRequest?.status === 'pending') {
         throw new BadRequestException('You already have a pending request');
       }
-      if (status.latestRequest?.status === 'rejected' && status.latestRequest.cooldownUntil) {
+      if (
+        status.latestRequest?.status === 'rejected' &&
+        status.latestRequest.cooldownUntil
+      ) {
         throw new BadRequestException(
           `Please wait until ${new Date(status.latestRequest.cooldownUntil).toISOString()} to request again`,
         );
       }
-      throw new BadRequestException('You are not eligible to request creator verification yet');
+      throw new BadRequestException(
+        'You are not eligible to request creator verification yet',
+      );
     }
 
     const newRequest = await this.requestModel.create({
@@ -397,12 +420,17 @@ export class CreatorVerificationService {
       .find(query)
       .sort({ createdAt: sortDirection })
       .limit(safeLimit)
-      .populate('userId', 'email roles isCreatorVerified creatorVerificationApprovedAt createdAt')
+      .populate(
+        'userId',
+        'email roles isCreatorVerified creatorVerificationApprovedAt createdAt',
+      )
       .lean();
 
     const userIds = rows
       .map((row) =>
-        extractUserIdFromRef(row.userId as Types.ObjectId | { _id?: Types.ObjectId }),
+        extractUserIdFromRef(
+          row.userId as Types.ObjectId | { _id?: Types.ObjectId },
+        ),
       )
       .filter(Boolean)
       .map((id) => new Types.ObjectId(id));
@@ -436,7 +464,9 @@ export class CreatorVerificationService {
           id: userId,
           email: (row.userId as { email?: string })?.email ?? null,
           roles: (row.userId as { roles?: string[] })?.roles ?? [],
-          isCreatorVerified: Boolean((row.userId as { isCreatorVerified?: boolean })?.isCreatorVerified),
+          isCreatorVerified: Boolean(
+            (row.userId as { isCreatorVerified?: boolean })?.isCreatorVerified,
+          ),
           creatorVerifiedAt:
             (row.userId as { creatorVerificationApprovedAt?: Date | null })
               ?.creatorVerificationApprovedAt ?? null,
@@ -451,14 +481,20 @@ export class CreatorVerificationService {
 
     return {
       items,
-      nextCursor: items.length === safeLimit ? items[items.length - 1]?.createdAt ?? null : null,
+      nextCursor:
+        items.length === safeLimit
+          ? (items[items.length - 1]?.createdAt ?? null)
+          : null,
     };
   }
 
   async getRequestDetailForAdmin(requestId: string) {
     const request = await this.requestModel
       .findById(requestId)
-      .populate('userId', 'email roles isCreatorVerified creatorVerificationApprovedAt createdAt')
+      .populate(
+        'userId',
+        'email roles isCreatorVerified creatorVerificationApprovedAt createdAt',
+      )
       .lean();
 
     if (!request) {
@@ -483,61 +519,60 @@ export class CreatorVerificationService {
       activeActionCount,
       creatorReviewHistory,
       creatorRevokeHistory,
-    ] =
-      await Promise.all([
-        this.profileModel
-          .findOne({ userId: userObjectId })
-          .select('displayName username avatarUrl bio location workplace stats')
-          .lean(),
-        this.buildEligibilitySnapshot(userId),
-        this.postModel
-          .find({
-            authorId: userObjectId,
-            status: 'published',
-            visibility: 'public',
-            kind: { $in: ['post', 'reel'] },
-            moderationState: { $ne: 'removed' },
-            deletedAt: null,
-          })
-          .sort({ createdAt: -1 })
-          .limit(20)
-          .select('kind content media stats visibility moderationState createdAt')
-          .lean(),
-        this.moderationActionModel
-          .find({
-            targetType: 'user',
-            targetId: userObjectId,
-            invalidatedAt: null,
-          })
-          .sort({ createdAt: -1 })
-          .limit(5)
-          .select('action category reason severity note expiresAt createdAt')
-          .lean(),
-        this.moderationActionModel.countDocuments({
+    ] = await Promise.all([
+      this.profileModel
+        .findOne({ userId: userObjectId })
+        .select('displayName username avatarUrl bio location workplace stats')
+        .lean(),
+      this.buildEligibilitySnapshot(userId),
+      this.postModel
+        .find({
+          authorId: userObjectId,
+          status: 'published',
+          visibility: 'public',
+          kind: { $in: ['post', 'reel'] },
+          moderationState: { $ne: 'removed' },
+          deletedAt: null,
+        })
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .select('kind content media stats visibility moderationState createdAt')
+        .lean(),
+      this.moderationActionModel
+        .find({
           targetType: 'user',
           targetId: userObjectId,
           invalidatedAt: null,
-        }),
-        this.requestModel
-          .find({
-            userId: userObjectId,
-            reviewedAt: { $ne: null },
-            status: { $in: ['approved', 'rejected'] },
-          })
-          .sort({ reviewedAt: -1, createdAt: -1 })
-          .select('status decisionReason reviewedAt reviewedBy createdAt')
-          .lean(),
-        this.moderationActionModel
-          .find({
-            targetType: 'user',
-            targetId: userObjectId,
-            invalidatedAt: null,
-            action: 'creator_verification_revoked',
-          })
-          .sort({ createdAt: -1 })
-          .select('action note moderatorId createdAt')
-          .lean(),
-      ]);
+        })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select('action category reason severity note expiresAt createdAt')
+        .lean(),
+      this.moderationActionModel.countDocuments({
+        targetType: 'user',
+        targetId: userObjectId,
+        invalidatedAt: null,
+      }),
+      this.requestModel
+        .find({
+          userId: userObjectId,
+          reviewedAt: { $ne: null },
+          status: { $in: ['approved', 'rejected'] },
+        })
+        .sort({ reviewedAt: -1, createdAt: -1 })
+        .select('status decisionReason reviewedAt reviewedBy createdAt')
+        .lean(),
+      this.moderationActionModel
+        .find({
+          targetType: 'user',
+          targetId: userObjectId,
+          invalidatedAt: null,
+          action: 'creator_verification_revoked',
+        })
+        .sort({ createdAt: -1 })
+        .select('action note moderatorId createdAt')
+        .lean(),
+    ]);
 
     const recentPostIds = recentPublicPosts
       .map((post) => normalizeId(post._id))
@@ -596,7 +631,9 @@ export class CreatorVerificationService {
       historyAdminUsers.map((item) => [normalizeId(item._id), item]),
     );
 
-    const getHistoryActor = (adminId: Types.ObjectId | string | null | undefined) => {
+    const getHistoryActor = (
+      adminId: Types.ObjectId | string | null | undefined,
+    ) => {
       const normalizedAdminId = normalizeId(adminId);
       if (!normalizedAdminId) {
         return {
@@ -683,16 +720,19 @@ export class CreatorVerificationService {
         kind: post.kind,
         content: (post.content ?? '').slice(0, 240),
         mediaCount: Array.isArray(post.media) ? post.media.length : 0,
-        coverUrl: Array.isArray(post.media) && post.media.length ? post.media[0]?.url ?? null : null,
+        coverUrl:
+          Array.isArray(post.media) && post.media.length
+            ? (post.media[0]?.url ?? null)
+            : null,
         media: Array.isArray(post.media)
           ? post.media.map((item) => ({
               type: item?.type === 'video' ? 'video' : 'image',
               url: typeof item?.url === 'string' ? item.url : null,
               originalUrl:
                 typeof item?.metadata?.['originalSecureUrl'] === 'string'
-                  ? (item.metadata?.['originalSecureUrl'] as string)
+                  ? item.metadata?.['originalSecureUrl']
                   : typeof item?.metadata?.['originalUrl'] === 'string'
-                    ? (item.metadata?.['originalUrl'] as string)
+                    ? item.metadata?.['originalUrl']
                     : null,
             }))
           : [],
@@ -740,7 +780,9 @@ export class CreatorVerificationService {
       throw new BadRequestException('Only pending requests can be reviewed');
     }
 
-    const user = await this.userModel.findById(request.userId).select('email roles isCreatorVerified');
+    const user = await this.userModel
+      .findById(request.userId)
+      .select('email roles isCreatorVerified');
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -833,13 +875,14 @@ export class CreatorVerificationService {
 
     user.isCreatorVerified = false;
     user.set('creatorVerificationApprovedAt', null);
-    user.roles = (user.roles ?? []).filter((role) => role !== 'creator') as Array<
-      'user' | 'creator' | 'admin'
-    >;
+    user.roles = (user.roles ?? []).filter(
+      (role) => role !== 'creator',
+    ) as Array<'user' | 'creator' | 'admin'>;
 
     request.reviewedBy = new Types.ObjectId(params.adminId);
     request.reviewedAt = new Date();
-    request.decisionReason = (params.note ?? '').trim() || 'Creator access revoked by admin';
+    request.decisionReason =
+      (params.note ?? '').trim() || 'Creator access revoked by admin';
 
     await Promise.all([user.save(), request.save()]);
 

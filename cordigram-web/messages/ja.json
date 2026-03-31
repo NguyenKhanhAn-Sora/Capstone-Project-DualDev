@@ -1,0 +1,1160 @@
+{
+  "settings": {
+    "system": {
+      "title": "システム",
+      "description": "言語とテーマの設定を選択してください。",
+      "language": {
+        "title": "言語",
+        "description": "表示言語を選択してください。",
+        "options": {
+          "en": "英語",
+          "vi": "ベトナム語",
+          "es": "スペイン語",
+          "fr": "フランス語",
+          "de": "ドイツ語",
+          "pt-BR": "ポルトガル語（ブラジル）",
+          "ru": "ロシア語",
+          "ja": "日本語",
+          "ko": "韓国語",
+          "zh": "中国語"
+        }
+      },
+      "theme": {
+        "title": "テーマ",
+        "description": "ライトモードとダークモードを切り替える。",
+        "options": {
+          "light": "光",
+          "dark": "ダーク"
+        }
+      }
+    },
+    "notifications": {
+      "title": "通知",
+      "description": "通知アラートを受け取るタイミングを調整できます。",
+      "loading": "読み込み中...",
+      "push": {
+        "title": "プッシュ通知",
+        "hint": "通知をミュートしても、新しい通知は保存されますが、リアルタイムで通知されることはありません。"
+      },
+      "actions": {
+        "mute": "ミュート",
+        "edit": "編集",
+        "enable": "有効にする"
+      },
+      "status": {
+        "enabled": "有効",
+        "muted": "ミュート",
+        "mutedUntilManual": "再度オンにするまでミュート状態になります",
+        "mutedRelative": "ミュートされた{relative}"
+      },
+      "muteOptions": {
+        "5m": "5分",
+        "10m": "10分",
+        "15m": "15分",
+        "30m": "30分",
+        "1h": "1時間",
+        "1d": "1日",
+        "until": "再び電源を入れるまでは",
+        "custom": "日時を選択してください"
+      },
+      "categories": {
+        "follow": {
+          "label": "以下",
+          "description": "誰かがあなたをフォローしたとき。"
+        },
+        "comment": {
+          "label": "コメント",
+          "description": "誰かがあなたの投稿やリールにコメントしたとき。"
+        },
+        "like": {
+          "label": "「いいね」",
+          "description": "誰かがあなたの投稿、リール、またはコメントに「いいね」をしたとき。"
+        },
+        "mentions": {
+          "label": "メンションとタグ",
+          "description": "誰かがあなたについて言及したり、あなたをタグ付けしたりしたとき。"
+        }
+      },
+      "errors": {
+        "loadFailed": "通知設定を読み込めません。",
+        "updateFailed": "通知を更新できません。",
+        "invalidDateTime": "有効な日時を選択してください。",
+        "chooseFutureTime": "今後の日時をお選びください。"
+      }
+    }
+  },
+  "sidebar": {
+    "nav": {
+      "home": "ホーム",
+      "search": "検索",
+      "message": "メッセージ",
+      "following": "以下",
+      "explore": "探検する",
+      "notification": "お知らせ",
+      "ads": "広告",
+      "create": "作成",
+      "reels": "リール"
+    },
+    "menu": {
+      "profile": "プロフィール",
+      "settings": "設定",
+      "saved": "保存済み",
+      "switchToLight": "ライトに切り替える",
+      "switchToDark": "ダークモードに切り替える",
+      "reportProblem": "問題を報告する",
+      "switchAccount": "アカウントを切り替える",
+      "logout": "ログアウト"
+    },
+    "switchAccount": {
+      "title": "続行するにはログインしてください",
+      "email": {
+        "label": "メールアドレス",
+        "placeholder": "メールアドレスを入力してください"
+      },
+      "password": {
+        "label": "パスワード",
+        "placeholder": "パスワードを入力してください",
+        "show": "パスワードを表示",
+        "hide": "パスワードを非表示にする"
+      },
+      "submit": {
+        "label": "ログイン",
+        "loading": "切り替え中..."
+      },
+      "google": "Googleで続ける",
+      "errors": {
+        "invalidEmail": "メールの形式が不正です",
+        "loginFailed": "ログインに失敗しました。もう一度お試しください。"
+      }
+    }
+  },
+  "common": {
+    "close": "閉じる",
+    "hidePost": "投稿を非表示にする"
+  },
+  "home": {
+    "feed": {
+      "signInToView": "フィードを表示するにはログインしてください",
+      "unableToLoad": "フィードを読み込めません",
+      "followingEmpty": "まだ誰にもフォローしていません。あるいは、フォローしている人がまだ何も投稿していません。",
+      "loadMore": "さらに表示",
+      "suggestionsAria": "ご提案"
+    },
+    "toast": {
+      "signInToRepost": "ログインして再投稿する",
+      "reposted": "再投稿",
+      "repostedWithQuote": "引用付きで再投稿",
+      "commentsOn": "コメント機能は有効になっています",
+      "commentsOff": "コメントは受け付けていません",
+      "commentsUpdateFailed": "コメントの更新に失敗しました",
+      "likeCountHidden": "「いいね」数を非表示にする",
+      "likeCountVisible": "「いいね」の数を表示",
+      "likeCountUpdateFailed": "「いいね」数の表示設定の更新に失敗しました",
+      "linkCopied": "リンクがクリップボードにコピーされました",
+      "linkCopyFailed": "リンクのコピーに失敗しました",
+      "signInToDelete": "投稿を削除するには、ログインしてください",
+      "deletedPost": "削除された投稿",
+      "deleteFailed": "投稿の削除に失敗しました",
+      "reportSubmitted": "報告書の提出",
+      "reportSubmitFailed": "レポートを送信できませんでした",
+      "actionFailed": "操作に失敗しました",
+      "blockFailed": "ブロックの作成に失敗しました"
+    },
+    "delete": {
+      "title": "この投稿を削除しますか？",
+      "body": "{name}",
+      "cancel": "キャンセル",
+      "confirm": "削除",
+      "deleting": "削除中..."
+    },
+    "block": {
+      "title": "このアカウントをブロックしますか？",
+      "body": "{name} をブロックしようとしています。このユーザーは、今後あなたとやり取りできなくなります。",
+      "cancel": "キャンセル",
+      "confirm": "ブロック",
+      "blocking": "接続中...",
+      "thisUser": "このユーザー"
+    },
+    "report": {
+      "title": "この投稿を報告する",
+      "description": "{name}の投稿に関する報告です。最も適切な理由を選択してください。",
+      "selectReason": "具体的な理由を選択してください",
+      "pickCategory": "まずカテゴリを選んでください。",
+      "cancel": "キャンセル",
+      "submit": "レポートを送信",
+      "submitting": "送信中...",
+      "notes": {
+        "label": "補足（任意）",
+        "placeholder": "必要に応じて、簡単な背景情報を追加してください..."
+      },
+      "groups": {
+        "abuse": {
+          "label": "ハラスメント／ヘイトスピーチ",
+          "reasons": {
+            "harassment": "特定の個人を標的にして嫌がらせをする",
+            "hateSpeech": "ヘイトスピーチや差別",
+            "offensiveDiscrimination": "社会的弱者を標的にする"
+          }
+        },
+        "violence": {
+          "label": "暴力・脅迫",
+          "reasons": {
+            "violenceThreats": "暴力を助長したり、暴力をほのめかしたりする",
+            "graphicViolence": "過激な暴力描写",
+            "extremism": "過激主義またはテロリズム",
+            "selfHarm": "自傷行為または自殺"
+          }
+        },
+        "sensitive": {
+          "label": "センシティブな内容",
+          "reasons": {
+            "nudity": "ヌードやアダルトコンテンツ",
+            "minorNudity": "軽微な安全上のリスク",
+            "sexualSolicitation": "売春勧誘"
+          }
+        },
+        "misinfo": {
+          "label": "なりすまし／誤情報",
+          "reasons": {
+            "fakeNews": "虚偽または誤解を招く情報",
+            "impersonation": "個人または組織へのなりすまし"
+          }
+        },
+        "spam": {
+          "label": "スパム／詐欺",
+          "reasons": {
+            "spam": "スパムまたは無関係なコンテンツ",
+            "financialScam": "金融詐欺",
+            "unsolicitedAds": "迷惑な広告"
+          }
+        },
+        "ip": {
+          "label": "知的財産",
+          "reasons": {
+            "copyright": "著作権侵害",
+            "trademark": "商標権侵害",
+            "brandImpersonation": "ブランドなりすまし"
+          }
+        },
+        "illegal": {
+          "label": "違法行為",
+          "reasons": {
+            "contraband": "密輸品",
+            "illegalTransaction": "違法取引"
+          }
+        },
+        "privacy": {
+          "label": "プライバシーの侵害",
+          "reasons": {
+            "doxxing": "個人情報の暴露",
+            "nonconsensualIntimate": "同意のない性的コンテンツ"
+          }
+        },
+        "other": {
+          "label": "その他",
+          "reasons": {
+            "other": "その他の理由"
+          }
+        }
+      }
+    },
+    "visibility": {
+      "title": "表示設定の編集",
+      "description": "この投稿を誰に表示するかを選択してください。",
+      "cancel": "キャンセル",
+      "update": "表示設定を更新",
+      "updating": "更新中...",
+      "signIn": "ログインしてください",
+      "updateFailed": "表示設定の更新に失敗しました",
+      "options": {
+        "public": {
+          "title": "公開",
+          "description": "この投稿は誰でも閲覧できます"
+        },
+        "followers": {
+          "title": "友達 / フォロー中",
+          "description": "この投稿はフォロワーのみ閲覧可能です"
+        },
+        "private": {
+          "title": "非公開",
+          "description": "この投稿を見ることができるのはあなただけです"
+        }
+      }
+    },
+    "edit": {
+      "title": "投稿を編集する",
+      "caption": "キャプション",
+      "addEmoji": "絵文字を追加",
+      "emojiIcon": "絵文字アイコン",
+      "placeholder": "何か書いてみて…",
+      "searching": "検索中...",
+      "noMatches": "該当する結果はありません",
+      "hashtags": "ハッシュタグ",
+      "addHashtag": "ハッシュタグを追加",
+      "removeHashtag": "{tag} を削除する",
+      "location": {
+        "label": "場所",
+        "placeholder": "場所を追加する",
+        "noSuggestions": "提案はありません",
+        "noSuggestionsError": "該当する提案が見つかりませんでした。別のキーワードをお試しください。"
+      },
+      "allowComments": {
+        "title": "コメントを許可する",
+        "hint": "全員からフィードバックを受け取れるようにする"
+      },
+      "allowDownloads": {
+        "title": "ダウンロードを許可する",
+        "hint": "信頼できる人に元のファイルを共有してください",
+        "inheritedLoading": "元の投稿から引き継がれました（読み込み中…）",
+        "inheritedLocked": "元の投稿から引き継がれたものです（変更できません）"
+      },
+      "hideLike": {
+        "title": "「いいね」を非表示にする",
+        "hint": "この投稿の「いいね！」数は表示されません"
+      },
+      "cancel": "キャンセル",
+      "saveChanges": "変更を保存",
+      "saving": "保存中...",
+      "signInToEdit": "投稿を編集するには、ログインしてください",
+      "updated": "投稿を更新しました",
+      "updateFailed": "投稿の更新に失敗しました"
+    },
+    "mention": {
+      "signIn": "ログインしてユーザーにメンションする",
+      "userNotFound": "ユーザーが見つかりません"
+    },
+    "menu": {
+      "editPost": "投稿を編集する",
+      "editVisibility": "表示設定の編集",
+      "muteNotifications": "通知をミュートする",
+      "turnOffComments": "コメントを非表示にする",
+      "turnOnComments": "コメントを有効にする",
+      "showLike": "「いいね」を表示",
+      "hideLike": "「いいね」を非表示にする",
+      "goToPost": "投稿へ",
+      "copyLink": "リンクをコピー",
+      "deletePost": "投稿を削除",
+      "unfollow": "フォロー解除",
+      "follow": "フォロー",
+      "save": "この投稿を保存する",
+      "unsave": "この投稿を保存解除する",
+      "hidePost": "この投稿を非表示にする",
+      "report": "レポート",
+      "blockAccount": "このアカウントをブロックする"
+    },
+    "follow": {
+      "following": "以下",
+      "follow": "フォロー",
+      "unfollow": "フォロー解除"
+    },
+    "repost": {
+      "banner": "転載元：",
+      "original": "元の投稿"
+    },
+    "content": {
+      "seeMore": "もっと見る",
+      "collapse": "折りたたむ"
+    },
+    "media": {
+      "tapForSound": "タップして音を再生",
+      "previous": "以前のメディア",
+      "next": "次のメディア",
+      "alt": "メディア",
+      "overlayAlt": "投稿メディア"
+    },
+    "actions": {
+      "liked": "「いいね！」",
+      "like": "「いいね」",
+      "comment": "コメント",
+      "saved": "保存済み",
+      "save": "保存",
+      "repost": "再投稿"
+    },
+    "repostOverlay": {
+      "visibility": {
+        "public": {
+          "title": "公開",
+          "description": "この再投稿は誰でも閲覧できます"
+        },
+        "followers": {
+          "title": "フォロワー",
+          "description": "このリポストはフォロワーのみが閲覧できます"
+        },
+        "private": {
+          "title": "非公開",
+          "description": "この再投稿を見ることができるのはあなただけです"
+        },
+        "label": "視認性"
+      },
+      "errors": {
+        "couldNotRepost": "再投稿できませんでした"
+      },
+      "quote": {
+        "title": "引用",
+        "subtitle": "@{name} の投稿 {kind} を引用",
+        "caption": "キャプション",
+        "addEmoji": "絵文字を追加",
+        "emojiIcon": "絵文字アイコン",
+        "placeholder": "ご意見をお寄せください..."
+      },
+      "hashtags": {
+        "label": "ハッシュタグ #",
+        "remove": "ハッシュタグ「{tag}」を削除する",
+        "add": "ハッシュタグを追加",
+        "example": "例：旅行"
+      },
+      "location": {
+        "label": "場所",
+        "placeholder": "場所を追加する",
+        "searching": "検索中...",
+        "noSuggestions": "提案はありません",
+        "noMatch": "該当する場所が見つかりませんでした。"
+      },
+      "switch": {
+        "allowComments": {
+          "title": "コメントを許可する",
+          "hint": "他のユーザーはあなたの引用に返信できます"
+        },
+        "allowDownloads": {
+          "title": "ダウンロードを許可する",
+          "hint": "元の投稿から引き継がれたものです（変更できません）"
+        },
+        "hideLike": {
+          "title": "「いいね」を非表示にする",
+          "hint": "この引用文の「いいね」数は、あなただけが見ることができます"
+        }
+      },
+      "actions": {
+        "cancel": "キャンセル",
+        "sharing": "共有中...",
+        "shareQuote": "引用を共有する"
+      },
+      "sheet": {
+        "title": "再投稿",
+        "reposting": "再投稿します…",
+        "repost": "再投稿",
+        "quote": "引用"
+      },
+      "kinds": {
+        "post": "投稿",
+        "reel": "リール"
+      }
+    },
+    "imageViewer": {
+      "close": "画像を閉じる",
+      "alt": "画像"
+    }
+  },
+  "adminLogin": {
+    "brand": {
+      "eyebrow": "管理コンソール",
+      "title": "Cordigram コントロールルーム",
+      "subtitle": "安全性、モデレーション、プラットフォームの健全性を、明確かつ迅速に管理します。",
+      "footnote": "社内スタッフのみ閲覧可。すべての操作は記録され、監視されています。"
+    },
+    "stats": {
+      "access": {
+        "label": "アクセス権限",
+        "value": "閲覧制限あり"
+      },
+      "audit": {
+        "label": "監査",
+        "value": "有効"
+      },
+      "status": {
+        "label": "ステータス",
+        "value": "運用中"
+      }
+    },
+    "form": {
+      "badge": "安全なログイン",
+      "title": "管理画面にログイン",
+      "subtitle": "スタッフの認証情報を使用して続行してください。",
+      "emailLabel": "職場のメールアドレス",
+      "emailPlaceholder": "admin@cordigram.com",
+      "passwordLabel": "パスワード",
+      "passwordPlaceholder": "パスワードを入力してください",
+      "resetLink": "スタッフのパスワードリセット",
+      "submit": "管理画面へ進む",
+      "submitting": "ログイン中...",
+      "needAccess": "アクセスが必要ですか？",
+      "contact": "スーパー管理者へ連絡する"
+    },
+    "errors": {
+      "loginFailed": "ログインに失敗しました"
+    }
+  },
+  "forgotPassword": {
+    "title": "パスワードをお忘れの方",
+    "subtitle": "アカウントのメールアドレスを入力し、確認コードを入力してください",
+    "emailPlaceholder": "メールアドレス",
+    "otpPlaceholder": "OTPを入力してください",
+    "newPasswordPlaceholder": "新しいパスワード",
+    "confirmPasswordPlaceholder": "新しいパスワードを確認してください",
+    "sendOtp": "OTPを送信",
+    "sending": "送信中...",
+    "verifyOtp": "OTPを確認する",
+    "checking": "確認中...",
+    "confirm": "確認",
+    "updating": "更新中...",
+    "useAnotherEmail": "別のメールアドレスを使用する",
+    "backToLogin": "ログイン画面に戻る",
+    "passwordToggle": {
+      "show": "パスワードを表示",
+      "hide": "パスワードを非表示にする"
+    },
+    "messages": {
+      "otpSent": "OTPを送信しました。受信箱をご確認ください。",
+      "otpVerified": "OTPによる認証が完了しました。新しいパスワードを設定してください。",
+      "passwordUpdated": "パスワードが更新されました。ログイン画面へ移動します..."
+    },
+    "errors": {
+      "sendOtpFailed": "OTPを送信できませんでした。もう一度お試しください。",
+      "invalidOtp": "OTPが無効です。もう一度お試しください。",
+      "resetFailed": "パスワードのリセットに失敗しました。もう一度お試しください。"
+    }
+  },
+  "authLogin": {
+    "common": {
+      "close": "閉じる",
+      "cancel": "キャンセル"
+    },
+    "errors": {
+      "enterOtp": "OTPを入力してください。",
+      "invalidOtp": "OTPが無効か、有効期限が切れています。",
+      "otpRecentlySent": "OTPが送信されました。数分後に再度お試しください。",
+      "resendOtpFailed": "OTPを再送信できません。",
+      "invalidSignInMethod": "無効なログイン方法",
+      "invalidEmail": "メールの形式が不正です",
+      "loginFailed": "ログインに失敗しました。もう一度お試しください。"
+    },
+    "recent": {
+      "title": "最近の報告",
+      "deleteAll": "すべて削除",
+      "deleting": "削除中...",
+      "account": "アカウント",
+      "continueAs": "{label} として続ける",
+      "remove": "{label} を削除する"
+    },
+    "hero": {
+      "title": "お帰りなさい！",
+      "subtitle": "会話を続け、チャンネルを更新し、チームと協力しましょう。すべてが常に同期され、安全に管理され、いつでも利用可能な状態です。",
+      "chips": {
+        "secureSessions": "セッションのセキュリティ確保",
+        "instantNotifications": "即時通知",
+        "multiPlatform": "マルチプラットフォーム対応"
+      },
+      "badges": {
+        "accessControl": "すべてのチャンネルで明確なアクセス制御。",
+        "sso": "Webとモバイル間で同期されたシングルサインオン。",
+        "uiOptimized": "仕事やコンテンツの共有に最適化されたUI。"
+      }
+    },
+    "form": {
+      "title": "ログイン",
+      "emailLabel": "メールアドレス",
+      "emailPlaceholder": "メールアドレスを入力してください",
+      "passwordLabel": "パスワード",
+      "passwordPlaceholder": "パスワードを入力してください",
+      "passwordToggle": {
+        "show": "パスワードを表示",
+        "hide": "パスワードを非表示にする"
+      },
+      "logIn": "ログイン",
+      "loggingIn": "ログイン中...",
+      "forgotPassword": "パスワードをお忘れですか？",
+      "noAccount": "アカウントをお持ちではありませんか？",
+      "signUp": "登録する",
+      "or": "または",
+      "signInWithGoogle": "Googleでログイン"
+    },
+    "confirm": {
+      "removeAccountTitle": "アカウントを削除しますか？",
+      "remove": "削除",
+      "removing": "削除中...",
+      "deleteAllRecentTitle": "最近の履歴をすべて削除しますか？",
+      "deleteAllRecentText": "これにより、保存されている直近のアカウントがすべて削除されます。"
+    },
+    "twoFactor": {
+      "title": "二段階認証",
+      "subtitle": "メールに送信された6桁のコードを入力してください。",
+      "placeholder": "------",
+      "resend": "OTPを再送信",
+      "resendIn": "再送信（{seconds}s）",
+      "verifying": "確認中...",
+      "continue": "続きを読む"
+    }
+  },
+  "adminDashboard": {
+    "errors": {
+      "loadStatsFailed": "統計データの読み込みに失敗しました"
+    },
+    "common": {
+      "viewAll": "すべて表示",
+      "review": "レビュー",
+      "details": "詳細"
+    },
+    "header": {
+      "eyebrow": "管理ダッシュボード",
+      "title": "管理人さん、お帰りなさい",
+      "subtitle": "プラットフォームの健全性および安全に関する指標の概要。",
+      "synced": "2分前に同期されました",
+      "openQueue": "モデレーションキューを開く"
+    },
+    "kpi": {
+      "new": "新着",
+      "totalUsers": "ユーザー総数",
+      "allTime": "過去最高",
+      "newUsers24h": "新規ユーザー（過去24時間）",
+      "postsCreated": "作成された投稿",
+      "openReports": "レポートを開く",
+      "activeCalls": "現在接続中の通話",
+      "stable": "安定"
+    },
+    "queue": {
+      "title": "レポートキュー",
+      "items": {
+        "postHarassment": {
+          "title": "ハラスメントの通報があった",
+          "tag": "投稿",
+          "status": "新着",
+          "time": "12分前に報告されました"
+        },
+        "userImpersonation": {
+          "title": "なりすまし行為の疑いで報告されたユーザー",
+          "tag": "ユーザー",
+          "status": "調査中",
+          "time": "1時間前に投稿されました"
+        },
+        "commentSensitive": {
+          "title": "コメントに機密情報が含まれています",
+          "tag": "コメント",
+          "status": "新着",
+          "time": "2時間前に投稿されました"
+        }
+      }
+    },
+    "alerts": {
+      "title": "安全に関する注意喚起",
+      "items": {
+        "nightfeedSpike": {
+          "title": "#夜中の授乳の投稿が急増",
+          "note": "過去1時間で24件の報告がありました。手動での確認をご検討ください。"
+        },
+        "repeatOffender": {
+          "title": "常習犯が検出されました",
+          "note": "このユーザーは、過去24時間に複数の投稿で計5件の報告を受けています。"
+        }
+      }
+    },
+    "health": {
+      "title": "システムの健全性",
+      "items": {
+        "api": {
+          "label": "API",
+          "value": "運用中"
+        },
+        "realtime": {
+          "label": "リアルタイム",
+          "value": "安定"
+        },
+        "storage": {
+          "label": "ストレージ",
+          "value": "68% 使用済み"
+        }
+      }
+    },
+    "quickActions": {
+      "title": "クイックアクション",
+      "openTools": "ツールを開く",
+      "items": {
+        "findUser": {
+          "title": "ユーザーを検索",
+          "desc": "ユーザーを検索して、プロフィールやレポートを確認します。",
+          "cta": "検索"
+        },
+        "reviewContent": {
+          "title": "レビューの内容",
+          "desc": "最新の注目投稿をチェックしましょう。",
+          "cta": "レビュー"
+        },
+        "broadcastNotice": {
+          "title": "放送のお知らせ",
+          "desc": "すべてのユーザーにシステム通知を送信してください。",
+          "cta": "草案"
+        }
+      }
+    },
+    "activity": {
+      "title": "最近の管理者による操作",
+      "viewLogs": "ログを表示する",
+      "items": {
+        "resolvedReport": "解決済みレポート #1293（投稿への嫌がらせ）",
+        "suspendedUser": "なりすまし行為のため、ユーザー @riverlane を一時停止しました",
+        "detectedSpike": "リールに関する報告件数が急増しました",
+        "time12m": "12分前",
+        "time48m": "48分前",
+        "time2h": "2時間前"
+      }
+    }
+  },
+  "authSignup": {
+    "steps": {
+      "email": "メールアドレスを入力してください",
+      "otp": "OTPを確認する",
+      "profile": "プロフィール情報"
+    },
+    "errors": {
+      "birthdateInvalid": "生年月日が不正です",
+      "birthdateFuture": "生年月日は未来の日付にすることはできません",
+      "displayNameLength": "3文字以上30文字以下",
+      "displayNameMinLetters": "スペースを除いた後、表示名は3文字以上必要です",
+      "displayNameOnlyLettersSpaces": "表示名には、英字とスペースのみを含めることができます",
+      "passwordMismatch": "パスワードが一致しません",
+      "usernameMin": "ユーザー名は3文字以上である必要があります",
+      "usernameMax": "ユーザー名は30文字以内にしてください",
+      "usernameFormat": "ユーザー名には、英字、数字、アンダースコア、およびピリオドのみ使用できます",
+      "usernameTaken": "そのユーザー名はすでに使用されています",
+      "emailRequired": "メールアドレスを入力してください",
+      "sendOtpFailed": "OTPを送信できませんでした",
+      "otpInvalid": "OTPコードが無効です",
+      "verifyOtpFailed": "OTPの確認ができませんでした",
+      "usernameChecking": "ユーザー名の確認",
+      "passwordRequired": "パスワードが必要です",
+      "passwordMin": "パスワードは8文字以上である必要があります",
+      "displayNameUsernameRequired": "表示名とユーザー名は必須です",
+      "genderRequired": "性別を選択してください",
+      "missingSignupToken": "登録トークンが見つかりません。OTPを再度確認してください",
+      "avatarUploadFailed": "アバターのアップロードに失敗しました",
+      "completeProfileFailed": "プロフィールの作成が完了できませんでした"
+    },
+    "info": {
+      "otpSent": "OTPがメールで送信されました",
+      "verifySuccess": "確認が完了しました。アカウント情報を入力してください。",
+      "changeEmailRequestNewOtp": "メールアドレスを変更し、新しいOTPをリクエストすることができます。",
+      "signupSuccessRedirect": "登録が完了しました。リダイレクトします..."
+    },
+    "email": {
+      "emailAddress": "メールアドレス",
+      "emailPlaceholder": "email@example.com",
+      "sending": "送信中...",
+      "sendOtp": "OTPを送信"
+    },
+    "otp": {
+      "enterCode": "OTPコードを入力してください",
+      "sentTo": "{email} 宛て",
+      "placeholder": "例：123456",
+      "changeEmail": "メールアドレスを変更する",
+      "resendIn": "{seconds}秒後に再送信",
+      "resendCode": "コードを再送信",
+      "verifying": "確認中...",
+      "verify": "確認する"
+    },
+    "profile": {
+      "displayName": "表示名",
+      "displayNamePlaceholder": "例：Cordigrammer",
+      "username": "ユーザー名",
+      "usernamePlaceholder": "ユーザー名",
+      "usernameHelp": "ユーザー名には、英字、数字、アンダースコア、およびピリオドのみを含めることができます",
+      "password": "パスワード",
+      "passwordPlaceholder": "8文字以上",
+      "confirmPassword": "パスワードの確認",
+      "confirmPasswordPlaceholder": "確認のため、もう一度入力してください",
+      "ariaHidePassword": "パスワードを非表示にする",
+      "ariaShowPassword": "パスワードを表示",
+      "birthdate": "生年月日",
+      "gender": "性別",
+      "shortBioOptional": "簡単な自己紹介（任意）",
+      "shortBioPlaceholder": "ご自身について少し教えてください",
+      "processing": "処理中...",
+      "next": "次へ"
+    },
+    "gender": {
+      "male": "男性",
+      "female": "女性",
+      "other": "その他",
+      "preferNotToSay": "言いたくない",
+      "selectOption": "オプションを選択してください"
+    },
+    "location": {
+      "optional": "場所（任意）",
+      "placeholder": "都市、ランドマーク、または場所を追加する",
+      "useCurrent": "現在地を使用する",
+      "searching": "検索中...",
+      "noSuggestions": "提案が見つかりませんでした",
+      "noSuggestionsTryKeywords": "該当する提案が見つかりませんでした。別のキーワードをお試しください。"
+    },
+    "avatar": {
+      "choose": "アバターを選択",
+      "previewAlt": "『アバター』予告編",
+      "pickImage": "プレビューしてトリミングしたい画像を選んでください。",
+      "chooseFromDevice": "デバイスから画像を選択",
+      "zoom": "ズーム",
+      "skip": "スキップ",
+      "finishing": "完了中...",
+      "finish": "完了"
+    },
+    "aria": {
+      "backToProfile": "プロフィール情報に戻る"
+    },
+    "page": {
+      "title": "Cordigramのアカウントを作成する",
+      "stepCounter": "ステップ{current} / {total}",
+      "alreadyHaveAccount": "すでにアカウントをお持ちですか？",
+      "logIn": "ログイン",
+      "or": "または",
+      "signUpWithGoogle": "Googleで登録する"
+    },
+    "hero": {
+      "title": "Cordigramへようこそ！",
+      "subtitle": "リアルタイムチャットチャンネルを備えたソーシャルプラットフォームです。Discord風のチャンネルを作成したり、Instagramのように写真や動画を共有したりして、現代的な方法でコミュニティをつなぎましょう。",
+      "chips": {
+        "realtimeChannels": "リアルタイムチャンネル",
+        "mediaFeedStories": "メディアフィードとストーリー",
+        "voiceReady": "音声対応"
+      },
+      "badges": {
+        "permissionsRoles": "コミュニティを安全に管理するための権限と役割。",
+        "multiDeviceSync": "複数のデバイス間で同期し、通知を即座に受け取れます。",
+        "modernUi": "コンテンツの共有に最適化されたモダンUI。"
+      }
+    }
+  },
+  "peopleYouMayKnow": {
+    "title": "あなたがお知り合いかもしれない人",
+    "empty": "今のところ、特に提案はありません。",
+    "aria": {
+      "section": "あなたがお知り合いかもしれない人"
+    },
+    "actions": {
+      "seeAll": "すべて表示",
+      "showLess": "表示を縮小",
+      "follow": "フォロー",
+      "following": "以下"
+    },
+    "errors": {
+      "loadFailed": "候補の読み込みに失敗しました",
+      "followUpdateFailed": "フォローの更新に失敗しました"
+    }
+  },
+  "commentLikesOverlay": {
+    "title": "「いいね」",
+    "loading": "読み込み中...",
+    "loadingMore": "さらに読み込み中...",
+    "search": {
+      "placeholder": "ユーザー名を検索",
+      "ariaLabel": "ユーザー名を検索"
+    },
+    "empty": {
+      "noMatchingUsers": "該当するユーザーはいません",
+      "noLikes": "まだ「いいね」はありません"
+    },
+    "actions": {
+      "close": "閉じる",
+      "you": "あなた",
+      "follow": "フォロー",
+      "following": "以下"
+    },
+    "aria": {
+      "viewProfile": "{username}のプロフィールを表示"
+    },
+    "errors": {
+      "sessionExpired": "セッションが期限切れになりました。",
+      "loadLikesFailed": "「いいね」の読み込みに失敗しました",
+      "loadMoreFailed": "さらに読み込めませんでした"
+    }
+  },
+  "adsDashboard": {
+    "errors": {
+      "loadFailed": "広告ダッシュボードの読み込みに失敗しました。"
+    },
+    "status": {
+      "active": "アクティブ",
+      "hidden": "非表示",
+      "paused": "一時停止中",
+      "canceled": "中止",
+      "completed": "完了"
+    },
+    "empty": {
+      "title": "まだ広告はありません",
+      "createFirstAd": "初めての広告を作成する",
+      "checklist": {
+        "goal": "目標：認知度の向上またはコンバージョンの増加",
+        "budget": "予算およびスケジュールの策定",
+        "creative": "コンテンツ、メディア、そして明確なCTA"
+      }
+    },
+    "actions": {
+      "createNewAd": "新しい広告を作成する",
+      "viewAll": "すべて表示",
+      "details": "詳細"
+    },
+    "metrics": {
+      "totalBudget": "総予算",
+      "spent": "閲覧済み：{value}",
+      "impressions": "感想",
+      "reach": "連絡先：{value}",
+      "averageCtr": "平均クリック率",
+      "clicks": "リンク：{value}",
+      "activeCampaigns": "進行中のキャンペーン",
+      "liveHint": "現在実施中のキャンペーン"
+    },
+    "trend": {
+      "title": "7日間のインプレッション推移",
+      "subtitle": "過去7日間の広告配信状況とCTAクリック数を追跡します。",
+      "barTitle": "{day}：{impressions}回の表示 - {clicks}回のクリック"
+    },
+    "campaigns": {
+      "title": "広告キャンペーン",
+      "subtitle": "直近のアクティブなキャンペーン5件の概要。"
+    },
+    "table": {
+      "campaign": "キャンペーン",
+      "status": "ステータス",
+      "spent": "使用済み",
+      "impressionsShort": "印刷",
+      "ctr": "CTR",
+      "clicks": "クリック数",
+      "action": "アクション",
+      "noActive": "現在、実施中のキャンペーンはありません。"
+    }
+  },
+  "explorePage": {
+    "loading": "読み込み中...",
+    "itemsCount": "{count} 商品",
+    "errors": {
+      "unableToLoad": "「explore」を読み込めません"
+    }
+  },
+  "adsCreatePage": {
+    "header": {
+      "title": "広告キャンペーンを作成する",
+      "subtitle": "「広告作成はシンプルな流れで進められます：広告の目的、クリエイティブ、ターゲット層、そしてパッケージ料金です。」",
+      "backToDashboard": "ダッシュボードに戻る"
+    },
+    "sections": {
+      "objective": {
+        "title": "キャンペーンの目標を選択してください",
+        "required": "必須"
+      },
+      "creative": {
+        "title": "広告クリエイティブ",
+        "pill": "本文"
+      },
+      "audience": {
+        "title": "ターゲット層の選定",
+        "pill": "ターゲティング"
+      }
+    },
+    "defaults": {
+      "campaignName": "学生向けキャンペーン",
+      "primaryText": "最新のコレクションで、あなたのスタイルをアップグレードしましょう。発売記念の限定キャンペーンを実施中です。",
+      "headline": "ローンチ記念キャンペーン - 本日限定30%オフ",
+      "description": "高品質な商品を、全国へ迅速にお届けします。",
+      "location": "ベトナム",
+      "fallbackCampaignName": "Cordigram広告キャンペーン",
+      "interests": {
+        "technology": "技術",
+        "onlineShopping": "オンラインショッピング"
+      }
+    },
+    "objective": {
+      "awareness": {
+        "label": "認識",
+        "desc": "あなたのブランドを記憶に残してくれる可能性の高い、新たな層にリーチしましょう。"
+      },
+      "traffic": {
+        "label": "交通",
+        "desc": "ユーザーをウェブサイトや商品ページへ誘導しましょう。"
+      },
+      "engagement": {
+        "label": "エンゲージメント",
+        "desc": "「いいね！」やコメント、シェアを増やしましょう。"
+      },
+      "leads": {
+        "label": "見込み客の開拓",
+        "desc": "見込み客の連絡先情報を収集する。"
+      },
+      "sales": {
+        "label": "売上",
+        "desc": "購入やコンバージョン行動を促進する。"
+      },
+      "messages": {
+        "label": "メッセージ",
+        "desc": "あなたの提案に興味を持っている人々と会話を始めましょう。"
+      }
+    },
+    "fields": {
+      "campaignName": "キャンペーン名",
+      "campaignNamePlaceholder": "例：新学期キャンペーン",
+      "primaryText": "本文",
+      "headline": "見出し",
+      "ctaButton": "CTAボタン",
+      "selectCta": "CTAを選択",
+      "description": "説明",
+      "destinationUrl": "リンク先URL",
+      "location": "場所",
+      "ageRange": "対象年齢",
+      "to": "～に",
+      "interests": "興味・関心",
+      "interestsPlaceholder": "興味のある項目を入力して、「追加」を押してください",
+      "add": "追加"
+    },
+    "location": {
+      "loadingCountries": "国を読み込んでいます...",
+      "selectLocation": "場所を選択"
+    },
+    "format": {
+      "single": "単一の画像",
+      "carousel": "カルーセル",
+      "video": "動画"
+    },
+    "cta": {
+      "Learn More": "詳細はこちら",
+      "Shop Now": "今すぐ購入",
+      "Sign Up": "登録する",
+      "Book Now": "今すぐ予約する",
+      "Contact Us": "お問い合わせ"
+    },
+    "emoji": {
+      "add": "絵文字を追加",
+      "icon": "絵文字アイコン"
+    },
+    "media": {
+      "title": "メディアをアップロード",
+      "hint": "{uploadLabel}。ファイルがサーバーにアップロードされ、プレビューに反映されます。",
+      "uploadOneVideo": "動画を1本アップロードする",
+      "uploadUpToFiveImages": "最大5枚の画像をアップロードできます",
+      "uploadOneImage": "画像を1枚アップロードする",
+      "uploading": "読み込み中...",
+      "chooseFiles": "ファイルを選択してください",
+      "video": "動画",
+      "image": "画像",
+      "remove": "削除",
+      "errors": {
+        "loginAgain": "メディアをアップロードするには、再度ログインしてください。",
+        "selectVideo": "動画ファイルを選択してください。",
+        "selectImages": "画像ファイルを選択してください。",
+        "carouselLimit": "カルーセルには最大5枚の画像を登録できます。画像を1枚削除すると、さらに画像をアップロードできます。",
+        "singleLimit": "この形式では、1つのファイルのみをサポートしています。",
+        "uploadFailed": "アップロードに失敗しました。もう一度お試しください。"
+      }
+    },
+    "validation": {
+      "primaryTextRequired": "本文の入力が必要です。",
+      "headlineRequired": "見出しは必須です。",
+      "destinationRequired": "宛先URLの入力が必要です。",
+      "destinationProtocol": "宛先URLは、http:// または https:// で始まる必要があります。",
+      "destinationInvalid": "宛先URLが無効です。",
+      "mediaRequired": "公開する前にメディアをアップロードしてください。"
+    },
+    "interests": {
+      "recommended": {
+        "technology": "技術",
+        "fashion": "ファッション",
+        "beauty": "美",
+        "gaming": "ゲーム",
+        "startup": "スタートアップ",
+        "education": "教育",
+        "fitness": "フィットネス",
+        "food": "食べ物",
+        "travel": "旅行"
+      }
+    },
+    "placement": {
+      "title": "配置",
+      "homeFeedOnly": "この広告はホームフィードでのみ配信されます。"
+    },
+    "packages": {
+      "title": "プロモーションパッケージ",
+      "boostSection": "1. 筋力を高める",
+      "durationSection": "2. 期間プラン",
+      "days": "{days} 日",
+      "boost": {
+        "hint": "ホームフィードでの広告の表示頻度を調整します。",
+        "light": {
+          "title": "ライトブースト",
+          "highlight": "最初の広告に最適",
+          "level": "競争が激しくない"
+        },
+        "standard": {
+          "title": "スタンダード・ブースト",
+          "highlight": "最も選ばれている",
+          "level": "中規模の大会"
+        },
+        "strong": {
+          "title": "大幅な向上",
+          "highlight": "視認性が高い",
+          "level": "激しい競争"
+        }
+      },
+      "duration": {
+        "d3": {
+          "note": "短いバースト"
+        },
+        "d7": {
+          "note": "1週間のランニング"
+        },
+        "d14": {
+          "note": "継続的な配送"
+        },
+        "d30": {
+          "note": "1ヶ月間の補償"
+        }
+      },
+      "summary": {
+        "boost": "ブーストパッケージ",
+        "duration": "期間プラン",
+        "total": "総費用",
+        "selected": "「{boost}」を{days}日間選択しました。"
+      }
+    },
+    "preview": {
+      "title": "ライブプレビュー",
+      "sponsored": "提供：",
+      "userAvatar": "ユーザーのアバター",
+      "displayName": "表示名",
+      "username": "ユーザー名",
+      "primaryTextFallback": "メインのテキストはここに表示されます。",
+      "video": "動画のプレビュー",
+      "creative": "クリエイティブプレビュー",
+      "adCreativeAlt": "広告クリエイティブのプレビュー",
+      "carouselImage": "カルーセルのクリエイティブ {index}",
+      "previousImage": "前のカルーセル画像",
+      "nextImage": "次のカルーセル画像"
+    },
+    "actions": {
+      "cancel": "キャンセル",
+      "publishAd": "広告を掲載する",
+      "back": "戻る"
+    },
+    "payment": {
+      "title": "支払いを確認する",
+      "close": "支払いモーダルを閉じる",
+      "subtitle": "お支払いを完了するため、Stripe Checkout（テストモード）にリダイレクトされます。",
+      "days": "日",
+      "creatingCheckout": "決済処理中...",
+      "payWithStripe": "Stripeでお支払い",
+      "summary": {
+        "objective": "目的",
+        "adFormat": "広告フォーマット",
+        "boost": "ブーストパッケージ",
+        "duration": "期間プラン",
+        "total": "合計"
+      },
+      "terms": {
+        "prefix": "私は以下の内容に同意します",
+        "link": "期間",
+        "suffix": "およびCordigramの広告規定。"
+      },
+      "errors": {
+        "completeRequiredFields": "お支払い前に、すべての必須項目にご入力ください。",
+        "acceptTerms": "お支払いに進む前に、利用規約にご同意ください。",
+        "loginAgain": "お支払い前に、再度ログインしてください。",
+        "prepareCreativeFailed": "チェックアウト用の広告クリエイティブの準備に失敗しました。",
+        "createSessionFailed": "Stripeのチェックアウトセッションを作成できませんでした。",
+        "startCheckoutFailed": "チェックアウトセッションの開始に失敗しました。"
+      }
+    }
+  }
+}

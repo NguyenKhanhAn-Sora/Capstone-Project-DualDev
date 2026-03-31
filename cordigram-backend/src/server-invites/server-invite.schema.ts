@@ -32,4 +32,3 @@ ServerInviteSchema.index(
   { fromUserId: 1, toUserId: 1, serverId: 1, status: 1 },
   { unique: true, partialFilterExpression: { status: 'pending' } },
 );
-

@@ -23,16 +23,14 @@ export class FollowsController {
   ) {}
 
   @Get('following')
-  async getFollowing(
-    @Request() req: Request & { user?: AuthenticatedUser },
-  ) {
+  async getFollowing(@Request() req: Request & { user?: AuthenticatedUser }) {
     if (!req.user) {
       throw new Error('Unauthorized');
     }
 
     const userId = new Types.ObjectId(req.user.userId);
     console.log('Getting following for userId:', userId.toString());
-    
+
     const followingIds = await this.followsService.getFollowing(userId);
     console.log('followingIds:', followingIds);
 
@@ -56,9 +54,7 @@ export class FollowsController {
   }
 
   @Get('followers')
-  async getFollowers(
-    @Request() req: Request & { user?: AuthenticatedUser },
-  ) {
+  async getFollowers(@Request() req: Request & { user?: AuthenticatedUser }) {
     if (!req.user) {
       throw new Error('Unauthorized');
     }
@@ -93,7 +89,10 @@ export class FollowsController {
     const followerId = new Types.ObjectId(req.user.userId);
     const followeeId = new Types.ObjectId(targetUserId);
 
-    const isFollowing = await this.followsService.isFollowing(followerId, followeeId);
+    const isFollowing = await this.followsService.isFollowing(
+      followerId,
+      followeeId,
+    );
 
     return { isFollowing };
   }

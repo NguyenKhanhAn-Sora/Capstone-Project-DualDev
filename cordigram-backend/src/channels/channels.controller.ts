@@ -26,11 +26,7 @@ export class ChannelsController {
     @Param('serverId') serverId: string,
     @Body() body: { name: string; type?: 'text' | 'voice' | 'mixed' },
   ) {
-    return this.channelsService.createCategory(
-      serverId,
-      body.name,
-      body.type,
-    );
+    return this.channelsService.createCategory(serverId, body.name, body.type);
   }
 
   @Get('categories/list')

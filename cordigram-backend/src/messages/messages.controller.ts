@@ -72,18 +72,15 @@ export class MessagesController {
     message: any,
   ) {
     try {
-      const ctx =
-        await this.messagesService.getMessageNotificationContext(
-          channelId,
-          senderId,
-          mentionIds,
-        );
+      const ctx = await this.messagesService.getMessageNotificationContext(
+        channelId,
+        senderId,
+        mentionIds,
+      );
       if (!ctx) return;
 
       const senderName =
-        message.senderId?.displayName ??
-        message.senderId?.username ??
-        'Ai đó';
+        message.senderId?.displayName ?? message.senderId?.username ?? 'Ai đó';
 
       const mentionSet = new Set(ctx.mentionedUserIds);
 
@@ -132,7 +129,12 @@ export class MessagesController {
     @Request() req: any,
   ) {
     const viewerId = req.user?.userId;
-    return this.messagesService.getMessagesByChannelId(channelId, limit, skip, viewerId);
+    return this.messagesService.getMessagesByChannelId(
+      channelId,
+      limit,
+      skip,
+      viewerId,
+    );
   }
 
   @Post('read')

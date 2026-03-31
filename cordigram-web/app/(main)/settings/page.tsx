@@ -59,6 +59,11 @@ import ProfileEditOverlay from "@/ui/profile-edit-overlay/profile-edit-overlay";
 import { useTheme } from "@/component/theme-provider";
 import { useTranslations } from "next-intl";
 import { useLanguage } from "@/component/language-provider";
+import {
+  LOCALE_LABELS,
+  SUPPORTED_LOCALES,
+  type LanguageCode,
+} from "@/lib/i18n/locales";
 import { formatDistanceToNow } from "date-fns";
 import { DateSelect } from "@/ui/date-select/date-select";
 import { TimeSelect } from "@/ui/time-select/time-select";
@@ -1443,11 +1448,20 @@ export default function SettingsPage() {
       ({
         en: tSystem("language.options.en"),
         vi: tSystem("language.options.vi"),
-      }) satisfies Record<"en" | "vi", string>,
+        es: tSystem("language.options.es"),
+        fr: tSystem("language.options.fr"),
+        de: tSystem("language.options.de"),
+        "pt-BR": tSystem("language.options.pt-BR"),
+        ru: tSystem("language.options.ru"),
+        ja: tSystem("language.options.ja"),
+        ko: tSystem("language.options.ko"),
+        zh: tSystem("language.options.zh"),
+      }) satisfies Record<LanguageCode, string>,
     [tSystem],
   );
 
-  const getLanguageLabel = (value: "en" | "vi") => languageLabelMap[value];
+  const getLanguageLabel = (value: LanguageCode) =>
+    languageLabelMap[value] ?? LOCALE_LABELS[value];
 
   const visibilityKeyMap = useMemo(
     () =>
@@ -4245,7 +4259,7 @@ export default function SettingsPage() {
                         </button>
                         {languageOpen ? (
                           <div className={styles.languageMenu} role="listbox">
-                            {(["en", "vi"] as const).map((value) => (
+                            {SUPPORTED_LOCALES.map((value) => (
                               <button
                                 key={value}
                                 type="button"

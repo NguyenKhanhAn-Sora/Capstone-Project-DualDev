@@ -14,7 +14,10 @@ import {
 } from '../channels/channel-category.schema';
 import { User, UserSchema } from '../users/user.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
-import { ServerInvite, ServerInviteSchema } from '../server-invites/server-invite.schema';
+import {
+  ServerInvite,
+  ServerInviteSchema,
+} from '../server-invites/server-invite.schema';
 import { Message, MessageSchema } from '../messages/message.schema';
 import { RolesModule } from '../roles/roles.module';
 import { MessagesModule } from '../messages/messages.module';

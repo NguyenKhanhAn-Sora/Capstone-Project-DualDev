@@ -1,5 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import {
+  SUPPORTED_LANGUAGES,
+  type SupportedLanguage,
+} from './language.constants';
 
 export type Role = 'user' | 'creator' | 'admin';
 export type Status = 'active' | 'banned' | 'pending';
@@ -19,7 +23,7 @@ export type RecentAccount = {
 
 export type UserSettings = {
   theme: 'light' | 'dark';
-  language: 'en' | 'vi';
+  language: SupportedLanguage;
   notifications?: {
     mutedUntil?: Date | null;
     mutedIndefinitely?: boolean;
@@ -152,7 +156,7 @@ export class User extends Document {
   @Prop({
     type: {
       theme: { type: String, enum: ['light', 'dark'], default: 'light' },
-      language: { type: String, enum: ['en', 'vi'], default: 'en' },
+      language: { type: String, enum: SUPPORTED_LANGUAGES, default: 'en' },
       notifications: {
         mutedUntil: { type: Date, default: null },
         mutedIndefinitely: { type: Boolean, default: false },

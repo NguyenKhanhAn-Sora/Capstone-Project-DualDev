@@ -1,0 +1,1160 @@
+{
+  "settings": {
+    "system": {
+      "title": "시스템",
+      "description": "원하는 언어와 테마를 선택하세요.",
+      "language": {
+        "title": "언어",
+        "description": "원하는 표시 언어를 선택하세요.",
+        "options": {
+          "en": "영어",
+          "vi": "베트남어",
+          "es": "스페인어",
+          "fr": "프랑스어",
+          "de": "독일어",
+          "pt-BR": "포르투갈어 (브라질)",
+          "ru": "러시아어",
+          "ja": "일본어",
+          "ko": "한국어",
+          "zh": "중국어"
+        }
+      },
+      "theme": {
+        "title": "주제",
+        "description": "밝은 모드와 어두운 모드를 전환하세요.",
+        "options": {
+          "light": "빛",
+          "dark": "어둠"
+        }
+      }
+    },
+    "notifications": {
+      "title": "알림",
+      "description": "알림을 받을 시점을 직접 설정하세요.",
+      "loading": "로딩 중...",
+      "push": {
+        "title": "푸시 알림",
+        "hint": "알림이 비활성화되어 있어도 새로운 알림은 계속 저장되지만, 실시간으로 알림이 표시되지는 않습니다."
+      },
+      "actions": {
+        "mute": "소리 끄기",
+        "edit": "편집",
+        "enable": "활성화"
+      },
+      "status": {
+        "enabled": "활성화됨",
+        "muted": "음소거됨",
+        "mutedUntilManual": "다시 켜기 전까지 음소거 상태입니다",
+        "mutedRelative": "음소거됨 {relative}"
+      },
+      "muteOptions": {
+        "5m": "5분",
+        "10m": "10분",
+        "15m": "15분",
+        "30m": "30분",
+        "1h": "1시간",
+        "1d": "1일",
+        "until": "다시 켜기 전까지는",
+        "custom": "날짜와 시간 선택"
+      },
+      "categories": {
+        "follow": {
+          "label": "다음",
+          "description": "누군가가 당신을 팔로우할 때."
+        },
+        "comment": {
+          "label": "댓글",
+          "description": "누군가 내 게시물이나 릴스에 댓글을 남길 때."
+        },
+        "like": {
+          "label": "좋아요",
+          "description": "누군가가 당신의 게시물, 릴, 또는 댓글에 ‘좋아요’를 누를 때."
+        },
+        "mentions": {
+          "label": "멘션 및 태그",
+          "description": "누군가가 당신을 언급하거나 태그했을 때."
+        }
+      },
+      "errors": {
+        "loadFailed": "알림 설정을 불러올 수 없습니다.",
+        "updateFailed": "알림을 업데이트할 수 없습니다.",
+        "invalidDateTime": "유효한 날짜와 시간을 선택해 주세요.",
+        "chooseFutureTime": "나중에 할 시간을 선택해 주세요."
+      }
+    }
+  },
+  "sidebar": {
+    "nav": {
+      "home": "홈",
+      "search": "검색",
+      "message": "메시지",
+      "following": "다음",
+      "explore": "탐색하기",
+      "notification": "알림",
+      "ads": "광고",
+      "create": "만들기",
+      "reels": "릴"
+    },
+    "menu": {
+      "profile": "프로필",
+      "settings": "설정",
+      "saved": "저장됨",
+      "switchToLight": "밝은 모드로 전환",
+      "switchToDark": "어두운 모드로 전환",
+      "reportProblem": "문제 신고",
+      "switchAccount": "계정 전환",
+      "logout": "로그아웃"
+    },
+    "switchAccount": {
+      "title": "계정에 로그인하여 계속하세요",
+      "email": {
+        "label": "이메일 주소",
+        "placeholder": "이메일 입력"
+      },
+      "password": {
+        "label": "비밀번호",
+        "placeholder": "비밀번호를 입력하세요",
+        "show": "비밀번호 표시",
+        "hide": "비밀번호 숨기기"
+      },
+      "submit": {
+        "label": "로그인",
+        "loading": "전환 중..."
+      },
+      "google": "Google로 계속하기",
+      "errors": {
+        "invalidEmail": "이메일 형식이 올바르지 않습니다",
+        "loginFailed": "로그인에 실패했습니다. 다시 시도해 주세요."
+      }
+    }
+  },
+  "common": {
+    "close": "닫기",
+    "hidePost": "게시물 숨기기"
+  },
+  "home": {
+    "feed": {
+      "signInToView": "피드를 보려면 로그인하세요",
+      "unableToLoad": "피드를 불러올 수 없습니다",
+      "followingEmpty": "아직 팔로우 중인 사람이 없거나, 팔로우 중인 사람들이 아무것도 게시하지 않았습니다.",
+      "loadMore": "더 보기",
+      "suggestionsAria": "제안 사항"
+    },
+    "toast": {
+      "signInToRepost": "로그인 후 다시 공유하기",
+      "reposted": "재게시됨",
+      "repostedWithQuote": "인용과 함께 재게시함",
+      "commentsOn": "댓글 기능 활성화됨",
+      "commentsOff": "댓글 기능 비활성화됨",
+      "commentsUpdateFailed": "댓글 업데이트에 실패했습니다",
+      "likeCountHidden": "‘좋아요’ 수 숨기기",
+      "likeCountVisible": "‘좋아요’ 수 표시",
+      "likeCountUpdateFailed": "‘좋아요’ 수 표시 설정 업데이트에 실패했습니다",
+      "linkCopied": "링크가 클립보드에 복사되었습니다",
+      "linkCopyFailed": "링크 복사에 실패했습니다",
+      "signInToDelete": "게시물을 삭제하려면 로그인해 주세요",
+      "deletedPost": "삭제된 게시물",
+      "deleteFailed": "게시물 삭제에 실패했습니다",
+      "reportSubmitted": "보고서 제출됨",
+      "reportSubmitFailed": "보고서를 제출할 수 없습니다",
+      "actionFailed": "작업이 실패했습니다",
+      "blockFailed": "블록 생성 실패"
+    },
+    "delete": {
+      "title": "이 게시물을 삭제하시겠습니까?",
+      "body": "{name}",
+      "cancel": "취소",
+      "confirm": "삭제",
+      "deleting": "삭제 중..."
+    },
+    "block": {
+      "title": "이 계정을 차단하시겠습니까?",
+      "body": "{name}를 차단하려고 합니다. 이 사용자는 더 이상 귀하와 소통할 수 없게 됩니다.",
+      "cancel": "취소",
+      "confirm": "차단",
+      "blocking": "연결 중...",
+      "thisUser": "이 사용자"
+    },
+    "report": {
+      "title": "이 게시물 신고하기",
+      "description": "{name} 게시물 신고. 가장 정확한 사유를 선택해 주세요.",
+      "selectReason": "구체적인 사유를 선택하세요",
+      "pickCategory": "먼저 카테고리를 선택하세요.",
+      "cancel": "취소",
+      "submit": "보고서 제출",
+      "submitting": "보내는 중...",
+      "notes": {
+        "label": "추가 사항 (선택 사항)",
+        "placeholder": "필요한 경우 간략한 배경을 추가하세요..."
+      },
+      "groups": {
+        "abuse": {
+          "label": "괴롭힘 / 혐오 발언",
+          "reasons": {
+            "harassment": "특정 개인을 괴롭히는 행위",
+            "hateSpeech": "혐오 발언 또는 차별",
+            "offensiveDiscrimination": "취약 계층을 공격한다"
+          }
+        },
+        "violence": {
+          "label": "폭력 / 협박",
+          "reasons": {
+            "violenceThreats": "폭력을 조장하거나 선동하는",
+            "graphicViolence": "폭력적인 장면",
+            "extremism": "극단주의 또는 테러",
+            "selfHarm": "자해 또는 자살"
+          }
+        },
+        "sensitive": {
+          "label": "민감한 콘텐츠",
+          "reasons": {
+            "nudity": "노출 또는 성인 콘텐츠",
+            "minorNudity": "경미한 안전 위험",
+            "sexualSolicitation": "성매매 유인"
+          }
+        },
+        "misinfo": {
+          "label": "사칭 / 허위 정보",
+          "reasons": {
+            "fakeNews": "허위 또는 오해의 소지가 있는 정보",
+            "impersonation": "개인 또는 단체 사칭"
+          }
+        },
+        "spam": {
+          "label": "스팸 / 사기",
+          "reasons": {
+            "spam": "스팸 또는 관련 없는 콘텐츠",
+            "financialScam": "금융 사기",
+            "unsolicitedAds": "원치 않는 광고"
+          }
+        },
+        "ip": {
+          "label": "지적 재산권",
+          "reasons": {
+            "copyright": "저작권 침해",
+            "trademark": "상표권 침해",
+            "brandImpersonation": "브랜드 사칭"
+          }
+        },
+        "illegal": {
+          "label": "불법 행위",
+          "reasons": {
+            "contraband": "밀수품",
+            "illegalTransaction": "불법 거래"
+          }
+        },
+        "privacy": {
+          "label": "개인정보 침해",
+          "reasons": {
+            "doxxing": "개인 정보 유출",
+            "nonconsensualIntimate": "동의 없이 촬영된 성적 콘텐츠"
+          }
+        },
+        "other": {
+          "label": "기타",
+          "reasons": {
+            "other": "다른 이유"
+          }
+        }
+      }
+    },
+    "visibility": {
+      "title": "표시 설정 편집",
+      "description": "이 게시물을 볼 수 있는 사람을 선택하세요.",
+      "cancel": "취소",
+      "update": "표시 설정 업데이트",
+      "updating": "업데이트 중...",
+      "signIn": "로그인해 주세요",
+      "updateFailed": "표시 설정 업데이트에 실패했습니다",
+      "options": {
+        "public": {
+          "title": "공개",
+          "description": "누구나 이 게시물을 볼 수 있습니다"
+        },
+        "followers": {
+          "title": "친구 / 팔로우",
+          "description": "이 게시물은 팔로워만 볼 수 있습니다"
+        },
+        "private": {
+          "title": "비공개",
+          "description": "이 게시물은 오직 귀하만 볼 수 있습니다"
+        }
+      }
+    },
+    "edit": {
+      "title": "글 수정",
+      "caption": "설명",
+      "addEmoji": "이모티콘 추가",
+      "emojiIcon": "이모지 아이콘",
+      "placeholder": "뭔가 써 봐...",
+      "searching": "검색 중...",
+      "noMatches": "결과 없음",
+      "hashtags": "해시태그",
+      "addHashtag": "해시태그 추가",
+      "removeHashtag": "{tag} 제거",
+      "location": {
+        "label": "위치",
+        "placeholder": "장소 추가",
+        "noSuggestions": "제안할 내용이 없습니다",
+        "noSuggestionsError": "제안된 내용이 없습니다. 다른 키워드를 입력해 보세요."
+      },
+      "allowComments": {
+        "title": "댓글 허용",
+        "hint": "모든 사람으로부터 피드백을 받을 수 있도록 설정"
+      },
+      "allowDownloads": {
+        "title": "다운로드 허용",
+        "hint": "신뢰하는 사람들에게 원본 파일을 공유하세요",
+        "inheritedLoading": "원본 게시물에서 가져옴 (로딩 중…)",
+        "inheritedLocked": "원본 게시물에서 가져온 내용입니다(변경할 수 없음)"
+      },
+      "hideLike": {
+        "title": "숨기기",
+        "hint": "시청자들은 이 게시물의 ‘좋아요’ 수를 볼 수 없습니다"
+      },
+      "cancel": "취소",
+      "saveChanges": "변경 사항 저장",
+      "saving": "저장 중...",
+      "signInToEdit": "게시물을 수정하려면 로그인해 주세요",
+      "updated": "게시물 업데이트됨",
+      "updateFailed": "게시물 업데이트에 실패했습니다"
+    },
+    "mention": {
+      "signIn": "사용자를 태그하려면 로그인하세요",
+      "userNotFound": "사용자를 찾을 수 없습니다"
+    },
+    "menu": {
+      "editPost": "글 수정",
+      "editVisibility": "표시 설정 편집",
+      "muteNotifications": "알림 음소거",
+      "turnOffComments": "댓글 비활성화",
+      "turnOnComments": "댓글 허용",
+      "showLike": "‘좋아요’ 표시",
+      "hideLike": "숨기기",
+      "goToPost": "게시물 보기",
+      "copyLink": "링크 복사",
+      "deletePost": "게시물 삭제",
+      "unfollow": "팔로우 취소",
+      "follow": "팔로우하기",
+      "save": "이 게시물 저장하기",
+      "unsave": "이 게시물 저장 취소",
+      "hidePost": "이 게시물 숨기기",
+      "report": "보고서",
+      "blockAccount": "이 계정 차단하기"
+    },
+    "follow": {
+      "following": "다음",
+      "follow": "팔로우하기",
+      "unfollow": "팔로우 취소"
+    },
+    "repost": {
+      "banner": "다음에서 재게시됨",
+      "original": "원본 게시물"
+    },
+    "content": {
+      "seeMore": "더 보기",
+      "collapse": "접기"
+    },
+    "media": {
+      "tapForSound": "탭하면 소리가 나요",
+      "previous": "이전 미디어",
+      "next": "다음 미디어",
+      "alt": "미디어",
+      "overlayAlt": "포스트 미디어"
+    },
+    "actions": {
+      "liked": "좋아요",
+      "like": "좋아요",
+      "comment": "댓글",
+      "saved": "저장됨",
+      "save": "저장",
+      "repost": "재게시"
+    },
+    "repostOverlay": {
+      "visibility": {
+        "public": {
+          "title": "공개",
+          "description": "누구나 이 재게시물을 볼 수 있습니다"
+        },
+        "followers": {
+          "title": "팔로워",
+          "description": "팔로워만 이 리포스트를 볼 수 있습니다"
+        },
+        "private": {
+          "title": "비공개",
+          "description": "이 재게시물은 오직 귀하만 볼 수 있습니다"
+        },
+        "label": "가시성"
+      },
+      "errors": {
+        "couldNotRepost": "다시 게시할 수 없습니다"
+      },
+      "quote": {
+        "title": "인용",
+        "subtitle": "@{name} 님의 {kind} 게시물을 인용합니다",
+        "caption": "설명",
+        "addEmoji": "이모티콘 추가",
+        "emojiIcon": "이모지 아이콘",
+        "placeholder": "여러분의 의견을 남겨주세요..."
+      },
+      "hashtags": {
+        "label": "해시태그 #",
+        "remove": "{tag} 해시태그를 제거하세요",
+        "add": "해시태그 추가",
+        "example": "예: 여행"
+      },
+      "location": {
+        "label": "위치",
+        "placeholder": "장소 추가",
+        "searching": "검색 중...",
+        "noSuggestions": "제안할 내용이 없습니다",
+        "noMatch": "적합한 위치를 찾을 수 없습니다."
+      },
+      "switch": {
+        "allowComments": {
+          "title": "댓글 허용",
+          "hint": "다른 사람들이 귀하의 인용문에 답글을 달 수 있습니다"
+        },
+        "allowDownloads": {
+          "title": "다운로드 허용",
+          "hint": "원본 게시물에서 가져온 내용입니다(변경할 수 없음)."
+        },
+        "hideLike": {
+          "title": "숨기기",
+          "hint": "이 인용문에 달린 ‘좋아요’ 수는 오직 당신만 볼 수 있습니다"
+        }
+      },
+      "actions": {
+        "cancel": "취소",
+        "sharing": "공유 중...",
+        "shareQuote": "인용문 공유하기"
+      },
+      "sheet": {
+        "title": "재게시",
+        "reposting": "다시 올립니다...",
+        "repost": "재게시",
+        "quote": "인용"
+      },
+      "kinds": {
+        "post": "게시물",
+        "reel": "릴"
+      }
+    },
+    "imageViewer": {
+      "close": "이미지 닫기",
+      "alt": "이미지"
+    }
+  },
+  "adminLogin": {
+    "brand": {
+      "eyebrow": "관리 콘솔",
+      "title": "코디그램 관제실",
+      "subtitle": "안전, 콘텐츠 관리, 플랫폼 상태를 명확하고 신속하게 관리하세요.",
+      "footnote": "내부 직원 전용입니다. 모든 활동은 기록 및 모니터링됩니다."
+    },
+    "stats": {
+      "access": {
+        "label": "접근 권한 수준",
+        "value": "제한됨"
+      },
+      "audit": {
+        "label": "감사",
+        "value": "활성화됨"
+      },
+      "status": {
+        "label": "상태",
+        "value": "운영"
+      }
+    },
+    "form": {
+      "badge": "안전한 로그인",
+      "title": "관리자 로그인",
+      "subtitle": "직원 자격 증명을 사용하여 계속 진행하십시오.",
+      "emailLabel": "업무용 이메일",
+      "emailPlaceholder": "admin@cordigram.com",
+      "passwordLabel": "비밀번호",
+      "passwordPlaceholder": "비밀번호를 입력하세요",
+      "resetLink": "직원 비밀번호 재설정",
+      "submit": "관리자 페이지로 이동",
+      "submitting": "로그인 중...",
+      "needAccess": "접근 권한이 필요하신가요?",
+      "contact": "슈퍼 관리자에게 문의하기"
+    },
+    "errors": {
+      "loginFailed": "로그인에 실패했습니다"
+    }
+  },
+  "forgotPassword": {
+    "title": "비밀번호 찾기",
+    "subtitle": "계정 이메일을 입력하고 인증 코드를 확인하세요",
+    "emailPlaceholder": "이메일 주소",
+    "otpPlaceholder": "OTP 입력",
+    "newPasswordPlaceholder": "새 비밀번호",
+    "confirmPasswordPlaceholder": "새 비밀번호 확인",
+    "sendOtp": "OTP 보내기",
+    "sending": "전송 중...",
+    "verifyOtp": "OTP 확인",
+    "checking": "확인 중...",
+    "confirm": "확인",
+    "updating": "업데이트 중...",
+    "useAnotherEmail": "다른 이메일 주소로 보내기",
+    "backToLogin": "로그인으로 돌아가기",
+    "passwordToggle": {
+      "show": "비밀번호 표시",
+      "hide": "비밀번호 숨기기"
+    },
+    "messages": {
+      "otpSent": "일회용 비밀번호(OTP)를 발송했습니다. 수신함을 확인해 주세요.",
+      "otpVerified": "OTP 인증이 완료되었습니다. 새 비밀번호를 설정해 주세요.",
+      "passwordUpdated": "비밀번호가 업데이트되었습니다. 로그인 페이지로 이동 중입니다..."
+    },
+    "errors": {
+      "sendOtpFailed": "OTP를 전송할 수 없습니다. 다시 시도해 주세요.",
+      "invalidOtp": "OTP가 유효하지 않습니다. 다시 시도해 주세요.",
+      "resetFailed": "비밀번호 재설정이 실패했습니다. 다시 시도해 주세요."
+    }
+  },
+  "authLogin": {
+    "common": {
+      "close": "닫기",
+      "cancel": "취소"
+    },
+    "errors": {
+      "enterOtp": "OTP를 입력해 주세요.",
+      "invalidOtp": "OTP가 유효하지 않거나 만료되었습니다.",
+      "otpRecentlySent": "일회용 비밀번호(OTP)가 방금 발송되었습니다. {seconds}초 후에 다시 시도해 주세요.",
+      "resendOtpFailed": "OTP를 다시 보낼 수 없습니다.",
+      "invalidSignInMethod": "로그인 방법이 잘못되었습니다",
+      "invalidEmail": "이메일 형식이 올바르지 않습니다",
+      "loginFailed": "로그인에 실패했습니다. 다시 시도해 주세요."
+    },
+    "recent": {
+      "title": "최근 게시물",
+      "deleteAll": "모두 삭제",
+      "deleting": "삭제 중...",
+      "account": "계정",
+      "continueAs": "{label}로 계속하기",
+      "remove": "{label} 제거"
+    },
+    "hero": {
+      "title": "다시 오신 것을 환영합니다!",
+      "subtitle": "대화를 이어가고, 채널을 업데이트하며, 팀원들과 협업하세요. 모든 내용이 동기화되어 안전하게 관리되며, 언제든지 바로 사용할 수 있습니다.",
+      "chips": {
+        "secureSessions": "보안 세션",
+        "instantNotifications": "실시간 알림",
+        "multiPlatform": "다양한 플랫폼 지원"
+      },
+      "badges": {
+        "accessControl": "모든 채널에 대한 명확한 접근 제어.",
+        "sso": "웹과 모바일 간에 연동되는 단일 로그인.",
+        "uiOptimized": "업무 및 콘텐츠 공유에 최적화된 UI."
+      }
+    },
+    "form": {
+      "title": "로그인",
+      "emailLabel": "이메일 주소",
+      "emailPlaceholder": "이메일 주소를 입력하세요",
+      "passwordLabel": "비밀번호",
+      "passwordPlaceholder": "비밀번호를 입력하세요",
+      "passwordToggle": {
+        "show": "비밀번호 표시",
+        "hide": "비밀번호 숨기기"
+      },
+      "logIn": "로그인",
+      "loggingIn": "로그인 중...",
+      "forgotPassword": "비밀번호를 잊으셨나요?",
+      "noAccount": "계정이 없으신가요?",
+      "signUp": "가입하기",
+      "or": "또는",
+      "signInWithGoogle": "Google로 로그인"
+    },
+    "confirm": {
+      "removeAccountTitle": "계정을 삭제하시겠습니까?",
+      "remove": "제거",
+      "removing": "제거 중...",
+      "deleteAllRecentTitle": "최근 기록을 모두 삭제하시겠습니까?",
+      "deleteAllRecentText": "이렇게 하면 저장된 최근 계정 정보가 모두 삭제됩니다."
+    },
+    "twoFactor": {
+      "title": "2단계 인증",
+      "subtitle": "이메일로 전송된 6자리 코드를 입력하세요.",
+      "placeholder": "------",
+      "resend": "OTP 다시 보내기",
+      "resendIn": "다시 보내기 ({seconds}s)",
+      "verifying": "확인 중...",
+      "continue": "계속"
+    }
+  },
+  "adminDashboard": {
+    "errors": {
+      "loadStatsFailed": "통계 데이터를 불러오지 못했습니다"
+    },
+    "common": {
+      "viewAll": "모두 보기",
+      "review": "리뷰",
+      "details": "상세 정보"
+    },
+    "header": {
+      "eyebrow": "관리자 대시보드",
+      "title": "관리자님, 다시 오신 것을 환영합니다",
+      "subtitle": "플랫폼의 건강 및 안전 신호 개요.",
+      "synced": "2분 전에 동기화됨",
+      "openQueue": "검토 대기열 열기"
+    },
+    "kpi": {
+      "new": "새로움",
+      "totalUsers": "총 사용자 수",
+      "allTime": "역대",
+      "newUsers24h": "신규 사용자 (24시간)",
+      "postsCreated": "작성된 게시물",
+      "openReports": "보고서 열기",
+      "activeCalls": "진행 중인 통화",
+      "stable": "안정적인"
+    },
+    "queue": {
+      "title": "보고서 대기열",
+      "items": {
+        "postHarassment": {
+          "title": "성희롱 신고된 게시물",
+          "tag": "게시물",
+          "status": "새로움",
+          "time": "12분 전에 게시됨"
+        },
+        "userImpersonation": {
+          "title": "사용자가 사칭으로 신고됨",
+          "tag": "사용자",
+          "status": "조사 중",
+          "time": "1시간 전에 게시됨"
+        },
+        "commentSensitive": {
+          "title": "댓글에 민감한 내용이 포함되어 있습니다",
+          "tag": "댓글",
+          "status": "새로움",
+          "time": "2시간 전에 게시됨"
+        }
+      }
+    },
+    "alerts": {
+      "title": "안전 주의보",
+      "items": {
+        "nightfeedSpike": {
+          "title": "#야간수유 관련 게시물이 급증하고 있습니다",
+          "note": "지난 1시간 동안 24건의 신고가 접수되었습니다. 수동 검토를 고려해 주십시오."
+        },
+        "repeatOffender": {
+          "title": "상습범이 적발되었습니다",
+          "note": "이 사용자는 지난 24시간 동안 여러 게시물에 걸쳐 총 5건의 신고를 받았습니다."
+        }
+      }
+    },
+    "health": {
+      "title": "시스템 상태",
+      "items": {
+        "api": {
+          "label": "API",
+          "value": "운영"
+        },
+        "realtime": {
+          "label": "실시간",
+          "value": "안정적인"
+        },
+        "storage": {
+          "label": "저장",
+          "value": "68% 사용됨"
+        }
+      }
+    },
+    "quickActions": {
+      "title": "빠른 작업",
+      "openTools": "도구 열기",
+      "items": {
+        "findUser": {
+          "title": "사용자 찾기",
+          "desc": "프로필이나 보고서를 확인하려는 사용자를 찾으세요.",
+          "cta": "검색"
+        },
+        "reviewContent": {
+          "title": "리뷰 내용",
+          "desc": "최근 신고된 게시물을 확인해 보세요.",
+          "cta": "리뷰"
+        },
+        "broadcastNotice": {
+          "title": "방송 안내",
+          "desc": "모든 사용자에게 시스템 공지사항을 발송하십시오.",
+          "cta": "초안"
+        }
+      }
+    },
+    "activity": {
+      "title": "최근 관리자 활동",
+      "viewLogs": "로그 보기",
+      "items": {
+        "resolvedReport": "보고서 #1293 해결됨 (게시물 관련 괴롭힘)",
+        "suspendedUser": "신분 사칭으로 인해 사용자 @riverlane의 계정을 정지했습니다",
+        "detectedSpike": "릴 관련 보고서 건수가 급증한 것으로 확인됨",
+        "time12m": "12분 전",
+        "time48m": "48분 전",
+        "time2h": "2시간 전"
+      }
+    }
+  },
+  "authSignup": {
+    "steps": {
+      "email": "이메일 입력",
+      "otp": "OTP 확인",
+      "profile": "프로필 정보"
+    },
+    "errors": {
+      "birthdateInvalid": "생년월일이 잘못되었습니다",
+      "birthdateFuture": "생년월일은 미래의 날짜일 수 없습니다",
+      "displayNameLength": "최소 3자, 최대 30자",
+      "displayNameMinLetters": "공백을 제거한 후 표시 이름은 최소 3자 이상이어야 합니다.",
+      "displayNameOnlyLettersSpaces": "표시 이름에는 영문자와 공백만 포함할 수 있습니다",
+      "passwordMismatch": "비밀번호가 일치하지 않습니다",
+      "usernameMin": "사용자 이름은 3자 이상이어야 합니다",
+      "usernameMax": "사용자 이름은 최대 30자 이내여야 합니다",
+      "usernameFormat": "사용자 이름에는 영문자, 숫자, 밑줄, 점만 사용할 수 있습니다",
+      "usernameTaken": "사용자 이름이 이미 사용 중입니다",
+      "emailRequired": "이메일을 입력해 주세요",
+      "sendOtpFailed": "OTP를 전송할 수 없습니다",
+      "otpInvalid": "OTP 코드가 유효하지 않습니다",
+      "verifyOtpFailed": "OTP를 확인할 수 없습니다",
+      "usernameChecking": "사용자 이름 확인",
+      "passwordRequired": "비밀번호가 필요합니다",
+      "passwordMin": "비밀번호는 8자 이상이어야 합니다",
+      "displayNameUsernameRequired": "표시 이름과 사용자 이름은 필수 입력 항목입니다",
+      "genderRequired": "성별을 선택해 주세요",
+      "missingSignupToken": "가입 토큰이 누락되었습니다. OTP를 다시 확인해 주세요.",
+      "avatarUploadFailed": "아바타 업로드에 실패했습니다",
+      "completeProfileFailed": "프로필을 완성할 수 없습니다"
+    },
+    "info": {
+      "otpSent": "이메일로 OTP가 발송되었습니다",
+      "verifySuccess": "인증에 성공했습니다. 계정 정보를 완성해 주세요.",
+      "changeEmailRequestNewOtp": "이메일을 변경하고 새로운 OTP를 요청할 수 있습니다.",
+      "signupSuccessRedirect": "가입이 완료되었습니다. 이동 중입니다..."
+    },
+    "email": {
+      "emailAddress": "이메일 주소",
+      "emailPlaceholder": "email@example.com",
+      "sending": "전송 중...",
+      "sendOtp": "OTP 보내기"
+    },
+    "otp": {
+      "enterCode": "OTP 코드를 입력하세요",
+      "sentTo": "{email}으로 전송됨",
+      "placeholder": "예: 123456",
+      "changeEmail": "이메일 변경",
+      "resendIn": "{seconds}초 후에 다시 보내기",
+      "resendCode": "인증 코드 다시 보내기",
+      "verifying": "확인 중...",
+      "verify": "확인"
+    },
+    "profile": {
+      "displayName": "표시 이름",
+      "displayNamePlaceholder": "예: Cordigrammer",
+      "username": "사용자 이름",
+      "usernamePlaceholder": "사용자 이름",
+      "usernameHelp": "사용자 이름에는 영문자, 숫자, 밑줄, 점만 사용할 수 있습니다",
+      "password": "비밀번호",
+      "passwordPlaceholder": "최소 8자",
+      "confirmPassword": "비밀번호 확인",
+      "confirmPasswordPlaceholder": "다시 입력하여 확인해 주세요",
+      "ariaHidePassword": "비밀번호 숨기기",
+      "ariaShowPassword": "비밀번호 표시",
+      "birthdate": "생년월일",
+      "gender": "성별",
+      "shortBioOptional": "간단한 자기소개 (선택 사항)",
+      "shortBioPlaceholder": "자신에 대해 간단히 소개해 주세요",
+      "processing": "처리 중...",
+      "next": "다음"
+    },
+    "gender": {
+      "male": "남성",
+      "female": "여성",
+      "other": "기타",
+      "preferNotToSay": "말하고 싶지 않습니다",
+      "selectOption": "옵션을 선택하세요"
+    },
+    "location": {
+      "optional": "위치 (선택 사항)",
+      "placeholder": "도시, 랜드마크 또는 장소를 추가하세요",
+      "useCurrent": "현재 위치 사용",
+      "searching": "검색 중...",
+      "noSuggestions": "제안 사항이 없습니다",
+      "noSuggestionsTryKeywords": "제안된 내용이 없습니다. 다른 키워드를 입력해 보세요."
+    },
+    "avatar": {
+      "choose": "아바타 선택",
+      "previewAlt": "아바타 예고편",
+      "pickImage": "미리 보고 자르려는 이미지를 선택하세요.",
+      "chooseFromDevice": "기기에서 이미지 선택",
+      "zoom": "확대",
+      "skip": "건너뛰기",
+      "finishing": "마무리 중...",
+      "finish": "완료"
+    },
+    "aria": {
+      "backToProfile": "프로필 정보로 돌아가기"
+    },
+    "page": {
+      "title": "Cordigram 계정 만들기",
+      "stepCounter": "단계 {current} / {total}",
+      "alreadyHaveAccount": "이미 계정이 있으신가요?",
+      "logIn": "로그인",
+      "or": "또는",
+      "signUpWithGoogle": "Google로 가입하기"
+    },
+    "hero": {
+      "title": "코디그램에 오신 것을 환영합니다!",
+      "subtitle": "실시간 채팅 채널을 갖춘 소셜 플랫폼입니다. 디스코드(Discord) 스타일의 채널을 만들고, 인스타그램처럼 사진과 동영상을 공유하며, 현대적인 방식으로 커뮤니티를 연결하세요.",
+      "chips": {
+        "realtimeChannels": "실시간 채널",
+        "mediaFeedStories": "미디어 피드 및 스토리",
+        "voiceReady": "음성 지원"
+      },
+      "badges": {
+        "permissionsRoles": "커뮤니티를 안전하게 관리하기 위한 권한 및 역할.",
+        "multiDeviceSync": "여러 기기 간 동기화 및 실시간 알림.",
+        "modernUi": "콘텐츠 공유에 최적화된 모던 UI."
+      }
+    }
+  },
+  "peopleYouMayKnow": {
+    "title": "아는 사람일 수도 있는 분들",
+    "empty": "지금은 딱히 제안할 게 없습니다.",
+    "aria": {
+      "section": "아는 사람일 수도 있는 분들"
+    },
+    "actions": {
+      "seeAll": "모두 보기",
+      "showLess": "더 적게 보기",
+      "follow": "팔로우하기",
+      "following": "다음"
+    },
+    "errors": {
+      "loadFailed": "제안 사항을 불러오지 못했습니다",
+      "followUpdateFailed": "팔로우 업데이트에 실패했습니다"
+    }
+  },
+  "commentLikesOverlay": {
+    "title": "좋아요",
+    "loading": "로딩 중...",
+    "loadingMore": "더 불러오고 있습니다...",
+    "search": {
+      "placeholder": "사용자 이름 검색",
+      "ariaLabel": "사용자 이름 검색"
+    },
+    "empty": {
+      "noMatchingUsers": "일치하는 사용자가 없습니다",
+      "noLikes": "아직 좋아요가 없습니다"
+    },
+    "actions": {
+      "close": "닫기",
+      "you": "당신",
+      "follow": "팔로우하기",
+      "following": "다음"
+    },
+    "aria": {
+      "viewProfile": "{username}의 프로필 보기"
+    },
+    "errors": {
+      "sessionExpired": "세션이 만료되었습니다.",
+      "loadLikesFailed": "‘좋아요’를 불러오는 데 실패했습니다",
+      "loadMoreFailed": "더 많은 내용을 불러오지 못했습니다"
+    }
+  },
+  "adsDashboard": {
+    "errors": {
+      "loadFailed": "광고 대시보드를 불러오지 못했습니다."
+    },
+    "status": {
+      "active": "활성",
+      "hidden": "숨김",
+      "paused": "일시 중지됨",
+      "canceled": "취소됨",
+      "completed": "완료됨"
+    },
+    "empty": {
+      "title": "아직 광고가 없습니다",
+      "createFirstAd": "첫 번째 광고 만들기",
+      "checklist": {
+        "goal": "목표: 인지도 제고 또는 전환율 향상",
+        "budget": "예산 및 일정 수립",
+        "creative": "콘텐츠, 미디어 및 명확한 행동 유도 문구"
+      }
+    },
+    "actions": {
+      "createNewAd": "새 광고 만들기",
+      "viewAll": "모두 보기",
+      "details": "상세 정보"
+    },
+    "metrics": {
+      "totalBudget": "총 예산",
+      "spent": "지출 내역: {value}",
+      "impressions": "인상",
+      "reach": "연락처: {value}",
+      "averageCtr": "평균 클릭률",
+      "clicks": "링크: {value}",
+      "activeCampaigns": "진행 중인 캠페인",
+      "liveHint": "현재 진행 중인 캠페인"
+    },
+    "trend": {
+      "title": "7일간 노출 수 추이",
+      "subtitle": "지난 7일 동안의 광고 노출 및 CTA 클릭 수를 추적하세요.",
+      "barTitle": "{day}: {impressions} 노출 수 - {clicks} 클릭 수"
+    },
+    "campaigns": {
+      "title": "광고 캠페인",
+      "subtitle": "최근에 진행 중인 5개의 캠페인을 한눈에 확인하세요."
+    },
+    "table": {
+      "campaign": "캠페인",
+      "status": "상태",
+      "spent": "지출",
+      "impressionsShort": "인쇄",
+      "ctr": "CTR",
+      "clicks": "조회수",
+      "action": "액션",
+      "noActive": "현재 진행 중인 캠페인이 없습니다."
+    }
+  },
+  "explorePage": {
+    "loading": "로딩 중...",
+    "itemsCount": "{count} 항목",
+    "errors": {
+      "unableToLoad": "'explore'를 불러올 수 없습니다"
+    }
+  },
+  "adsCreatePage": {
+    "header": {
+      "title": "광고 캠페인 만들기",
+      "subtitle": "간단한 단계별 절차에 따라 광고를 제작하세요: 광고 목표, 광고 소재, 타겟 고객, 패키지 가격.",
+      "backToDashboard": "대시보드로 돌아가기"
+    },
+    "sections": {
+      "objective": {
+        "title": "캠페인 목표 선택",
+        "required": "필수"
+      },
+      "creative": {
+        "title": "광고 크리에이티브",
+        "pill": "본문"
+      },
+      "audience": {
+        "title": "대상 고객 타겟팅",
+        "pill": "타겟팅"
+      }
+    },
+    "defaults": {
+      "campaignName": "학생 대상 프로모션 캠페인",
+      "primaryText": "최신 컬렉션으로 여러분의 공간을 업그레이드해 보세요. 지금 한정 출시 기념 혜택이 제공됩니다.",
+      "headline": "출시 기념 특별 혜택 - 오늘 30% 할인",
+      "description": "최고 품질의 제품과 전국 어디든 빠른 배송을 제공합니다.",
+      "location": "베트남",
+      "fallbackCampaignName": "코디그램 광고 캠페인",
+      "interests": {
+        "technology": "기술",
+        "onlineShopping": "온라인 쇼핑"
+      }
+    },
+    "objective": {
+      "awareness": {
+        "label": "인식",
+        "desc": "귀사의 브랜드를 기억해 줄 가능성이 높은 새로운 고객층을 확보하세요."
+      },
+      "traffic": {
+        "label": "교통",
+        "desc": "방문자를 웹사이트나 제품 페이지로 유도하세요."
+      },
+      "engagement": {
+        "label": "참여",
+        "desc": "더 많은 반응, 댓글, 공유를 받아보세요."
+      },
+      "leads": {
+        "label": "잠재 고객 발굴",
+        "desc": "잠재 고객의 연락처를 수집하세요."
+      },
+      "sales": {
+        "label": "판매",
+        "desc": "구매 및 전환을 유도합니다."
+      },
+      "messages": {
+        "label": "메시지",
+        "desc": "귀하의 제안에 관심이 있는 분들과 대화를 시작해 보세요."
+      }
+    },
+    "fields": {
+      "campaignName": "캠페인 이름",
+      "campaignNamePlaceholder": "예: 개학 시즌 프로모션",
+      "primaryText": "본문",
+      "headline": "제목",
+      "ctaButton": "CTA 버튼",
+      "selectCta": "CTA 선택",
+      "description": "설명",
+      "destinationUrl": "목적지 URL",
+      "location": "위치",
+      "ageRange": "연령대",
+      "to": "~",
+      "interests": "관심사",
+      "interestsPlaceholder": "관심 분야를 입력하고 ‘추가’를 누르세요",
+      "add": "추가"
+    },
+    "location": {
+      "loadingCountries": "국가 불러오는 중...",
+      "selectLocation": "위치 선택"
+    },
+    "format": {
+      "single": "단일 이미지",
+      "carousel": "캐러셀",
+      "video": "동영상"
+    },
+    "cta": {
+      "Learn More": "자세히 알아보기",
+      "Shop Now": "지금 구매하기",
+      "Sign Up": "회원 가입",
+      "Book Now": "지금 예약하기",
+      "Contact Us": "문의하기"
+    },
+    "emoji": {
+      "add": "이모티콘 추가",
+      "icon": "이모지 아이콘"
+    },
+    "media": {
+      "title": "미디어 업로드",
+      "hint": "{uploadLabel}. 파일이 서버에 업로드되면 미리보기에 반영됩니다.",
+      "uploadOneVideo": "동영상 하나 올리기",
+      "uploadUpToFiveImages": "최대 5장의 이미지를 업로드하세요",
+      "uploadOneImage": "사진 한 장을 업로드하세요",
+      "uploading": "업로드 중...",
+      "chooseFiles": "파일 선택",
+      "video": "동영상",
+      "image": "이미지",
+      "remove": "제거",
+      "errors": {
+        "loginAgain": "미디어를 업로드하려면 다시 로그인해 주세요.",
+        "selectVideo": "동영상 파일을 선택해 주세요.",
+        "selectImages": "이미지 파일을 선택해 주세요.",
+        "carouselLimit": "캐러셀에는 최대 5장의 이미지를 추가할 수 있습니다. 더 많은 이미지를 업로드하려면 하나를 삭제하세요.",
+        "singleLimit": "이 형식은 하나의 파일만 지원합니다.",
+        "uploadFailed": "업로드에 실패했습니다. 다시 시도해 주세요."
+      }
+    },
+    "validation": {
+      "primaryTextRequired": "본문 내용을 입력해 주세요.",
+      "headlineRequired": "제목은 필수입니다.",
+      "destinationRequired": "목적지 URL을 입력해야 합니다.",
+      "destinationProtocol": "대상 URL은 http:// 또는 https://로 시작해야 합니다.",
+      "destinationInvalid": "목적지 URL이 잘못되었습니다.",
+      "mediaRequired": "게시하기 전에 미디어 파일을 업로드해 주세요."
+    },
+    "interests": {
+      "recommended": {
+        "technology": "기술",
+        "fashion": "패션",
+        "beauty": "미용",
+        "gaming": "게임",
+        "startup": "스타트업",
+        "education": "교육",
+        "fitness": "피트니스",
+        "food": "음식",
+        "travel": "여행"
+      }
+    },
+    "placement": {
+      "title": "배치",
+      "homeFeedOnly": "이 광고는 홈 피드에서만 노출됩니다."
+    },
+    "packages": {
+      "title": "프로모션 패키지",
+      "boostSection": "1. 근력 향상",
+      "durationSection": "2. 이용 기간 패키지",
+      "days": "{days} 일",
+      "boost": {
+        "hint": "홈 피드에서 광고가 얼마나 많이 노출되는지를 조절합니다.",
+        "light": {
+          "title": "라이트 부스트",
+          "highlight": "첫 광고에 가장 적합",
+          "level": "경쟁이 적음"
+        },
+        "standard": {
+          "title": "표준 부스트",
+          "highlight": "가장 많이 선택된",
+          "level": "중급 대회"
+        },
+        "strong": {
+          "title": "강력한 부스트",
+          "highlight": "시인성이 뛰어난",
+          "level": "치열한 경쟁"
+        }
+      },
+      "duration": {
+        "d3": {
+          "note": "짧은 순간"
+        },
+        "d7": {
+          "note": "1주일 동안의 운영"
+        },
+        "d14": {
+          "note": "지속적인 배송"
+        },
+        "d30": {
+          "note": "한 달 내내 보장"
+        }
+      },
+      "summary": {
+        "boost": "부스트 패키지",
+        "duration": "기간별 패키지",
+        "total": "총 비용",
+        "selected": "{boost}를 {days}일 동안 선택하셨습니다."
+      }
+    },
+    "preview": {
+      "title": "실시간 미리보기",
+      "sponsored": "협찬",
+      "userAvatar": "사용자 아바타",
+      "displayName": "표시 이름",
+      "username": "사용자 이름",
+      "primaryTextFallback": "본문 내용이 여기에 표시됩니다.",
+      "video": "동영상 미리보기",
+      "creative": "작성 미리보기",
+      "adCreativeAlt": "광고 크리에이티브 미리보기",
+      "carouselImage": "캐러셀 광고 이미지 {index}",
+      "previousImage": "이전 캐러셀 이미지",
+      "nextImage": "다음 캐러셀 이미지"
+    },
+    "actions": {
+      "cancel": "취소",
+      "publishAd": "광고 게시",
+      "back": "뒤로"
+    },
+    "payment": {
+      "title": "결제 확인",
+      "close": "결제 모달 닫기",
+      "subtitle": "결제를 완료하시려면 Stripe Checkout(테스트 모드)으로 이동하게 됩니다.",
+      "days": "일",
+      "creatingCheckout": "결제 진행 중...",
+      "payWithStripe": "Stripe로 결제하기",
+      "summary": {
+        "objective": "목표",
+        "adFormat": "광고 형식",
+        "boost": "부스트 패키지",
+        "duration": "기간별 패키지",
+        "total": "합계"
+      },
+      "terms": {
+        "prefix": "다음에 동의합니다.",
+        "link": "용어",
+        "suffix": "그리고 코디그램의 광고 규정."
+      },
+      "errors": {
+        "completeRequiredFields": "결제 전에 모든 필수 항목을 입력해 주세요.",
+        "acceptTerms": "결제를 진행하기 전에 이용 약관에 동의해 주십시오.",
+        "loginAgain": "결제를 진행하시려면 다시 로그인해 주세요.",
+        "prepareCreativeFailed": "결제용 광고 크리에이티브를 준비하는 데 실패했습니다.",
+        "createSessionFailed": "Stripe 결제 세션을 생성할 수 없습니다.",
+        "startCheckoutFailed": "결제 세션을 시작할 수 없습니다."
+      }
+    }
+  }
+}

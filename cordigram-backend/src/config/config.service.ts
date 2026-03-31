@@ -116,7 +116,9 @@ export class ConfigService {
   }
 
   get moderationEnabled(): boolean {
-    return String(process.env.MODERATION_ENABLED ?? 'true').toLowerCase() === 'true';
+    return (
+      String(process.env.MODERATION_ENABLED ?? 'true').toLowerCase() === 'true'
+    );
   }
 
   get moderationProvider(): 'rekognition' | 'service' {
@@ -136,7 +138,10 @@ export class ConfigService {
   }
 
   get moderationFailOpen(): boolean {
-    return String(process.env.MODERATION_FAIL_OPEN ?? 'true').toLowerCase() === 'true';
+    return (
+      String(process.env.MODERATION_FAIL_OPEN ?? 'true').toLowerCase() ===
+      'true'
+    );
   }
 
   get moderationBlurThreshold(): number {

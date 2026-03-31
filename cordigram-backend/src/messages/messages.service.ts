@@ -63,8 +63,10 @@ export class MessagesService {
     channel.messageCount = (channel.messageCount || 0) + 1;
     await channel.save();
 
-    const enriched = await this.getMessageByIdEnriched(savedMessage._id.toString());
-    return enriched as any;
+    const enriched = await this.getMessageByIdEnriched(
+      savedMessage._id.toString(),
+    );
+    return enriched;
   }
 
   async createWaveStickerMessage(
@@ -95,7 +97,7 @@ export class MessagesService {
     await channel.save();
 
     const enriched = await this.getMessageByIdEnriched(saved._id.toString());
-    return enriched as any;
+    return enriched;
   }
 
   /**
@@ -130,9 +132,7 @@ export class MessagesService {
         .lean()
         .exec();
       if (server) {
-        const memberUserIds = server.members.map((m) =>
-          m.userId.toString(),
-        );
+        const memberUserIds = server.members.map((m) => m.userId.toString());
         const profiles = await this.profileModel
           .find({
             userId: { $in: memberUserIds.map((id) => new Types.ObjectId(id)) },
@@ -186,7 +186,8 @@ export class MessagesService {
     if (!server) return null;
 
     const level =
-      (server as any).interactionSettings?.defaultNotificationLevel === 'mentions'
+      (server as any).interactionSettings?.defaultNotificationLevel ===
+      'mentions'
         ? 'mentions'
         : 'all';
 
@@ -268,7 +269,7 @@ export class MessagesService {
     );
 
     return messages.map((msg: any) => {
-      const ch = msg.channelId as any;
+      const ch = msg.channelId;
       const serverId = ch?.serverId?.toString() ?? '';
       return {
         id: msg._id.toString(),
@@ -279,8 +280,7 @@ export class MessagesService {
         messageId: msg._id.toString(),
         actorName: profileMap.get(msg.senderId.toString()) ?? 'Ai đó',
         excerpt: (msg.content ?? '').slice(0, 200),
-        createdAt:
-          msg.createdAt?.toISOString?.() ?? new Date().toISOString(),
+        createdAt: msg.createdAt?.toISOString?.() ?? new Date().toISOString(),
       };
     });
   }
@@ -299,7 +299,8 @@ export class MessagesService {
     if (!msg) return null;
 
     const senderId = msg.senderId?._id ?? msg.senderId;
-    const senderUserId = senderId != null ? new Types.ObjectId(senderId.toString()) : null;
+    const senderUserId =
+      senderId != null ? new Types.ObjectId(senderId.toString()) : null;
     const senderProfile = senderUserId
       ? await this.profileModel
           .findOne({ userId: senderUserId })
@@ -311,7 +312,9 @@ export class MessagesService {
     const result: any = {
       ...msg,
       senderId: {
-        ...(typeof msg.senderId === 'object' ? msg.senderId : { _id: msg.senderId, email: '' }),
+        ...(typeof msg.senderId === 'object'
+          ? msg.senderId
+          : { _id: msg.senderId, email: '' }),
         displayName: senderProfile?.displayName ?? undefined,
         username: senderProfile?.username ?? undefined,
         avatarUrl: senderProfile?.avatarUrl ?? undefined,
@@ -321,7 +324,8 @@ export class MessagesService {
     const replyToRaw = msg.replyTo as any;
     if (replyToRaw && typeof replyToRaw === 'object') {
       const rtSenderId = replyToRaw.senderId?._id ?? replyToRaw.senderId;
-      const rtUserId = rtSenderId != null ? new Types.ObjectId(rtSenderId.toString()) : null;
+      const rtUserId =
+        rtSenderId != null ? new Types.ObjectId(rtSenderId.toString()) : null;
       const rtProfile = rtUserId
         ? await this.profileModel
             .findOne({ userId: rtUserId })
@@ -357,7 +361,9 @@ export class MessagesService {
     if (viewerId) {
       const ignoredSet = await this.ignoredService.getIgnoredUserIds(viewerId);
       if (ignoredSet.size > 0) {
-        match.senderId = { $nin: Array.from(ignoredSet).map((id) => new Types.ObjectId(id)) };
+        match.senderId = {
+          $nin: Array.from(ignoredSet).map((id) => new Types.ObjectId(id)),
+        };
       }
     }
     const messages = await this.messageModel
@@ -376,7 +382,8 @@ export class MessagesService {
     const enriched = await Promise.all(
       messages.map(async (msg: any) => {
         const senderId = msg.senderId?._id ?? msg.senderId;
-        const senderUserId = senderId != null ? new Types.ObjectId(senderId.toString()) : null;
+        const senderUserId =
+          senderId != null ? new Types.ObjectId(senderId.toString()) : null;
         const senderProfile = senderUserId
           ? await this.profileModel
               .findOne({ userId: senderUserId })
@@ -388,17 +395,22 @@ export class MessagesService {
         const result: any = {
           ...msg,
           senderId: {
-            ...(typeof msg.senderId === 'object' ? msg.senderId : { _id: msg.senderId, email: '' }),
+            ...(typeof msg.senderId === 'object'
+              ? msg.senderId
+              : { _id: msg.senderId, email: '' }),
             displayName: senderProfile?.displayName ?? undefined,
             username: senderProfile?.username ?? undefined,
             avatarUrl: senderProfile?.avatarUrl ?? undefined,
           },
         };
 
-        const replyToRaw = msg.replyTo as any;
+        const replyToRaw = msg.replyTo;
         if (replyToRaw && typeof replyToRaw === 'object') {
           const rtSenderId = replyToRaw.senderId?._id ?? replyToRaw.senderId;
-          const rtUserId = rtSenderId != null ? new Types.ObjectId(rtSenderId.toString()) : null;
+          const rtUserId =
+            rtSenderId != null
+              ? new Types.ObjectId(rtSenderId.toString())
+              : null;
           const rtProfile = rtUserId
             ? await this.profileModel
                 .findOne({ userId: rtUserId })
@@ -436,10 +448,11 @@ export class MessagesService {
           .lean()
           .exec();
         const stickerReply =
-          (server as any)?.interactionSettings?.stickerReplyWelcomeEnabled ?? true;
+          (server as any)?.interactionSettings?.stickerReplyWelcomeEnabled ??
+          true;
         for (const m of enriched) {
-          if ((m as any).messageType === 'welcome') {
-            (m as any).stickerReplyWelcomeEnabled = stickerReply;
+          if (m.messageType === 'welcome') {
+            m.stickerReplyWelcomeEnabled = stickerReply;
           }
         }
       }

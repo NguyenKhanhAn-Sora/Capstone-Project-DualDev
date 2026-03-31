@@ -261,7 +261,7 @@ export class ProfilesService {
           throw new BadRequestException('workplace is invalid');
         }
 
-        const nextCompanyId = company._id as Types.ObjectId;
+        const nextCompanyId = company._id;
         profile.workplace = {
           companyId: nextCompanyId,
           companyName: company.name,
@@ -425,7 +425,9 @@ export class ProfilesService {
       },
     ];
 
-    const items = (await this.profileModel.aggregate(pipeline).exec()) as Array<{
+    const items = (await this.profileModel
+      .aggregate(pipeline)
+      .exec()) as Array<{
       id: string;
       userId: string;
       username: string;

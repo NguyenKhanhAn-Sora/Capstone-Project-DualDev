@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "i18n:deepl": "node scripts/deepl-sync-locales.mjs"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",

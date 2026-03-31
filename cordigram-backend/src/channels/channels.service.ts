@@ -111,9 +111,7 @@ export class ChannelsService {
         'manageChannels',
       );
       if (!isCreator && !canManage) {
-        throw new ForbiddenException(
-          'Bạn không có quyền chỉnh sửa kênh này',
-        );
+        throw new ForbiddenException('Bạn không có quyền chỉnh sửa kênh này');
       }
     }
 
@@ -141,9 +139,7 @@ export class ChannelsService {
       'manageChannels',
     );
     if (!isCreator && !canManage) {
-      throw new ForbiddenException(
-        'Bạn không có quyền xóa kênh này',
-      );
+      throw new ForbiddenException('Bạn không có quyền xóa kênh này');
     }
 
     await this.serverModel.findByIdAndUpdate(
@@ -229,9 +225,7 @@ export class ChannelsService {
     return cats;
   }
 
-  private async migrateServerToCategories(
-    serverId: string,
-  ): Promise<any[]> {
+  private async migrateServerToCategories(serverId: string): Promise<any[]> {
     const serverOid = new Types.ObjectId(serverId);
 
     const textCat = new this.categoryModel({

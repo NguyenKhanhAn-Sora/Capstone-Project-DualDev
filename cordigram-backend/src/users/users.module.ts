@@ -18,12 +18,18 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OtpModule } from '../otp/otp.module';
 import { Session, SessionSchema } from '../auth/session.schema';
 import { ActivityModule } from '../activity/activity.module';
-import { ModerationAction, ModerationActionSchema } from '../moderation/moderation-action.schema';
+import {
+  ModerationAction,
+  ModerationActionSchema,
+} from '../moderation/moderation-action.schema';
 import { Post, PostSchema } from '../posts/post.schema';
 import { Comment, CommentSchema } from '../comment/comment.schema';
 import { ActivityLog, ActivityLogSchema } from '../activity/activity.schema';
 import { ReportPost, ReportPostSchema } from '../reportpost/reportpost.schema';
-import { ReportComment, ReportCommentSchema } from '../reportcomment/reportcomment.schema';
+import {
+  ReportComment,
+  ReportCommentSchema,
+} from '../reportcomment/reportcomment.schema';
 import { ReportUser, ReportUserSchema } from '../reportuser/reportuser.schema';
 import { StrikeDecaySchedulerService } from './strike-decay-scheduler.service';
 

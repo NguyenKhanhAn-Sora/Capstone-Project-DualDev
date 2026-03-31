@@ -96,7 +96,10 @@ export class ReportCommentService {
     if (!comment) return;
     if (comment.deletedAt) return;
     if (comment.autoHiddenPendingReview) return;
-    if (comment.moderationState === 'removed' || comment.moderationState === 'restricted') {
+    if (
+      comment.moderationState === 'removed' ||
+      comment.moderationState === 'restricted'
+    ) {
       return;
     }
 
@@ -135,7 +138,15 @@ export class ReportCommentService {
         .select('createdAt isVerified status')
         .lean(),
       this.reportCommentModel
-        .aggregate([{ $match: { createdAt: { $gte: since7d }, status: { $ne: 'resolved' } } }, { $group: { _id: '$reporterId', count: { $sum: 1 } } }])
+        .aggregate([
+          {
+            $match: {
+              createdAt: { $gte: since7d },
+              status: { $ne: 'resolved' },
+            },
+          },
+          { $group: { _id: '$reporterId', count: { $sum: 1 } } },
+        ])
         .exec(),
     ]);
 
@@ -222,15 +233,28 @@ export class ReportCommentService {
       reasonSet.add(reporterId);
       reasonReporterMap.set(reason, reasonSet);
 
-      const createdAtMs = report.createdAt ? new Date(report.createdAt).getTime() : 0;
+      const createdAtMs = report.createdAt
+        ? new Date(report.createdAt).getTime()
+        : 0;
       if (createdAtMs >= since1h.getTime()) reportsLast1h += 1;
       if (createdAtMs >= since24h.getTime()) reportsLast24h += 1;
     });
 
-    const topCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'other';
-    const severeTopCategory = ['violence', 'illegal', 'privacy', 'abuse'].includes(topCategory);
+    const topCategory =
+      Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+      'other';
+    const severeTopCategory = [
+      'violence',
+      'illegal',
+      'privacy',
+      'abuse',
+    ].includes(topCategory);
 
-    const severeReasonCount = ['nonconsensual_intimate', 'self_harm', 'extremism']
+    const severeReasonCount = [
+      'nonconsensual_intimate',
+      'self_harm',
+      'extremism',
+    ]
       .map((reason) => reasonReporterMap.get(reason)?.size ?? 0)
       .reduce((max, count) => Math.max(max, count), 0);
 
@@ -250,12 +274,19 @@ export class ReportCommentService {
 
     const hiddenAt = new Date();
     const hiddenUntil = new Date(hiddenAt.getTime() + 24 * 60 * 60 * 1000);
-    const moderatorId = await this.resolveSystemModeratorId(fallbackModeratorId);
-    const trigger = meetsCriticalRule ? 'critical-threshold' : 'standard-threshold';
+    const moderatorId =
+      await this.resolveSystemModeratorId(fallbackModeratorId);
+    const trigger = meetsCriticalRule
+      ? 'critical-threshold'
+      : 'standard-threshold';
 
     const updateResult = await this.commentModel
       .updateOne(
-        { _id: commentId, autoHiddenPendingReview: { $ne: true }, deletedAt: null },
+        {
+          _id: commentId,
+          autoHiddenPendingReview: { $ne: true },
+          deletedAt: null,
+        },
         {
           $set: {
             moderationState: 'hidden',

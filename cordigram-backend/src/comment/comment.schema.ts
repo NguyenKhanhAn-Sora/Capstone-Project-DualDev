@@ -47,7 +47,8 @@ export class CommentMedia {
 }
 
 const CommentMediaSchema = SchemaFactory.createForClass(CommentMedia);
-const CommentLinkPreviewSchema = SchemaFactory.createForClass(CommentLinkPreview);
+const CommentLinkPreviewSchema =
+  SchemaFactory.createForClass(CommentLinkPreview);
 
 @Schema({ timestamps: true })
 export class Comment extends Document {

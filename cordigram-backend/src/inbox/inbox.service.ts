@@ -97,11 +97,15 @@ export class InboxService {
     const userObjectId = new Types.ObjectId(userId);
     const [eventItems, pendingInvites, serverNotifications, seenDocs] =
       await Promise.all([
-      this.getForYouEvents(userId),
-      this.serverInvitesService.getPendingForUser(userId),
-      this.serversService.getForYouRoleNotifications(userId),
-      this.inboxSeenModel.find({ userId: userObjectId }).select('sourceType sourceId').lean().exec(),
-    ]);
+        this.getForYouEvents(userId),
+        this.serverInvitesService.getPendingForUser(userId),
+        this.serversService.getForYouRoleNotifications(userId),
+        this.inboxSeenModel
+          .find({ userId: userObjectId })
+          .select('sourceType sourceId')
+          .lean()
+          .exec(),
+      ]);
     const seenSet = new Set(
       (seenDocs as { sourceType: string; sourceId: string }[]).map(
         (s) => `${s.sourceType}:${s.sourceId}`,
@@ -109,16 +113,26 @@ export class InboxService {
     );
     const inviteItems: InboxServerInviteItem[] = (pendingInvites as any[]).map(
       (inv) => {
-        const server = inv.serverId as { _id: string; name: string; avatarUrl?: string };
+        const server = inv.serverId as {
+          _id: string;
+          name: string;
+          avatarUrl?: string;
+        };
         const from = inv.fromUserId as { _id: string; email?: string };
         const id = inv._id.toString();
         return {
           type: 'server_invite' as const,
           _id: id,
-          serverId: (server?._id ?? inv.serverId)?.toString?.() ?? inv.serverId?.toString?.() ?? '',
+          serverId:
+            (server?._id ?? inv.serverId)?.toString?.() ??
+            inv.serverId?.toString?.() ??
+            '',
           serverName: server?.name ?? 'Máy chủ',
           serverAvatarUrl: server?.avatarUrl ?? null,
-          inviterId: (from?._id ?? inv.fromUserId)?.toString?.() ?? inv.fromUserId?.toString?.() ?? '',
+          inviterId:
+            (from?._id ?? inv.fromUserId)?.toString?.() ??
+            inv.fromUserId?.toString?.() ??
+            '',
           inviterDisplay: from?.email ?? 'Ai đó',
           createdAt: inv.createdAt?.toISOString?.() ?? new Date().toISOString(),
           seen: seenSet.has(`server_invite:${id}`),
@@ -142,7 +156,11 @@ export class InboxService {
   }
 
   /** Đánh dấu một mục (event hoặc server_invite) là đã xem. */
-  async markSeen(userId: string, sourceType: string, sourceId: string): Promise<void> {
+  async markSeen(
+    userId: string,
+    sourceType: string,
+    sourceId: string,
+  ): Promise<void> {
     const userObjectId = new Types.ObjectId(userId);
     await this.inboxSeenModel.findOneAndUpdate(
       { userId: userObjectId, sourceType, sourceId },
@@ -168,11 +186,16 @@ export class InboxService {
       }
     }
 
-    results.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+    results.sort(
+      (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+    );
     return results.slice(0, 50);
   }
 
-  private toInboxEventItem(ev: ServerEvent, server: { name: string; avatarUrl?: string | null }): InboxEventItem {
+  private toInboxEventItem(
+    ev: ServerEvent,
+    server: { name: string; avatarUrl?: string | null },
+  ): InboxEventItem {
     const channelId = ev.channelId
       ? {
           _id: (ev.channelId as any)._id?.toString?.() ?? '',
@@ -193,7 +216,8 @@ export class InboxService {
       status: (ev as any).status,
       description: (ev as any).description ?? null,
       coverImageUrl: (ev as any).coverImageUrl ?? null,
-      createdAt: (ev as any).createdAt?.toISOString?.() ?? new Date().toISOString(),
+      createdAt:
+        (ev as any).createdAt?.toISOString?.() ?? new Date().toISOString(),
     };
   }
 
@@ -219,13 +243,14 @@ export class InboxService {
       const channels = (server as any).channels ?? [];
       for (const ch of channels) {
         const channelId = ch._id?.toString?.() ?? ch.toString?.() ?? '';
-        const channelName = (ch as any).name ?? 'general';
-        const channelType = (ch as any).type;
+        const channelName = ch.name ?? 'general';
+        const channelType = ch.type;
         if (channelType !== 'text') continue;
-        const unreadCount = await this.messagesService.getUnreadCountByChannelId(
-          userId,
-          channelId,
-        );
+        const unreadCount =
+          await this.messagesService.getUnreadCountByChannelId(
+            userId,
+            channelId,
+          );
         if (unreadCount <= 0) continue;
         const messages = await this.messagesService.getMessagesByChannelId(
           channelId,
@@ -235,7 +260,7 @@ export class InboxService {
         );
         const lastMsg = messages[0];
         if (!lastMsg) continue;
-        const senderId = (lastMsg as any).senderId?._id ?? (lastMsg as any).senderId;
+        const senderId = lastMsg.senderId?._id ?? lastMsg.senderId;
         const senderStr = senderId?.toString?.();
         if (senderStr && ignoredSet.has(senderStr)) continue;
         result.push({
@@ -244,8 +269,9 @@ export class InboxService {
           channelName,
           serverId,
           serverName: (server as any).name ?? 'Máy chủ',
-          lastMessage: (lastMsg as any).content ?? '',
-          lastMessageAt: (lastMsg as any).createdAt?.toISOString?.() ?? new Date().toISOString(),
+          lastMessage: lastMsg.content ?? '',
+          lastMessageAt:
+            lastMsg.createdAt?.toISOString?.() ?? new Date().toISOString(),
           unreadCount,
         });
       }

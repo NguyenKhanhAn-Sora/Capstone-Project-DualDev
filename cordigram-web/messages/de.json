@@ -1,0 +1,1160 @@
+{
+  "settings": {
+    "system": {
+      "title": "System",
+      "description": "Wählen Sie Ihre Sprache und Ihre Design-Einstellungen aus.",
+      "language": {
+        "title": "Sprache",
+        "description": "Wählen Sie Ihre bevorzugte Anzeigesprache aus.",
+        "options": {
+          "en": "Deutsch",
+          "vi": "Vietnamesisch",
+          "es": "Spanisch",
+          "fr": "Französisch",
+          "de": "Deutsch",
+          "pt-BR": "Portugiesisch (Brasilien)",
+          "ru": "Russisch",
+          "ja": "Japanisch",
+          "ko": "Koreanisch",
+          "zh": "Chinesisch"
+        }
+      },
+      "theme": {
+        "title": "Thema",
+        "description": "Wechseln Sie zwischen hellem und dunklem Modus.",
+        "options": {
+          "light": "Licht",
+          "dark": "Dunkel"
+        }
+      }
+    },
+    "notifications": {
+      "title": "Benachrichtigungen",
+      "description": "Legen Sie fest, wann Sie Benachrichtigungen erhalten möchten.",
+      "loading": "Wird geladen...",
+      "push": {
+        "title": "Push-Benachrichtigungen",
+        "hint": "Wenn die Benachrichtigungen stummgeschaltet sind, werden neue Benachrichtigungen zwar weiterhin gespeichert, Sie werden jedoch nicht in Echtzeit benachrichtigt."
+      },
+      "actions": {
+        "mute": "Stummschalten",
+        "edit": "Bearbeiten",
+        "enable": "Aktivieren"
+      },
+      "status": {
+        "enabled": "Aktiviert",
+        "muted": "Stummgeschaltet",
+        "mutedUntilManual": "Stummgeschaltet, bis du den Ton wieder einschaltest",
+        "mutedRelative": "Gedämpfte „{relative}“"
+      },
+      "muteOptions": {
+        "5m": "5 Minuten",
+        "10m": "10 Minuten",
+        "15m": "15 Minuten",
+        "30m": "30 Minuten",
+        "1h": "1 Stunde",
+        "1d": "1 Tag",
+        "until": "Bis ich es wieder einschalte",
+        "custom": "Datum und Uhrzeit auswählen"
+      },
+      "categories": {
+        "follow": {
+          "label": "Es folgt",
+          "description": "Wenn dir jemand folgt."
+        },
+        "comment": {
+          "label": "Kommentare",
+          "description": "Wenn jemand deine Beiträge oder Reels kommentiert."
+        },
+        "like": {
+          "label": "Likes",
+          "description": "Wenn jemand deine Beiträge, Reels oder Kommentare mit „Gefällt mir“ markiert."
+        },
+        "mentions": {
+          "label": "Erwähnungen und Tags",
+          "description": "Wenn jemand dich erwähnt oder markiert."
+        }
+      },
+      "errors": {
+        "loadFailed": "Die Benachrichtigungseinstellungen können nicht geladen werden.",
+        "updateFailed": "Benachrichtigungen können nicht aktualisiert werden.",
+        "invalidDateTime": "Bitte wählen Sie ein gültiges Datum und eine gültige Uhrzeit aus.",
+        "chooseFutureTime": "Bitte wählen Sie einen späteren Zeitpunkt aus."
+      }
+    }
+  },
+  "sidebar": {
+    "nav": {
+      "home": "Startseite",
+      "search": "Suchen",
+      "message": "Nachricht",
+      "following": "Im Anschluss",
+      "explore": "Entdecken",
+      "notification": "Benachrichtigung",
+      "ads": "Anzeigen",
+      "create": "Erstellen",
+      "reels": "Rollen"
+    },
+    "menu": {
+      "profile": "Profil",
+      "settings": "Einstellungen",
+      "saved": "Gespeichert",
+      "switchToLight": "Auf Licht umschalten",
+      "switchToDark": "Zum Dunkelmodus wechseln",
+      "reportProblem": "Ein Problem melden",
+      "switchAccount": "Konto wechseln",
+      "logout": "Abmelden"
+    },
+    "switchAccount": {
+      "title": "Bitte melden Sie sich an, um fortzufahren",
+      "email": {
+        "label": "E-Mail-Adresse",
+        "placeholder": "E-Mail-Adresse eingeben"
+      },
+      "password": {
+        "label": "Passwort",
+        "placeholder": "Passwort eingeben",
+        "show": "Passwort anzeigen",
+        "hide": "Passwort ausblenden"
+      },
+      "submit": {
+        "label": "Anmelden",
+        "loading": "Umschalten..."
+      },
+      "google": "Mit Google fortfahren",
+      "errors": {
+        "invalidEmail": "Das E-Mail-Format ist ungültig",
+        "loginFailed": "Die Anmeldung ist fehlgeschlagen. Bitte versuche es erneut."
+      }
+    }
+  },
+  "common": {
+    "close": "Schließen",
+    "hidePost": "Beitrag ausblenden"
+  },
+  "home": {
+    "feed": {
+      "signInToView": "Melden Sie sich an, um den Feed anzuzeigen",
+      "unableToLoad": "Feed kann nicht geladen werden",
+      "followingEmpty": "Du folgst noch niemandem, oder die Personen, denen du folgst, haben noch nichts gepostet.",
+      "loadMore": "Mehr laden",
+      "suggestionsAria": "Vorschläge"
+    },
+    "toast": {
+      "signInToRepost": "Anmelden, um den Beitrag erneut zu posten",
+      "reposted": "Erneut gepostet",
+      "repostedWithQuote": "Mit Zitat erneut gepostet",
+      "commentsOn": "Kommentare sind aktiviert",
+      "commentsOff": "Kommentare deaktiviert",
+      "commentsUpdateFailed": "Die Aktualisierung der Kommentare ist fehlgeschlagen",
+      "likeCountHidden": "Likes ausblenden",
+      "likeCountVisible": "Anzahl der Likes anzeigen",
+      "likeCountUpdateFailed": "Die Sichtbarkeit der Likes konnte nicht aktualisiert werden",
+      "linkCopied": "Link in die Zwischenablage kopiert",
+      "linkCopyFailed": "Das Kopieren des Links ist fehlgeschlagen",
+      "signInToDelete": "Bitte melde dich an, um Beiträge zu löschen",
+      "deletedPost": "Gelöschter Beitrag",
+      "deleteFailed": "Das Löschen des Beitrags ist fehlgeschlagen",
+      "reportSubmitted": "Bericht eingereicht",
+      "reportSubmitFailed": "Der Bericht konnte nicht übermittelt werden",
+      "actionFailed": "Aktion fehlgeschlagen",
+      "blockFailed": "Blockierung fehlgeschlagen"
+    },
+    "delete": {
+      "title": "Diesen Beitrag löschen?",
+      "body": "{name}",
+      "cancel": "Abbrechen",
+      "confirm": "Löschen",
+      "deleting": "Wird gelöscht..."
+    },
+    "block": {
+      "title": "Dieses Konto sperren?",
+      "body": "Sie sind dabei, {name} zu blockieren. Diese Person kann dann nicht mehr mit Ihnen kommunizieren.",
+      "cancel": "Abbrechen",
+      "confirm": "Block",
+      "blocking": "Wird geladen...",
+      "thisUser": "dieser Benutzer"
+    },
+    "report": {
+      "title": "Diesen Beitrag melden",
+      "description": "Beitrag unter „{name}“ melden. Bitte wähle den zutreffendsten Grund aus.",
+      "selectReason": "Wählen Sie einen bestimmten Grund aus",
+      "pickCategory": "Wähle zuerst eine Kategorie aus.",
+      "cancel": "Abbrechen",
+      "submit": "Bericht einreichen",
+      "submitting": "Wird gesendet...",
+      "notes": {
+        "label": "Zusätzliche Anmerkungen (optional)",
+        "placeholder": "Fügen Sie bei Bedarf einen kurzen Kontext hinzu..."
+      },
+      "groups": {
+        "abuse": {
+          "label": "Belästigung / Hassrede",
+          "reasons": {
+            "harassment": "Nimmt eine bestimmte Person ins Visier, um sie zu schikanieren",
+            "hateSpeech": "Hassrede oder Diskriminierung",
+            "offensiveDiscrimination": "greift schutzbedürftige Gruppen an"
+          }
+        },
+        "violence": {
+          "label": "Gewalt / Drohungen",
+          "reasons": {
+            "violenceThreats": "droht mit Gewalt oder verherrlicht Gewalt",
+            "graphicViolence": "Grafische Darstellungen von Gewalt",
+            "extremism": "Extremismus oder Terrorismus",
+            "selfHarm": "Selbstverletzung oder Selbstmord"
+          }
+        },
+        "sensitive": {
+          "label": "Anstößige Inhalte",
+          "reasons": {
+            "nudity": "Nacktheit oder Inhalte für Erwachsene",
+            "minorNudity": "Geringes Sicherheitsrisiko",
+            "sexualSolicitation": "Anbahnung sexueller Kontakte"
+          }
+        },
+        "misinfo": {
+          "label": "Identitätsbetrug / Falschinformationen",
+          "reasons": {
+            "fakeNews": "Falsche oder irreführende Informationen",
+            "impersonation": "Sich als eine andere Person oder Organisation ausgeben"
+          }
+        },
+        "spam": {
+          "label": "Spam / Betrug",
+          "reasons": {
+            "spam": "Spam oder irrelevante Inhalte",
+            "financialScam": "Finanzbetrug",
+            "unsolicitedAds": "Unerwünschte Werbung"
+          }
+        },
+        "ip": {
+          "label": "Geistiges Eigentum",
+          "reasons": {
+            "copyright": "Urheberrechtsverletzung",
+            "trademark": "Markenrechtsverletzung",
+            "brandImpersonation": "Markenmissbrauch"
+          }
+        },
+        "illegal": {
+          "label": "Illegale Aktivitäten",
+          "reasons": {
+            "contraband": "Schmuggelware",
+            "illegalTransaction": "Illegale Transaktion"
+          }
+        },
+        "privacy": {
+          "label": "Verletzung der Privatsphäre",
+          "reasons": {
+            "doxxing": "Veröffentlichung privater Informationen",
+            "nonconsensualIntimate": "Intime Inhalte ohne Einwilligung"
+          }
+        },
+        "other": {
+          "label": "Sonstiges",
+          "reasons": {
+            "other": "Anderer Grund"
+          }
+        }
+      }
+    },
+    "visibility": {
+      "title": "Sichtbarkeit bearbeiten",
+      "description": "Wähle aus, wer diesen Beitrag sehen darf.",
+      "cancel": "Abbrechen",
+      "update": "Sichtbarkeit aktualisieren",
+      "updating": "Wird aktualisiert...",
+      "signIn": "Bitte melden Sie sich an",
+      "updateFailed": "Die Aktualisierung der Sichtbarkeit ist fehlgeschlagen",
+      "options": {
+        "public": {
+          "title": "Öffentlich",
+          "description": "Jeder kann diesen Beitrag sehen"
+        },
+        "followers": {
+          "title": "Freunde / Abonnierte",
+          "description": "Nur Follower können diesen Beitrag sehen"
+        },
+        "private": {
+          "title": "Privat",
+          "description": "Nur du kannst diesen Beitrag sehen"
+        }
+      }
+    },
+    "edit": {
+      "title": "Beitrag bearbeiten",
+      "caption": "Bildunterschrift",
+      "addEmoji": "Emoji hinzufügen",
+      "emojiIcon": "Emoji-Symbol",
+      "placeholder": "Schreib etwas...",
+      "searching": "Suche...",
+      "noMatches": "Keine Treffer",
+      "hashtags": "Hashtags",
+      "addHashtag": "Hashtag hinzufügen",
+      "removeHashtag": "{tag} entfernen",
+      "location": {
+        "label": "Standort",
+        "placeholder": "Ort hinzufügen",
+        "noSuggestions": "Keine Vorschläge",
+        "noSuggestionsError": "Es wurden keine Vorschläge gefunden. Versuchen Sie es mit anderen Suchbegriffen."
+      },
+      "allowComments": {
+        "title": "Kommentare zulassen",
+        "hint": "Aktivieren, um Feedback von allen zu erhalten"
+      },
+      "allowDownloads": {
+        "title": "Downloads zulassen",
+        "hint": "Teile die Originaldatei mit Personen, denen du vertraust",
+        "inheritedLoading": "Aus dem ursprünglichen Beitrag übernommen (wird geladen…)",
+        "inheritedLocked": "Aus dem ursprünglichen Beitrag übernommen (kann nicht geändert werden)"
+      },
+      "hideLike": {
+        "title": "Verbergen",
+        "hint": "Die Zuschauer sehen die Anzahl der Likes zu diesem Beitrag nicht"
+      },
+      "cancel": "Abbrechen",
+      "saveChanges": "Änderungen speichern",
+      "saving": "Wird gespeichert...",
+      "signInToEdit": "Bitte melde dich an, um Beiträge zu bearbeiten",
+      "updated": "Beitrag aktualisiert",
+      "updateFailed": "Die Aktualisierung des Beitrags ist fehlgeschlagen"
+    },
+    "mention": {
+      "signIn": "Melden Sie sich an, um Nutzer zu erwähnen",
+      "userNotFound": "Benutzer nicht gefunden"
+    },
+    "menu": {
+      "editPost": "Beitrag bearbeiten",
+      "editVisibility": "Sichtbarkeit bearbeiten",
+      "muteNotifications": "Benachrichtigungen stummschalten",
+      "turnOffComments": "Kommentare deaktivieren",
+      "turnOnComments": "Kommentare aktivieren",
+      "showLike": "Gefällt mir",
+      "hideLike": "Verbergen",
+      "goToPost": "Zum Beitrag",
+      "copyLink": "Link kopieren",
+      "deletePost": "Beitrag löschen",
+      "unfollow": "Entfolgen",
+      "follow": "Folgen",
+      "save": "Diesen Beitrag speichern",
+      "unsave": "Diesen Beitrag nicht speichern",
+      "hidePost": "Diesen Beitrag ausblenden",
+      "report": "Bericht",
+      "blockAccount": "Dieses Konto blockieren"
+    },
+    "follow": {
+      "following": "Im Anschluss",
+      "follow": "Folgen",
+      "unfollow": "Entfolgen"
+    },
+    "repost": {
+      "banner": "Wiederveröffentlicht von",
+      "original": "ursprünglicher Beitrag"
+    },
+    "content": {
+      "seeMore": "Mehr erfahren",
+      "collapse": "Zusammenklappen"
+    },
+    "media": {
+      "tapForSound": "Zum Abspielen antippen",
+      "previous": "Frühere Medien",
+      "next": "Nächstes Medium",
+      "alt": "Medien",
+      "overlayAlt": "Medienbeiträge"
+    },
+    "actions": {
+      "liked": "Gefällt mir",
+      "like": "Gefällt mir",
+      "comment": "Kommentar",
+      "saved": "Gespeichert",
+      "save": "Speichern",
+      "repost": "Erneut posten"
+    },
+    "repostOverlay": {
+      "visibility": {
+        "public": {
+          "title": "Öffentlich",
+          "description": "Jeder kann diesen Beitrag ansehen"
+        },
+        "followers": {
+          "title": "Follower",
+          "description": "Nur Follower können diesen Repost sehen"
+        },
+        "private": {
+          "title": "Privat",
+          "description": "Nur du kannst diesen Repost sehen"
+        },
+        "label": "Sichtbarkeit"
+      },
+      "errors": {
+        "couldNotRepost": "Konnte nicht erneut gepostet werden"
+      },
+      "quote": {
+        "title": "Zitat",
+        "subtitle": "Zitat von @{name}: {kind}",
+        "caption": "Bildunterschrift",
+        "addEmoji": "Emoji hinzufügen",
+        "emojiIcon": "Emoji-Symbol",
+        "placeholder": "Schreibe deine Meinung dazu..."
+      },
+      "hashtags": {
+        "label": "Hashtags #",
+        "remove": "Hashtag entfernen {tag}",
+        "add": "Hashtag hinzufügen",
+        "example": "Beispiel: Reisen"
+      },
+      "location": {
+        "label": "Standort",
+        "placeholder": "Ort hinzufügen",
+        "searching": "Suche...",
+        "noSuggestions": "Keine Vorschläge",
+        "noMatch": "Es wurden keine passenden Standorte gefunden."
+      },
+      "switch": {
+        "allowComments": {
+          "title": "Kommentare zulassen",
+          "hint": "Andere können auf Ihr Zitat antworten"
+        },
+        "allowDownloads": {
+          "title": "Downloads zulassen",
+          "hint": "Aus dem ursprünglichen Beitrag übernommen (kann nicht geändert werden)"
+        },
+        "hideLike": {
+          "title": "Verbergen",
+          "hint": "Nur du kannst die Likes zu diesem Zitat sehen"
+        }
+      },
+      "actions": {
+        "cancel": "Abbrechen",
+        "sharing": "Teilen...",
+        "shareQuote": "Zitat teilen"
+      },
+      "sheet": {
+        "title": "Erneut posten",
+        "reposting": "Erneut gepostet...",
+        "repost": "Erneut posten",
+        "quote": "Zitat"
+      },
+      "kinds": {
+        "post": "Beitrag",
+        "reel": "Rolle"
+      }
+    },
+    "imageViewer": {
+      "close": "Bild schließen",
+      "alt": "Bild"
+    }
+  },
+  "adminLogin": {
+    "brand": {
+      "eyebrow": "Admin-Konsole",
+      "title": "Cordigram-Kontrollraum",
+      "subtitle": "Sorgen Sie mit Klarheit und Schnelligkeit für Sicherheit, Moderation und den guten Zustand der Plattform.",
+      "footnote": "Nur für interne Mitarbeiter. Alle Aktionen werden protokolliert und überwacht."
+    },
+    "stats": {
+      "access": {
+        "label": "Zugriffsebene",
+        "value": "Eingeschränkt"
+      },
+      "audit": {
+        "label": "Prüfung",
+        "value": "Aktiviert"
+      },
+      "status": {
+        "label": "Status",
+        "value": "Betriebsbereit"
+      }
+    },
+    "form": {
+      "badge": "Sichere Anmeldung",
+      "title": "Bei Admin anmelden",
+      "subtitle": "Melden Sie sich mit Ihren Mitarbeiterdaten an, um fortzufahren.",
+      "emailLabel": "Dienst-E-Mail",
+      "emailPlaceholder": "admin@cordigram.com",
+      "passwordLabel": "Passwort",
+      "passwordPlaceholder": "Geben Sie Ihr Passwort ein",
+      "resetLink": "Passwort zurücksetzen für Mitarbeiter",
+      "submit": "Weiter zur Verwaltung",
+      "submitting": "Anmeldung läuft...",
+      "needAccess": "Benötigen Sie Zugang?",
+      "contact": "Kontakt zum Super-Admin"
+    },
+    "errors": {
+      "loginFailed": "Anmeldung fehlgeschlagen"
+    }
+  },
+  "forgotPassword": {
+    "title": "Passwort vergessen",
+    "subtitle": "Gib die E-Mail-Adresse deines Kontos ein und bestätige den Code",
+    "emailPlaceholder": "Ihre E-Mail-Adresse",
+    "otpPlaceholder": "Einmalpasswort eingeben",
+    "newPasswordPlaceholder": "Neues Passwort",
+    "confirmPasswordPlaceholder": "Neues Passwort bestätigen",
+    "sendOtp": "Einmalpasswort senden",
+    "sending": "Wird gesendet...",
+    "verifyOtp": "Einmalpasswort bestätigen",
+    "checking": "Wird geprüft...",
+    "confirm": "Bestätigen",
+    "updating": "Wird aktualisiert...",
+    "useAnotherEmail": "Eine andere E-Mail-Adresse verwenden",
+    "backToLogin": "Zurück zur Anmeldung",
+    "passwordToggle": {
+      "show": "Passwort anzeigen",
+      "hide": "Passwort ausblenden"
+    },
+    "messages": {
+      "otpSent": "Einmaliges Passwort gesendet. Bitte überprüfen Sie Ihren Posteingang.",
+      "otpVerified": "OTP-Verifizierung erfolgreich. Bitte legen Sie ein neues Passwort fest.",
+      "passwordUpdated": "Passwort aktualisiert. Weiterleitung zur Anmeldung..."
+    },
+    "errors": {
+      "sendOtpFailed": "Das Einmalpasswort konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
+      "invalidOtp": "Ungültiges OTP, bitte versuchen Sie es erneut.",
+      "resetFailed": "Das Zurücksetzen des Passworts ist fehlgeschlagen. Bitte versuche es erneut."
+    }
+  },
+  "authLogin": {
+    "common": {
+      "close": "Schließen",
+      "cancel": "Abbrechen"
+    },
+    "errors": {
+      "enterOtp": "Bitte geben Sie das Einmalpasswort ein.",
+      "invalidOtp": "Ungültiges oder abgelaufenes OTP.",
+      "otpRecentlySent": "Das OTP wurde gerade gesendet. Versuchen Sie es in einigen Minuten erneut.",
+      "resendOtpFailed": "Das OTP kann nicht erneut gesendet werden.",
+      "invalidSignInMethod": "Ungültige Anmeldemethode",
+      "invalidEmail": "Das E-Mail-Format ist ungültig",
+      "loginFailed": "Die Anmeldung ist fehlgeschlagen. Bitte versuche es erneut."
+    },
+    "recent": {
+      "title": "Aktuelle Berichte",
+      "deleteAll": "Alle löschen",
+      "deleting": "Wird gelöscht...",
+      "account": "Konto",
+      "continueAs": "Weiter unter {label}",
+      "remove": "{label} entfernen"
+    },
+    "hero": {
+      "title": "Willkommen zurück!",
+      "subtitle": "Führen Sie Gespräche weiter, aktualisieren Sie Kanäle und arbeiten Sie mit Ihrem Team zusammen. Alles bleibt synchronisiert, sicher und einsatzbereit.",
+      "chips": {
+        "secureSessions": "Sichere Sitzungen",
+        "instantNotifications": "Sofortige Benachrichtigungen",
+        "multiPlatform": "Für mehrere Plattformen geeignet"
+      },
+      "badges": {
+        "accessControl": "Eindeutige Zugriffskontrolle für jeden Kanal.",
+        "sso": "Einmalige Anmeldung, synchronisiert über Web und Mobilgeräte.",
+        "uiOptimized": "Benutzeroberfläche, optimiert für die Arbeit und die gemeinsame Nutzung von Inhalten."
+      }
+    },
+    "form": {
+      "title": "Anmelden",
+      "emailLabel": "E-Mail-Adresse",
+      "emailPlaceholder": "Geben Sie Ihre E-Mail-Adresse ein",
+      "passwordLabel": "Passwort",
+      "passwordPlaceholder": "Geben Sie Ihr Passwort ein",
+      "passwordToggle": {
+        "show": "Passwort anzeigen",
+        "hide": "Passwort ausblenden"
+      },
+      "logIn": "Anmelden",
+      "loggingIn": "Anmeldung...",
+      "forgotPassword": "Passwort vergessen?",
+      "noAccount": "Sie haben noch kein Konto?",
+      "signUp": "Anmelden",
+      "or": "oder",
+      "signInWithGoogle": "Mit Google anmelden"
+    },
+    "confirm": {
+      "removeAccountTitle": "Konto löschen?",
+      "remove": "Entfernen",
+      "removing": "Entfernen...",
+      "deleteAllRecentTitle": "Alle letzten löschen?",
+      "deleteAllRecentText": "Dadurch werden alle zuletzt gespeicherten Konten gelöscht."
+    },
+    "twoFactor": {
+      "title": "Zwei-Faktor-Authentifizierung",
+      "subtitle": "Geben Sie den 6-stelligen Code ein, der Ihnen per E-Mail zugesandt wurde.",
+      "placeholder": "------",
+      "resend": "OTP erneut senden",
+      "resendIn": "Erneut senden (E-{seconds})",
+      "verifying": "Wird überprüft...",
+      "continue": "Weiter"
+    }
+  },
+  "adminDashboard": {
+    "errors": {
+      "loadStatsFailed": "Statistiken konnten nicht geladen werden"
+    },
+    "common": {
+      "viewAll": "Alle anzeigen",
+      "review": "Rezension",
+      "details": "Details"
+    },
+    "header": {
+      "eyebrow": "Admin-Dashboard",
+      "title": "Willkommen zurück, Admin",
+      "subtitle": "Übersicht über die Sicherheits- und Warnmeldungen der Plattform.",
+      "synced": "Vor 2 Minuten synchronisiert",
+      "openQueue": "Moderationswarteschlange öffnen"
+    },
+    "kpi": {
+      "new": "Neu",
+      "totalUsers": "Gesamtzahl der Nutzer",
+      "allTime": "Gesamt",
+      "newUsers24h": "Neue Nutzer (24 Std.)",
+      "postsCreated": "Erstellte Beiträge",
+      "openReports": "Berichte öffnen",
+      "activeCalls": "Aktive Anrufe",
+      "stable": "Stall"
+    },
+    "queue": {
+      "title": "Berichtswarteschlange",
+      "items": {
+        "postHarassment": {
+          "title": "Beitrag wegen Belästigung gemeldet",
+          "tag": "Beitrag",
+          "status": "Neu",
+          "time": "Vor 12 Minuten gemeldet"
+        },
+        "userImpersonation": {
+          "title": "Benutzer wegen Identitätsbetrugs gemeldet",
+          "tag": "Benutzer",
+          "status": "Untersuchung",
+          "time": "Vor 1 Stunde gemeldet"
+        },
+        "commentSensitive": {
+          "title": "Der Kommentar enthält sensible Inhalte",
+          "tag": "Kommentar",
+          "status": "Neu",
+          "time": "Vor 2 Stunden gemeldet"
+        }
+      }
+    },
+    "alerts": {
+      "title": "Sicherheitswarnungen",
+      "items": {
+        "nightfeedSpike": {
+          "title": "Es wird ein sprunghafter Anstieg bei #nightfeed gemeldet",
+          "note": "24 Meldungen in der letzten Stunde. Bitte manuelle Überprüfung in Betracht ziehen."
+        },
+        "repeatOffender": {
+          "title": "Ein Wiederholungstäter mit hoher Rückfallquote wurde identifiziert",
+          "note": "Der Nutzer hat innerhalb von 24 Stunden 5 Meldungen zu verschiedenen Beiträgen abgegeben."
+        }
+      }
+    },
+    "health": {
+      "title": "Systemzustand",
+      "items": {
+        "api": {
+          "label": "API",
+          "value": "Betriebsbereit"
+        },
+        "realtime": {
+          "label": "Echtzeit",
+          "value": "Stall"
+        },
+        "storage": {
+          "label": "Lagerung",
+          "value": "68 % genutzt"
+        }
+      }
+    },
+    "quickActions": {
+      "title": "Schnellaktionen",
+      "openTools": "Werkzeuge öffnen",
+      "items": {
+        "findUser": {
+          "title": "Benutzer suchen",
+          "desc": "Suchen Sie einen Benutzer, um dessen Profil oder Berichte anzusehen.",
+          "cta": "Suchen"
+        },
+        "reviewContent": {
+          "title": "Inhalt der Rezension",
+          "desc": "Hier findest du die neuesten markierten Beiträge.",
+          "cta": "Rezension"
+        },
+        "broadcastNotice": {
+          "title": "Sendungshinweis",
+          "desc": "Senden Sie eine Systemmeldung an alle Benutzer.",
+          "cta": "Entwurf"
+        }
+      }
+    },
+    "activity": {
+      "title": "Aktuelle Administratoraktivitäten",
+      "viewLogs": "Protokolle anzeigen",
+      "items": {
+        "resolvedReport": "Bericht Nr. 1293 (Belästigung) abgeschlossen",
+        "suspendedUser": "Der Nutzer @riverlane wurde wegen Identitätsbetrugs gesperrt",
+        "detectedSpike": "Es wurde ein sprunghafter Anstieg des Berichtsvolumens für Reels festgestellt",
+        "time12m": "vor 12 Minuten",
+        "time48m": "vor 48 Minuten",
+        "time2h": "vor 2 Stunden"
+      }
+    }
+  },
+  "authSignup": {
+    "steps": {
+      "email": "E-Mail-Adresse eingeben",
+      "otp": "Einmalpasswort bestätigen",
+      "profile": "Profilinformationen"
+    },
+    "errors": {
+      "birthdateInvalid": "Das Geburtsdatum ist ungültig",
+      "birthdateFuture": "Das Geburtsdatum darf nicht in der Zukunft liegen",
+      "displayNameLength": "Mindestens 3 und höchstens 30 Zeichen",
+      "displayNameMinLetters": "Der Anzeigename muss nach dem Entfernen der Leerzeichen mindestens 3 Buchstaben lang sein",
+      "displayNameOnlyLettersSpaces": "Der Anzeigename darf nur Buchstaben und Leerzeichen enthalten",
+      "passwordMismatch": "Die Passwörter stimmen nicht überein",
+      "usernameMin": "Der Benutzername muss mindestens 3 Zeichen lang sein",
+      "usernameMax": "Der Benutzername darf höchstens 30 Zeichen lang sein",
+      "usernameFormat": "Der Benutzername darf nur Buchstaben, Zahlen, Unterstriche und Punkte enthalten",
+      "usernameTaken": "Der Benutzername ist bereits vergeben",
+      "emailRequired": "Bitte gib deine E-Mail-Adresse ein",
+      "sendOtpFailed": "Das OTP konnte nicht gesendet werden",
+      "otpInvalid": "Der OTP-Code ist ungültig",
+      "verifyOtpFailed": "Das Einmalpasswort konnte nicht überprüft werden",
+      "usernameChecking": "Benutzername prüfen",
+      "passwordRequired": "Ein Passwort ist erforderlich",
+      "passwordMin": "Das Passwort muss mindestens 8 Zeichen lang sein",
+      "displayNameUsernameRequired": "Anzeigename und Benutzername sind Pflichtangaben",
+      "genderRequired": "Bitte wählen Sie Ihr Geschlecht aus",
+      "missingSignupToken": "Anmeldetoken fehlt, bitte überprüfen Sie das OTP erneut",
+      "avatarUploadFailed": "Das Hochladen des Avatars ist fehlgeschlagen",
+      "completeProfileFailed": "Das Profil konnte nicht vervollständigt werden"
+    },
+    "info": {
+      "otpSent": "Einmalpasswort an Ihre E-Mail-Adresse gesendet",
+      "verifySuccess": "Die Überprüfung war erfolgreich. Vervollständigen Sie Ihre Kontoangaben.",
+      "changeEmailRequestNewOtp": "Sie können die E-Mail-Adresse ändern und ein neues Einmalpasswort anfordern.",
+      "signupSuccessRedirect": "Die Anmeldung war erfolgreich. Weiterleitung..."
+    },
+    "email": {
+      "emailAddress": "E-Mail-Adresse",
+      "emailPlaceholder": "email@example.com",
+      "sending": "Wird gesendet...",
+      "sendOtp": "Einmalpasswort senden"
+    },
+    "otp": {
+      "enterCode": "Geben Sie den OTP-Code ein",
+      "sentTo": "Gesendet an {email}",
+      "placeholder": "Beispiel: 123456",
+      "changeEmail": "E-Mail-Adresse ändern",
+      "resendIn": "Erneut senden in {seconds} s",
+      "resendCode": "Code erneut senden",
+      "verifying": "Wird überprüft...",
+      "verify": "Überprüfen"
+    },
+    "profile": {
+      "displayName": "Anzeigename",
+      "displayNamePlaceholder": "z. B. Cordigrammer",
+      "username": "Benutzername",
+      "usernamePlaceholder": "Benutzername",
+      "usernameHelp": "Der Benutzername darf nur Buchstaben, Zahlen, Unterstriche und Punkte enthalten",
+      "password": "Passwort",
+      "passwordPlaceholder": "Mindestens 8 Zeichen",
+      "confirmPassword": "Passwort bestätigen",
+      "confirmPasswordPlaceholder": "Bitte erneut eingeben, um zu bestätigen",
+      "ariaHidePassword": "Passwort ausblenden",
+      "ariaShowPassword": "Passwort anzeigen",
+      "birthdate": "Geburtsdatum",
+      "gender": "Geschlecht",
+      "shortBioOptional": "Kurzbiografie (optional)",
+      "shortBioPlaceholder": "Erzähl uns ein wenig über dich",
+      "processing": "Wird verarbeitet...",
+      "next": "Weiter"
+    },
+    "gender": {
+      "male": "Männlich",
+      "female": "weiblich",
+      "other": "Sonstiges",
+      "preferNotToSay": "Möchte ich lieber nicht sagen",
+      "selectOption": "Wählen Sie eine Option aus"
+    },
+    "location": {
+      "optional": "Ort (optional)",
+      "placeholder": "Eine Stadt, eine Sehenswürdigkeit oder einen Ort hinzufügen",
+      "useCurrent": "Aktuellen Standort verwenden",
+      "searching": "Suche...",
+      "noSuggestions": "Es wurden keine Vorschläge gefunden",
+      "noSuggestionsTryKeywords": "Es wurden keine Vorschläge gefunden. Versuchen Sie es mit anderen Suchbegriffen."
+    },
+    "avatar": {
+      "choose": "Avatar auswählen",
+      "previewAlt": "Vorschau auf „Avatar“",
+      "pickImage": "Wähle ein Bild aus, um eine Vorschau anzuzeigen und es zuzuschneiden.",
+      "chooseFromDevice": "Bild vom Gerät auswählen",
+      "zoom": "Zoom",
+      "skip": "Überspringen",
+      "finishing": "Fertigstellen...",
+      "finish": "Fertigstellen"
+    },
+    "aria": {
+      "backToProfile": "Zurück zu den Profilinformationen"
+    },
+    "page": {
+      "title": "Erstelle ein Cordigram-Konto",
+      "stepCounter": "Schritt {current} / {total}",
+      "alreadyHaveAccount": "Haben Sie bereits ein Konto?",
+      "logIn": "Anmelden",
+      "or": "oder",
+      "signUpWithGoogle": "Mit Google anmelden"
+    },
+    "hero": {
+      "title": "Willkommen bei Cordigram!",
+      "subtitle": "Eine soziale Plattform mit Chat-Kanälen in Echtzeit. Erstelle Kanäle im Discord-Stil, teile Fotos und Videos wie auf Instagram und verbinde Communities auf moderne Weise.",
+      "chips": {
+        "realtimeChannels": "Echtzeitkanäle",
+        "mediaFeedStories": "Medien-Feed und Beiträge",
+        "voiceReady": "Sprachgesteuert"
+      },
+      "badges": {
+        "permissionsRoles": "Berechtigungen und Rollen für die sichere Verwaltung von Communities.",
+        "multiDeviceSync": "Synchronisierung über mehrere Geräte hinweg mit sofortigen Benachrichtigungen.",
+        "modernUi": "Eine moderne Benutzeroberfläche, die für die Weitergabe von Inhalten optimiert ist."
+      }
+    }
+  },
+  "peopleYouMayKnow": {
+    "title": "Personen, die Sie vielleicht kennen",
+    "empty": "Im Moment habe ich keine Vorschläge.",
+    "aria": {
+      "section": "Personen, die Sie vielleicht kennen"
+    },
+    "actions": {
+      "seeAll": "Alle anzeigen",
+      "showLess": "Weniger anzeigen",
+      "follow": "Folgen",
+      "following": "Im Anschluss"
+    },
+    "errors": {
+      "loadFailed": "Vorschläge konnten nicht geladen werden",
+      "followUpdateFailed": "Die Aktualisierung der Abonnements ist fehlgeschlagen"
+    }
+  },
+  "commentLikesOverlay": {
+    "title": "Likes",
+    "loading": "Wird geladen...",
+    "loadingMore": "Wird geladen...",
+    "search": {
+      "placeholder": "Benutzername suchen",
+      "ariaLabel": "Benutzername suchen"
+    },
+    "empty": {
+      "noMatchingUsers": "Es wurden keine passenden Nutzer gefunden",
+      "noLikes": "Noch keine Likes"
+    },
+    "actions": {
+      "close": "Schließen",
+      "you": "Du",
+      "follow": "Folgen",
+      "following": "Im Anschluss"
+    },
+    "aria": {
+      "viewProfile": "{username}-Profil anzeigen"
+    },
+    "errors": {
+      "sessionExpired": "Die Sitzung ist abgelaufen.",
+      "loadLikesFailed": "Likes konnten nicht geladen werden",
+      "loadMoreFailed": "Es konnten keine weiteren Ergebnisse geladen werden"
+    }
+  },
+  "adsDashboard": {
+    "errors": {
+      "loadFailed": "Das Anzeigen-Dashboard konnte nicht geladen werden."
+    },
+    "status": {
+      "active": "Aktiv",
+      "hidden": "Versteckt",
+      "paused": "Angehalten",
+      "canceled": "Abgesagt",
+      "completed": "Abgeschlossen"
+    },
+    "empty": {
+      "title": "Noch keine Anzeigen",
+      "createFirstAd": "Erstellen Sie Ihre erste Anzeige",
+      "checklist": {
+        "goal": "Ziel: Steigerung der Bekanntheit oder der Konversionsrate",
+        "budget": "Budget- und Terminplanung",
+        "creative": "Inhalt, Medien und klare Handlungsaufforderung"
+      }
+    },
+    "actions": {
+      "createNewAd": "Neue Anzeige erstellen",
+      "viewAll": "Alle anzeigen",
+      "details": "Details"
+    },
+    "metrics": {
+      "totalBudget": "Gesamtbudget",
+      "spent": "Quelle: {value}",
+      "impressions": "Eindrücke",
+      "reach": "Kontakt: {value}",
+      "averageCtr": "Durchschnittliche Klickrate",
+      "clicks": "Link: {value}",
+      "activeCampaigns": "Laufende Kampagnen",
+      "liveHint": "Derzeit laufende Kampagnen"
+    },
+    "trend": {
+      "title": "Entwicklung der Impressionen über 7 Tage",
+      "subtitle": "Verfolgen Sie die Anzeigenauslieferung und die Klicks auf Handlungsaufforderungen der letzten 7 Tage.",
+      "barTitle": "{day}: {impressions} Impressionen – {clicks} Klicks"
+    },
+    "campaigns": {
+      "title": "Werbekampagnen",
+      "subtitle": "Übersicht über Ihre 5 letzten aktiven Kampagnen."
+    },
+    "table": {
+      "campaign": "Kampagne",
+      "status": "Status",
+      "spent": "Ausgegeben",
+      "impressionsShort": "Druck.",
+      "ctr": "CTR",
+      "clicks": "Klicks",
+      "action": "Aktion",
+      "noActive": "Derzeit gibt es keine aktiven Kampagnen."
+    }
+  },
+  "explorePage": {
+    "loading": "Wird geladen...",
+    "itemsCount": "{count} Artikel",
+    "errors": {
+      "unableToLoad": "„Explore“ kann nicht geladen werden"
+    }
+  },
+  "adsCreatePage": {
+    "header": {
+      "title": "Werbekampagne erstellen",
+      "subtitle": "Erstellen Sie Ihre Anzeige in wenigen einfachen Schritten: Zielsetzung, Werbemittel, Zielgruppe und Preispaket.",
+      "backToDashboard": "Zurück zum Dashboard"
+    },
+    "sections": {
+      "objective": {
+        "title": "Kampagnenziel auswählen",
+        "required": "Erforderlich"
+      },
+      "creative": {
+        "title": "Anzeigenentwurf",
+        "pill": "Hauptinhalt"
+      },
+      "audience": {
+        "title": "Zielgruppenansprache",
+        "pill": "Zielgruppenansprache"
+      }
+    },
+    "defaults": {
+      "campaignName": "Werbekampagne für Studierende",
+      "primaryText": "Erweitere deine Ausrüstung mit unserer neuesten Kollektion. Jetzt mit limitiertem Einführungsangebot erhältlich.",
+      "headline": "Einführungsangebot – Sparen Sie heute 30 %",
+      "description": "Hochwertige Produkte mit schnellem Versand ins ganze Land.",
+      "location": "Vietnam",
+      "fallbackCampaignName": "Cordigram-Werbekampagne",
+      "interests": {
+        "technology": "Technologie",
+        "onlineShopping": "Online-Shopping"
+      }
+    },
+    "objective": {
+      "awareness": {
+        "label": "Bewusstsein",
+        "desc": "Erreichen Sie neue Menschen, die sich wahrscheinlich an Ihre Marke erinnern werden."
+      },
+      "traffic": {
+        "label": "Verkehr",
+        "desc": "Leiten Sie Besucher auf Ihre Website oder Produktseite weiter."
+      },
+      "engagement": {
+        "label": "Engagement",
+        "desc": "Erhalte mehr Reaktionen, Kommentare und Likes."
+      },
+      "leads": {
+        "label": "Lead-Generierung",
+        "desc": "Erfassen Sie die Kontaktdaten potenzieller Kunden."
+      },
+      "sales": {
+        "label": "Verkauf",
+        "desc": "Steigern Sie die Kaufzahlen und die Konversionsrate."
+      },
+      "messages": {
+        "label": "Nachrichten",
+        "desc": "Nehmen Sie Kontakt zu Personen auf, die an Ihrem Angebot interessiert sind."
+      }
+    },
+    "fields": {
+      "campaignName": "Name der Kampagne",
+      "campaignNamePlaceholder": "z. B. Aktion zum Schulanfang",
+      "primaryText": "Haupttext",
+      "headline": "Überschrift",
+      "ctaButton": "CTA-Schaltfläche",
+      "selectCta": "CTA auswählen",
+      "description": "Beschreibung",
+      "destinationUrl": "Ziel-URL",
+      "location": "Standort",
+      "ageRange": "Altersgruppe",
+      "to": "zu",
+      "interests": "Interessen",
+      "interestsPlaceholder": "Geben Sie ein Interesse ein und klicken Sie auf „Hinzufügen“",
+      "add": "Hinzufügen"
+    },
+    "location": {
+      "loadingCountries": "Länder werden geladen...",
+      "selectLocation": "Standort auswählen"
+    },
+    "format": {
+      "single": "Einzelbild",
+      "carousel": "Karussell",
+      "video": "Video"
+    },
+    "cta": {
+      "Learn More": "Weitere Informationen",
+      "Shop Now": "Jetzt kaufen",
+      "Sign Up": "Anmelden",
+      "Book Now": "Jetzt buchen",
+      "Contact Us": "Kontakt"
+    },
+    "emoji": {
+      "add": "Emoji hinzufügen",
+      "icon": "Emoji-Symbol"
+    },
+    "media": {
+      "title": "Medien hochladen",
+      "hint": "{uploadLabel}. Die Dateien werden auf den Server hochgeladen und in der Vorschau angezeigt.",
+      "uploadOneVideo": "Ein Video hochladen",
+      "uploadUpToFiveImages": "Lade bis zu 5 Bilder hoch",
+      "uploadOneImage": "Ein Bild hochladen",
+      "uploading": "Wird hochgeladen...",
+      "chooseFiles": "Dateien auswählen",
+      "video": "Video",
+      "image": "Bild",
+      "remove": "Entfernen",
+      "errors": {
+        "loginAgain": "Bitte melde dich erneut an, um Medien hochzuladen.",
+        "selectVideo": "Bitte wählen Sie eine Videodatei aus.",
+        "selectImages": "Bitte wählen Sie Bilddateien aus.",
+        "carouselLimit": "Carousel unterstützt bis zu 5 Bilder. Entferne eines, um weitere hochzuladen.",
+        "singleLimit": "Dieses Format unterstützt nur eine Datei.",
+        "uploadFailed": "Der Upload ist fehlgeschlagen. Bitte versuche es erneut."
+      }
+    },
+    "validation": {
+      "primaryTextRequired": "Der Haupttext ist erforderlich.",
+      "headlineRequired": "Eine Überschrift ist erforderlich.",
+      "destinationRequired": "Die Ziel-URL ist erforderlich.",
+      "destinationProtocol": "Die Ziel-URL muss mit http:// oder https:// beginnen.",
+      "destinationInvalid": "Die Ziel-URL ist ungültig.",
+      "mediaRequired": "Bitte lade die Medien vor der Veröffentlichung hoch."
+    },
+    "interests": {
+      "recommended": {
+        "technology": "Technologie",
+        "fashion": "Mode",
+        "beauty": "Schönheit",
+        "gaming": "Gaming",
+        "startup": "Start",
+        "education": "Bildung",
+        "fitness": "Fitness",
+        "food": "Essen",
+        "travel": "Reisen"
+      }
+    },
+    "placement": {
+      "title": "Platzierung",
+      "homeFeedOnly": "Diese Anzeige wird ausschließlich im Home-Feed geschaltet."
+    },
+    "packages": {
+      "title": "Aktionspaket",
+      "boostSection": "1. Kraft steigern",
+      "durationSection": "2. Laufzeitpaket",
+      "days": "{days} Tage",
+      "boost": {
+        "hint": "Legt fest, wie stark Ihre Anzeige im Home-Feed hervorgehoben wird.",
+        "light": {
+          "title": "Lichtverstärkung",
+          "highlight": "Am besten für die erste Anzeige",
+          "level": "Geringer Wettbewerb"
+        },
+        "standard": {
+          "title": "Standard-Boost",
+          "highlight": "Am häufigsten ausgewählt",
+          "level": "Mittlerer Wettbewerb"
+        },
+        "strong": {
+          "title": "Kräftiger Schub",
+          "highlight": "Gute Sichtbarkeit",
+          "level": "Starker Wettbewerb"
+        }
+      },
+      "duration": {
+        "d3": {
+          "note": "Kurze Salve"
+        },
+        "d7": {
+          "note": "Einwöchiger Lauf"
+        },
+        "d14": {
+          "note": "Kontinuierliche Lieferung"
+        },
+        "d30": {
+          "note": "Vollständige Monatsdeckung"
+        }
+      },
+      "summary": {
+        "boost": "Boost-Paket",
+        "duration": "Laufzeitpaket",
+        "total": "Gesamtkosten",
+        "selected": "Sie haben „{boost}“ für {days} Tage ausgewählt."
+      }
+    },
+    "preview": {
+      "title": "Live-Vorschau",
+      "sponsored": "Gesponsert",
+      "userAvatar": "Benutzer-Avatar",
+      "displayName": "Anzeigename",
+      "username": "Benutzername",
+      "primaryTextFallback": "Hier erscheint Ihr Haupttext.",
+      "video": "Videovorschau",
+      "creative": "Kreative Vorschau",
+      "adCreativeAlt": "Vorschau der Anzeigenvorlage",
+      "carouselImage": "Karussell-Anzeige {index}",
+      "previousImage": "Vorheriges Bild in der Bildergalerie",
+      "nextImage": "Nächstes Bild in der Bildergalerie"
+    },
+    "actions": {
+      "cancel": "Abbrechen",
+      "publishAd": "Anzeige schalten",
+      "back": "Zurück"
+    },
+    "payment": {
+      "title": "Zahlung bestätigen",
+      "close": "Zahlungsfenster schließen",
+      "subtitle": "Sie werden zu Stripe Checkout (Testmodus) weitergeleitet, um die Zahlung abzuschließen.",
+      "days": "Tage",
+      "creatingCheckout": "Kasse wird erstellt...",
+      "payWithStripe": "Mit Stripe bezahlen",
+      "summary": {
+        "objective": "Ziel",
+        "adFormat": "Anzeigenformat",
+        "boost": "Boost-Paket",
+        "duration": "Laufzeitpaket",
+        "total": "Insgesamt"
+      },
+      "terms": {
+        "prefix": "Ich stimme den",
+        "link": "Begriff",
+        "suffix": "sowie die Werberichtlinien von Cordigram."
+      },
+      "errors": {
+        "completeRequiredFields": "Bitte füllen Sie vor der Zahlung alle Pflichtfelder aus.",
+        "acceptTerms": "Bitte stimmen Sie den Bedingungen zu, bevor Sie mit der Zahlung fortfahren.",
+        "loginAgain": "Bitte melden Sie sich vor der Zahlung erneut an.",
+        "prepareCreativeFailed": "Die Vorbereitung des Anzeigenmotivs für den Checkout ist fehlgeschlagen.",
+        "createSessionFailed": "Die Stripe-Checkout-Sitzung konnte nicht erstellt werden.",
+        "startCheckoutFailed": "Die Checkout-Sitzung konnte nicht gestartet werden."
+      }
+    }
+  }
+}

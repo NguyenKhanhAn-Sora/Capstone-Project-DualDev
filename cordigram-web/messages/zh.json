@@ -1,0 +1,1160 @@
+{
+  "settings": {
+    "system": {
+      "title": "系统",
+      "description": "请选择您的语言和主题偏好。",
+      "language": {
+        "title": "语言",
+        "description": "请选择您希望使用的显示语言。",
+        "options": {
+          "en": "英语",
+          "vi": "越南语",
+          "es": "西班牙语",
+          "fr": "法语",
+          "de": "德语",
+          "pt-BR": "葡萄牙语（巴西）",
+          "ru": "俄语",
+          "ja": "日语",
+          "ko": "韩语",
+          "zh": "中文"
+        }
+      },
+      "theme": {
+        "title": "主题",
+        "description": "在浅色模式和深色模式之间切换。",
+        "options": {
+          "light": "光",
+          "dark": "黑暗"
+        }
+      }
+    },
+    "notifications": {
+      "title": "通知",
+      "description": "控制接收通知提醒的时间。",
+      "loading": "正在加载...",
+      "push": {
+        "title": "推送通知",
+        "hint": "关闭通知后，新通知仍会被保存，但不会实时提醒您。"
+      },
+      "actions": {
+        "mute": "静音",
+        "edit": "编辑",
+        "enable": "启用"
+      },
+      "status": {
+        "enabled": "已启用",
+        "muted": "静音",
+        "mutedUntilManual": "已静音，需手动开启",
+        "mutedRelative": "已静音 {relative}"
+      },
+      "muteOptions": {
+        "5m": "5分钟",
+        "10m": "10分钟",
+        "15m": "15分钟",
+        "30m": "30分钟",
+        "1h": "1 小时",
+        "1d": "1天",
+        "until": "直到我把它重新打开",
+        "custom": "选择日期和时间"
+      },
+      "categories": {
+        "follow": {
+          "label": "如下",
+          "description": "当有人关注你时。"
+        },
+        "comment": {
+          "label": "评论",
+          "description": "当有人评论你的帖子或 Reels 时。"
+        },
+        "like": {
+          "label": "点赞",
+          "description": "当有人点赞你的帖子、Reels 或评论时。"
+        },
+        "mentions": {
+          "label": "提及和标签",
+          "description": "当有人提及或标记你时。"
+        }
+      },
+      "errors": {
+        "loadFailed": "无法加载通知设置。",
+        "updateFailed": "无法更新通知。",
+        "invalidDateTime": "请选择有效的日期和时间。",
+        "chooseFutureTime": "请选择一个未来的时间。"
+      }
+    }
+  },
+  "sidebar": {
+    "nav": {
+      "home": "首页",
+      "search": "搜索",
+      "message": "消息",
+      "following": "接下来",
+      "explore": "探索",
+      "notification": "通知",
+      "ads": "广告",
+      "create": "创建",
+      "reels": "Reels"
+    },
+    "menu": {
+      "profile": "个人简介",
+      "settings": "设置",
+      "saved": "已保存",
+      "switchToLight": "切换至亮色模式",
+      "switchToDark": "切换为深色模式",
+      "reportProblem": "报告问题",
+      "switchAccount": "切换账户",
+      "logout": "退出"
+    },
+    "switchAccount": {
+      "title": "请登录以继续",
+      "email": {
+        "label": "电子邮箱地址",
+        "placeholder": "输入电子邮件地址"
+      },
+      "password": {
+        "label": "密码",
+        "placeholder": "输入密码",
+        "show": "显示密码",
+        "hide": "隐藏密码"
+      },
+      "submit": {
+        "label": "登录",
+        "loading": "正在切换..."
+      },
+      "google": "继续使用 Google",
+      "errors": {
+        "invalidEmail": "电子邮件格式不正确",
+        "loginFailed": "登录失败。请重试。"
+      }
+    }
+  },
+  "common": {
+    "close": "关闭",
+    "hidePost": "隐藏帖子"
+  },
+  "home": {
+    "feed": {
+      "signInToView": "登录以查看动态",
+      "unableToLoad": "无法加载订阅源",
+      "followingEmpty": "您目前尚未关注任何人，或者您关注的人尚未发布任何内容。",
+      "loadMore": "加载更多",
+      "suggestionsAria": "建议"
+    },
+    "toast": {
+      "signInToRepost": "登录以转发",
+      "reposted": "转发",
+      "repostedWithQuote": "转发并引用",
+      "commentsOn": "已开启评论功能",
+      "commentsOff": "评论已关闭",
+      "commentsUpdateFailed": "无法更新评论",
+      "likeCountHidden": "隐藏点赞数",
+      "likeCountVisible": "显示点赞数",
+      "likeCountUpdateFailed": "无法更新点赞数可见性",
+      "linkCopied": "链接已复制到剪贴板",
+      "linkCopyFailed": "复制链接失败",
+      "signInToDelete": "请登录以删除帖子",
+      "deletedPost": "已删除的帖子",
+      "deleteFailed": "删除帖子失败",
+      "reportSubmitted": "报告已提交",
+      "reportSubmitFailed": "无法提交报告",
+      "actionFailed": "操作失败",
+      "blockFailed": "区块生成失败"
+    },
+    "delete": {
+      "title": "删除这篇帖子？",
+      "body": "{name}",
+      "cancel": "取消",
+      "confirm": "删除",
+      "deleting": "正在删除..."
+    },
+    "block": {
+      "title": "要屏蔽这个账号吗？",
+      "body": "您即将屏蔽 {name}。该账号将无法再与您互动。",
+      "cancel": "取消",
+      "confirm": "块",
+      "blocking": "正在加载...",
+      "thisUser": "该用户"
+    },
+    "report": {
+      "title": "举报此帖子",
+      "description": "举报{name}上的帖子。请选择最准确的理由。",
+      "selectReason": "请选择具体原因",
+      "pickCategory": "请先选择一个类别。",
+      "cancel": "取消",
+      "submit": "提交报告",
+      "submitting": "正在提交...",
+      "notes": {
+        "label": "补充说明（可选）",
+        "placeholder": "如有需要，请补充简要背景信息……"
+      },
+      "groups": {
+        "abuse": {
+          "label": "骚扰 / 仇恨言论",
+          "reasons": {
+            "harassment": "以某人为骚扰对象",
+            "hateSpeech": "仇恨言论或歧视",
+            "offensiveDiscrimination": "针对弱势群体的攻击"
+          }
+        },
+        "violence": {
+          "label": "暴力 / 威胁",
+          "reasons": {
+            "violenceThreats": "威胁或鼓吹暴力",
+            "graphicViolence": "血腥暴力画面",
+            "extremism": "极端主义或恐怖主义",
+            "selfHarm": "自残或自杀"
+          }
+        },
+        "sensitive": {
+          "label": "敏感内容",
+          "reasons": {
+            "nudity": "裸露或成人内容",
+            "minorNudity": "轻微的安全风险",
+            "sexualSolicitation": "性骚扰"
+          }
+        },
+        "misinfo": {
+          "label": "冒充 / 虚假信息",
+          "reasons": {
+            "fakeNews": "虚假或误导性信息",
+            "impersonation": "冒充个人或组织"
+          }
+        },
+        "spam": {
+          "label": "垃圾邮件 / 诈骗",
+          "reasons": {
+            "spam": "垃圾信息或无关内容",
+            "financialScam": "金融诈骗",
+            "unsolicitedAds": "垃圾广告"
+          }
+        },
+        "ip": {
+          "label": "知识产权",
+          "reasons": {
+            "copyright": "侵犯版权",
+            "trademark": "商标侵权",
+            "brandImpersonation": "冒充品牌"
+          }
+        },
+        "illegal": {
+          "label": "非法活动",
+          "reasons": {
+            "contraband": "违禁品",
+            "illegalTransaction": "非法交易"
+          }
+        },
+        "privacy": {
+          "label": "侵犯隐私",
+          "reasons": {
+            "doxxing": "泄露私人信息",
+            "nonconsensualIntimate": "未经同意的亲密内容"
+          }
+        },
+        "other": {
+          "label": "其他",
+          "reasons": {
+            "other": "其他原因"
+          }
+        }
+      }
+    },
+    "visibility": {
+      "title": "编辑可见性",
+      "description": "选择谁可以查看此帖子。",
+      "cancel": "取消",
+      "update": "更新可见性",
+      "updating": "正在更新...",
+      "signIn": "请登录",
+      "updateFailed": "更新可见性失败",
+      "options": {
+        "public": {
+          "title": "公开",
+          "description": "任何人都可以查看这篇帖子"
+        },
+        "followers": {
+          "title": "好友 / 关注",
+          "description": "只有关注者才能查看此帖子"
+        },
+        "private": {
+          "title": "私密",
+          "description": "只有你能查看这篇帖子"
+        }
+      }
+    },
+    "edit": {
+      "title": "编辑帖子",
+      "caption": "图片说明",
+      "addEmoji": "添加表情符号",
+      "emojiIcon": "表情符号图标",
+      "placeholder": "写点什么……",
+      "searching": "正在搜索...",
+      "noMatches": "没有匹配结果",
+      "hashtags": "话题标签",
+      "addHashtag": "添加话题标签",
+      "removeHashtag": "卸载 {tag}",
+      "location": {
+        "label": "位置",
+        "placeholder": "添加地点",
+        "noSuggestions": "没有建议",
+        "noSuggestionsError": "未找到相关建议，请尝试其他关键词。"
+      },
+      "allowComments": {
+        "title": "允许评论",
+        "hint": "允许接收来自所有人的反馈"
+      },
+      "allowDownloads": {
+        "title": "允许下载",
+        "hint": "将原始文件分享给您信任的人",
+        "inheritedLoading": "继承自原始帖子（正在加载……）",
+        "inheritedLocked": "继承自原始帖子（无法修改）"
+      },
+      "hideLike": {
+        "title": "隐藏 喜欢",
+        "hint": "观众无法看到这条帖子的点赞数"
+      },
+      "cancel": "取消",
+      "saveChanges": "保存更改",
+      "saving": "正在保存...",
+      "signInToEdit": "请登录以编辑帖子",
+      "updated": "帖子已更新",
+      "updateFailed": "更新帖子失败"
+    },
+    "mention": {
+      "signIn": "登录以提及用户",
+      "userNotFound": "未找到该用户"
+    },
+    "menu": {
+      "editPost": "编辑帖子",
+      "editVisibility": "编辑可见性",
+      "muteNotifications": "静音通知",
+      "turnOffComments": "关闭评论",
+      "turnOnComments": "开启评论",
+      "showLike": "点赞",
+      "hideLike": "隐藏 喜欢",
+      "goToPost": "前往帖子",
+      "copyLink": "复制链接",
+      "deletePost": "删除帖子",
+      "unfollow": "取消关注",
+      "follow": "关注",
+      "save": "保存这篇帖子",
+      "unsave": "取消保存此帖子",
+      "hidePost": "隐藏此帖子",
+      "report": "报告",
+      "blockAccount": "屏蔽该账号"
+    },
+    "follow": {
+      "following": "接下来",
+      "follow": "关注",
+      "unfollow": "取消关注"
+    },
+    "repost": {
+      "banner": "转载自",
+      "original": "原文"
+    },
+    "content": {
+      "seeMore": "查看更多",
+      "collapse": "折叠"
+    },
+    "media": {
+      "tapForSound": "点击播放声音",
+      "previous": "之前的媒体",
+      "next": "下一媒体",
+      "alt": "媒体",
+      "overlayAlt": "发布媒体"
+    },
+    "actions": {
+      "liked": "点赞",
+      "like": "点赞",
+      "comment": "评论",
+      "saved": "已保存",
+      "save": "保存",
+      "repost": "转发"
+    },
+    "repostOverlay": {
+      "visibility": {
+        "public": {
+          "title": "公开",
+          "description": "任何人都可以查看此转发内容"
+        },
+        "followers": {
+          "title": "关注者",
+          "description": "只有关注者才能查看此转发"
+        },
+        "private": {
+          "title": "私密",
+          "description": "只有你能查看此转发"
+        },
+        "label": "可见性"
+      },
+      "errors": {
+        "couldNotRepost": "无法重新发布"
+      },
+      "quote": {
+        "title": "引用",
+        "subtitle": "引用 @{name} 的 {kind}",
+        "caption": "图片说明",
+        "addEmoji": "添加表情符号",
+        "emojiIcon": "表情符号图标",
+        "placeholder": "请发表您的看法……"
+      },
+      "hashtags": {
+        "label": "话题标签 #",
+        "remove": "删除话题标签{tag}",
+        "add": "添加话题标签",
+        "example": "示例：旅行"
+      },
+      "location": {
+        "label": "位置",
+        "placeholder": "添加地点",
+        "searching": "正在搜索...",
+        "noSuggestions": "没有建议",
+        "noMatch": "未找到合适的地点。"
+      },
+      "switch": {
+        "allowComments": {
+          "title": "允许评论",
+          "hint": "其他人可以回复您的引用"
+        },
+        "allowDownloads": {
+          "title": "允许下载",
+          "hint": "继承自原始帖子（无法修改）"
+        },
+        "hideLike": {
+          "title": "隐藏 喜欢",
+          "hint": "只有你能看到这条引文的点赞数"
+        }
+      },
+      "actions": {
+        "cancel": "取消",
+        "sharing": "正在分享...",
+        "shareQuote": "分享报价"
+      },
+      "sheet": {
+        "title": "转发",
+        "reposting": "转发……",
+        "repost": "转发",
+        "quote": "引用"
+      },
+      "kinds": {
+        "post": "帖子",
+        "reel": "卷轴"
+      }
+    },
+    "imageViewer": {
+      "close": "关闭图片",
+      "alt": "图片"
+    }
+  },
+  "adminLogin": {
+    "brand": {
+      "eyebrow": "管理控制台",
+      "title": "Cordigram 控制室",
+      "subtitle": "清晰、高效地管理安全、内容审核及平台健康状况。",
+      "footnote": "仅限内部员工使用。所有操作均会被记录并受到监控。"
+    },
+    "stats": {
+      "access": {
+        "label": "访问级别",
+        "value": "受限"
+      },
+      "audit": {
+        "label": "审计",
+        "value": "已启用"
+      },
+      "status": {
+        "label": "状态",
+        "value": "运行中"
+      }
+    },
+    "form": {
+      "badge": "安全登录",
+      "title": "登录管理员后台",
+      "subtitle": "请使用您的员工凭证继续。",
+      "emailLabel": "工作邮箱",
+      "emailPlaceholder": "admin@cordigram.com",
+      "passwordLabel": "密码",
+      "passwordPlaceholder": "请输入密码",
+      "resetLink": "员工密码重置",
+      "submit": "继续前往“管理”",
+      "submitting": "正在登录...",
+      "needAccess": "需要访问权限吗？",
+      "contact": "联系超级管理员"
+    },
+    "errors": {
+      "loginFailed": "登录失败"
+    }
+  },
+  "forgotPassword": {
+    "title": "忘记密码",
+    "subtitle": "请输入您的账户邮箱并验证验证码",
+    "emailPlaceholder": "您的电子邮件",
+    "otpPlaceholder": "输入一次性密码",
+    "newPasswordPlaceholder": "新密码",
+    "confirmPasswordPlaceholder": "确认新密码",
+    "sendOtp": "发送一次性密码",
+    "sending": "正在发送...",
+    "verifyOtp": "验证一次性密码",
+    "checking": "正在检查...",
+    "confirm": "确认",
+    "updating": "正在更新...",
+    "useAnotherEmail": "请使用另一个邮箱",
+    "backToLogin": "返回登录页面",
+    "passwordToggle": {
+      "show": "显示密码",
+      "hide": "隐藏密码"
+    },
+    "messages": {
+      "otpSent": "一次性密码已发送。请查看您的收件箱。",
+      "otpVerified": "已通过一次性密码验证。请设置新密码。",
+      "passwordUpdated": "密码已更新。正在重定向至登录页面..."
+    },
+    "errors": {
+      "sendOtpFailed": "无法发送一次性密码，请重试。",
+      "invalidOtp": "一次性密码无效，请重试。",
+      "resetFailed": "密码重置失败，请重试。"
+    }
+  },
+  "authLogin": {
+    "common": {
+      "close": "关闭",
+      "cancel": "取消"
+    },
+    "errors": {
+      "enterOtp": "请输入一次性密码。",
+      "invalidOtp": "一次性密码无效或已过期。",
+      "otpRecentlySent": "一次性密码（OTP）已发送。请在{seconds}秒后重试。",
+      "resendOtpFailed": "无法重新发送一次性密码。",
+      "invalidSignInMethod": "登录方式无效",
+      "invalidEmail": "电子邮件格式不正确",
+      "loginFailed": "登录失败。请重试。"
+    },
+    "recent": {
+      "title": "近期动态",
+      "deleteAll": "删除全部",
+      "deleting": "正在删除...",
+      "account": "账户",
+      "continueAs": "继续使用 {label}",
+      "remove": "卸载 {label}"
+    },
+    "hero": {
+      "title": "欢迎回来！",
+      "subtitle": "继续对话、更新频道，并与团队协作。所有内容均保持同步、安全且随时可用。",
+      "chips": {
+        "secureSessions": "安全会话",
+        "instantNotifications": "即时通知",
+        "multiPlatform": "支持多平台"
+      },
+      "badges": {
+        "accessControl": "每个频道均设有明确的访问控制。",
+        "sso": "单点登录，网页端与移动端数据同步。",
+        "uiOptimized": "界面经过优化，更适合工作与内容分享。"
+      }
+    },
+    "form": {
+      "title": "登录",
+      "emailLabel": "电子邮箱地址",
+      "emailPlaceholder": "请输入您的电子邮件地址",
+      "passwordLabel": "密码",
+      "passwordPlaceholder": "请输入密码",
+      "passwordToggle": {
+        "show": "显示密码",
+        "hide": "隐藏密码"
+      },
+      "logIn": "登录",
+      "loggingIn": "正在登录...",
+      "forgotPassword": "忘记密码了吗？",
+      "noAccount": "还没有账号吗？",
+      "signUp": "注册",
+      "or": "或",
+      "signInWithGoogle": "使用 Google 登录"
+    },
+    "confirm": {
+      "removeAccountTitle": "删除账户？",
+      "remove": "删除",
+      "removing": "正在删除...",
+      "deleteAllRecentTitle": "删除所有最近的？",
+      "deleteAllRecentText": "这将清除所有已保存的最近账户。"
+    },
+    "twoFactor": {
+      "title": "双因素验证",
+      "subtitle": "请输入发送到您邮箱的6位验证码。",
+      "placeholder": "------",
+      "resend": "重新发送一次性密码",
+      "resendIn": "重新发送（{seconds}s）",
+      "verifying": "正在验证...",
+      "continue": "继续"
+    }
+  },
+  "adminDashboard": {
+    "errors": {
+      "loadStatsFailed": "无法加载统计数据"
+    },
+    "common": {
+      "viewAll": "查看全部",
+      "review": "评论",
+      "details": "详情"
+    },
+    "header": {
+      "eyebrow": "管理员仪表盘",
+      "title": "欢迎回来，管理员",
+      "subtitle": "平台健康与安全信号概览。",
+      "synced": "2分钟前同步",
+      "openQueue": "打开审核队列"
+    },
+    "kpi": {
+      "new": "新",
+      "totalUsers": "用户总数",
+      "allTime": "历史总计",
+      "newUsers24h": "新用户（24小时内）",
+      "postsCreated": "已发布的帖子",
+      "openReports": "打开报告",
+      "activeCalls": "当前通话",
+      "stable": "稳定"
+    },
+    "queue": {
+      "title": "报告队列",
+      "items": {
+        "postHarassment": {
+          "title": "该帖子因涉嫌骚扰已被举报",
+          "tag": "帖子",
+          "status": "新",
+          "time": "12分钟前发布"
+        },
+        "userImpersonation": {
+          "title": "该用户因冒充他人被举报",
+          "tag": "用户",
+          "status": "调查",
+          "time": "1小时前发布"
+        },
+        "commentSensitive": {
+          "title": "该评论包含敏感内容",
+          "tag": "评论",
+          "status": "新",
+          "time": "2小时前发布"
+        }
+      }
+    },
+    "alerts": {
+      "title": "安全警报",
+      "items": {
+        "nightfeedSpike": {
+          "title": "#夜间喂食 的相关报告激增",
+          "note": "过去一小时内收到24份报告。请考虑进行人工审核。"
+        },
+        "repeatOffender": {
+          "title": "检测到高频重复违规者",
+          "note": "该用户在过去24小时内因多篇帖子共收到5次举报。"
+        }
+      }
+    },
+    "health": {
+      "title": "系统健康状况",
+      "items": {
+        "api": {
+          "label": "API",
+          "value": "运行中"
+        },
+        "realtime": {
+          "label": "实时",
+          "value": "稳定"
+        },
+        "storage": {
+          "label": "存储",
+          "value": "已使用 68%"
+        }
+      }
+    },
+    "quickActions": {
+      "title": "快速操作",
+      "openTools": "打开工具",
+      "items": {
+        "findUser": {
+          "title": "查找用户",
+          "desc": "查找用户以查看其个人资料或报告。",
+          "cta": "搜索"
+        },
+        "reviewContent": {
+          "title": "评论内容",
+          "desc": "查看最新被标记的帖子。",
+          "cta": "评论"
+        },
+        "broadcastNotice": {
+          "title": "广播通知",
+          "desc": "向所有用户发送系统通知。",
+          "cta": "草稿"
+        }
+      }
+    },
+    "activity": {
+      "title": "最近的管理员活动",
+      "viewLogs": "查看日志",
+      "items": {
+        "resolvedReport": "已解决报告 #1293（骚扰事件）",
+        "suspendedUser": "因冒充他人，已暂停用户 @riverlane 的账号",
+        "detectedSpike": "检测到Reels的报告量出现激增",
+        "time12m": "12分钟前",
+        "time48m": "48分钟前",
+        "time2h": "2小时前"
+      }
+    }
+  },
+  "authSignup": {
+    "steps": {
+      "email": "输入电子邮件地址",
+      "otp": "验证一次性密码",
+      "profile": "个人资料"
+    },
+    "errors": {
+      "birthdateInvalid": "出生日期无效",
+      "birthdateFuture": "出生日期不能是未来日期",
+      "displayNameLength": "至少3个字符，最多30个字符",
+      "displayNameMinLetters": "删除空格后，显示名称至少需要3个字母",
+      "displayNameOnlyLettersSpaces": "显示名称只能包含字母和空格",
+      "passwordMismatch": "密码不匹配",
+      "usernameMin": "用户名必须至少包含3个字符",
+      "usernameMax": "用户名长度不得超过30个字符",
+      "usernameFormat": "用户名只能包含字母、数字、下划线和句点",
+      "usernameTaken": "该用户名已被占用",
+      "emailRequired": "请输入您的电子邮件地址",
+      "sendOtpFailed": "无法发送一次性密码",
+      "otpInvalid": "OTP 验证码无效",
+      "verifyOtpFailed": "无法验证一次性密码",
+      "usernameChecking": "验证用户名",
+      "passwordRequired": "需要输入密码",
+      "passwordMin": "密码必须至少包含8个字符",
+      "displayNameUsernameRequired": "显示名称和用户名是必填项",
+      "genderRequired": "请选择您的性别",
+      "missingSignupToken": "缺少注册令牌，请重新验证一次性密码",
+      "avatarUploadFailed": "头像上传失败",
+      "completeProfileFailed": "无法完成个人资料"
+    },
+    "info": {
+      "otpSent": "已将一次性密码发送至您的邮箱",
+      "verifySuccess": "验证成功。请完善您的账户信息。",
+      "changeEmailRequestNewOtp": "您可以更改邮箱并申请新的一次性密码。",
+      "signupSuccessRedirect": "注册成功。正在重定向..."
+    },
+    "email": {
+      "emailAddress": "电子邮箱地址",
+      "emailPlaceholder": "email@example.com",
+      "sending": "正在发送...",
+      "sendOtp": "发送一次性密码"
+    },
+    "otp": {
+      "enterCode": "输入一次性密码",
+      "sentTo": "已发送至 {email}",
+      "placeholder": "示例：123456",
+      "changeEmail": "更改电子邮件地址",
+      "resendIn": "{seconds}秒后重新发送",
+      "resendCode": "重新发送验证码",
+      "verifying": "正在验证...",
+      "verify": "验证"
+    },
+    "profile": {
+      "displayName": "显示名称",
+      "displayNamePlaceholder": "例如：Cordigrammer",
+      "username": "用户名",
+      "usernamePlaceholder": "用户名",
+      "usernameHelp": "用户名只能包含字母、数字、下划线和句点",
+      "password": "密码",
+      "passwordPlaceholder": "至少8个字符",
+      "confirmPassword": "确认密码",
+      "confirmPasswordPlaceholder": "请重新输入以确认",
+      "ariaHidePassword": "隐藏密码",
+      "ariaShowPassword": "显示密码",
+      "birthdate": "出生日期",
+      "gender": "性别",
+      "shortBioOptional": "简短简介（可选）",
+      "shortBioPlaceholder": "请简单介绍一下自己",
+      "processing": "正在处理...",
+      "next": "下一页"
+    },
+    "gender": {
+      "male": "男性",
+      "female": "女性",
+      "other": "其他",
+      "preferNotToSay": "不愿透露",
+      "selectOption": "请选择一个选项"
+    },
+    "location": {
+      "optional": "位置（可选）",
+      "placeholder": "添加城市、地标或地点",
+      "useCurrent": "使用当前位置",
+      "searching": "正在搜索...",
+      "noSuggestions": "未找到相关建议",
+      "noSuggestionsTryKeywords": "未找到相关建议，请尝试其他关键词。"
+    },
+    "avatar": {
+      "choose": "选择头像",
+      "previewAlt": "《阿凡达》预告片",
+      "pickImage": "选择一张图片进行预览和裁剪。",
+      "chooseFromDevice": "从设备中选择图片",
+      "zoom": "放大",
+      "skip": "跳过",
+      "finishing": "正在处理中...",
+      "finish": "完成"
+    },
+    "aria": {
+      "backToProfile": "返回个人资料"
+    },
+    "page": {
+      "title": "创建一个Cordigram账户",
+      "stepCounter": "步骤 {current} / {total}",
+      "alreadyHaveAccount": "已有账户？",
+      "logIn": "登录",
+      "or": "或",
+      "signUpWithGoogle": "使用 Google 账号注册"
+    },
+    "hero": {
+      "title": "欢迎来到Cordigram！",
+      "subtitle": "一个拥有实时聊天频道的社交平台。创建类似 Discord 的频道，像 Instagram 一样分享照片/视频，并以现代方式连接社区。",
+      "chips": {
+        "realtimeChannels": "实时频道",
+        "mediaFeedStories": "媒体资讯与报道",
+        "voiceReady": "支持语音"
+      },
+      "badges": {
+        "permissionsRoles": "用于安全管理社区的权限和角色。",
+        "multiDeviceSync": "多设备同步，即时通知。",
+        "modernUi": "专为内容分享优化的现代用户界面。"
+      }
+    }
+  },
+  "peopleYouMayKnow": {
+    "title": "您可能认识的人",
+    "empty": "目前没有建议。",
+    "aria": {
+      "section": "您可能认识的人"
+    },
+    "actions": {
+      "seeAll": "查看全部",
+      "showLess": "显示更少",
+      "follow": "关注",
+      "following": "接下来"
+    },
+    "errors": {
+      "loadFailed": "无法加载建议",
+      "followUpdateFailed": "更新关注失败"
+    }
+  },
+  "commentLikesOverlay": {
+    "title": "点赞",
+    "loading": "正在加载...",
+    "loadingMore": "正在加载更多...",
+    "search": {
+      "placeholder": "搜索用户名",
+      "ariaLabel": "搜索用户名"
+    },
+    "empty": {
+      "noMatchingUsers": "没有匹配的用户",
+      "noLikes": "尚未获得点赞"
+    },
+    "actions": {
+      "close": "关闭",
+      "you": "你",
+      "follow": "关注",
+      "following": "接下来"
+    },
+    "aria": {
+      "viewProfile": "查看{username}的个人资料"
+    },
+    "errors": {
+      "sessionExpired": "会话已过期。",
+      "loadLikesFailed": "无法加载点赞",
+      "loadMoreFailed": "无法加载更多内容"
+    }
+  },
+  "adsDashboard": {
+    "errors": {
+      "loadFailed": "无法加载广告仪表盘。"
+    },
+    "status": {
+      "active": "已启用",
+      "hidden": "隐藏",
+      "paused": "暂停",
+      "canceled": "已取消",
+      "completed": "已完成"
+    },
+    "empty": {
+      "title": "目前没有广告",
+      "createFirstAd": "创建您的第一条广告",
+      "checklist": {
+        "goal": "目标：提高知名度或转化率",
+        "budget": "预算与进度规划",
+        "creative": "内容、媒体和清晰的行动号召"
+      }
+    },
+    "actions": {
+      "createNewAd": "创建新广告",
+      "viewAll": "查看全部",
+      "details": "详情"
+    },
+    "metrics": {
+      "totalBudget": "总预算",
+      "spent": "已花费：{value}",
+      "impressions": "印象",
+      "reach": "联系邮箱：{value}",
+      "averageCtr": "平均点击率",
+      "clicks": "点击此处：{value}",
+      "activeCampaigns": "正在进行的活动",
+      "liveHint": "当前正在进行的活动"
+    },
+    "trend": {
+      "title": "7天展示量趋势",
+      "subtitle": "跟踪过去7天内的广告展示情况和CTA点击情况。",
+      "barTitle": "{day}：{impressions} 次展示 - {clicks} 次点击"
+    },
+    "campaigns": {
+      "title": "广告活动",
+      "subtitle": "快速查看您最近的 5 个活跃广告系列。"
+    },
+    "table": {
+      "campaign": "活动",
+      "status": "状态",
+      "spent": "已花费",
+      "impressionsShort": "Impr.",
+      "ctr": "点击率",
+      "clicks": "点击量",
+      "action": "动作",
+      "noActive": "目前没有正在进行的活动。"
+    }
+  },
+  "explorePage": {
+    "loading": "正在加载...",
+    "itemsCount": "{count} 项目",
+    "errors": {
+      "unableToLoad": "无法加载“探索”"
+    }
+  },
+  "adsCreatePage": {
+    "header": {
+      "title": "创建广告活动",
+      "subtitle": "按照简单的流程创建广告：广告目标、创意素材、受众群体以及套餐价格。",
+      "backToDashboard": "返回仪表盘"
+    },
+    "sections": {
+      "objective": {
+        "title": "选择广告系列目标",
+        "required": "必填"
+      },
+      "creative": {
+        "title": "广告创意",
+        "pill": "主要内容"
+      },
+      "audience": {
+        "title": "受众定位",
+        "pill": "定位"
+      }
+    },
+    "defaults": {
+      "campaignName": "学生推广活动",
+      "primaryText": "用我们最新的系列产品升级您的装备。限时首发优惠现已开启。",
+      "headline": "限时优惠——今天立享7折优惠",
+      "description": "优质产品，全国快速发货。",
+      "location": "越南",
+      "fallbackCampaignName": "Cordigram 广告活动",
+      "interests": {
+        "technology": "技术",
+        "onlineShopping": "网购"
+      }
+    },
+    "objective": {
+      "awareness": {
+        "label": "意识",
+        "desc": "触达那些可能会记住您品牌的新受众。"
+      },
+      "traffic": {
+        "label": "交通",
+        "desc": "将用户引导至您的网站或产品页面。"
+      },
+      "engagement": {
+        "label": "参与度",
+        "desc": "获得更多点赞、评论和分享。"
+      },
+      "leads": {
+        "label": "潜在客户开发",
+        "desc": "收集潜在客户的联系方式。"
+      },
+      "sales": {
+        "label": "销售",
+        "desc": "促进购买和转化行为。"
+      },
+      "messages": {
+        "label": "消息",
+        "desc": "与对您的产品或服务感兴趣的人展开对话。"
+      }
+    },
+    "fields": {
+      "campaignName": "活动名称",
+      "campaignNamePlaceholder": "例如：开学促销",
+      "primaryText": "正文",
+      "headline": "标题",
+      "ctaButton": "CTA按钮",
+      "selectCta": "选择CTA",
+      "description": "描述",
+      "destinationUrl": "目标网址",
+      "location": "位置",
+      "ageRange": "适用年龄段",
+      "to": "到",
+      "interests": "兴趣",
+      "interestsPlaceholder": "输入兴趣标签，然后点击“添加”",
+      "add": "添加"
+    },
+    "location": {
+      "loadingCountries": "正在加载国家...",
+      "selectLocation": "选择地点"
+    },
+    "format": {
+      "single": "单张图片",
+      "carousel": "旋转木马",
+      "video": "视频"
+    },
+    "cta": {
+      "Learn More": "了解更多",
+      "Shop Now": "立即选购",
+      "Sign Up": "注册",
+      "Book Now": "立即预订",
+      "Contact Us": "联系我们"
+    },
+    "emoji": {
+      "add": "添加表情符号",
+      "icon": "表情符号图标"
+    },
+    "media": {
+      "title": "上传媒体",
+      "hint": "{uploadLabel}。文件上传至服务器后，预览界面会实时更新。",
+      "uploadOneVideo": "上传一个视频",
+      "uploadUpToFiveImages": "最多可上传 5 张图片",
+      "uploadOneImage": "上传一张图片",
+      "uploading": "正在上传...",
+      "chooseFiles": "选择文件",
+      "video": "视频",
+      "image": "图片",
+      "remove": "删除",
+      "errors": {
+        "loginAgain": "请重新登录以上传媒体文件。",
+        "selectVideo": "请选择一个视频文件。",
+        "selectImages": "请选择图片文件。",
+        "carouselLimit": "轮播图最多支持 5 张图片。删除一张即可上传更多图片。",
+        "singleLimit": "此格式仅支持一个文件。",
+        "uploadFailed": "上传失败。请重试。"
+      }
+    },
+    "validation": {
+      "primaryTextRequired": "必须提供正文。",
+      "headlineRequired": "必须填写标题。",
+      "destinationRequired": "必须填写目标网址。",
+      "destinationProtocol": "目标网址必须以 http:// 或 https:// 开头。",
+      "destinationInvalid": "目标网址无效。",
+      "mediaRequired": "发布前请先上传媒体文件。"
+    },
+    "interests": {
+      "recommended": {
+        "technology": "技术",
+        "fashion": "时尚",
+        "beauty": "美",
+        "gaming": "游戏",
+        "startup": "初创公司",
+        "education": "教育",
+        "fitness": "健身",
+        "food": "食品",
+        "travel": "旅行"
+      }
+    },
+    "placement": {
+      "title": "安置",
+      "homeFeedOnly": "该广告仅会在首页信息流中展示。"
+    },
+    "packages": {
+      "title": "促销套餐",
+      "boostSection": "1. 增强力量",
+      "durationSection": "2. 时长套餐",
+      "days": "{days} 天",
+      "boost": {
+        "hint": "控制您的广告在首页信息流中的推广力度。",
+        "light": {
+          "title": "光效增强",
+          "highlight": "最适合首条广告",
+          "level": "竞争较小"
+        },
+        "standard": {
+          "title": "标准增强",
+          "highlight": "最受欢迎",
+          "level": "中等竞争"
+        },
+        "strong": {
+          "title": "强力助推",
+          "highlight": "高可见度",
+          "level": "竞争激烈"
+        }
+      },
+      "duration": {
+        "d3": {
+          "note": "短暂爆发"
+        },
+        "d7": {
+          "note": "一周跑"
+        },
+        "d14": {
+          "note": "持续交付"
+        },
+        "d30": {
+          "note": "整月保障"
+        }
+      },
+      "summary": {
+        "boost": "增强包",
+        "duration": "时长套餐",
+        "total": "总费用",
+        "selected": "您已选择在 {days} 网站上预订 {boost}，为期  天。"
+      }
+    },
+    "preview": {
+      "title": "实时预览",
+      "sponsored": "赞助",
+      "userAvatar": "用户头像",
+      "displayName": "显示名称",
+      "username": "用户名",
+      "primaryTextFallback": "您的主要文本将显示在此处。",
+      "video": "视频预览",
+      "creative": "创意预览",
+      "adCreativeAlt": "广告创意预览",
+      "carouselImage": "轮播图创意 {index}",
+      "previousImage": "上一张轮播图片",
+      "nextImage": "下一张轮播图片"
+    },
+    "actions": {
+      "cancel": "取消",
+      "publishAd": "发布广告",
+      "back": "返回"
+    },
+    "payment": {
+      "title": "确认付款",
+      "close": "关闭支付弹窗",
+      "subtitle": "您将被重定向至 Stripe Checkout（测试模式）以完成支付。",
+      "days": "天",
+      "creatingCheckout": "正在创建结账页面...",
+      "payWithStripe": "使用 Stripe 支付",
+      "summary": {
+        "objective": "目标",
+        "adFormat": "广告形式",
+        "boost": "增强包",
+        "duration": "时长套餐",
+        "total": "总计"
+      },
+      "terms": {
+        "prefix": "我同意",
+        "link": "术语",
+        "suffix": "以及Cordigram的广告规则。"
+      },
+      "errors": {
+        "completeRequiredFields": "请在付款前填写所有必填项。",
+        "acceptTerms": "请同意条款后再继续进行支付。",
+        "loginAgain": "请在付款前重新登录。",
+        "prepareCreativeFailed": "无法为结账页面准备广告素材。",
+        "createSessionFailed": "无法创建 Stripe 结账会话。",
+        "startCheckoutFailed": "无法启动结账会话。"
+      }
+    }
+  }
+}

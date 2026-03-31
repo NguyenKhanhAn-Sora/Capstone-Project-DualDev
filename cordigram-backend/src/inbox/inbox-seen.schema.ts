@@ -17,4 +17,7 @@ export class InboxSeen extends Document {
 }
 
 export const InboxSeenSchema = SchemaFactory.createForClass(InboxSeen);
-InboxSeenSchema.index({ userId: 1, sourceType: 1, sourceId: 1 }, { unique: true });
+InboxSeenSchema.index(
+  { userId: 1, sourceType: 1, sourceId: 1 },
+  { unique: true },
+);

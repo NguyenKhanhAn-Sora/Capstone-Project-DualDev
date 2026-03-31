@@ -93,7 +93,8 @@ export class ServerInvitesService {
       toUserId: toId,
       status: 'pending',
     });
-    if (!invite) throw new NotFoundException('Không tìm thấy lời mời hoặc đã xử lý.');
+    if (!invite)
+      throw new NotFoundException('Không tìm thấy lời mời hoặc đã xử lý.');
     await this.accept(invite._id.toString(), userId);
   }
 

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Roboto } from "next/font/google";
+import { Roboto } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "../component/theme-provider";
 import { NextIntlClientProvider } from "next-intl";
 import { cookies } from "next/headers";
 import { LanguageProvider } from "../component/language-provider";
+import { resolveLocale } from "@/lib/i18n/locales";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -28,8 +29,7 @@ export default async function MainLayout({
 }>) {
   const cookieStore = await cookies();
   const storedLocale = cookieStore.get("NEXT_LOCALE")?.value;
-  const locale =
-    storedLocale === "vi" || storedLocale === "en" ? storedLocale : "en";
+  const locale = resolveLocale(storedLocale);
   const messages = (await import(`../messages/${locale}.json`)).default;
   return (
     <html lang={locale} suppressHydrationWarning>

@@ -449,7 +449,7 @@ export class SearchService {
       ),
     );
 
-    let postMap = new Map<
+    const postMap = new Map<
       string,
       {
         id: string;
@@ -724,7 +724,7 @@ export class SearchService {
     if (existingIndex >= 0) {
       update.items.splice(existingIndex, 1);
     }
-    update.items.unshift(nextItem as any);
+    update.items.unshift(nextItem);
     // Defensive cleanup: remove any legacy company entries from history.
     update.items = (update.items ?? [])
       .filter((i: any) => i?.kind !== 'company')

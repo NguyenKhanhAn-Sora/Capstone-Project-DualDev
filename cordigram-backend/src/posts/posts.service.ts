@@ -64,13 +64,14 @@ export class PostsService {
   }
 
   private async getProfilesWithCreatorVerification(userIds: Types.ObjectId[]) {
-    if (!userIds.length) return [] as Array<{
-      userId?: Types.ObjectId;
-      displayName?: string;
-      username?: string;
-      avatarUrl?: string;
-      isCreatorVerified?: boolean;
-    }>;
+    if (!userIds.length)
+      return [] as Array<{
+        userId?: Types.ObjectId;
+        displayName?: string;
+        username?: string;
+        avatarUrl?: string;
+        isCreatorVerified?: boolean;
+      }>;
 
     const profiles = await this.profileModel
       .find({ userId: { $in: userIds } })
@@ -91,7 +92,8 @@ export class PostsService {
 
     return profiles.map((profile) => ({
       ...profile,
-      isCreatorVerified: verifiedMap.get(profile.userId?.toString?.() ?? '') ?? false,
+      isCreatorVerified:
+        verifiedMap.get(profile.userId?.toString?.() ?? '') ?? false,
     }));
   }
 
@@ -176,8 +178,10 @@ export class PostsService {
     if (activeLimited) trust -= 0.22;
     if (activeSuspended) trust -= 0.35;
 
-    const reportPenalty =
-      Math.min(0.35, reportsOpen30d * 0.03 + reportsTotal30d * 0.008);
+    const reportPenalty = Math.min(
+      0.35,
+      reportsOpen30d * 0.03 + reportsTotal30d * 0.008,
+    );
     trust -= reportPenalty;
 
     return Math.max(0, Math.min(1, trust));
@@ -927,9 +931,7 @@ export class PostsService {
             displayName: repostSourceProfile.displayName,
             username: repostSourceProfile.username,
             avatarUrl: repostSourceProfile.avatarUrl,
-            isCreatorVerified: Boolean(
-              repostSourceProfile.isCreatorVerified,
-            ),
+            isCreatorVerified: Boolean(repostSourceProfile.isCreatorVerified),
           }
         : undefined,
       repostSourceContent: repostSourcePost?.content ?? null,
@@ -988,7 +990,8 @@ export class PostsService {
       const postId = item.promotedPostId?.toString?.();
       if (!postId) return;
       const weight =
-        typeof item.boostWeight === 'number' && Number.isFinite(item.boostWeight)
+        typeof item.boostWeight === 'number' &&
+        Number.isFinite(item.boostWeight)
           ? Math.max(0, item.boostWeight)
           : 0;
       const current = boostByPostId.get(postId) ?? 0;
@@ -1238,7 +1241,8 @@ export class PostsService {
         return;
       }
 
-      const canPlaceBySpacing = arranged.length - lastSponsoredIndex >= minSpacing;
+      const canPlaceBySpacing =
+        arranged.length - lastSponsoredIndex >= minSpacing;
       if (sponsoredCount < maxSponsored && canPlaceBySpacing) {
         arranged.push(item);
         sponsoredCount += 1;
@@ -1457,11 +1461,19 @@ export class PostsService {
     if (!mutedUntil) return;
 
     const mutedDate = new Date(mutedUntil);
-    if (Number.isNaN(mutedDate.getTime()) || mutedDate.getTime() <= Date.now()) {
+    if (
+      Number.isNaN(mutedDate.getTime()) ||
+      mutedDate.getTime() <= Date.now()
+    ) {
       await this.userModel
         .updateOne(
           { _id: userObjectId },
-          { $set: { interactionMutedUntil: null, interactionMutedIndefinitely: false } },
+          {
+            $set: {
+              interactionMutedUntil: null,
+              interactionMutedIndefinitely: false,
+            },
+          },
         )
         .exec();
       return;
@@ -1599,11 +1611,13 @@ export class PostsService {
     };
   }
 
-  private resolvePostModerationSummary(media: Array<{
-    type: 'image' | 'video';
-    url: string;
-    metadata?: Record<string, unknown> | null;
-  }>): {
+  private resolvePostModerationSummary(
+    media: Array<{
+      type: 'image' | 'video';
+      url: string;
+      metadata?: Record<string, unknown> | null;
+    }>,
+  ): {
     decision: 'approve' | 'blur' | 'reject';
     reasons: string[];
   } | null {
@@ -1617,7 +1631,9 @@ export class PostsService {
         ) {
           const reasonsRaw = item?.metadata?.['moderationReasons'];
           const reasons = Array.isArray(reasonsRaw)
-            ? reasonsRaw.filter((value): value is string => typeof value === 'string')
+            ? reasonsRaw.filter(
+                (value): value is string => typeof value === 'string',
+              )
             : [];
           return { decision: rawDecision, reasons };
         }
@@ -1645,13 +1661,15 @@ export class PostsService {
     if (decisions.some((item) => item.decision === 'blur')) {
       return {
         decision: 'blur',
-        reasons: decisions.find((item) => item.decision === 'blur')?.reasons ?? [],
+        reasons:
+          decisions.find((item) => item.decision === 'blur')?.reasons ?? [],
       };
     }
 
     return {
       decision: 'approve',
-      reasons: decisions.find((item) => item.decision === 'approve')?.reasons ?? [],
+      reasons:
+        decisions.find((item) => item.decision === 'approve')?.reasons ?? [],
     };
   }
 
@@ -1749,7 +1767,10 @@ export class PostsService {
     const hiddenIds = new Set(
       hidden.map((h) => h.postId?.toString?.()).filter(Boolean),
     );
-    const hiddenObjectIds = Array.from(hiddenIds, (id) => new Types.ObjectId(id));
+    const hiddenObjectIds = Array.from(
+      hiddenIds,
+      (id) => new Types.ObjectId(id),
+    );
 
     const followees = await this.followModel
       .find({ followerId: userObjectId })
@@ -1919,7 +1940,7 @@ export class PostsService {
             )
           : 0;
         const reputationPriority = isSponsored
-          ? sponsoredSignals.reputationByAuthorId.get(authorId) ?? 0
+          ? (sponsoredSignals.reputationByAuthorId.get(authorId) ?? 0)
           : 0;
         return {
           post,
@@ -2178,7 +2199,7 @@ export class PostsService {
       return {
         ...response,
         sponsored: isSponsoredPost,
-        cta: promotedId ? sponsoredCtaByPostId.get(promotedId) ?? '' : '',
+        cta: promotedId ? (sponsoredCtaByPostId.get(promotedId) ?? '') : '',
       };
     });
   }
@@ -2229,7 +2250,10 @@ export class PostsService {
     );
 
     const now = new Date();
-    const hiddenObjectIds = Array.from(hiddenIds, (id) => new Types.ObjectId(id));
+    const hiddenObjectIds = Array.from(
+      hiddenIds,
+      (id) => new Types.ObjectId(id),
+    );
 
     const followCandidates = await this.postModel
       .find({
@@ -2304,7 +2328,9 @@ export class PostsService {
       safeLimit,
     );
 
-    const topPosts = prioritized.slice(sliceStart, sliceEnd).map((item) => item.post);
+    const topPosts = prioritized
+      .slice(sliceStart, sliceEnd)
+      .map((item) => item.post);
 
     const authorIds = Array.from(
       new Set(
@@ -2455,7 +2481,7 @@ export class PostsService {
       return {
         ...response,
         sponsored: isSponsoredPost,
-        cta: promotedId ? sponsoredCtaByPostId.get(promotedId) ?? '' : '',
+        cta: promotedId ? (sponsoredCtaByPostId.get(promotedId) ?? '') : '',
       };
     });
   }
@@ -3903,7 +3929,7 @@ export class PostsService {
 
     const userIds = slice
       .map((doc) => doc.userId?.toString?.())
-      .filter(Boolean) as string[];
+      .filter(Boolean);
 
     if (!userIds.length) {
       return { items: [], nextCursor };
@@ -4300,10 +4326,7 @@ export class PostsService {
       throw new ForbiddenException('Only the author can change visibility');
     }
 
-    if (
-      post.moderationState === 'restricted' &&
-      visibility !== 'followers'
-    ) {
+    if (post.moderationState === 'restricted' && visibility !== 'followers') {
       throw new ForbiddenException(
         'Visibility is locked to followers while reach restriction is active',
       );
@@ -4568,7 +4591,8 @@ export class PostsService {
       ? 1.3
       : 1;
 
-    const baseScore = (engagement + 1) * freshness * qualityBoost * relationshipBoost;
+    const baseScore =
+      (engagement + 1) * freshness * qualityBoost * relationshipBoost;
     const sponsoredBoost = 1 + Math.max(0, sponsoredBoostWeight);
     const reachPenalty = reachRestricted ? REACH_RESTRICT_SCORE_MULTIPLIER : 1;
     return baseScore * sponsoredBoost * reachPenalty;
@@ -4647,4 +4671,3 @@ export class PostsService {
     return { userObjectId, postObjectId };
   }
 }
-

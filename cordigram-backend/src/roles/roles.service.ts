@@ -123,7 +123,11 @@ export class RolesService {
     const role = await this.getRoleById(serverId, roleId);
 
     // Không cho phép đổi tên role @everyone
-    if (role.isDefault && updateRoleDto.name && updateRoleDto.name !== '@everyone') {
+    if (
+      role.isDefault &&
+      updateRoleDto.name &&
+      updateRoleDto.name !== '@everyone'
+    ) {
       throw new BadRequestException('Cannot rename the @everyone role');
     }
 
@@ -367,7 +371,10 @@ export class RolesService {
    * Lấy role cao nhất (position lớn nhất) của một member
    * Role cao nhất quyết định màu hiển thị và quyền hạn mạnh nhất
    */
-  async getHighestRole(serverId: string, memberId: string): Promise<Role | null> {
+  async getHighestRole(
+    serverId: string,
+    memberId: string,
+  ): Promise<Role | null> {
     const roles = await this.getMemberRoles(serverId, memberId);
     if (roles.length === 0) return null;
     // Roles đã được sort theo position DESC, nên role đầu tiên là cao nhất
@@ -378,7 +385,10 @@ export class RolesService {
    * Lấy position cao nhất của một member
    * Dùng để so sánh role hierarchy
    */
-  async getHighestPosition(serverId: string, memberId: string): Promise<number> {
+  async getHighestPosition(
+    serverId: string,
+    memberId: string,
+  ): Promise<number> {
     const highestRole = await this.getHighestRole(serverId, memberId);
     return highestRole ? highestRole.position : 0;
   }
@@ -401,14 +411,17 @@ export class RolesService {
       return true;
     }
 
-    const permissions = await this.calculateMemberPermissions(serverId, memberId);
+    const permissions = await this.calculateMemberPermissions(
+      serverId,
+      memberId,
+    );
     return permissions[permission] === true;
   }
 
   /**
    * Kiểm tra user A có thể tác động (kick/ban/timeout) đến user B không
    * Quy tắc: Chỉ có thể tác động đến user có role position THẤP HƠN
-   * 
+   *
    * @param serverId - ID server
    * @param actorId - ID user thực hiện hành động
    * @param targetId - ID user bị tác động
@@ -447,17 +460,33 @@ export class RolesService {
     serverId: string,
     memberId: string,
   ): Promise<{
-    roles: Array<{ _id: string; name: string; color: string; position: number }>;
-    highestRole: { _id: string; name: string; color: string; position: number } | null;
+    roles: Array<{
+      _id: string;
+      name: string;
+      color: string;
+      position: number;
+    }>;
+    highestRole: {
+      _id: string;
+      name: string;
+      color: string;
+      position: number;
+    } | null;
     displayColor: string;
   }> {
     const roles = await this.getMemberRoles(serverId, memberId);
-    
+
     // DEBUG: Log roles tìm được
-    console.log(`[getMemberRoleInfo] memberId=${memberId}, found roles:`, 
-      roles.map(r => ({ name: r.name, color: r.color, isDefault: r.isDefault, position: r.position }))
+    console.log(
+      `[getMemberRoleInfo] memberId=${memberId}, found roles:`,
+      roles.map((r) => ({
+        name: r.name,
+        color: r.color,
+        isDefault: r.isDefault,
+        position: r.position,
+      })),
     );
-    
+
     const roleInfos = roles
       .filter((r) => !r.isDefault) // Không hiển thị @everyone trong danh sách badges
       .map((r) => ({
@@ -483,7 +512,10 @@ export class RolesService {
     const displayColor = highestRole?.color || '#99AAB5';
 
     // DEBUG: Log kết quả
-    console.log(`[getMemberRoleInfo] memberId=${memberId}, displayColor=${displayColor}, highestRole:`, highestRole);
+    console.log(
+      `[getMemberRoleInfo] memberId=${memberId}, displayColor=${displayColor}, highestRole:`,
+      highestRole,
+    );
 
     return {
       roles: roleInfos,

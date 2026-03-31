@@ -120,7 +120,7 @@ export class CompaniesService {
       // If two requests create the same normalized name concurrently, unique index may throw.
       const code =
         typeof err === 'object' && err && 'code' in err
-          ? Number((err as any).code)
+          ? Number(err.code)
           : undefined;
       if (code === 11000) {
         return this.companyModel.findOne({ nameNormalized: normalized }).exec();

@@ -22,7 +22,9 @@ export class LinkPreviewService {
     const urls = this.extractUrls(text);
     if (!urls.length) return [];
 
-    const previews = await Promise.all(urls.map((url) => this.fetchPreview(url)));
+    const previews = await Promise.all(
+      urls.map((url) => this.fetchPreview(url)),
+    );
     return previews.filter((item): item is CommentLinkPreview => Boolean(item));
   }
 
@@ -40,7 +42,9 @@ export class LinkPreviewService {
     return unique.slice(0, this.maxUrls);
   }
 
-  private async fetchPreview(rawUrl: string): Promise<CommentLinkPreview | null> {
+  private async fetchPreview(
+    rawUrl: string,
+  ): Promise<CommentLinkPreview | null> {
     try {
       const parsed = new URL(rawUrl);
 
@@ -79,8 +83,12 @@ export class LinkPreviewService {
           return null;
         }
 
-        const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
-        if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
+        const contentType =
+          response.headers.get('content-type')?.toLowerCase() ?? '';
+        if (
+          !contentType.includes('text/html') &&
+          !contentType.includes('application/xhtml+xml')
+        ) {
           return null;
         }
 
@@ -187,7 +195,8 @@ export class LinkPreviewService {
 
     return {
       url: baseUrl.toString(),
-      canonicalUrl: this.resolveUrl(canonicalRaw, baseUrl) ?? baseUrl.toString(),
+      canonicalUrl:
+        this.resolveUrl(canonicalRaw, baseUrl) ?? baseUrl.toString(),
       domain: baseUrl.hostname,
       siteName: this.cleanText(siteName),
       title: this.cleanText(title),
@@ -235,14 +244,14 @@ export class LinkPreviewService {
       'i',
     );
 
-    return html.match(relPattern)?.[3] ?? html.match(reversePattern)?.[2] ?? null;
+    return (
+      html.match(relPattern)?.[3] ?? html.match(reversePattern)?.[2] ?? null
+    );
   }
 
   private cleanText(value: string | null): string | null {
     if (!value) return null;
-    const decoded = this.decodeHtml(value)
-      .replace(/\s+/g, ' ')
-      .trim();
+    const decoded = this.decodeHtml(value).replace(/\s+/g, ' ').trim();
     return decoded || null;
   }
 
@@ -284,7 +293,11 @@ export class LinkPreviewService {
   private isBlockedHost(hostname: string): boolean {
     const host = hostname.toLowerCase();
 
-    if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) {
+    if (
+      host === 'localhost' ||
+      host.endsWith('.localhost') ||
+      host.endsWith('.local')
+    ) {
       return true;
     }
 

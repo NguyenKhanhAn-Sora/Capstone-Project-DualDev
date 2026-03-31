@@ -8,7 +8,15 @@
         "description": "Chọn ngôn ngữ hiển thị ưa thích.",
         "options": {
           "en": "Tiếng Anh",
-          "vi": "Tiếng Việt"
+          "vi": "Tiếng Việt",
+          "es": "Tiếng Tây Ban Nha",
+          "fr": "Tiếng Pháp",
+          "de": "Tiếng Đức",
+          "pt-BR": "Tiếng Bồ Đào Nha (Brazil)",
+          "ru": "Tiếng Nga",
+          "ja": "Tiếng Nhật",
+          "ko": "Tiếng Hàn",
+          "zh": "Tiếng Trung"
         }
       },
       "theme": {

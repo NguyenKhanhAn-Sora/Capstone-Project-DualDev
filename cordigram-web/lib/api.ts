@@ -1,3 +1,5 @@
+import type { LanguageCode } from "@/lib/i18n/locales";
+
 export interface ApiError<T = unknown> {
   status: number;
   message: string;
@@ -1430,7 +1432,7 @@ export type UpdateAvatarResponse = {
 
 export type UserSettingsResponse = {
   theme: "light" | "dark";
-  language?: "en" | "vi";
+  language?: LanguageCode;
 };
 
 export type NotificationCategoryKey =
@@ -1698,7 +1700,7 @@ export async function fetchUserSettings(opts: {
 export async function updateUserSettings(opts: {
   token: string;
   theme?: "light" | "dark";
-  language?: "en" | "vi";
+  language?: LanguageCode;
 }): Promise<UserSettingsResponse> {
   const { token, theme, language } = opts;
   return apiFetch<UserSettingsResponse>({

@@ -38,10 +38,7 @@ export class ServersController {
    * Lấy danh sách thành viên (chỉ owner - API cũ)
    */
   @Get(':id/members')
-  async getServerMembers(
-    @Param('id') serverId: string,
-    @Request() req: any,
-  ) {
+  async getServerMembers(@Param('id') serverId: string, @Request() req: any) {
     return this.serversService.getServerMembers(serverId, req.user.userId);
   }
 
@@ -54,7 +51,10 @@ export class ServersController {
     @Param('id') serverId: string,
     @Request() req: any,
   ) {
-    return this.serversService.getServerMembersWithRoles(serverId, req.user.userId);
+    return this.serversService.getServerMembersWithRoles(
+      serverId,
+      req.user.userId,
+    );
   }
 
   /**
@@ -62,11 +62,11 @@ export class ServersController {
    * GET /servers/:id/my-permissions
    */
   @Get(':id/my-permissions')
-  async getMyPermissions(
-    @Param('id') serverId: string,
-    @Request() req: any,
-  ) {
-    return this.serversService.getCurrentUserPermissions(serverId, req.user.userId);
+  async getMyPermissions(@Param('id') serverId: string, @Request() req: any) {
+    return this.serversService.getCurrentUserPermissions(
+      serverId,
+      req.user.userId,
+    );
   }
 
   @Get(':id/interaction-settings')
@@ -74,7 +74,10 @@ export class ServersController {
     @Param('id') serverId: string,
     @Request() req: any,
   ) {
-    return this.serversService.getInteractionSettings(serverId, req.user.userId);
+    return this.serversService.getInteractionSettings(
+      serverId,
+      req.user.userId,
+    );
   }
 
   @Patch(':id/interaction-settings')
@@ -109,7 +112,11 @@ export class ServersController {
     },
     @Request() req: any,
   ) {
-    return this.serversService.createRoleNotification(serverId, req.user.userId, body);
+    return this.serversService.createRoleNotification(
+      serverId,
+      req.user.userId,
+      body,
+    );
   }
 
   // =====================================================
@@ -165,11 +172,7 @@ export class ServersController {
     @Param('memberId') memberId: string,
     @Request() req: any,
   ) {
-    return this.serversService.unbanMember(
-      serverId,
-      req.user.userId,
-      memberId,
-    );
+    return this.serversService.unbanMember(serverId, req.user.userId, memberId);
   }
 
   /**
@@ -177,10 +180,7 @@ export class ServersController {
    * GET /servers/:id/bans
    */
   @Get(':id/bans')
-  async getBannedUsers(
-    @Param('id') serverId: string,
-    @Request() req: any,
-  ) {
+  async getBannedUsers(@Param('id') serverId: string, @Request() req: any) {
     return this.serversService.getBannedUsers(serverId, req.user.userId);
   }
 
@@ -196,7 +196,9 @@ export class ServersController {
     @Request() req: any,
   ) {
     if (!body?.durationSeconds || body.durationSeconds <= 0) {
-      throw new BadRequestException('durationSeconds must be a positive number');
+      throw new BadRequestException(
+        'durationSeconds must be a positive number',
+      );
     }
     return this.serversService.timeoutMember(
       serverId,
@@ -255,7 +257,8 @@ export class ServersController {
   @Post(':id/prune')
   async pruneMembers(
     @Param('id') serverId: string,
-    @Body() body: { days: number; role?: 'moderator' | 'member' | 'none' | 'all' },
+    @Body()
+    body: { days: number; role?: 'moderator' | 'member' | 'none' | 'all' },
     @Request() req: any,
   ) {
     const days = Number(body?.days);

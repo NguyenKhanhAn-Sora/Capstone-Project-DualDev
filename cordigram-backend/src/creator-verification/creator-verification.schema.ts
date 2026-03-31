@@ -27,7 +27,11 @@ export class CreatorVerificationRequest extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
   userId: Types.ObjectId;
 
-  @Prop({ type: String, enum: ['pending', 'approved', 'rejected'], required: true })
+  @Prop({
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    required: true,
+  })
   status: CreatorVerificationStatus;
 
   @Prop({ type: String, trim: true, maxlength: 600, default: '' })
@@ -76,8 +80,9 @@ export class CreatorVerificationRequest extends Document {
   updatedAt?: Date;
 }
 
-export const CreatorVerificationRequestSchema =
-  SchemaFactory.createForClass(CreatorVerificationRequest);
+export const CreatorVerificationRequestSchema = SchemaFactory.createForClass(
+  CreatorVerificationRequest,
+);
 
 CreatorVerificationRequestSchema.index({ userId: 1, createdAt: -1 });
 CreatorVerificationRequestSchema.index({ status: 1, createdAt: -1 });

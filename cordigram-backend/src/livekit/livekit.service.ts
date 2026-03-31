@@ -19,7 +19,9 @@ export class LivekitService {
 
   private getRoomService(): RoomServiceClient {
     if (!this.roomService) {
-      const url = this.livekitUrl.replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:');
+      const url = this.livekitUrl
+        .replace(/^wss:/i, 'https:')
+        .replace(/^ws:/i, 'http:');
       this.roomService = new RoomServiceClient(
         url,
         this.livekitApiKey,
@@ -35,7 +37,8 @@ export class LivekitService {
   private async ensureVoiceChannelCapacity(roomName: string): Promise<void> {
     if (!roomName.startsWith('voice-')) return;
     try {
-      const participants = await this.getRoomService().listParticipants(roomName);
+      const participants =
+        await this.getRoomService().listParticipants(roomName);
       if (participants.length >= VOICE_CHANNEL_MAX_PARTICIPANTS) {
         throw new BadRequestException(
           'Kênh thoại đã đủ 15 người. Vui lòng thử lại sau.',
@@ -97,7 +100,8 @@ export class LivekitService {
   ): Promise<{ identity: string; name: string }[]> {
     const roomName = this.voiceChannelRoomName(serverId, channelId);
     try {
-      const participants = await this.getRoomService().listParticipants(roomName);
+      const participants =
+        await this.getRoomService().listParticipants(roomName);
       return participants.map((p) => ({
         identity: p.identity ?? '',
         name: p.name ?? p.identity ?? 'Người dùng',

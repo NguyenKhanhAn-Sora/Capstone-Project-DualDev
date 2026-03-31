@@ -138,7 +138,9 @@ export class DirectMessagesController {
         user.userId,
       );
       if (socketId) {
-        const count = await this.directMessagesService.getUnreadCount(user.userId);
+        const count = await this.directMessagesService.getUnreadCount(
+          user.userId,
+        );
         (this.directMessagesGateway as any).server
           ?.to(socketId)
           ?.emit?.('dm-unread-count', {
@@ -198,8 +200,12 @@ export class DirectMessagesController {
 
     // Emit realtime update to both sender + receiver so both UIs update without reload
     try {
-      const senderId = (populated as any).senderId?._id?.toString?.() || (populated as any).senderId?.toString?.();
-      const receiverId = (populated as any).receiverId?._id?.toString?.() || (populated as any).receiverId?.toString?.();
+      const senderId =
+        (populated as any).senderId?._id?.toString?.() ||
+        (populated as any).senderId?.toString?.();
+      const receiverId =
+        (populated as any).receiverId?._id?.toString?.() ||
+        (populated as any).receiverId?.toString?.();
       if (senderId && receiverId) {
         this.directMessagesGateway.emitReactionUpdate({
           messageId: (populated as any)._id?.toString?.() || messageId,

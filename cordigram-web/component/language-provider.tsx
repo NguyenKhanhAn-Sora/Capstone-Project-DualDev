@@ -3,8 +3,11 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { fetchUserSettings, updateUserSettings } from "@/lib/api";
 import { useRouter } from "next/navigation";
-
-export type LanguageCode = "en" | "vi";
+import {
+  DEFAULT_LOCALE,
+  type LanguageCode,
+  isSupportedLocale,
+} from "@/lib/i18n/locales";
 
 type LanguageContextValue = {
   language: LanguageCode;
@@ -26,7 +29,7 @@ const readCookieLocale = (): LanguageCode | null => {
     .find((part) => part.startsWith(`${COOKIE_NAME}=`));
   if (!match) return null;
   const value = decodeURIComponent(match.split("=")[1] || "");
-  return value === "vi" || value === "en" ? value : null;
+  return isSupportedLocale(value) ? value : null;
 };
 
 const writeCookieLocale = (locale: LanguageCode) => {
@@ -36,7 +39,7 @@ const writeCookieLocale = (locale: LanguageCode) => {
   )}; path=/; max-age=${COOKIE_MAX_AGE}`;
 };
 
-const pickInitialLocale = (): LanguageCode => readCookieLocale() ?? "en";
+const pickInitialLocale = (): LanguageCode => readCookieLocale() ?? DEFAULT_LOCALE;
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -60,7 +63,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetchUserSettings({ token });
         if (cancelled) return;
-        if (res.language === "en" || res.language === "vi") {
+        if (isSupportedLocale(res.language)) {
           setLanguageState(res.language);
           if (res.language !== language) {
             writeCookieLocale(res.language);

@@ -97,7 +97,10 @@ export class ReportPostService {
 
     if (!post) return;
     if (post.autoHiddenPendingReview) return;
-    if (post.moderationState === 'removed' || post.moderationState === 'restricted') {
+    if (
+      post.moderationState === 'removed' ||
+      post.moderationState === 'restricted'
+    ) {
       return;
     }
 
@@ -136,7 +139,15 @@ export class ReportPostService {
         .select('createdAt isVerified status')
         .lean(),
       this.reportPostModel
-        .aggregate([{ $match: { createdAt: { $gte: since7d }, status: { $ne: 'resolved' } } }, { $group: { _id: '$reporterId', count: { $sum: 1 } } }])
+        .aggregate([
+          {
+            $match: {
+              createdAt: { $gte: since7d },
+              status: { $ne: 'resolved' },
+            },
+          },
+          { $group: { _id: '$reporterId', count: { $sum: 1 } } },
+        ])
         .exec(),
     ]);
 
@@ -223,15 +234,25 @@ export class ReportPostService {
       reasonSet.add(reporterId);
       reasonReporterMap.set(reason, reasonSet);
 
-      const createdAtMs = report.createdAt ? new Date(report.createdAt).getTime() : 0;
+      const createdAtMs = report.createdAt
+        ? new Date(report.createdAt).getTime()
+        : 0;
       if (createdAtMs >= since1h.getTime()) reportsLast1h += 1;
       if (createdAtMs >= since24h.getTime()) reportsLast24h += 1;
     });
 
-    const topCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'other';
-    const severeTopCategory = ['violence', 'illegal', 'privacy'].includes(topCategory);
+    const topCategory =
+      Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+      'other';
+    const severeTopCategory = ['violence', 'illegal', 'privacy'].includes(
+      topCategory,
+    );
 
-    const severeReasonCount = ['nonconsensual_intimate', 'self_harm', 'extremism']
+    const severeReasonCount = [
+      'nonconsensual_intimate',
+      'self_harm',
+      'extremism',
+    ]
       .map((reason) => reasonReporterMap.get(reason)?.size ?? 0)
       .reduce((max, count) => Math.max(max, count), 0);
 
@@ -251,8 +272,11 @@ export class ReportPostService {
 
     const hiddenAt = new Date();
     const hiddenUntil = new Date(hiddenAt.getTime() + 24 * 60 * 60 * 1000);
-    const moderatorId = await this.resolveSystemModeratorId(fallbackModeratorId);
-    const trigger = meetsCriticalRule ? 'critical-threshold' : 'standard-threshold';
+    const moderatorId =
+      await this.resolveSystemModeratorId(fallbackModeratorId);
+    const trigger = meetsCriticalRule
+      ? 'critical-threshold'
+      : 'standard-threshold';
 
     const updateResult = await this.postModel
       .updateOne(

@@ -1072,7 +1072,7 @@ export default function ReelPage({
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
-  const activeReel = items[activeIndex];
+  const active = items[activeIndex];
 
   const editingReel = useMemo(() => {
     if (!editTargetId) return null;
@@ -2193,7 +2193,6 @@ export default function ReelPage({
       .catch(() => undefined);
   };
 
-  const active = items[activeIndex];
   const isAuthor = useMemo(
     () => Boolean(active?.authorId && viewerId && active.authorId === viewerId),
     [active?.authorId, viewerId],

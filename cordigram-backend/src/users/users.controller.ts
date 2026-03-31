@@ -35,6 +35,7 @@ import { RequestTwoFactorOtpDto } from './dto/request-two-factor-otp.dto';
 import { VerifyTwoFactorOtpDto } from './dto/verify-two-factor-otp.dto';
 import { ActivityType } from '../activity/activity.schema';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
+import { type SupportedLanguage } from './language.constants';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -49,7 +50,7 @@ export class UsersController {
   @Get('settings')
   async getSettings(
     @Req() req: Request & { user?: AuthenticatedUser },
-  ): Promise<{ theme: 'light' | 'dark'; language: 'en' | 'vi' }> {
+  ): Promise<{ theme: 'light' | 'dark'; language: SupportedLanguage }> {
     const userId = req.user?.userId;
     if (!userId) {
       throw new UnauthorizedException('Unauthorized');
@@ -265,7 +266,7 @@ export class UsersController {
   async updateSettings(
     @Req() req: Request & { user?: AuthenticatedUser },
     @Body() dto: UpdateSettingsDto,
-  ): Promise<{ theme: 'light' | 'dark'; language: 'en' | 'vi' }> {
+  ): Promise<{ theme: 'light' | 'dark'; language: SupportedLanguage }> {
     const userId = req.user?.userId;
     if (!userId) {
       throw new UnauthorizedException('Unauthorized');

@@ -30,7 +30,8 @@ export class ServersService {
     private channelCategoryModel: Model<ChannelCategory>,
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
-    @InjectModel(ServerInvite.name) private serverInviteModel: Model<ServerInvite>,
+    @InjectModel(ServerInvite.name)
+    private serverInviteModel: Model<ServerInvite>,
     @InjectModel(ServerNotification.name)
     private serverNotificationModel: Model<ServerNotification>,
     @InjectModel(Message.name) private messageModel: Model<Message>,
@@ -57,9 +58,12 @@ export class ServersService {
   }): Promise<string[]> {
     const { serverId, requesterUserId, days, roleFilter } = params;
     const server = await this.serverModel.findById(serverId).exec();
-    if (!server) throw new NotFoundException(`Server with id ${serverId} not found`);
+    if (!server)
+      throw new NotFoundException(`Server with id ${serverId} not found`);
     if (server.ownerId.toString() !== requesterUserId) {
-      throw new ForbiddenException('Chỉ chủ máy chủ mới có thể lược bỏ thành viên');
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ mới có thể lược bỏ thành viên',
+      );
     }
     if (!Number.isFinite(days) || days <= 0) {
       throw new BadRequestException('days must be a positive number');
@@ -89,12 +93,13 @@ export class ServersService {
     for (const u of users as any[]) {
       const deviceLastSeen: Date | null =
         Array.isArray(u.loginDevices) && u.loginDevices.length > 0
-          ? u.loginDevices
+          ? (u.loginDevices
               .map((d: any) => (d?.lastSeenAt ? new Date(d.lastSeenAt) : null))
               .filter(Boolean)
-              .sort((a: Date, b: Date) => b.getTime() - a.getTime())[0] ?? null
+              .sort((a: Date, b: Date) => b.getTime() - a.getTime())[0] ?? null)
           : null;
-      const lastActive = deviceLastSeen ?? (u.createdAt ? new Date(u.createdAt) : new Date(0));
+      const lastActive =
+        deviceLastSeen ?? (u.createdAt ? new Date(u.createdAt) : new Date(0));
       if (lastActive < cutoff) {
         prunable.push(u._id.toString());
       }
@@ -125,13 +130,18 @@ export class ServersService {
     if (ids.length === 0) return 0;
 
     const server = await this.serverModel.findById(serverId).exec();
-    if (!server) throw new NotFoundException(`Server with id ${serverId} not found`);
+    if (!server)
+      throw new NotFoundException(`Server with id ${serverId} not found`);
     if (server.ownerId.toString() !== requesterUserId) {
-      throw new ForbiddenException('Chỉ chủ máy chủ mới có thể lược bỏ thành viên');
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ mới có thể lược bỏ thành viên',
+      );
     }
 
     const removeSet = new Set(ids);
-    server.members = server.members.filter((m) => !removeSet.has(m.userId.toString()));
+    server.members = server.members.filter(
+      (m) => !removeSet.has(m.userId.toString()),
+    );
     server.memberCount = server.members.length;
     await server.save();
     return ids.length;
@@ -235,7 +245,8 @@ export class ServersService {
       ],
     };
 
-    const channelDefs = templateChannels[template] ?? templateChannels['custom'];
+    const channelDefs =
+      templateChannels[template] ?? templateChannels['custom'];
     const savedChannelIds: Types.ObjectId[] = [];
 
     const hasInfoChannels = channelDefs.some((d) => d.category === 'info');
@@ -257,7 +268,7 @@ export class ServersService {
         type: 'text',
       });
       const saved = await infoCat.save();
-      infoCatId = saved._id as Types.ObjectId;
+      infoCatId = saved._id;
     }
     if (hasTextChannels) {
       const textCat = new this.channelCategoryModel({
@@ -267,7 +278,7 @@ export class ServersService {
         type: 'text',
       });
       const saved = await textCat.save();
-      textCatId = saved._id as Types.ObjectId;
+      textCatId = saved._id;
     }
     if (hasVoiceChannels) {
       const voiceCat = new this.channelCategoryModel({
@@ -277,7 +288,7 @@ export class ServersService {
         type: 'voice',
       });
       const saved = await voiceCat.save();
-      voiceCatId = saved._id as Types.ObjectId;
+      voiceCatId = saved._id;
     }
 
     let textPos = 0;
@@ -309,7 +320,7 @@ export class ServersService {
         position: pos,
       });
       const saved = await channel.save();
-      savedChannelIds.push(saved._id as Types.ObjectId);
+      savedChannelIds.push(saved._id);
     }
 
     savedServer.channels = savedChannelIds;
@@ -320,9 +331,12 @@ export class ServersService {
       .sort({ position: 1 })
       .lean()
       .exec();
-    const infoChannel = allCreatedChannels.find((c: any) => c.category === 'info');
-    const defaultTextChannel = allCreatedChannels.find((c: any) => (c as any).isDefault);
-    const autoSystemChannel = infoChannel || defaultTextChannel || allCreatedChannels[0];
+    const infoChannel = allCreatedChannels.find(
+      (c: any) => c.category === 'info',
+    );
+    const defaultTextChannel = allCreatedChannels.find((c: any) => c.isDefault);
+    const autoSystemChannel =
+      infoChannel || defaultTextChannel || allCreatedChannels[0];
     if (autoSystemChannel) {
       (savedServer as any).interactionSettings = {
         ...((savedServer as any).interactionSettings ?? {}),
@@ -349,7 +363,9 @@ export class ServersService {
 
     const member = server.members.find((m) => m.userId.toString() === userId);
     if (!member || member.role === 'member') {
-      throw new ForbiddenException('Only owner or moderator can create categories');
+      throw new ForbiddenException(
+        'Only owner or moderator can create categories',
+      );
     }
 
     const position = server.serverCategories?.length ?? 0;
@@ -360,7 +376,10 @@ export class ServersService {
       isPrivate,
     };
 
-    server.serverCategories = [...(server.serverCategories ?? []), category as any];
+    server.serverCategories = [
+      ...(server.serverCategories ?? []),
+      category as any,
+    ];
     await server.save();
 
     return category;
@@ -369,7 +388,9 @@ export class ServersService {
   async getCategories(serverId: string) {
     const server = await this.serverModel.findById(serverId).lean();
     if (!server) throw new NotFoundException('Server not found');
-    return (server.serverCategories ?? []).sort((a: any, b: any) => a.position - b.position);
+    return (server.serverCategories ?? []).sort(
+      (a: any, b: any) => a.position - b.position,
+    );
   }
 
   async getServersByUserId(userId: string): Promise<Server[]> {
@@ -494,33 +515,59 @@ export class ServersService {
     serverId: string,
     newMemberId: string,
   ): Promise<void> {
-    console.log('[sendWelcomeMessage] serverId:', serverId, 'newMemberId:', newMemberId);
+    console.log(
+      '[sendWelcomeMessage] serverId:',
+      serverId,
+      'newMemberId:',
+      newMemberId,
+    );
     const server = await this.serverModel
       .findById(serverId)
       .select('interactionSettings')
       .lean()
       .exec();
-    if (!server) { console.log('[sendWelcomeMessage] Server not found'); return; }
+    if (!server) {
+      console.log('[sendWelcomeMessage] Server not found');
+      return;
+    }
 
     const settings = (server as any).interactionSettings ?? {};
     console.log('[sendWelcomeMessage] settings:', JSON.stringify(settings));
-    if (!settings.systemMessagesEnabled) { console.log('[sendWelcomeMessage] systemMessagesEnabled=false, skip'); return; }
-    if (!settings.welcomeMessageEnabled) { console.log('[sendWelcomeMessage] welcomeMessageEnabled=false, skip'); return; }
+    if (!settings.systemMessagesEnabled) {
+      console.log('[sendWelcomeMessage] systemMessagesEnabled=false, skip');
+      return;
+    }
+    if (!settings.welcomeMessageEnabled) {
+      console.log('[sendWelcomeMessage] welcomeMessageEnabled=false, skip');
+      return;
+    }
 
     const systemChannelId = settings.systemChannelId;
-    if (!systemChannelId) { console.log('[sendWelcomeMessage] No systemChannelId, skip'); return; }
+    if (!systemChannelId) {
+      console.log('[sendWelcomeMessage] No systemChannelId, skip');
+      return;
+    }
 
     const channel = await this.channelModel.findById(systemChannelId).exec();
-    if (!channel || channel.type !== 'text') { console.log('[sendWelcomeMessage] Channel not found or not text, type:', channel?.type); return; }
-    console.log('[sendWelcomeMessage] Sending to channel:', channel.name, channel._id);
+    if (!channel || channel.type !== 'text') {
+      console.log(
+        '[sendWelcomeMessage] Channel not found or not text, type:',
+        channel?.type,
+      );
+      return;
+    }
+    console.log(
+      '[sendWelcomeMessage] Sending to channel:',
+      channel.name,
+      channel._id,
+    );
 
     const profile = await this.profileModel
       .findOne({ userId: new Types.ObjectId(newMemberId) })
       .select('displayName username')
       .lean()
       .exec();
-    const displayName =
-      profile?.displayName || profile?.username || 'Ai đó';
+    const displayName = profile?.displayName || profile?.username || 'Ai đó';
 
     const welcomeMsg = new this.messageModel({
       channelId: new Types.ObjectId(systemChannelId.toString()),
@@ -634,10 +681,14 @@ export class ServersService {
     }
 
     if (server.ownerId.toString() === userId) {
-      throw new ForbiddenException('Chủ máy chủ không thể rời. Hãy chuyển quyền hoặc xóa máy chủ.');
+      throw new ForbiddenException(
+        'Chủ máy chủ không thể rời. Hãy chuyển quyền hoặc xóa máy chủ.',
+      );
     }
 
-    const wasMember = server.members.some((m) => m.userId.toString() === userId);
+    const wasMember = server.members.some(
+      (m) => m.userId.toString() === userId,
+    );
     if (!wasMember) {
       return;
     }
@@ -723,12 +774,17 @@ export class ServersService {
     ].filter(Boolean);
     if (inviterIds.length > 0) {
       const inviterProfiles = await this.profileModel
-        .find({ userId: { $in: inviterIds.map((id) => new Types.ObjectId(id)) } })
+        .find({
+          userId: { $in: inviterIds.map((id) => new Types.ObjectId(id)) },
+        })
         .select('userId username')
         .lean()
         .exec();
       const inviterMap = new Map(
-        (inviterProfiles as any[]).map((p) => [p.userId.toString(), p.username]),
+        (inviterProfiles as any[]).map((p) => [
+          p.userId.toString(),
+          p.username,
+        ]),
       );
       for (const inv of acceptedInvites as any[]) {
         const toId = (inv.toUserId?._id ?? inv.toUserId)?.toString();
@@ -763,7 +819,8 @@ export class ServersService {
       const joinedCordigramAt = user?.createdAt
         ? new Date(user.createdAt)
         : m.joinedAt;
-      const joinedAt = m.joinedAt instanceof Date ? m.joinedAt : new Date(m.joinedAt);
+      const joinedAt =
+        m.joinedAt instanceof Date ? m.joinedAt : new Date(m.joinedAt);
       const isOwner = server.ownerId.toString() === uid;
       const invite = inviteByToId.get(uid);
 
@@ -799,14 +856,24 @@ export class ServersService {
   // USER PERMISSIONS
   // =====================================================
 
-  private async canManageServer(serverId: string, userId: string): Promise<boolean> {
-    const server = await this.serverModel.findById(serverId).select('ownerId').lean().exec();
+  private async canManageServer(
+    serverId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('ownerId')
+      .lean()
+      .exec();
     if (!server) return false;
     if (server.ownerId.toString() === userId) return true;
     return this.rolesService.hasPermission(serverId, userId, 'manageServer');
   }
 
-  private async assertCanManageServer(serverId: string, userId: string): Promise<void> {
+  private async assertCanManageServer(
+    serverId: string,
+    userId: string,
+  ): Promise<void> {
     const allowed = await this.canManageServer(serverId, userId);
     if (!allowed) {
       throw new ForbiddenException(
@@ -815,7 +882,10 @@ export class ServersService {
     }
   }
 
-  async getInteractionSettings(serverId: string, requesterUserId: string): Promise<{
+  async getInteractionSettings(
+    serverId: string,
+    requesterUserId: string,
+  ): Promise<{
     systemMessagesEnabled: boolean;
     welcomeMessageEnabled: boolean;
     stickerReplyWelcomeEnabled: boolean;
@@ -872,7 +942,7 @@ export class ServersService {
 
     const next = {
       ...(server as any).interactionSettings,
-    } as any;
+    };
 
     if (payload.systemMessagesEnabled !== undefined) {
       next.systemMessagesEnabled = Boolean(payload.systemMessagesEnabled);
@@ -881,7 +951,9 @@ export class ServersService {
       next.welcomeMessageEnabled = Boolean(payload.welcomeMessageEnabled);
     }
     if (payload.stickerReplyWelcomeEnabled !== undefined) {
-      next.stickerReplyWelcomeEnabled = Boolean(payload.stickerReplyWelcomeEnabled);
+      next.stickerReplyWelcomeEnabled = Boolean(
+        payload.stickerReplyWelcomeEnabled,
+      );
     }
     if (payload.defaultNotificationLevel !== undefined) {
       next.defaultNotificationLevel =
@@ -931,7 +1003,10 @@ export class ServersService {
       if (!payload.roleId) {
         throw new BadRequestException('roleId là bắt buộc khi targetType=role');
       }
-      const role = await this.rolesService.getRoleById(serverId, payload.roleId);
+      const role = await this.rolesService.getRoleById(
+        serverId,
+        payload.roleId,
+      );
       targetRoleName = role.name;
       targetRoleObjectId = new Types.ObjectId(role._id as any);
       recipients = role.isDefault
@@ -982,9 +1057,9 @@ export class ServersService {
       .exec();
 
     if (!docs.length) return [];
-    const serverIds = Array.from(new Set(docs.map((d: any) => d.serverId.toString()))).map(
-      (id) => new Types.ObjectId(id),
-    );
+    const serverIds = Array.from(
+      new Set(docs.map((d: any) => d.serverId.toString())),
+    ).map((id) => new Types.ObjectId(id));
     const servers = await this.serverModel
       .find({ _id: { $in: serverIds } })
       .select('_id name avatarUrl')
@@ -1034,9 +1109,7 @@ export class ServersService {
     }
 
     // Kiểm tra có phải member không
-    const isMember = server.members.some(
-      (m) => m.userId.toString() === userId,
-    );
+    const isMember = server.members.some((m) => m.userId.toString() === userId);
     if (!isMember) {
       throw new ForbiddenException('Bạn không phải thành viên của server này');
     }
@@ -1044,7 +1117,10 @@ export class ServersService {
     const isOwner = server.ownerId.toString() === userId;
 
     // Kiểm tra user có vai trò nào ngoài @everyone không
-    const memberRoles = await this.rolesService.getMemberRoles(serverId, userId);
+    const memberRoles = await this.rolesService.getMemberRoles(
+      serverId,
+      userId,
+    );
     const hasCustomRole = memberRoles.some((r) => !r.isDefault);
 
     // Owner có tất cả quyền
@@ -1100,7 +1176,12 @@ export class ServersService {
       avatarUrl: string;
       joinedAt: Date;
       isOwner: boolean;
-      roles: Array<{ _id: string; name: string; color: string; position: number }>;
+      roles: Array<{
+        _id: string;
+        name: string;
+        color: string;
+        position: number;
+      }>;
       highestRolePosition: number;
       displayColor: string;
     }>;
@@ -1144,7 +1225,12 @@ export class ServersService {
       avatarUrl: string;
       joinedAt: Date;
       isOwner: boolean;
-      roles: Array<{ _id: string; name: string; color: string; position: number }>;
+      roles: Array<{
+        _id: string;
+        name: string;
+        color: string;
+        position: number;
+      }>;
       highestRolePosition: number;
       displayColor: string;
     }> = [];
@@ -1163,7 +1249,8 @@ export class ServersService {
         displayName: profile?.displayName ?? 'Người dùng',
         username: profile?.username ?? uid,
         avatarUrl: profile?.avatarUrl ?? '',
-        joinedAt: m.joinedAt instanceof Date ? m.joinedAt : new Date(m.joinedAt),
+        joinedAt:
+          m.joinedAt instanceof Date ? m.joinedAt : new Date(m.joinedAt),
         isOwner: server.ownerId.toString() === uid,
         roles: roleInfo.roles,
         highestRolePosition: roleInfo.highestRole?.position ?? 0,
@@ -1182,7 +1269,11 @@ export class ServersService {
     const [canKick, canBan, canTimeout] = await Promise.all([
       this.rolesService.hasPermission(serverId, requesterUserId, 'kickMembers'),
       this.rolesService.hasPermission(serverId, requesterUserId, 'banMembers'),
-      this.rolesService.hasPermission(serverId, requesterUserId, 'timeoutMembers'),
+      this.rolesService.hasPermission(
+        serverId,
+        requesterUserId,
+        'timeoutMembers',
+      ),
     ]);
 
     return {
@@ -1233,8 +1324,13 @@ export class ServersService {
     // Xóa member khỏi tất cả roles
     const roles = await this.rolesService.getRolesByServer(serverId);
     for (const role of roles) {
-      if (!role.isDefault && role.memberIds.some((id) => id.toString() === targetId)) {
-        role.memberIds = role.memberIds.filter((id) => id.toString() !== targetId);
+      if (
+        !role.isDefault &&
+        role.memberIds.some((id) => id.toString() === targetId)
+      ) {
+        role.memberIds = role.memberIds.filter(
+          (id) => id.toString() !== targetId,
+        );
         await role.save();
       }
     }
@@ -1299,8 +1395,13 @@ export class ServersService {
     // Xóa member khỏi tất cả roles
     const roles = await this.rolesService.getRolesByServer(serverId);
     for (const role of roles) {
-      if (!role.isDefault && role.memberIds.some((id) => id.toString() === targetId)) {
-        role.memberIds = role.memberIds.filter((id) => id.toString() !== targetId);
+      if (
+        !role.isDefault &&
+        role.memberIds.some((id) => id.toString() === targetId)
+      ) {
+        role.memberIds = role.memberIds.filter(
+          (id) => id.toString() !== targetId,
+        );
         await role.save();
       }
     }
@@ -1479,7 +1580,7 @@ export class ServersService {
     );
 
     return server.bannedUsers.map((b) => {
-      const profile = profileMap.get(b.userId.toString()) as any;
+      const profile = profileMap.get(b.userId.toString());
       return {
         userId: b.userId.toString(),
         username: profile?.username ?? 'Người dùng',
@@ -1514,7 +1615,9 @@ export class ServersService {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
     if (server.ownerId.toString() !== currentOwnerUserId) {
-      throw new ForbiddenException('Chỉ chủ máy chủ mới có thể chuyển quyền sở hữu');
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ mới có thể chuyển quyền sở hữu',
+      );
     }
     if (newOwnerId === currentOwnerUserId) {
       throw new BadRequestException('Không thể chuyển quyền cho chính mình');
@@ -1525,7 +1628,9 @@ export class ServersService {
       (m) => m.userId.toString() === newOwnerId,
     );
     if (!newOwnerMember) {
-      throw new BadRequestException('Người nhận phải là thành viên của máy chủ');
+      throw new BadRequestException(
+        'Người nhận phải là thành viên của máy chủ',
+      );
     }
 
     server.ownerId = newOwnerObjectId;

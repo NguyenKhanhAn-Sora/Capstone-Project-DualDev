@@ -1,4 +1,11 @@
-import { Body, Controller, Get, Post, UseGuards, Request } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { InboxService } from './inbox.service';
 import { MarkSeenDto } from './dto/mark-seen.dto';
@@ -16,7 +23,11 @@ export class InboxController {
 
   @Post('seen')
   async markSeen(@Body() dto: MarkSeenDto, @Request() req: any) {
-    await this.inboxService.markSeen(req.user.userId, dto.sourceType, dto.sourceId);
+    await this.inboxService.markSeen(
+      req.user.userId,
+      dto.sourceType,
+      dto.sourceId,
+    );
     return { ok: true };
   }
 
