@@ -34,7 +34,7 @@ const SIDEBAR_SECTIONS: { title: string; items: SidebarEntry[]; key: string }[] 
     key: "group-profile",
     title: "",
     items: [
-      { id: "profile", label: "Hiển Thị Mod" },
+      { id: "profile", label: "Hồ sơ máy chủ" },
       { id: "interactions", label: "Tương Tác" },
       { id: "privileges", label: "Đặc Quyền Nâng Cấp" },
     ],
@@ -83,7 +83,7 @@ const SIDEBAR_SECTIONS: { title: string; items: SidebarEntry[]; key: string }[] 
 ];
 
 const SECTION_LABELS: Record<ServerSettingsSection, string> = {
-  profile: "Hiển Thị Mod",
+  profile: "Hồ sơ máy chủ",
   interactions: "Tương Tác",
   privileges: "Đặc Quyền Nâng Cấp",
   emoji: "Emoji",

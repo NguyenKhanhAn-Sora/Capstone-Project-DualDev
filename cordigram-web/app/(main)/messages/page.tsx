@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useLayoutEffect, useRef, memo, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, memo, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -66,11 +66,18 @@ import InviteToServerPopup from "@/components/InviteToServerPopup/InviteToServer
 import MessagesInbox from "@/components/MessagesInbox/MessagesInbox";
 import ServerContextMenu from "@/components/ServerContextMenu/ServerContextMenu";
 import ChannelContextMenu from "@/components/ChannelContextMenu/ChannelContextMenu";
+import CategoryContextMenu from "@/components/CategoryContextMenu/CategoryContextMenu";
+import * as sidebarPrefs from "@/lib/sidebar-prefs";
+import type { CategoryNotifyMode, ChannelNotifyMode } from "@/lib/sidebar-prefs";
 import ServerSettingsPanel from "@/components/ServerSettingsPanel/ServerSettingsPanel";
 import ServerMembersSection from "@/components/ServerMembersSection/ServerMembersSection";
 import RolesSection from "@/components/RolesSection/RolesSection";
 import ServerInteractionsSection from "@/components/ServerInteractionsSection/ServerInteractionsSection";
 import ServerAccessSection from "@/components/ServerAccessSection/ServerAccessSection";
+import ServerProfileSection from "@/components/ServerProfileSection/ServerProfileSection";
+import AuditLogSection from "@/components/AuditLogSection/AuditLogSection";
+import ServerSafetySection from "@/components/ServerSafetySection/ServerSafetySection";
+import { mapSectionToSafetyTab } from "@/components/ServerSafetySection/safety-tab-map";
 import MessageSearchPanel from "@/components/MessageSearchPanel/MessageSearchPanel";
 import MentionDropdown from "@/components/MentionDropdown/MentionDropdown";
 import { fetchInboxForYou } from "@/lib/inbox-api";
@@ -440,10 +447,10 @@ const MessageItem = memo(
       const el = messageRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const fromCurrentUser = message.isFromCurrentUser;
+      const fromRight = message.isFromCurrentUser && message.replyToMessage?.messageType !== "welcome";
       const PADDING = 8;
       const QUICK_BAR_W = 380; // estimate to keep inside viewport
-      const baseLeft = fromCurrentUser ? rect.right - QUICK_BAR_W - 10 : rect.left + 50;
+      const baseLeft = fromRight ? rect.right - QUICK_BAR_W - 10 : rect.left + 50;
       const clampedLeft = Math.min(
         Math.max(baseLeft, PADDING),
         Math.max(PADDING, window.innerWidth - PADDING - QUICK_BAR_W),
@@ -453,7 +460,7 @@ const MessageItem = memo(
         top: rect.top - 50,
         left: clampedLeft,
       });
-    }, [message.isFromCurrentUser]);
+    }, [message.isFromCurrentUser, message.replyToMessage?.messageType]);
 
     useLayoutEffect(() => {
       if (!scrollContainerRef?.current || (!isHovered && !showEmojiPicker && !showActionsMenu)) {
@@ -503,11 +510,16 @@ const MessageItem = memo(
       };
     }, [message.id, message.isFromCurrentUser, message.isRead, onVisible]);
 
+    /** Sticker/GIF trả lời welcome: hiển thị căn trái như tin nhận (không dùng bubble gửi bên phải). */
+    const alignAsSent =
+      message.isFromCurrentUser &&
+      message.replyToMessage?.messageType !== "welcome";
+
     return (
       <div
         ref={messageRef}
         className={`${styles.messageGroup} ${
-          message.isFromCurrentUser ? styles.sent : styles.received
+          alignAsSent ? styles.sent : styles.received
         }`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => {
@@ -595,6 +607,8 @@ const MessageItem = memo(
                       ? "Sticker"
                       : message.replyToMessage.messageType === "voice"
                         ? "Tin nhắn thoại"
+                        : message.replyToMessage.messageType === "welcome"
+                          ? (message.replyToMessage.text || "Lời chào mừng")
                         : message.replyToMessage.text}
                 </div>
               </div>
@@ -602,7 +616,7 @@ const MessageItem = memo(
           )}
           <div
             className={`${styles.messageBubble} ${
-              message.isFromCurrentUser ? styles.sent : styles.received
+              alignAsSent ? styles.sent : styles.received
             }`}
           >
             {renderMessageContent(message)}
@@ -619,7 +633,7 @@ const MessageItem = memo(
           )}
 
           {/* ✅ Read receipt indicator - only show for sent messages */}
-          {message.isFromCurrentUser && message.type === "direct" && (
+          {alignAsSent && message.type === "direct" && (
             <div className={styles.readReceipt}>
               {message.isRead ? (
                 <div className={styles.readStatus}>
@@ -703,8 +717,8 @@ const MessageItem = memo(
             onMenuClick={() => setShowActionsMenu(true)}
             position={{
               top: -45,
-              right: message.isFromCurrentUser ? 10 : undefined,
-              left: message.isFromCurrentUser ? undefined : 50,
+              right: alignAsSent ? 10 : undefined,
+              left: alignAsSent ? undefined : 50,
             }}
           />
         ))}
@@ -743,8 +757,8 @@ const MessageItem = memo(
             onClose={() => setShowEmojiPicker(false)}
             position={{
               top: 50,
-              right: message.isFromCurrentUser ? 10 : undefined,
-              left: message.isFromCurrentUser ? undefined : 50,
+              right: alignAsSent ? 10 : undefined,
+              left: alignAsSent ? undefined : 50,
             }}
           />
         ))}
@@ -774,8 +788,8 @@ const MessageItem = memo(
             onClose={() => setShowActionsMenu(false)}
             position={{
               top: 50,
-              right: message.isFromCurrentUser ? 10 : undefined,
-              left: message.isFromCurrentUser ? undefined : 50,
+              right: alignAsSent ? 10 : undefined,
+              left: alignAsSent ? undefined : 50,
             }}
             isOwnMessage={message.isFromCurrentUser}
             isPinned={message.isPinned || false}
@@ -803,6 +817,18 @@ function formatMessageTime(date: Date) {
   if (diffDays < 7) return `${diffDays}d ago`;
 
   return date.toLocaleDateString();
+}
+
+/** API getMessages sort createdAt:-1; UI chat cần cũ → mới (trên xuống dưới) để khớp append/socket. */
+function sortServerMessagesAscending(messages: UIMessage[]): UIMessage[] {
+  return [...messages].sort(
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+  );
+}
+
+function appendServerMessage(prev: UIMessage[], ui: UIMessage): UIMessage[] {
+  if (prev.some((m) => m.id === ui.id)) return prev;
+  return sortServerMessagesAscending([...prev, ui]);
 }
 
 // ✅ Helper function to check if avatar URL is valid
@@ -909,6 +935,7 @@ export default function MessagesPage() {
     x: number;
     y: number;
     channel: { _id: string; name: string; isDefault?: boolean };
+    categoryId: string | null;
   } | null>(null);
   const [categoryContextMenu, setCategoryContextMenu] = useState<{
     x: number;
@@ -927,6 +954,10 @@ export default function MessagesPage() {
   const [hideMutedChannels, setHideMutedChannels] = useState(false);
   const [showAllChannels, setShowAllChannels] = useState(false);
   const [serverNotificationLevel, setServerNotificationLevel] = useState<"all" | "mentions" | "none">("all");
+  const [currentServerPermissions, setCurrentServerPermissions] =
+    useState<serversApi.CurrentUserServerPermissions | null>(null);
+  const [sidebarPrefsTick, setSidebarPrefsTick] = useState(0);
+  const bumpSidebarPrefs = useCallback(() => setSidebarPrefsTick((t) => t + 1), []);
   const [wavingIds, setWavingIds] = useState<Set<string>>(new Set());
 
   // Mention system
@@ -1184,7 +1215,7 @@ export default function MessagesPage() {
       replyTo: msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo._id : typeof msg.replyTo === "string" ? msg.replyTo : undefined,
       replyToMessage: mapReplyToMessage(msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo : null),
     };
-    setMessages((prev) => [...prev, uiMessage]);
+    setMessages((prev) => appendServerMessage(prev, uiMessage));
     shouldAutoScrollRef.current = true;
     clearNewMessageChannel();
   }, [newMessageChannel, selectedChannel, currentUserId, clearNewMessageChannel]);
@@ -2404,7 +2435,7 @@ export default function MessagesPage() {
         ),
       }));
 
-      setMessages(uiMessages);
+      setMessages(sortServerMessagesAscending(uiMessages));
       setError(null);
     } catch (err) {
       console.error("Failed to load messages", err);
@@ -2862,7 +2893,7 @@ export default function MessagesPage() {
         reactions: normalizeReactions((newMessage as any).reactions),
       };
 
-      setMessages((prev) => [...prev, uiMessage]);
+      setMessages((prev) => appendServerMessage(prev, uiMessage));
       setReplyingTo(null);
       serversApi.markChannelAsRead(selectedChannel).catch(() => {});
     } catch (err) {
@@ -3047,7 +3078,7 @@ export default function MessagesPage() {
           replyTo: replyingTo?.id,
           reactions: [],
         };
-        setMessages((prev) => [...prev, uiMsg]);
+        setMessages((prev) => appendServerMessage(prev, uiMsg));
         setReplyingTo(null);
       } catch (err) {
         console.error(`Failed to send ${type}:`, err);
@@ -3489,7 +3520,32 @@ export default function MessagesPage() {
   const getChannelsForCategory = useCallback(
     (categoryId: string) =>
       allChannels
-        .filter((c) => c.categoryId === categoryId && c.category !== "info")
+        .filter((c) => {
+          if (c.category === "info") return false;
+          const cid =
+            typeof c.categoryId === "string"
+              ? c.categoryId
+              : c.categoryId
+                ? String((c.categoryId as any)._id ?? c.categoryId)
+                : null;
+          return cid === categoryId;
+        })
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    [allChannels],
+  );
+
+  const getUncategorizedChannels = useCallback(
+    () =>
+      allChannels
+        .filter((c) => {
+          if (c.category === "info") return false;
+          if (!c.categoryId) return true;
+          const cid =
+            typeof c.categoryId === "string"
+              ? c.categoryId
+              : String((c.categoryId as any)?._id ?? c.categoryId);
+          return !cid;
+        })
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
     [allChannels],
   );
@@ -3757,7 +3813,7 @@ export default function MessagesPage() {
           replyToMessage,
           reactions: [],
         };
-        setMessages((prev) => [...prev, uiMsg]);
+        setMessages((prev) => appendServerMessage(prev, uiMsg));
       } catch (e) {
         console.error("Wave sticker failed", e);
       } finally {
@@ -3825,7 +3881,7 @@ export default function MessagesPage() {
             display: "flex",
             flexDirection: "column",
             gap: 0,
-            padding: "8px 16px",
+            padding: "8px 0",
             margin: "4px 0",
           }}>
             <div style={{
@@ -4124,7 +4180,7 @@ export default function MessagesPage() {
               return newMap;
             });
           } else if (selectedChannel) {
-            setMessages((prev) => [...prev, loadingMessage]);
+            setMessages((prev) => appendServerMessage(prev, loadingMessage));
           }
         }
 
@@ -4299,7 +4355,7 @@ export default function MessagesPage() {
           return newMap;
         });
       } else if (selectedChannel) {
-        setMessages((prev) => [...prev, loadingMessage]);
+        setMessages((prev) => appendServerMessage(prev, loadingMessage));
       }
 
       // Auto-scroll (instant for polls)
@@ -4377,6 +4433,79 @@ export default function MessagesPage() {
     setPollDuration(24);
     setPollAllowMultiple(false);
   };
+
+  useEffect(() => {
+    if (!selectedServer || !token) {
+      setCurrentServerPermissions(null);
+      return;
+    }
+    let cancelled = false;
+    serversApi
+      .getCurrentUserPermissions(selectedServer)
+      .then((p) => {
+        if (!cancelled) setCurrentServerPermissions(p);
+      })
+      .catch(() => {
+        if (!cancelled) setCurrentServerPermissions(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedServer, token]);
+
+  useEffect(() => {
+    if (!currentUserId || !selectedServer) return;
+    const sp = sidebarPrefs.getServerPrefs(currentUserId, selectedServer);
+    if (sp.serverNotify) setServerNotificationLevel(sp.serverNotify);
+  }, [currentUserId, selectedServer, sidebarPrefsTick]);
+
+  const selectedServerEntity = useMemo(
+    () => servers.find((s) => s._id === selectedServer),
+    [servers, selectedServer],
+  );
+
+  /** Chủ server hoặc (quản lý máy chủ và quản lý kênh) — chỉnh sửa/xóa kênh & danh mục */
+  const canManageChannelsStructure = useMemo(() => {
+    if (!currentUserId || !selectedServerEntity) return false;
+    const ownerId = String(
+      (selectedServerEntity as any).ownerId?._id ?? (selectedServerEntity as any).ownerId ?? "",
+    );
+    if (ownerId === currentUserId) return true;
+    const p = currentServerPermissions;
+    return !!(p?.canManageServer && p?.canManageChannels);
+  }, [currentUserId, selectedServerEntity, currentServerPermissions]);
+
+  const canAccessPrivateChannel = useMemo(() => {
+    if (!currentUserId || !selectedServerEntity) return false;
+    const ownerId = String(
+      (selectedServerEntity as any).ownerId?._id ?? (selectedServerEntity as any).ownerId ?? "",
+    );
+    if (ownerId === currentUserId) return true;
+    const p = currentServerPermissions;
+    return !!(p?.canManageServer || p?.canManageChannels);
+  }, [currentUserId, selectedServerEntity, currentServerPermissions]);
+
+  const trySelectChannel = useCallback(
+    (channelId: string) => {
+      const channel = allChannels.find((c) => c._id === channelId);
+      if (channel?.isPrivate && !canAccessPrivateChannel) {
+        setError("Vai trò của bạn không được phép vào kênh riêng tư này");
+        return;
+      }
+      setError(null);
+      setSelectedChannel(channelId);
+    },
+    [allChannels, canAccessPrivateChannel],
+  );
+
+  const getCategoryCollapseState = useCallback(
+    (categoryId: string) => {
+      if (!currentUserId || !selectedServer) return { enabled: false, collapsed: false };
+      const p = sidebarPrefs.getServerPrefs(currentUserId, selectedServer).categories[categoryId];
+      return { enabled: Boolean(p?.collapseUiEnabled), collapsed: Boolean(p?.collapsed) };
+    },
+    [currentUserId, selectedServer, sidebarPrefsTick],
+  );
 
   if (!canRender) {
     return null;
@@ -4934,20 +5063,46 @@ export default function MessagesPage() {
                 {infoChannels.length > 0 && (() => {
                   const infoCatId = infoChannels.find(c => c.categoryId)?.categoryId;
                   const infoCat = infoCatId ? serverCategories.find(c => c._id === infoCatId) : null;
+                  const infoCollapse = infoCat ? getCategoryCollapseState(infoCat._id) : { enabled: false, collapsed: false };
+                  const hideInfoChannels = infoCollapse.enabled && infoCollapse.collapsed;
                   return (
                   <div className={styles.section}>
                     <div
                       className={styles.sectionHeader}
+                      style={{ display: "flex", alignItems: "center", gap: 6 }}
                       onContextMenu={infoCat ? (e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         setCategoryContextMenu({ x: e.clientX, y: e.clientY, category: { _id: infoCat._id, name: infoCat.name } });
                       } : undefined}
                     >
+                      {infoCat && infoCollapse.enabled && currentUserId && selectedServer && (
+                        <button
+                          type="button"
+                          title={infoCollapse.collapsed ? "Mở rộng danh mục" : "Thu gọn danh mục"}
+                          aria-label={infoCollapse.collapsed ? "Mở rộng" : "Thu gọn"}
+                          className={styles.addChannelBtn}
+                          style={{ flexShrink: 0 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sidebarPrefs.setCategoryCollapsed(
+                              currentUserId,
+                              selectedServer,
+                              infoCat._id,
+                              !infoCollapse.collapsed,
+                            );
+                            bumpSidebarPrefs();
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            {infoCollapse.collapsed ? <path d="M6 9l6 6 6-6" /> : <path d="M18 15l-6-6-6 6" />}
+                          </svg>
+                        </button>
+                      )}
                       {renamingCategoryId && infoCat && renamingCategoryId === infoCat._id ? (
                         <input
                           className={styles.sectionTitle}
-                          style={{ background: "var(--color-bg-input, #1e1f22)", border: "1px solid var(--color-primary)", borderRadius: "3px", padding: "0 4px", color: "inherit", font: "inherit", outline: "none", width: "100%" }}
+                          style={{ background: "var(--color-bg-input, #1e1f22)", border: "1px solid var(--color-primary)", borderRadius: "3px", padding: "0 4px", color: "inherit", font: "inherit", outline: "none", flex: 1, minWidth: 0 }}
                           autoFocus
                           value={renamingCategoryName}
                           onChange={(e) => setRenamingCategoryName(e.target.value)}
@@ -4958,19 +5113,19 @@ export default function MessagesPage() {
                           onBlur={() => handleRenameCategory(infoCat._id, renamingCategoryName)}
                         />
                       ) : (
-                        <h3 className={styles.sectionTitle}>{infoCat?.name ?? "Thông Tin"}</h3>
+                        <h3 className={styles.sectionTitle} style={{ flex: 1, margin: 0 }}>{infoCat?.name ?? "Thông Tin"}</h3>
                       )}
                     </div>
-                    {infoChannels.map((channel) => (
+                    {!hideInfoChannels && infoChannels.map((channel) => (
                       <div
                         key={channel._id}
                         className={`${styles.conversationItem} ${
                           selectedChannel === channel._id ? styles.active : ""
                         }`}
-                        onClick={() => setSelectedChannel(channel._id)}
+                        onClick={() => trySelectChannel(channel._id)}
                         onContextMenu={(e) => {
                           e.preventDefault();
-                          setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault } });
+                          setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault }, categoryId: channel.categoryId ?? null });
                         }}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
@@ -4987,12 +5142,15 @@ export default function MessagesPage() {
                   const infoCatIds = new Set(infoChannels.map(c => c.categoryId).filter(Boolean));
                   const visibleCategories = serverCategories.filter(cat => !infoCatIds.has(cat._id));
                   return visibleCategories.length > 0 ? (
-                  visibleCategories.map((cat) => {
+                  <>
+                  {visibleCategories.map((cat) => {
                     const channelsInCat = getChannelsForCategory(cat._id);
                     const isVoiceCategory = cat.type === "voice";
                     const isCatDragging = dragType === "category" && dragId === cat._id;
                     const isCatDropTarget = dragType === "category" && dragOverId === cat._id && dragId !== cat._id;
                     const isChannelDropOnCat = dragType === "channel" && dragOverCategoryId === cat._id;
+                    const catCollapse = getCategoryCollapseState(cat._id);
+                    const hideCatChannels = catCollapse.enabled && catCollapse.collapsed;
                     return (
                       <div
                         key={cat._id}
@@ -5015,17 +5173,45 @@ export default function MessagesPage() {
                         )}
                         <div
                           className={styles.sectionHeader}
-                          style={{ cursor: canDragChannels ? "grab" : "default" }}
+                          style={{
+                            cursor: canDragChannels ? "grab" : "default",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
                           onContextMenu={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             setCategoryContextMenu({ x: e.clientX, y: e.clientY, category: { _id: cat._id, name: cat.name } });
                           }}
                         >
+                          {catCollapse.enabled && currentUserId && selectedServer && (
+                            <button
+                              type="button"
+                              title={catCollapse.collapsed ? "Mở rộng danh mục" : "Thu gọn danh mục"}
+                              aria-label={catCollapse.collapsed ? "Mở rộng" : "Thu gọn"}
+                              className={styles.addChannelBtn}
+                              style={{ flexShrink: 0 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                sidebarPrefs.setCategoryCollapsed(
+                                  currentUserId,
+                                  selectedServer,
+                                  cat._id,
+                                  !catCollapse.collapsed,
+                                );
+                                bumpSidebarPrefs();
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                {catCollapse.collapsed ? <path d="M6 9l6 6 6-6" /> : <path d="M18 15l-6-6-6 6" />}
+                              </svg>
+                            </button>
+                          )}
                           {renamingCategoryId === cat._id ? (
                             <input
                               className={styles.sectionTitle}
-                              style={{ background: "var(--color-bg-input, #1e1f22)", border: "1px solid var(--color-primary)", borderRadius: "3px", padding: "0 4px", color: "inherit", font: "inherit", outline: "none", width: "100%" }}
+                              style={{ background: "var(--color-bg-input, #1e1f22)", border: "1px solid var(--color-primary)", borderRadius: "3px", padding: "0 4px", color: "inherit", font: "inherit", outline: "none", flex: 1, minWidth: 0 }}
                               autoFocus
                               value={renamingCategoryName}
                               onChange={(e) => setRenamingCategoryName(e.target.value)}
@@ -5036,7 +5222,7 @@ export default function MessagesPage() {
                               onBlur={() => handleRenameCategory(cat._id, renamingCategoryName)}
                             />
                           ) : (
-                            <h3 className={styles.sectionTitle}>{cat.name}</h3>
+                            <h3 className={styles.sectionTitle} style={{ flex: 1, margin: 0 }}>{cat.name}</h3>
                           )}
                           <button
                             type="button"
@@ -5052,6 +5238,7 @@ export default function MessagesPage() {
                         <div
                           className={styles.categoryChannelList}
                           style={{
+                            display: hideCatChannels ? "none" : undefined,
                             minHeight: isChannelDropOnCat && channelsInCat.length === 0 ? "32px" : undefined,
                             background: isChannelDropOnCat && channelsInCat.length === 0 ? "var(--color-bg-hover)" : undefined,
                             borderRadius: "4px",
@@ -5081,10 +5268,10 @@ export default function MessagesPage() {
                                   {isChDropTarget && dragPosition === "before" && <div className={styles.dropIndicator} style={{ top: 0 }} />}
                                   <div
                                     className={`${styles.conversationItem} ${isSelected ? styles.active : ""}`}
-                                    onClick={() => setSelectedChannel(channel._id)}
+                                    onClick={() => trySelectChannel(channel._id)}
                                     onContextMenu={(e) => {
                                       e.preventDefault();
-                                      setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault } });
+                                      setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault }, categoryId: channel.categoryId ?? null });
                                     }}
                                   >
                                     <div className={styles.voiceChannelRow}>
@@ -5156,10 +5343,10 @@ export default function MessagesPage() {
                                 {isChDropTarget && dragPosition === "before" && <div className={styles.dropIndicator} style={{ top: 0 }} />}
                                 <div
                                   className={`${styles.conversationItem} ${isSelected ? styles.active : ""}`}
-                                  onClick={() => setSelectedChannel(channel._id)}
+                                  onClick={() => trySelectChannel(channel._id)}
                                   onContextMenu={(e) => {
                                     e.preventDefault();
-                                    setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault } });
+                                    setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault }, categoryId: channel.categoryId ?? null });
                                   }}
                                   style={{ cursor: canDragChannels ? "grab" : "pointer" }}
                                 >
@@ -5182,7 +5369,43 @@ export default function MessagesPage() {
                         )}
                       </div>
                     );
-                  })
+                  })}
+                  {getUncategorizedChannels().length > 0 && (
+                    <div className={styles.section}>
+                      <div className={styles.sectionHeader}>
+                        <h3 className={styles.sectionTitle}>Kênh khác</h3>
+                      </div>
+                      {getUncategorizedChannels().map((channel) => (
+                        <div
+                          key={channel._id}
+                          className={`${styles.conversationItem} ${selectedChannel === channel._id ? styles.active : ""}`}
+                          onClick={() => trySelectChannel(channel._id)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setChannelContextMenu({
+                              x: e.clientX,
+                              y: e.clientY,
+                              channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault },
+                              categoryId: channel.categoryId ?? null,
+                            });
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+                            {channel.type === "voice" ? (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, opacity: 0.7 }}>
+                                <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                              </svg>
+                            ) : (
+                              <span style={{ fontSize: "18px" }}>#</span>
+                            )}
+                            <span style={{ fontSize: channel.type === "voice" ? "14px" : "18px" }}>{channel.name}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  </>
                 ) : (
                   <>
                     <div className={styles.section}>
@@ -5196,10 +5419,10 @@ export default function MessagesPage() {
                         <div
                           key={channel._id}
                           className={`${styles.conversationItem} ${selectedChannel === channel._id ? styles.active : ""}`}
-                          onClick={() => setSelectedChannel(channel._id)}
+                          onClick={() => trySelectChannel(channel._id)}
                           onContextMenu={(e) => {
                             e.preventDefault();
-                            setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault } });
+                            setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault }, categoryId: channel.categoryId ?? null });
                           }}
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
@@ -5221,10 +5444,10 @@ export default function MessagesPage() {
                         <div
                           key={channel._id}
                           className={`${styles.conversationItem} ${selectedChannel === channel._id ? styles.active : ""}`}
-                          onClick={() => setSelectedChannel(channel._id)}
+                          onClick={() => trySelectChannel(channel._id)}
                           onContextMenu={(e) => {
                             e.preventDefault();
-                            setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault } });
+                            setChannelContextMenu({ x: e.clientX, y: e.clientY, channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault }, categoryId: channel.categoryId ?? null });
                           }}
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
@@ -5577,10 +5800,11 @@ export default function MessagesPage() {
                         <div style={{
                           display: "flex",
                           flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
+                          alignItems: "stretch",
+                          alignSelf: "stretch",
+                          width: "100%",
                           padding: "48px 16px 24px",
-                          textAlign: "center",
+                          textAlign: "left",
                           borderBottom: "1px solid var(--color-border)",
                           marginBottom: 8,
                         }}>
@@ -5590,6 +5814,7 @@ export default function MessagesPage() {
                             color: "var(--color-text)",
                             lineHeight: 1.3,
                             margin: 0,
+                            textAlign: "left",
                           }}>
                             Chào mừng đến với
                             <br />
@@ -5599,7 +5824,8 @@ export default function MessagesPage() {
                             fontSize: 14,
                             color: "var(--color-text-muted)",
                             marginTop: 8,
-                            maxWidth: 480,
+                            maxWidth: 560,
+                            textAlign: "left",
                           }}>
                             Đây là khởi đầu của kênh{" "}
                             <strong style={{ color: "var(--color-text)" }}>
@@ -5609,15 +5835,19 @@ export default function MessagesPage() {
                           </p>
                           {/* Welcome messages: nằm dưới phần chào mừng, không bị trôi theo chat */}
                           <div style={{
-                            width: "min(720px, 100%)",
+                            width: "100%",
+                            maxWidth: "100%",
                             marginTop: 14,
                             display: "flex",
                             flexDirection: "column",
                             gap: 6,
                             textAlign: "left",
+                            alignSelf: "flex-start",
                           }}>
                             {messages
                               .filter((m) => m.messageType === "welcome")
+                              .slice()
+                              .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
                               .map((m) => (
                                 <div key={m.id} data-message-id={m.id}>
                                   {renderMessageContent(m)}
@@ -6344,7 +6574,7 @@ export default function MessagesPage() {
           }}
           onNavigateToChannel={(serverId, channelId) => {
             setSelectedServer(serverId);
-            setSelectedChannel(channelId);
+            trySelectChannel(channelId);
             setShowMessagesInbox(false);
           }}
           onNavigateToDM={(userId, displayName, username, avatarUrl) => {
@@ -6383,7 +6613,7 @@ export default function MessagesPage() {
         onResultClick={(messageId, channelId) => {
           setShowMessageSearch(false);
           if (channelId && selectedServer) {
-            setSelectedChannel(channelId);
+            trySelectChannel(channelId);
           }
         }}
       />
@@ -6466,8 +6696,26 @@ export default function MessagesPage() {
             });
             setServerContextMenu(null);
           }}
-          onMuteServer={() => setServerContextMenu(null)}
-          onNotificationSettings={() => setServerContextMenu(null)}
+          onMuteServer={(duration) => {
+            if (!currentUserId) return;
+            const { mutedUntil, mutedForever } = sidebarPrefs.muteKeyToUntil(duration);
+            sidebarPrefs.setServerMute(currentUserId, serverContextMenu.server._id, mutedUntil, mutedForever);
+            bumpSidebarPrefs();
+            setServerContextMenu(null);
+          }}
+          onUnmuteServer={() => {
+            if (!currentUserId) return;
+            sidebarPrefs.clearServerMute(currentUserId, serverContextMenu.server._id);
+            bumpSidebarPrefs();
+            setServerContextMenu(null);
+          }}
+          onSetNotificationLevel={(level) => {
+            if (!currentUserId) return;
+            sidebarPrefs.setServerNotify(currentUserId, serverContextMenu.server._id, level);
+            setServerNotificationLevel(level);
+            bumpSidebarPrefs();
+            setServerContextMenu(null);
+          }}
           hideMutedChannels={hideMutedChannels}
           onToggleHideMutedChannels={() => {
             setHideMutedChannels((v) => !v);
@@ -6483,8 +6731,6 @@ export default function MessagesPage() {
             setShowServerSettingsPanel(true);
             setServerContextMenu(null);
           }}
-          onSecuritySettings={() => setServerContextMenu(null)}
-          onEditServerProfile={() => setServerContextMenu(null)}
           onCreateChannel={() => {
             setSelectedServer(serverContextMenu.server._id);
             setCreateChannelDefaultType("text");
@@ -6520,72 +6766,134 @@ export default function MessagesPage() {
             }
           }}
           notificationLevel={serverNotificationLevel}
+          serverMuted={
+            !!(currentUserId
+              ? sidebarPrefs.isServerMuted(
+                  sidebarPrefs.getServerPrefs(currentUserId, serverContextMenu.server._id),
+                )
+              : false)
+          }
         />
       )}
 
-      {channelContextMenu && (
-        <ChannelContextMenu
-          x={channelContextMenu.x}
-          y={channelContextMenu.y}
-          channel={channelContextMenu.channel}
-          onClose={() => setChannelContextMenu(null)}
-          onEditChannel={handleEditChannel}
-          onDeleteChannel={handleDeleteChannel}
-        />
-      )}
-
-      {categoryContextMenu && (
-        <div
-          style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: 9999 }}
-          onClick={() => setCategoryContextMenu(null)}
-          onContextMenu={(e) => { e.preventDefault(); setCategoryContextMenu(null); }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              top: categoryContextMenu.y,
-              left: categoryContextMenu.x,
-              background: "var(--color-bg-secondary, #111214)",
-              borderRadius: "6px",
-              padding: "6px 0",
-              minWidth: "180px",
-              boxShadow: "0 4px 16px rgba(0,0,0,.4)",
-              zIndex: 10000,
+      {channelContextMenu && selectedServer && currentUserId && (() => {
+        const sp = sidebarPrefs.getServerPrefs(currentUserId, selectedServer);
+        const chId = channelContextMenu.channel._id;
+        const catId = channelContextMenu.categoryId;
+        const catPref = catId ? sp.categories[catId] : undefined;
+        const chPref = sp.channels[chId];
+        const categoryNotify: CategoryNotifyMode = catPref?.notify ?? "inherit_server";
+        const channelNotify: ChannelNotifyMode = chPref?.notify ?? "inherit_category";
+        const channelMuted = sidebarPrefs.isChannelMuted(chPref);
+        const origin = typeof window !== "undefined" ? window.location.origin : "";
+        return (
+          <ChannelContextMenu
+            x={channelContextMenu.x}
+            y={channelContextMenu.y}
+            categoryId={catId}
+            channel={channelContextMenu.channel}
+            canManageChannelsStructure={canManageChannelsStructure}
+            serverNotificationLevel={serverNotificationLevel}
+            categoryNotifyMode={categoryNotify}
+            channelNotifyMode={channelNotify}
+            channelMuted={channelMuted}
+            isMemberOfServer
+            onClose={() => setChannelContextMenu(null)}
+            onInviteToChannel={() => {
+              trySelectChannel(channelContextMenu.channel._id);
             }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 12px", background: "none", border: "none", color: "var(--color-text-primary, #dbdee1)", fontSize: "14px", cursor: "pointer", textAlign: "left" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--color-bg-hover, #35373c)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "none"; }}
-              onClick={() => {
-                setRenamingCategoryId(categoryContextMenu.category._id);
-                setRenamingCategoryName(categoryContextMenu.category.name);
-                setCategoryContextMenu(null);
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-              Đổi tên danh mục
-            </button>
-            <button
-              type="button"
-              style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 12px", background: "none", border: "none", color: "#ed4245", fontSize: "14px", cursor: "pointer", textAlign: "left" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--color-bg-hover, #35373c)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "none"; }}
-              onClick={() => {
-                if (confirm(`Bạn có chắc muốn xóa danh mục "${categoryContextMenu.category.name}"? Các kênh bên trong sẽ không bị xóa.`)) {
-                  handleDeleteCategory(categoryContextMenu.category._id);
-                }
-                setCategoryContextMenu(null);
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-              Xóa danh mục
-            </button>
-          </div>
-        </div>
-      )}
+            onCopyChannelLink={() => {
+              const url = `${origin}/invite/server/${selectedServer}/${chId}`;
+              void navigator.clipboard?.writeText(url).catch(() => {
+                window.prompt("Sao chép liên kết:", url);
+              });
+            }}
+            onMarkAsRead={() => serversApi.markChannelAsRead(chId)}
+            onMuteChannel={(duration) => {
+              const { mutedUntil, mutedForever } = sidebarPrefs.muteKeyToUntil(duration);
+              sidebarPrefs.setChannelMute(currentUserId, selectedServer, chId, mutedUntil, mutedForever);
+              bumpSidebarPrefs();
+            }}
+            onUnmuteChannel={() => {
+              sidebarPrefs.clearChannelMute(currentUserId, selectedServer, chId);
+              bumpSidebarPrefs();
+            }}
+            onSetChannelNotify={(mode) => {
+              sidebarPrefs.setChannelNotify(currentUserId, selectedServer, chId, mode);
+              bumpSidebarPrefs();
+            }}
+            onJoinServerThenOpenChannel={async () => {
+              await serversApi.joinServer(selectedServer);
+              await loadServers();
+            }}
+            onEditChannel={handleEditChannel}
+            onDeleteChannel={handleDeleteChannel}
+          />
+        );
+      })()}
+
+      {categoryContextMenu && selectedServer && currentUserId && (() => {
+        const sp = sidebarPrefs.getServerPrefs(currentUserId, selectedServer);
+        const catId = categoryContextMenu.category._id;
+        const catPref = sp.categories[catId];
+        const categoryNotify: CategoryNotifyMode = catPref?.notify ?? "inherit_server";
+        const categoryMuted = sidebarPrefs.isCategoryMuted(catPref);
+        const collapseUiEnabled = Boolean(catPref?.collapseUiEnabled);
+        const allCatIds = serverCategories.map((c) => c._id);
+        return (
+          <CategoryContextMenu
+            x={categoryContextMenu.x}
+            y={categoryContextMenu.y}
+            category={categoryContextMenu.category}
+            canManageChannelsStructure={canManageChannelsStructure}
+            serverNotificationLevel={serverNotificationLevel}
+            categoryNotifyMode={categoryNotify}
+            collapseUiEnabled={collapseUiEnabled}
+            categoryMuted={categoryMuted}
+            onClose={() => setCategoryContextMenu(null)}
+            onMarkAsRead={async () => {
+              const list = allChannels.filter((ch) => ch.categoryId === catId);
+              for (const ch of list) {
+                await serversApi.markChannelAsRead(ch._id).catch(() => {});
+              }
+            }}
+            onToggleCollapseUi={(enabled) => {
+              sidebarPrefs.setCategoryCollapseUi(currentUserId, selectedServer, catId, enabled);
+              bumpSidebarPrefs();
+            }}
+            onCollapseAllCategories={() => {
+              sidebarPrefs.collapseAllCategories(currentUserId, selectedServer, allCatIds);
+              bumpSidebarPrefs();
+            }}
+            onMuteCategory={(duration) => {
+              const { mutedUntil, mutedForever } = sidebarPrefs.muteKeyToUntil(duration);
+              sidebarPrefs.setCategoryMute(currentUserId, selectedServer, catId, mutedUntil, mutedForever);
+              bumpSidebarPrefs();
+            }}
+            onUnmuteCategory={() => {
+              sidebarPrefs.clearCategoryMute(currentUserId, selectedServer, catId);
+              bumpSidebarPrefs();
+            }}
+            onSetCategoryNotify={(mode) => {
+              sidebarPrefs.setCategoryNotify(currentUserId, selectedServer, catId, mode);
+              bumpSidebarPrefs();
+            }}
+            onEditCategory={() => {
+              setRenamingCategoryId(categoryContextMenu.category._id);
+              setRenamingCategoryName(categoryContextMenu.category.name);
+            }}
+            onDeleteCategory={() => {
+              if (
+                confirm(
+                  `Bạn có chắc muốn xóa danh mục "${categoryContextMenu.category.name}"? Các kênh bên trong sẽ không bị xóa.`,
+                )
+              ) {
+                handleDeleteCategory(categoryContextMenu.category._id);
+              }
+            }}
+          />
+        );
+      })()}
 
       <ServerSettingsPanel
         isOpen={showServerSettingsPanel}
@@ -6611,6 +6919,42 @@ export default function MessagesPage() {
           await loadServers();
         }}
         renderSection={(section) => {
+          if (section === "profile" && serverSettingsTarget?.serverId) {
+            const serverData =
+              servers.find((s) => s._id === serverSettingsTarget.serverId) ?? null;
+            return (
+              <ServerProfileSection
+                serverId={serverSettingsTarget.serverId}
+                token={token}
+                canManageSettings={
+                  Boolean(serverSettingsPermissions?.isOwner) ||
+                  Boolean(serverSettingsPermissions?.canManageServer)
+                }
+                initialServer={serverData}
+                onUpdated={(updated) => {
+                  setServers((prev) =>
+                    prev.map((s) =>
+                      s._id === updated._id
+                        ? ({
+                            ...s,
+                            name: updated.name,
+                            description: updated.description,
+                            avatarUrl: updated.avatarUrl,
+                            bannerUrl: (updated as any).bannerUrl,
+                            profileTraits: (updated as any).profileTraits,
+                          } as any)
+                        : s,
+                    ),
+                  );
+                  setServerSettingsTarget((prev) =>
+                    prev && prev.serverId === updated._id
+                      ? { ...prev, serverName: updated.name || prev.serverName }
+                      : prev,
+                  );
+                }}
+              />
+            );
+          }
           if (section === "members" && serverSettingsTarget?.serverId) {
             return (
               <ServerMembersSection
@@ -6681,6 +7025,22 @@ export default function MessagesPage() {
                   Boolean(serverSettingsPermissions?.isOwner) ||
                   Boolean(serverSettingsPermissions?.canManageServer)
                 }
+              />
+            );
+          }
+          if (section === "audit-log" && serverSettingsTarget?.serverId) {
+            return <AuditLogSection serverId={serverSettingsTarget.serverId} />;
+          }
+          if ((section === "safety" || section === "automod" || section === "privileges") && serverSettingsTarget?.serverId) {
+            const initialTab = mapSectionToSafetyTab(section);
+            return (
+              <ServerSafetySection
+                serverId={serverSettingsTarget.serverId}
+                canManageSettings={
+                  Boolean(serverSettingsPermissions?.isOwner) ||
+                  Boolean(serverSettingsPermissions?.canManageServer)
+                }
+                initialTab={initialTab}
               />
             );
           }

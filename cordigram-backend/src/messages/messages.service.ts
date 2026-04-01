@@ -17,6 +17,7 @@ import { IgnoredService } from '../users/ignored.service';
 import { RolesService } from '../roles/roles.service';
 import { InboxSeen } from '../inbox/inbox-seen.schema';
 import { UserServer } from '../access/user-server.schema';
+import { User } from '../users/user.schema';
 
 @Injectable()
 export class MessagesService {
@@ -29,10 +30,46 @@ export class MessagesService {
     private channelReadStateModel: Model<ChannelReadState>,
     @InjectModel(UserServer.name) private userServerModel: Model<UserServer>,
     @InjectModel(InboxSeen.name) private inboxSeenModel: Model<InboxSeen>,
+    @InjectModel(User.name) private userModel: Model<User>,
     private readonly ignoredService: IgnoredService,
     @Inject(forwardRef(() => RolesService))
     private readonly rolesService: RolesService,
   ) {}
+
+  private containsExternalLink(content: string): boolean {
+    const urls = content.match(/https?:\/\/[^\s]+/gi) || [];
+    if (urls.length === 0) return false;
+    const whitelist = [
+      'youtube.com',
+      'youtu.be',
+      'facebook.com',
+      'google.com',
+      'github.com',
+      'discord.com',
+      'discord.gg',
+      'tiktok.com',
+      'x.com',
+      'twitter.com',
+    ];
+    return urls.some((u) => {
+      try {
+        const h = new URL(u).hostname.toLowerCase();
+        return !whitelist.some((d) => h === d || h.endsWith(`.${d}`));
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  private async canAccessPrivateChannel(serverId: string, userId: string): Promise<boolean> {
+    const allowedManageServer = await this.rolesService.hasPermission(
+      serverId,
+      userId,
+      'manageServer',
+    );
+    if (allowedManageServer) return true;
+    return this.rolesService.hasPermission(serverId, userId, 'manageChannels');
+  }
 
   async createMessage(
     channelId: string,
@@ -62,13 +99,89 @@ export class MessagesService {
 
     const isMember =
       isOwner ||
-      Array.isArray((server as any).members) &&
+      (Array.isArray((server as any).members) &&
         (server as any).members.some(
           (m: any) => (m?.userId?._id ?? m?.userId)?.toString() === userId,
-        );
+        ));
 
     if (!isMember) {
       throw new ForbiddenException('Bạn không thuộc server này');
+    }
+
+    if (channel.isPrivate) {
+      const canAccessPrivate = await this.canAccessPrivateChannel(
+        channel.serverId.toString(),
+        userId,
+      );
+      if (!canAccessPrivate) {
+        throw new ForbiddenException('Vai trò của bạn không được phép vào kênh riêng tư này');
+      }
+    }
+
+    const safety = (server as any).safetySettings || {};
+    const spamProtection = safety.spamProtection || {};
+    const automod = safety.automod || {};
+    const memberRow = ((server as any).members || []).find(
+      (m: any) => (m?.userId?._id ?? m?.userId)?.toString() === userId,
+    );
+    const isBypass =
+      isOwner ||
+      (await this.rolesService.hasPermission(
+        channel.serverId.toString(),
+        userId,
+        'manageServer',
+      ));
+    if (!isBypass) {
+      if (
+        spamProtection.verificationLevel === 'medium' ||
+        spamProtection.verificationLevel === 'high'
+      ) {
+        const user = await this.userModel
+          .findById(userId)
+          .select('createdAt')
+          .lean()
+          .exec();
+        const accountAgeMs =
+          Date.now() - new Date((user as any)?.createdAt || 0).getTime();
+        if (
+          spamProtection.verificationLevel === 'medium' &&
+          accountAgeMs < 5 * 60 * 1000
+        ) {
+          throw new ForbiddenException(
+            'Tài khoản cần trên 5 phút để gửi tin nhắn trong server này',
+          );
+        }
+        if (spamProtection.verificationLevel === 'high') {
+          const joinedAt = new Date(memberRow?.joinedAt || Date.now());
+          if (Date.now() - joinedAt.getTime() < 10 * 60 * 1000) {
+            throw new ForbiddenException(
+              'Bạn cần tham gia server trên 10 phút để gửi tin nhắn',
+            );
+          }
+        }
+      }
+
+      const bannedWords: string[] = Array.isArray(automod.bannedWords)
+        ? automod.bannedWords
+        : [];
+      const lowered = (createMessageDto.content || '').toLowerCase();
+      const matchedBanned = bannedWords.some(
+        (w) => w && lowered.includes(String(w).toLowerCase()),
+      );
+      if (matchedBanned && automod.bannedWordResponse === 'delete') {
+        throw new ForbiddenException('Tin nhắn chứa từ bị cấm và đã bị chặn');
+      }
+
+      const mentionLimit = Number(automod.mentionSpamLimit || 8);
+      const mentionMatches =
+        (createMessageDto.content || '').match(
+          /@(?:everyone|here|[^\s@]+)/gi,
+        ) || [];
+      if (mentionMatches.length > mentionLimit) {
+        throw new ForbiddenException(
+          'Phát hiện spam đề cập. Tin nhắn đã bị chặn.',
+        );
+      }
     }
 
     const canResolveMentions = await this.rolesService.hasPermission(
@@ -85,10 +198,16 @@ export class MessagesService {
         )
       : [];
 
+    const contentWithWarning =
+      spamProtection.warnExternalLinks &&
+      this.containsExternalLink(createMessageDto.content || '')
+        ? `${createMessageDto.content}\n\n⚠️ Cảnh báo: liên kết ngoài danh sách tin cậy.`
+        : createMessageDto.content;
+
     const message = new this.messageModel({
       channelId: new Types.ObjectId(channelId),
       senderId: userObjectId,
-      content: createMessageDto.content,
+      content: contentWithWarning,
       attachments: createMessageDto.attachments || [],
       replyTo: createMessageDto.replyTo
         ? new Types.ObjectId(createMessageDto.replyTo)
@@ -103,8 +222,10 @@ export class MessagesService {
     channel.messageCount = (channel.messageCount || 0) + 1;
     await channel.save();
 
-    const enriched = await this.getMessageByIdEnriched(savedMessage._id.toString());
-    return enriched as any;
+    const enriched = await this.getMessageByIdEnriched(
+      savedMessage._id.toString(),
+    );
+    return enriched;
   }
 
   async createWaveStickerMessage(
@@ -116,6 +237,16 @@ export class MessagesService {
     const channel = await this.channelModel.findById(channelId);
     if (!channel) {
       throw new NotFoundException(`Channel with id ${channelId} not found`);
+    }
+
+    if (channel.isPrivate) {
+      const canAccessPrivate = await this.canAccessPrivateChannel(
+        channel.serverId.toString(),
+        userId,
+      );
+      if (!canAccessPrivate) {
+        throw new ForbiddenException('Vai trò của bạn không được phép vào kênh riêng tư này');
+      }
     }
 
     const message = new this.messageModel({
@@ -135,7 +266,7 @@ export class MessagesService {
     await channel.save();
 
     const enriched = await this.getMessageByIdEnriched(saved._id.toString());
-    return enriched as any;
+    return enriched;
   }
 
   /**
@@ -249,7 +380,8 @@ export class MessagesService {
     if (!server) return null;
 
     const level =
-      (server as any).interactionSettings?.defaultNotificationLevel === 'mentions'
+      (server as any).interactionSettings?.defaultNotificationLevel ===
+      'mentions'
         ? 'mentions'
         : 'all';
 
@@ -335,7 +467,7 @@ export class MessagesService {
     );
 
     return messages.map((msg: any) => {
-      const ch = msg.channelId as any;
+      const ch = msg.channelId;
       const rawSid = ch?.serverId;
       const serverId = rawSid != null ? String(rawSid) : '';
       return {
@@ -347,8 +479,7 @@ export class MessagesService {
         messageId: msg._id.toString(),
         actorName: profileMap.get(msg.senderId.toString()) ?? 'Ai đó',
         excerpt: (msg.content ?? '').slice(0, 200),
-        createdAt:
-          msg.createdAt?.toISOString?.() ?? new Date().toISOString(),
+        createdAt: msg.createdAt?.toISOString?.() ?? new Date().toISOString(),
       };
     });
   }
@@ -367,7 +498,8 @@ export class MessagesService {
     if (!msg) return null;
 
     const senderId = msg.senderId?._id ?? msg.senderId;
-    const senderUserId = senderId != null ? new Types.ObjectId(senderId.toString()) : null;
+    const senderUserId =
+      senderId != null ? new Types.ObjectId(senderId.toString()) : null;
     const senderProfile = senderUserId
       ? await this.profileModel
           .findOne({ userId: senderUserId })
@@ -379,7 +511,9 @@ export class MessagesService {
     const result: any = {
       ...msg,
       senderId: {
-        ...(typeof msg.senderId === 'object' ? msg.senderId : { _id: msg.senderId, email: '' }),
+        ...(typeof msg.senderId === 'object'
+          ? msg.senderId
+          : { _id: msg.senderId, email: '' }),
         displayName: senderProfile?.displayName ?? undefined,
         username: senderProfile?.username ?? undefined,
         avatarUrl: senderProfile?.avatarUrl ?? undefined,
@@ -389,7 +523,8 @@ export class MessagesService {
     const replyToRaw = msg.replyTo as any;
     if (replyToRaw && typeof replyToRaw === 'object') {
       const rtSenderId = replyToRaw.senderId?._id ?? replyToRaw.senderId;
-      const rtUserId = rtSenderId != null ? new Types.ObjectId(rtSenderId.toString()) : null;
+      const rtUserId =
+        rtSenderId != null ? new Types.ObjectId(rtSenderId.toString()) : null;
       const rtProfile = rtUserId
         ? await this.profileModel
             .findOne({ userId: rtUserId })
@@ -427,7 +562,7 @@ export class MessagesService {
     if (viewerId) {
       const channel = await this.channelModel
         .findById(channelId)
-        .select('serverId')
+        .select('serverId isPrivate')
         .lean()
         .exec();
       if (!channel) throw new NotFoundException('Channel not found');
@@ -439,6 +574,16 @@ export class MessagesService {
       });
 
       if (!isMember) throw new ForbiddenException('Bạn không thuộc server này');
+
+      if ((channel as any).isPrivate) {
+        const canAccessPrivate = await this.canAccessPrivateChannel(
+          channel.serverId.toString(),
+          viewerId,
+        );
+        if (!canAccessPrivate) {
+          throw new ForbiddenException('Vai trò của bạn không được phép vào kênh riêng tư này');
+        }
+      }
     }
 
     if (viewerId) {
@@ -470,7 +615,8 @@ export class MessagesService {
     const enriched = await Promise.all(
       messages.map(async (msg: any) => {
         const senderId = msg.senderId?._id ?? msg.senderId;
-        const senderUserId = senderId != null ? new Types.ObjectId(senderId.toString()) : null;
+        const senderUserId =
+          senderId != null ? new Types.ObjectId(senderId.toString()) : null;
         const senderProfile = senderUserId
           ? await this.profileModel
               .findOne({ userId: senderUserId })
@@ -482,17 +628,22 @@ export class MessagesService {
         const result: any = {
           ...msg,
           senderId: {
-            ...(typeof msg.senderId === 'object' ? msg.senderId : { _id: msg.senderId, email: '' }),
+            ...(typeof msg.senderId === 'object'
+              ? msg.senderId
+              : { _id: msg.senderId, email: '' }),
             displayName: senderProfile?.displayName ?? undefined,
             username: senderProfile?.username ?? undefined,
             avatarUrl: senderProfile?.avatarUrl ?? undefined,
           },
         };
 
-        const replyToRaw = msg.replyTo as any;
+        const replyToRaw = msg.replyTo;
         if (replyToRaw && typeof replyToRaw === 'object') {
           const rtSenderId = replyToRaw.senderId?._id ?? replyToRaw.senderId;
-          const rtUserId = rtSenderId != null ? new Types.ObjectId(rtSenderId.toString()) : null;
+          const rtUserId =
+            rtSenderId != null
+              ? new Types.ObjectId(rtSenderId.toString())
+              : null;
           const rtProfile = rtUserId
             ? await this.profileModel
                 .findOne({ userId: rtUserId })
@@ -530,10 +681,11 @@ export class MessagesService {
           .lean()
           .exec();
         const stickerReply =
-          (server as any)?.interactionSettings?.stickerReplyWelcomeEnabled ?? true;
+          (server as any)?.interactionSettings?.stickerReplyWelcomeEnabled ??
+          true;
         for (const m of enriched) {
-          if ((m as any).messageType === 'welcome') {
-            (m as any).stickerReplyWelcomeEnabled = stickerReply;
+          if (m.messageType === 'welcome') {
+            m.stickerReplyWelcomeEnabled = stickerReply;
           }
         }
       }

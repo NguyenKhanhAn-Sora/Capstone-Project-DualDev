@@ -9,7 +9,10 @@ export class IgnoredService {
     @InjectModel(Ignored.name) private readonly ignoredModel: Model<Ignored>,
   ) {}
 
-  async addIgnored(userId: string, ignoredUserId: string): Promise<{ ignored: boolean }> {
+  async addIgnored(
+    userId: string,
+    ignoredUserId: string,
+  ): Promise<{ ignored: boolean }> {
     if (userId === ignoredUserId) {
       throw new BadRequestException('Cannot ignore yourself');
     }
@@ -25,17 +28,25 @@ export class IgnoredService {
     return { ignored: true };
   }
 
-  async removeIgnored(userId: string, ignoredUserId: string): Promise<{ ignored: boolean }> {
+  async removeIgnored(
+    userId: string,
+    ignoredUserId: string,
+  ): Promise<{ ignored: boolean }> {
     if (userId === ignoredUserId) {
       throw new BadRequestException('Invalid');
     }
     const u = this.asObjectId(userId, 'userId');
     const ignored = this.asObjectId(ignoredUserId, 'ignoredUserId');
-    await this.ignoredModel.deleteOne({ userId: u, ignoredUserId: ignored }).exec();
+    await this.ignoredModel
+      .deleteOne({ userId: u, ignoredUserId: ignored })
+      .exec();
     return { ignored: false };
   }
 
-  async isIgnored(viewerId: string | Types.ObjectId, targetId: string | Types.ObjectId): Promise<boolean> {
+  async isIgnored(
+    viewerId: string | Types.ObjectId,
+    targetId: string | Types.ObjectId,
+  ): Promise<boolean> {
     const viewer = this.asObjectId(viewerId, 'viewerId');
     const target = this.asObjectId(targetId, 'targetId');
     const doc = await this.ignoredModel
@@ -47,7 +58,9 @@ export class IgnoredService {
   }
 
   /** Returns set of user IDs that the viewer has ignored (so we hide their messages). */
-  async getIgnoredUserIds(viewerId: string | Types.ObjectId): Promise<Set<string>> {
+  async getIgnoredUserIds(
+    viewerId: string | Types.ObjectId,
+  ): Promise<Set<string>> {
     const viewer = this.asObjectId(viewerId, 'viewerId');
     const docs = await this.ignoredModel
       .find({ userId: viewer })
@@ -56,15 +69,21 @@ export class IgnoredService {
       .exec();
     const set = new Set<string>();
     docs.forEach((d) => {
-      const id = (d as { ignoredUserId?: Types.ObjectId }).ignoredUserId?.toString?.();
+      const id = (
+        d as { ignoredUserId?: Types.ObjectId }
+      ).ignoredUserId?.toString?.();
       if (id) set.add(id);
     });
     return set;
   }
 
-  private asObjectId(id: string | Types.ObjectId, field: string): Types.ObjectId {
+  private asObjectId(
+    id: string | Types.ObjectId,
+    field: string,
+  ): Types.ObjectId {
     if (id instanceof Types.ObjectId) return id;
-    if (!Types.ObjectId.isValid(id)) throw new BadRequestException(`Invalid ${field}`);
+    if (!Types.ObjectId.isValid(id))
+      throw new BadRequestException(`Invalid ${field}`);
     return new Types.ObjectId(id);
   }
 }

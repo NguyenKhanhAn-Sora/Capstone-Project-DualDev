@@ -5,10 +5,11 @@ import { AuditLogService } from './audit-log.service';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: AuditLog.name, schema: AuditLogSchema }]),
+    MongooseModule.forFeature([
+      { name: AuditLog.name, schema: AuditLogSchema },
+    ]),
   ],
   providers: [AuditLogService],
   exports: [AuditLogService, MongooseModule],
 })
 export class AuditLogModule {}
-

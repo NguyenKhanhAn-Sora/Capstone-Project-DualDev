@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./ServerContextMenu.module.css";
 
 export interface ServerContextMenuServer {
@@ -32,15 +32,14 @@ export interface ServerContextMenuProps {
   onMarkAsRead: () => void;
   onInviteToServer: () => void;
   onMuteServer: (duration: "15m" | "1h" | "3h" | "8h" | "24h" | "until") => void;
-  onNotificationSettings: () => void;
+  onUnmuteServer?: () => void;
+  onSetNotificationLevel: (level: "all" | "mentions" | "none") => void;
   hideMutedChannels: boolean;
   onToggleHideMutedChannels: () => void;
   /** Chỉ khi không phải owner */
   showAllChannels?: boolean;
   onToggleShowAllChannels?: () => void;
   onServerSettings: () => void;
-  onSecuritySettings: () => void;
-  onEditServerProfile: () => void;
   onCreateChannel: () => void;
   onCreateCategory: () => void;
   onCreateEvent: () => void;
@@ -48,6 +47,8 @@ export interface ServerContextMenuProps {
   onLeaveServer?: () => void;
   /** Current notification level for display: "all" | "mentions" | "none" */
   notificationLevel?: "all" | "mentions" | "none";
+  /** Mute state for display */
+  serverMuted?: boolean;
 }
 
 const MUTE_OPTIONS: { key: "15m" | "1h" | "3h" | "8h" | "24h" | "until"; label: string }[] = [
@@ -69,21 +70,22 @@ export default function ServerContextMenu({
   onMarkAsRead,
   onInviteToServer,
   onMuteServer,
-  onNotificationSettings,
+  onUnmuteServer,
+  onSetNotificationLevel,
   hideMutedChannels,
   onToggleHideMutedChannels,
   showAllChannels = false,
   onToggleShowAllChannels,
   onServerSettings,
-  onSecuritySettings,
-  onEditServerProfile,
   onCreateChannel,
   onCreateCategory,
   onCreateEvent,
   onLeaveServer,
   notificationLevel = "all",
+  serverMuted = false,
 }: ServerContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const submenuRef = useRef<HTMLDivElement>(null);
   const [submenu, setSubmenu] = useState<"mute" | "notifications" | null>(null);
   const [submenuPos, setSubmenuPos] = useState({ top: 0, left: 0 });
 
@@ -109,14 +111,22 @@ export default function ServerContextMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!submenu || !menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
-    setSubmenuPos({
-      top: 0,
-      left: rect.width + 4,
-    });
-  }, [submenu]);
+    const gap = 4;
+    const subW = submenuRef.current?.offsetWidth ?? 220;
+    let left = rect.right + gap;
+    if (left + subW > window.innerWidth - 8) {
+      left = Math.max(8, rect.left - subW - gap);
+    }
+    const subH = submenuRef.current?.offsetHeight ?? 220;
+    let top = rect.top;
+    if (top + subH > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - 8 - subH);
+    }
+    setSubmenuPos({ top, left });
+  }, [submenu, x, y]);
 
   const notificationLabel =
     notificationLevel === "all"
@@ -152,11 +162,15 @@ export default function ServerContextMenu({
         )}
 
         {/* Tắt âm máy chủ - hiển thị cho tất cả */}
-        <div
-          className={`${styles.menuItem} ${styles.menuItemWithSub}`}
-          onMouseEnter={() => setSubmenu("mute")}
-          onMouseLeave={() => setSubmenu(null)}
+        <button
+          type="button"
+          className={`${styles.menuItem} ${styles.menuItemWithSub} ${submenu === "mute" ? styles.menuItemOpen : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSubmenu((s) => (s === "mute" ? null : "mute"));
+          }}
           role="menuitem"
+          aria-expanded={submenu === "mute"}
         >
           <span>Tắt âm Máy chủ</span>
           <span className={styles.arrow}>
@@ -164,15 +178,18 @@ export default function ServerContextMenu({
               <path d="M9 18l6-6-6-6" />
             </svg>
           </span>
-        </div>
+        </button>
 
         {/* Cài đặt thông báo - hiển thị cho tất cả */}
-        <div
-          className={`${styles.menuItem} ${styles.menuItemWithSub}`}
-          onMouseEnter={() => setSubmenu("notifications")}
-          onMouseLeave={() => setSubmenu(null)}
-          onClick={onNotificationSettings}
+        <button
+          type="button"
+          className={`${styles.menuItem} ${styles.menuItemWithSub} ${submenu === "notifications" ? styles.menuItemOpen : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSubmenu((s) => (s === "notifications" ? null : "notifications"));
+          }}
           role="menuitem"
+          aria-expanded={submenu === "notifications"}
         >
           <div>
             <span>Cài đặt thông báo</span>
@@ -183,7 +200,7 @@ export default function ServerContextMenu({
               <path d="M9 18l6-6-6-6" />
             </svg>
           </span>
-        </div>
+        </button>
 
         {/* Ẩn kênh bị tắt âm - hiển thị cho tất cả */}
         <button
@@ -237,16 +254,6 @@ export default function ServerContextMenu({
           </>
         )}
 
-        {/* Cài đặt bảo mật - hiển thị cho tất cả */}
-        <button type="button" className={styles.menuItem} onClick={onSecuritySettings} role="menuitem">
-          Cài Đặt Bảo Mật
-        </button>
-
-        {/* Chỉnh sửa hồ sơ theo máy chủ - hiển thị cho tất cả */}
-        <button type="button" className={styles.menuItem} onClick={onEditServerProfile} role="menuitem">
-          Chỉnh Sửa Hồ Sơ Theo Máy Chủ
-        </button>
-
         {/* === Phần tạo mới - hiển thị nếu có quyền === */}
         {(canManageChannels || canManageEvents) && (
           <>
@@ -297,39 +304,55 @@ export default function ServerContextMenu({
       {/* Submenu: Tắt âm */}
       {submenu === "mute" && menuRef.current && (
         <div
+          ref={submenuRef}
           data-server-context-submenu
           className={styles.submenu}
           style={{
-            left: x + menuRef.current.offsetWidth + 4,
-            top: y,
+            left: submenuPos.left,
+            top: submenuPos.top,
           }}
           role="menu"
         >
-          {MUTE_OPTIONS.map((opt) => (
+          {serverMuted && onUnmuteServer ? (
             <button
-              key={opt.key}
               type="button"
               className={styles.submenuItem}
               onClick={() => {
-                onMuteServer(opt.key);
+                onUnmuteServer();
                 onClose();
               }}
               role="menuitem"
             >
-              {opt.label}
+              Bỏ tắt âm máy chủ
             </button>
-          ))}
+          ) : (
+            MUTE_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                className={styles.submenuItem}
+                onClick={() => {
+                  onMuteServer(opt.key);
+                  onClose();
+                }}
+                role="menuitem"
+              >
+                {opt.label}
+              </button>
+            ))
+          )}
         </div>
       )}
 
       {/* Submenu: Thông báo */}
       {submenu === "notifications" && menuRef.current && (
         <div
+          ref={submenuRef}
           data-server-context-submenu
           className={styles.submenu}
           style={{
-            left: x + menuRef.current.offsetWidth + 4,
-            top: y,
+            left: submenuPos.left,
+            top: submenuPos.top,
           }}
           role="menu"
         >
@@ -337,7 +360,7 @@ export default function ServerContextMenu({
             type="button"
             className={`${styles.submenuItem} ${notificationLevel === "all" ? styles.selected : ""}`}
             onClick={() => {
-              onNotificationSettings();
+              onSetNotificationLevel("all");
               onClose();
             }}
             role="menuitem"
@@ -349,7 +372,7 @@ export default function ServerContextMenu({
             type="button"
             className={`${styles.submenuItem} ${notificationLevel === "mentions" ? styles.selected : ""}`}
             onClick={() => {
-              onNotificationSettings();
+              onSetNotificationLevel("mentions");
               onClose();
             }}
             role="menuitem"
@@ -361,7 +384,7 @@ export default function ServerContextMenu({
             type="button"
             className={`${styles.submenuItem} ${notificationLevel === "none" ? styles.selected : ""}`}
             onClick={() => {
-              onNotificationSettings();
+              onSetNotificationLevel("none");
               onClose();
             }}
             role="menuitem"

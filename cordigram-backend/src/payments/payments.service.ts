@@ -52,14 +52,20 @@ export class PaymentsService {
   };
 
   private getCampaignStatus(
-    tx: Pick<PaymentTransaction, 'isExpiredHidden' | 'hiddenReason' | 'expiresAt'>,
+    tx: Pick<
+      PaymentTransaction,
+      'isExpiredHidden' | 'hiddenReason' | 'expiresAt'
+    >,
     now: Date,
   ): 'active' | 'hidden' | 'canceled' | 'completed' {
     if (tx.hiddenReason === 'canceled') return 'canceled';
     if (tx.hiddenReason === 'paused') return 'hidden';
 
     const expiresAt = tx.expiresAt ? new Date(tx.expiresAt) : null;
-    if (tx.isExpiredHidden || (expiresAt && expiresAt.getTime() <= now.getTime())) {
+    if (
+      tx.isExpiredHidden ||
+      (expiresAt && expiresAt.getTime() <= now.getTime())
+    ) {
       return 'completed';
     }
 
@@ -129,7 +135,9 @@ export class PaymentsService {
       )
       .exec();
 
-    await this.postInteractionModel.deleteMany({ postId: { $in: repostIds } }).exec();
+    await this.postInteractionModel
+      .deleteMany({ postId: { $in: repostIds } })
+      .exec();
   }
 
   private parseCreativeContent(content?: string | null) {
@@ -202,7 +210,8 @@ export class PaymentsService {
 
     const primaryText = metaLines[0] ?? '';
     const headline = metaLines.length > 1 ? metaLines[1] : '';
-    const adDescription = metaLines.length > 2 ? metaLines.slice(2).join(' ') : '';
+    const adDescription =
+      metaLines.length > 2 ? metaLines.slice(2).join(' ') : '';
 
     return {
       primaryText,
@@ -451,7 +460,9 @@ export class PaymentsService {
                     {
                       $match: {
                         postId: {
-                          $in: relatedPostIds.map((id) => new Types.ObjectId(id)),
+                          $in: relatedPostIds.map(
+                            (id) => new Types.ObjectId(id),
+                          ),
                         },
                         type: { $in: ['like', 'repost'] },
                         createdAt: { $gte: startsAt, $lte: expiresAt },
@@ -530,9 +541,13 @@ export class PaymentsService {
             reposts,
             engagements,
             averageDwellMs:
-              typeof dwell?.avgDurationMs === 'number' ? dwell.avgDurationMs : 0,
+              typeof dwell?.avgDurationMs === 'number'
+                ? dwell.avgDurationMs
+                : 0,
             totalDwellMs:
-              typeof dwell?.totalDurationMs === 'number' ? dwell.totalDurationMs : 0,
+              typeof dwell?.totalDurationMs === 'number'
+                ? dwell.totalDurationMs
+                : 0,
             dwellSamples: dwell?.samples ?? 0,
             engagementRate,
             _reachUserIds: reachUserIds.map((id) => String(id)),
@@ -590,7 +605,9 @@ export class PaymentsService {
     summary.engagements = summary.likes + summary.comments + summary.reposts;
 
     const ctr =
-      summary.impressions > 0 ? (summary.clicks / summary.impressions) * 100 : 0;
+      summary.impressions > 0
+        ? (summary.clicks / summary.impressions) * 100
+        : 0;
     const engagementRate =
       summary.impressions > 0
         ? (summary.engagements / summary.impressions) * 100
@@ -641,18 +658,20 @@ export class PaymentsService {
       trendMap.set(key, { impressions: 0, clicks: 0 });
     }
 
-    trendRaw.forEach((row: { _id?: { day?: string; eventType?: string }; count?: number }) => {
-      const key = row?._id?.day;
-      if (!key || !trendMap.has(key)) return;
-      const entry = trendMap.get(key);
-      if (!entry) return;
-      if (row?._id?.eventType === 'impression') {
-        entry.impressions += row.count ?? 0;
-      } else if (row?._id?.eventType === 'cta_click') {
-        entry.clicks += row.count ?? 0;
-      }
-      trendMap.set(key, entry);
-    });
+    trendRaw.forEach(
+      (row: { _id?: { day?: string; eventType?: string }; count?: number }) => {
+        const key = row?._id?.day;
+        if (!key || !trendMap.has(key)) return;
+        const entry = trendMap.get(key);
+        if (!entry) return;
+        if (row?._id?.eventType === 'impression') {
+          entry.impressions += row.count ?? 0;
+        } else if (row?._id?.eventType === 'cta_click') {
+          entry.clicks += row.count ?? 0;
+        }
+        trendMap.set(key, entry);
+      },
+    );
 
     const trend = Array.from(trendMap.entries()).map(([day, values]) => ({
       day,
@@ -776,7 +795,9 @@ export class PaymentsService {
         ctaLabel: lockedTx.ctaLabel,
         destinationUrl: lockedTx.destinationUrl,
         interests: lockedTx.interests ?? [],
-        mediaCount: Array.isArray(lockedTx.mediaUrls) ? lockedTx.mediaUrls.length : 0,
+        mediaCount: Array.isArray(lockedTx.mediaUrls)
+          ? lockedTx.mediaUrls.length
+          : 0,
         targetCampaignId: lockedTx.targetCampaignId,
       });
 
@@ -899,15 +920,12 @@ export class PaymentsService {
     }
 
     await this.postModel
-      .updateOne(
-        filter,
-        {
-          $set: {
-            visibility: 'public',
-            publishedAt: new Date(),
-          },
+      .updateOne(filter, {
+        $set: {
+          visibility: 'public',
+          publishedAt: new Date(),
         },
-      )
+      })
       .exec();
   }
 
@@ -918,7 +936,9 @@ export class PaymentsService {
   }) {
     const { userId, email, dto } = opts;
     const actionType =
-      dto.actionType === 'campaign_upgrade' ? 'campaign_upgrade' : 'campaign_create';
+      dto.actionType === 'campaign_upgrade'
+        ? 'campaign_upgrade'
+        : 'campaign_create';
     const durationDays = this.getDurationDays(dto.durationPackageId);
     const boostWeight = this.getBoostWeight(dto.boostPackageId);
     const currency = (dto.currency ?? 'vnd').toLowerCase();
@@ -931,7 +951,10 @@ export class PaymentsService {
       'Payment for promoted campaign in Cordigram Home Feed.';
 
     if (actionType === 'campaign_upgrade') {
-      if (!dto.targetCampaignId || !Types.ObjectId.isValid(dto.targetCampaignId)) {
+      if (
+        !dto.targetCampaignId ||
+        !Types.ObjectId.isValid(dto.targetCampaignId)
+      ) {
         throw new BadRequestException('Invalid targetCampaignId');
       }
 
@@ -950,7 +973,9 @@ export class PaymentsService {
         throw new BadRequestException('Target campaign not found');
       }
 
-      const currentBoostPrice = this.getBoostPrice(targetTx.boostPackageId ?? null);
+      const currentBoostPrice = this.getBoostPrice(
+        targetTx.boostPackageId ?? null,
+      );
       const nextBoostPrice = this.getBoostPrice(dto.boostPackageId);
       if (nextBoostPrice <= 0) {
         throw new BadRequestException('Invalid boostPackageId');
@@ -963,7 +988,9 @@ export class PaymentsService {
       const durationAddon = this.getDurationPrice(dto.durationPackageId);
       amountTotal = boostDelta + durationAddon;
       if (!Number.isFinite(amountTotal) || amountTotal < 1000) {
-        throw new BadRequestException('Upgrade total must be at least 1000 VND');
+        throw new BadRequestException(
+          'Upgrade total must be at least 1000 VND',
+        );
       }
 
       targetCampaignId = dto.targetCampaignId;
@@ -1001,7 +1028,8 @@ export class PaymentsService {
         adFormat: dto.adFormat ?? '',
         boostPackageId: dto.boostPackageId,
         durationPackageId: dto.durationPackageId,
-        promotedPostId: actionType === 'campaign_upgrade' ? '' : dto.promotedPostId ?? '',
+        promotedPostId:
+          actionType === 'campaign_upgrade' ? '' : (dto.promotedPostId ?? ''),
         durationDays: String(durationDays),
         boostWeight: String(boostWeight),
       },
@@ -1010,7 +1038,7 @@ export class PaymentsService {
     const paymentIntentId =
       typeof session.payment_intent === 'string'
         ? session.payment_intent
-        : session.payment_intent?.id ?? null;
+        : (session.payment_intent?.id ?? null);
 
     await this.paymentTransactions.findOneAndUpdate(
       { sessionId: session.id },
@@ -1042,7 +1070,10 @@ export class PaymentsService {
         mediaUrls: dto.mediaUrls ?? [],
         boostPackageId: dto.boostPackageId,
         durationPackageId: dto.durationPackageId,
-        promotedPostId: actionType === 'campaign_upgrade' ? null : dto.promotedPostId ?? null,
+        promotedPostId:
+          actionType === 'campaign_upgrade'
+            ? null
+            : (dto.promotedPostId ?? null),
         durationDays,
         boostWeight,
       },
@@ -1066,7 +1097,9 @@ export class PaymentsService {
       session.metadata?.actionType === 'campaign_upgrade'
         ? 'campaign_upgrade'
         : 'campaign_create';
-    const durationDays = this.getDurationDays(session.metadata?.durationPackageId);
+    const durationDays = this.getDurationDays(
+      session.metadata?.durationPackageId,
+    );
     const boostWeight = this.getBoostWeight(session.metadata?.boostPackageId);
     const paidAt =
       session.payment_status === 'paid' || session.status === 'complete'
@@ -1076,7 +1109,7 @@ export class PaymentsService {
     const paymentIntentId =
       typeof session.payment_intent === 'string'
         ? session.payment_intent
-        : session.payment_intent?.id ?? null;
+        : (session.payment_intent?.id ?? null);
 
     await this.paymentTransactions.findOneAndUpdate(
       { sessionId: session.id },
@@ -1095,7 +1128,7 @@ export class PaymentsService {
         promotedPostId:
           actionType === 'campaign_upgrade'
             ? null
-            : session.metadata?.promotedPostId ?? null,
+            : (session.metadata?.promotedPostId ?? null),
         durationDays,
         boostWeight,
         amountTotal: session.amount_total ?? 0,
@@ -1155,14 +1188,16 @@ export class PaymentsService {
     const paymentIntentId =
       typeof session.payment_intent === 'string'
         ? session.payment_intent
-        : session.payment_intent?.id ?? null;
+        : (session.payment_intent?.id ?? null);
 
     const metadata = session.metadata ?? {};
     const actionType =
       metadata.actionType === 'campaign_upgrade'
         ? 'campaign_upgrade'
         : 'campaign_create';
-    const durationDays = this.getDurationDays(metadata.durationPackageId ?? null);
+    const durationDays = this.getDurationDays(
+      metadata.durationPackageId ?? null,
+    );
     const boostWeight = this.getBoostWeight(metadata.boostPackageId ?? null);
     const paidAt =
       session.payment_status === 'paid' || session.status === 'complete'
@@ -1177,7 +1212,8 @@ export class PaymentsService {
         actionType,
         targetCampaignId: metadata.targetCampaignId ?? null,
         paymentIntentId,
-        customerEmail: session.customer_details?.email ?? session.customer_email ?? null,
+        customerEmail:
+          session.customer_details?.email ?? session.customer_email ?? null,
         amountTotal: session.amount_total ?? 0,
         currency: session.currency ?? 'vnd',
         paymentStatus: session.payment_status,
@@ -1188,7 +1224,9 @@ export class PaymentsService {
         boostPackageId: metadata.boostPackageId ?? '',
         durationPackageId: metadata.durationPackageId ?? '',
         promotedPostId:
-          actionType === 'campaign_upgrade' ? null : metadata.promotedPostId ?? null,
+          actionType === 'campaign_upgrade'
+            ? null
+            : (metadata.promotedPostId ?? null),
         durationDays,
         boostWeight,
         ...(paidAt ? { paidAt } : {}),
@@ -1266,7 +1304,9 @@ export class PaymentsService {
     }
 
     const now = new Date();
-    const currentBoostPrice = this.getBoostPrice(targetTx.boostPackageId ?? null);
+    const currentBoostPrice = this.getBoostPrice(
+      targetTx.boostPackageId ?? null,
+    );
     const nextBoostPrice = this.getBoostPrice(boostPackageId ?? null);
     const nextWeight = this.getBoostWeight(boostPackageId ?? null);
     const extraDays = this.getDurationDays(durationPackageId ?? null);
@@ -1277,11 +1317,17 @@ export class PaymentsService {
     }
 
     if (extraDays > 0) {
-      const currentExpires = targetTx.expiresAt ? new Date(targetTx.expiresAt) : now;
-      const base = currentExpires.getTime() > now.getTime() ? currentExpires : now;
+      const currentExpires = targetTx.expiresAt
+        ? new Date(targetTx.expiresAt)
+        : now;
+      const base =
+        currentExpires.getTime() > now.getTime() ? currentExpires : now;
       targetTx.durationDays = (targetTx.durationDays ?? 0) + extraDays;
-      targetTx.durationPackageId = durationPackageId ?? targetTx.durationPackageId;
-      targetTx.expiresAt = new Date(base.getTime() + extraDays * 24 * 60 * 60 * 1000);
+      targetTx.durationPackageId =
+        durationPackageId ?? targetTx.durationPackageId;
+      targetTx.expiresAt = new Date(
+        base.getTime() + extraDays * 24 * 60 * 60 * 1000,
+      );
     }
 
     const paidValue = Number(amountTotal ?? 0);
@@ -1362,7 +1408,9 @@ export class PaymentsService {
 
     const now = new Date();
 
-    const promotedPostId = String(campaign.promotedPostId ?? tx.promotedPostId ?? '');
+    const promotedPostId = String(
+      campaign.promotedPostId ?? tx.promotedPostId ?? '',
+    );
     const promotedPost = Types.ObjectId.isValid(promotedPostId)
       ? await this.postModel
           .findOne({ _id: new Types.ObjectId(promotedPostId), deletedAt: null })
@@ -1370,7 +1418,9 @@ export class PaymentsService {
           .lean()
       : null;
 
-    const parsedCreative = this.parseCreativeContent(promotedPost?.content ?? '');
+    const parsedCreative = this.parseCreativeContent(
+      promotedPost?.content ?? '',
+    );
     const postMediaUrls = Array.isArray(promotedPost?.media)
       ? promotedPost.media
           .map((item) => item?.url?.toString?.() ?? '')
@@ -1412,7 +1462,9 @@ export class PaymentsService {
           tx.isExpiredHidden !== true,
         canResume:
           tx.hiddenReason !== 'canceled' &&
-          (tx.hiddenReason === 'paused' || tx.hiddenReason === 'expired' || tx.isExpiredHidden === true),
+          (tx.hiddenReason === 'paused' ||
+            tx.hiddenReason === 'expired' ||
+            tx.isExpiredHidden === true),
         canCancel: false,
         requiresExtendBeforeResume:
           (tx.hiddenReason === 'expired' || tx.isExpiredHidden === true) &&
@@ -1489,9 +1541,12 @@ export class PaymentsService {
           throw new BadRequestException('extendDays must be between 1 and 90');
         }
         const currentExpires = tx.expiresAt ? new Date(tx.expiresAt) : now;
-        const base = currentExpires.getTime() > now.getTime() ? currentExpires : now;
+        const base =
+          currentExpires.getTime() > now.getTime() ? currentExpires : now;
         tx.durationDays = (tx.durationDays ?? 0) + extendDays;
-        tx.expiresAt = new Date(base.getTime() + extendDays * 24 * 60 * 60 * 1000);
+        tx.expiresAt = new Date(
+          base.getTime() + extendDays * 24 * 60 * 60 * 1000,
+        );
         if (
           tx.hiddenReason !== 'paused' &&
           tx.hiddenReason !== 'canceled' &&
@@ -1568,10 +1623,18 @@ export class PaymentsService {
         const locationText = (params.locationText ?? '').trim();
         const placement = (params.placement ?? 'home_feed').trim();
         const interests = Array.from(
-          new Set((params.interests ?? []).map((item) => String(item).trim()).filter(Boolean)),
+          new Set(
+            (params.interests ?? [])
+              .map((item) => String(item).trim())
+              .filter(Boolean),
+          ),
         ).slice(0, 30);
         const mediaUrls = Array.from(
-          new Set((params.mediaUrls ?? []).map((item) => String(item).trim()).filter(Boolean)),
+          new Set(
+            (params.mediaUrls ?? [])
+              .map((item) => String(item).trim())
+              .filter(Boolean),
+          ),
         ).slice(0, 8);
 
         const ageMin =

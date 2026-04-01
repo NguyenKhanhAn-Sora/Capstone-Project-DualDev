@@ -15,7 +15,11 @@ export class BroadcastNotice extends Document {
   @Prop({ type: String, required: true, trim: true, maxlength: 2000 })
   body: string;
 
-  @Prop({ type: String, enum: ['info', 'warning', 'critical'], default: 'info' })
+  @Prop({
+    type: String,
+    enum: ['info', 'warning', 'critical'],
+    default: 'info',
+  })
   level: SystemNoticeLevel;
 
   @Prop({ type: String, default: null, maxlength: 300 })
@@ -43,5 +47,6 @@ export class BroadcastNotice extends Document {
   updatedAt?: Date;
 }
 
-export const BroadcastNoticeSchema = SchemaFactory.createForClass(BroadcastNotice);
+export const BroadcastNoticeSchema =
+  SchemaFactory.createForClass(BroadcastNotice);
 BroadcastNoticeSchema.index({ createdAt: -1 });

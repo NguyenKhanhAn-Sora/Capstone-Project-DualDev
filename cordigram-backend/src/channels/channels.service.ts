@@ -13,6 +13,7 @@ import { ChannelCategory } from './channel-category.schema';
 import { Server } from '../servers/server.schema';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { RolesService } from '../roles/roles.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Injectable()
 export class ChannelsService {
@@ -23,6 +24,7 @@ export class ChannelsService {
     @InjectModel(Server.name) private serverModel: Model<Server>,
     @Inject(forwardRef(() => RolesService))
     private rolesService: RolesService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async createChannel(
@@ -66,6 +68,18 @@ export class ChannelsService {
 
     server.channels.push(savedChannel._id);
     await server.save();
+    await this.auditLogService.logServerEvent({
+      serverId,
+      actorUserId: userId,
+      action: 'channel.create',
+      targetType: 'channel',
+      targetId: savedChannel._id.toString(),
+      targetName: savedChannel.name,
+      changes: [
+        { field: 'name', to: savedChannel.name },
+        { field: 'type', to: savedChannel.type },
+      ],
+    });
 
     return savedChannel;
   }
@@ -111,16 +125,32 @@ export class ChannelsService {
         'manageChannels',
       );
       if (!isCreator && !canManage) {
-        throw new ForbiddenException(
-          'Bạn không có quyền chỉnh sửa kênh này',
-        );
+        throw new ForbiddenException('Bạn không có quyền chỉnh sửa kênh này');
       }
     }
 
+    const oldName = channel.name;
+    const oldDesc = channel.description;
     if (name) channel.name = name;
     if (description !== undefined) channel.description = description;
-
-    return channel.save();
+    const saved = await channel.save();
+    await this.auditLogService.logServerEvent({
+      serverId: channel.serverId.toString(),
+      actorUserId: userId || channel.createdBy.toString(),
+      action: 'channel.update',
+      targetType: 'channel',
+      targetId: channelId,
+      targetName: saved.name,
+      changes: [
+        { field: 'name', from: oldName, to: saved.name },
+        {
+          field: 'description',
+          from: oldDesc || '',
+          to: saved.description || '',
+        },
+      ],
+    });
+    return saved;
   }
 
   async deleteChannel(channelId: string, userId: string): Promise<void> {
@@ -141,9 +171,7 @@ export class ChannelsService {
       'manageChannels',
     );
     if (!isCreator && !canManage) {
-      throw new ForbiddenException(
-        'Bạn không có quyền xóa kênh này',
-      );
+      throw new ForbiddenException('Bạn không có quyền xóa kênh này');
     }
 
     await this.serverModel.findByIdAndUpdate(
@@ -153,6 +181,15 @@ export class ChannelsService {
     );
 
     await this.channelModel.findByIdAndDelete(channelId);
+    await this.auditLogService.logServerEvent({
+      serverId: channel.serverId.toString(),
+      actorUserId: userId,
+      action: 'channel.delete',
+      targetType: 'channel',
+      targetId: channelId,
+      targetName: channel.name,
+      changes: [{ field: 'deleted', from: 'false', to: 'true' }],
+    });
   }
 
   async getChannelsByType(
@@ -229,9 +266,7 @@ export class ChannelsService {
     return cats;
   }
 
-  private async migrateServerToCategories(
-    serverId: string,
-  ): Promise<any[]> {
+  private async migrateServerToCategories(serverId: string): Promise<any[]> {
     const serverOid = new Types.ObjectId(serverId);
 
     const textCat = new this.categoryModel({

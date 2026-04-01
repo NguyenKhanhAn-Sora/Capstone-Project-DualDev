@@ -12,7 +12,9 @@ import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: InboxSeen.name, schema: InboxSeenSchema }]),
+    MongooseModule.forFeature([
+      { name: InboxSeen.name, schema: InboxSeenSchema },
+    ]),
     ServersModule,
     EventsModule,
     ServerInvitesModule,

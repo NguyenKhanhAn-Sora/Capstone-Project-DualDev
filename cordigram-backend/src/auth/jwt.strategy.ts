@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '../config/config.service';
@@ -58,7 +62,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       }
     }
 
-    const user = await this.usersService.releaseAccountLimitIfExpired(payload.sub);
+    const user = await this.usersService.releaseAccountLimitIfExpired(
+      payload.sub,
+    );
     if (!user) {
       throw new UnauthorizedException('User not found');
     }

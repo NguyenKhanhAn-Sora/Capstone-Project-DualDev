@@ -101,7 +101,10 @@ export class AdminService {
       ],
       $and: [
         {
-          $or: [{ hiddenReason: null }, { hiddenReason: { $nin: ['canceled', 'paused'] } }],
+          $or: [
+            { hiddenReason: null },
+            { hiddenReason: { $nin: ['canceled', 'paused'] } },
+          ],
         },
         {
           $or: [{ isExpiredHidden: { $ne: true } }, { isExpiredHidden: null }],
@@ -117,7 +120,9 @@ export class AdminService {
         {
           $match: {
             createdAt: { $gte: since, $lte: now },
-            eventType: { $in: ['impression', 'cta_click'] as AdEngagementEventType[] },
+            eventType: {
+              $in: ['impression', 'cta_click'] as AdEngagementEventType[],
+            },
           },
         },
         {
@@ -168,14 +173,20 @@ export class AdminService {
   }
 
   private getCampaignLifecycleStatus(
-    tx: Pick<PaymentTransaction, 'isExpiredHidden' | 'hiddenReason' | 'expiresAt'>,
+    tx: Pick<
+      PaymentTransaction,
+      'isExpiredHidden' | 'hiddenReason' | 'expiresAt'
+    >,
     now: Date,
   ): 'active' | 'hidden' | 'canceled' | 'completed' {
     if (tx.hiddenReason === 'canceled') return 'canceled';
     if (tx.hiddenReason === 'paused') return 'hidden';
 
     const expiresAt = tx.expiresAt ? new Date(tx.expiresAt) : null;
-    if (tx.isExpiredHidden || (expiresAt && expiresAt.getTime() <= now.getTime())) {
+    if (
+      tx.isExpiredHidden ||
+      (expiresAt && expiresAt.getTime() <= now.getTime())
+    ) {
       return 'completed';
     }
 
@@ -221,9 +232,7 @@ export class AdminService {
     return Math.min(1.5, Math.max(0.3, Number(weight.toFixed(2))));
   }
 
-  private async getAvgReportReviewMinutes(
-    since: Date,
-  ): Promise<number | null> {
+  private async getAvgReportReviewMinutes(since: Date): Promise<number | null> {
     const buildPipeline = () => [
       {
         $match: {
@@ -257,7 +266,9 @@ export class AdminService {
       this.reportUserModel.aggregate(buildPipeline()).exec(),
     ]);
 
-    const merged = [postAgg[0], commentAgg[0], userAgg[0]].filter(Boolean) as Array<{
+    const merged = [postAgg[0], commentAgg[0], userAgg[0]].filter(
+      Boolean,
+    ) as Array<{
       count?: number;
       totalMs?: number;
     }>;
@@ -409,7 +420,10 @@ export class AdminService {
   }): Promise<Types.ObjectId | null> {
     const { targetType, targetId } = params;
     if (targetType === 'post') {
-      const post = await this.postModel.findById(targetId).select('authorId').lean();
+      const post = await this.postModel
+        .findById(targetId)
+        .select('authorId')
+        .lean();
       return post?.authorId ? new Types.ObjectId(post.authorId) : null;
     }
 
@@ -541,7 +555,10 @@ export class AdminService {
           .findById(offenderId)
           .select('strikeCount')
           .lean();
-        const nextStrike = Math.max(0, (offender?.strikeCount ?? 0) - strikeDelta);
+        const nextStrike = Math.max(
+          0,
+          (offender?.strikeCount ?? 0) - strikeDelta,
+        );
         await this.userModel
           .updateOne({ _id: offenderId }, { $set: { strikeCount: nextStrike } })
           .exec();
@@ -573,7 +590,9 @@ export class AdminService {
     }>;
   }> {
     const normalizedType =
-      params?.type === 'post' || params?.type === 'comment' || params?.type === 'user'
+      params?.type === 'post' ||
+      params?.type === 'comment' ||
+      params?.type === 'user'
         ? params.type
         : null;
     const safeLimit = Math.min(Math.max(params?.limit ?? 80, 1), 200);
@@ -607,52 +626,52 @@ export class AdminService {
       )
       .lean();
 
-    const [resolvedPostTargetIds, resolvedCommentTargetIds, resolvedUserTargetIds] =
-      await Promise.all([
-        normalizedType && normalizedType !== 'post'
-          ? Promise.resolve<Array<Types.ObjectId | string>>([])
-          : this.reportPostModel
-              .distinct('postId', { status: 'resolved' })
-              .exec(),
-        normalizedType && normalizedType !== 'comment'
-          ? Promise.resolve<Array<Types.ObjectId | string>>([])
-          : this.reportCommentModel
-              .distinct('commentId', { status: 'resolved' })
-              .exec(),
-        normalizedType && normalizedType !== 'user'
-          ? Promise.resolve<Array<Types.ObjectId | string>>([])
-          : this.reportUserModel
-              .distinct('targetUserId', { status: 'resolved' })
-              .exec(),
-      ]);
+    const [
+      resolvedPostTargetIds,
+      resolvedCommentTargetIds,
+      resolvedUserTargetIds,
+    ] = await Promise.all([
+      normalizedType && normalizedType !== 'post'
+        ? Promise.resolve<Array<Types.ObjectId | string>>([])
+        : this.reportPostModel
+            .distinct('postId', { status: 'resolved' })
+            .exec(),
+      normalizedType && normalizedType !== 'comment'
+        ? Promise.resolve<Array<Types.ObjectId | string>>([])
+        : this.reportCommentModel
+            .distinct('commentId', { status: 'resolved' })
+            .exec(),
+      normalizedType && normalizedType !== 'user'
+        ? Promise.resolve<Array<Types.ObjectId | string>>([])
+        : this.reportUserModel
+            .distinct('targetUserId', { status: 'resolved' })
+            .exec(),
+    ]);
 
     const resolvedPostTargetSet = new Set(
-      resolvedPostTargetIds
-        .filter((id) => id)
-        .map((id) => id.toString()),
+      resolvedPostTargetIds.filter((id) => id).map((id) => id.toString()),
     );
     const resolvedCommentTargetSet = new Set(
-      resolvedCommentTargetIds
-        .filter((id) => id)
-        .map((id) => id.toString()),
+      resolvedCommentTargetIds.filter((id) => id).map((id) => id.toString()),
     );
     const resolvedUserTargetSet = new Set(
-      resolvedUserTargetIds
-        .filter((id) => id)
-        .map((id) => id.toString()),
+      resolvedUserTargetIds.filter((id) => id).map((id) => id.toString()),
     );
 
     const resolvedActions = actions.filter((item) => {
       const key = item.targetId?.toString?.() ?? '';
       if (!key) return false;
       if (item.targetType === 'post') return resolvedPostTargetSet.has(key);
-      if (item.targetType === 'comment') return resolvedCommentTargetSet.has(key);
+      if (item.targetType === 'comment')
+        return resolvedCommentTargetSet.has(key);
       return resolvedUserTargetSet.has(key);
     });
 
     const moderatorIds = Array.from(
       new Set(
-        resolvedActions.map((item) => item.moderatorId?.toString?.()).filter(Boolean),
+        resolvedActions
+          .map((item) => item.moderatorId?.toString?.())
+          .filter(Boolean),
       ),
     )
       .filter((id): id is string => Boolean(id))
@@ -758,7 +777,9 @@ export class AdminService {
       userIds.length
         ? this.userModel
             .find({ _id: { $in: userIds } })
-            .select('_id status interactionMutedUntil interactionMutedIndefinitely accountLimitedUntil accountLimitedIndefinitely suspendedUntil suspendedIndefinitely')
+            .select(
+              '_id status interactionMutedUntil interactionMutedIndefinitely accountLimitedUntil accountLimitedIndefinitely suspendedUntil suspendedIndefinitely',
+            )
             .lean<ResolvedUserDoc[]>()
             .exec()
         : Promise.resolve<ResolvedUserDoc[]>([]),
@@ -772,20 +793,28 @@ export class AdminService {
     ]);
 
     const postMap = new Map<string, ResolvedPostDoc>(
-      posts.map((item): [string, ResolvedPostDoc] => [item._id.toString(), item]),
+      posts.map((item): [string, ResolvedPostDoc] => [
+        item._id.toString(),
+        item,
+      ]),
     );
     const commentMap = new Map<string, ResolvedCommentDoc>(
-      comments.map(
-        (item): [string, ResolvedCommentDoc] => [item._id.toString(), item],
-      ),
+      comments.map((item): [string, ResolvedCommentDoc] => [
+        item._id.toString(),
+        item,
+      ]),
     );
     const userMap = new Map<string, ResolvedUserDoc>(
-      users.map((item): [string, ResolvedUserDoc] => [item._id.toString(), item]),
+      users.map((item): [string, ResolvedUserDoc] => [
+        item._id.toString(),
+        item,
+      ]),
     );
     const userProfileMap = new Map<string, ResolvedUserProfileDoc>(
-      userProfiles.map(
-        (item): [string, ResolvedUserProfileDoc] => [item.userId.toString(), item],
-      ),
+      userProfiles.map((item): [string, ResolvedUserProfileDoc] => [
+        item.userId.toString(),
+        item,
+      ]),
     );
 
     const postAuthorIds = Array.from(
@@ -808,7 +837,9 @@ export class AdminService {
     );
 
     const commentAuthorIds = Array.from(
-      new Set(comments.map((item) => item.authorId?.toString?.()).filter(Boolean)),
+      new Set(
+        comments.map((item) => item.authorId?.toString?.()).filter(Boolean),
+      ),
     )
       .filter((id): id is string => Boolean(id))
       .filter((id) => Types.ObjectId.isValid(id))
@@ -822,9 +853,10 @@ export class AdminService {
           .exec()
       : [];
 
-    const commentAuthorProfileMap = new Map<string, ResolvedCommentAuthorProfileDoc>(
-      commentAuthorProfiles.map((item) => [item.userId.toString(), item]),
-    );
+    const commentAuthorProfileMap = new Map<
+      string,
+      ResolvedCommentAuthorProfileDoc
+    >(commentAuthorProfiles.map((item) => [item.userId.toString(), item]));
 
     const rollbackSupportedActions = new Set([
       'remove_post',
@@ -859,7 +891,9 @@ export class AdminService {
           targetLabel = post.content.slice(0, 100);
         }
         if (item.action === 'remove_post') {
-          penaltyActive = Boolean(post?.deletedAt || post?.moderationState === 'removed');
+          penaltyActive = Boolean(
+            post?.deletedAt || post?.moderationState === 'removed',
+          );
         } else if (item.action === 'restrict_post') {
           penaltyActive = post?.moderationState === 'restricted';
         }
@@ -896,7 +930,9 @@ export class AdminService {
           penaltyActive =
             user?.status === 'banned' ||
             Boolean(user?.suspendedIndefinitely) ||
-            (user?.suspendedUntil ? new Date(user.suspendedUntil).getTime() > Date.now() : false);
+            (user?.suspendedUntil
+              ? new Date(user.suspendedUntil).getTime() > Date.now()
+              : false);
         } else if (item.action === 'limit_account') {
           penaltyActive =
             user?.status === 'pending' ||
@@ -943,13 +979,18 @@ export class AdminService {
     adminId: string;
   }): Promise<{ status: 'ok'; reopenedCount: number }> {
     const normalizedType =
-      params.type === 'post' || params.type === 'comment' || params.type === 'user'
+      params.type === 'post' ||
+      params.type === 'comment' ||
+      params.type === 'user'
         ? params.type
         : null;
     if (!normalizedType) {
       throw new BadRequestException('Invalid target type');
     }
-    if (!Types.ObjectId.isValid(params.targetId) || !Types.ObjectId.isValid(params.adminId)) {
+    if (
+      !Types.ObjectId.isValid(params.targetId) ||
+      !Types.ObjectId.isValid(params.adminId)
+    ) {
       throw new BadRequestException('Invalid target/admin id');
     }
 
@@ -1035,7 +1076,9 @@ export class AdminService {
           : await this.reportUserModel
               .updateMany(
                 {
-                  targetUserId: { $in: [targetObjectId, params.targetId as any] },
+                  targetUserId: {
+                    $in: [targetObjectId, params.targetId as any],
+                  },
                   status: 'resolved',
                 },
                 reopenPayload,
@@ -1065,7 +1108,10 @@ export class AdminService {
     note?: string | null;
     adminId: string;
   }): Promise<{ status: 'ok' }> {
-    if (!Types.ObjectId.isValid(params.actionId) || !Types.ObjectId.isValid(params.adminId)) {
+    if (
+      !Types.ObjectId.isValid(params.actionId) ||
+      !Types.ObjectId.isValid(params.adminId)
+    ) {
       throw new BadRequestException('Invalid action/admin id');
     }
 
@@ -1079,11 +1125,15 @@ export class AdminService {
     }
 
     if (
-      ['auto_hidden_pending_review', 'no_violation', 'rollback_moderation'].includes(
-        moderationAction.action,
-      )
+      [
+        'auto_hidden_pending_review',
+        'no_violation',
+        'rollback_moderation',
+      ].includes(moderationAction.action)
     ) {
-      throw new BadRequestException('This moderation action cannot be rolled back');
+      throw new BadRequestException(
+        'This moderation action cannot be rolled back',
+      );
     }
 
     const targetType = moderationAction.targetType;
@@ -1105,8 +1155,7 @@ export class AdminService {
       reason: 'rollback_moderation',
       severity: null,
       note:
-        params.note ??
-        `Rollback moderation action: ${moderationAction.action}`,
+        params.note ?? `Rollback moderation action: ${moderationAction.action}`,
       moderatorId: adminId,
       expiresAt: null,
     });
@@ -1350,11 +1399,14 @@ export class AdminService {
       });
 
     const postTargetIds = baseQueue
-      .filter((item) => item.type === 'post' && Types.ObjectId.isValid(item.targetId))
+      .filter(
+        (item) => item.type === 'post' && Types.ObjectId.isValid(item.targetId),
+      )
       .map((item) => new Types.ObjectId(item.targetId));
     const commentTargetIds = baseQueue
       .filter(
-        (item) => item.type === 'comment' && Types.ObjectId.isValid(item.targetId),
+        (item) =>
+          item.type === 'comment' && Types.ObjectId.isValid(item.targetId),
       )
       .map((item) => new Types.ObjectId(item.targetId));
 
@@ -1372,28 +1424,34 @@ export class AdminService {
       postTargetIds.length
         ? this.postModel
             .find({ _id: { $in: postTargetIds } })
-            .select('_id autoHiddenPendingReview autoHiddenUntil autoHiddenEscalatedAt')
+            .select(
+              '_id autoHiddenPendingReview autoHiddenUntil autoHiddenEscalatedAt',
+            )
             .lean<AutoHiddenTargetDoc[]>()
             .exec()
         : Promise.resolve<AutoHiddenTargetDoc[]>([]),
       commentTargetIds.length
         ? this.commentModel
             .find({ _id: { $in: commentTargetIds } })
-            .select('_id autoHiddenPendingReview autoHiddenUntil autoHiddenEscalatedAt')
+            .select(
+              '_id autoHiddenPendingReview autoHiddenUntil autoHiddenEscalatedAt',
+            )
             .lean<AutoHiddenTargetDoc[]>()
             .exec()
         : Promise.resolve<AutoHiddenTargetDoc[]>([]),
     ]);
 
     const postTargetMap = new Map<string, AutoHiddenTargetDoc>(
-      postTargets.map(
-        (target): [string, AutoHiddenTargetDoc] => [target._id.toString(), target],
-      ),
+      postTargets.map((target): [string, AutoHiddenTargetDoc] => [
+        target._id.toString(),
+        target,
+      ]),
     );
     const commentTargetMap = new Map<string, AutoHiddenTargetDoc>(
-      commentTargets.map(
-        (target): [string, AutoHiddenTargetDoc] => [target._id.toString(), target],
-      ),
+      commentTargets.map((target): [string, AutoHiddenTargetDoc] => [
+        target._id.toString(),
+        target,
+      ]),
     );
 
     const nowDate = new Date();
@@ -1410,7 +1468,9 @@ export class AdminService {
           item.type === 'post'
             ? postTargetMap.get(item.targetId)
             : commentTargetMap.get(item.targetId);
-        const autoHiddenPendingReview = Boolean(target?.autoHiddenPendingReview);
+        const autoHiddenPendingReview = Boolean(
+          target?.autoHiddenPendingReview,
+        );
         const hiddenUntilMs = target?.autoHiddenUntil
           ? new Date(target.autoHiddenUntil).getTime()
           : 0;
@@ -1424,7 +1484,10 @@ export class AdminService {
           if (item.type === 'post' && Types.ObjectId.isValid(item.targetId)) {
             escalatedPostIds.push(new Types.ObjectId(item.targetId));
           }
-          if (item.type === 'comment' && Types.ObjectId.isValid(item.targetId)) {
+          if (
+            item.type === 'comment' &&
+            Types.ObjectId.isValid(item.targetId)
+          ) {
             escalatedCommentIds.push(new Types.ObjectId(item.targetId));
           }
         }
@@ -1490,11 +1553,16 @@ export class AdminService {
       return !seenKeys.has(key);
     });
 
-    const reportQueue = [...seededByType, ...remaining].slice(0, reportQueueLimit);
+    const reportQueue = [...seededByType, ...remaining].slice(
+      0,
+      reportQueueLimit,
+    );
     const openReportsCount = queue.length;
     const highRiskCount = queue.filter(
       (item) =>
-        item.severity === 'high' || item.autoHideSuggested || item.escalatedPriority,
+        item.severity === 'high' ||
+        item.autoHideSuggested ||
+        item.escalatedPriority,
     ).length;
     const medianScore = queue.length
       ? (() => {
@@ -1913,7 +1981,8 @@ export class AdminService {
 
         return {
           reporterId,
-          displayName: profile?.displayName ?? fallbackAccount?.displayName ?? null,
+          displayName:
+            profile?.displayName ?? fallbackAccount?.displayName ?? null,
           username:
             profile?.username ??
             fallbackAccount?.username ??
@@ -2411,18 +2480,25 @@ export class AdminService {
       $or: [{ isExpiredHidden: true }, { expiresAt: { $lte: now } }],
     };
 
-    const [adsRevenueStats, totalCampaigns, pausedCampaigns, canceledCampaigns, completedCampaigns] =
-      await Promise.all([
-        this.getAdsRevenueStats({ since: since30d, now }),
-        this.paymentTransactionModel.countDocuments(baseCampaignQuery).exec(),
-        this.paymentTransactionModel
-          .countDocuments({ ...baseCampaignQuery, hiddenReason: 'paused' })
-          .exec(),
-        this.paymentTransactionModel
-          .countDocuments({ ...baseCampaignQuery, hiddenReason: 'canceled' })
-          .exec(),
-        this.paymentTransactionModel.countDocuments(completedCampaignQuery).exec(),
-      ]);
+    const [
+      adsRevenueStats,
+      totalCampaigns,
+      pausedCampaigns,
+      canceledCampaigns,
+      completedCampaigns,
+    ] = await Promise.all([
+      this.getAdsRevenueStats({ since: since30d, now }),
+      this.paymentTransactionModel.countDocuments(baseCampaignQuery).exec(),
+      this.paymentTransactionModel
+        .countDocuments({ ...baseCampaignQuery, hiddenReason: 'paused' })
+        .exec(),
+      this.paymentTransactionModel
+        .countDocuments({ ...baseCampaignQuery, hiddenReason: 'canceled' })
+        .exec(),
+      this.paymentTransactionModel
+        .countDocuments(completedCampaignQuery)
+        .exec(),
+    ]);
 
     return {
       adsGrossRevenue30d: adsRevenueStats.adsGrossRevenue30d,
@@ -2592,58 +2668,71 @@ export class AdminService {
       ),
     );
 
-    const promotedPostObjectIds = promotedPostIds.map((id) => new Types.ObjectId(id));
+    const promotedPostObjectIds = promotedPostIds.map(
+      (id) => new Types.ObjectId(id),
+    );
 
     const [posts, eventRows]: [CampaignPostLite[], CampaignEventAggRow[]] =
       await Promise.all([
-      promotedPostObjectIds.length
-        ? (this.postModel
-            .find({ _id: { $in: promotedPostObjectIds } })
-            .select('_id content visibility deletedAt')
-            .lean()
-            .exec() as Promise<CampaignPostLite[]>)
-        : Promise.resolve([]),
-      promotedPostObjectIds.length
-        ? (this.adEngagementEventModel
-            .aggregate([
-              {
-                $match: {
-                  promotedPostId: { $in: promotedPostObjectIds },
-                  eventType: {
-                    $in: ['impression', 'cta_click', 'dwell'] as AdEngagementEventType[],
-                  },
-                },
-              },
-              {
-                $group: {
-                  _id: {
-                    promotedPostId: '$promotedPostId',
-                    eventType: '$eventType',
-                  },
-                  count: { $sum: 1 },
-                  totalDurationMs: {
-                    $sum: {
-                      $cond: [
-                        { $eq: ['$eventType', 'dwell'] },
-                        { $ifNull: ['$durationMs', 0] },
-                        0,
-                      ],
+        promotedPostObjectIds.length
+          ? (this.postModel
+              .find({ _id: { $in: promotedPostObjectIds } })
+              .select('_id content visibility deletedAt')
+              .lean()
+              .exec() as Promise<CampaignPostLite[]>)
+          : Promise.resolve([]),
+        promotedPostObjectIds.length
+          ? (this.adEngagementEventModel
+              .aggregate([
+                {
+                  $match: {
+                    promotedPostId: { $in: promotedPostObjectIds },
+                    eventType: {
+                      $in: [
+                        'impression',
+                        'cta_click',
+                        'dwell',
+                      ] as AdEngagementEventType[],
                     },
                   },
                 },
-              },
-            ])
-            .exec() as Promise<CampaignEventAggRow[]>)
-        : Promise.resolve([]),
+                {
+                  $group: {
+                    _id: {
+                      promotedPostId: '$promotedPostId',
+                      eventType: '$eventType',
+                    },
+                    count: { $sum: 1 },
+                    totalDurationMs: {
+                      $sum: {
+                        $cond: [
+                          { $eq: ['$eventType', 'dwell'] },
+                          { $ifNull: ['$durationMs', 0] },
+                          0,
+                        ],
+                      },
+                    },
+                  },
+                },
+              ])
+              .exec() as Promise<CampaignEventAggRow[]>)
+          : Promise.resolve([]),
       ]);
 
     const postMap = new Map<string, CampaignPostLite>(
-      posts.map((post) => [post._id.toString(), post] as [string, CampaignPostLite]),
+      posts.map(
+        (post) => [post._id.toString(), post] as [string, CampaignPostLite],
+      ),
     );
 
     const metricsMap = new Map<
       string,
-      { impressions: number; clicks: number; dwellCount: number; dwellDurationMs: number }
+      {
+        impressions: number;
+        clicks: number;
+        dwellCount: number;
+        dwellDurationMs: number;
+      }
     >();
     eventRows.forEach((row) => {
       const postId = row?._id?.promotedPostId?.toString?.();
@@ -2674,7 +2763,9 @@ export class AdminService {
       const promotedPostId = String(doc.promotedPostId ?? '');
       const profile = profileMap.get(userId);
       const promotedPost = postMap.get(promotedPostId);
-      const parsedPostCreative = this.parseAdCreativeContent(promotedPost?.content);
+      const parsedPostCreative = this.parseAdCreativeContent(
+        promotedPost?.content,
+      );
       const metric = metricsMap.get(promotedPostId) ?? {
         impressions: 0,
         clicks: 0,
@@ -2688,7 +2779,9 @@ export class AdminService {
           : null;
       const avgDwellSeconds =
         metric.dwellCount > 0
-          ? Number((metric.dwellDurationMs / metric.dwellCount / 1000).toFixed(2))
+          ? Number(
+              (metric.dwellDurationMs / metric.dwellCount / 1000).toFixed(2),
+            )
           : null;
 
       return {
@@ -2707,7 +2800,8 @@ export class AdminService {
         expiresAt: doc.expiresAt ?? null,
         amountTotal: Number(doc.amountTotal ?? 0),
         boostWeight: Number(doc.boostWeight ?? 0),
-        placement: typeof doc.placement === 'string' ? doc.placement : 'home_feed',
+        placement:
+          typeof doc.placement === 'string' ? doc.placement : 'home_feed',
         paymentStatus:
           typeof doc.paymentStatus === 'string' ? doc.paymentStatus : null,
         checkoutStatus:
@@ -2729,7 +2823,8 @@ export class AdminService {
           parsedPostCreative?.cta ||
           '',
         destinationUrl:
-          (typeof doc.destinationUrl === 'string' && doc.destinationUrl.trim()) ||
+          (typeof doc.destinationUrl === 'string' &&
+            doc.destinationUrl.trim()) ||
           parsedPostCreative?.destinationUrl ||
           '',
         post: {
@@ -2857,7 +2952,9 @@ export class AdminService {
           .lean()
       : null;
 
-    const parsedPostCreative = this.parseAdCreativeContent(promotedPost?.content);
+    const parsedPostCreative = this.parseAdCreativeContent(
+      promotedPost?.content,
+    );
 
     const postMediaUrls = Array.isArray(promotedPost?.media)
       ? promotedPost.media
@@ -2882,99 +2979,108 @@ export class AdminService {
       .map((item: { _id?: Types.ObjectId }) => item._id?.toString?.())
       .filter((id): id is string => Boolean(id));
 
-    const [impressionCount, reachUserIds, ctaClickCount, dwellAgg, interactionAgg, viewUserIds, commentCount] =
-      await Promise.all([
-        this.adEngagementEventModel
-          .countDocuments({
-            promotedPostId: new Types.ObjectId(promotedPostId),
-            eventType: 'impression',
-            createdAt: { $gte: startsAt, $lte: expiresAt },
-          })
-          .exec(),
-        this.adEngagementEventModel
-          .distinct('userId', {
-            promotedPostId: new Types.ObjectId(promotedPostId),
-            eventType: 'impression',
-            createdAt: { $gte: startsAt, $lte: expiresAt },
-          })
-          .exec(),
-        this.adEngagementEventModel
-          .countDocuments({
-            promotedPostId: new Types.ObjectId(promotedPostId),
-            eventType: 'cta_click',
-            createdAt: { $gte: startsAt, $lte: expiresAt },
-          })
-          .exec(),
-        this.adEngagementEventModel
-          .aggregate([
-            {
-              $match: {
-                promotedPostId: new Types.ObjectId(promotedPostId),
-                eventType: 'dwell',
-                durationMs: { $gt: 0 },
-                createdAt: { $gte: startsAt, $lte: expiresAt },
-              },
+    const [
+      impressionCount,
+      reachUserIds,
+      ctaClickCount,
+      dwellAgg,
+      interactionAgg,
+      viewUserIds,
+      commentCount,
+    ] = await Promise.all([
+      this.adEngagementEventModel
+        .countDocuments({
+          promotedPostId: new Types.ObjectId(promotedPostId),
+          eventType: 'impression',
+          createdAt: { $gte: startsAt, $lte: expiresAt },
+        })
+        .exec(),
+      this.adEngagementEventModel
+        .distinct('userId', {
+          promotedPostId: new Types.ObjectId(promotedPostId),
+          eventType: 'impression',
+          createdAt: { $gte: startsAt, $lte: expiresAt },
+        })
+        .exec(),
+      this.adEngagementEventModel
+        .countDocuments({
+          promotedPostId: new Types.ObjectId(promotedPostId),
+          eventType: 'cta_click',
+          createdAt: { $gte: startsAt, $lte: expiresAt },
+        })
+        .exec(),
+      this.adEngagementEventModel
+        .aggregate([
+          {
+            $match: {
+              promotedPostId: new Types.ObjectId(promotedPostId),
+              eventType: 'dwell',
+              durationMs: { $gt: 0 },
+              createdAt: { $gte: startsAt, $lte: expiresAt },
             },
-            {
-              $group: {
-                _id: null,
-                avgDurationMs: { $avg: '$durationMs' },
-                totalDurationMs: { $sum: '$durationMs' },
-                samples: { $sum: 1 },
-              },
+          },
+          {
+            $group: {
+              _id: null,
+              avgDurationMs: { $avg: '$durationMs' },
+              totalDurationMs: { $sum: '$durationMs' },
+              samples: { $sum: 1 },
             },
-          ])
-          .exec(),
-        relatedPostIds.length
-          ? this.postInteractionModel
-              .aggregate([
-                {
-                  $match: {
-                    postId: {
-                      $in: relatedPostIds.map((id) => new Types.ObjectId(id)),
-                    },
-                    type: { $in: ['like', 'repost'] },
-                    createdAt: { $gte: startsAt, $lte: expiresAt },
+          },
+        ])
+        .exec(),
+      relatedPostIds.length
+        ? this.postInteractionModel
+            .aggregate([
+              {
+                $match: {
+                  postId: {
+                    $in: relatedPostIds.map((id) => new Types.ObjectId(id)),
                   },
+                  type: { $in: ['like', 'repost'] },
+                  createdAt: { $gte: startsAt, $lte: expiresAt },
                 },
-                {
-                  $group: {
-                    _id: '$type',
-                    count: { $sum: 1 },
-                  },
+              },
+              {
+                $group: {
+                  _id: '$type',
+                  count: { $sum: 1 },
                 },
-              ])
-              .exec()
-          : Promise.resolve([]),
-        relatedPostIds.length
-          ? this.postInteractionModel
-              .distinct('userId', {
-                postId: {
-                  $in: relatedPostIds.map((id) => new Types.ObjectId(id)),
-                },
-                type: 'view',
-                createdAt: { $gte: startsAt, $lte: expiresAt },
-              })
-              .exec()
-          : Promise.resolve([]),
-        relatedPostIds.length
-          ? this.commentModel
-              .countDocuments({
-                postId: {
-                  $in: relatedPostIds.map((id) => new Types.ObjectId(id)),
-                },
-                deletedAt: null,
-                createdAt: { $gte: startsAt, $lte: expiresAt },
-              })
-              .exec()
-          : Promise.resolve(0),
-      ]);
+              },
+            ])
+            .exec()
+        : Promise.resolve([]),
+      relatedPostIds.length
+        ? this.postInteractionModel
+            .distinct('userId', {
+              postId: {
+                $in: relatedPostIds.map((id) => new Types.ObjectId(id)),
+              },
+              type: 'view',
+              createdAt: { $gte: startsAt, $lte: expiresAt },
+            })
+            .exec()
+        : Promise.resolve([]),
+      relatedPostIds.length
+        ? this.commentModel
+            .countDocuments({
+              postId: {
+                $in: relatedPostIds.map((id) => new Types.ObjectId(id)),
+              },
+              deletedAt: null,
+              createdAt: { $gte: startsAt, $lte: expiresAt },
+            })
+            .exec()
+        : Promise.resolve(0),
+    ]);
 
     const interactionMap = new Map<string, number>();
-    (interactionAgg as Array<{ _id?: string; count?: number }>).forEach((row) => {
-      if (!row?._id) return;
-      interactionMap.set(row._id, row.count ?? 0);
-    });
+    (interactionAgg as Array<{ _id?: string; count?: number }>).forEach(
+      (row) => {
+        if (!row?._id) return;
+        interactionMap.set(row._id, row.count ?? 0);
+      },
+    );
 
     const dwell = dwellAgg?.[0] as
       | { avgDurationMs?: number; totalDurationMs?: number; samples?: number }
@@ -2986,7 +3092,9 @@ export class AdminService {
     const clicks = ctaClickCount ?? 0;
     const engagements = likes + commentCount + reposts;
     const ctrPct =
-      impressions > 0 ? Number(((clicks / impressions) * 100).toFixed(2)) : null;
+      impressions > 0
+        ? Number(((clicks / impressions) * 100).toFixed(2))
+        : null;
     const engagementRatePct =
       impressions > 0
         ? Number(((engagements / impressions) * 100).toFixed(2))
@@ -3011,7 +3119,8 @@ export class AdminService {
       amountTotal: Number(tx.amountTotal ?? 0),
       boostWeight: Number(tx.boostWeight ?? 0),
       placement: typeof tx.placement === 'string' ? tx.placement : 'home_feed',
-      paymentStatus: typeof tx.paymentStatus === 'string' ? tx.paymentStatus : null,
+      paymentStatus:
+        typeof tx.paymentStatus === 'string' ? tx.paymentStatus : null,
       checkoutStatus:
         typeof tx.checkoutStatus === 'string' ? tx.checkoutStatus : null,
       objective: tx.objective ?? '',
@@ -3132,7 +3241,10 @@ export class AdminService {
         throw new BadRequestException('Cancellation reason is required');
       }
       const expiresAt = tx.expiresAt ? new Date(tx.expiresAt) : null;
-      if (tx.isExpiredHidden || (expiresAt && expiresAt.getTime() <= now.getTime())) {
+      if (
+        tx.isExpiredHidden ||
+        (expiresAt && expiresAt.getTime() <= now.getTime())
+      ) {
         throw new BadRequestException('Completed campaign cannot be canceled');
       }
       updates.hiddenReason = 'canceled';
@@ -3141,7 +3253,9 @@ export class AdminService {
       updates.adminCancelReason = cancelReason;
     } else if (params.action === 'reopen_canceled_campaign') {
       if (tx.hiddenReason !== 'canceled') {
-        throw new BadRequestException('Only canceled campaigns can be reopened');
+        throw new BadRequestException(
+          'Only canceled campaigns can be reopened',
+        );
       }
       const expiresAt = tx.expiresAt ? new Date(tx.expiresAt) : null;
       if (expiresAt && expiresAt.getTime() <= now.getTime()) {
@@ -3310,7 +3424,9 @@ export class AdminService {
       campaignId: refreshed._id.toString(),
       status: this.getCampaignLifecycleStatus(refreshed, new Date()),
       hiddenReason:
-        typeof refreshed.hiddenReason === 'string' ? refreshed.hiddenReason : null,
+        typeof refreshed.hiddenReason === 'string'
+          ? refreshed.hiddenReason
+          : null,
     };
   }
 
@@ -3359,7 +3475,11 @@ export class AdminService {
       .lean();
 
     const moderatorIds = Array.from(
-      new Set(actionDocs.map((item) => item.moderatorId?.toString?.()).filter(Boolean)),
+      new Set(
+        actionDocs
+          .map((item) => item.moderatorId?.toString?.())
+          .filter(Boolean),
+      ),
     )
       .filter((id): id is string => Boolean(id))
       .filter((id) => Types.ObjectId.isValid(id))
@@ -3448,7 +3568,9 @@ export class AdminService {
     ]);
 
     const postMap = new Map(posts.map((item) => [item._id.toString(), item]));
-    const commentMap = new Map(comments.map((item) => [item._id.toString(), item]));
+    const commentMap = new Map(
+      comments.map((item) => [item._id.toString(), item]),
+    );
     const moderatorProfileMap = new Map(
       moderatorProfiles.map((item) => [item.userId.toString(), item]),
     );
@@ -3465,7 +3587,9 @@ export class AdminService {
           .map((item) => item.authorId?.toString?.())
           .filter(
             (id): id is string =>
-              typeof id === 'string' && id.length > 0 && Types.ObjectId.isValid(id),
+              typeof id === 'string' &&
+              id.length > 0 &&
+              Types.ObjectId.isValid(id),
           ),
       ),
     ).map((id) => new Types.ObjectId(id));
@@ -3503,7 +3627,8 @@ export class AdminService {
           : null;
         if (authorProfile?.username) return `@${authorProfile.username}`;
         if (authorProfile?.displayName) return authorProfile.displayName;
-        if (comment?.content?.trim()) return comment.content.trim().slice(0, 80);
+        if (comment?.content?.trim())
+          return comment.content.trim().slice(0, 80);
         return `comment:${id}`;
       }
 
@@ -3521,7 +3646,10 @@ export class AdminService {
       severity: 'low' | 'medium' | 'high' | null;
     }) => {
       const { action, targetType, targetLabel, targetId, severity } = params;
-      const normalizedAction = action.replace(/[_-]+/g, ' ').trim().toUpperCase();
+      const normalizedAction = action
+        .replace(/[_-]+/g, ' ')
+        .trim()
+        .toUpperCase();
       const strikeDelta = this.getStrikeIncrement(action, severity);
       const targetText = `${targetType} ${targetLabel} (id: ${targetId})`;
 
@@ -3620,7 +3748,9 @@ export class AdminService {
     const safeLimit = Math.min(Math.max(params?.limit ?? 50, 1), 200);
     const safeOffset = Math.max(params?.offset ?? 0, 0);
     const normalizedType =
-      params?.type === 'post' || params?.type === 'comment' || params?.type === 'user'
+      params?.type === 'post' ||
+      params?.type === 'comment' ||
+      params?.type === 'user'
         ? params.type
         : null;
 
@@ -3654,22 +3784,25 @@ export class AdminService {
       query.action = params.action.trim();
     }
 
-    const [total, rows]: [number, Array<{
-      _id: Types.ObjectId;
-      targetType: 'post' | 'comment' | 'user';
-      targetId: Types.ObjectId;
-      action: string;
-      category: string;
-      reason: string;
-      severity?: 'low' | 'medium' | 'high' | null;
-      note?: string | null;
-      expiresAt?: Date | null;
-      moderatorId?: Types.ObjectId | null;
-      invalidatedAt?: Date | null;
-      invalidatedReason?: string | null;
-      invalidatedBy?: Types.ObjectId | null;
-      createdAt?: Date | null;
-    }>] = await Promise.all([
+    const [total, rows]: [
+      number,
+      Array<{
+        _id: Types.ObjectId;
+        targetType: 'post' | 'comment' | 'user';
+        targetId: Types.ObjectId;
+        action: string;
+        category: string;
+        reason: string;
+        severity?: 'low' | 'medium' | 'high' | null;
+        note?: string | null;
+        expiresAt?: Date | null;
+        moderatorId?: Types.ObjectId | null;
+        invalidatedAt?: Date | null;
+        invalidatedReason?: string | null;
+        invalidatedBy?: Types.ObjectId | null;
+        createdAt?: Date | null;
+      }>,
+    ] = await Promise.all([
       this.moderationActionModel.countDocuments(query).exec(),
       this.moderationActionModel
         .find(query)
@@ -3685,31 +3818,48 @@ export class AdminService {
     const moderatorIds = Array.from(
       new Set(rows.map((row) => row.moderatorId?.toString?.()).filter(Boolean)),
     )
-      .filter((id): id is string => typeof id === 'string' && Types.ObjectId.isValid(id))
+      .filter(
+        (id): id is string =>
+          typeof id === 'string' && Types.ObjectId.isValid(id),
+      )
       .map((id) => new Types.ObjectId(id));
 
     const invalidatorIds = Array.from(
-      new Set(rows.map((row) => row.invalidatedBy?.toString?.()).filter(Boolean)),
+      new Set(
+        rows.map((row) => row.invalidatedBy?.toString?.()).filter(Boolean),
+      ),
     )
-      .filter((id): id is string => typeof id === 'string' && Types.ObjectId.isValid(id))
+      .filter(
+        (id): id is string =>
+          typeof id === 'string' && Types.ObjectId.isValid(id),
+      )
       .map((id) => new Types.ObjectId(id));
 
     const postTargetIds = rows
       .filter((row) => row.targetType === 'post')
       .map((row) => row.targetId?.toString?.())
-      .filter((id): id is string => typeof id === 'string' && Types.ObjectId.isValid(id))
+      .filter(
+        (id): id is string =>
+          typeof id === 'string' && Types.ObjectId.isValid(id),
+      )
       .map((id) => new Types.ObjectId(id));
 
     const commentTargetIds = rows
       .filter((row) => row.targetType === 'comment')
       .map((row) => row.targetId?.toString?.())
-      .filter((id): id is string => typeof id === 'string' && Types.ObjectId.isValid(id))
+      .filter(
+        (id): id is string =>
+          typeof id === 'string' && Types.ObjectId.isValid(id),
+      )
       .map((id) => new Types.ObjectId(id));
 
     const userTargetIds = rows
       .filter((row) => row.targetType === 'user')
       .map((row) => row.targetId?.toString?.())
-      .filter((id): id is string => typeof id === 'string' && Types.ObjectId.isValid(id))
+      .filter(
+        (id): id is string =>
+          typeof id === 'string' && Types.ObjectId.isValid(id),
+      )
       .map((id) => new Types.ObjectId(id));
 
     type BasicProfileDoc = {
@@ -3780,17 +3930,28 @@ export class AdminService {
         : Promise.resolve<BasicProfileDoc[]>([]),
     ]);
 
-    const actorProfileMap = new Map(actorProfiles.map((item) => [item.userId.toString(), item]));
-    const actorUserMap = new Map(actorUsers.map((item) => [item._id.toString(), item]));
+    const actorProfileMap = new Map(
+      actorProfiles.map((item) => [item.userId.toString(), item]),
+    );
+    const actorUserMap = new Map(
+      actorUsers.map((item) => [item._id.toString(), item]),
+    );
     const postMap = new Map(posts.map((item) => [item._id.toString(), item]));
-    const commentMap = new Map(comments.map((item) => [item._id.toString(), item]));
-    const userProfileMap = new Map(userProfiles.map((item) => [item.userId.toString(), item]));
+    const commentMap = new Map(
+      comments.map((item) => [item._id.toString(), item]),
+    );
+    const userProfileMap = new Map(
+      userProfiles.map((item) => [item.userId.toString(), item]),
+    );
 
     const ownerIds = Array.from(
       new Set(
         [...posts, ...comments]
           .map((item) => item.authorId?.toString?.())
-          .filter((id): id is string => typeof id === 'string' && Types.ObjectId.isValid(id)),
+          .filter(
+            (id): id is string =>
+              typeof id === 'string' && Types.ObjectId.isValid(id),
+          ),
       ),
     ).map((id) => new Types.ObjectId(id));
 
@@ -3801,7 +3962,9 @@ export class AdminService {
           .lean<BasicProfileDoc[]>()
           .exec()
       : [];
-    const ownerProfileMap = new Map(ownerProfiles.map((item) => [item.userId.toString(), item]));
+    const ownerProfileMap = new Map(
+      ownerProfiles.map((item) => [item.userId.toString(), item]),
+    );
 
     const getActor = (id: Types.ObjectId | null | undefined) => {
       const key = id?.toString?.() ?? '';
@@ -3830,7 +3993,9 @@ export class AdminService {
       const targetKey = row.targetId.toString();
       if (row.targetType === 'post') {
         const post = postMap.get(targetKey);
-        const owner = post?.authorId ? ownerProfileMap.get(post.authorId.toString()) : null;
+        const owner = post?.authorId
+          ? ownerProfileMap.get(post.authorId.toString())
+          : null;
         if (owner?.username) return `@${owner.username}`;
         if (owner?.displayName) return owner.displayName;
         if (post?.content?.trim()) return post.content.trim().slice(0, 60);
@@ -3843,7 +4008,8 @@ export class AdminService {
           : null;
         if (owner?.username) return `@${owner.username}`;
         if (owner?.displayName) return owner.displayName;
-        if (comment?.content?.trim()) return comment.content.trim().slice(0, 60);
+        if (comment?.content?.trim())
+          return comment.content.trim().slice(0, 60);
         return 'Unknown owner';
       }
       const profile = userProfileMap.get(targetKey);
@@ -3853,16 +4019,15 @@ export class AdminService {
     };
 
     const items = rows.map((row) => {
-      const strikeDelta =
-        [
-          'no_violation',
-          'rollback_moderation',
-          'creator_verification_approved',
-          'creator_verification_rejected',
-          'creator_verification_revoked',
-        ].includes(row.action)
-          ? null
-          : this.getStrikeIncrement(row.action, row.severity ?? null);
+      const strikeDelta = [
+        'no_violation',
+        'rollback_moderation',
+        'creator_verification_approved',
+        'creator_verification_rejected',
+        'creator_verification_revoked',
+      ].includes(row.action)
+        ? null
+        : this.getStrikeIncrement(row.action, row.severity ?? null);
 
       const actionLabelMap: Record<string, string> = {
         creator_verification_approved: 'CREATOR VERIFICATION APPROVED',
@@ -3939,7 +4104,9 @@ export class AdminService {
 
     const actionUrl = params.actionUrl?.trim() || null;
     if (actionUrl && !/^https?:\/\//i.test(actionUrl)) {
-      throw new BadRequestException('Action URL must start with http:// or https://');
+      throw new BadRequestException(
+        'Action URL must start with http:// or https://',
+      );
     }
 
     const targetMode =
@@ -3957,11 +4124,15 @@ export class AdminService {
     );
 
     if (targetMode === 'include' && includeUserIds.length === 0) {
-      throw new BadRequestException('Include mode requires at least one user id');
+      throw new BadRequestException(
+        'Include mode requires at least one user id',
+      );
     }
 
     if (targetMode === 'exclude' && excludeUserIds.length === 0) {
-      throw new BadRequestException('Exclude mode requires at least one user id');
+      throw new BadRequestException(
+        'Exclude mode requires at least one user id',
+      );
     }
 
     return this.notificationsService.broadcastSystemNotice({
@@ -3980,7 +4151,10 @@ export class AdminService {
     return this.notificationsService.listSystemNoticeHistory(limit ?? 30);
   }
 
-  async suggestBroadcastUsers(query?: string, limit = 8): Promise<{
+  async suggestBroadcastUsers(
+    query?: string,
+    limit = 8,
+  ): Promise<{
     items: Array<{
       userId: string;
       username: string;
@@ -4013,7 +4187,10 @@ export class AdminService {
 
     const userIds = profiles
       .map((item) => item.userId?.toString?.())
-      .filter((id): id is string => typeof id === 'string' && Types.ObjectId.isValid(id));
+      .filter(
+        (id): id is string =>
+          typeof id === 'string' && Types.ObjectId.isValid(id),
+      );
 
     const users = userIds.length
       ? await this.userModel
@@ -4048,9 +4225,7 @@ export class AdminService {
   ): Promise<string[]> {
     const values = Array.from(
       new Set(
-        (input ?? [])
-          .map((raw) => String(raw ?? '').trim())
-          .filter(Boolean),
+        (input ?? []).map((raw) => String(raw ?? '').trim()).filter(Boolean),
       ),
     );
     if (!values.length) return [];
@@ -4102,7 +4277,9 @@ export class AdminService {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  private extractCloudinaryPublicIdFromUrl(url: string | null | undefined): string | null {
+  private extractCloudinaryPublicIdFromUrl(
+    url: string | null | undefined,
+  ): string | null {
     if (!url || typeof url !== 'string') return null;
 
     try {
@@ -4186,7 +4363,9 @@ export class AdminService {
       reject: 3,
     };
 
-    const resolvePrimaryModeration = (media: any[]): {
+    const resolvePrimaryModeration = (
+      media: any[],
+    ): {
       decision: 'approve' | 'blur' | 'reject';
       provider: string | null;
       reasons: string[];
@@ -4215,7 +4394,9 @@ export class AdminService {
               ? item.metadata.moderationProvider
               : null,
           reasons: Array.isArray(item?.metadata?.moderationReasons)
-            ? item.metadata.moderationReasons.filter((x: any) => typeof x === 'string')
+            ? item.metadata.moderationReasons.filter(
+                (x: any) => typeof x === 'string',
+              )
             : [],
           url: typeof item?.url === 'string' ? item.url : null,
         }))
@@ -4233,7 +4414,9 @@ export class AdminService {
     const docs = await this.postModel
       .find({
         createdAt: { $gte: previousWindowEnd },
-        'media.metadata.moderationDecision': { $in: ['approve', 'blur', 'reject'] },
+        'media.metadata.moderationDecision': {
+          $in: ['approve', 'blur', 'reject'],
+        },
       })
       .sort({ createdAt: -1 })
       .limit(safeLimit)
@@ -4243,7 +4426,9 @@ export class AdminService {
     const statsDocs = await this.postModel
       .find({
         createdAt: { $gte: previousWindowStart },
-        'media.metadata.moderationDecision': { $in: ['approve', 'blur', 'reject'] },
+        'media.metadata.moderationDecision': {
+          $in: ['approve', 'blur', 'reject'],
+        },
       })
       .select('createdAt media')
       .lean();
@@ -4384,7 +4569,9 @@ export class AdminService {
       (item: any, index: number) => {
         const rawDecision = item?.metadata?.moderationDecision;
         const moderationDecision: 'approve' | 'blur' | 'reject' | 'unknown' =
-          rawDecision === 'approve' || rawDecision === 'blur' || rawDecision === 'reject'
+          rawDecision === 'approve' ||
+          rawDecision === 'blur' ||
+          rawDecision === 'reject'
             ? rawDecision
             : 'unknown';
 
@@ -4409,7 +4596,9 @@ export class AdminService {
         const moderationReasons: string[] = Array.isArray(
           item?.metadata?.moderationReasons,
         )
-          ? item.metadata.moderationReasons.filter((x: any) => typeof x === 'string')
+          ? item.metadata.moderationReasons.filter(
+              (x: any) => typeof x === 'string',
+            )
           : [];
 
         return {
@@ -4549,17 +4738,19 @@ export class AdminService {
           )
         : [];
       const manualReason = `Admin manual blur on media #${params.mediaIndex + 1}`;
-      const nextReasons = Array.from(new Set([...existingReasons, manualReason]));
+      const nextReasons = Array.from(
+        new Set([...existingReasons, manualReason]),
+      );
 
       const originalUrl =
         typeof metadata['originalUrl'] === 'string'
-          ? (metadata['originalUrl'] as string)
+          ? metadata['originalUrl']
           : typeof target?.url === 'string'
             ? (target.url as string)
             : null;
       const originalSecureUrl =
         typeof metadata['originalSecureUrl'] === 'string'
-          ? (metadata['originalSecureUrl'] as string)
+          ? metadata['originalSecureUrl']
           : originalUrl;
 
       media[params.mediaIndex] = {
@@ -4960,7 +5151,11 @@ export class AdminService {
 
       if (Types.ObjectId.isValid(q)) {
         const objectId = new Types.ObjectId(q);
-        orFilters.push({ _id: objectId }, { postId: objectId }, { authorId: objectId });
+        orFilters.push(
+          { _id: objectId },
+          { postId: objectId },
+          { authorId: objectId },
+        );
       }
 
       const matchedProfiles = await this.profileModel
@@ -5017,7 +5212,8 @@ export class AdminService {
       const authorKey = doc.authorId?.toString?.() ?? '';
       const profile = profileMap.get(authorKey);
       const rawContent = typeof doc.content === 'string' ? doc.content : '';
-      const preview = rawContent.length > 180 ? `${rawContent.slice(0, 177)}...` : rawContent;
+      const preview =
+        rawContent.length > 180 ? `${rawContent.slice(0, 177)}...` : rawContent;
 
       return {
         commentId: doc._id.toString(),
@@ -5192,7 +5388,10 @@ export class AdminService {
     };
   }
 
-  async getDirectModerationTargetDetail(type: string, targetId: string): Promise<any> {
+  async getDirectModerationTargetDetail(
+    type: string,
+    targetId: string,
+  ): Promise<any> {
     if (!['post', 'comment', 'user'].includes(type)) {
       throw new BadRequestException('Unsupported target type');
     }
@@ -5205,7 +5404,9 @@ export class AdminService {
     if (type === 'post') {
       const post = await this.postModel
         .findById(objectId)
-        .select('authorId content media visibility moderationState autoHiddenPendingReview createdAt')
+        .select(
+          'authorId content media visibility moderationState autoHiddenPendingReview createdAt',
+        )
         .lean();
       if (!post) {
         throw new NotFoundException('Post not found');
@@ -5254,7 +5455,9 @@ export class AdminService {
     if (type === 'comment') {
       const comment = await this.commentModel
         .findById(objectId)
-        .select('postId authorId content media moderationState autoHiddenPendingReview createdAt')
+        .select(
+          'postId authorId content media moderationState autoHiddenPendingReview createdAt',
+        )
         .lean();
       if (!comment) {
         throw new NotFoundException('Comment not found');
@@ -5292,12 +5495,20 @@ export class AdminService {
             comment.media && typeof comment.media === 'object'
               ? [
                   {
-                    type: (comment.media as any)?.type === 'video' ? 'video' : 'image',
-                    url: typeof (comment.media as any)?.url === 'string' ? (comment.media as any).url : '',
+                    type:
+                      (comment.media as any)?.type === 'video'
+                        ? 'video'
+                        : 'image',
+                    url:
+                      typeof (comment.media as any)?.url === 'string'
+                        ? (comment.media as any).url
+                        : '',
                     originalUrl:
-                      typeof (comment.media as any)?.metadata?.originalSecureUrl === 'string'
+                      typeof (comment.media as any)?.metadata
+                        ?.originalSecureUrl === 'string'
                         ? (comment.media as any).metadata.originalSecureUrl
-                        : typeof (comment.media as any)?.metadata?.originalUrl === 'string'
+                        : typeof (comment.media as any)?.metadata
+                              ?.originalUrl === 'string'
                           ? (comment.media as any).metadata.originalUrl
                           : null,
                   },
@@ -5355,7 +5566,9 @@ export class AdminService {
         status: user.status ?? 'active',
         strikeCount: Number(user.strikeCount ?? 0),
         interactionMutedUntil: user.interactionMutedUntil ?? null,
-        interactionMutedIndefinitely: Boolean(user.interactionMutedIndefinitely),
+        interactionMutedIndefinitely: Boolean(
+          user.interactionMutedIndefinitely,
+        ),
         accountLimitedUntil: user.accountLimitedUntil ?? null,
         accountLimitedIndefinitely: Boolean(user.accountLimitedIndefinitely),
         suspendedUntil: user.suspendedUntil ?? null,
@@ -5410,19 +5623,9 @@ export class AdminService {
       adminId,
     } = params;
 
-    const normalizedType = type === 'comment' || type === 'user' ? type : 'post';
-    const resolvedAction =
-      (action as
-        | 'no_violation'
-        | 'remove_post'
-        | 'restrict_post'
-        | 'delete_comment'
-        | 'warn'
-        | 'mute_interaction'
-        | 'suspend_user'
-        | 'limit_account'
-        | 'violation'
-        | undefined) ?? 'violation';
+    const normalizedType =
+      type === 'comment' || type === 'user' ? type : 'post';
+    const resolvedAction = action ?? 'violation';
 
     // If this target still has open reports, run the exact resolve-report pipeline
     // so audit, strike, notifications, and status transitions stay fully consistent.
@@ -5447,7 +5650,13 @@ export class AdminService {
     }
 
     const allowedActionsByType: Record<string, string[]> = {
-      post: ['no_violation', 'remove_post', 'restrict_post', 'warn', 'violation'],
+      post: [
+        'no_violation',
+        'remove_post',
+        'restrict_post',
+        'warn',
+        'violation',
+      ],
       comment: [
         'no_violation',
         'delete_comment',
@@ -5465,8 +5674,12 @@ export class AdminService {
       ],
     };
 
-    if (!(allowedActionsByType[normalizedType] ?? []).includes(resolvedAction)) {
-      throw new BadRequestException('Action is not allowed for this target type');
+    if (
+      !(allowedActionsByType[normalizedType] ?? []).includes(resolvedAction)
+    ) {
+      throw new BadRequestException(
+        'Action is not allowed for this target type',
+      );
     }
 
     if (!Types.ObjectId.isValid(targetId)) {
@@ -5591,12 +5804,14 @@ export class AdminService {
             ? resolvedLimitExpiresAt
             : null;
 
-    const resolvedSeverity =
-      ['no_violation', 'warn', 'mute_interaction', 'suspend_user'].includes(
-        resolvedAction,
-      )
-        ? null
-        : severity ?? null;
+    const resolvedSeverity = [
+      'no_violation',
+      'warn',
+      'mute_interaction',
+      'suspend_user',
+    ].includes(resolvedAction)
+      ? null
+      : (severity ?? null);
 
     const targetObjectId = new Types.ObjectId(targetId);
     const moderatorObjectId = new Types.ObjectId(adminId);
@@ -5772,7 +5987,11 @@ export class AdminService {
       }
     }
 
-    if (resolvedAction === 'mute_interaction' && offenderId && resolvedMuteExpiresAt) {
+    if (
+      resolvedAction === 'mute_interaction' &&
+      offenderId &&
+      resolvedMuteExpiresAt
+    ) {
       await this.userModel
         .updateOne(
           { _id: offenderId },
@@ -5790,7 +6009,11 @@ export class AdminService {
       );
     }
 
-    if (resolvedAction === 'mute_interaction' && offenderId && resolvedMuteUntilTurnOn) {
+    if (
+      resolvedAction === 'mute_interaction' &&
+      offenderId &&
+      resolvedMuteUntilTurnOn
+    ) {
       await this.userModel
         .updateOne(
           { _id: offenderId },
@@ -5859,19 +6082,24 @@ export class AdminService {
       }
     }
 
-    const strikeIncrement =
-      ['warn', 'mute_interaction'].includes(resolvedAction)
-        ? 0
-        : resolvedAction === 'suspend_user'
+    const strikeIncrement = ['warn', 'mute_interaction'].includes(
+      resolvedAction,
+    )
+      ? 0
+      : resolvedAction === 'suspend_user'
+        ? 3
+        : resolvedSeverity === 'high'
           ? 3
-          : resolvedSeverity === 'high'
-            ? 3
-            : resolvedSeverity === 'medium'
-              ? 2
-              : 1;
+          : resolvedSeverity === 'medium'
+            ? 2
+            : 1;
 
     let strikeTotalAfter: number | null = null;
-    if (resolvedAction !== 'no_violation' && offenderId && strikeIncrement > 0) {
+    if (
+      resolvedAction !== 'no_violation' &&
+      offenderId &&
+      strikeIncrement > 0
+    ) {
       const offender = await this.userModel
         .findOneAndUpdate(
           { _id: offenderId },
@@ -6076,21 +6304,16 @@ export class AdminService {
     } = params;
     const normalizedType =
       type === 'comment' || type === 'user' ? type : 'post';
-    const resolvedAction =
-      (action as
-        | 'no_violation'
-        | 'remove_post'
-        | 'restrict_post'
-        | 'delete_comment'
-        | 'warn'
-        | 'mute_interaction'
-        | 'suspend_user'
-        | 'limit_account'
-        | 'violation'
-        | undefined) ?? 'violation';
+    const resolvedAction = action ?? 'violation';
 
     const allowedActionsByType: Record<string, string[]> = {
-      post: ['no_violation', 'remove_post', 'restrict_post', 'warn', 'violation'],
+      post: [
+        'no_violation',
+        'remove_post',
+        'restrict_post',
+        'warn',
+        'violation',
+      ],
       comment: [
         'no_violation',
         'delete_comment',
@@ -6108,8 +6331,12 @@ export class AdminService {
       ],
     };
 
-    if (!(allowedActionsByType[normalizedType] ?? []).includes(resolvedAction)) {
-      throw new BadRequestException('Action is not allowed for this target type');
+    if (
+      !(allowedActionsByType[normalizedType] ?? []).includes(resolvedAction)
+    ) {
+      throw new BadRequestException(
+        'Action is not allowed for this target type',
+      );
     }
 
     if (!Types.ObjectId.isValid(targetId)) {
@@ -6230,16 +6457,18 @@ export class AdminService {
         ? resolvedMuteExpiresAt
         : resolvedAction === 'suspend_user'
           ? resolvedSuspendExpiresAt
-        : resolvedAction === 'limit_account'
-          ? resolvedLimitExpiresAt
-          : null;
+          : resolvedAction === 'limit_account'
+            ? resolvedLimitExpiresAt
+            : null;
 
-    const resolvedSeverity =
-      ['no_violation', 'warn', 'mute_interaction', 'suspend_user'].includes(
-        resolvedAction,
-      )
-        ? null
-        : severity ?? null;
+    const resolvedSeverity = [
+      'no_violation',
+      'warn',
+      'mute_interaction',
+      'suspend_user',
+    ].includes(resolvedAction)
+      ? null
+      : (severity ?? null);
 
     const targetObjectId = new Types.ObjectId(targetId);
     const moderatorObjectId = new Types.ObjectId(adminId);
@@ -6468,7 +6697,11 @@ export class AdminService {
       }
     }
 
-    if (resolvedAction === 'mute_interaction' && offenderId && resolvedMuteExpiresAt) {
+    if (
+      resolvedAction === 'mute_interaction' &&
+      offenderId &&
+      resolvedMuteExpiresAt
+    ) {
       await this.userModel
         .updateOne(
           { _id: offenderId },
@@ -6486,7 +6719,11 @@ export class AdminService {
       );
     }
 
-    if (resolvedAction === 'mute_interaction' && offenderId && resolvedMuteUntilTurnOn) {
+    if (
+      resolvedAction === 'mute_interaction' &&
+      offenderId &&
+      resolvedMuteUntilTurnOn
+    ) {
       await this.userModel
         .updateOne(
           { _id: offenderId },
@@ -6565,11 +6802,12 @@ export class AdminService {
       resolvedAt: new Date(),
     };
 
-    const strikeIncrement =
-      ['warn', 'mute_interaction'].includes(resolvedAction)
-        ? 0
-        : resolvedAction === 'suspend_user'
-          ? 3
+    const strikeIncrement = ['warn', 'mute_interaction'].includes(
+      resolvedAction,
+    )
+      ? 0
+      : resolvedAction === 'suspend_user'
+        ? 3
         : resolvedSeverity === 'high'
           ? 3
           : resolvedSeverity === 'medium'
@@ -6609,7 +6847,11 @@ export class AdminService {
         .exec();
     }
 
-    if (resolvedAction !== 'no_violation' && offenderId && strikeIncrement > 0) {
+    if (
+      resolvedAction !== 'no_violation' &&
+      offenderId &&
+      strikeIncrement > 0
+    ) {
       const offender = await this.userModel
         .findOneAndUpdate(
           { _id: offenderId },
@@ -6812,7 +7054,9 @@ export class AdminService {
           ? 'post'
           : null;
     if (!normalizedType) {
-      throw new BadRequestException('Rollback is only available for post/comment');
+      throw new BadRequestException(
+        'Rollback is only available for post/comment',
+      );
     }
     if (!Types.ObjectId.isValid(params.targetId)) {
       throw new BadRequestException('Invalid target id');
@@ -6828,7 +7072,9 @@ export class AdminService {
         throw new NotFoundException('Post not found');
       }
       if (!post.autoHiddenPendingReview) {
-        throw new BadRequestException('Post is not in auto-hidden pending state');
+        throw new BadRequestException(
+          'Post is not in auto-hidden pending state',
+        );
       }
       await this.postModel
         .updateOne(
@@ -6859,7 +7105,9 @@ export class AdminService {
         throw new NotFoundException('Comment not found');
       }
       if (!comment.autoHiddenPendingReview) {
-        throw new BadRequestException('Comment is not in auto-hidden pending state');
+        throw new BadRequestException(
+          'Comment is not in auto-hidden pending state',
+        );
       }
       await this.commentModel
         .updateOne(

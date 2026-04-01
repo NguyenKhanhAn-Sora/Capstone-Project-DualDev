@@ -14,7 +14,12 @@ export class AdEngagementEvent extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Post', default: null, index: true })
   renderedPostId?: Types.ObjectId | null;
 
-  @Prop({ type: String, enum: ['impression', 'dwell', 'cta_click'], required: true, index: true })
+  @Prop({
+    type: String,
+    enum: ['impression', 'dwell', 'cta_click'],
+    required: true,
+    index: true,
+  })
   eventType: AdEngagementEventType;
 
   @Prop({ type: String, required: true, trim: true, index: true })
@@ -33,9 +38,14 @@ export class AdEngagementEvent extends Document {
   updatedAt: Date;
 }
 
-export const AdEngagementEventSchema = SchemaFactory.createForClass(AdEngagementEvent);
+export const AdEngagementEventSchema =
+  SchemaFactory.createForClass(AdEngagementEvent);
 
-AdEngagementEventSchema.index({ promotedPostId: 1, eventType: 1, createdAt: -1 });
+AdEngagementEventSchema.index({
+  promotedPostId: 1,
+  eventType: 1,
+  createdAt: -1,
+});
 AdEngagementEventSchema.index({ userId: 1, promotedPostId: 1, createdAt: -1 });
 AdEngagementEventSchema.index(
   { userId: 1, promotedPostId: 1, sessionId: 1, eventType: 1 },

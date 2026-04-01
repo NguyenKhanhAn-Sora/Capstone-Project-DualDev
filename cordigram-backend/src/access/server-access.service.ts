@@ -15,7 +15,9 @@ import { Server, ServerAccessMode } from '../servers/server.schema';
 import { Rule } from './rule.schema';
 import { UserServer, UserServerStatus } from './user-server.schema';
 
-function calcAgeFromBirthdate(birthdate: Date | null | undefined): number | null {
+function calcAgeFromBirthdate(
+  birthdate: Date | null | undefined,
+): number | null {
   if (!birthdate) return null;
   const now = new Date();
   let age = now.getFullYear() - birthdate.getFullYear();
@@ -30,7 +32,8 @@ function defaultStatusForAccessMode(
 ): { status: UserServerStatus; acceptedRules: boolean } {
   // Age restriction sẽ được xử lý trước.
   const acceptedRules = !serverHasRules;
-  if (accessMode === 'apply') return { status: 'pending', acceptedRules: false };
+  if (accessMode === 'apply')
+    return { status: 'pending', acceptedRules: false };
   // discoverable hoặc invite_only: vào thẳng accepted nhưng acceptedRules tùy hasRules
   return { status: 'accepted', acceptedRules };
 }
@@ -47,7 +50,9 @@ export class ServerAccessService {
   ) {}
 
   private getEffectiveAccessMode(server: Server): ServerAccessMode {
-    const fromField = (server as any).accessMode as ServerAccessMode | undefined;
+    const fromField = (server as any).accessMode as
+      | ServerAccessMode
+      | undefined;
     if (fromField) return fromField;
     return server.isPublic ? 'discoverable' : 'invite_only';
   }
@@ -92,13 +97,16 @@ export class ServerAccessService {
   }> {
     const server = await this.serversService.getServerById(serverId);
     const isOwner = String(server.ownerId) === String(requesterUserId);
-    if (!isOwner) throw new ForbiddenException('Chỉ chủ máy chủ mới có thể chỉnh sửa');
+    if (!isOwner)
+      throw new ForbiddenException('Chỉ chủ máy chủ mới có thể chỉnh sửa');
 
     const prevHasRules = Boolean((server as any).hasRules);
 
     if (patch.accessMode) (server as any).accessMode = patch.accessMode;
-    if (patch.isAgeRestricted !== undefined) (server as any).isAgeRestricted = patch.isAgeRestricted;
-    if (patch.hasRules !== undefined) (server as any).hasRules = Boolean(patch.hasRules);
+    if (patch.isAgeRestricted !== undefined)
+      (server as any).isAgeRestricted = patch.isAgeRestricted;
+    if (patch.hasRules !== undefined)
+      (server as any).hasRules = Boolean(patch.hasRules);
 
     // Compatibility: sync isPublic with accessMode
     const effectiveMode = this.getEffectiveAccessMode(server);
@@ -128,13 +136,19 @@ export class ServerAccessService {
     };
   }
 
-  async addRule(serverId: string, requesterUserId: string, content: string): Promise<{ id: string; content: string }> {
+  async addRule(
+    serverId: string,
+    requesterUserId: string,
+    content: string,
+  ): Promise<{ id: string; content: string }> {
     const server = await this.serversService.getServerById(serverId);
     const isOwner = String(server.ownerId) === String(requesterUserId);
-    if (!isOwner) throw new ForbiddenException('Chỉ chủ máy chủ mới có thể thêm quy định');
+    if (!isOwner)
+      throw new ForbiddenException('Chỉ chủ máy chủ mới có thể thêm quy định');
 
     const trimmed = (content ?? '').trim();
-    if (!trimmed) throw new BadRequestException('Nội dung quy định không được rỗng');
+    if (!trimmed)
+      throw new BadRequestException('Nội dung quy định không được rỗng');
 
     const rule = await new this.ruleModel({
       serverId: new Types.ObjectId(serverId),
@@ -144,7 +158,10 @@ export class ServerAccessService {
     return { id: String(rule._id), content: rule.content };
   }
 
-  async getMyStatus(serverId: string, userId: string): Promise<{
+  async getMyStatus(
+    serverId: string,
+    userId: string,
+  ): Promise<{
     status: UserServerStatus | null;
     acceptedRules: boolean;
     hasRules: boolean;
@@ -166,7 +183,8 @@ export class ServerAccessService {
       .exec();
 
     if (!doc) {
-      const fallbackStatus: UserServerStatus = accessMode === 'apply' ? 'pending' : 'accepted';
+      const fallbackStatus: UserServerStatus =
+        accessMode === 'apply' ? 'pending' : 'accepted';
       return {
         status: fallbackStatus,
         acceptedRules: !hasRules,
@@ -217,7 +235,10 @@ export class ServerAccessService {
       await this.ensureMemberInServer(serverId, userId, 'member');
       const updated = await this.userServerModel
         .findOneAndUpdate(
-          { userId: new Types.ObjectId(userId), serverId: new Types.ObjectId(serverId) },
+          {
+            userId: new Types.ObjectId(userId),
+            serverId: new Types.ObjectId(serverId),
+          },
           { $set: { status: 'rejected', acceptedRules: false } },
           { upsert: true, new: true },
         )
@@ -231,7 +252,8 @@ export class ServerAccessService {
     // resolve status theo accessMode
     if (accessMode === 'invite_only') {
       // verify có pending invite
-      const pendings = await this.serverInvitesService.getPendingForUser(userId);
+      const pendings =
+        await this.serverInvitesService.getPendingForUser(userId);
       const hasPending = (pendings as any[]).some((inv) => {
         const sid =
           inv?.serverId?._id?.toString?.() ??
@@ -239,7 +261,8 @@ export class ServerAccessService {
           inv?.serverId;
         return String(sid) === String(serverId);
       });
-      if (!hasPending) throw new ForbiddenException('Bạn cần có invite link để tham gia');
+      if (!hasPending)
+        throw new ForbiddenException('Bạn cần có invite link để tham gia');
 
       await this.serverInvitesService.acceptByServer(serverId, userId);
     } else if (accessMode === 'apply') {
@@ -252,12 +275,18 @@ export class ServerAccessService {
     }
 
     const { status, acceptedRules } = statusOverride
-      ? { status: statusOverride, acceptedRules: acceptedRulesOverride as boolean }
+      ? {
+          status: statusOverride,
+          acceptedRules: acceptedRulesOverride as boolean,
+        }
       : defaultStatusForAccessMode(accessMode, serverHasRules);
 
     const updated = await this.userServerModel
       .findOneAndUpdate(
-        { userId: new Types.ObjectId(userId), serverId: new Types.ObjectId(serverId) },
+        {
+          userId: new Types.ObjectId(userId),
+          serverId: new Types.ObjectId(serverId),
+        },
         {
           $set: {
             status,
@@ -275,10 +304,15 @@ export class ServerAccessService {
   /**
    * Owner approve user pending (kết quả status=accepted).
    */
-  async approveUser(serverId: string, requesterUserId: string, targetUserId: string): Promise<UserServer> {
+  async approveUser(
+    serverId: string,
+    requesterUserId: string,
+    targetUserId: string,
+  ): Promise<UserServer> {
     const server = await this.serversService.getServerById(serverId);
     const isOwner = String(server.ownerId) === String(requesterUserId);
-    if (!isOwner) throw new ForbiddenException('Chỉ chủ máy chủ mới duyệt được');
+    if (!isOwner)
+      throw new ForbiddenException('Chỉ chủ máy chủ mới duyệt được');
 
     const target = await this.userServerModel
       .findOne({
@@ -295,7 +329,10 @@ export class ServerAccessService {
     const serverHasRules = Boolean((server as any).hasRules);
     const updated = await this.userServerModel
       .findOneAndUpdate(
-        { userId: new Types.ObjectId(targetUserId), serverId: new Types.ObjectId(serverId) },
+        {
+          userId: new Types.ObjectId(targetUserId),
+          serverId: new Types.ObjectId(serverId),
+        },
         {
           $set: {
             status: 'accepted',
@@ -328,11 +365,16 @@ export class ServerAccessService {
     if (!user) {
       const isMember = this.serversService.isMember(server as any, userId);
       if (!isMember) {
-        throw new ForbiddenException('Bạn chưa được chấp nhận để truy cập chat');
+        throw new ForbiddenException(
+          'Bạn chưa được chấp nhận để truy cập chat',
+        );
       }
       const created = await this.userServerModel
         .findOneAndUpdate(
-          { userId: new Types.ObjectId(userId), serverId: new Types.ObjectId(serverId) },
+          {
+            userId: new Types.ObjectId(userId),
+            serverId: new Types.ObjectId(serverId),
+          },
           { $set: { status: 'accepted', acceptedRules: true } },
           { upsert: true, new: true },
         )
@@ -351,7 +393,10 @@ export class ServerAccessService {
       // server không bật rules thì coi như đã accept
       const updated = await this.userServerModel
         .findOneAndUpdate(
-          { userId: new Types.ObjectId(userId), serverId: new Types.ObjectId(serverId) },
+          {
+            userId: new Types.ObjectId(userId),
+            serverId: new Types.ObjectId(serverId),
+          },
           { $set: { acceptedRules: true } },
           { upsert: true, new: true },
         )
@@ -365,7 +410,10 @@ export class ServerAccessService {
 
     const updated = await this.userServerModel
       .findOneAndUpdate(
-        { userId: new Types.ObjectId(userId), serverId: new Types.ObjectId(serverId) },
+        {
+          userId: new Types.ObjectId(userId),
+          serverId: new Types.ObjectId(serverId),
+        },
         { $set: { acceptedRules: true } },
         { upsert: true, new: true },
       )
@@ -375,12 +423,19 @@ export class ServerAccessService {
     return updated as any;
   }
 
-  private async ensureMemberInServer(serverId: string, userId: string, role: 'member' | 'moderator' | 'owner' = 'member') {
+  private async ensureMemberInServer(
+    serverId: string,
+    userId: string,
+    role: 'member' | 'moderator' | 'owner' = 'member',
+  ) {
     const server = await this.serversService.getServerById(serverId);
     if (this.serversService.isMember(server as any, userId)) return;
     // addMemberToServer chỉ chấp nhận moderator/member trong code hiện tại.
     // Ở đây chỉ dùng member.
-    await this.serversService.addMemberToServer(serverId, userId, role === 'owner' ? 'member' : 'member');
+    await this.serversService.addMemberToServer(
+      serverId,
+      userId,
+      role === 'owner' ? 'member' : 'member',
+    );
   }
 }
-

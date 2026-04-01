@@ -202,7 +202,10 @@ export class MediaModerationService {
     jobId: string,
   ): Promise<ContentModerationDetection[]> {
     const timeoutMs = Math.max(5000, this.config.moderationVideoMaxWaitMs);
-    const pollIntervalMs = Math.max(500, this.config.moderationVideoPollIntervalMs);
+    const pollIntervalMs = Math.max(
+      500,
+      this.config.moderationVideoPollIntervalMs,
+    );
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < timeoutMs) {
@@ -224,7 +227,9 @@ export class MediaModerationService {
       }
 
       if (status === 'FAILED') {
-        throw new Error(page.StatusMessage || 'Rekognition video moderation failed');
+        throw new Error(
+          page.StatusMessage || 'Rekognition video moderation failed',
+        );
       }
 
       await this.sleep(pollIntervalMs);
@@ -302,7 +307,9 @@ export class MediaModerationService {
         violence = Math.max(violence, item.confidence);
       }
 
-      if (MediaModerationService.GORE_LABELS.some((key) => merged.includes(key))) {
+      if (
+        MediaModerationService.GORE_LABELS.some((key) => merged.includes(key))
+      ) {
         gore = Math.max(gore, item.confidence);
       }
 
@@ -325,8 +332,14 @@ export class MediaModerationService {
   }
 
   private resolveDecision(scores: Record<string, number>): ModerationDecision {
-    const rejectThreshold = this.clampThreshold(this.config.moderationRejectThreshold, 0.82);
-    const blurThreshold = this.clampThreshold(this.config.moderationBlurThreshold, 0.55);
+    const rejectThreshold = this.clampThreshold(
+      this.config.moderationRejectThreshold,
+      0.82,
+    );
+    const blurThreshold = this.clampThreshold(
+      this.config.moderationBlurThreshold,
+      0.55,
+    );
 
     if (scores.nudity >= rejectThreshold) {
       return 'reject';
@@ -347,8 +360,14 @@ export class MediaModerationService {
     decision: ModerationDecision,
     scores: Record<string, number>,
   ): string[] {
-    const blurThreshold = this.clampThreshold(this.config.moderationBlurThreshold, 0.55);
-    const rejectThreshold = this.clampThreshold(this.config.moderationRejectThreshold, 0.82);
+    const blurThreshold = this.clampThreshold(
+      this.config.moderationBlurThreshold,
+      0.55,
+    );
+    const rejectThreshold = this.clampThreshold(
+      this.config.moderationRejectThreshold,
+      0.82,
+    );
 
     if (decision === 'reject') {
       return [
@@ -378,7 +397,9 @@ export class MediaModerationService {
         : ['violence/gore/weapons signal reached blur threshold'];
     }
 
-    return ['no reject-level nudity and no blur-level violence/gore/weapons signals'];
+    return [
+      'no reject-level nudity and no blur-level violence/gore/weapons signals',
+    ];
   }
 
   private clampThreshold(value: number, fallback: number): number {
@@ -507,11 +528,14 @@ export class MediaModerationService {
       });
       form.append('file', file, params.filename ?? fallbackFilename);
 
-      const response = await fetch(`${this.config.moderationServiceUrl}${endpoint}`, {
-        method: 'POST',
-        body: form,
-        signal: controller.signal,
-      });
+      const response = await fetch(
+        `${this.config.moderationServiceUrl}${endpoint}`,
+        {
+          method: 'POST',
+          body: form,
+          signal: controller.signal,
+        },
+      );
 
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as {

@@ -38,6 +38,8 @@ export interface Server {
   name: string;
   description?: string;
   avatarUrl?: string;
+  bannerUrl?: string;
+  profileTraits?: Array<{ emoji: string; text: string }>;
   template?: ServerTemplate;
   purpose?: ServerPurpose;
   ownerId: string;
@@ -52,6 +54,53 @@ export interface Server {
   isPublic?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ServerProfileStats {
+  onlineCount: number;
+  memberCount: number;
+  createdAt: string;
+}
+
+export interface ServerAuditLogRow {
+  _id: string;
+  actorUserId?: string;
+  action: string;
+  targetType?: "server" | "channel" | "member";
+  targetId?: string;
+  targetName?: string;
+  changes?: Array<{ field: string; from?: string | null; to?: string | null }>;
+  createdAt: string;
+}
+
+export interface ServerSafetySettings {
+  spamProtection: {
+    verificationLevel: "low" | "medium" | "high";
+    hideMutedDm: boolean;
+    filterDmSpam: boolean;
+    warnExternalLinks: boolean;
+    hideSpamMessages: boolean;
+    deleteSpammerMessages: boolean;
+  };
+  automod: {
+    bannedWords: string[];
+    blockInUsername: boolean;
+    bannedWordResponse: "warn" | "delete";
+    exemptRoleIds: string[];
+    spamSuspectEnabled: boolean;
+    spamSuspectResponse: "warn" | "block";
+    spamAllowedChannelIds: string[];
+    spamAllowedRoleIds: string[];
+    mentionSpamLimit: number;
+    mentionSpamWindowMinutes: number;
+    mentionAttackDetection: boolean;
+    mentionSpamResponse: "warn" | "block24h" | "timeout";
+    mentionTimeoutMinutes: number;
+  };
+  privileges: {
+    bypassRoleIds: string[];
+    managerRoleIds: string[];
+  };
 }
 
 export interface ServerCategory {
@@ -172,16 +221,72 @@ export async function getServer(serverId: string): Promise<Server> {
   return response.json();
 }
 
+export async function getServerProfileStats(serverId: string): Promise<ServerProfileStats> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/profile-stats`, {
+    headers: getHeaders(),
+  });
+  if (!response.ok) throw new Error("Không tải được thống kê máy chủ");
+  return response.json();
+}
+
+export async function getServerAuditLogs(
+  serverId: string,
+  query?: { action?: string; actorUserId?: string; limit?: number; before?: string },
+): Promise<ServerAuditLogRow[]> {
+  const params = new URLSearchParams();
+  if (query?.action) params.set("action", query.action);
+  if (query?.actorUserId) params.set("actorUserId", query.actorUserId);
+  if (query?.limit) params.set("limit", String(query.limit));
+  if (query?.before) params.set("before", query.before);
+  const qs = params.toString();
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/audit-logs${qs ? `?${qs}` : ""}`, {
+    headers: getHeaders(),
+  });
+  if (!response.ok) throw new Error("Không tải được nhật ký chỉnh sửa");
+  return response.json();
+}
+
+export async function getServerSafetySettings(serverId: string): Promise<ServerSafetySettings> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/safety-settings`, {
+    headers: getHeaders(),
+  });
+  if (!response.ok) throw new Error("Không tải được thiết lập an toàn");
+  return response.json();
+}
+
+export async function updateServerSafetySettings(
+  serverId: string,
+  patch: Partial<ServerSafetySettings>,
+): Promise<ServerSafetySettings> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/safety-settings`, {
+    method: "PATCH",
+    headers: getHeaders(),
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) throw new Error("Không cập nhật được thiết lập an toàn");
+  return response.json();
+}
+
 export async function updateServer(
   serverId: string,
-  name?: string,
-  description?: string,
-  avatarUrl?: string,
+  name?: string | null,
+  description?: string | null,
+  avatarUrl?: string | null,
+  extra?: {
+    bannerUrl?: string | null;
+    profileTraits?: Array<{ emoji: string; text: string }>;
+  },
 ): Promise<Server> {
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}`, {
     method: "PATCH",
     headers: getHeaders(),
-    body: JSON.stringify({ name, description, avatarUrl }),
+    body: JSON.stringify({
+      name,
+      description,
+      avatarUrl,
+      bannerUrl: extra?.bannerUrl,
+      profileTraits: extra?.profileTraits,
+    }),
   });
 
   if (!response.ok) {
@@ -1410,7 +1515,8 @@ export async function getMessages(
   });
 
   if (!response.ok) {
-    throw new Error("Không tải được tin nhắn");
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được tin nhắn");
   }
 
   return response.json();

@@ -9,7 +9,10 @@ export class FollowsService {
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
   ) {}
 
-  async follow(followerId: Types.ObjectId, followeeId: Types.ObjectId): Promise<Follow> {
+  async follow(
+    followerId: Types.ObjectId,
+    followeeId: Types.ObjectId,
+  ): Promise<Follow> {
     // Check if already following
     const existing = await this.followModel.findOne({
       followerId,
@@ -23,7 +26,10 @@ export class FollowsService {
     return this.followModel.create({ followerId, followeeId });
   }
 
-  async unfollow(followerId: Types.ObjectId, followeeId: Types.ObjectId): Promise<void> {
+  async unfollow(
+    followerId: Types.ObjectId,
+    followeeId: Types.ObjectId,
+  ): Promise<void> {
     await this.followModel.deleteOne({ followerId, followeeId });
   }
 
@@ -43,7 +49,10 @@ export class FollowsService {
     return follows.map((f) => f.followerId);
   }
 
-  async isFollowing(followerId: Types.ObjectId, followeeId: Types.ObjectId): Promise<boolean> {
+  async isFollowing(
+    followerId: Types.ObjectId,
+    followeeId: Types.ObjectId,
+  ): Promise<boolean> {
     const follow = await this.followModel.findOne({
       followerId,
       followeeId,

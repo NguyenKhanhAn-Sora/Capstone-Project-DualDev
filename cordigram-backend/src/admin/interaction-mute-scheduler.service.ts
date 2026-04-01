@@ -25,7 +25,9 @@ export class InteractionMuteSchedulerService
   private queue?: Queue<UnmuteJobData>;
   private worker?: Worker<UnmuteJobData>;
 
-  constructor(@InjectModel(User.name) private readonly userModel: Model<User>) {}
+  constructor(
+    @InjectModel(User.name) private readonly userModel: Model<User>,
+  ) {}
 
   onModuleInit() {
     this.initQueue();
@@ -81,7 +83,9 @@ export class InteractionMuteSchedulerService
     );
 
     this.worker.on('failed', (job, err) => {
-      this.logger.error(`Interaction unmute job failed ${job?.id}: ${err?.message}`);
+      this.logger.error(
+        `Interaction unmute job failed ${job?.id}: ${err?.message}`,
+      );
     });
   }
 
@@ -107,7 +111,12 @@ export class InteractionMuteSchedulerService
       await this.userModel
         .updateOne(
           { _id: userObjectId },
-          { $set: { interactionMutedUntil: null, interactionMutedIndefinitely: false } },
+          {
+            $set: {
+              interactionMutedUntil: null,
+              interactionMutedIndefinitely: false,
+            },
+          },
         )
         .exec();
       return;
@@ -131,7 +140,12 @@ export class InteractionMuteSchedulerService
     await this.userModel
       .updateOne(
         { _id: userObjectId },
-        { $set: { interactionMutedUntil: null, interactionMutedIndefinitely: false } },
+        {
+          $set: {
+            interactionMutedUntil: null,
+            interactionMutedIndefinitely: false,
+          },
+        },
       )
       .exec();
   }

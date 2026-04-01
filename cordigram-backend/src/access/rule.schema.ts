@@ -13,4 +13,3 @@ export class Rule extends Document {
 export const RuleSchema = SchemaFactory.createForClass(Rule);
 
 RuleSchema.index({ serverId: 1, content: 1 });
-

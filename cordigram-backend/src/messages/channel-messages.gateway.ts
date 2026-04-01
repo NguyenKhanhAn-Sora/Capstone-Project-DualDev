@@ -84,11 +84,7 @@ export class ChannelMessagesGateway
     this.server.to(`channel:${channelId}`).emit('new-message', { message });
   }
 
-  emitReactionUpdate(
-    channelId: string,
-    messageId: string,
-    reactions: any[],
-  ) {
+  emitReactionUpdate(channelId: string, messageId: string, reactions: any[]) {
     this.server
       .to(`channel:${channelId}`)
       .emit('reaction-updated', { messageId, reactions });

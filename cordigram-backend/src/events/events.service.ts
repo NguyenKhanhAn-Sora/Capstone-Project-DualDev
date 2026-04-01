@@ -34,13 +34,9 @@ export class EventsService {
     if (!server) {
       throw new NotFoundException('Server not found');
     }
-    const member = server.members.find(
-      (m) => m.userId.toString() === userId,
-    );
+    const member = server.members.find((m) => m.userId.toString() === userId);
     if (!member || !['owner', 'moderator'].includes(member.role)) {
-      throw new ForbiddenException(
-        'Only owner or moderator can create events',
-      );
+      throw new ForbiddenException('Only owner or moderator can create events');
     }
 
     const startAt = new Date(dto.startAt);
@@ -114,16 +110,23 @@ export class EventsService {
   }
 
   /** Start event (owner/moderator can start early) */
-  async startEvent(serverId: string, eventId: string, userId: string): Promise<ServerEvent> {
+  async startEvent(
+    serverId: string,
+    eventId: string,
+    userId: string,
+  ): Promise<ServerEvent> {
     const server = await this.serverModel.findById(serverId);
     if (!server) throw new NotFoundException('Server not found');
     const member = server.members.find((m) => m.userId.toString() === userId);
     if (!member || !['owner', 'moderator'].includes(member.role)) {
-      throw new ForbiddenException('Only owner or moderator can start the event');
+      throw new ForbiddenException(
+        'Only owner or moderator can start the event',
+      );
     }
     const event = await this.eventModel.findById(eventId).exec();
     if (!event) throw new NotFoundException('Event not found');
-    if (event.serverId.toString() !== serverId) throw new NotFoundException('Event not found');
+    if (event.serverId.toString() !== serverId)
+      throw new NotFoundException('Event not found');
     if (event.status === 'live' || event.status === 'ended') {
       throw new BadRequestException('Event cannot be started');
     }
@@ -132,7 +135,11 @@ export class EventsService {
   }
 
   /** End event (owner/moderator) */
-  async endEvent(serverId: string, eventId: string, userId: string): Promise<ServerEvent> {
+  async endEvent(
+    serverId: string,
+    eventId: string,
+    userId: string,
+  ): Promise<ServerEvent> {
     const server = await this.serverModel.findById(serverId);
     if (!server) throw new NotFoundException('Server not found');
     const member = server.members.find((m) => m.userId.toString() === userId);
@@ -141,7 +148,8 @@ export class EventsService {
     }
     const event = await this.eventModel.findById(eventId).exec();
     if (!event) throw new NotFoundException('Event not found');
-    if (event.serverId.toString() !== serverId) throw new NotFoundException('Event not found');
+    if (event.serverId.toString() !== serverId)
+      throw new NotFoundException('Event not found');
     if (event.status !== 'live') {
       throw new BadRequestException('Event is not live');
     }
@@ -180,7 +188,12 @@ export class EventsService {
       description: string | null;
       channelId: { name: string; type: string } | null;
     };
-    server: { _id: string; name: string; isPublic: boolean; avatarUrl: string | null };
+    server: {
+      _id: string;
+      name: string;
+      isPublic: boolean;
+      avatarUrl: string | null;
+    };
     isMember: boolean;
   }> {
     const event = await this.eventModel

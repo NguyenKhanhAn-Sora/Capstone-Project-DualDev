@@ -36,7 +36,10 @@ export class DirectMessagesGateway
       const [totalUnread, conversationUnread] = await Promise.all([
         this.directMessagesService.getUnreadCount(toUserId),
         fromUserId
-          ? this.directMessagesService.getUnreadCountByUser(toUserId, fromUserId)
+          ? this.directMessagesService.getUnreadCountByUser(
+              toUserId,
+              fromUserId,
+            )
           : Promise.resolve(undefined),
       ]);
       this.server.to(socketId).emit('dm-unread-count', {

@@ -44,5 +44,56 @@ export class AuditLogService {
       .lean()
       .exec();
   }
-}
 
+  async logServerEvent(params: {
+    serverId: string;
+    actorUserId: string;
+    action:
+      | 'server.update'
+      | 'server.safety.update'
+      | 'channel.create'
+      | 'channel.update'
+      | 'channel.delete';
+    targetType: 'server' | 'channel' | 'member';
+    targetId: string;
+    targetName?: string;
+    changes?: Array<{ field: string; from?: unknown; to?: unknown }>;
+  }): Promise<void> {
+    await this.auditLogModel.create({
+      serverId: new Types.ObjectId(params.serverId),
+      actorUserId: new Types.ObjectId(params.actorUserId),
+      action: params.action,
+      targetType: params.targetType,
+      targetId: params.targetId,
+      targetName: params.targetName,
+      changes: (params.changes || []).map((c) => ({
+        field: c.field,
+        from: c.from == null ? null : String(c.from),
+        to: c.to == null ? null : String(c.to),
+      })),
+    });
+  }
+
+  async getServerAuditLogs(params: {
+    serverId: string;
+    action?: string;
+    actorUserId?: string;
+    limit?: number;
+    before?: string;
+  }) {
+    const q: Record<string, any> = {
+      serverId: new Types.ObjectId(params.serverId),
+    };
+    if (params.action) q.action = params.action;
+    if (params.actorUserId)
+      q.actorUserId = new Types.ObjectId(params.actorUserId);
+    if (params.before) q.createdAt = { $lt: new Date(params.before) };
+    const limit = Math.min(Math.max(params.limit || 50, 1), 100);
+    return this.auditLogModel
+      .find(q)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean()
+      .exec();
+  }
+}

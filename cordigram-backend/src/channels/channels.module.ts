@@ -9,6 +9,7 @@ import {
 } from './channel-category.schema';
 import { Server, ServerSchema } from '../servers/server.schema';
 import { RolesModule } from '../roles/roles.module';
+import { AuditLogModule } from '../audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { RolesModule } from '../roles/roles.module';
       { name: Server.name, schema: ServerSchema },
     ]),
     forwardRef(() => RolesModule),
+    AuditLogModule,
   ],
   providers: [ChannelsService],
   controllers: [ChannelsController],

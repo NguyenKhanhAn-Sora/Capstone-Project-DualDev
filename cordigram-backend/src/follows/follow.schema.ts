@@ -12,4 +12,3 @@ export class Follow extends Document {
 
 export const FollowSchema = SchemaFactory.createForClass(Follow);
 FollowSchema.index({ followerId: 1, followeeId: 1 }, { unique: true });
-

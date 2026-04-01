@@ -1,7 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
-export type ChannelMessageType = 'text' | 'gif' | 'sticker' | 'voice' | 'system' | 'welcome';
+export type ChannelMessageType =
+  | 'text'
+  | 'gif'
+  | 'sticker'
+  | 'voice'
+  | 'system'
+  | 'welcome';
 
 @Schema({ timestamps: true })
 export class Message extends Document {

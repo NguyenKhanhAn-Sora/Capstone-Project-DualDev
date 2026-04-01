@@ -50,7 +50,10 @@ export class PaymentsController {
       throw new UnauthorizedException();
     }
 
-    return this.paymentsService.getCheckoutSessionStatus(sessionId, user.userId);
+    return this.paymentsService.getCheckoutSessionStatus(
+      sessionId,
+      user.userId,
+    );
   }
 
   @Get('me/ads-created')
@@ -84,7 +87,9 @@ export class PaymentsController {
     }
 
     if (!body?.promotedPostId || !body?.eventType || !body?.sessionId) {
-      throw new BadRequestException('Missing promotedPostId, eventType, or sessionId');
+      throw new BadRequestException(
+        'Missing promotedPostId, eventType, or sessionId',
+      );
     }
 
     if (!['impression', 'dwell', 'cta_click'].includes(body.eventType)) {
@@ -92,7 +97,10 @@ export class PaymentsController {
     }
 
     if (body.eventType === 'dwell') {
-      if (typeof body.durationMs !== 'number' || !Number.isFinite(body.durationMs)) {
+      if (
+        typeof body.durationMs !== 'number' ||
+        !Number.isFinite(body.durationMs)
+      ) {
         throw new BadRequestException('durationMs is required for dwell event');
       }
       if (body.durationMs < 0) {
@@ -188,25 +196,29 @@ export class PaymentsController {
       throw new BadRequestException('Invalid action');
     }
 
-    return this.paymentsService.performAdsCampaignAction(user.userId, campaignId, {
-      action: body.action,
-      boostPackageId: body.boostPackageId,
-      extendDays: body.extendDays,
-      campaignName: body.campaignName,
-      objective: body.objective,
-      adFormat: body.adFormat,
-      primaryText: body.primaryText,
-      headline: body.headline,
-      adDescription: body.adDescription,
-      destinationUrl: body.destinationUrl,
-      cta: body.cta,
-      interests: body.interests,
-      locationText: body.locationText,
-      ageMin: body.ageMin,
-      ageMax: body.ageMax,
-      placement: body.placement,
-      mediaUrls: body.mediaUrls,
-    });
+    return this.paymentsService.performAdsCampaignAction(
+      user.userId,
+      campaignId,
+      {
+        action: body.action,
+        boostPackageId: body.boostPackageId,
+        extendDays: body.extendDays,
+        campaignName: body.campaignName,
+        objective: body.objective,
+        adFormat: body.adFormat,
+        primaryText: body.primaryText,
+        headline: body.headline,
+        adDescription: body.adDescription,
+        destinationUrl: body.destinationUrl,
+        cta: body.cta,
+        interests: body.interests,
+        locationText: body.locationText,
+        ageMin: body.ageMin,
+        ageMax: body.ageMax,
+        placement: body.placement,
+        mediaUrls: body.mediaUrls,
+      },
+    );
   }
 
   @Post('webhook')

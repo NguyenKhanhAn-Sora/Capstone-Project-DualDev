@@ -17,6 +17,7 @@ import { UsersModule } from '../users/users.module';
 import { RolesModule } from '../roles/roles.module';
 import { InboxSeen, InboxSeenSchema } from '../inbox/inbox-seen.schema';
 import { UserServer, UserServerSchema } from '../access/user-server.schema';
+import { User, UserSchema } from '../users/user.schema';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { UserServer, UserServerSchema } from '../access/user-server.schema';
       { name: Server.name, schema: ServerSchema },
       { name: InboxSeen.name, schema: InboxSeenSchema },
       { name: UserServer.name, schema: UserServerSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your_secret_key',

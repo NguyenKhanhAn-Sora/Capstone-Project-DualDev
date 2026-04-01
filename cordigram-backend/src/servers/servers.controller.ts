@@ -55,10 +55,7 @@ export class ServersController {
   }
 
   @Get(':id/members')
-  async getServerMembers(
-    @Param('id') serverId: string,
-    @Request() req: any,
-  ) {
+  async getServerMembers(@Param('id') serverId: string, @Request() req: any) {
     return this.serversService.getServerMembers(serverId, req.user.userId);
   }
 
@@ -71,7 +68,10 @@ export class ServersController {
     @Param('id') serverId: string,
     @Request() req: any,
   ) {
-    return this.serversService.getServerMembersWithRoles(serverId, req.user.userId);
+    return this.serversService.getServerMembersWithRoles(
+      serverId,
+      req.user.userId,
+    );
   }
 
   // =====================================================
@@ -115,11 +115,11 @@ export class ServersController {
    * GET /servers/:id/my-permissions
    */
   @Get(':id/my-permissions')
-  async getMyPermissions(
-    @Param('id') serverId: string,
-    @Request() req: any,
-  ) {
-    return this.serversService.getCurrentUserPermissions(serverId, req.user.userId);
+  async getMyPermissions(@Param('id') serverId: string, @Request() req: any) {
+    return this.serversService.getCurrentUserPermissions(
+      serverId,
+      req.user.userId,
+    );
   }
 
   @Get(':id/interaction-settings')
@@ -127,7 +127,10 @@ export class ServersController {
     @Param('id') serverId: string,
     @Request() req: any,
   ) {
-    return this.serversService.getInteractionSettings(serverId, req.user.userId);
+    return this.serversService.getInteractionSettings(
+      serverId,
+      req.user.userId,
+    );
   }
 
   @Patch(':id/interaction-settings')
@@ -162,7 +165,11 @@ export class ServersController {
     },
     @Request() req: any,
   ) {
-    return this.serversService.createRoleNotification(serverId, req.user.userId, body);
+    return this.serversService.createRoleNotification(
+      serverId,
+      req.user.userId,
+      body,
+    );
   }
 
   // =====================================================
@@ -218,11 +225,7 @@ export class ServersController {
     @Param('memberId') memberId: string,
     @Request() req: any,
   ) {
-    return this.serversService.unbanMember(
-      serverId,
-      req.user.userId,
-      memberId,
-    );
+    return this.serversService.unbanMember(serverId, req.user.userId, memberId);
   }
 
   /**
@@ -230,10 +233,7 @@ export class ServersController {
    * GET /servers/:id/bans
    */
   @Get(':id/bans')
-  async getBannedUsers(
-    @Param('id') serverId: string,
-    @Request() req: any,
-  ) {
+  async getBannedUsers(@Param('id') serverId: string, @Request() req: any) {
     return this.serversService.getBannedUsers(serverId, req.user.userId);
   }
 
@@ -249,7 +249,9 @@ export class ServersController {
     @Request() req: any,
   ) {
     if (!body?.durationSeconds || body.durationSeconds <= 0) {
-      throw new BadRequestException('durationSeconds must be a positive number');
+      throw new BadRequestException(
+        'durationSeconds must be a positive number',
+      );
     }
     return this.serversService.timeoutMember(
       serverId,
@@ -308,7 +310,8 @@ export class ServersController {
   @Post(':id/prune')
   async pruneMembers(
     @Param('id') serverId: string,
-    @Body() body: { days: number; role?: 'moderator' | 'member' | 'none' | 'all' },
+    @Body()
+    body: { days: number; role?: 'moderator' | 'member' | 'none' | 'all' },
     @Request() req: any,
   ) {
     const days = Number(body?.days);
@@ -329,6 +332,11 @@ export class ServersController {
     return this.serversService.getServerById(serverId);
   }
 
+  @Get(':id/profile-stats')
+  async getServerProfileStats(@Param('id') serverId: string) {
+    return this.serversService.getServerProfileStats(serverId);
+  }
+
   @Patch(':id')
   async updateServer(
     @Param('id') serverId: string,
@@ -340,6 +348,44 @@ export class ServersController {
       updateServerDto,
       req.user.userId,
     );
+  }
+
+  @Get(':id/safety-settings')
+  async getSafetySettings(@Param('id') serverId: string, @Request() req: any) {
+    return this.serversService.getServerSafetySettings(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  @Patch(':id/safety-settings')
+  async updateSafetySettings(
+    @Param('id') serverId: string,
+    @Body() body: Record<string, any>,
+    @Request() req: any,
+  ) {
+    return this.serversService.updateServerSafetySettings(
+      serverId,
+      req.user.userId,
+      body,
+    );
+  }
+
+  @Get(':id/audit-logs')
+  async getServerAuditLogs(
+    @Param('id') serverId: string,
+    @Request() req: any,
+    @Query('action') action?: string,
+    @Query('actorUserId') actorUserId?: string,
+    @Query('limit') limit?: string,
+    @Query('before') before?: string,
+  ) {
+    return this.serversService.getServerAuditLogs(serverId, req.user.userId, {
+      action,
+      actorUserId,
+      limit: limit ? Number(limit) : undefined,
+      before,
+    });
   }
 
   @Delete(':id')
@@ -366,11 +412,11 @@ export class ServersController {
   async updateAccessSettings(
     @Param('id') serverId: string,
     @Body()
-      body: {
-        accessMode?: 'invite_only' | 'apply' | 'discoverable';
-        isAgeRestricted?: boolean;
-        hasRules?: boolean;
-      },
+    body: {
+      accessMode?: 'invite_only' | 'apply' | 'discoverable';
+      isAgeRestricted?: boolean;
+      hasRules?: boolean;
+    },
     @Request() req: any,
   ) {
     if (!body) throw new BadRequestException('Missing body');
@@ -388,7 +434,11 @@ export class ServersController {
     @Request() req: any,
   ) {
     if (!body?.content) throw new BadRequestException('content is required');
-    return this.serverAccessService.addRule(serverId, req.user.userId, body.content);
+    return this.serverAccessService.addRule(
+      serverId,
+      req.user.userId,
+      body.content,
+    );
   }
 
   @Get(':id/access/my-status')

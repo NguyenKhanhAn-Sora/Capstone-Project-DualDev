@@ -120,7 +120,9 @@ export class AdminController {
       throw new BadRequestException('Missing action');
     }
 
-    if (!['cancel_campaign', 'reopen_canceled_campaign'].includes(body.action)) {
+    if (
+      !['cancel_campaign', 'reopen_canceled_campaign'].includes(body.action)
+    ) {
       throw new BadRequestException('Invalid action');
     }
 

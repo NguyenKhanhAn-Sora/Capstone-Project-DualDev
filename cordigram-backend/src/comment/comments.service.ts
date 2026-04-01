@@ -292,10 +292,7 @@ export class CommentsService {
     if (moderationState) $set.moderationState = moderationState;
 
     const deleteResult = await this.commentModel
-      .updateMany(
-        { _id: { $in: idsToDelete }, deletedAt: null },
-        { $set },
-      )
+      .updateMany({ _id: { $in: idsToDelete }, deletedAt: null }, { $set })
       .exec();
 
     const deletedCount = deleteResult.modifiedCount ?? 0;
@@ -356,11 +353,19 @@ export class CommentsService {
     if (!mutedUntil) return;
 
     const mutedDate = new Date(mutedUntil);
-    if (Number.isNaN(mutedDate.getTime()) || mutedDate.getTime() <= Date.now()) {
+    if (
+      Number.isNaN(mutedDate.getTime()) ||
+      mutedDate.getTime() <= Date.now()
+    ) {
       await this.userModel
         .updateOne(
           { _id: userObjectId },
-          { $set: { interactionMutedUntil: null, interactionMutedIndefinitely: false } },
+          {
+            $set: {
+              interactionMutedUntil: null,
+              interactionMutedIndefinitely: false,
+            },
+          },
         )
         .exec();
       return;
@@ -624,7 +629,10 @@ export class CommentsService {
   }): Promise<{ deleted: true; count: number }> {
     const postObjectId = this.asObjectId(params.postId, 'postId');
     const commentObjectId = this.asObjectId(params.commentId, 'commentId');
-    const moderatorObjectId = this.asObjectId(params.moderatorId, 'moderatorId');
+    const moderatorObjectId = this.asObjectId(
+      params.moderatorId,
+      'moderatorId',
+    );
 
     const post = await this.postModel
       .findById(postObjectId)
@@ -880,7 +888,7 @@ export class CommentsService {
 
     const userIds = slice
       .map((doc) => doc.userId?.toString?.())
-      .filter(Boolean) as string[];
+      .filter(Boolean);
 
     if (!userIds.length) {
       return { items: [], nextCursor };
@@ -1001,9 +1009,8 @@ export class CommentsService {
       dto.mentions ?? comment.mentions ?? [],
       nextContent,
     );
-    const linkPreviews = await this.linkPreviewService.extractFromText(
-      nextContent,
-    );
+    const linkPreviews =
+      await this.linkPreviewService.extractFromText(nextContent);
     const nextMentionNames = mentions.map((m) => m.username);
     const addedMentions = nextMentionNames.filter(
       (m) => !prevMentionNames.includes(m),
@@ -1192,8 +1199,8 @@ export class CommentsService {
               return { username: m };
             }
             return {
-              userId: (m as any)?.userId?.toString?.(),
-              username: (m as any)?.username,
+              userId: m?.userId?.toString?.(),
+              username: m?.username,
             };
           })
         : [],
@@ -1321,8 +1328,8 @@ export class CommentsService {
         }
 
         if (val && typeof val === 'object') {
-          const username = (val as any).username?.toString?.().trim?.();
-          const userId = (val as any).userId?.toString?.();
+          const username = val.username?.toString?.().trim?.();
+          const userId = val.userId?.toString?.();
           if (username && /^[a-z0-9_.]{1,30}$/i.test(username)) {
             const key = username.toLowerCase();
             const existing = map.get(key) ?? {};
@@ -1387,7 +1394,7 @@ export class CommentsService {
 
     const resolvedIds = profiles
       .map((p) => p.userId?.toString?.())
-      .filter(Boolean) as string[];
+      .filter(Boolean);
 
     const actorIdStr = actorId.toString();
     const recipientIds = Array.from(

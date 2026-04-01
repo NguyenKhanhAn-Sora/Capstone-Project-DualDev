@@ -1031,8 +1031,12 @@ export class NotificationsService {
       signupStage: 'completed',
     } as const;
 
-    const includeObjectIds = params.includeUserIds.map((id) => new Types.ObjectId(id));
-    const excludeObjectIds = params.excludeUserIds.map((id) => new Types.ObjectId(id));
+    const includeObjectIds = params.includeUserIds.map(
+      (id) => new Types.ObjectId(id),
+    );
+    const excludeObjectIds = params.excludeUserIds.map(
+      (id) => new Types.ObjectId(id),
+    );
 
     const recipientFilter: {
       status: 'active';
@@ -1179,7 +1183,10 @@ export class NotificationsService {
     const adminIds = Array.from(
       new Set(rows.map((item) => item.adminId?.toString?.()).filter(Boolean)),
     )
-      .filter((id): id is string => typeof id === 'string' && Types.ObjectId.isValid(id))
+      .filter(
+        (id): id is string =>
+          typeof id === 'string' && Types.ObjectId.isValid(id),
+      )
       .map((id) => new Types.ObjectId(id));
 
     const [profiles, users] = adminIds.length
@@ -1187,7 +1194,13 @@ export class NotificationsService {
           this.profileModel
             .find({ userId: { $in: adminIds } })
             .select('userId displayName username')
-            .lean<Array<{ userId: Types.ObjectId; displayName?: string; username?: string }>>()
+            .lean<
+              Array<{
+                userId: Types.ObjectId;
+                displayName?: string;
+                username?: string;
+              }>
+            >()
             .exec(),
           this.userModel
             .find({ _id: { $in: adminIds } })
@@ -1197,7 +1210,9 @@ export class NotificationsService {
         ])
       : [[], []];
 
-    const profileMap = new Map(profiles.map((item) => [item.userId.toString(), item]));
+    const profileMap = new Map(
+      profiles.map((item) => [item.userId.toString(), item]),
+    );
     const userMap = new Map(users.map((item) => [item._id.toString(), item]));
 
     const items = rows.map((row) => {
@@ -1392,7 +1407,9 @@ export class NotificationsService {
       id: doc._id.toString(),
       type: doc.type,
       actor: {
-        id: isSystemNotice ? 'system:cordigram' : (profile?.userId?.toString() ?? actorId),
+        id: isSystemNotice
+          ? 'system:cordigram'
+          : (profile?.userId?.toString() ?? actorId),
         displayName: isSystemNotice
           ? 'Cordigram'
           : (profile?.displayName ?? 'Unknown user'),

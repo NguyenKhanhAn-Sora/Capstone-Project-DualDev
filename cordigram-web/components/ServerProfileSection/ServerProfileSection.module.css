@@ -1,0 +1,170 @@
+.wrap {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) 320px;
+  gap: 24px;
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.card {
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-panel-text-faint);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--color-panel-text-muted);
+  margin-top: 6px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn {
+  border: 1px solid var(--color-panel-border);
+  background: var(--color-panel-hover);
+  color: var(--color-panel-text);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btnPrimary {
+  border-color: var(--color-panel-accent);
+  background: var(--color-panel-accent);
+  color: #fff;
+}
+
+.btnDanger {
+  border-color: #ed4245;
+  color: #ed4245;
+  background: transparent;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.traitsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.traitField {
+  position: relative;
+}
+
+.emojiBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--color-panel-border);
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+
+.traitInput {
+  padding-left: 44px !important;
+}
+
+.bannerPalette {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(80px, 1fr));
+  gap: 8px;
+}
+
+.bannerSwatch {
+  height: 64px;
+  border-radius: 9px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.bannerSwatchActive {
+  border-color: #7a8bff;
+}
+
+.preview {
+  border: 1px solid var(--color-panel-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--color-panel-sidebar);
+}
+
+.previewBanner {
+  height: 96px;
+  background: linear-gradient(135deg, #ff3ea5, #7a4dff);
+  background-size: cover;
+  background-position: center;
+}
+
+.previewBody {
+  padding: 12px;
+}
+
+.previewName {
+  font-weight: 700;
+  font-size: 20px;
+}
+
+.previewDesc {
+  margin-top: 8px;
+  color: var(--color-panel-text-muted);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.error {
+  color: #ed4245;
+  font-size: 13px;
+}
+
+.success {
+  color: #3ba55d;
+  font-size: 13px;
+}
+
+.emojiPickerPopover {
+  position: fixed;
+  z-index: 10030;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+@media (max-width: 960px) {
+  .wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .traitsGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+

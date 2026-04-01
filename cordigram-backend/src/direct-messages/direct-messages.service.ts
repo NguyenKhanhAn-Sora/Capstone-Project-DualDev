@@ -74,7 +74,9 @@ export class DirectMessagesService {
       const user2 = new Types.ObjectId(userId2);
 
       const ignoredSet = await this.ignoredService.getIgnoredUserIds(userId1);
-      const ignoredObjectIds = Array.from(ignoredSet).map((id) => new Types.ObjectId(id));
+      const ignoredObjectIds = Array.from(ignoredSet).map(
+        (id) => new Types.ObjectId(id),
+      );
       const baseMatch: any = {
         $or: [
           { senderId: user1, receiverId: user2 },
@@ -144,10 +146,14 @@ export class DirectMessagesService {
 
           // Enrich replyTo (if populated) with Profile.displayName
           let enrichedReplyTo: any = null;
-          if (msg.replyTo && (msg.replyTo as any).senderId?._id) {
+          if (msg.replyTo && msg.replyTo.senderId?._id) {
             const rt: any = msg.replyTo;
-            const rtSenderUserId = new Types.ObjectId(rt.senderId._id.toString());
-            const rtReceiverUserId = new Types.ObjectId(rt.receiverId._id.toString());
+            const rtSenderUserId = new Types.ObjectId(
+              rt.senderId._id.toString(),
+            );
+            const rtReceiverUserId = new Types.ObjectId(
+              rt.receiverId._id.toString(),
+            );
 
             const rtSenderProfile = await this.profileModel
               .findOne({ userId: rtSenderUserId })
@@ -190,7 +196,8 @@ export class DirectMessagesService {
                 _id: rt.receiverId._id,
                 email: rt.receiverId.email,
                 username: rtReceiverDisplay,
-                displayName: rtReceiverProfile?.displayName ?? rtReceiverDisplay,
+                displayName:
+                  rtReceiverProfile?.displayName ?? rtReceiverDisplay,
                 avatar: rtReceiverProfile?.avatarUrl,
               },
             };
@@ -245,7 +252,9 @@ export class DirectMessagesService {
 
     // Enrich with profile data
     const senderUserId = new Types.ObjectId(message.senderId._id.toString());
-    const receiverUserId = new Types.ObjectId(message.receiverId._id.toString());
+    const receiverUserId = new Types.ObjectId(
+      message.receiverId._id.toString(),
+    );
 
     const senderProfile = await this.profileModel
       .findOne({ userId: senderUserId })
@@ -272,7 +281,7 @@ export class DirectMessagesService {
 
     // Enrich replyTo (if any) with Profile.displayName
     let enrichedReplyTo: any = null;
-    if (message.replyTo && (message.replyTo as any).senderId?._id) {
+    if (message.replyTo && message.replyTo.senderId?._id) {
       const rt: any = message.replyTo;
       const rtSenderUserId = new Types.ObjectId(rt.senderId._id.toString());
       const rtReceiverUserId = new Types.ObjectId(rt.receiverId._id.toString());
@@ -341,7 +350,7 @@ export class DirectMessagesService {
         avatar: receiverProfile?.avatarUrl,
       },
       replyTo: enrichedReplyTo ?? message.replyTo ?? null,
-    } as any;
+    };
   }
 
   async updateDirectMessage(
@@ -436,7 +445,10 @@ export class DirectMessagesService {
     );
   }
 
-  async markConversationAsRead(userId: string, fromUserId: string): Promise<void> {
+  async markConversationAsRead(
+    userId: string,
+    fromUserId: string,
+  ): Promise<void> {
     await this.directMessageModel.updateMany(
       {
         receiverId: new Types.ObjectId(userId),
@@ -538,7 +550,14 @@ export class DirectMessagesService {
 
   /** Unread DM conversations for inbox, excluding ignored users. Returns displayName and last message. */
   async getUnreadConversations(userId: string): Promise<
-    { userId: string; displayName: string; username: string; lastMessage: string; lastMessageAt: string; unreadCount: number }[]
+    {
+      userId: string;
+      displayName: string;
+      username: string;
+      lastMessage: string;
+      lastMessageAt: string;
+      unreadCount: number;
+    }[]
   > {
     const [conversations, ignoredSet] = await Promise.all([
       this.getConversationList(userId),
@@ -547,7 +566,14 @@ export class DirectMessagesService {
     const withUnread = conversations.filter(
       (c) => (c.unreadCount ?? 0) > 0 && !ignoredSet.has(String(c.userId)),
     );
-    const result: { userId: string; displayName: string; username: string; lastMessage: string; lastMessageAt: string; unreadCount: number }[] = [];
+    const result: {
+      userId: string;
+      displayName: string;
+      username: string;
+      lastMessage: string;
+      lastMessageAt: string;
+      unreadCount: number;
+    }[] = [];
     for (const c of withUnread) {
       const otherUserId = new Types.ObjectId(c.userId);
       const profile = await this.profileModel
@@ -555,13 +581,18 @@ export class DirectMessagesService {
         .select('displayName username avatarUrl')
         .lean()
         .exec();
-      const displayName = (profile as any)?.displayName || (profile as any)?.username || c.username || 'Unknown';
+      const displayName =
+        (profile as any)?.displayName ||
+        (profile as any)?.username ||
+        c.username ||
+        'Unknown';
       result.push({
         userId: String(c.userId),
         displayName,
         username: c.username || 'Unknown',
         lastMessage: c.lastMessage ?? '',
-        lastMessageAt: c.lastMessageTime?.toISOString?.() ?? new Date().toISOString(),
+        lastMessageAt:
+          c.lastMessageTime?.toISOString?.() ?? new Date().toISOString(),
         unreadCount: c.unreadCount ?? 0,
       });
     }
@@ -672,10 +703,7 @@ export class DirectMessagesService {
     }
   }
 
-  async pinMessage(
-    messageId: string,
-    userId: string,
-  ): Promise<DirectMessage> {
+  async pinMessage(messageId: string, userId: string): Promise<DirectMessage> {
     const message = await this.directMessageModel.findById(messageId);
 
     if (!message) {

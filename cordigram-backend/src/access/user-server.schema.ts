@@ -28,4 +28,3 @@ export class UserServer extends Document {
 export const UserServerSchema = SchemaFactory.createForClass(UserServer);
 
 UserServerSchema.index({ userId: 1, serverId: 1 }, { unique: true });
-

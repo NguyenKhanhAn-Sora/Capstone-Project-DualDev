@@ -43,6 +43,36 @@ export interface ServerInteractionSettings {
   systemChannelId?: Types.ObjectId | null;
 }
 
+export interface ServerSafetySettings {
+  spamProtection: {
+    verificationLevel: 'low' | 'medium' | 'high';
+    hideMutedDm: boolean;
+    filterDmSpam: boolean;
+    warnExternalLinks: boolean;
+    hideSpamMessages: boolean;
+    deleteSpammerMessages: boolean;
+  };
+  automod: {
+    bannedWords: string[];
+    blockInUsername: boolean;
+    bannedWordResponse: 'warn' | 'delete';
+    exemptRoleIds: string[];
+    spamSuspectEnabled: boolean;
+    spamSuspectResponse: 'warn' | 'block';
+    spamAllowedChannelIds: string[];
+    spamAllowedRoleIds: string[];
+    mentionSpamLimit: number;
+    mentionSpamWindowMinutes: number;
+    mentionAttackDetection: boolean;
+    mentionSpamResponse: 'warn' | 'block24h' | 'timeout';
+    mentionTimeoutMinutes: number;
+  };
+  privileges: {
+    bypassRoleIds: string[];
+    managerRoleIds: string[];
+  };
+}
+
 @Schema({ timestamps: true })
 export class Server extends Document {
   @Prop({ required: true, trim: true })
@@ -53,6 +83,20 @@ export class Server extends Document {
 
   @Prop({ type: String, default: null })
   avatarUrl: string | null;
+
+  @Prop({ type: String, default: null })
+  bannerUrl: string | null;
+
+  @Prop({
+    type: [
+      {
+        emoji: { type: String, trim: true, default: '🙂' },
+        text: { type: String, trim: true, maxlength: 80, default: '' },
+      },
+    ],
+    default: [],
+  })
+  profileTraits: Array<{ emoji: string; text: string }>;
 
   @Prop({
     type: String,
@@ -172,6 +216,84 @@ export class Server extends Document {
     }),
   })
   interactionSettings: ServerInteractionSettings;
+
+  @Prop({
+    type: {
+      spamProtection: {
+        verificationLevel: {
+          type: String,
+          enum: ['low', 'medium', 'high'],
+          default: 'low',
+        },
+        hideMutedDm: { type: Boolean, default: false },
+        filterDmSpam: { type: Boolean, default: false },
+        warnExternalLinks: { type: Boolean, default: true },
+        hideSpamMessages: { type: Boolean, default: false },
+        deleteSpammerMessages: { type: Boolean, default: false },
+      },
+      automod: {
+        bannedWords: { type: [String], default: [] },
+        blockInUsername: { type: Boolean, default: false },
+        bannedWordResponse: {
+          type: String,
+          enum: ['warn', 'delete'],
+          default: 'warn',
+        },
+        exemptRoleIds: { type: [String], default: [] },
+        spamSuspectEnabled: { type: Boolean, default: false },
+        spamSuspectResponse: {
+          type: String,
+          enum: ['warn', 'block'],
+          default: 'warn',
+        },
+        spamAllowedChannelIds: { type: [String], default: [] },
+        spamAllowedRoleIds: { type: [String], default: [] },
+        mentionSpamLimit: { type: Number, default: 8 },
+        mentionSpamWindowMinutes: { type: Number, default: 10 },
+        mentionAttackDetection: { type: Boolean, default: false },
+        mentionSpamResponse: {
+          type: String,
+          enum: ['warn', 'block24h', 'timeout'],
+          default: 'warn',
+        },
+        mentionTimeoutMinutes: { type: Number, default: 30 },
+      },
+      privileges: {
+        bypassRoleIds: { type: [String], default: [] },
+        managerRoleIds: { type: [String], default: [] },
+      },
+    },
+    default: () => ({
+      spamProtection: {
+        verificationLevel: 'low',
+        hideMutedDm: false,
+        filterDmSpam: false,
+        warnExternalLinks: true,
+        hideSpamMessages: false,
+        deleteSpammerMessages: false,
+      },
+      automod: {
+        bannedWords: [],
+        blockInUsername: false,
+        bannedWordResponse: 'warn',
+        exemptRoleIds: [],
+        spamSuspectEnabled: false,
+        spamSuspectResponse: 'warn',
+        spamAllowedChannelIds: [],
+        spamAllowedRoleIds: [],
+        mentionSpamLimit: 8,
+        mentionSpamWindowMinutes: 10,
+        mentionAttackDetection: false,
+        mentionSpamResponse: 'warn',
+        mentionTimeoutMinutes: 30,
+      },
+      privileges: {
+        bypassRoleIds: [],
+        managerRoleIds: [],
+      },
+    }),
+  })
+  safetySettings: ServerSafetySettings;
 }
 
 export const ServerSchema = SchemaFactory.createForClass(Server);
