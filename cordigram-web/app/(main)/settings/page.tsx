@@ -259,6 +259,15 @@ const formatRemainingHourMinute = (
 const isWarnAction = (action: string) =>
   action === "warn" || action === "warn_user";
 
+const getCreatorRequestStatusClassName = (status?: string | null) => {
+  const normalized = (status ?? "").toLowerCase();
+  if (normalized === "approved") return "approved";
+  if (normalized === "rejected") return "rejected";
+  return "pending";
+};
+
+const CONTENT_PAGE_SIZE = 10;
+
 type IconProps = { size?: number; filled?: boolean };
 
 const IconLike = ({ size = 18, filled }: IconProps) => (
@@ -580,6 +589,9 @@ export default function SettingsPage() {
     null,
   );
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [activityVisibleCount, setActivityVisibleCount] = useState(
+    CONTENT_PAGE_SIZE,
+  );
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityLoadingMore, setActivityLoadingMore] = useState(false);
   const [activityError, setActivityError] = useState<string | null>(null);
@@ -601,6 +613,9 @@ export default function SettingsPage() {
     hidden: false,
     blocked: false,
   });
+  const [hiddenPostsVisibleCount, setHiddenPostsVisibleCount] = useState(
+    CONTENT_PAGE_SIZE,
+  );
 
   useEffect(() => {
     const section = searchParams.get("section");
@@ -869,6 +884,7 @@ export default function SettingsPage() {
 
   const loadContentSettings = useCallback(async () => {
     if (!token) return;
+    setHiddenPostsVisibleCount(CONTENT_PAGE_SIZE);
     setHiddenPostsLoading(true);
     setBlockedUsersLoading(true);
     setHiddenPostsError(null);
@@ -916,6 +932,7 @@ export default function SettingsPage() {
     async (mode: "reset" | "more" = "reset") => {
       if (!token) return;
       const isReset = mode === "reset";
+      let loadedCount = 0;
       if (isReset) {
         setActivityLoading(true);
         setActivityError(null);
@@ -932,6 +949,7 @@ export default function SettingsPage() {
           types,
         });
         const items = res.items ?? [];
+        loadedCount = items.length;
         setActivityItems((prev) => (isReset ? items : [...prev, ...items]));
         setActivityCursor(res.nextCursor ?? null);
       } catch (err) {
@@ -941,9 +959,48 @@ export default function SettingsPage() {
         if (isReset) setActivityLoading(false);
         else setActivityLoadingMore(false);
       }
+
+      return loadedCount;
     },
     [token, activityFilter, activityCursor],
   );
+
+  const visibleActivityItems = useMemo(
+    () => activityItems.slice(0, activityVisibleCount),
+    [activityItems, activityVisibleCount],
+  );
+
+  const canSeeMoreActivity =
+    activityVisibleCount < activityItems.length || Boolean(activityCursor);
+
+  const handleSeeMoreActivity = useCallback(async () => {
+    if (activityVisibleCount < activityItems.length) {
+      setActivityVisibleCount((prev) => prev + CONTENT_PAGE_SIZE);
+      return;
+    }
+    if (!activityCursor || activityLoadingMore) return;
+    const loaded = await loadActivityLog("more");
+    if ((loaded ?? 0) > 0) {
+      setActivityVisibleCount((prev) => prev + CONTENT_PAGE_SIZE);
+    }
+  }, [
+    activityVisibleCount,
+    activityItems.length,
+    activityCursor,
+    activityLoadingMore,
+    loadActivityLog,
+  ]);
+
+  const visibleHiddenPosts = useMemo(
+    () => hiddenPosts.slice(0, hiddenPostsVisibleCount),
+    [hiddenPosts, hiddenPostsVisibleCount],
+  );
+
+  const canSeeMoreHiddenPosts = hiddenPostsVisibleCount < hiddenPosts.length;
+
+  const handleSeeMoreHiddenPosts = useCallback(() => {
+    setHiddenPostsVisibleCount((prev) => prev + CONTENT_PAGE_SIZE);
+  }, []);
 
   const loadViolationCenter = useCallback(async () => {
     if (!token) return;
@@ -985,6 +1042,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!token || activeKey !== "content") return;
+    setActivityVisibleCount(CONTENT_PAGE_SIZE);
     loadActivityLog("reset");
   }, [token, activeKey, activityFilter, loadActivityLog]);
 
@@ -2869,140 +2927,177 @@ export default function SettingsPage() {
 
                   {creatorStatus ? (
                     <>
-                      <div className={styles.verificationScoreCard}>
-                        <p className={styles.infoTitle}>Creator score</p>
-                        <p className={styles.verificationScoreValue}>
-                          {creatorStatus.eligibility.score} /{" "}
-                          {creatorStatus.eligibility.minimumScore}
-                        </p>
-                        <p className={styles.hint}>
-                          {creatorStatus.eligibility.eligible
-                            ? "Your account currently meets all conditions."
-                            : "Improve the missing conditions below to become eligible."}
-                        </p>
-                      </div>
-
-                      <ul className={styles.infoList}>
-                        <li className={styles.infoItem}>
-                          <div className={styles.infoText}>
-                            <p className={styles.infoTitle}>Account age</p>
-                            <p className={styles.infoValue}>
-                              {creatorStatus.eligibility.accountAgeDays} days
-                            </p>
-                          </div>
-                          <p className={styles.hint}>
-                            Minimum {creatorStatus.criteria.minAccountAgeDays} days
-                          </p>
-                        </li>
-                        <li className={styles.infoItem}>
-                          <div className={styles.infoText}>
-                            <p className={styles.infoTitle}>Followers</p>
-                            <p className={styles.infoValue}>
-                              {creatorStatus.eligibility.followersCount}
-                            </p>
-                          </div>
-                          <p className={styles.hint}>
-                            Minimum {creatorStatus.criteria.minFollowersCount}
-                          </p>
-                        </li>
-                        <li className={styles.infoItem}>
-                          <div className={styles.infoText}>
-                            <p className={styles.infoTitle}>Published posts</p>
-                            <p className={styles.infoValue}>
-                              {creatorStatus.eligibility.postsCount}
-                            </p>
-                          </div>
-                          <p className={styles.hint}>
-                            Minimum {creatorStatus.criteria.minPostsCount}
-                          </p>
-                        </li>
-                        <li className={styles.infoItem}>
-                          <div className={styles.infoText}>
-                            <p className={styles.infoTitle}>Active posting days (30d)</p>
-                            <p className={styles.infoValue}>
-                              {creatorStatus.eligibility.activePostingDays30d}
-                            </p>
-                          </div>
-                          <p className={styles.hint}>
-                            Minimum {creatorStatus.criteria.minActivePostingDays30d}
-                          </p>
-                        </li>
-                        <li className={styles.infoItem}>
-                          <div className={styles.infoText}>
-                            <p className={styles.infoTitle}>Avg engagement/post (30d)</p>
-                            <p className={styles.infoValue}>
-                              {creatorStatus.eligibility.engagementPerPost30d}
-                            </p>
-                          </div>
-                          <p className={styles.hint}>
-                            Minimum {creatorStatus.criteria.minEngagementPerPost30d}
-                          </p>
-                        </li>
-                        <li className={styles.infoItem}>
-                          <div className={styles.infoText}>
-                            <p className={styles.infoTitle}>Recent violations (90d)</p>
-                            <p className={styles.infoValue}>
-                              {creatorStatus.eligibility.recentViolations90d}
-                            </p>
-                          </div>
-                          <p className={styles.hint}>
-                            Maximum {creatorStatus.criteria.maxRecentViolations90d}
-                          </p>
-                        </li>
-                      </ul>
-
-                      {creatorStatus.eligibility.failedRequirements.length ? (
-                        <p className={styles.error}>
-                          Missing requirements: {" "}
-                          {creatorStatus.eligibility.failedRequirements
-                            .map(formatRequirementLabel)
-                            .join(", ")}
-                        </p>
-                      ) : null}
-
-                      {creatorStatus.latestRequest ? (
-                        <div className={styles.verificationStatusCard}>
-                          <p className={styles.infoTitle}>Latest request</p>
-                          <p className={styles.infoValue}>
-                            Status: {creatorStatus.latestRequest.status}
-                          </p>
-                          {creatorStatus.latestRequest.createdAt ? (
-                            <p className={styles.hint}>
-                              Submitted {" "}
-                              {formatRelativeTime(
-                                creatorStatus.latestRequest.createdAt,
-                              )}
-                            </p>
-                          ) : null}
-                          {creatorStatus.latestRequest.reviewedAt ? (
-                            <p className={styles.hint}>
-                              Reviewed {" "}
-                              {formatRelativeTime(
-                                creatorStatus.latestRequest.reviewedAt,
-                              )}
-                            </p>
-                          ) : null}
-                          {creatorStatus.latestRequest.decisionReason ? (
-                            <p className={styles.hint}>
-                              Reason: {creatorStatus.latestRequest.decisionReason}
-                            </p>
-                          ) : null}
-                          {creatorStatus.latestRequest.cooldownUntil ? (
-                            <p className={styles.hint}>
-                              You can request again {" "}
-                              {formatRelativeTime(
-                                creatorStatus.latestRequest.cooldownUntil,
-                              )}
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : null}
-
                       {creatorStatus.account.isCreatorVerified ? (
-                        <div className={styles.successBox}>
-                          Your account is creator verified.
+                        <div className={styles.creatorApprovedPanel}>
+                          {creatorStatus.latestRequest ? (
+                            <div className={styles.creatorLatestCard}>
+                              <div className={styles.creatorLatestHeader}>
+                                <p className={styles.infoTitle}>Latest request</p>
+                                <span
+                                  className={`${styles.creatorStatusPill} ${
+                                    styles[
+                                      `creatorStatusPill_${getCreatorRequestStatusClassName(
+                                        creatorStatus.latestRequest.status,
+                                      )}`
+                                    ]
+                                  }`}
+                                >
+                                  {creatorStatus.latestRequest.status}
+                                </span>
+                              </div>
+                              {creatorStatus.latestRequest.createdAt ? (
+                                <p className={styles.hint}>
+                                  Submitted {" "}
+                                  {formatRelativeTime(
+                                    creatorStatus.latestRequest.createdAt,
+                                  )}
+                                </p>
+                              ) : null}
+                              {creatorStatus.latestRequest.reviewedAt ? (
+                                <p className={styles.hint}>
+                                  Reviewed {" "}
+                                  {formatRelativeTime(
+                                    creatorStatus.latestRequest.reviewedAt,
+                                  )}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
+                          <div className={styles.creatorVerifiedNotice}>
+                            Your account is creator verified.
+                          </div>
                         </div>
                       ) : (
+                        <>
+                          <div className={styles.verificationScoreCard}>
+                            <p className={styles.infoTitle}>Creator score</p>
+                            <p className={styles.verificationScoreValue}>
+                              {creatorStatus.eligibility.score} /{" "}
+                              {creatorStatus.eligibility.minimumScore}
+                            </p>
+                            <p className={styles.hint}>
+                              {creatorStatus.eligibility.eligible
+                                ? "Your account currently meets all conditions."
+                                : "Improve the missing conditions below to become eligible."}
+                            </p>
+                          </div>
+
+                          <ul className={styles.infoList}>
+                            <li className={styles.infoItem}>
+                              <div className={styles.infoText}>
+                                <p className={styles.infoTitle}>Account age</p>
+                                <p className={styles.infoValue}>
+                                  {creatorStatus.eligibility.accountAgeDays} days
+                                </p>
+                              </div>
+                              <p className={styles.hint}>
+                                Minimum {creatorStatus.criteria.minAccountAgeDays} days
+                              </p>
+                            </li>
+                            <li className={styles.infoItem}>
+                              <div className={styles.infoText}>
+                                <p className={styles.infoTitle}>Followers</p>
+                                <p className={styles.infoValue}>
+                                  {creatorStatus.eligibility.followersCount}
+                                </p>
+                              </div>
+                              <p className={styles.hint}>
+                                Minimum {creatorStatus.criteria.minFollowersCount}
+                              </p>
+                            </li>
+                            <li className={styles.infoItem}>
+                              <div className={styles.infoText}>
+                                <p className={styles.infoTitle}>Published posts</p>
+                                <p className={styles.infoValue}>
+                                  {creatorStatus.eligibility.postsCount}
+                                </p>
+                              </div>
+                              <p className={styles.hint}>
+                                Minimum {creatorStatus.criteria.minPostsCount}
+                              </p>
+                            </li>
+                            <li className={styles.infoItem}>
+                              <div className={styles.infoText}>
+                                <p className={styles.infoTitle}>Active posting days (30d)</p>
+                                <p className={styles.infoValue}>
+                                  {creatorStatus.eligibility.activePostingDays30d}
+                                </p>
+                              </div>
+                              <p className={styles.hint}>
+                                Minimum {creatorStatus.criteria.minActivePostingDays30d}
+                              </p>
+                            </li>
+                            <li className={styles.infoItem}>
+                              <div className={styles.infoText}>
+                                <p className={styles.infoTitle}>Avg engagement/post (30d)</p>
+                                <p className={styles.infoValue}>
+                                  {creatorStatus.eligibility.engagementPerPost30d}
+                                </p>
+                              </div>
+                              <p className={styles.hint}>
+                                Minimum {creatorStatus.criteria.minEngagementPerPost30d}
+                              </p>
+                            </li>
+                            <li className={styles.infoItem}>
+                              <div className={styles.infoText}>
+                                <p className={styles.infoTitle}>Recent violations (90d)</p>
+                                <p className={styles.infoValue}>
+                                  {creatorStatus.eligibility.recentViolations90d}
+                                </p>
+                              </div>
+                              <p className={styles.hint}>
+                                Maximum {creatorStatus.criteria.maxRecentViolations90d}
+                              </p>
+                            </li>
+                          </ul>
+
+                          {creatorStatus.eligibility.failedRequirements.length ? (
+                            <p className={styles.error}>
+                              Missing requirements: {" "}
+                              {creatorStatus.eligibility.failedRequirements
+                                .map(formatRequirementLabel)
+                                .join(", ")}
+                            </p>
+                          ) : null}
+
+                          {creatorStatus.latestRequest ? (
+                            <div className={styles.verificationStatusCard}>
+                              <p className={styles.infoTitle}>Latest request</p>
+                              <p className={styles.infoValue}>
+                                Status: {creatorStatus.latestRequest.status}
+                              </p>
+                              {creatorStatus.latestRequest.createdAt ? (
+                                <p className={styles.hint}>
+                                  Submitted {" "}
+                                  {formatRelativeTime(
+                                    creatorStatus.latestRequest.createdAt,
+                                  )}
+                                </p>
+                              ) : null}
+                              {creatorStatus.latestRequest.reviewedAt ? (
+                                <p className={styles.hint}>
+                                  Reviewed {" "}
+                                  {formatRelativeTime(
+                                    creatorStatus.latestRequest.reviewedAt,
+                                  )}
+                                </p>
+                              ) : null}
+                              {creatorStatus.latestRequest.decisionReason ? (
+                                <p className={styles.hint}>
+                                  Reason: {creatorStatus.latestRequest.decisionReason}
+                                </p>
+                              ) : null}
+                              {creatorStatus.latestRequest.cooldownUntil ? (
+                                <p className={styles.hint}>
+                                  You can request again {" "}
+                                  {formatRelativeTime(
+                                    creatorStatus.latestRequest.cooldownUntil,
+                                  )}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
+
                         <div className={styles.form}>
                           <label className={styles.label}>
                             Request note (optional)
@@ -3047,6 +3142,7 @@ export default function SettingsPage() {
                             </button>
                           </div>
                         </div>
+                        </>
                       )}
                     </>
                   ) : null}
@@ -3753,7 +3849,7 @@ export default function SettingsPage() {
 
                     {activityItems.length ? (
                       <div className={styles.activityList}>
-                        {activityItems.map((item) => {
+                        {visibleActivityItems.map((item) => {
                           const meta = item.meta ?? {};
                           const authorName =
                             meta.postAuthorDisplayName ||
@@ -3863,15 +3959,15 @@ export default function SettingsPage() {
                       <p className={styles.hint}>No activity yet.</p>
                     ) : null}
 
-                    {activityCursor ? (
+                    {canSeeMoreActivity ? (
                       <div className={styles.activityFooter}>
                         <button
                           type="button"
                           className={styles.secondary}
-                          onClick={() => loadActivityLog("more")}
+                          onClick={handleSeeMoreActivity}
                           disabled={activityLoadingMore}
                         >
-                          {activityLoadingMore ? "Loading..." : "Load more"}
+                          {activityLoadingMore ? "Loading..." : "See more"}
                         </button>
                       </div>
                     ) : null}
@@ -3930,7 +4026,7 @@ export default function SettingsPage() {
 
                     {hiddenPosts.length ? (
                       <div className={styles.contentList}>
-                        {hiddenPosts.map((post) => {
+                        {visibleHiddenPosts.map((post) => {
                           const authorName =
                             post.authorDisplayName ||
                             post.authorUsername ||
@@ -4009,6 +4105,18 @@ export default function SettingsPage() {
                       </div>
                     ) : !hiddenPostsLoading ? (
                       <p className={styles.hint}>No hidden posts.</p>
+                    ) : null}
+
+                    {canSeeMoreHiddenPosts ? (
+                      <div className={styles.activityFooter}>
+                        <button
+                          type="button"
+                          className={styles.secondary}
+                          onClick={handleSeeMoreHiddenPosts}
+                        >
+                          See more
+                        </button>
+                      </div>
                     ) : null}
                   </div>
                 </div>

@@ -1711,6 +1711,7 @@ export class AdminService {
       authorDisplayName: string | null;
       authorUsername: string | null;
       authorAvatarUrl: string | null;
+      authorIsCreator: boolean;
       content: string;
       media: Array<{ type: 'image' | 'video'; url: string }>;
       createdAt: Date | null;
@@ -1724,6 +1725,7 @@ export class AdminService {
       authorDisplayName: string | null;
       authorUsername: string | null;
       authorAvatarUrl: string | null;
+      authorIsCreator: boolean;
       content: string;
       media: { type: 'image' | 'video'; url: string } | null;
       createdAt: Date | null;
@@ -1734,6 +1736,7 @@ export class AdminService {
       postAuthorAvatarUrl: string | null;
       postAuthorUsername: string | null;
       postAuthorDisplayName: string | null;
+      postAuthorIsCreator: boolean;
       autoHiddenPendingReview?: boolean;
       autoHiddenAt?: Date | null;
       autoHiddenUntil?: Date | null;
@@ -1743,6 +1746,7 @@ export class AdminService {
       displayName: string | null;
       username: string | null;
       avatarUrl: string | null;
+      isCreator: boolean;
       bio: string | null;
       location: string | null;
       workplace: string | null;
@@ -2018,11 +2022,16 @@ export class AdminService {
               .findOne({ userId: post.authorId })
               .select('displayName username avatarUrl')
               .lean();
+            const authorUser = await this.userModel
+              .findById(post.authorId)
+              .select('isCreatorVerified')
+              .lean();
 
             return {
               authorDisplayName: profile?.displayName ?? null,
               authorUsername: profile?.username ?? null,
               authorAvatarUrl: profile?.avatarUrl ?? null,
+              authorIsCreator: Boolean(authorUser?.isCreatorVerified),
               content: post.content ?? '',
               media: (post.media ?? []).map((item) => ({
                 type: item.type,
@@ -2053,6 +2062,10 @@ export class AdminService {
               .findOne({ userId: comment.authorId })
               .select('displayName username avatarUrl')
               .lean();
+            const authorUser = await this.userModel
+              .findById(comment.authorId)
+              .select('isCreatorVerified')
+              .lean();
 
             const post = await this.postModel
               .findById(comment.postId)
@@ -2064,11 +2077,18 @@ export class AdminService {
                   .select('displayName username avatarUrl')
                   .lean()
               : null;
+            const postAuthorUser = post?.authorId
+              ? await this.userModel
+                  .findById(post.authorId)
+                  .select('isCreatorVerified')
+                  .lean()
+              : null;
 
             return {
               authorDisplayName: authorProfile?.displayName ?? null,
               authorUsername: authorProfile?.username ?? null,
               authorAvatarUrl: authorProfile?.avatarUrl ?? null,
+              authorIsCreator: Boolean(authorUser?.isCreatorVerified),
               content: comment.content ?? '',
               media: comment.media
                 ? { type: comment.media.type, url: comment.media.url }
@@ -2084,6 +2104,7 @@ export class AdminService {
               postAuthorAvatarUrl: postAuthorProfile?.avatarUrl ?? null,
               postAuthorUsername: postAuthorProfile?.username ?? null,
               postAuthorDisplayName: postAuthorProfile?.displayName ?? null,
+              postAuthorIsCreator: Boolean(postAuthorUser?.isCreatorVerified),
               autoHiddenPendingReview: Boolean(comment.autoHiddenPendingReview),
               autoHiddenAt: comment.autoHiddenAt ?? null,
               autoHiddenUntil: comment.autoHiddenUntil ?? null,
@@ -2110,7 +2131,7 @@ export class AdminService {
               this.userModel
                 .findById(targetId)
                 .select(
-                  'createdAt status email recentAccounts followerCount followingCount',
+                  'createdAt status email recentAccounts followerCount followingCount isCreatorVerified',
                 )
                 .lean(),
             ]);
@@ -2159,6 +2180,7 @@ export class AdminService {
               displayName,
               username,
               avatarUrl,
+              isCreator: Boolean(user?.isCreatorVerified),
               bio: profile?.bio ?? null,
               location: profile?.location ?? null,
               workplace: profile?.workplace?.companyName ?? null,

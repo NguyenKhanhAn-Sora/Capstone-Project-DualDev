@@ -1774,9 +1774,7 @@ export default function ProfileLayout({
                 className={styles.closeBtn}
                 aria-label="Close"
                 onClick={closeReportModal}
-              >
-                <span aria-hidden>X</span>
-              </button>
+              />
             </div>
 
             <div className={styles.reportGrid}>

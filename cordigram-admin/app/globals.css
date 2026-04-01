@@ -22,6 +22,7 @@
     var(--color-bg);
   --color-scrollbar-thumb: #c5c5c5;
   --color-background-stat-reel: #5757570f;
+  --radius-control: 12px;
 }
 
 [data-theme="dark"] {
@@ -61,6 +62,13 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-roboto);
+}
+
+button,
+input,
+select,
+textarea {
+  border-radius: var(--radius-control);
 }
 
 ::-webkit-scrollbar {

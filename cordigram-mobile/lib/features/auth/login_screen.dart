@@ -1,5 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import '../../core/config/app_config.dart';
+import '../../core/services/api_service.dart';
+import '../../core/services/auth_storage.dart';
+import '../home/home_screen.dart';
+import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,6 +23,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _showPassword = false;
   bool _rememberMe = true;
+  bool _loading = false;
+  String _error = '';
+  bool _googleLoading = false;
 
   @override
   void dispose() {
@@ -23,15 +34,128 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() {
+      _loading = true;
+      _error = '';
+    });
+    try {
+      final deviceId = AuthStorage.deviceId;
+      final result = await ApiService.postAuth(
+        '/auth/login',
+        body: {
+          'email': _emailController.text.trim().toLowerCase(),
+          'password': _passwordController.text,
+          'loginMethod': 'password',
+        },
+        extraHeaders: {
+          if (deviceId != null) 'x-device-id': deviceId,
+          'x-login-method': 'password',
+        },
+      );
+      final accessToken = result.body['accessToken'] as String?;
+      if (accessToken == null) {
+        // Two-factor flow — not yet implemented on mobile
+        setState(() {
+          _loading = false;
+          _error = 'Two-factor authentication is not yet supported on mobile.';
+        });
+        return;
+      }
+      await AuthStorage.saveTokens(
+        accessToken: accessToken,
+        refreshToken: result.refreshToken,
+      );
+      if (!mounted) return;
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+    } on ApiException catch (e) {
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Could not connect to server. Please try again.';
+        _loading = false;
+      });
+    }
+  }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Login UI is ready. API login wiring is next.'),
-      ),
-    );
+  Future<void> _handleGoogleLogin() async {
+    setState(() {
+      _googleLoading = true;
+      _error = '';
+    });
+    try {
+      final deviceId = AuthStorage.deviceId;
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/auth/google/mobile')
+          .replace(
+            queryParameters: deviceId != null ? {'deviceId': deviceId} : {},
+          );
+
+      final result = await FlutterWebAuth2.authenticate(
+        url: uri.toString(),
+        callbackUrlScheme: 'cordigram',
+      );
+
+      final callbackUri = Uri.parse(result);
+      final accessToken = callbackUri.queryParameters['accessToken'];
+      final signupToken = callbackUri.queryParameters['signupToken'];
+      final refreshToken = callbackUri.queryParameters['refreshToken'];
+      final needsProfile = callbackUri.queryParameters['needsProfile'] == '1';
+
+      if (accessToken != null && !needsProfile) {
+        await AuthStorage.saveTokens(
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        );
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      } else if (signupToken != null && needsProfile) {
+        final email = _decodeEmailFromToken(signupToken);
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) =>
+                SignupScreen.google(signupToken: signupToken, email: email),
+          ),
+        );
+      } else {
+        setState(() => _googleLoading = false);
+      }
+    } on PlatformException catch (e) {
+      if (e.code != 'CANCELED') {
+        setState(() {
+          _error = 'Google sign-in failed. Please try again.';
+        });
+      }
+      setState(() => _googleLoading = false);
+    } catch (e) {
+      setState(() {
+        _error = 'Google sign-in failed. Please try again.';
+        _googleLoading = false;
+      });
+    }
+  }
+
+  String _decodeEmailFromToken(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length < 2) return '';
+      final payload = parts[1];
+      final padded = payload + '=' * ((4 - payload.length % 4) % 4);
+      final bytes = base64Url.decode(padded);
+      final map = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+      return (map['email'] as String? ?? '').toLowerCase();
+    } catch (_) {
+      return '';
+    }
   }
 
   @override
@@ -155,11 +279,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 const Spacer(),
                                 TextButton(
                                   onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Forgot password flow will be added next.',
-                                        ),
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const ForgotPasswordScreen(),
                                       ),
                                     );
                                   },
@@ -168,11 +291,36 @@ class _LoginScreenState extends State<LoginScreen> {
                               ],
                             ),
                             const SizedBox(height: 6),
+                            if (_error.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade50,
+                                    border: Border.all(
+                                      color: Colors.red.shade200,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    _error,
+                                    style: TextStyle(
+                                      color: Colors.red.shade700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             SizedBox(
                               width: double.infinity,
                               height: 50,
                               child: FilledButton(
-                                onPressed: _submit,
+                                onPressed: _loading ? null : _submit,
                                 style: FilledButton.styleFrom(
                                   backgroundColor: const Color(0xFF3470A2),
                                   foregroundColor: Colors.white,
@@ -180,13 +328,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                     borderRadius: BorderRadius.circular(14),
                                   ),
                                 ),
-                                child: const Text(
-                                  'Sign in',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
+                                child: _loading
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          valueColor: AlwaysStoppedAnimation(
+                                            Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Sign in',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -194,16 +353,21 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: double.infinity,
                               height: 48,
                               child: OutlinedButton.icon(
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Google login UI only. API wiring next.',
-                                      ),
-                                    ),
-                                  );
-                                },
-                                icon: const _GoogleBadge(),
+                                onPressed: _googleLoading
+                                    ? null
+                                    : _handleGoogleLogin,
+                                icon: _googleLoading
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation(
+                                            Color(0xFF1F2937),
+                                          ),
+                                        ),
+                                      )
+                                    : const _GoogleBadge(),
                                 label: const Text('Continue with Google'),
                                 style: OutlinedButton.styleFrom(
                                   side: const BorderSide(

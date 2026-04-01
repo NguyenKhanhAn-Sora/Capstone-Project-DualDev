@@ -19,6 +19,7 @@ This app is configured to connect to the existing Cordigram backend.
 	If adb is not recognized, run:
 
 	C:\Users\admin\AppData\Local\Android\Sdk\platform-tools\adb.exe reverse tcp:9999 tcp:9999
+	
 
 4. Run app with API base URL:
 

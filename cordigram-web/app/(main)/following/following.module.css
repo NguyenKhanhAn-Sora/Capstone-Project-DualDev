@@ -7,10 +7,6 @@
   align-items: start;
 }
 
-.layoutPosts {
-  grid-template-columns: 168px minmax(0, 1fr) 168px;
-}
-
 .layoutReels {
   grid-template-columns: 168px minmax(0, 1fr);
 }
@@ -20,6 +16,7 @@
   top: 18px;
   height: fit-content;
   margin-left: -18px;
+  max-width: 150px;
 }
 
 .content {

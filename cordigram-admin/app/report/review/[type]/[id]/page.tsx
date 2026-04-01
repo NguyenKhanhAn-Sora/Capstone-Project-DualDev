@@ -75,6 +75,7 @@ type ReportDetailPayload = {
     authorDisplayName: string | null;
     authorUsername: string | null;
     authorAvatarUrl: string | null;
+    authorIsCreator: boolean;
     content: string;
     media: Array<{ type: "image" | "video"; url: string }>;
     createdAt: string | null;
@@ -84,6 +85,7 @@ type ReportDetailPayload = {
     authorDisplayName: string | null;
     authorUsername: string | null;
     authorAvatarUrl: string | null;
+    authorIsCreator: boolean;
     content: string;
     media: { type: "image" | "video"; url: string } | null;
     createdAt: string | null;
@@ -94,11 +96,13 @@ type ReportDetailPayload = {
     postAuthorAvatarUrl: string | null;
     postAuthorUsername: string | null;
     postAuthorDisplayName: string | null;
+    postAuthorIsCreator: boolean;
   } | null;
   userPreview?: {
     displayName: string | null;
     username: string | null;
     avatarUrl: string | null;
+    isCreator: boolean;
     bio: string | null;
     location: string | null;
     workplace: string | null;
@@ -211,6 +215,25 @@ function CollapsibleCaption({
         </button>
       ) : null}
     </>
+  );
+}
+
+function DisplayNameWithCreator({
+  name,
+  isCreator,
+  className,
+}: {
+  name: string;
+  isCreator?: boolean;
+  className: string;
+}) {
+  return (
+    <p className={`${className} ${styles.nameWithCreator}`}>
+      <span>{name}</span>
+      {isCreator ? (
+        <span className={styles.creatorTick} aria-label="Creator account" />
+      ) : null}
+    </p>
   );
 }
 
@@ -834,9 +857,11 @@ export default function ReportReviewPage() {
                       <div className={styles.avatar}></div>
                     )}
                     <div>
-                      <p className={styles.postAuthor}>
-                        {detail?.postPreview?.authorDisplayName ?? "--"}
-                      </p>
+                      <DisplayNameWithCreator
+                        className={styles.postAuthor}
+                        name={detail?.postPreview?.authorDisplayName ?? "--"}
+                        isCreator={detail?.postPreview?.authorIsCreator}
+                      />
                       <p className={styles.postMeta}>
                         @{detail?.postPreview?.authorUsername ?? "unknown"} ·
                         Posted {formatTime(detail?.postPreview?.createdAt)}
@@ -912,10 +937,14 @@ export default function ReportReviewPage() {
                         <div className={styles.avatar}></div>
                       )}
                       <div>
-                        <p className={styles.postAuthor}>
-                          {detail?.commentPreview?.postAuthorDisplayName ??
-                            "--"}
-                        </p>
+                        <DisplayNameWithCreator
+                          className={styles.postAuthor}
+                          name={
+                            detail?.commentPreview?.postAuthorDisplayName ??
+                            "--"
+                          }
+                          isCreator={detail?.commentPreview?.postAuthorIsCreator}
+                        />
                         <p className={styles.postMeta}>
                           @
                           {detail?.commentPreview?.postAuthorUsername ??
@@ -972,9 +1001,13 @@ export default function ReportReviewPage() {
                       <div className={styles.avatar}></div>
                     )}
                     <div>
-                      <p className={styles.postAuthor}>
-                        {detail?.commentPreview?.authorDisplayName ?? "--"}
-                      </p>
+                      <DisplayNameWithCreator
+                        className={styles.postAuthor}
+                        name={
+                          detail?.commentPreview?.authorDisplayName ?? "--"
+                        }
+                        isCreator={detail?.commentPreview?.authorIsCreator}
+                      />
                       <p className={styles.postMeta}>
                         @{detail?.commentPreview?.authorUsername ?? "unknown"} ·
                         Commented{" "}
@@ -1050,9 +1083,11 @@ export default function ReportReviewPage() {
                       <div className={styles.avatarLarge}></div>
                     )}
                     <div>
-                      <p className={styles.userName}>
-                        {detail?.userPreview?.displayName ?? "--"}
-                      </p>
+                      <DisplayNameWithCreator
+                        className={styles.userName}
+                        name={detail?.userPreview?.displayName ?? "--"}
+                        isCreator={detail?.userPreview?.isCreator}
+                      />
                       <p className={styles.userHandle}>
                         @{detail?.userPreview?.username ?? "unknown"}
                       </p>
@@ -1069,27 +1104,12 @@ export default function ReportReviewPage() {
                   {detail?.userPreview?.bio?.trim() ? (
                     <p className={styles.userBio}>{detail.userPreview.bio}</p>
                   ) : null}
-                  {(detail?.userPreview?.location?.trim() ||
-                    detail?.userPreview?.workplace?.trim()) && (
-                    <div className={styles.userMetaRow}>
-                      {detail?.userPreview?.location?.trim() ? (
-                        <span className={styles.userMetaItem}>
-                          {detail.userPreview.location}
-                        </span>
-                      ) : null}
-                      {detail?.userPreview?.workplace?.trim() ? (
-                        <span className={styles.userMetaItem}>
-                          {detail.userPreview.workplace}
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
                   <div className={styles.userStats}>
                     <div>
                       <span className={styles.userStatValue}>
                         {formatNumber(detail?.userPreview?.stats?.postsCount)}
                       </span>
-                      <span className={styles.userStatLabel}>Posts</span>
+                      <span className={styles.userStatLabel}> Posts</span>
                     </div>
                     <div>
                       <span className={styles.userStatValue}>
@@ -1097,7 +1117,7 @@ export default function ReportReviewPage() {
                           detail?.userPreview?.stats?.followersCount,
                         )}
                       </span>
-                      <span className={styles.userStatLabel}>Followers</span>
+                      <span className={styles.userStatLabel}> Followers</span>
                     </div>
                     <div>
                       <span className={styles.userStatValue}>
@@ -1105,7 +1125,7 @@ export default function ReportReviewPage() {
                           detail?.userPreview?.stats?.followingCount,
                         )}
                       </span>
-                      <span className={styles.userStatLabel}>Following</span>
+                      <span className={styles.userStatLabel}> Following</span>
                     </div>
                   </div>
                 </div>
@@ -1394,9 +1414,7 @@ export default function ReportReviewPage() {
                 type="button"
                 onClick={closeReasonPicker}
                 aria-label="Close"
-              >
-                ×
-              </button>
+              />
             </div>
             {decisionMode === "dismiss" ? (
               <div className={styles.reasonPanel}>

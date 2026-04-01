@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'core/services/auth_storage.dart';
 import 'features/auth/login_screen.dart';
+import 'features/home/home_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AuthStorage.loadAll();
   runApp(const MyApp());
 }
 
@@ -42,7 +46,9 @@ class MyApp extends StatelessWidget {
           minVerticalPadding: 0,
         ),
       ),
-      home: const LoginScreen(),
+      home: AuthStorage.accessToken != null
+          ? const HomeScreen()
+          : const LoginScreen(),
     );
   }
 }

@@ -401,7 +401,6 @@ export default function AuditLogPage() {
 
           <div className={styles.metaRow}>
             <span>Total: {total.toLocaleString()}</span>
-            <span>Visible: {visibleItems.length.toLocaleString()}</span>
           </div>
 
           {loading && !initialized ? <p className={styles.muted}>Loading audit logs...</p> : null}
@@ -420,7 +419,6 @@ export default function AuditLogPage() {
                   <th>Action</th>
                   <th>Target</th>
                   <th>Reasoning</th>
-                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -471,20 +469,6 @@ export default function AuditLogPage() {
                           Severity: {item.detail.severity || "n/a"} · Exp: {formatDateTime(item.detail.expiresAt)}
                         </p>
                         <p className={styles.sub}>{item.detail.note || "No note"}</p>
-                      </td>
-                      <td>
-                        {item.invalidation.invalidated ? (
-                          <>
-                            <p className={styles.statusWarn}>Invalidated</p>
-                            <p className={styles.sub}>At: {formatDateTime(item.invalidation.at)}</p>
-                            <p className={styles.sub}>By: {invalidatedBy}</p>
-                            <p className={styles.sub}>
-                              Reason: {humanizeLabel(item.invalidation.reason)}
-                            </p>
-                          </>
-                        ) : (
-                          <p className={styles.statusOk}>Active</p>
-                        )}
                       </td>
                     </tr>
                   );

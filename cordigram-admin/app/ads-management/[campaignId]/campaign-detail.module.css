@@ -395,14 +395,34 @@
   position: absolute;
   top: 18px;
   right: 18px;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
   border: 1px solid rgba(201, 217, 239, 0.38);
   background: rgba(16, 31, 52, 0.82);
-  color: #f3f8ff;
-  font-size: 18px;
+  color: transparent;
+  font-size: 0;
   cursor: pointer;
+}
+
+.mediaClose::before,
+.mediaClose::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 13px;
+  height: 2px;
+  border-radius: 999px;
+  background: #f3f8ff;
+}
+
+.mediaClose::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.mediaClose::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .mediaNav {

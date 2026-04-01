@@ -537,12 +537,38 @@
 }
 
 .reviewClose {
-  border: none;
-  background: transparent;
-  color: var(--cm-text-muted);
-  font-size: 22px;
-  line-height: 1;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(130, 139, 154, 0.68);
+  border-radius: 999px;
+  background: color-mix(in srgb, #ffffff 84%, #e8eef8 16%);
+  color: transparent;
+  font-size: 0;
   cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reviewClose::before,
+.reviewClose::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 13px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--cm-text-strong);
+}
+
+.reviewClose::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.reviewClose::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .reviewBody {
@@ -892,12 +918,38 @@
 }
 
 .modalClose {
-  border: none;
-  background: transparent;
-  color: var(--cm-text-muted);
-  font-size: 22px;
-  line-height: 1;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(130, 139, 154, 0.68);
+  border-radius: 999px;
+  background: color-mix(in srgb, #ffffff 84%, #e8eef8 16%);
+  color: transparent;
+  font-size: 0;
   cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalClose::before,
+.modalClose::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 13px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--cm-text-strong);
+}
+
+.modalClose::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.modalClose::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .modalTarget {
@@ -1270,15 +1322,34 @@
   position: absolute;
   top: 16px;
   right: 16px;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
   border: 1px solid rgba(165, 184, 212, 0.28);
   background: rgba(9, 16, 30, 0.55);
-  color: #eef4ff;
-  font-size: 20px;
-  line-height: 1;
+  color: transparent;
+  font-size: 0;
   cursor: pointer;
+}
+
+.mediaClose::before,
+.mediaClose::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 13px;
+  height: 2px;
+  border-radius: 999px;
+  background: #eef4ff;
+}
+
+.mediaClose::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.mediaClose::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .mediaStage {

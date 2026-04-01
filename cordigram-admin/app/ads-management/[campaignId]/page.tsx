@@ -478,9 +478,7 @@ export default function AdminAdsCampaignDetailPage() {
             className={styles.mediaClose}
             onClick={() => setActiveMediaIndex(null)}
             aria-label="Close media preview"
-          >
-            x
-          </button>
+          />
 
           {canGoPrev ? (
             <button

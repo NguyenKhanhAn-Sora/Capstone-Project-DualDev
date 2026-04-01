@@ -587,7 +587,7 @@ export default function AdminDashboardPage() {
 
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Auto Moderation (Basic)</h2>
+            <h2 className={styles.panelTitle}>Auto Moderation</h2>
             <Link href="/moderation" className={styles.panelAction}>
               Open details
             </Link>

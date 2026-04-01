@@ -192,3 +192,183 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Global close-button standardization across cordigram-web */
+:where(
+  button[aria-label*="close" i],
+  button[aria-label*="đóng" i],
+  button[title*="đóng" i],
+  button[class*="closeBtn"],
+  button[class*="closeButton"],
+  button[class*="modalClose"],
+  button[class*="mediaClose"],
+  button[class*="reportClose"],
+  button[class*="aboutClose"],
+  button[class*="detailClose"],
+  button[class*="notMeClose"],
+  button[class*="muteClose"],
+  button[class*="paymentCloseBtn"],
+  button[class*="activeNowCloseBtn"],
+  button[class*="eventDetailClose"],
+  button[class*="commentCloseBtn"],
+  button[class*="filterClose"],
+  button[class*="modalCloseBtn"],
+  button[class*="voiceInviteDismiss"],
+  button[class*="close"]
+) {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative;
+  border: 1px solid var(--color-border-button-x) !important;
+  background: color-mix(in srgb, var(--color-surface) 84%, #e8eef8 16%) !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+
+:where(
+  button[aria-label*="close" i],
+  button[aria-label*="đóng" i],
+  button[title*="đóng" i],
+  button[class*="closeBtn"],
+  button[class*="closeButton"],
+  button[class*="modalClose"],
+  button[class*="mediaClose"],
+  button[class*="reportClose"],
+  button[class*="aboutClose"],
+  button[class*="detailClose"],
+  button[class*="notMeClose"],
+  button[class*="muteClose"],
+  button[class*="paymentCloseBtn"],
+  button[class*="activeNowCloseBtn"],
+  button[class*="eventDetailClose"],
+  button[class*="commentCloseBtn"],
+  button[class*="filterClose"],
+  button[class*="modalCloseBtn"],
+  button[class*="voiceInviteDismiss"],
+  button[class*="close"]
+):not(:has(svg))::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--color-button-x);
+}
+
+:where(
+  button[aria-label*="close" i],
+  button[aria-label*="đóng" i],
+  button[title*="đóng" i],
+  button[class*="closeBtn"],
+  button[class*="closeButton"],
+  button[class*="modalClose"],
+  button[class*="mediaClose"],
+  button[class*="reportClose"],
+  button[class*="aboutClose"],
+  button[class*="detailClose"],
+  button[class*="notMeClose"],
+  button[class*="muteClose"],
+  button[class*="paymentCloseBtn"],
+  button[class*="activeNowCloseBtn"],
+  button[class*="eventDetailClose"],
+  button[class*="commentCloseBtn"],
+  button[class*="filterClose"],
+  button[class*="modalCloseBtn"],
+  button[class*="voiceInviteDismiss"],
+  button[class*="close"]
+):not(:has(svg))::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--color-button-x);
+}
+
+:where(
+  button[aria-label*="close" i],
+  button[aria-label*="đóng" i],
+  button[title*="đóng" i],
+  button[class*="closeBtn"],
+  button[class*="closeButton"],
+  button[class*="modalClose"],
+  button[class*="mediaClose"],
+  button[class*="reportClose"],
+  button[class*="aboutClose"],
+  button[class*="detailClose"],
+  button[class*="notMeClose"],
+  button[class*="muteClose"],
+  button[class*="paymentCloseBtn"],
+  button[class*="activeNowCloseBtn"],
+  button[class*="eventDetailClose"],
+  button[class*="commentCloseBtn"],
+  button[class*="filterClose"],
+  button[class*="modalCloseBtn"],
+  button[class*="voiceInviteDismiss"],
+  button[class*="close"]
+):not(:has(svg))::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+:where(
+  button[aria-label*="close" i],
+  button[aria-label*="đóng" i],
+  button[title*="đóng" i],
+  button[class*="closeBtn"],
+  button[class*="closeButton"],
+  button[class*="modalClose"],
+  button[class*="mediaClose"],
+  button[class*="reportClose"],
+  button[class*="aboutClose"],
+  button[class*="detailClose"],
+  button[class*="notMeClose"],
+  button[class*="muteClose"],
+  button[class*="paymentCloseBtn"],
+  button[class*="activeNowCloseBtn"],
+  button[class*="eventDetailClose"],
+  button[class*="commentCloseBtn"],
+  button[class*="filterClose"],
+  button[class*="modalCloseBtn"],
+  button[class*="voiceInviteDismiss"],
+  button[class*="close"]
+):not(:has(svg))::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+:where(
+  button[aria-label*="close" i],
+  button[aria-label*="đóng" i],
+  button[title*="đóng" i],
+  button[class*="closeBtn"],
+  button[class*="closeButton"],
+  button[class*="modalClose"],
+  button[class*="mediaClose"],
+  button[class*="reportClose"],
+  button[class*="aboutClose"],
+  button[class*="detailClose"],
+  button[class*="notMeClose"],
+  button[class*="muteClose"],
+  button[class*="paymentCloseBtn"],
+  button[class*="activeNowCloseBtn"],
+  button[class*="eventDetailClose"],
+  button[class*="commentCloseBtn"],
+  button[class*="filterClose"],
+  button[class*="modalCloseBtn"],
+  button[class*="voiceInviteDismiss"],
+  button[class*="close"]
+):has(svg) svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-button-x);
+}

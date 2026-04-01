@@ -355,7 +355,7 @@
 
   .tableWrap {
     border: 0;
-    border-radius: 0;
+    border-radius: 14px;
   }
 
   .tableHead {

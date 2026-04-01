@@ -1,9 +1,12 @@
 class AppConfig {
   const AppConfig._();
 
-  // Use --dart-define=API_BASE_URL=... when running the app.
-  static const apiBaseUrl = String.fromEnvironment(
+  static const _rawBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://localhost:9999',
   );
+
+  // Strip any accidental trailing slash or backslash that can appear when the
+  // value is supplied via --dart-define on Windows (e.g. API_BASE_URL=http://localhost:9999\).
+  static final apiBaseUrl = _rawBaseUrl.replaceAll(RegExp(r'[/\\]+$'), '');
 }

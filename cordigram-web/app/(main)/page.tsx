@@ -252,6 +252,11 @@ const parseSponsoredCreative = (value: string) => {
   };
 };
 
+const hasStructuredSponsoredMarkers = (value: string) =>
+  /\[\[AD_(PRIMARY_TEXT|HEADLINE|DESCRIPTION|CTA|URL)\]\]/i.test(
+    value || "",
+  );
+
 const findActiveMention = (value: string, caret: number) => {
   const beforeCaret = value.slice(0, caret);
   const match = /(^|[\s([{.,!?])@([a-zA-Z0-9_.]{0,30})$/i.exec(beforeCaret);
@@ -1989,20 +1994,34 @@ function FeedCard({
   } = data;
 
   const displayAt = publishedAt || createdAt;
-  const isSponsoredRepost = Boolean(sponsored && repostOf);
-  const promotedAdPostId = sponsored ? (repostOf || id) : null;
-  const sourceCreativeContent =
-    isSponsoredRepost && repostSourceContent ? repostSourceContent : "";
+  const sourceCreativeContent = repostSourceContent || "";
+  const hasStructuredSourceCreative = hasStructuredSponsoredMarkers(
+    repostSourceContent || "",
+  );
+  const hasStructuredSelfCreative = hasStructuredSponsoredMarkers(content || "");
+  const isAdLikePost = Boolean(
+    sponsored || hasStructuredSelfCreative || hasStructuredSourceCreative,
+  );
+  const promotedAdPostId = isAdLikePost ? (repostOf || id) : null;
+  const isSponsoredRepost = Boolean(repostOf && (sponsored || hasStructuredSourceCreative));
   const sourceSponsoredCreative = useMemo(() => {
-    if (!isSponsoredRepost) return null;
+    if (!isSponsoredRepost || !hasStructuredSourceCreative) return null;
     return parseSponsoredCreative(sourceCreativeContent);
-  }, [isSponsoredRepost, sourceCreativeContent]);
-  const sponsoredCreative = useMemo(() => {
-    if (!sponsored || isSponsoredRepost) return null;
+  }, [isSponsoredRepost, hasStructuredSourceCreative, sourceCreativeContent]);
+  const sponsoredRepostCreative = useMemo(() => {
+    if (!isSponsoredRepost) return null;
+    if (sourceSponsoredCreative) return sourceSponsoredCreative;
+    if (!hasStructuredSelfCreative) return null;
     return parseSponsoredCreative(content || "");
-  }, [content, sponsored, isSponsoredRepost]);
-  const renderedContent =
-    sponsoredCreative?.primaryText || (isSponsoredRepost ? content : content);
+  }, [isSponsoredRepost, sourceSponsoredCreative, hasStructuredSelfCreative, content]);
+  const sponsoredCreative = useMemo(() => {
+    if (isSponsoredRepost) return null;
+    if (!sponsored && !hasStructuredSelfCreative) return null;
+    return parseSponsoredCreative(content || "");
+  }, [content, sponsored, isSponsoredRepost, hasStructuredSelfCreative]);
+  const renderedContent = isSponsoredRepost
+    ? sponsoredRepostCreative?.primaryText || content
+    : sponsoredCreative?.primaryText || content;
   const sourceMedia =
     isSponsoredRepost && Array.isArray(repostSourceMedia)
       ? repostSourceMedia
@@ -2050,7 +2069,7 @@ function FeedCard({
 
   const sendAdsEvent = useCallback(
     (eventType: "impression" | "dwell" | "cta_click", durationMs?: number) => {
-      if (!token || !promotedAdPostId || !sponsored) return;
+      if (!token || !promotedAdPostId || !isAdLikePost) return;
       if (!adsSessionIdRef.current) {
         adsSessionIdRef.current = getAdsTrackSessionId();
       }
@@ -2064,7 +2083,7 @@ function FeedCard({
         source: "home_feed",
       }).catch(() => undefined);
     },
-    [id, promotedAdPostId, sponsored, token],
+    [id, promotedAdPostId, isAdLikePost, token],
   );
 
   const onSponsoredCtaClick = useCallback(() => {
@@ -2168,11 +2187,11 @@ function FeedCard({
   }, [id, onRemoteUpdate, token]);
 
   useEffect(() => {
-    if (!sponsored) return;
+    if (!isAdLikePost) return;
     if (!adsSessionIdRef.current) {
       adsSessionIdRef.current = getAdsTrackSessionId();
     }
-  }, [sponsored]);
+  }, [isAdLikePost]);
 
   useEffect(() => {
     const el = cardRef.current;
@@ -2185,7 +2204,7 @@ function FeedCard({
             dwellTimer.current = setTimeout(() => {
               lastViewAt.current = Date.now();
               onView(id);
-              if (sponsored) {
+              if (isAdLikePost) {
                 sendAdsEvent("impression");
               }
             }, VIEW_DWELL_MS);
@@ -2204,10 +2223,10 @@ function FeedCard({
       }
       observer.disconnect();
     };
-  }, [id, onView, sendAdsEvent, sponsored]);
+  }, [id, onView, sendAdsEvent, isAdLikePost]);
 
   useEffect(() => {
-    if (!sponsored) return;
+    if (!isAdLikePost) return;
     const el = cardRef.current;
     if (!el) return;
 
@@ -2244,7 +2263,7 @@ function FeedCard({
         }
       }
     };
-  }, [sendAdsEvent, sponsored]);
+  }, [sendAdsEvent, isAdLikePost]);
 
   useEffect(() => {
     const el = cardRef.current;
@@ -4241,8 +4260,8 @@ function FeedCard({
             </div>
           </div>
 
-          {sourceSponsoredCreative?.primaryText ? (
-            <p className={styles.repostAdPrimary}>{sourceSponsoredCreative.primaryText}</p>
+          {sponsoredRepostCreative?.primaryText ? (
+            <p className={styles.repostAdPrimary}>{sponsoredRepostCreative.primaryText}</p>
           ) : null}
 
           {sourceMedia.length ? (
@@ -4305,28 +4324,28 @@ function FeedCard({
             </div>
           ) : null}
 
-          {sourceSponsoredCreative &&
-          (sourceSponsoredCreative.headline ||
-            sourceSponsoredCreative.description ||
-            sourceSponsoredCreative.destinationUrl) ? (
+          {sponsoredRepostCreative &&
+          (sponsoredRepostCreative.headline ||
+            sponsoredRepostCreative.description ||
+            sponsoredRepostCreative.destinationUrl) ? (
             <div className={styles.sponsoredMetaRow}>
               <div className={styles.sponsoredMetaText}>
-                {sourceSponsoredCreative.headline ? (
-                  <p className={styles.sponsoredHeadline}>{sourceSponsoredCreative.headline}</p>
+                {sponsoredRepostCreative.headline ? (
+                  <p className={styles.sponsoredHeadline}>{sponsoredRepostCreative.headline}</p>
                 ) : null}
-                {sourceSponsoredCreative.description ? (
-                  <p className={styles.sponsoredDescription}>{sourceSponsoredCreative.description}</p>
+                {sponsoredRepostCreative.description ? (
+                  <p className={styles.sponsoredDescription}>{sponsoredRepostCreative.description}</p>
                 ) : null}
               </div>
-              {sourceSponsoredCreative.destinationUrl ? (
+              {sponsoredRepostCreative.destinationUrl ? (
                 <a
                   className={styles.sponsoredCta}
-                  href={sourceSponsoredCreative.destinationUrl}
+                  href={sponsoredRepostCreative.destinationUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={onSponsoredCtaClick}
                 >
-                  {sourceSponsoredCreative.cta || "Shop Now"}
+                  {sponsoredRepostCreative.cta || "Shop Now"}
                 </a>
               ) : null}
             </div>

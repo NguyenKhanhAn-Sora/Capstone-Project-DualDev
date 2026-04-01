@@ -5,7 +5,6 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./login.module.css";
 import { getApiBaseUrl } from "@/lib/api";
-import { getWebBaseUrl } from "@/lib/urls";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -13,7 +12,7 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const webBase = getWebBaseUrl();
+  const [forgotPasswordNotice, setForgotPasswordNotice] = useState(false);
 
   const canSubmit = useMemo(
     () => email.trim().length > 0 && password.trim().length > 0,
@@ -113,10 +112,20 @@ export default function AdminLoginPage() {
           ) : null}
 
           <div className={styles.row}>
-            <a href={`${webBase}/login`} className={styles.link}>
+            <button
+              type="button"
+              className={styles.linkButton}
+              onClick={() => setForgotPasswordNotice(true)}
+            >
               Forgot password?
-            </a>
+            </button>
           </div>
+
+          {forgotPasswordNotice ? (
+            <div className={styles.infoNotice} role="status" aria-live="polite">
+              For password recovery support, please contact cordigram@gmail.com.
+            </div>
+          ) : null}
 
           <button
             type="submit"

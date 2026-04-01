@@ -1461,9 +1461,7 @@ export default function ContentModerationPage() {
                   Type: {reviewOverlay.type.toUpperCase()} · ID: {reviewOverlay.targetId}
                 </p>
               </div>
-              <button type="button" className={styles.reviewClose} onClick={closeReviewOverlay} aria-label="Close review overlay">
-                x
-              </button>
+              <button type="button" className={styles.reviewClose} onClick={closeReviewOverlay} aria-label="Close review overlay" />
             </div>
 
             {reviewOverlay.loading ? <p className={styles.subText}>Loading target detail...</p> : null}
@@ -1928,9 +1926,7 @@ export default function ContentModerationPage() {
                 <p className={styles.modalTitle}>Select moderation action</p>
                 <p className={styles.modalSubtitle}>Choose reason and action to apply. Severity is optional for warning and suspend.</p>
               </div>
-              <button type="button" className={styles.modalClose} onClick={() => setModal((prev) => ({ ...prev, open: false }))} aria-label="Close">
-                x
-              </button>
+              <button type="button" className={styles.modalClose} onClick={() => setModal((prev) => ({ ...prev, open: false }))} aria-label="Close" />
             </div>
 
             <p className={styles.modalTarget}>{modal.targetLabel} · {modal.targetId}</p>
@@ -2138,9 +2134,7 @@ export default function ContentModerationPage() {
       {mediaViewer.open ? (
         <div className={styles.mediaOverlay} onClick={closeMediaViewer}>
           <p className={styles.mediaCounter}>Post media · {mediaViewer.index + 1}/{mediaViewer.media.length}</p>
-          <button type="button" className={styles.mediaClose} onClick={closeMediaViewer} aria-label="Close media viewer">
-            x
-          </button>
+          <button type="button" className={styles.mediaClose} onClick={closeMediaViewer} aria-label="Close media viewer" />
 
           {mediaViewer.media.length > 1 ? (
             <button

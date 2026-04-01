@@ -54,9 +54,7 @@ export default function ImageViewerOverlay({
           event.stopPropagation();
           onClose();
         }}
-      >
-        ×
-      </button>
+      />
       <div
         className={styles.figure}
         onClick={(event) => event.stopPropagation()}

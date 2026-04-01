@@ -55,12 +55,44 @@
   margin: 0;
   font-size: 14px;
   color: var(--color-text-muted);
-  max-width: 520px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--color-border-button-x);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface) 82%, #e8eef8 18%);
+  color: transparent;
+  font-size: 0;
+  gap: 12px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.16s ease, border-color 0.16s ease;
 }
 
-.topActions {
-  display: flex;
-  gap: 12px;
+.modalClose::before,
+.modalClose::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 13px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--color-button-x);
+}
+
+.modalClose::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.modalClose::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.modalClose:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
   flex-wrap: wrap;
 }
 
@@ -269,6 +301,33 @@
 .userName {
   margin: 0;
   font-weight: 700;
+}
+
+.nameWithCreator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.creatorTick {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #1d9bf0;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.creatorTick::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 3px;
+  width: 4px;
+  height: 7px;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(40deg);
 }
 
 .postMeta,
@@ -734,12 +793,44 @@
 }
 
 .modalClose {
-  border: none;
-  background: transparent;
-  font-size: 20px;
-  line-height: 1;
-  color: var(--color-text-muted);
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border-button-x);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface) 82%, #e8eef8 18%);
+  color: transparent;
+  font-size: 0;
   cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.modalClose::before,
+.modalClose::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 13px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--color-button-x);
+}
+
+.modalClose::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.modalClose::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.modalClose:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
 }
 
 .reasonLayout {

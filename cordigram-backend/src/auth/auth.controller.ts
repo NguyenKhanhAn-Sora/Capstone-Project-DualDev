@@ -3,10 +3,13 @@ import {
   Body,
   Controller,
   Delete,
+  ExecutionContext,
   Get,
   Headers,
+  Injectable,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UploadedFiles,
@@ -58,6 +61,23 @@ const avatarFileFilter = (
   }
   cb(null, true);
 };
+
+/**
+ * Guard used exclusively by GET /auth/google/mobile.
+ * Encodes the app's deviceId into the OAuth `state` parameter so it survives
+ * the full Google redirect round-trip without relying on cookies.
+ * State format: "mobile:<urlencoded-deviceId>"
+ */
+@Injectable()
+class MobileGoogleGuard extends AuthGuard('google') {
+  override getAuthenticateOptions(context: ExecutionContext) {
+    const req = context
+      .switchToHttp()
+      .getRequest<{ query: Record<string, string> }>();
+    const deviceId = encodeURIComponent(req.query?.deviceId ?? '');
+    return { state: `mobile:${deviceId}` };
+  }
+}
 
 @Controller('auth')
 export class AuthController {
@@ -324,6 +344,13 @@ export class AuthController {
     return this.authService.resendTwoFactorOtp(dto.token);
   }
 
+  // ── Mobile Google OAuth entry point ──────────────────────────────────────
+  // MobileGoogleGuard encodes deviceId into the OAuth `state` param so it
+  // survives the full Google redirect round-trip without needing cookies.
+  @Get('google/mobile')
+  @UseGuards(MobileGoogleGuard)
+  mobileGoogleAuth() {}
+
   @Get('google')
   @UseGuards(AuthGuard('google'))
   async googleAuth() {}
@@ -335,10 +362,23 @@ export class AuthController {
       (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0] ||
       req.ip ||
       '';
+
+    // Decode platform + deviceId from the OAuth state param.
+    // Format: "mobile:<urlencoded-deviceId>" for mobile, absent or other for web.
+    const rawState = (req.query as Record<string, string>)?.state;
+    let isMobile = false;
+    let stateDeviceId = '';
+    if (rawState?.startsWith('mobile:')) {
+      isMobile = true;
+      stateDeviceId = decodeURIComponent(rawState.slice(7));
+    }
+
     const deviceId =
+      stateDeviceId ||
       (req.cookies?.['device_id'] as string | undefined) ||
       (req.headers['x-device-id'] as string | undefined) ||
       '';
+
     const user = req.user as
       | undefined
       | {
@@ -363,14 +403,26 @@ export class AuthController {
 
     const params = new URLSearchParams();
     params.append('needsProfile', result.needsProfile ? '1' : '0');
-    if ('accessToken' in result) {
-      params.append('accessToken', result.accessToken);
-      this.setRefreshCookie(res, result.refreshToken);
-    }
     if ('signupToken' in result) {
       params.append('signupToken', result.signupToken);
     }
 
+    if (isMobile) {
+      // For mobile: pass refreshToken as URL param (app can't read HttpOnly cookies)
+      if ('accessToken' in result) {
+        params.append('accessToken', result.accessToken);
+        params.append('refreshToken', result.refreshToken);
+      }
+      return res.redirect(
+        `cordigram://auth/google/callback?${params.toString()}`,
+      );
+    }
+
+    // Web flow — set cookie, redirect to frontend
+    if ('accessToken' in result) {
+      params.append('accessToken', result.accessToken);
+      this.setRefreshCookie(res, result.refreshToken);
+    }
     const redirectUrl = `${this.config.frontendUrl}/auth/google/callback?${params.toString()}`;
     return res.redirect(redirectUrl);
   }
