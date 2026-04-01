@@ -1,11 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import * as serversApi from "@/lib/servers-api";
 import { blockUser, ignoreUser } from "@/lib/api";
 import MemberContextMenu from "@/components/MemberContextMenu/MemberContextMenu";
 import MemberProfilePopup from "@/components/MemberProfilePopup/MemberProfilePopup";
 import IgnoreUserPopup from "@/components/IgnoreUserPopup/IgnoreUserPopup";
+import ModeratorViewToggle from "@/components/ModeratorViewToggle/ModeratorViewToggle";
+import MemberDataGrid from "@/components/MemberDataGrid/MemberDataGrid";
+import MemberDetailsPanel from "@/components/MemberDetailsPanel/MemberDetailsPanel";
+import { useModeratorView } from "@/hooks/use-moderator-view";
+import * as memberList from "@/lib/member-list-logic";
+import type { ModeratorMemberRow } from "@/lib/mod-view-api";
 import styles from "./ServerMembersSection.module.css";
 
 /** Hiển thị "X ngày trước" hoặc "X năm" nếu >= 365 ngày */
@@ -20,11 +26,45 @@ function formatDaysOrYears(date: Date | string): string {
 
 // Extended member type với thông tin role
 interface ExtendedMember extends serversApi.MemberWithRoles {
-  // Thêm các trường từ ServerMemberRow để tương thích ngược
   joinedCordigramAt?: string;
-  joinMethod?: "owner" | "invited" | "link";
   invitedBy?: { id: string; username: string };
-  role?: string; // Tương thích ngược
+  role?: string;
+}
+
+function normalizeMemberRow(m: unknown): ExtendedMember {
+  const rec = m as Record<string, unknown>;
+  const isOwner = Boolean(rec.isOwner);
+  return {
+    ...(m as unknown as ExtendedMember),
+    serverMemberRole: (rec.serverMemberRole as ExtendedMember["serverMemberRole"]) ?? (isOwner ? "owner" : "member"),
+    accountCreatedAt: (rec.accountCreatedAt as string) ?? String(rec.joinedAt ?? ""),
+    accountAgeDays: typeof rec.accountAgeDays === "number" ? rec.accountAgeDays : 0,
+    messagesLast10Min: typeof rec.messagesLast10Min === "number" ? rec.messagesLast10Min : 0,
+    messagesLast30d: typeof rec.messagesLast30d === "number" ? rec.messagesLast30d : 0,
+    lastMessageAt: (rec.lastMessageAt as string | null) ?? null,
+    isOnline: Boolean(rec.isOnline),
+    joinMethod: (rec.joinMethod as serversApi.MemberWithRoles["joinMethod"]) ?? "link",
+    invitedBy: rec.invitedBy as ExtendedMember["invitedBy"],
+  } as ExtendedMember;
+}
+
+function toModeratorGridRow(m: ExtendedMember): ModeratorMemberRow {
+  const flags: ModeratorMemberRow["flags"] = [];
+  if (m.accountAgeDays < 7) flags.push("new-account");
+  if (m.messagesLast10Min > 50) flags.push("spam");
+  return {
+    userId: m.userId,
+    displayName: m.displayName,
+    username: m.username,
+    avatarUrl: m.avatarUrl ?? "",
+    joinedAt: m.joinedAt,
+    accountCreatedAt: m.accountCreatedAt,
+    accountAgeDays: m.accountAgeDays,
+    joinMethod: m.joinMethod ?? "link",
+    invitedBy: m.invitedBy,
+    roles: m.roles,
+    flags,
+  };
 }
 
 function joinMethodLabel(row: ExtendedMember): string {
@@ -76,7 +116,14 @@ export default function ServerMembersSection({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState<"name" | "joinedAt" | "role">("joinedAt");
+  const [sortBy, setSortBy] = useState<memberList.SortKey>("joinedAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [listFilters, setListFilters] = useState<memberList.MemberListFilters>({
+    serverRole: "all",
+    newAccountOnly: false,
+    spamOnly: false,
+  });
   const [showInChannelList, setShowInChannelList] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filterModalOpen, setFilterModalOpen] = useState(false);
@@ -100,6 +147,13 @@ export default function ServerMembersSection({
   const [timeoutDuration, setTimeoutDuration] = useState(TIMEOUT_DURATIONS[0].seconds);
   const [moderationLoading, setModerationLoading] = useState(false);
 
+  // Moderator View state
+  const canEnableModView = permissions.isOwner || permissions.canKick;
+  const moderatorView = useModeratorView({
+    serverId,
+    canEnable: canEnableModView,
+  });
+
   // Fetch members với role info
   const fetchMembers = useCallback(async () => {
     if (!serverId) return;
@@ -120,7 +174,7 @@ export default function ServerMembersSection({
         })),
         permissions: response.currentUserPermissions,
       });
-      setMembers(response.members as ExtendedMember[]);
+      setMembers(response.members.map((m) => normalizeMemberRow(m)));
       setPermissions(response.currentUserPermissions);
     } catch (err) {
       // Fallback to old API nếu API mới fail
@@ -130,21 +184,30 @@ export default function ServerMembersSection({
         const oldList = await serversApi.getServerMembers(serverId);
         console.log("[ServerMembersSection] OLD API Response:", oldList);
         // Convert sang ExtendedMember format
-        const converted: ExtendedMember[] = oldList.map((m) => ({
-          userId: m.userId,
-          displayName: m.displayName,
-          username: m.username,
-          avatarUrl: m.avatarUrl,
-          joinedAt: m.joinedAt,
-          joinedCordigramAt: m.joinedCordigramAt,
-          joinMethod: m.joinMethod,
-          invitedBy: m.invitedBy,
-          isOwner: m.role === "owner",
-          roles: [],
-          highestRolePosition: 0,
-          displayColor: "#99AAB5",
-          role: m.role,
-        }));
+        const converted: ExtendedMember[] = oldList.map((m) =>
+          normalizeMemberRow({
+            userId: m.userId,
+            displayName: m.displayName,
+            username: m.username,
+            avatarUrl: m.avatarUrl,
+            joinedAt: m.joinedAt,
+            joinedCordigramAt: m.joinedCordigramAt,
+            joinMethod: m.joinMethod ?? "link",
+            invitedBy: m.invitedBy,
+            isOwner: m.role === "owner",
+            serverMemberRole: m.role === "owner" ? "owner" : m.role === "moderator" ? "moderator" : "member",
+            roles: [],
+            highestRolePosition: 0,
+            displayColor: "#99AAB5",
+            role: m.role,
+            accountCreatedAt: m.joinedCordigramAt ?? m.joinedAt,
+            accountAgeDays: 0,
+            messagesLast10Min: 0,
+            messagesLast30d: 0,
+            lastMessageAt: null,
+            isOnline: false,
+          }),
+        );
         setMembers(converted);
         setPermissions({ canKick: isOwner, canBan: isOwner, canTimeout: isOwner, isOwner });
       } catch (fallbackErr) {
@@ -189,29 +252,12 @@ export default function ServerMembersSection({
     };
   }, [filterModalOpen, filterDays, filterRole, serverId]);
 
-  const filtered = members.filter((m) => {
-    if (!search.trim()) return true;
-    const q = search.trim().toLowerCase();
-    return (
-      m.displayName.toLowerCase().includes(q) ||
-      m.username.toLowerCase().includes(q) ||
-      m.userId.toLowerCase().includes(q)
-    );
-  });
-
-  const sorted = [...filtered].sort((a, b) => {
-    switch (sortBy) {
-      case "name":
-        return (a.displayName || a.username).localeCompare(b.displayName || b.username);
-      case "joinedAt":
-        return new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime();
-      case "role":
-        // Sắp xếp theo position role cao nhất
-        return b.highestRolePosition - a.highestRolePosition;
-      default:
-        return 0;
-    }
-  });
+  const processedMembers = useMemo(() => {
+    let list = memberList.filterMembersBySearch(members, search);
+    list = memberList.filterMembersByAdvanced(list, listFilters);
+    list = memberList.applyChannelListSidebar(list, showInChannelList);
+    return memberList.sortMembers(list, sortBy, sortOrder);
+  }, [members, search, listFilters, showInChannelList, sortBy, sortOrder]);
 
   /**
    * Kiểm tra current user có thể tác động target không
@@ -284,10 +330,10 @@ export default function ServerMembersSection({
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === sorted.length) {
+    if (selectedIds.size === processedMembers.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(sorted.map((r) => r.userId)));
+      setSelectedIds(new Set(processedMembers.map((r) => r.userId)));
     }
   };
   const toggleSelect = (userId: string) => {
@@ -340,7 +386,7 @@ export default function ServerMembersSection({
         </button>
       </div>
       <p className={styles.desc}>
-        Tùy chọn này sẽ hiển thị trang thành viên trong danh sách kênh, cho phép bạn nhanh chóng xem những người vừa mới tham gia vào máy chủ và tìm kiếm những người dùng bị gắn cờ vì hoạt động bất thường.
+        Khi bật, chỉ hiển thị tối đa 50 thành viên: đang trực tuyến, tài khoản mới (&lt; 7 ngày), gia nhập gần đây hoặc có hoạt động tin nhắn trong 7 ngày — phù hợp hiển thị trong danh sách kênh.
       </p>
 
       <h3 className={styles.sectionTitle}>Kết quả tìm kiếm</h3>
@@ -348,35 +394,165 @@ export default function ServerMembersSection({
         <input
           type="text"
           className={styles.search}
-          placeholder="Tìm theo tên người dùng hoặc id"
+          placeholder="Tìm theo username hoặc user ID (lọc ngay)"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select
-          className={styles.sortSelect}
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          title="Sắp xếp"
-        >
-          <option value="joinedAt">Gia nhập server</option>
-          <option value="name">Tên</option>
-          <option value="role">Vai trò</option>
-        </select>
-        {isOwner && (
+        <div className={styles.toolbarRight}>
           <button
             type="button"
-            className={styles.btnSecondary}
-            onClick={() => setFilterModalOpen(true)}
+            className={styles.sortButton}
+            onClick={() => setSortMenuOpen((open) => !open)}
           >
-            Lược bỏ
+            <span className={styles.sortButtonIcon} />
+            <span>Sắp xếp</span>
           </button>
-        )}
+          {sortMenuOpen && (
+            <div className={styles.sortMenu} role="menu">
+              <button
+                type="button"
+                className={`${styles.sortMenuItem} ${
+                  sortBy === "joinedAt" && sortOrder === "desc" ? styles.sortMenuItemActive : ""
+                }`}
+                onClick={() => {
+                  setSortBy("joinedAt");
+                  setSortOrder("desc");
+                  setSortMenuOpen(false);
+                }}
+              >
+                <span>Gia nhập từ (mới nhất trước)</span>
+                <span
+                  className={`${styles.sortMenuDot} ${
+                    sortBy === "joinedAt" && sortOrder === "desc" ? styles.sortMenuDotActive : ""
+                  }`}
+                />
+              </button>
+              <button
+                type="button"
+                className={`${styles.sortMenuItem} ${
+                  sortBy === "joinedAt" && sortOrder === "asc" ? styles.sortMenuItemActive : ""
+                }`}
+                onClick={() => {
+                  setSortBy("joinedAt");
+                  setSortOrder("asc");
+                  setSortMenuOpen(false);
+                }}
+              >
+                <span>Gia nhập từ (lâu nhất trước)</span>
+                <span
+                  className={`${styles.sortMenuDot} ${
+                    sortBy === "joinedAt" && sortOrder === "asc" ? styles.sortMenuDotActive : ""
+                  }`}
+                />
+              </button>
+              <button
+                type="button"
+                className={`${styles.sortMenuItem} ${
+                  sortBy === "username" && sortOrder === "asc" ? styles.sortMenuItemActive : ""
+                }`}
+                onClick={() => {
+                  setSortBy("username");
+                  setSortOrder("asc");
+                  setSortMenuOpen(false);
+                }}
+              >
+                <span>Username (A → Z)</span>
+                <span
+                  className={`${styles.sortMenuDot} ${
+                    sortBy === "username" && sortOrder === "asc" ? styles.sortMenuDotActive : ""
+                  }`}
+                />
+              </button>
+              <button
+                type="button"
+                className={`${styles.sortMenuItem} ${
+                  sortBy === "activity" && sortOrder === "desc" ? styles.sortMenuItemActive : ""
+                }`}
+                onClick={() => {
+                  setSortBy("activity");
+                  setSortOrder("desc");
+                  setSortMenuOpen(false);
+                }}
+              >
+                <span>Hoạt động (nhiều → ít)</span>
+                <span
+                  className={`${styles.sortMenuDot} ${
+                    sortBy === "activity" && sortOrder === "desc"
+                      ? styles.sortMenuDotActive
+                      : ""
+                  }`}
+                />
+              </button>
+              <div className={styles.sortMenuDivider} />
+              <div className={styles.sortMenuLabel}>Lọc</div>
+              <button
+                type="button"
+                className={`${styles.sortMenuItem} ${
+                  listFilters.newAccountOnly ? styles.sortMenuItemActive : ""
+                }`}
+                onClick={() =>
+                  setListFilters((f) => ({ ...f, newAccountOnly: !f.newAccountOnly }))
+                }
+              >
+                <span>Tài khoản mới (&lt; 7 ngày)</span>
+                <span
+                  className={`${styles.sortMenuDot} ${
+                    listFilters.newAccountOnly ? styles.sortMenuDotActive : ""
+                  }`}
+                />
+              </button>
+              <button
+                type="button"
+                className={`${styles.sortMenuItem} ${
+                  listFilters.spamOnly ? styles.sortMenuItemActive : ""
+                }`}
+                onClick={() => setListFilters((f) => ({ ...f, spamOnly: !f.spamOnly }))}
+              >
+                <span>Spam (&gt; 50 tin / 10 phút)</span>
+                <span
+                  className={`${styles.sortMenuDot} ${
+                    listFilters.spamOnly ? styles.sortMenuDotActive : ""
+                  }`}
+                />
+              </button>
+              <div className={styles.sortMenuDivider} />
+              <div className={styles.sortMenuLabel}>Vai trò</div>
+              <div className={styles.sortMenuItem}>
+                <select
+                  className={styles.sortSelect}
+                  value={listFilters.serverRole}
+                  onChange={(e) =>
+                    setListFilters((f) => ({
+                      ...f,
+                      serverRole: e.target.value as memberList.MemberListFilters["serverRole"],
+                    }))
+                  }
+                  title="Lọc vai trò"
+                >
+                  <option value="all">Mọi vai trò</option>
+                  <option value="owner">Chủ</option>
+                  <option value="moderator">Điều hành</option>
+                  <option value="member">Thành viên</option>
+                </select>
+              </div>
+            </div>
+          )}
+          {isOwner && (
+            <button
+              type="button"
+              className={styles.btnSecondary}
+              onClick={() => setFilterModalOpen(true)}
+            >
+              Lược bỏ
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <p className={styles.error}>{error}</p>}
       {loading && <p className={styles.loading}>Đang tải...</p>}
 
-      {!loading && !error && (
+      {!loading && !error && !moderatorView.enabled && (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
@@ -384,19 +560,16 @@ export default function ServerMembersSection({
                 <th className={styles.thCheck}>
                   <input
                     type="checkbox"
-                    checked={sorted.length > 0 && selectedIds.size === sorted.length}
+                    checked={processedMembers.length > 0 && selectedIds.size === processedMembers.length}
                     onChange={toggleSelectAll}
                     aria-label="Chọn tất cả"
                   />
                 </th>
                 <th className={styles.thName}>TÊN</th>
-                <th className={styles.th}>GIA NHẬP TỪ</th>
-                <th className={styles.th}>VAI TRÒ</th>
-                <th className={styles.thSignal}>TÍN HIỆU</th>
               </tr>
             </thead>
             <tbody>
-              {sorted.map((row) => (
+              {processedMembers.map((row) => (
                 <tr key={row.userId} className={styles.row}>
                   <td className={styles.tdCheck}>
                     <input
@@ -419,8 +592,7 @@ export default function ServerMembersSection({
                       )}
                     </div>
                     <div className={styles.nameBlock}>
-                      {/* Tên hiển thị màu theo role cao nhất */}
-                      <span 
+                      <span
                         className={styles.displayName}
                         style={{ color: row.displayColor || "#fff" }}
                       >
@@ -429,27 +601,6 @@ export default function ServerMembersSection({
                       </span>
                       <span className={styles.username}>{row.username}</span>
                     </div>
-                  </td>
-                  <td className={styles.td}>{formatDaysOrYears(row.joinedAt)}</td>
-                  <td className={styles.td}>{renderRoleBadges(row)}</td>
-                  <td className={styles.tdSignal}>
-                    <button
-                      type="button"
-                      className={styles.iconBtn}
-                      title="Hồ sơ"
-                      aria-label="Hồ sơ"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setProfileMember(row);
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-                      </svg>
-                    </button>
                     <button
                       type="button"
                       className={styles.iconBtn}
@@ -474,10 +625,41 @@ export default function ServerMembersSection({
             </tbody>
           </table>
           <p className={styles.resultCount}>
-            Đang hiển thị {sorted.length} thành viên
+            Đang hiển thị {processedMembers.length} thành viên
+            {showInChannelList ? " (tối đa 50 khi bật hiển thị trong kênh)" : ""}
           </p>
         </div>
       )}
+
+      {!loading && !error && moderatorView.enabled && (
+        <div className={styles.modViewLayout}>
+          <div className={styles.modViewGrid}>
+            <MemberDataGrid
+              rows={processedMembers.map(toModeratorGridRow)}
+              loading={false}
+              onRowClick={(r) => moderatorView.loadDetail(r.userId)}
+            />
+          </div>
+          {(moderatorView.detail || moderatorView.detailLoading) && (
+            <div className={styles.modViewPanel}>
+              <MemberDetailsPanel
+                detail={moderatorView.detail}
+                loading={moderatorView.detailLoading}
+                error={moderatorView.detailError}
+                onClose={() => moderatorView.loadDetail("")}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className={styles.modViewToggleWrap}>
+        <ModeratorViewToggle
+          enabled={moderatorView.enabled}
+          canEnable={moderatorView.canEnable}
+          onChange={(next) => moderatorView.setEnabled(next)}
+        />
+      </div>
 
       {filterModalOpen && (
         <div className={styles.filterOverlay} role="dialog" aria-modal>

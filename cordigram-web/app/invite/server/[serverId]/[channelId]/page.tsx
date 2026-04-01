@@ -121,28 +121,6 @@ export default function InviteServerChannelPage() {
     );
   }
 
-  if (server && !server.isPublic && !isMember) {
-    return (
-      <div className="min-h-screen bg-[#313338] flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <p className="text-[#f2f3f5] text-lg font-medium mb-2">
-            Bạn không có quyền truy cập máy chủ này
-          </p>
-          <p className="text-[#b5bac1] text-sm mb-4">
-            Máy chủ này là riêng tư. Chỉ thành viên được mời mới có thể truy cập.
-          </p>
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            className="px-4 py-2 rounded bg-[#5865f2] text-white"
-          >
-            Về trang chủ
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   if (!server) return null;
 
   const hasAvatar = isValidAvatarUrl(server.avatarUrl ?? undefined);

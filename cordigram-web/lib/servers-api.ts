@@ -1,6 +1,6 @@
 import { decodeJwt } from "./auth";
 
-const API_BASE_URL = "http://localhost:9999";
+export const API_BASE_URL = "http://localhost:9999";
 
 function getToken(): string {
   return (
@@ -8,7 +8,7 @@ function getToken(): string {
   );
 }
 
-function getHeaders() {
+export function getHeaders() {
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${getToken()}`,
@@ -278,6 +278,7 @@ export interface RolePermissions {
   timeoutMembers: boolean;
 
   // Quyền Kênh Tin Nhắn
+  mentionEveryone: boolean;
   sendMessages: boolean;
   sendMessagesInThreads: boolean;
   createPublicThreads: boolean;
@@ -512,6 +513,7 @@ export interface MemberWithRoles {
   avatarUrl: string;
   joinedAt: string;
   isOwner: boolean;
+  serverMemberRole: "owner" | "moderator" | "member";
   roles: Array<{
     _id: string;
     name: string;
@@ -520,6 +522,14 @@ export interface MemberWithRoles {
   }>;
   highestRolePosition: number;
   displayColor: string; // Màu hiển thị username (từ role cao nhất)
+  accountCreatedAt: string;
+  accountAgeDays: number;
+  messagesLast10Min: number;
+  messagesLast30d: number;
+  lastMessageAt: string | null;
+  isOnline: boolean;
+  joinMethod: "owner" | "invited" | "link";
+  invitedBy?: { id: string; username: string };
 }
 
 /**
@@ -712,6 +722,8 @@ export interface CurrentUserServerPermissions {
   canManageChannels: boolean;
   canManageEvents: boolean;
   canCreateInvite: boolean;
+  /** Được dùng đề cập (@) — không ảnh hưởng việc nhận tin khi người khác @ bạn. */
+  mentionEveryone?: boolean;
 }
 
 export interface ServerInteractionSettings {
@@ -747,6 +759,7 @@ export async function getCurrentUserPermissions(
         canManageChannels: membersResponse.currentUserPermissions.isOwner,
         canManageEvents: membersResponse.currentUserPermissions.isOwner,
         canCreateInvite: true,
+        mentionEveryone: membersResponse.currentUserPermissions.isOwner,
       };
     } catch {
       return {
@@ -759,6 +772,7 @@ export async function getCurrentUserPermissions(
         canManageChannels: false,
         canManageEvents: false,
         canCreateInvite: true,
+        mentionEveryone: false,
       };
     }
   }
@@ -924,6 +938,27 @@ export async function declineServerInvite(inviteId: string): Promise<void> {
   }
 }
 
+// Mentions
+export interface MentionSuggestion {
+  id: string;
+  name: string;
+  type: "special" | "role" | "user";
+  description: string;
+  avatarUrl?: string;
+  color?: string;
+}
+
+export async function getMentionSuggestions(
+  serverId: string,
+  keyword: string = "",
+): Promise<MentionSuggestion[]> {
+  const url = new URL(`${API_BASE_URL}/servers/${serverId}/mentions`);
+  if (keyword) url.searchParams.set("keyword", keyword);
+  const response = await fetch(url.toString(), { headers: getHeaders() });
+  if (!response.ok) return [];
+  return response.json();
+}
+
 // Channels
 export async function createChannel(
   serverId: string,
@@ -963,6 +998,37 @@ export async function createCategory(
   );
   if (!response.ok) throw new Error("Không tạo được danh mục");
   return response.json();
+}
+
+export async function updateCategory(
+  serverId: string,
+  categoryId: string,
+  name: string,
+): Promise<ServerCategory> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/channels/categories/${categoryId}`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify({ name }),
+    },
+  );
+  if (!response.ok) throw new Error("Không đổi tên được danh mục");
+  return response.json();
+}
+
+export async function deleteCategory(
+  serverId: string,
+  categoryId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/channels/categories/${categoryId}`,
+    {
+      method: "DELETE",
+      headers: getHeaders(),
+    },
+  );
+  if (!response.ok) throw new Error("Không xóa được danh mục");
 }
 
 export async function getCategories(serverId: string): Promise<ServerCategory[]> {
@@ -1293,7 +1359,16 @@ export async function createMessage(
   );
 
   if (!response.ok) {
-    throw new Error("Không tạo được tin nhắn");
+    let message = "Không tạo được tin nhắn";
+    try {
+      const data = await response.json();
+      if (data?.message) {
+        message = Array.isArray(data.message) ? data.message.join(", ") : String(data.message);
+      }
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
   }
 
   return response.json();
@@ -1573,5 +1648,119 @@ export async function isFollowing(userId: string): Promise<boolean> {
   } catch (err) {
     console.error("Failed to check following status", err);
     return false;
+  }
+}
+
+// =========================================================
+// Server Access Control (Discord tab "Truy cập")
+// =========================================================
+
+export type ServerAccessMode = "invite_only" | "apply" | "discoverable";
+
+export interface ServerAccessRule {
+  id: string;
+  content: string;
+}
+
+export interface ServerAccessSettings {
+  accessMode: ServerAccessMode;
+  isAgeRestricted: boolean;
+  hasRules: boolean;
+  rules: ServerAccessRule[];
+}
+
+export type MyServerAccessStatusValue = "pending" | "accepted" | "rejected" | null;
+
+export interface MyServerAccessStatus {
+  status: MyServerAccessStatusValue;
+  acceptedRules: boolean;
+  hasRules: boolean;
+  accessMode: ServerAccessMode;
+}
+
+export async function getServerAccessSettings(serverId: string): Promise<ServerAccessSettings> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/settings`, {
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được cài đặt truy cập");
+  }
+
+  return response.json();
+}
+
+export async function updateServerAccessSettings(
+  serverId: string,
+  patch: Partial<Pick<ServerAccessSettings, "accessMode" | "isAgeRestricted" | "hasRules">>,
+): Promise<Pick<ServerAccessSettings, "accessMode" | "isAgeRestricted" | "hasRules">> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/settings`, {
+    method: "PATCH",
+    headers: getHeaders(),
+    body: JSON.stringify(patch),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không lưu được cài đặt truy cập");
+  }
+
+  return response.json();
+}
+
+export async function addServerAccessRule(serverId: string, content: string): Promise<ServerAccessRule> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/rules`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ content }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không thêm được quy định");
+  }
+
+  return response.json();
+}
+
+export async function getMyServerAccessStatus(serverId: string): Promise<MyServerAccessStatus> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/my-status`, {
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được trạng thái truy cập");
+  }
+
+  return response.json();
+}
+
+export async function acceptServerRules(serverId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/accept-rules`, {
+    method: "POST",
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không thể đồng ý quy định");
+  }
+}
+
+export async function approveServerAccessUser(
+  serverId: string,
+  userId: string,
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/approve`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ userId }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không thể duyệt yêu cầu gia nhập");
   }
 }

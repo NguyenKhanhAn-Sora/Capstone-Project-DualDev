@@ -6,18 +6,14 @@ import DeleteServerModal from "@/components/DeleteServerModal";
 
 export type ServerSettingsSection =
   | "profile"
-  | "identity"
   | "interactions"
   | "privileges"
   | "emoji"
   | "sticker"
-  | "voice-emotes"
   | "members"
   | "roles"
   | "invites"
   | "access"
-  | "integrations"
-  | "app-directory"
   | "safety"
   | "audit-log"
   | "bans"
@@ -38,8 +34,7 @@ const SIDEBAR_SECTIONS: { title: string; items: SidebarEntry[]; key: string }[] 
     key: "group-profile",
     title: "",
     items: [
-      { id: "profile", label: "Hồ Sơ Máy Chủ" },
-      { id: "identity", label: "Số Nhận Diện Máy Chủ" },
+      { id: "profile", label: "Hiển Thị Mod" },
       { id: "interactions", label: "Tương Tác" },
       { id: "privileges", label: "Đặc Quyền Nâng Cấp" },
     ],
@@ -50,7 +45,6 @@ const SIDEBAR_SECTIONS: { title: string; items: SidebarEntry[]; key: string }[] 
     items: [
       { id: "emoji", label: "Emoji" },
       { id: "sticker", label: "Sticker" },
-      { id: "voice-emotes", label: "Biểu Cảm Tiếng" },
     ],
   },
   {
@@ -61,14 +55,6 @@ const SIDEBAR_SECTIONS: { title: string; items: SidebarEntry[]; key: string }[] 
       { id: "roles", label: "Vai trò" },
       { id: "invites", label: "Lời mời" },
       { id: "access", label: "Truy cập" },
-    ],
-  },
-  {
-    key: "group-ung-dung",
-    title: "ỨNG DỤNG",
-    items: [
-      { id: "integrations", label: "Tích hợp" },
-      { id: "app-directory", label: "Thư Mục App", external: true },
     ],
   },
   {
@@ -97,19 +83,15 @@ const SIDEBAR_SECTIONS: { title: string; items: SidebarEntry[]; key: string }[] 
 ];
 
 const SECTION_LABELS: Record<ServerSettingsSection, string> = {
-  profile: "Hồ Sơ Máy Chủ",
-  identity: "Số Nhận Diện Máy Chủ",
+  profile: "Hiển Thị Mod",
   interactions: "Tương Tác",
   privileges: "Đặc Quyền Nâng Cấp",
   emoji: "Emoji",
   sticker: "Sticker",
-  "voice-emotes": "Biểu Cảm Tiếng",
   members: "Thành viên",
   roles: "Vai trò",
   invites: "Lời mời",
   access: "Truy cập",
-  integrations: "Tích hợp",
-  "app-directory": "Thư Mục App",
   safety: "Thiết lập An toàn",
   "audit-log": "Nhật Ký Chỉnh Sửa",
   bans: "Chặn",

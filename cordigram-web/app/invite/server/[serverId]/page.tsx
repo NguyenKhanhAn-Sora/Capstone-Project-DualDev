@@ -79,11 +79,8 @@ export default function InviteServerPage() {
     setJoining(true);
     setError(null);
     try {
-      if (server?.isPublic) {
-        await serversApi.joinServer(serverId);
-      } else {
-        await serversApi.acceptServerInviteByServer(serverId);
-      }
+      // Dùng joinServer để backend tự xử lý theo accessMode (apply / invite_only / discoverable)
+      await serversApi.joinServer(serverId);
       router.replace(`/messages?server=${serverId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể tham gia máy chủ");

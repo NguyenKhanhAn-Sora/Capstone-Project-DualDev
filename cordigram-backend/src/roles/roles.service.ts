@@ -15,12 +15,14 @@ import {
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto, ReorderRolesDto } from './dto/update-role.dto';
 import { Server } from '../servers/server.schema';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Injectable()
 export class RolesService {
   constructor(
     @InjectModel(Role.name) private roleModel: Model<Role>,
     @InjectModel(Server.name) private serverModel: Model<Server>,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -248,7 +250,19 @@ export class RolesService {
     }
 
     role.memberIds.push(memberObjectId);
-    return role.save();
+    const saved = await role.save();
+
+    // Ghi audit log
+    await this.auditLogService.logRoleChange({
+      serverId,
+      targetUserId: memberId,
+      actorUserId: userId,
+      action: 'role.add',
+      roleId,
+      roleNameSnapshot: role.name,
+    });
+
+    return saved;
   }
 
   /**
@@ -273,7 +287,19 @@ export class RolesService {
 
     const memberObjectId = new Types.ObjectId(memberId);
     role.memberIds = role.memberIds.filter((id) => !id.equals(memberObjectId));
-    return role.save();
+    const saved = await role.save();
+
+    // Ghi audit log
+    await this.auditLogService.logRoleChange({
+      serverId,
+      targetUserId: memberId,
+      actorUserId: userId,
+      action: 'role.remove',
+      roleId,
+      roleNameSnapshot: role.name,
+    });
+
+    return saved;
   }
 
   /**
@@ -314,6 +340,7 @@ export class RolesService {
       kickMembers: false,
       banMembers: false,
       timeoutMembers: false,
+      mentionEveryone: false,
       sendMessages: false,
       sendMessagesInThreads: false,
       createPublicThreads: false,

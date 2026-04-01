@@ -70,7 +70,9 @@ import ServerSettingsPanel from "@/components/ServerSettingsPanel/ServerSettings
 import ServerMembersSection from "@/components/ServerMembersSection/ServerMembersSection";
 import RolesSection from "@/components/RolesSection/RolesSection";
 import ServerInteractionsSection from "@/components/ServerInteractionsSection/ServerInteractionsSection";
+import ServerAccessSection from "@/components/ServerAccessSection/ServerAccessSection";
 import MessageSearchPanel from "@/components/MessageSearchPanel/MessageSearchPanel";
+import MentionDropdown from "@/components/MentionDropdown/MentionDropdown";
 import { fetchInboxForYou } from "@/lib/inbox-api";
 
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
@@ -874,6 +876,8 @@ export default function MessagesPage() {
 
   // Permission: can this user reorder channels/categories?
   const [canDragChannels, setCanDragChannels] = useState(false);
+  /** Quyền dùng @ (mentionEveryone / owner) — không ảnh hưởng xem tin khi người khác đề cập bạn. */
+  const [canUseMentions, setCanUseMentions] = useState(false);
 
   // Drag-and-drop state
   const [dragType, setDragType] = useState<"category" | "channel" | null>(null);
@@ -906,6 +910,13 @@ export default function MessagesPage() {
     y: number;
     channel: { _id: string; name: string; isDefault?: boolean };
   } | null>(null);
+  const [categoryContextMenu, setCategoryContextMenu] = useState<{
+    x: number;
+    y: number;
+    category: { _id: string; name: string };
+  } | null>(null);
+  const [renamingCategoryId, setRenamingCategoryId] = useState<string | null>(null);
+  const [renamingCategoryName, setRenamingCategoryName] = useState("");
   const [serverSettingsPermissions, setServerSettingsPermissions] =
     useState<serversApi.CurrentUserServerPermissions | null>(null);
   const [showServerSettingsPanel, setShowServerSettingsPanel] = useState(false);
@@ -917,6 +928,15 @@ export default function MessagesPage() {
   const [showAllChannels, setShowAllChannels] = useState(false);
   const [serverNotificationLevel, setServerNotificationLevel] = useState<"all" | "mentions" | "none">("all");
   const [wavingIds, setWavingIds] = useState<Set<string>>(new Set());
+
+  // Mention system
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionKeyword, setMentionKeyword] = useState("");
+  const [mentionSuggestions, setMentionSuggestions] = useState<serversApi.MentionSuggestion[]>([]);
+  const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
+  const [mentionStartPos, setMentionStartPos] = useState(-1);
+  const mentionFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messageInputRef = useRef<HTMLInputElement>(null);
   const [showEventsPopup, setShowEventsPopup] = useState(false);
   const [showCreateEventWizard, setShowCreateEventWizard] = useState(false);
   const [showEventImageEditor, setShowEventImageEditor] = useState(false);
@@ -945,6 +965,11 @@ export default function MessagesPage() {
   const [friends, setFriends] = useState<serversApi.Friend[]>([]);
   const [selectedDirectMessageFriend, setSelectedDirectMessageFriend] =
     useState<serversApi.Friend | null>(null);
+  // Access Control (server rules approval modal)
+  const [myServerAccessStatus, setMyServerAccessStatus] =
+    useState<serversApi.MyServerAccessStatus | null>(null);
+  const [showAcceptRulesModal, setShowAcceptRulesModal] = useState(false);
+  const [acceptRulesLoading, setAcceptRulesLoading] = useState(false);
   const [dmProfileSidebarOpen, setDmProfileSidebarOpen] = useState(true);
   const [voiceInviteDismissed, setVoiceInviteDismissed] = useState<Set<string>>(new Set());
   const [inviteToVoiceTarget, setInviteToVoiceTarget] = useState<{
@@ -1082,6 +1107,12 @@ export default function MessagesPage() {
   });
 
   const prevChannelRef = useRef<string | null>(null);
+  /** Luôn là kênh đang chọn (tránh closure cũ sau await trong loadMessages). */
+  const selectedChannelRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedChannelRef.current = selectedChannel;
+  }, [selectedChannel]);
+
   const {
     isConnected: isChannelSocketConnected,
     newMessageChannel,
@@ -1731,8 +1762,14 @@ export default function MessagesPage() {
         });
       // Fetch permissions to determine if user can drag channels
       serversApi.getCurrentUserPermissions(selectedServer)
-        .then((perms) => setCanDragChannels(perms.isOwner || perms.canManageChannels))
-        .catch(() => setCanDragChannels(false));
+        .then((perms) => {
+          setCanDragChannels(perms.isOwner || perms.canManageChannels);
+          setCanUseMentions(Boolean(perms.isOwner || perms.mentionEveryone));
+        })
+        .catch(() => {
+          setCanDragChannels(false);
+          setCanUseMentions(false);
+        });
       // Fetch interaction settings for welcome banner
       serversApi.getInteractionSettings(selectedServer)
         .then((s) => setServerInteractionSettings(s))
@@ -1748,9 +1785,41 @@ export default function MessagesPage() {
       setServerEventsTotalCount(0);
       setMemberRoleColors({});
       setCanDragChannels(false);
+      setCanUseMentions(false);
       setServerInteractionSettings(null);
     }
   }, [selectedServer, loadActiveEvents]);
+
+  // Fetch "my access status" để biết có cần chấp nhận quy định hay không.
+  useEffect(() => {
+    if (!selectedServer || selectedDirectMessageFriend) {
+      setMyServerAccessStatus(null);
+      setShowAcceptRulesModal(false);
+      setAcceptRulesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setMyServerAccessStatus(null);
+    setShowAcceptRulesModal(false);
+
+    (async () => {
+      try {
+        const status = await serversApi.getMyServerAccessStatus(selectedServer);
+        if (cancelled) return;
+        setMyServerAccessStatus(status);
+        setShowAcceptRulesModal(Boolean(status.hasRules && !status.acceptedRules));
+      } catch {
+        if (cancelled) return;
+        setMyServerAccessStatus(null);
+        setShowAcceptRulesModal(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedServer, selectedDirectMessageFriend]);
 
   // Refetch active events mỗi 60s khi đang chọn server → sự kiện xuất hiện đúng lúc khi đến giờ
   useEffect(() => {
@@ -2101,16 +2170,16 @@ export default function MessagesPage() {
     }
   }, [messageDeleted]);
 
-  // Load messages only when a TEXT channel is selected (voice channels are for call, not chat)
+  // Load messages when any text chat channel is selected (includes category "info"; textChannels state excludes info only for sidebar grouping)
   const selectedVoiceChannel = selectedChannel
     ? voiceChannels.find((c) => c._id === selectedChannel)
     : null;
-  const selectedTextChannel = selectedChannel
-    ? textChannels.find((c) => c._id === selectedChannel)
+  const selectedChatTextChannel = selectedChannel
+    ? allChannels.find((c) => c._id === selectedChannel && c.type === "text")
     : null;
 
   useEffect(() => {
-    if (selectedChannel && selectedTextChannel) {
+    if (selectedChannel && selectedChatTextChannel) {
       setReplyingTo(null);
       const prev = prevChannelRef.current;
       if (prev && prev !== selectedChannel) leaveChannel(prev);
@@ -2120,7 +2189,7 @@ export default function MessagesPage() {
       // Đánh dấu kênh đã đọc để thông báo chưa đọc trong Hộp thư biến mất
       serversApi.markChannelAsRead(selectedChannel).catch(() => {});
     }
-  }, [selectedChannel, selectedTextChannel?._id, joinChannel, leaveChannel]);
+  }, [selectedChannel, selectedChatTextChannel?._id, joinChannel, leaveChannel]);
 
   useEffect(() => {
     if (!selectedChannel && prevChannelRef.current) {
@@ -2288,7 +2357,13 @@ export default function MessagesPage() {
 
   const loadMessages = async (channelId: string) => {
     try {
+      // Guard chống race condition: chỉ apply kết quả nếu request này vẫn là request mới nhất của kênh đang được chọn.
+      const requestKey = `${channelId}:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+      (loadMessages as any)._lastKey = requestKey;
       const backendMessages = await serversApi.getMessages(channelId, 50, 0);
+      // Nếu trong lúc chờ user đã chuyển kênh, bỏ qua kết quả cũ để tránh "tin nhắn bị dính sang kênh khác".
+      if ((loadMessages as any)._lastKey !== requestKey) return;
+      if (selectedChannelRef.current !== channelId) return;
 
       const uiMessages: UIMessage[] = backendMessages.map((msg: serversApi.Message) => ({
         id: msg._id,
@@ -2704,13 +2779,35 @@ export default function MessagesPage() {
     setReplyingTo(message);
   };
 
+  const shouldBlockServerChatInput = Boolean(
+    selectedServer &&
+      !selectedDirectMessageFriend &&
+      myServerAccessStatus?.hasRules &&
+      !myServerAccessStatus?.acceptedRules,
+  );
+
+  useEffect(() => {
+    if (!shouldBlockServerChatInput) return;
+    setMentionOpen(false);
+    setShowPlusMenu(false);
+    setShowEmojiPicker(false);
+    setShowGifPicker(false);
+  }, [shouldBlockServerChatInput]);
+
   const handleSendMessage = async () => {
+    if (shouldBlockServerChatInput) {
+      setShowAcceptRulesModal(true);
+      return;
+    }
     if (!messageText.trim() || !selectedChannel) return;
 
     const content = messageText.trim();
 
     try {
       setMessageText("");
+      setMentionOpen(false);
+      setMentionKeyword("");
+      setMentionStartPos(-1);
       shouldAutoScrollRef.current = true;
 
       const newMessage = await serversApi.createMessage(
@@ -2767,10 +2864,27 @@ export default function MessagesPage() {
 
       setMessages((prev) => [...prev, uiMessage]);
       setReplyingTo(null);
+      serversApi.markChannelAsRead(selectedChannel).catch(() => {});
     } catch (err) {
       console.error("Failed to send message", err);
       setError("Không gửi được tin nhắn");
       setMessageText(content);
+    }
+  };
+
+  const handleAcceptServerRules = async () => {
+    if (!selectedServer) return;
+    setAcceptRulesLoading(true);
+    setError(null);
+    try {
+      await serversApi.acceptServerRules(selectedServer);
+      const status = await serversApi.getMyServerAccessStatus(selectedServer);
+      setMyServerAccessStatus(status);
+      setShowAcceptRulesModal(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể chấp nhận quy định");
+    } finally {
+      setAcceptRulesLoading(false);
     }
   };
 
@@ -3247,6 +3361,129 @@ export default function MessagesPage() {
     await loadChannels(selectedServer);
   };
 
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (!selectedServer) return;
+    try {
+      await serversApi.deleteCategory(selectedServer, categoryId);
+      await loadChannels(selectedServer);
+    } catch (err) {
+      console.error("Failed to delete category", err);
+    }
+  };
+
+  const handleRenameCategory = async (categoryId: string, newName: string) => {
+    if (!selectedServer || !newName.trim()) return;
+    try {
+      await serversApi.updateCategory(selectedServer, categoryId, newName.trim());
+      await loadChannels(selectedServer);
+    } catch (err) {
+      console.error("Failed to rename category", err);
+    }
+    setRenamingCategoryId(null);
+    setRenamingCategoryName("");
+  };
+
+  // ── Mention helpers ──
+
+  const fetchMentionSuggestions = useCallback(
+    async (keyword: string) => {
+      if (!selectedServer || !canUseMentions) return;
+      try {
+        const results = await serversApi.getMentionSuggestions(selectedServer, keyword);
+        setMentionSuggestions(results);
+        setMentionActiveIndex(0);
+      } catch {
+        setMentionSuggestions([]);
+      }
+    },
+    [selectedServer, canUseMentions],
+  );
+
+  const handleMentionDetect = useCallback(
+    (value: string, cursorPos: number) => {
+      if (!canUseMentions) {
+        setMentionOpen(false);
+        return;
+      }
+      let atPos = -1;
+      for (let i = cursorPos - 1; i >= 0; i--) {
+        const ch = value[i];
+        if (ch === "@") { atPos = i; break; }
+        if (ch === " " || ch === "\n") break;
+      }
+
+      if (atPos === -1 || (atPos > 0 && value[atPos - 1] !== " " && value[atPos - 1] !== "\n" && atPos !== 0)) {
+        if (atPos === -1) { setMentionOpen(false); return; }
+      }
+
+      const keyword = value.slice(atPos + 1, cursorPos);
+      setMentionOpen(true);
+      setMentionStartPos(atPos);
+      setMentionKeyword(keyword);
+
+      if (mentionFetchTimer.current) clearTimeout(mentionFetchTimer.current);
+      mentionFetchTimer.current = setTimeout(() => fetchMentionSuggestions(keyword), 150);
+    },
+    [fetchMentionSuggestions, canUseMentions],
+  );
+
+  const handleMentionSelect = useCallback(
+    (suggestion: serversApi.MentionSuggestion) => {
+      const input = messageInputRef.current;
+      if (!input || mentionStartPos === -1) return;
+
+      let insertText: string;
+      if (suggestion.type === "user") {
+        insertText = `@${suggestion.description || suggestion.name}`;
+      } else {
+        insertText = suggestion.name;
+      }
+
+      const before = messageText.slice(0, mentionStartPos);
+      const after = messageText.slice(input.selectionStart ?? messageText.length);
+      const newText = before + insertText + " " + after;
+      setMessageText(newText);
+      setMentionOpen(false);
+      setMentionKeyword("");
+      setMentionStartPos(-1);
+
+      requestAnimationFrame(() => {
+        if (messageInputRef.current) {
+          const pos = before.length + insertText.length + 1;
+          messageInputRef.current.setSelectionRange(pos, pos);
+          messageInputRef.current.focus();
+        }
+      });
+    },
+    [mentionStartPos, messageText],
+  );
+
+  const handleMentionKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!mentionOpen || mentionSuggestions.length === 0) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionActiveIndex((prev) =>
+          prev < mentionSuggestions.length - 1 ? prev + 1 : 0,
+        );
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionActiveIndex((prev) =>
+          prev > 0 ? prev - 1 : mentionSuggestions.length - 1,
+        );
+      } else if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        e.stopPropagation();
+        handleMentionSelect(mentionSuggestions[mentionActiveIndex]);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setMentionOpen(false);
+      }
+    },
+    [mentionOpen, mentionSuggestions, mentionActiveIndex, handleMentionSelect],
+  );
+
   // ── Drag-and-drop helpers ──
 
   const getChannelsForCategory = useCallback(
@@ -3521,7 +3758,6 @@ export default function MessagesPage() {
           reactions: [],
         };
         setMessages((prev) => [...prev, uiMsg]);
-        shouldAutoScrollRef.current = true;
       } catch (e) {
         console.error("Wave sticker failed", e);
       } finally {
@@ -4265,6 +4501,7 @@ export default function MessagesPage() {
                       canManageChannels: isOwner,
                       canManageEvents: isOwner,
                       canCreateInvite: true,
+                      mentionEveryone: isOwner,
                     };
                   }
                   
@@ -4694,10 +4931,35 @@ export default function MessagesPage() {
                   <span>Nâng Cấp Máy Chủ</span>
                 </button>
                 {/* Thông Tin section - only shown when info channels exist */}
-                {infoChannels.length > 0 && (
+                {infoChannels.length > 0 && (() => {
+                  const infoCatId = infoChannels.find(c => c.categoryId)?.categoryId;
+                  const infoCat = infoCatId ? serverCategories.find(c => c._id === infoCatId) : null;
+                  return (
                   <div className={styles.section}>
-                    <div className={styles.sectionHeader}>
-                      <h3 className={styles.sectionTitle}>Thông Tin</h3>
+                    <div
+                      className={styles.sectionHeader}
+                      onContextMenu={infoCat ? (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setCategoryContextMenu({ x: e.clientX, y: e.clientY, category: { _id: infoCat._id, name: infoCat.name } });
+                      } : undefined}
+                    >
+                      {renamingCategoryId && infoCat && renamingCategoryId === infoCat._id ? (
+                        <input
+                          className={styles.sectionTitle}
+                          style={{ background: "var(--color-bg-input, #1e1f22)", border: "1px solid var(--color-primary)", borderRadius: "3px", padding: "0 4px", color: "inherit", font: "inherit", outline: "none", width: "100%" }}
+                          autoFocus
+                          value={renamingCategoryName}
+                          onChange={(e) => setRenamingCategoryName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleRenameCategory(infoCat._id, renamingCategoryName);
+                            if (e.key === "Escape") { setRenamingCategoryId(null); setRenamingCategoryName(""); }
+                          }}
+                          onBlur={() => handleRenameCategory(infoCat._id, renamingCategoryName)}
+                        />
+                      ) : (
+                        <h3 className={styles.sectionTitle}>{infoCat?.name ?? "Thông Tin"}</h3>
+                      )}
                     </div>
                     {infoChannels.map((channel) => (
                       <div
@@ -4717,11 +4979,15 @@ export default function MessagesPage() {
                       </div>
                     ))}
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* Dynamic categories with drag-and-drop */}
-                {serverCategories.length > 0 ? (
-                  serverCategories.map((cat) => {
+                {(() => {
+                  const infoCatIds = new Set(infoChannels.map(c => c.categoryId).filter(Boolean));
+                  const visibleCategories = serverCategories.filter(cat => !infoCatIds.has(cat._id));
+                  return visibleCategories.length > 0 ? (
+                  visibleCategories.map((cat) => {
                     const channelsInCat = getChannelsForCategory(cat._id);
                     const isVoiceCategory = cat.type === "voice";
                     const isCatDragging = dragType === "category" && dragId === cat._id;
@@ -4747,8 +5013,31 @@ export default function MessagesPage() {
                         {isCatDropTarget && dragPosition === "before" && (
                           <div className={styles.dropIndicator} style={{ top: 0 }} />
                         )}
-                        <div className={styles.sectionHeader} style={{ cursor: canDragChannels ? "grab" : "default" }}>
-                          <h3 className={styles.sectionTitle}>{cat.name}</h3>
+                        <div
+                          className={styles.sectionHeader}
+                          style={{ cursor: canDragChannels ? "grab" : "default" }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setCategoryContextMenu({ x: e.clientX, y: e.clientY, category: { _id: cat._id, name: cat.name } });
+                          }}
+                        >
+                          {renamingCategoryId === cat._id ? (
+                            <input
+                              className={styles.sectionTitle}
+                              style={{ background: "var(--color-bg-input, #1e1f22)", border: "1px solid var(--color-primary)", borderRadius: "3px", padding: "0 4px", color: "inherit", font: "inherit", outline: "none", width: "100%" }}
+                              autoFocus
+                              value={renamingCategoryName}
+                              onChange={(e) => setRenamingCategoryName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleRenameCategory(cat._id, renamingCategoryName);
+                                if (e.key === "Escape") { setRenamingCategoryId(null); setRenamingCategoryName(""); }
+                              }}
+                              onBlur={() => handleRenameCategory(cat._id, renamingCategoryName)}
+                            />
+                          ) : (
+                            <h3 className={styles.sectionTitle}>{cat.name}</h3>
+                          )}
                           <button
                             type="button"
                             className={styles.addChannelBtn}
@@ -4948,7 +5237,8 @@ export default function MessagesPage() {
                       )}
                     </div>
                   </>
-                )}
+                );
+                })()}
                 </div>{/* end conversationsScrollArea */}
 
                 {/* Voice Controls Footer - cùng vị trí như bên DM */}
@@ -5317,6 +5607,23 @@ export default function MessagesPage() {
                             </strong>
                             . Hãy bắt đầu cuộc trò chuyện!
                           </p>
+                          {/* Welcome messages: nằm dưới phần chào mừng, không bị trôi theo chat */}
+                          <div style={{
+                            width: "min(720px, 100%)",
+                            marginTop: 14,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                            textAlign: "left",
+                          }}>
+                            {messages
+                              .filter((m) => m.messageType === "welcome")
+                              .map((m) => (
+                                <div key={m.id} data-message-id={m.id}>
+                                  {renderMessageContent(m)}
+                                </div>
+                              ))}
+                          </div>
                         </div>
                       )}
                       {messages.length === 0 &&
@@ -5334,8 +5641,10 @@ export default function MessagesPage() {
                           <p>Chưa có tin nhắn. Hãy bắt đầu trò chuyện!</p>
                         </div>
                       ) : (
-                    messages.map((message) => {
-                      if (message.messageType === "welcome" || message.messageType === "system") {
+                    messages
+                      .filter((m) => m.messageType !== "welcome")
+                      .map((message) => {
+                      if (message.messageType === "system") {
                         return (
                           <div key={message.id} data-message-id={message.id}>
                             {renderMessageContent(message)}
@@ -5433,7 +5742,13 @@ export default function MessagesPage() {
                 )}
 
                 {/* Input Area */}
-                <div className={styles.inputArea}>
+                <div
+                  className={styles.inputArea}
+                  style={{
+                    opacity: shouldBlockServerChatInput ? 0.6 : 1,
+                    pointerEvents: shouldBlockServerChatInput ? "none" : undefined,
+                  }}
+                >
                   {/* Plus Menu Button */}
                   <div style={{ position: "relative" }}>
                     <button
@@ -5520,6 +5835,35 @@ export default function MessagesPage() {
                     )}
                   </div>
 
+                  {selectedServer &&
+                    !selectedDirectMessageFriend &&
+                    canUseMentions &&
+                    !shouldBlockServerChatInput && (
+                    <button
+                      className={styles.plusButton}
+                      title="Đề cập (@mention)"
+                      type="button"
+                      onClick={() => {
+                        const start = messageText.length;
+                        setMessageText(messageText + "@");
+                        setMentionOpen(true);
+                        setMentionStartPos(start);
+                        setMentionKeyword("");
+                        fetchMentionSuggestions("");
+                        requestAnimationFrame(() => {
+                          const el = messageInputRef.current;
+                          if (el) {
+                            el.focus();
+                            el.setSelectionRange(start + 1, start + 1);
+                          }
+                        });
+                      }}
+                      style={{ fontSize: "16px", fontWeight: 700 }}
+                    >
+                      @
+                    </button>
+                  )}
+
                   {/* Voice Recorder */}
                   {isRecordingVoice && (
                     <VoiceRecorder
@@ -5539,23 +5883,41 @@ export default function MessagesPage() {
                   {/* Normal Text Input */}
                   {!isRecordingVoice && !isUploadingVoice && (
                     <>
-                      <div className={styles.inputWrapper}>
+                      <div className={styles.inputWrapper} style={{ position: "relative" }}>
+                        {mentionOpen &&
+                          selectedServer &&
+                          !selectedDirectMessageFriend &&
+                          canUseMentions &&
+                          !shouldBlockServerChatInput && (
+                          <MentionDropdown
+                            suggestions={mentionSuggestions}
+                            activeIndex={mentionActiveIndex}
+                            keyword={mentionKeyword}
+                            onSelect={handleMentionSelect}
+                            onActiveIndexChange={setMentionActiveIndex}
+                          />
+                        )}
                         <input
+                          ref={messageInputRef}
                           type="text"
                           className={styles.messageInput}
                           placeholder="Nhập tin nhắn..."
+                          disabled={shouldBlockServerChatInput}
                           value={messageText}
                           onChange={(e) => {
                             const newValue = e.target.value;
                             setMessageText(newValue);
 
-                            // ✅ Optimized Typing indicator logic - only for direct messages
+                            if (selectedServer && !selectedDirectMessageFriend && canUseMentions) {
+                              const cursorPos = e.target.selectionStart ?? newValue.length;
+                              handleMentionDetect(newValue, cursorPos);
+                            }
+
                             if (
                               selectedDirectMessageFriend &&
                               notifyTyping &&
                               newValue.length > 0
                             ) {
-                              // Only notify once when starting to type
                               if (!isTypingRef.current) {
                                 isTypingRef.current = true;
                                 notifyTyping(
@@ -5564,12 +5926,10 @@ export default function MessagesPage() {
                                 );
                               }
 
-                              // Clear previous timeout
                               if (typingTimeoutRef.current) {
                                 clearTimeout(typingTimeoutRef.current);
                               }
 
-                              // Set timeout to stop typing after 2 seconds of inactivity
                               typingTimeoutRef.current = setTimeout(() => {
                                 if (isTypingRef.current) {
                                   isTypingRef.current = false;
@@ -5585,7 +5945,6 @@ export default function MessagesPage() {
                               newValue.length === 0 &&
                               isTypingRef.current
                             ) {
-                              // Stop typing immediately when input is cleared
                               isTypingRef.current = false;
                               notifyTyping(
                                 selectedDirectMessageFriend._id,
@@ -5596,11 +5955,22 @@ export default function MessagesPage() {
                               }
                             }
                           }}
-                          onKeyPress={(e) => {
+                          onKeyDown={(e) => {
+                            if (
+                              mentionOpen &&
+                              mentionSuggestions.length > 0 &&
+                              canUseMentions &&
+                              !shouldBlockServerChatInput
+                            ) {
+                              if (["ArrowDown", "ArrowUp", "Tab", "Escape"].includes(e.key) || (e.key === "Enter" && !e.shiftKey)) {
+                                handleMentionKeyDown(e);
+                                return;
+                              }
+                            }
+
                             if (e.key === "Enter" && !e.shiftKey) {
                               e.preventDefault();
 
-                              // ✅ Stop typing when sending message
                               if (
                                 selectedDirectMessageFriend &&
                                 notifyTyping &&
@@ -5614,6 +5984,11 @@ export default function MessagesPage() {
                                 if (typingTimeoutRef.current) {
                                   clearTimeout(typingTimeoutRef.current);
                                 }
+                              }
+
+                              if (!selectedDirectMessageFriend && shouldBlockServerChatInput) {
+                                setShowAcceptRulesModal(true);
+                                return;
                               }
 
                               selectedDirectMessageFriend
@@ -5759,7 +6134,7 @@ export default function MessagesPage() {
                             ? handleSendDirectMessage
                             : handleSendMessage
                         }
-                        disabled={!messageText.trim()}
+                        disabled={!messageText.trim() || (!selectedDirectMessageFriend && shouldBlockServerChatInput)}
                         title="Gửi tin nhắn"
                       >
                         <svg
@@ -5889,6 +6264,64 @@ export default function MessagesPage() {
         onClose={() => setShowCreateServerModal(false)}
         onServerCreated={handleServerCreated}
       />
+
+      {/* Accept Server Rules Modal */}
+      {showAcceptRulesModal && selectedServer && !selectedDirectMessageFriend && (
+        <div
+          role="dialog"
+          aria-modal
+          aria-label="Đồng ý quy định"
+          onClick={() => {
+            // Modal chỉ để người dùng đồng ý, không cho đóng tắt để tránh phá luồng chat.
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10, 18, 40, 0.45)",
+            zIndex: 20000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(520px, 92vw)",
+              background: "var(--color-panel-bg)",
+              borderRadius: 12,
+              border: "1px solid var(--color-panel-border)",
+              boxShadow: "0 16px 48px rgba(0,0,0,.4)",
+              padding: 20,
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Đồng ý quy định</h3>
+            <p style={{ marginTop: 8, color: "var(--color-panel-text-muted)", fontSize: 13, lineHeight: 1.45 }}>
+              Máy chủ này yêu cầu bạn chấp nhận quy định trước khi có thể gửi tin nhắn.
+            </p>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16, gap: 10 }}>
+              <button
+                type="button"
+                onClick={handleAcceptServerRules}
+                disabled={acceptRulesLoading}
+                style={{
+                  border: "1px solid var(--color-panel-accent)",
+                  background: "var(--color-panel-accent)",
+                  color: "white",
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  cursor: acceptRulesLoading ? "not-allowed" : "pointer",
+                  fontWeight: 800,
+                }}
+              >
+                {acceptRulesLoading ? "Đang xử lý..." : "Đồng ý"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showMessagesInbox && (
         <MessagesInbox
@@ -6101,6 +6534,59 @@ export default function MessagesPage() {
         />
       )}
 
+      {categoryContextMenu && (
+        <div
+          style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: 9999 }}
+          onClick={() => setCategoryContextMenu(null)}
+          onContextMenu={(e) => { e.preventDefault(); setCategoryContextMenu(null); }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: categoryContextMenu.y,
+              left: categoryContextMenu.x,
+              background: "var(--color-bg-secondary, #111214)",
+              borderRadius: "6px",
+              padding: "6px 0",
+              minWidth: "180px",
+              boxShadow: "0 4px 16px rgba(0,0,0,.4)",
+              zIndex: 10000,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 12px", background: "none", border: "none", color: "var(--color-text-primary, #dbdee1)", fontSize: "14px", cursor: "pointer", textAlign: "left" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--color-bg-hover, #35373c)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "none"; }}
+              onClick={() => {
+                setRenamingCategoryId(categoryContextMenu.category._id);
+                setRenamingCategoryName(categoryContextMenu.category.name);
+                setCategoryContextMenu(null);
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+              Đổi tên danh mục
+            </button>
+            <button
+              type="button"
+              style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 12px", background: "none", border: "none", color: "#ed4245", fontSize: "14px", cursor: "pointer", textAlign: "left" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--color-bg-hover, #35373c)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "none"; }}
+              onClick={() => {
+                if (confirm(`Bạn có chắc muốn xóa danh mục "${categoryContextMenu.category.name}"? Các kênh bên trong sẽ không bị xóa.`)) {
+                  handleDeleteCategory(categoryContextMenu.category._id);
+                }
+                setCategoryContextMenu(null);
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+              Xóa danh mục
+            </button>
+          </div>
+        </div>
+      )}
+
       <ServerSettingsPanel
         isOpen={showServerSettingsPanel}
         onClose={() => {
@@ -6184,6 +6670,17 @@ export default function MessagesPage() {
                   Boolean(serverSettingsPermissions?.canManageServer)
                 }
                 textChannels={allChannels.filter((c) => c.type !== "voice")}
+              />
+            );
+          }
+          if (section === "access" && serverSettingsTarget?.serverId) {
+            return (
+              <ServerAccessSection
+                serverId={serverSettingsTarget.serverId}
+                canManageSettings={
+                  Boolean(serverSettingsPermissions?.isOwner) ||
+                  Boolean(serverSettingsPermissions?.canManageServer)
+                }
               />
             );
           }

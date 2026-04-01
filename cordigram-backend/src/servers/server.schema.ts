@@ -12,6 +12,8 @@ export type ServerTemplate =
   | 'artists-creators';
 export type ServerPurpose = 'club-community' | 'me-and-friends';
 
+export type ServerAccessMode = 'invite_only' | 'apply' | 'discoverable';
+
 export interface ServerMember {
   userId: Types.ObjectId;
   role: 'owner' | 'moderator' | 'member';
@@ -131,6 +133,23 @@ export class Server extends Document {
 
   @Prop({ type: Boolean, default: true })
   isPublic: boolean;
+
+  /**
+   * Control cách user tham gia server + điều kiện chat.
+   * Default set discoverable để tương thích với behavior hiện tại.
+   */
+  @Prop({
+    type: String,
+    enum: ['invite_only', 'apply', 'discoverable'],
+    default: 'discoverable',
+  })
+  accessMode: ServerAccessMode;
+
+  @Prop({ type: Boolean, default: false })
+  isAgeRestricted: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  hasRules: boolean;
 
   @Prop({
     type: {

@@ -1027,6 +1027,7 @@
   contain: layout style paint;
 }
 
+
 .messageGroup {
   display: flex;
   flex-direction: row;

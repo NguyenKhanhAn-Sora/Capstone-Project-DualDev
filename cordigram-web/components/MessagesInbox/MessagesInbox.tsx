@@ -42,7 +42,13 @@ function formatTimeAgo(iso: string): string {
   return d.toLocaleDateString("vi-VN");
 }
 
-export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigateToDM, onMarkSeen, onAcceptInvite }: MessagesInboxProps) {
+export default function MessagesInbox({
+  onClose,
+  onNavigateToChannel,
+  onNavigateToDM,
+  onMarkSeen,
+  onAcceptInvite,
+}: MessagesInboxProps) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("for-you");
   const [forYouItems, setForYouItems] = useState<InboxForYouItem[]>([]);
@@ -75,27 +81,20 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const [forYouRes, unreadRes, mentionsRes] = await Promise.all([
-          fetchInboxForYou(),
-          fetchInboxUnread(),
-          fetchInboxMentions(),
-        ]);
-        if (cancelled) return;
-        setForYouItems(forYouRes.items ?? []);
-        setUnreadItems(unreadRes.items ?? []);
-        setMentionItems(mentionsRes.items ?? []);
-      } catch (e) {
-        if (!cancelled) {
-          setForYouItems([]);
-          setUnreadItems([]);
-          setMentionItems([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading({ "for-you": false, unread: false, mentions: false });
-        }
-      }
+      setLoading({ "for-you": true, unread: true, mentions: true });
+      const results = await Promise.allSettled([
+        fetchInboxForYou(),
+        fetchInboxUnread(),
+        fetchInboxMentions(),
+      ]);
+      if (cancelled) return;
+      const forYouRes = results[0].status === "fulfilled" ? results[0].value : null;
+      const unreadRes = results[1].status === "fulfilled" ? results[1].value : null;
+      const mentionsRes = results[2].status === "fulfilled" ? results[2].value : null;
+      setForYouItems(forYouRes?.items ?? []);
+      setUnreadItems(unreadRes?.items ?? []);
+      setMentionItems(mentionsRes?.items ?? []);
+      setLoading({ "for-you": false, unread: false, mentions: false });
     })();
     return () => {
       cancelled = true;
@@ -149,6 +148,19 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
       chSocket.disconnect();
     };
   }, [authToken]);
+
+  useEffect(() => {
+    if (tab !== "mentions") return;
+    let cancelled = false;
+    fetchInboxMentions()
+      .then((res) => {
+        if (!cancelled) setMentionItems(res.items ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [tab]);
 
   /** Mở item trong tab Dành cho bạn và đánh dấu đã xem. */
   const handleForYouClick = async (item: InboxForYouItem) => {
@@ -216,7 +228,11 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
     onClose();
   };
 
-  const handleMentionClick = (item: InboxMentionItem) => {
+  const handleMentionClick = async (item: InboxMentionItem) => {
+    try {
+      await markInboxSeen("channel_mention", item.messageId || item.id);
+      setMentionItems((prev) => prev.filter((m) => m.id !== item.id));
+    } catch (_) {}
     if (onNavigateToChannel) onNavigateToChannel(item.serverId, item.channelId);
     else router.push(`/messages?server=${item.serverId}&channel=${item.channelId}`);
     onClose();
@@ -507,18 +523,28 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                   <button
                     key={item.id}
                     type="button"
-                    className={styles.mentionItem}
+                    className={styles.unreadItem}
                     onClick={() => handleMentionClick(item)}
                   >
-                    <div className={styles.eventAvatar}>
-                      {item.actorName.charAt(0).toUpperCase()}
+                    <div className={styles.eventItemAvatarWrap}>
+                      <div className={styles.eventAvatar}>
+                        {(item.serverName?.trim() || "#").charAt(0).toUpperCase()}
+                      </div>
                     </div>
                     <div className={styles.eventBody}>
-                      <p className={styles.eventTitle}>
-                        {item.actorName} đã đề cập bạn trong # {item.channelName}
-                      </p>
-                      <p className={styles.eventMeta}>
-                        {item.serverName} • {formatTimeAgo(item.createdAt)}
+                      <div className={styles.unreadTopRow}>
+                        <p className={styles.unreadTitle}>
+                          {item.serverName?.trim() || "Máy chủ"}, #{item.channelName}
+                        </p>
+                        <span className={styles.unreadTime}>
+                          {formatTimeAgo(item.createdAt)}
+                        </span>
+                      </div>
+                      <p className={styles.unreadPreview}>
+                        <strong>{item.actorName}</strong> đã đề cập bạn
+                        {item.excerpt?.trim()
+                          ? ` — ${item.excerpt.trim().slice(0, 140)}`
+                          : ""}
                       </p>
                     </div>
                   </button>

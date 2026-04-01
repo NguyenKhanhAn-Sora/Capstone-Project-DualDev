@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -12,6 +14,9 @@ import { Server } from '../servers/server.schema';
 import { ChannelReadState } from './channel-read-state.schema';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { IgnoredService } from '../users/ignored.service';
+import { RolesService } from '../roles/roles.service';
+import { InboxSeen } from '../inbox/inbox-seen.schema';
+import { UserServer } from '../access/user-server.schema';
 
 @Injectable()
 export class MessagesService {
@@ -22,7 +27,11 @@ export class MessagesService {
     @InjectModel(Server.name) private serverModel: Model<Server>,
     @InjectModel(ChannelReadState.name)
     private channelReadStateModel: Model<ChannelReadState>,
+    @InjectModel(UserServer.name) private userServerModel: Model<UserServer>,
+    @InjectModel(InboxSeen.name) private inboxSeenModel: Model<InboxSeen>,
     private readonly ignoredService: IgnoredService,
+    @Inject(forwardRef(() => RolesService))
+    private readonly rolesService: RolesService,
   ) {}
 
   async createMessage(
@@ -38,12 +47,43 @@ export class MessagesService {
 
     const userObjectId = new Types.ObjectId(userId);
 
-    const mentionIds = await this.resolveMentions(
+    // Access Control đơn giản: chỉ cần là thành viên server là được chat.
+    // (Mặc định mọi server cho phép gửi tin nhắn, GIF, emoji, sticker, voice, upload ảnh.)
+    const server = await this.serverModel
+      .findById(channel.serverId)
+      .select('ownerId members')
+      .lean()
+      .exec();
+    if (!server) throw new NotFoundException('Server not found');
+
+    const isOwner =
+      (server as any).ownerId?.toString?.() === userId ||
+      (server as any).ownerId?.toString?.() === userObjectId.toString();
+
+    const isMember =
+      isOwner ||
+      Array.isArray((server as any).members) &&
+        (server as any).members.some(
+          (m: any) => (m?.userId?._id ?? m?.userId)?.toString() === userId,
+        );
+
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không thuộc server này');
+    }
+
+    const canResolveMentions = await this.rolesService.hasPermission(
       channel.serverId.toString(),
       userId,
-      createMessageDto.content,
-      createMessageDto.mentions,
+      'mentionEveryone',
     );
+    const mentionIds = canResolveMentions
+      ? await this.resolveMentions(
+          channel.serverId.toString(),
+          userId,
+          createMessageDto.content,
+          createMessageDto.mentions,
+        )
+      : [];
 
     const message = new this.messageModel({
       channelId: new Types.ObjectId(channelId),
@@ -99,8 +139,8 @@ export class MessagesService {
   }
 
   /**
-   * Parse @username from content + merge with explicit mention IDs from DTO.
-   * Returns deduplicated user IDs (excluding the sender).
+   * Gộp explicit IDs + @everyone/@here + @vai trò + @username trong nội dung.
+   * Mỗi user được đề cập có ObjectId trong message.mentions → tab Hộp thư "Đề cập".
    */
   private async resolveMentions(
     serverId: string,
@@ -116,43 +156,66 @@ export class MessagesService {
       }
     }
 
-    const mentionPattern = /@([a-zA-Z0-9._-]+)/g;
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('members')
+      .lean()
+      .exec();
+    if (!server) return Array.from(mentionSet);
+
+    const memberUserIds = server.members.map((m) => m.userId.toString());
+    const allExceptSender = memberUserIds.filter((id) => id !== senderId);
+
+    if (/@everyone\b/i.test(content)) {
+      for (const id of allExceptSender) mentionSet.add(id);
+    }
+    if (/@here\b/i.test(content)) {
+      for (const id of allExceptSender) mentionSet.add(id);
+    }
+
+    const roles = await this.rolesService.getRolesByServer(serverId);
+    for (const role of roles) {
+      if (role.isDefault) continue;
+      const escaped = role.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (new RegExp(`@${escaped}(?:\\s|$|[\\n\\r.,!?])`, 'i').test(content)) {
+        for (const uid of role.memberIds ?? []) {
+          const sid = uid.toString();
+          if (sid !== senderId && memberUserIds.includes(sid)) {
+            mentionSet.add(sid);
+          }
+        }
+      }
+    }
+
+    const mentionPattern = /@([^\s@]+)/g;
     const usernames: string[] = [];
     let match: RegExpExecArray | null;
     while ((match = mentionPattern.exec(content)) !== null) {
-      usernames.push(match[1].toLowerCase());
+      const token = match[1].toLowerCase();
+      if (token === 'everyone' || token === 'here') continue;
+      usernames.push(token);
     }
 
     if (usernames.length > 0) {
-      const server = await this.serverModel
-        .findById(serverId)
-        .select('members')
+      const profiles = await this.profileModel
+        .find({
+          userId: { $in: memberUserIds.map((id) => new Types.ObjectId(id)) },
+          $or: [
+            { username: { $in: usernames } },
+            {
+              username: {
+                $in: usernames.map((u) => new RegExp(`^${u}$`, 'i')),
+              },
+            },
+          ],
+        })
+        .select('userId username')
         .lean()
         .exec();
-      if (server) {
-        const memberUserIds = server.members.map((m) =>
-          m.userId.toString(),
-        );
-        const profiles = await this.profileModel
-          .find({
-            userId: { $in: memberUserIds.map((id) => new Types.ObjectId(id)) },
-            $or: [
-              { username: { $in: usernames } },
-              {
-                username: {
-                  $in: usernames.map((u) => new RegExp(`^${u}$`, 'i')),
-                },
-              },
-            ],
-          })
-          .select('userId username')
-          .lean()
-          .exec();
 
-        for (const profile of profiles) {
-          const uid = profile.userId.toString();
-          if (uid !== senderId) mentionSet.add(uid);
-        }
+      for (const profile of profiles) {
+        const uid = profile.userId.toString();
+        if (uid !== senderId) mentionSet.add(uid);
       }
     }
 
@@ -237,8 +300,12 @@ export class MessagesService {
     const serverIds = [
       ...new Set(
         messages
-          .map((m: any) => m.channelId?.serverId?.toString())
-          .filter(Boolean),
+          .map((m: any) => {
+            const ch = m.channelId;
+            if (!ch || typeof ch !== 'object') return null;
+            return ch.serverId != null ? String(ch.serverId) : null;
+          })
+          .filter(Boolean) as string[],
       ),
     ];
     const servers = await this.serverModel
@@ -246,8 +313,8 @@ export class MessagesService {
       .select('name')
       .lean()
       .exec();
-    const serverMap = new Map(
-      servers.map((s: any) => [s._id.toString(), s.name]),
+    const serverMap = new Map<string, string>(
+      servers.map((s: any) => [String(s._id), s.name]),
     );
 
     const senderIds = [
@@ -269,13 +336,14 @@ export class MessagesService {
 
     return messages.map((msg: any) => {
       const ch = msg.channelId as any;
-      const serverId = ch?.serverId?.toString() ?? '';
+      const rawSid = ch?.serverId;
+      const serverId = rawSid != null ? String(rawSid) : '';
       return {
         id: msg._id.toString(),
         channelId: ch?._id?.toString() ?? '',
         channelName: ch?.name ?? 'general',
         serverId,
-        serverName: serverMap.get(serverId) ?? 'Máy chủ',
+        serverName: (serverId && serverMap.get(serverId)) || 'Máy chủ',
         messageId: msg._id.toString(),
         actorName: profileMap.get(msg.senderId.toString()) ?? 'Ai đó',
         excerpt: (msg.content ?? '').slice(0, 200),
@@ -354,10 +422,36 @@ export class MessagesService {
       channelId: new Types.ObjectId(channelId),
       isDeleted: false,
     };
+
+    // Access Control: nếu có viewerId thì chỉ cho xem khi viewer thuộc server.
+    if (viewerId) {
+      const channel = await this.channelModel
+        .findById(channelId)
+        .select('serverId')
+        .lean()
+        .exec();
+      if (!channel) throw new NotFoundException('Channel not found');
+
+      const viewerOid = new Types.ObjectId(viewerId);
+      const isMember = await this.serverModel.exists({
+        _id: channel.serverId,
+        $or: [{ ownerId: viewerOid }, { 'members.userId': viewerOid }],
+      });
+
+      if (!isMember) throw new ForbiddenException('Bạn không thuộc server này');
+    }
+
     if (viewerId) {
       const ignoredSet = await this.ignoredService.getIgnoredUserIds(viewerId);
       if (ignoredSet.size > 0) {
-        match.senderId = { $nin: Array.from(ignoredSet).map((id) => new Types.ObjectId(id)) };
+        const viewerOid = new Types.ObjectId(viewerId);
+        const ignoredIds = Array.from(ignoredSet).map(
+          (id) => new Types.ObjectId(id),
+        );
+        match.$or = [
+          { senderId: { $nin: ignoredIds } },
+          { mentions: viewerOid },
+        ];
       }
     }
     const messages = await this.messageModel
@@ -545,11 +639,39 @@ export class MessagesService {
   async markChannelAsRead(userId: string, channelId: string): Promise<void> {
     const userObjectId = new Types.ObjectId(userId);
     const channelObjectId = new Types.ObjectId(channelId);
+    const now = new Date();
     await this.channelReadStateModel.findOneAndUpdate(
       { userId: userObjectId, channelId: channelObjectId },
-      { $set: { lastReadAt: new Date() } },
+      { $set: { lastReadAt: now } },
       { upsert: true },
     );
+
+    const mentionMsgs = await this.messageModel
+      .find({
+        channelId: channelObjectId,
+        isDeleted: false,
+        mentions: userObjectId,
+        createdAt: { $lte: now },
+      })
+      .select('_id')
+      .lean()
+      .exec();
+
+    if (mentionMsgs.length > 0) {
+      await this.inboxSeenModel.bulkWrite(
+        mentionMsgs.map((m: { _id: Types.ObjectId }) => ({
+          updateOne: {
+            filter: {
+              userId: userObjectId,
+              sourceType: 'channel_mention',
+              sourceId: m._id.toString(),
+            },
+            update: { $set: { seenAt: now } },
+            upsert: true,
+          },
+        })),
+      );
+    }
   }
 
   /** Số tin nhắn chưa đọc trong kênh đối với user (tin có createdAt > lastReadAt). */

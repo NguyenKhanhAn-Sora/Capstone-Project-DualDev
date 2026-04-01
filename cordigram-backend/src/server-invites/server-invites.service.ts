@@ -3,6 +3,8 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -13,6 +15,7 @@ import { ServersService } from '../servers/servers.service';
 export class ServerInvitesService {
   constructor(
     @InjectModel(ServerInvite.name) private inviteModel: Model<ServerInvite>,
+    @Inject(forwardRef(() => ServersService))
     private readonly serversService: ServersService,
   ) {}
 

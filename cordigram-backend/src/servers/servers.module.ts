@@ -18,6 +18,7 @@ import { ServerInvite, ServerInviteSchema } from '../server-invites/server-invit
 import { Message, MessageSchema } from '../messages/message.schema';
 import { RolesModule } from '../roles/roles.module';
 import { MessagesModule } from '../messages/messages.module';
+import { ServerAccessModule } from '../access/access.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { MessagesModule } from '../messages/messages.module';
       { name: Message.name, schema: MessageSchema },
     ]),
     forwardRef(() => RolesModule),
+    forwardRef(() => ServerAccessModule),
     MessagesModule,
   ],
   providers: [ServersService],

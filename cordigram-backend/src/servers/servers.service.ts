@@ -20,6 +20,8 @@ import { RolesService } from '../roles/roles.service';
 import { ServerNotification } from './server-notification.schema';
 import { Message } from '../messages/message.schema';
 import { ChannelMessagesGateway } from '../messages/channel-messages.gateway';
+import { ServerAccessService } from '../access/server-access.service';
+import { RolePermissions } from '../roles/role.schema';
 
 @Injectable()
 export class ServersService {
@@ -37,6 +39,8 @@ export class ServersService {
     @Inject(forwardRef(() => RolesService))
     private rolesService: RolesService,
     private readonly channelMessagesGateway: ChannelMessagesGateway,
+    @Inject(forwardRef(() => ServerAccessService))
+    private readonly serverAccessService: ServerAccessService,
   ) {}
 
   /**
@@ -372,6 +376,137 @@ export class ServersService {
     return (server.serverCategories ?? []).sort((a: any, b: any) => a.position - b.position);
   }
 
+  async getMentionSuggestions(
+    serverId: string,
+    userId: string,
+    keyword: string,
+  ): Promise<
+    Array<{
+      id: string;
+      name: string;
+      type: 'special' | 'role' | 'user';
+      description: string;
+      avatarUrl?: string;
+      color?: string;
+    }>
+  > {
+    const server = await this.serverModel.findById(serverId).lean().exec();
+    if (!server) throw new NotFoundException('Server not found');
+
+    const isMember = (server as any).members.some(
+      (m: any) => m.userId.toString() === userId,
+    );
+    if (!isMember) throw new ForbiddenException('Bạn không phải thành viên');
+
+    const isOwner = (server as any).ownerId.toString() === userId;
+    const permissions = isOwner
+      ? { mentionEveryone: true, manageServer: true }
+      : await this.rolesService.calculateMemberPermissions(serverId, userId);
+
+    /** Chỉ chủ server hoặc quyền mentionEveryone — không có quyền thì không gợi ý đề cập (người khác vẫn có thể @ bạn). */
+    const canMentionEveryone =
+      isOwner || Boolean((permissions as { mentionEveryone?: boolean }).mentionEveryone);
+    if (!canMentionEveryone) {
+      return [];
+    }
+
+    const lowerKeyword = keyword.trim().toLowerCase();
+
+    const matchesSpecialMention = (displayName: string, kw: string): boolean => {
+      if (!kw) return true;
+      const n = displayName.toLowerCase();
+      const withoutAt = n.startsWith('@') ? n.slice(1) : n;
+      return n.includes(kw) || withoutAt.includes(kw);
+    };
+
+    const results: Array<{
+      id: string;
+      name: string;
+      type: 'special' | 'role' | 'user';
+      description: string;
+      avatarUrl?: string;
+      color?: string;
+    }> = [];
+
+    /** Hardcode — không lấy từ DB */
+    const specials: Array<{
+      id: string;
+      name: string;
+      type: 'special';
+      description: string;
+    }> = [
+      {
+        id: 'special_everyone',
+        name: '@everyone',
+        type: 'special',
+        description: 'Thông báo đến tất cả mọi người có quyền xem kênh này.',
+      },
+      {
+        id: 'special_here',
+        name: '@here',
+        type: 'special',
+        description: 'Thông báo đến tất cả mọi người có quyền được xem kênh.',
+      },
+    ];
+
+    for (const s of specials) {
+      if (matchesSpecialMention(s.name, lowerKeyword)) {
+        results.push(s);
+      }
+    }
+
+    const userRows: typeof results = [];
+    const memberUserIds = (server as any).members.map((m: any) =>
+      new Types.ObjectId(m.userId),
+    );
+    const profiles = await this.profileModel
+      .find({ userId: { $in: memberUserIds } })
+      .select('userId displayName username avatarUrl')
+      .lean()
+      .exec();
+
+    for (const p of profiles as any[]) {
+      const uid = p.userId.toString();
+      if (uid === userId) continue;
+      const displayName = p.displayName || p.username || 'Người dùng';
+      const username = p.username || '';
+      if (
+        lowerKeyword &&
+        !displayName.toLowerCase().includes(lowerKeyword) &&
+        !username.toLowerCase().includes(lowerKeyword)
+      ) {
+        continue;
+      }
+      userRows.push({
+        id: uid,
+        name: displayName,
+        type: 'user',
+        description: username,
+        avatarUrl: p.avatarUrl || undefined,
+      });
+    }
+
+    const roleRows: typeof results = [];
+    const roles = await this.rolesService.getRolesByServer(serverId);
+    for (const role of roles) {
+      if (role.isDefault) continue;
+      const canMention = (role as any).mentionable || canMentionEveryone;
+      if (!canMention) continue;
+      const roleName = `@${role.name}`;
+      if (lowerKeyword && !roleName.toLowerCase().includes(lowerKeyword)) continue;
+      roleRows.push({
+        id: `role_${(role as any)._id.toString()}`,
+        name: roleName,
+        type: 'role',
+        description: 'Nhắc nhở người dùng có vai trò được quyền xem kênh này.',
+        color: role.color,
+      });
+    }
+
+    /** Thứ tự: special → user → role */
+    return [...results, ...userRows, ...roleRows].slice(0, 25);
+  }
+
   async getServersByUserId(userId: string): Promise<Server[]> {
     const userObjectId = new Types.ObjectId(userId);
     return this.serverModel
@@ -504,8 +639,16 @@ export class ServersService {
 
     const settings = (server as any).interactionSettings ?? {};
     console.log('[sendWelcomeMessage] settings:', JSON.stringify(settings));
-    if (!settings.systemMessagesEnabled) { console.log('[sendWelcomeMessage] systemMessagesEnabled=false, skip'); return; }
-    if (!settings.welcomeMessageEnabled) { console.log('[sendWelcomeMessage] welcomeMessageEnabled=false, skip'); return; }
+
+    // Defaults: nếu field chưa tồn tại (undefined) thì coi như enabled (giống UI mặc định).
+    if (settings.systemMessagesEnabled === false) {
+      console.log('[sendWelcomeMessage] systemMessagesEnabled=false, skip');
+      return;
+    }
+    if (settings.welcomeMessageEnabled === false) {
+      console.log('[sendWelcomeMessage] welcomeMessageEnabled=false, skip');
+      return;
+    }
 
     const systemChannelId = settings.systemChannelId;
     if (!systemChannelId) { console.log('[sendWelcomeMessage] No systemChannelId, skip'); return; }
@@ -583,17 +726,12 @@ export class ServersService {
 
   /** Join a public server (used from event link). Fails if server is private. */
   async joinServer(serverId: string, userId: string): Promise<Server> {
-    const server = await this.serverModel.findById(serverId);
-
-    if (!server) {
-      throw new NotFoundException(`Server with id ${serverId} not found`);
-    }
-
-    if (!server.isPublic) {
-      throw new ForbiddenException('You do not have access to this server');
-    }
-
-    return this.addMemberToServer(serverId, userId, 'member');
+    await this.serverAccessService.joinServer(userId, serverId);
+    // Khi join qua access flow, vẫn cần gửi welcome message (để frontend hiện block chào mừng + nút vẫy tay).
+    this.sendWelcomeMessage(serverId, userId).catch((err) => {
+      console.error('[sendWelcomeMessage] Failed:', err?.message || err);
+    });
+    return this.getServerById(serverId);
   }
 
   isMember(server: Server, userId: string): boolean {
@@ -790,6 +928,341 @@ export class ServersService {
         invitedBy,
         role: m.role,
       });
+    }
+
+    return result;
+  }
+
+  // =====================================================
+  // MODERATOR VIEW - MEMBERS SUMMARY
+  // =====================================================
+
+  /**
+   * Moderator View: danh sách thành viên với thông tin mở rộng cho bảng
+   * Chỉ owner hoặc user có quyền manageServer/kickMembers mới xem được
+   */
+  async getModeratorMembersSummary(
+    serverId: string,
+    requesterUserId: string,
+  ): Promise<
+    Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      joinedAt: Date;
+      accountCreatedAt: Date;
+      accountAgeDays: number;
+      joinMethod: 'owner' | 'invited' | 'link';
+      invitedBy?: { id: string; username: string };
+      roles: Array<{ _id: string; name: string; color: string; position: number }>;
+      flags: Array<'new-account' | 'spam' | 'suspicious-invite'>;
+    }>
+  > {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('ownerId members channels')
+      .exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    const isMember = server.members.some(
+      (m) => m.userId.toString() === requesterUserId,
+    );
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không phải thành viên của server này');
+    }
+
+    const isOwner = server.ownerId.toString() === requesterUserId;
+    const canManageServer = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'manageServer',
+    );
+    const canKickMembers = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'kickMembers',
+    );
+    if (!isOwner && !canManageServer && !canKickMembers) {
+      throw new ForbiddenException(
+        'Chỉ owner hoặc thành viên có quyền quản lý/duyệt thành viên mới xem được Moderator View',
+      );
+    }
+
+    const memberObjectIds = server.members.map((m) => m.userId);
+    const memberIdStrings = memberObjectIds.map((id) => id.toString());
+
+    // Lấy thông tin user (createdAt) để tính tuổi tài khoản
+    const users = await this.userModel
+      .find({ _id: { $in: memberObjectIds } })
+      .select('_id createdAt')
+      .lean()
+      .exec();
+    const userById = new Map<
+      string,
+      {
+        _id: Types.ObjectId;
+        createdAt: Date;
+      }
+    >(
+      users.map((u: any) => [u._id.toString(), u]),
+    );
+
+    // Lấy profile
+    const profiles = await this.profileModel
+      .find({ userId: { $in: memberObjectIds } })
+      .select('userId displayName username avatarUrl')
+      .lean()
+      .exec();
+    const profileByUserId = new Map(
+      profiles.map((p: any) => [p.userId.toString(), p]),
+    );
+
+    // Join method + invitedBy giống getServerMembers (nhưng không giới hạn owner)
+    const serverObjectId = new Types.ObjectId(serverId);
+    const acceptedInvites = await this.serverInviteModel
+      .find({
+        serverId: serverObjectId,
+        status: 'accepted',
+        toUserId: { $in: memberObjectIds },
+      })
+      .populate('fromUserId', '_id')
+      .lean()
+      .exec();
+    const inviteByToId = new Map<
+      string,
+      { fromUserId: string; fromUsername?: string; fromCreatedAt?: Date }
+    >();
+    const inviterIds = [
+      ...new Set(
+        (acceptedInvites as any[]).map((inv) => {
+          const from = inv.fromUserId;
+          return (from?._id ?? from)?.toString();
+        }),
+      ),
+    ].filter(Boolean);
+    if (inviterIds.length > 0) {
+      const inviterUsers = await this.userModel
+        .find({ _id: { $in: inviterIds.map((id) => new Types.ObjectId(id)) } })
+        .select('_id createdAt')
+        .lean()
+        .exec();
+      const inviterProfiles = await this.profileModel
+        .find({
+          userId: { $in: inviterIds.map((id) => new Types.ObjectId(id)) },
+        })
+        .select('userId username')
+        .lean()
+        .exec();
+      const inviterCreatedAtById = new Map(
+        inviterUsers.map((u: any) => [u._id.toString(), u.createdAt]),
+      );
+      const inviterUsernameById = new Map(
+        inviterProfiles.map((p: any) => [p.userId.toString(), p.username]),
+      );
+      for (const inv of acceptedInvites as any[]) {
+        const toId = (inv.toUserId?._id ?? inv.toUserId)?.toString();
+        const fromId = (inv.fromUserId?._id ?? inv.fromUserId)?.toString();
+        if (toId && fromId) {
+          inviteByToId.set(toId, {
+            fromUserId: fromId,
+            fromUsername: inviterUsernameById.get(fromId),
+            fromCreatedAt: inviterCreatedAtById.get(fromId),
+          });
+        }
+      }
+    }
+
+    // Activity + spam stats (server-wide aggregate, 30 ngày gần nhất)
+    const channelIds = ((server as any).channels ?? []) as Types.ObjectId[];
+    const spamStatsByUserId = new Map<
+      string,
+      {
+        totalLast30d: number;
+        last10m: number;
+        last24h: number;
+        linkCount: number;
+        mediaCount: number;
+      }
+    >();
+    if (channelIds.length > 0) {
+      const now = Date.now();
+      const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+      const tenMinutesAgo = new Date(now - 10 * 60 * 1000);
+      const oneDayAgo = new Date(now - 24 * 60 * 60 * 1000);
+
+      const agg = await this.messageModel.aggregate([
+        {
+          $match: {
+            channelId: { $in: channelIds },
+            senderId: { $in: memberObjectIds },
+            createdAt: { $gte: thirtyDaysAgo },
+          },
+        },
+        {
+          $group: {
+            _id: '$senderId',
+            totalLast30d: { $sum: 1 },
+            last10m: {
+              $sum: {
+                $cond: [{ $gte: ['$createdAt', tenMinutesAgo] }, 1, 0],
+              },
+            },
+            last24h: {
+              $sum: {
+                $cond: [{ $gte: ['$createdAt', oneDayAgo] }, 1, 0],
+              },
+            },
+            linkCount: {
+              $sum: {
+                $cond: [
+                  {
+                    $regexMatch: {
+                      input: '$content',
+                      regex: /https?:\/\//i,
+                    },
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+            mediaCount: {
+              $sum: {
+                $cond: [
+                  {
+                    $gt: [{ $size: { $ifNull: ['$attachments', []] } }, 0],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ]);
+
+      for (const row of agg as any[]) {
+        const uid = row._id.toString();
+        spamStatsByUserId.set(uid, {
+          totalLast30d: row.totalLast30d ?? 0,
+          last10m: row.last10m ?? 0,
+          last24h: row.last24h ?? 0,
+          linkCount: row.linkCount ?? 0,
+          mediaCount: row.mediaCount ?? 0,
+        });
+      }
+    }
+
+    const now = Date.now();
+    const flagsResult: Array<{
+      userId: string;
+      flags: Array<'new-account' | 'spam' | 'suspicious-invite'>;
+    }> = [];
+
+    const suspiciousInviterIds = new Set<string>();
+
+    // Precompute spam flags for inviters (dùng chung cho SuspiciousInvite)
+    for (const [uid, stats] of spamStatsByUserId.entries()) {
+      const isSpam =
+        (stats.last10m ?? 0) > 50 || (stats.last24h ?? 0) > 200;
+      if (isSpam) suspiciousInviterIds.add(uid);
+    }
+
+    const result: Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      joinedAt: Date;
+      accountCreatedAt: Date;
+      accountAgeDays: number;
+      joinMethod: 'owner' | 'invited' | 'link';
+      invitedBy?: { id: string; username: string };
+      roles: Array<{ _id: string; name: string; color: string; position: number }>;
+      flags: Array<'new-account' | 'spam' | 'suspicious-invite'>;
+    }> = [];
+
+    for (const m of server.members) {
+      const uid = m.userId.toString();
+      const profile = profileByUserId.get(uid) as
+        | { displayName: string; username: string; avatarUrl: string }
+        | undefined;
+      const user = userById.get(uid);
+      const accountCreatedAt =
+        user?.createdAt instanceof Date
+          ? user.createdAt
+          : user?.createdAt
+          ? new Date(user.createdAt)
+          : m.joinedAt instanceof Date
+          ? m.joinedAt
+          : new Date(m.joinedAt);
+      const joinedAt =
+        m.joinedAt instanceof Date ? m.joinedAt : new Date(m.joinedAt);
+
+      const ageDays = Math.floor(
+        (now - accountCreatedAt.getTime()) / (24 * 60 * 60 * 1000),
+      );
+
+      const invite = inviteByToId.get(uid);
+      let joinMethod: 'owner' | 'invited' | 'link' = 'link';
+      let invitedBy: { id: string; username: string } | undefined;
+      if (server.ownerId.toString() === uid) {
+        joinMethod = 'owner';
+      } else if (invite) {
+        joinMethod = 'invited';
+        invitedBy = {
+          id: invite.fromUserId,
+          username: invite.fromUsername ?? 'Người dùng',
+        };
+      }
+
+      const roleInfo = await this.rolesService.getMemberRoleInfo(serverId, uid);
+
+      const stats = spamStatsByUserId.get(uid);
+      const isSpam =
+        stats && (stats.last10m > 50 || stats.last24h > 200);
+
+      const memberFlags: Array<
+        'new-account' | 'spam' | 'suspicious-invite'
+      > = [];
+      if (ageDays < 3) {
+        memberFlags.push('new-account');
+      }
+      if (isSpam) {
+        memberFlags.push('spam');
+      }
+      if (
+        joinMethod === 'invited' &&
+        invite?.fromUserId &&
+        // Không bao giờ đánh dấu đáng ngờ nếu người mời là chủ server
+        invite.fromUserId !== server.ownerId.toString() &&
+        ((invite.fromCreatedAt &&
+          (now - new Date(invite.fromCreatedAt).getTime()) /
+            (24 * 60 * 60 * 1000) <
+            7) ||
+          suspiciousInviterIds.has(invite.fromUserId))
+      ) {
+        memberFlags.push('suspicious-invite');
+      }
+
+      result.push({
+        userId: uid,
+        displayName: profile?.displayName ?? 'Người dùng',
+        username: profile?.username ?? uid,
+        avatarUrl: profile?.avatarUrl ?? '',
+        joinedAt,
+        accountCreatedAt,
+        accountAgeDays: ageDays,
+        joinMethod,
+        invitedBy,
+        roles: roleInfo.roles,
+        flags: memberFlags,
+      });
+
+      flagsResult.push({ userId: uid, flags: memberFlags });
     }
 
     return result;
@@ -1027,6 +1500,7 @@ export class ServersService {
     canManageChannels: boolean;
     canManageEvents: boolean;
     canCreateInvite: boolean;
+    mentionEveryone: boolean;
   }> {
     const server = await this.serverModel.findById(serverId).exec();
     if (!server) {
@@ -1059,6 +1533,7 @@ export class ServersService {
         canManageChannels: true,
         canManageEvents: true,
         canCreateInvite: true,
+        mentionEveryone: true,
       };
     }
 
@@ -1078,12 +1553,208 @@ export class ServersService {
       canManageChannels: permissions.manageChannels,
       canManageEvents: permissions.manageEvents,
       canCreateInvite: permissions.createInvite,
+      mentionEveryone: Boolean(permissions.mentionEveryone),
     };
   }
 
   // =====================================================
   // PUBLIC MEMBER LIST WITH ROLE INFO
   // =====================================================
+
+  /**
+   * Bổ sung account age, activity (tin nhắn 10 phút / 30 ngày), last message, online (device),
+   * join method — dùng cho tab Thành viên (search/filter/sort/flags).
+   */
+  private async enrichMembersListForUi(
+    serverId: string,
+    server: Server,
+    membersResult: Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      joinedAt: Date;
+      isOwner: boolean;
+      serverMemberRole: 'owner' | 'moderator' | 'member';
+      roles: Array<{ _id: string; name: string; color: string; position: number }>;
+      highestRolePosition: number;
+      displayColor: string;
+    }>,
+  ): Promise<
+    Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      joinedAt: Date;
+      isOwner: boolean;
+      serverMemberRole: 'owner' | 'moderator' | 'member';
+      roles: Array<{ _id: string; name: string; color: string; position: number }>;
+      highestRolePosition: number;
+      displayColor: string;
+      accountCreatedAt: Date;
+      accountAgeDays: number;
+      messagesLast10Min: number;
+      messagesLast30d: number;
+      lastMessageAt: Date | null;
+      isOnline: boolean;
+      joinMethod: 'owner' | 'invited' | 'link';
+      invitedBy?: { id: string; username: string };
+    }>
+  > {
+    const now = Date.now();
+    const userObjectIds = membersResult.map((m) => new Types.ObjectId(m.userId));
+
+    const users = await this.userModel
+      .find({ _id: { $in: userObjectIds } })
+      .select('createdAt loginDevices')
+      .lean()
+      .exec();
+    const userById = new Map(
+      users.map((u: any) => [
+        u._id.toString(),
+        u as { createdAt?: Date; loginDevices?: Array<{ lastSeenAt?: Date }> },
+      ]),
+    );
+
+    const channelIds = ((server as any).channels ?? []) as Types.ObjectId[];
+    const tenMinAgo = new Date(now - 10 * 60 * 1000);
+    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    const fiveMinAgo = new Date(now - 5 * 60 * 1000);
+
+    const msgStats = new Map<
+      string,
+      { count30: number; count10: number; lastAt: Date | null }
+    >();
+    if (channelIds.length > 0) {
+      const agg = await this.messageModel
+        .aggregate([
+          {
+            $match: {
+              channelId: { $in: channelIds },
+              senderId: { $in: userObjectIds },
+              createdAt: { $gte: thirtyDaysAgo },
+            },
+          },
+          {
+            $group: {
+              _id: '$senderId',
+              count30: { $sum: 1 },
+              lastAt: { $max: '$createdAt' },
+              count10: {
+                $sum: {
+                  $cond: [{ $gte: ['$createdAt', tenMinAgo] }, 1, 0],
+                },
+              },
+            },
+          },
+        ])
+        .exec();
+      for (const row of agg as any[]) {
+        const uid = row._id.toString();
+        msgStats.set(uid, {
+          count30: row.count30 ?? 0,
+          count10: row.count10 ?? 0,
+          lastAt: row.lastAt ? new Date(row.lastAt) : null,
+        });
+      }
+    }
+
+    const serverOid = new Types.ObjectId(serverId);
+    const acceptedInvites = await this.serverInviteModel
+      .find({
+        serverId: serverOid,
+        status: 'accepted',
+        toUserId: { $in: userObjectIds },
+      })
+      .populate('fromUserId', '_id')
+      .lean()
+      .exec();
+    const inviteByToId = new Map<
+      string,
+      { fromUserId: string; fromUsername?: string }
+    >();
+    const inviterIds = [
+      ...new Set(
+        (acceptedInvites as any[]).map((inv) => {
+          const from = inv.fromUserId;
+          return (from?._id ?? from)?.toString();
+        }),
+      ),
+    ].filter(Boolean);
+    if (inviterIds.length > 0) {
+      const inviterProfiles = await this.profileModel
+        .find({
+          userId: { $in: inviterIds.map((id) => new Types.ObjectId(id)) },
+        })
+        .select('userId username')
+        .lean()
+        .exec();
+      const inviterMap = new Map(
+        inviterProfiles.map((p: any) => [p.userId.toString(), p.username]),
+      );
+      for (const inv of acceptedInvites as any[]) {
+        const toId = (inv.toUserId?._id ?? inv.toUserId)?.toString();
+        const fromId = (inv.fromUserId?._id ?? inv.fromUserId)?.toString();
+        if (toId && fromId) {
+          inviteByToId.set(toId, {
+            fromUserId: fromId,
+            fromUsername: inviterMap.get(fromId),
+          });
+        }
+      }
+    }
+
+    return membersResult.map((row) => {
+      const u = userById.get(row.userId);
+      const created = u?.createdAt
+        ? new Date(u.createdAt)
+        : row.joinedAt;
+      const ageDays = Math.floor(
+        (now - created.getTime()) / (24 * 60 * 60 * 1000),
+      );
+      const stats = msgStats.get(row.userId);
+      let lastDevice = 0;
+      if (u?.loginDevices?.length) {
+        for (const d of u.loginDevices) {
+          if (d?.lastSeenAt) {
+            lastDevice = Math.max(
+              lastDevice,
+              new Date(d.lastSeenAt).getTime(),
+            );
+          }
+        }
+      }
+      const isOnline = lastDevice > 0 && lastDevice >= fiveMinAgo.getTime();
+
+      let joinMethod: 'owner' | 'invited' | 'link' = 'link';
+      let invitedBy: { id: string; username: string } | undefined;
+      if (row.isOwner) {
+        joinMethod = 'owner';
+      } else {
+        const inv = inviteByToId.get(row.userId);
+        if (inv) {
+          joinMethod = 'invited';
+          invitedBy = {
+            id: inv.fromUserId,
+            username: inv.fromUsername ?? 'Người dùng',
+          };
+        }
+      }
+
+      return {
+        ...row,
+        accountCreatedAt: created,
+        accountAgeDays: ageDays,
+        messagesLast10Min: stats?.count10 ?? 0,
+        messagesLast30d: stats?.count30 ?? 0,
+        lastMessageAt: stats?.lastAt ?? null,
+        isOnline,
+        joinMethod,
+        invitedBy,
+      };
+    });
+  }
 
   /**
    * Lấy danh sách thành viên với thông tin role (PUBLIC - cho tất cả members)
@@ -1100,9 +1771,18 @@ export class ServersService {
       avatarUrl: string;
       joinedAt: Date;
       isOwner: boolean;
+      serverMemberRole: 'owner' | 'moderator' | 'member';
       roles: Array<{ _id: string; name: string; color: string; position: number }>;
       highestRolePosition: number;
       displayColor: string;
+      accountCreatedAt: Date;
+      accountAgeDays: number;
+      messagesLast10Min: number;
+      messagesLast30d: number;
+      lastMessageAt: Date | null;
+      isOnline: boolean;
+      joinMethod: 'owner' | 'invited' | 'link';
+      invitedBy?: { id: string; username: string };
     }>;
     currentUserPermissions: {
       canKick: boolean;
@@ -1144,6 +1824,7 @@ export class ServersService {
       avatarUrl: string;
       joinedAt: Date;
       isOwner: boolean;
+      serverMemberRole: 'owner' | 'moderator' | 'member';
       roles: Array<{ _id: string; name: string; color: string; position: number }>;
       highestRolePosition: number;
       displayColor: string;
@@ -1165,6 +1846,7 @@ export class ServersService {
         avatarUrl: profile?.avatarUrl ?? '',
         joinedAt: m.joinedAt instanceof Date ? m.joinedAt : new Date(m.joinedAt),
         isOwner: server.ownerId.toString() === uid,
+        serverMemberRole: m.role,
         roles: roleInfo.roles,
         highestRolePosition: roleInfo.highestRole?.position ?? 0,
         displayColor: roleInfo.displayColor,
@@ -1177,6 +1859,12 @@ export class ServersService {
       return b.highestRolePosition - a.highestRolePosition;
     });
 
+    const enriched = await this.enrichMembersListForUi(
+      serverId,
+      server,
+      membersResult,
+    );
+
     // Lấy quyền của user hiện tại
     const isOwner = server.ownerId.toString() === requesterUserId;
     const [canKick, canBan, canTimeout] = await Promise.all([
@@ -1186,12 +1874,241 @@ export class ServersService {
     ]);
 
     return {
-      members: membersResult,
+      members: enriched,
       currentUserPermissions: {
         canKick,
         canBan,
         canTimeout,
         isOwner,
+      },
+    };
+  }
+
+  // =====================================================
+  // MODERATOR VIEW - MEMBER DETAIL
+  // =====================================================
+
+  /**
+   * Moderator View: chi tiết 1 member cho panel bên phải
+   */
+  async getModeratorMemberDetail(
+    serverId: string,
+    targetUserId: string,
+    requesterUserId: string,
+  ): Promise<{
+    basic: {
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      joinedAt: Date;
+      accountCreatedAt: Date;
+      joinMethod: 'owner' | 'invited' | 'link';
+      invitedBy?: { id: string; username: string };
+    };
+    activity: {
+      messageCountLast30d: number;
+      linkCountLast30d: number;
+      mediaCountLast30d: number;
+    };
+    permissions: RolePermissions;
+    roles: {
+      assigned: Array<{ _id: string; name: string; color: string; position: number }>;
+      allServerRoles: Array<{ _id: string; name: string; color: string; position: number }>;
+    };
+  }> {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('ownerId members channels')
+      .exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    const isMember = server.members.some(
+      (m) => m.userId.toString() === requesterUserId,
+    );
+    if (!isMember) {
+      throw new ForbiddenException('Bạn không phải thành viên của server này');
+    }
+
+    const isOwner = server.ownerId.toString() === requesterUserId;
+    const canManageServer = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'manageServer',
+    );
+    const canKickMembers = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'kickMembers',
+    );
+    if (!isOwner && !canManageServer && !canKickMembers) {
+      throw new ForbiddenException(
+        'Chỉ owner hoặc thành viên có quyền quản lý/duyệt thành viên mới xem được Moderator View',
+      );
+    }
+
+    const memberEntry = server.members.find(
+      (m) => m.userId.toString() === targetUserId,
+    );
+    if (!memberEntry) {
+      throw new NotFoundException('Thành viên không thuộc máy chủ này');
+    }
+
+    const user = await this.userModel
+      .findById(memberEntry.userId)
+      .select('_id createdAt')
+      .lean()
+      .exec();
+    const profile = await this.profileModel
+      .findOne({ userId: memberEntry.userId })
+      .select('displayName username avatarUrl')
+      .lean()
+      .exec();
+
+    const accountCreatedAt =
+      user?.createdAt instanceof Date
+        ? user.createdAt
+        : user?.createdAt
+        ? new Date(user.createdAt)
+        : memberEntry.joinedAt instanceof Date
+        ? memberEntry.joinedAt
+        : new Date(memberEntry.joinedAt);
+    const joinedAt =
+      memberEntry.joinedAt instanceof Date
+        ? memberEntry.joinedAt
+        : new Date(memberEntry.joinedAt);
+
+    // Join method + invitedBy tương tự summary
+    const serverObjectId = new Types.ObjectId(serverId);
+    const acceptedInvites = await this.serverInviteModel
+      .find({
+        serverId: serverObjectId,
+        status: 'accepted',
+        toUserId: memberEntry.userId,
+      })
+      .populate('fromUserId', '_id')
+      .lean()
+      .exec();
+
+    let joinMethod: 'owner' | 'invited' | 'link' = 'link';
+    let invitedBy: { id: string; username: string } | undefined;
+    if (server.ownerId.toString() === targetUserId) {
+      joinMethod = 'owner';
+    } else if (acceptedInvites.length > 0) {
+      joinMethod = 'invited';
+      const inv = acceptedInvites[0] as any;
+      const fromId = (inv.fromUserId?._id ?? inv.fromUserId)?.toString();
+      if (fromId) {
+        const inviterProfile = await this.profileModel
+          .findOne({ userId: new Types.ObjectId(fromId) })
+          .select('username')
+          .lean()
+          .exec();
+        invitedBy = {
+          id: fromId,
+          username: inviterProfile?.username ?? 'Người dùng',
+        };
+      }
+    }
+
+    // Activity: thống kê 30 ngày gần nhất
+    const channelIds = ((server as any).channels ?? []) as Types.ObjectId[];
+    let messageCountLast30d = 0;
+    let linkCountLast30d = 0;
+    let mediaCountLast30d = 0;
+    if (channelIds.length > 0) {
+      const thirtyDaysAgo = new Date(
+        Date.now() - 30 * 24 * 60 * 60 * 1000,
+      );
+      const agg = await this.messageModel.aggregate([
+        {
+          $match: {
+            channelId: { $in: channelIds },
+            senderId: memberEntry.userId,
+            createdAt: { $gte: thirtyDaysAgo },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            linkCount: {
+              $sum: {
+                $cond: [
+                  {
+                    $regexMatch: {
+                      input: '$content',
+                      regex: /https?:\/\//i,
+                    },
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+            mediaCount: {
+              $sum: {
+                $cond: [
+                  {
+                    $gt: [
+                      { $size: { $ifNull: ['$attachments', []] } },
+                      0,
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ]);
+      if (agg.length > 0) {
+        const row = agg[0] as any;
+        messageCountLast30d = row.total ?? 0;
+        linkCountLast30d = row.linkCount ?? 0;
+        mediaCountLast30d = row.mediaCount ?? 0;
+      }
+    }
+
+    // Permissions & roles
+    const permissions = await this.rolesService.calculateMemberPermissions(
+      serverId,
+      targetUserId,
+    );
+    const memberRoleInfo = await this.rolesService.getMemberRoleInfo(
+      serverId,
+      targetUserId,
+    );
+    const allRoles = await this.rolesService.getRolesByServer(serverId);
+
+    return {
+      basic: {
+        userId: targetUserId,
+        displayName: profile?.displayName ?? 'Người dùng',
+        username: profile?.username ?? targetUserId,
+        avatarUrl: profile?.avatarUrl ?? '',
+        joinedAt,
+        accountCreatedAt,
+        joinMethod,
+        invitedBy,
+      },
+      activity: {
+        messageCountLast30d,
+        linkCountLast30d,
+        mediaCountLast30d,
+      },
+      permissions,
+      roles: {
+        assigned: memberRoleInfo.roles,
+        allServerRoles: allRoles.map((r) => ({
+          _id: r._id.toString(),
+          name: r.name,
+          color: r.color,
+          position: r.position,
+        })),
       },
     };
   }

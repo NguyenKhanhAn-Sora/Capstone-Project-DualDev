@@ -12,6 +12,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ServersService } from './servers.service';
+import { ServerAccessService } from '../access/server-access.service';
 import { CreateServerDto } from './dto/create-server.dto';
 import { UpdateServerDto } from './dto/update-server.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -19,7 +20,10 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 @Controller('servers')
 @UseGuards(JwtAuthGuard)
 export class ServersController {
-  constructor(private readonly serversService: ServersService) {}
+  constructor(
+    private readonly serversService: ServersService,
+    private readonly serverAccessService: ServerAccessService,
+  ) {}
 
   @Post()
   async createServer(
@@ -37,6 +41,19 @@ export class ServersController {
   /**
    * Lấy danh sách thành viên (chỉ owner - API cũ)
    */
+  @Get(':id/mentions')
+  async getMentionSuggestions(
+    @Param('id') serverId: string,
+    @Query('keyword') keyword: string = '',
+    @Request() req: any,
+  ) {
+    return this.serversService.getMentionSuggestions(
+      serverId,
+      req.user.userId,
+      keyword,
+    );
+  }
+
   @Get(':id/members')
   async getServerMembers(
     @Param('id') serverId: string,
@@ -55,6 +72,42 @@ export class ServersController {
     @Request() req: any,
   ) {
     return this.serversService.getServerMembersWithRoles(serverId, req.user.userId);
+  }
+
+  // =====================================================
+  // MODERATOR VIEW
+  // =====================================================
+
+  /**
+   * Moderator View: danh sách thành viên mở rộng cho bảng
+   * GET /servers/:id/mod-view/members
+   */
+  @Get(':id/mod-view/members')
+  async getModeratorMembers(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getModeratorMembersSummary(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  /**
+   * Moderator View: chi tiết 1 thành viên cho panel bên phải
+   * GET /servers/:id/mod-view/members/:memberId
+   */
+  @Get(':id/mod-view/members/:memberId')
+  async getModeratorMemberDetail(
+    @Param('id') serverId: string,
+    @Param('memberId') memberId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getModeratorMemberDetail(
+      serverId,
+      memberId,
+      req.user.userId,
+    );
   }
 
   /**
@@ -298,6 +351,68 @@ export class ServersController {
   @Post(':id/join')
   async joinServer(@Param('id') serverId: string, @Request() req: any) {
     return this.serversService.joinServer(serverId, req.user.userId);
+  }
+
+  // =====================================================
+  // Access Control (Discord tab "Truy cập")
+  // =====================================================
+
+  @Get(':id/access/settings')
+  async getAccessSettings(@Param('id') serverId: string) {
+    return this.serverAccessService.getAccessSettings(serverId);
+  }
+
+  @Patch(':id/access/settings')
+  async updateAccessSettings(
+    @Param('id') serverId: string,
+    @Body()
+      body: {
+        accessMode?: 'invite_only' | 'apply' | 'discoverable';
+        isAgeRestricted?: boolean;
+        hasRules?: boolean;
+      },
+    @Request() req: any,
+  ) {
+    if (!body) throw new BadRequestException('Missing body');
+    return this.serverAccessService.updateAccessSettings(
+      serverId,
+      req.user.userId,
+      body,
+    );
+  }
+
+  @Post(':id/access/rules')
+  async addAccessRule(
+    @Param('id') serverId: string,
+    @Body() body: { content: string },
+    @Request() req: any,
+  ) {
+    if (!body?.content) throw new BadRequestException('content is required');
+    return this.serverAccessService.addRule(serverId, req.user.userId, body.content);
+  }
+
+  @Get(':id/access/my-status')
+  async getMyAccessStatus(@Param('id') serverId: string, @Request() req: any) {
+    return this.serverAccessService.getMyStatus(serverId, req.user.userId);
+  }
+
+  @Post(':id/access/approve')
+  async approveAccessUser(
+    @Param('id') serverId: string,
+    @Body() body: { userId: string },
+    @Request() req: any,
+  ) {
+    if (!body?.userId) throw new BadRequestException('userId is required');
+    return this.serverAccessService.approveUser(
+      serverId,
+      req.user.userId,
+      body.userId,
+    );
+  }
+
+  @Post(':id/access/accept-rules')
+  async acceptAccessRules(@Param('id') serverId: string, @Request() req: any) {
+    return this.serverAccessService.acceptRules(serverId, req.user.userId);
   }
 
   @Post(':id/leave')

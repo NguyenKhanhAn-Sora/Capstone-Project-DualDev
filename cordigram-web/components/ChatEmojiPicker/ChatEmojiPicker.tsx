@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import styles from "./ChatEmojiPicker.module.css";
 
-const EmojiMart = dynamic(() => import("@emoji-mart/react"), {
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), {
   ssr: false,
   loading: () => <div className={styles.loading}>Đang tải...</div>,
 });
@@ -108,12 +108,7 @@ type Tab = "emoji" | "kaomoji";
 
 export default function ChatEmojiPicker({ onSelect, onClose, position = "top" }: ChatEmojiPickerProps) {
   const [tab, setTab] = useState<Tab>("emoji");
-  const [emojiData, setEmojiData] = useState<any>(null);
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    import("@emoji-mart/data").then((d) => setEmojiData(d.default ?? d));
-  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -130,27 +125,25 @@ export default function ChatEmojiPicker({ onSelect, onClose, position = "top" }:
           😀 Emoji
         </button>
         <button type="button" className={`${styles.tab} ${tab === "kaomoji" ? styles.tabActive : ""}`} onClick={() => setTab("kaomoji")}>
-          (≧◡≦) Kaomoji
+          (˶˃ ᵕ ˂˶)
         </button>
       </div>
 
       {tab === "emoji" && (
         <div className={styles.martWrap}>
-          {emojiData ? (
-            <EmojiMart
-              data={emojiData}
-              onEmojiSelect={(e: any) => { onSelect(e.native ?? e.shortcodes ?? ""); onClose(); }}
-              theme="auto"
-              locale="vi"
-              previewPosition="none"
-              skinTonePosition="none"
-              maxFrequentRows={2}
-              perLine={9}
-              set="native"
-            />
-          ) : (
-            <div className={styles.loading}>Đang tải emoji...</div>
-          )}
+          <EmojiPicker
+            onEmojiClick={(emojiData: any) => {
+              onSelect(emojiData?.emoji ?? "");
+              onClose();
+            }}
+            autoFocusSearch={false}
+            lazyLoadEmojis
+            searchDisabled={false}
+            skinTonesDisabled
+            previewConfig={{ showPreview: false }}
+            height={360}
+            width="100%"
+          />
         </div>
       )}
 

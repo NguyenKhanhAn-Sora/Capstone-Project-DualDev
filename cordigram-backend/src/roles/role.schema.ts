@@ -20,6 +20,7 @@ export interface RolePermissions {
   timeoutMembers: boolean; // Hạn chế thành viên (timeout)
 
   // === Quyền Kênh Tin Nhắn ===
+  mentionEveryone: boolean; // Đề cập @everyone, @here và Tất Cả Vai Trò
   sendMessages: boolean; // Gửi tin nhắn và tạo bài đăng
   sendMessagesInThreads: boolean; // Gửi tin nhắn trong chủ đề và bài đăng
   createPublicThreads: boolean; // Tạo chủ đề công khai
@@ -64,6 +65,7 @@ export const DEFAULT_EVERYONE_PERMISSIONS: RolePermissions = {
   timeoutMembers: false,
 
   // Quyền Kênh Tin Nhắn
+  mentionEveryone: false,
   sendMessages: true,
   sendMessagesInThreads: true,
   createPublicThreads: false,
@@ -108,6 +110,7 @@ export const DEFAULT_NEW_ROLE_PERMISSIONS: RolePermissions = {
   timeoutMembers: false,
 
   // Quyền Kênh Tin Nhắn - cơ bản true
+  mentionEveryone: false,
   sendMessages: true,
   sendMessagesInThreads: true,
   createPublicThreads: false,
@@ -176,6 +179,7 @@ export class Role extends Document {
       timeoutMembers: { type: Boolean, default: false },
 
       // Quyền Kênh Tin Nhắn
+      mentionEveryone: { type: Boolean, default: false },
       sendMessages: { type: Boolean, default: true },
       sendMessagesInThreads: { type: Boolean, default: true },
       createPublicThreads: { type: Boolean, default: false },

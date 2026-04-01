@@ -82,6 +82,13 @@ const PERMISSION_SECTIONS: PermissionSection[] = [
     title: "Quyền Kênh Tin Nhắn",
     permissions: [
       {
+        key: "mentionEveryone",
+        label: "Đề cập @everyone, @here và Tất Cả Vai Trò",
+        description:
+          "Cho phép thành viên dùng @everyone và @here để thông báo tới mọi người trong kênh, và đề cập các vai trò được bật “cho phép đề cập”.",
+        warning: "Chỉ nên cấp cho người đáng tin cậy.",
+      },
+      {
         key: "sendMessages",
         label: "Gửi tin nhắn và tạo bài đăng",
         description:
@@ -230,15 +237,21 @@ export default function PermissionsTab({
   isOwner,
   onUpdate,
 }: PermissionsTabProps) {
-  const [permissions, setPermissions] = useState<RolePermissions>({ ...role.permissions });
+  const mergeRolePermissions = (r: Role): RolePermissions => ({
+    ...r.permissions,
+    mentionEveryone: r.permissions.mentionEveryone ?? false,
+  });
+
+  const [permissions, setPermissions] = useState<RolePermissions>(mergeRolePermissions(role));
   const [searchQuery, setSearchQuery] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setPermissions({ ...role.permissions });
+    setPermissions(mergeRolePermissions(role));
   }, [role]);
 
-  const hasChanges = JSON.stringify(permissions) !== JSON.stringify(role.permissions);
+  const hasChanges =
+    JSON.stringify(permissions) !== JSON.stringify(mergeRolePermissions(role));
 
   const handleToggle = (key: keyof RolePermissions) => {
     if (!isOwner) return;
@@ -264,7 +277,7 @@ export default function PermissionsTab({
   }, [serverId, role._id, permissions, isOwner, hasChanges, onUpdate]);
 
   const handleReset = () => {
-    setPermissions({ ...role.permissions });
+    setPermissions(mergeRolePermissions(role));
   };
 
   const filteredSections = PERMISSION_SECTIONS.map((section) => ({
