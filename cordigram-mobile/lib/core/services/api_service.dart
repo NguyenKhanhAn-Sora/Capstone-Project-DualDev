@@ -67,6 +67,18 @@ class ApiService {
     return ApiAuthResult(body: responseBody, refreshToken: refreshToken);
   }
 
+  // ── DELETE, returns decoded Map ──
+  static Future<Map<String, dynamic>> delete(
+    String path, {
+    Map<String, String>? extraHeaders,
+  }) async {
+    final response = await _client
+        .delete(_uri(path), headers: {..._baseHeaders, ...?extraHeaders})
+        .timeout(const Duration(seconds: 15));
+
+    return _handleResponse(response);
+  }
+
   // ── GET, returns decoded Map ──
   static Future<Map<String, dynamic>> get(
     String path, {
@@ -77,6 +89,35 @@ class ApiService {
         .timeout(const Duration(seconds: 15));
 
     return _handleResponse(response);
+  }
+
+  // ── GET, returns decoded List (for array responses) ──
+  static Future<List<dynamic>> getList(
+    String path, {
+    Map<String, String>? extraHeaders,
+  }) async {
+    final response = await _client
+        .get(_uri(path), headers: {..._baseHeaders, ...?extraHeaders})
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.body.isEmpty) return [];
+      return jsonDecode(response.body) as List<dynamic>;
+    }
+
+    String message = 'Something went wrong';
+    int? retryAfterSec;
+    try {
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final msg = json['message'];
+      if (msg is String) {
+        message = msg;
+      } else if (msg is List && msg.isNotEmpty) {
+        message = msg.first.toString();
+      }
+      retryAfterSec = json['retryAfterSec'] as int?;
+    } catch (_) {}
+    throw ApiException(message, retryAfterSec: retryAfterSec);
   }
 
   static Map<String, dynamic> _handleResponse(http.Response response) {
