@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../auth/login_screen.dart';
+import '../post/create_tab_screen.dart';
+import '../post/post_detail_screen.dart';
 import 'models/feed_post.dart';
 import 'services/feed_service.dart';
 import 'services/post_interaction_service.dart';
@@ -15,7 +17,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  // ── Feed state ────────────────────────────────────────────────────────────
   final List<FeedPostState> _states = [];
   final ScrollController _scrollController = ScrollController();
 
@@ -26,48 +29,88 @@ class _HomeScreenState extends State<HomeScreen> {
   int _page = 1;
   String? _viewerId;
 
-  /// 5-second polling timer — refreshes stats for all visible posts
+  // ── Tab navigation ────────────────────────────────────────────────────────
+  late TabController _tabController;
+
+  // ── Nav badges ────────────────────────────────────────────────────────────
+  int _notifUnread = 0;
+  int _dmUnread = 0;
+
+  // ── Profile ───────────────────────────────────────────────────────────────
+  String? _avatarUrl;
+  String? _displayName;
+  String? _username;
+
+  // ── Polling ────────────────────────────────────────────────────────────────
   Timer? _pollTimer;
   static const Duration _pollInterval = Duration(seconds: 5);
-
-  /// Global per-post view cooldown — mirrors web's viewCooldownRef map.
-  /// Stores the epoch-ms timestamp of the last recorded view per postId.
   final Map<String, int> _viewCooldownMap = {};
-  // 5 minutes — same as web VIEW_COOLDOWN_MS = 300 000 ms
   static const int _kViewCooldownMs = 300000;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 5, vsync: this);
     _loadFeed();
-    _fetchViewerId();
+    _fetchProfile();
+    _fetchUnreadCounts();
     _scrollController.addListener(_onScroll);
     _startPolling();
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _pollTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
 
-  // ── Polling ────────────────────────────────────────────────────────────
+  // ── Profile + viewerId fetch ──────────────────────────────────────────────
 
-  /// Fetch current user’s profile to get viewerId (for isSelf detection).
-  Future<void> _fetchViewerId() async {
+  Future<void> _fetchProfile() async {
     try {
       final data = await ApiService.get(
         '/profiles/me',
         extraHeaders: {'Authorization': 'Bearer ${AuthStorage.accessToken}'},
       );
       if (!mounted) return;
-      final id = (data['userId'] as String?) ?? (data['id'] as String?);
-      if (id != null) setState(() => _viewerId = id);
-    } catch (_) {
-      // Non-critical — fail silently; follow button just won’t hide for own posts
-    }
+      setState(() {
+        final id = (data['userId'] as String?) ?? (data['id'] as String?);
+        if (id != null) _viewerId = id;
+        _avatarUrl = data['avatarUrl'] as String?;
+        _displayName = data['displayName'] as String?;
+        _username = data['username'] as String?;
+      });
+    } catch (_) {}
   }
+
+  // ── Unread counts ───────────────────────────────────────────────────────
+
+  Future<void> _fetchUnreadCounts() async {
+    final token = AuthStorage.accessToken;
+    if (token == null) return;
+    try {
+      final res = await ApiService.get(
+        '/notifications/unread-count',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+      if (!mounted) return;
+      setState(() => _notifUnread = (res['count'] as int?) ?? 0);
+    } catch (_) {}
+    try {
+      final res = await ApiService.get(
+        '/direct-messages/unread/count',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+      if (!mounted) return;
+      setState(() {
+        _dmUnread = (res['totalUnread'] as int?) ?? (res['count'] as int?) ?? 0;
+      });
+    } catch (_) {}
+  }
+
+  // ── Polling ────────────────────────────────────────────────────────
 
   void _startPolling() {
     _pollTimer?.cancel();
@@ -316,6 +359,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ── Post detail navigation ────────────────────────────────────────────────
+
+  void _openPostDetail(FeedPostState state) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PostDetailScreen(
+          postId: state.post.id,
+          initialState: state,
+          viewerId: _viewerId,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -325,57 +382,175 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ── Profile menu ──────────────────────────────────────────────────────────
+
+  void _showProfileMenu() {
+    final letter = (_displayName ?? _username ?? 'U')
+        .trim()
+        .substring(0, 1)
+        .toUpperCase();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF141D30),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _ProfileMenuSheet(
+        avatarUrl: _avatarUrl,
+        avatarLetter: letter,
+        displayName: _displayName,
+        username: _username != null ? '@$_username' : null,
+        onLogout: () {
+          Navigator.pop(ctx);
+          _logout();
+        },
+      ),
+    );
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   PreferredSizeWidget _buildAppBar() {
+    final letter = (_displayName ?? _username ?? 'U')
+        .trim()
+        .substring(0, 1)
+        .toUpperCase();
+
     return AppBar(
       backgroundColor: const Color(0xFF0D1526),
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
-      centerTitle: true,
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            'assets/images/cordigram-logo.png',
-            height: 28,
-            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            'Cordigram',
-            style: TextStyle(
-              color: Color(0xFFE8ECF8),
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-            ),
-          ),
-        ],
-      ),
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(
-          height: 1,
-          color: Colors.white.withValues(alpha: 0.07),
+      centerTitle: false,
+      titleSpacing: 14,
+      title: const Text(
+        'CORDIGRAM',
+        style: TextStyle(
+          color: Color(0xFFE8ECF8),
+          fontWeight: FontWeight.w800,
+          fontSize: 17,
+          letterSpacing: 1.2,
         ),
       ),
       actions: [
+        // Search
         IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Color(0xFF7A8BB0)),
-          tooltip: 'Logout',
-          onPressed: _logout,
+          icon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF9BAECF),
+            size: 27,
+          ),
+          tooltip: 'Search',
+          onPressed: () => ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Search coming soon'))),
+        ),
+        // Notifications with badge
+        _NavBadgeButton(
+          icon: Icons.notifications_outlined,
+          iconSize: 27,
+          count: _notifUnread,
+          tooltip: 'Notifications',
+          onTap: () {
+            setState(() => _notifUnread = 0);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Notifications coming soon')),
+            );
+          },
+        ),
+        // Direct messages with badge
+        _NavBadgeButton(
+          icon: Icons.chat_bubble_outline_rounded,
+          iconSize: 27,
+          count: _dmUnread,
+          tooltip: 'Messages',
+          onTap: () => ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Messages coming soon'))),
+        ),
+        // Profile avatar
+        GestureDetector(
+          onTap: _showProfileMenu,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 2, right: 12),
+            child: _avatarUrl != null
+                ? CircleAvatar(
+                    radius: 16,
+                    backgroundImage: NetworkImage(_avatarUrl!),
+                    backgroundColor: const Color(0xFF233050),
+                  )
+                : CircleAvatar(
+                    radius: 16,
+                    backgroundColor: const Color(0xFF3470A2),
+                    child: Text(
+                      letter,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+          ),
         ),
       ],
+      // ── Tab bar below the action row ──────────────────────────────────────
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(44),
+        child: ColoredBox(
+          color: const Color(0xFF0D1526),
+          child: TabBar(
+            controller: _tabController,
+            isScrollable: false,
+            labelColor: const Color(0xFFE8ECF8),
+            unselectedLabelColor: const Color(0xFF5A6B8A),
+            labelStyle: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w400,
+            ),
+            labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+            indicatorColor: const Color(0xFF4AA3E4),
+            indicatorWeight: 2.5,
+            dividerColor: Color.fromRGBO(255, 255, 255, 0.07),
+            tabs: const [
+              Tab(icon: Icon(Icons.home_rounded, size: 26)),
+              Tab(icon: Icon(Icons.how_to_reg_outlined, size: 26)),
+              Tab(icon: Icon(Icons.explore_outlined, size: 26)),
+              Tab(icon: Icon(Icons.smart_display_outlined, size: 26)),
+              Tab(icon: Icon(Icons.add_box_outlined, size: 26)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildBody() {
+    return TabBarView(
+      controller: _tabController,
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        _buildFeedTab(),
+        const _PlaceholderTab(label: 'Following'),
+        const _PlaceholderTab(label: 'Explore'),
+        const _PlaceholderTab(label: 'Reels'),
+        const CreateTabScreen(),
+      ],
+    );
+  }
+
+  Widget _buildFeedTab() {
     if (_initialLoad && _loading) {
       return const Center(
         child: CircularProgressIndicator(color: Color(0xFF4AA3E4)),
       );
     }
 
-    if (_initialLoad && _error != null) {
+    if (_error != null && _states.isEmpty) {
       return _ErrorState(
         message: _error!,
         onRetry: () => _loadFeed(refresh: true),
@@ -405,6 +580,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onHide: () => _onHide(_states[index].post.id),
                 onView: () => _onView(_states[index].post.id),
                 onFollow: _onFollow,
+                onComment: () => _openPostDetail(_states[index]),
               ),
               childCount: _states.length,
             ),
@@ -456,6 +632,262 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           // Bottom padding
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Nav badge icon button ─────────────────────────────────────────────────────
+
+class _NavBadgeButton extends StatelessWidget {
+  const _NavBadgeButton({
+    required this.icon,
+    required this.count,
+    required this.onTap,
+    this.tooltip = '',
+    this.iconSize = 24,
+  });
+  final IconData icon;
+  final int count;
+  final VoidCallback onTap;
+  final String tooltip;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(icon, color: const Color(0xFF9BAECF), size: iconSize),
+          if (count > 0)
+            Positioned(
+              top: -4,
+              right: -5,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE53935),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 14),
+                child: Text(
+                  count > 99 ? '99+' : '$count',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Profile menu bottom sheet ─────────────────────────────────────────────────
+
+class _ProfileMenuSheet extends StatelessWidget {
+  const _ProfileMenuSheet({
+    required this.avatarLetter,
+    required this.onLogout,
+    this.avatarUrl,
+    this.displayName,
+    this.username,
+  });
+  final String? avatarUrl;
+  final String avatarLetter;
+  final String? displayName;
+  final String? username;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(top: 10, bottom: 16),
+            decoration: BoxDecoration(
+              color: Color.fromRGBO(255, 255, 255, 0.18),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Avatar + name header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Row(
+              children: [
+                avatarUrl != null
+                    ? CircleAvatar(
+                        radius: 24,
+                        backgroundImage: NetworkImage(avatarUrl!),
+                        backgroundColor: const Color(0xFF233050),
+                      )
+                    : CircleAvatar(
+                        radius: 24,
+                        backgroundColor: const Color(0xFF3470A2),
+                        child: Text(
+                          avatarLetter,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                const SizedBox(width: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (displayName != null)
+                      Text(
+                        displayName!,
+                        style: const TextStyle(
+                          color: Color(0xFFE8ECF8),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    if (username != null)
+                      Text(
+                        username!,
+                        style: const TextStyle(
+                          color: Color(0xFF7A8BB0),
+                          fontSize: 13,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: Color(0xFF1E2D48), height: 1),
+          _SheetItem(
+            icon: Icons.person_outline_rounded,
+            label: 'Profile',
+            onTap: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Profile coming soon')),
+              );
+            },
+          ),
+          _SheetItem(
+            icon: Icons.settings_outlined,
+            label: 'Settings',
+            onTap: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Settings coming soon')),
+              );
+            },
+          ),
+          _SheetItem(
+            icon: Icons.bookmark_border_rounded,
+            label: 'Saved',
+            onTap: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Saved coming soon')),
+              );
+            },
+          ),
+          _SheetItem(
+            icon: Icons.flag_outlined,
+            label: 'Report a problem',
+            onTap: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Report a problem coming soon')),
+              );
+            },
+          ),
+          _SheetItem(
+            icon: Icons.logout_rounded,
+            label: 'Log out',
+            labelColor: const Color(0xFFE53935),
+            iconColor: const Color(0xFFE53935),
+            onTap: onLogout,
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetItem extends StatelessWidget {
+  const _SheetItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.labelColor,
+    this.iconColor,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color? labelColor;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor ?? const Color(0xFF9BAECF), size: 22),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: TextStyle(
+                color: labelColor ?? const Color(0xFFD0D8EE),
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Placeholder tab ───────────────────────────────────────────────────────────
+
+class _PlaceholderTab extends StatelessWidget {
+  const _PlaceholderTab({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.construction_rounded,
+            size: 48,
+            color: Color(0xFF4A5568),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '$label coming soon',
+            style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 15),
+          ),
         ],
       ),
     );

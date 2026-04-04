@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import '../config/app_config.dart';
 
 class ApiException implements Exception {
@@ -67,6 +68,23 @@ class ApiService {
     return ApiAuthResult(body: responseBody, refreshToken: refreshToken);
   }
 
+  // ── PATCH with JSON body, returns decoded Map ──
+  static Future<Map<String, dynamic>> patch(
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? extraHeaders,
+  }) async {
+    final response = await _client
+        .patch(
+          _uri(path),
+          headers: {..._baseHeaders, ...?extraHeaders},
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(const Duration(seconds: 15));
+
+    return _handleResponse(response);
+  }
+
   // ── DELETE, returns decoded Map ──
   static Future<Map<String, dynamic>> delete(
     String path, {
@@ -76,6 +94,31 @@ class ApiService {
         .delete(_uri(path), headers: {..._baseHeaders, ...?extraHeaders})
         .timeout(const Duration(seconds: 15));
 
+    return _handleResponse(response);
+  }
+
+  // ── POST multipart/form-data, returns decoded Map ──
+  static Future<Map<String, dynamic>> postMultipart(
+    String path, {
+    required String fieldName,
+    required String filePath,
+    required String contentType,
+    Map<String, String>? extraHeaders,
+  }) async {
+    final uri = _uri(path);
+    final request = http.MultipartRequest('POST', uri);
+    if (extraHeaders != null) request.headers.addAll(extraHeaders);
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        fieldName,
+        filePath,
+        contentType: MediaType.parse(contentType),
+      ),
+    );
+    final streamed = await _client
+        .send(request)
+        .timeout(const Duration(seconds: 60));
+    final response = await http.Response.fromStream(streamed);
     return _handleResponse(response);
   }
 

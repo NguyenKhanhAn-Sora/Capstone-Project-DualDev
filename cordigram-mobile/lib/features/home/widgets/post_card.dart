@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -142,6 +143,9 @@ class PostCard extends StatefulWidget {
     required this.onView,
     this.viewerId,
     this.onFollow,
+    this.onComment,
+    this.fullWidth = false,
+    this.detailMode = false,
   });
 
   final FeedPostState state;
@@ -158,6 +162,18 @@ class PostCard extends StatefulWidget {
 
   /// Called when the user taps Follow / Following on this card.
   final void Function(String authorId, bool nextFollow)? onFollow;
+
+  /// Called when the user taps the Comment button. If null the button is a
+  /// no-op (e.g. when already on the post detail screen).
+  final VoidCallback? onComment;
+
+  /// When true the card renders edge-to-edge: no horizontal/vertical margin,
+  /// no rounded corners, and no border — intended for the post detail screen.
+  final bool fullWidth;
+
+  /// When true (post detail screen): hides the X close button, hides the
+  /// Like/Comment/Repost/Save action bar, and hides the reposts stat.
+  final bool detailMode;
 
   @override
   State<PostCard> createState() => _PostCardState();
@@ -240,16 +256,24 @@ class _PostCardState extends State<PostCard> {
       key: Key('post-view-${post.id}'),
       onVisibilityChanged: _onVisibilityChanged,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        margin: widget.fullWidth
+            ? EdgeInsets.zero
+            : const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: const Color(0xFF131929),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isAdPost
-                ? const Color(0xFF0EA5E9).withValues(alpha: 0.35)
-                : Colors.white.withValues(alpha: 0.06),
-          ),
-          boxShadow: isAdPost
+          borderRadius: widget.fullWidth
+              ? BorderRadius.zero
+              : BorderRadius.circular(16),
+          border: widget.fullWidth
+              ? null
+              : Border.all(
+                  color: isAdPost
+                      ? const Color(0xFF0EA5E9).withValues(alpha: 0.35)
+                      : Colors.white.withValues(alpha: 0.06),
+                ),
+          boxShadow: widget.fullWidth
+              ? null
+              : isAdPost
               ? const [
                   BoxShadow(
                     color: Color(0x1F0EA5E9),
@@ -277,6 +301,8 @@ class _PostCardState extends State<PostCard> {
               _PostHeader(
                 post: post,
                 onHide: widget.onHide,
+                hideCloseButton: widget.detailMode,
+                useUsername: widget.detailMode,
                 isSponsored: isAdPost,
                 isFollowing: state.following,
                 showInlineFollow: showInlineFollow,
@@ -312,14 +338,21 @@ class _PostCardState extends State<PostCard> {
                 _AdCtaBanner(creative: creative),
               ],
               const SizedBox(height: 12),
-              _StatsRow(state: state),
-              const SizedBox(height: 2),
-              const _Divider(),
-              _ActionBar(
+              _StatsRow(
                 state: state,
-                onLike: widget.onLike,
-                onSave: widget.onSave,
+                hideReposts: widget.detailMode,
+                onLike: widget.detailMode ? widget.onLike : null,
               ),
+              if (!widget.detailMode) ...[
+                const SizedBox(height: 2),
+                const _Divider(),
+                _ActionBar(
+                  state: state,
+                  onLike: widget.onLike,
+                  onSave: widget.onSave,
+                  onComment: widget.onComment,
+                ),
+              ],
             ],
           ),
         ),
@@ -334,6 +367,8 @@ class _PostHeader extends StatelessWidget {
   const _PostHeader({
     required this.post,
     required this.onHide,
+    this.hideCloseButton = false,
+    this.useUsername = false,
     this.isSponsored = false,
     this.isFollowing = false,
     this.showInlineFollow = false,
@@ -341,6 +376,8 @@ class _PostHeader extends StatelessWidget {
   });
   final FeedPost post;
   final VoidCallback onHide;
+  final bool hideCloseButton;
+  final bool useUsername;
   final bool isSponsored;
   final bool isFollowing;
   final bool showInlineFollow;
@@ -363,7 +400,9 @@ class _PostHeader extends StatelessWidget {
                 children: [
                   Flexible(
                     child: Text(
-                      post.displayName,
+                      useUsername && post.username.isNotEmpty
+                          ? post.username
+                          : post.displayName,
                       style: const TextStyle(
                         color: Color(0xFFE8ECF8),
                         fontWeight: FontWeight.w700,
@@ -433,9 +472,10 @@ class _PostHeader extends StatelessWidget {
         ),
         // 3-dot menu button (UI stub)
         _HeaderIconBtn(icon: Icons.more_horiz_rounded, onTap: () {}),
-        const SizedBox(width: 2),
-        // Hide post button
-        _HeaderIconBtn(icon: Icons.close_rounded, onTap: onHide),
+        if (!hideCloseButton) ...[
+          const SizedBox(width: 2),
+          _HeaderIconBtn(icon: Icons.close_rounded, onTap: onHide),
+        ],
       ],
     );
   }
@@ -601,6 +641,72 @@ class _PostContentState extends State<_PostContent> {
   bool _expanded = false;
   static const int _maxLines = 3;
 
+  final List<TapGestureRecognizer> _recognizers = [];
+
+  static final _urlRegex = RegExp(
+    "https?://[^\\s<>()\\[\\]{}\"']+",
+    caseSensitive: false,
+  );
+
+  static String _stripTrailing(String url) =>
+      url.replaceAll(RegExp(r'[),.;!?]+$'), '');
+
+  List<InlineSpan> _buildSpans(String text) {
+    for (final r in _recognizers) r.dispose();
+    _recognizers.clear();
+    const baseStyle = TextStyle(
+      color: Color(0xFFE8ECF8),
+      fontSize: 14,
+      height: 1.55,
+    );
+    const urlStyle = TextStyle(
+      color: Color(0xFF60A5FA),
+      fontSize: 14,
+      height: 1.55,
+      decoration: TextDecoration.underline,
+      decorationColor: Color(0xFF60A5FA),
+    );
+    final spans = <InlineSpan>[];
+    int lastEnd = 0;
+    for (final match in _urlRegex.allMatches(text)) {
+      final rawUrl = match.group(0)!;
+      final stripped = _stripTrailing(rawUrl);
+      final trailingPunct = rawUrl.substring(stripped.length);
+      if (match.start > lastEnd) {
+        spans.add(
+          TextSpan(
+            text: text.substring(lastEnd, match.start),
+            style: baseStyle,
+          ),
+        );
+      }
+      final rec = TapGestureRecognizer()
+        ..onTap = () => launchUrl(
+          Uri.parse(stripped),
+          mode: LaunchMode.externalApplication,
+        );
+      _recognizers.add(rec);
+      spans.add(TextSpan(text: stripped, style: urlStyle, recognizer: rec));
+      if (trailingPunct.isNotEmpty) {
+        spans.add(TextSpan(text: trailingPunct, style: baseStyle));
+      }
+      lastEnd = match.end;
+    }
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd), style: baseStyle));
+    }
+    if (spans.isEmpty) {
+      spans.add(TextSpan(text: text, style: baseStyle));
+    }
+    return spans;
+  }
+
+  @override
+  void dispose() {
+    for (final r in _recognizers) r.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = widget.content;
@@ -608,13 +714,8 @@ class _PostContentState extends State<_PostContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          text,
-          style: const TextStyle(
-            color: Color(0xFFE8ECF8),
-            fontSize: 14,
-            height: 1.55,
-          ),
+        RichText(
+          text: TextSpan(children: _buildSpans(text)),
           maxLines: _expanded ? null : _maxLines,
           overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
         ),
@@ -888,8 +989,10 @@ class _AdCtaBanner extends StatelessWidget {
 // ── Stats row ─────────────────────────────────────────────────────────────────
 
 class _StatsRow extends StatelessWidget {
-  const _StatsRow({required this.state});
+  const _StatsRow({required this.state, this.hideReposts = false, this.onLike});
   final FeedPostState state;
+  final bool hideReposts;
+  final VoidCallback? onLike;
 
   static String _fmt(int n) {
     if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
@@ -915,12 +1018,22 @@ class _StatsRow extends StatelessWidget {
             child: Row(
               children: [
                 if (!hideLikes) ...[
-                  _StatChip(
-                    icon: Icons.thumb_up_outlined,
-                    iconColor: state.liked
-                        ? const Color(0xFF4AA3E4)
-                        : const Color(0xFF7A8BB0),
-                    value: _fmt(stats.hearts),
+                  GestureDetector(
+                    onTap: onLike,
+                    behavior: HitTestBehavior.opaque,
+                    child: _StatChip(
+                      iconWidget: _PostIconLike(
+                        size: 15,
+                        filled: state.liked,
+                        color: state.liked
+                            ? const Color(0xFF2b74b0)
+                            : const Color(0xFF7A8BB0),
+                      ),
+                      iconColor: state.liked
+                          ? const Color(0xFF2b74b0)
+                          : const Color(0xFF7A8BB0),
+                      value: _fmt(stats.hearts),
+                    ),
                   ),
                   const SizedBox(width: 12),
                 ],
@@ -932,7 +1045,7 @@ class _StatsRow extends StatelessWidget {
               ],
             ),
           ),
-          // Right: views + reposts
+          // Right: views (+ reposts if not detail mode)
           Row(
             children: [
               _StatChip(
@@ -940,12 +1053,14 @@ class _StatsRow extends StatelessWidget {
                 iconColor: const Color(0xFF7A8BB0),
                 value: _fmt(stats.viewCount),
               ),
-              const SizedBox(width: 12),
-              _StatChip(
-                icon: Icons.repeat_rounded,
-                iconColor: const Color(0xFF7A8BB0),
-                value: _fmt(stats.reposts),
-              ),
+              if (!hideReposts) ...[
+                const SizedBox(width: 12),
+                _StatChip(
+                  icon: Icons.repeat_rounded,
+                  iconColor: const Color(0xFF7A8BB0),
+                  value: _fmt(stats.reposts),
+                ),
+              ],
             ],
           ),
         ],
@@ -956,11 +1071,13 @@ class _StatsRow extends StatelessWidget {
 
 class _StatChip extends StatelessWidget {
   const _StatChip({
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.iconColor,
     required this.value,
   });
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final Color iconColor;
   final String value;
 
@@ -969,7 +1086,7 @@ class _StatChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 15, color: iconColor),
+        iconWidget ?? Icon(icon!, size: 15, color: iconColor),
         const SizedBox(width: 4),
         Text(
           value,
@@ -1006,10 +1123,12 @@ class _ActionBar extends StatelessWidget {
     required this.state,
     required this.onLike,
     required this.onSave,
+    this.onComment,
   });
   final FeedPostState state;
   final VoidCallback onLike;
   final VoidCallback onSave;
+  final VoidCallback? onComment;
 
   @override
   Widget build(BuildContext context) {
@@ -1019,12 +1138,16 @@ class _ActionBar extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _ActionButton(
-            icon: state.liked
-                ? Icons.thumb_up_rounded
-                : Icons.thumb_up_outlined,
+            iconWidget: _PostIconLike(
+              size: 18,
+              filled: state.liked,
+              color: state.liked
+                  ? const Color(0xFF2b74b0)
+                  : const Color(0xFF7A8BB0),
+            ),
             label: 'Like',
             color: state.liked
-                ? const Color(0xFF4AA3E4)
+                ? const Color(0xFF2b74b0)
                 : const Color(0xFF7A8BB0),
             onTap: onLike,
           ),
@@ -1032,7 +1155,7 @@ class _ActionBar extends StatelessWidget {
             icon: Icons.chat_bubble_outline_rounded,
             label: 'Comment',
             color: const Color(0xFF7A8BB0),
-            onTap: () {},
+            onTap: onComment ?? () {},
           ),
           _ActionButton(
             icon: Icons.repeat_rounded,
@@ -1058,13 +1181,15 @@ class _ActionBar extends StatelessWidget {
 
 class _ActionButton extends StatelessWidget {
   const _ActionButton({
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.label,
     required this.color,
     required this.onTap,
   });
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final String label;
   final Color color;
   final VoidCallback onTap;
@@ -1079,7 +1204,7 @@ class _ActionButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: color),
+            iconWidget ?? Icon(icon!, size: 18, color: color),
             const SizedBox(width: 5),
             Text(
               label,
@@ -1092,6 +1217,36 @@ class _ActionButton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Thumbs-up like icon (mirrors web's IconLike SVG) ─────────────────────────
+
+class _PostIconLike extends StatelessWidget {
+  const _PostIconLike({
+    required this.size,
+    required this.filled,
+    required this.color,
+  });
+  final double size;
+  final bool filled;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final String fill = filled ? 'currentColor' : 'none';
+    final String svg =
+        '''
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <path d="M6 10h3.2V6.6a2.1 2.1 0 0 1 2.1-2.1c.46 0 .91.16 1.27.45l.22.18c.32.26.51.66.51 1.07V10h3.6a2 2 0 0 1 1.97 2.35l-1 5.3A2.2 2.2 0 0 1 15.43 20H8.2A2.2 2.2 0 0 1 6 17.8Z" stroke="currentColor" stroke-width="1.6" fill="$fill"/>
+  <path d="M4 10h2v10H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" fill="$fill"/>
+</svg>''';
+    return SvgPicture.string(
+      svg,
+      width: size,
+      height: size,
+      colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
     );
   }
 }
