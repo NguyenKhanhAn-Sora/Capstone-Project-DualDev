@@ -8,6 +8,7 @@ import '../post/post_detail_screen.dart';
 import 'models/feed_post.dart';
 import 'services/feed_service.dart';
 import 'services/post_interaction_service.dart';
+import 'widgets/people_you_may_know.dart';
 import 'widgets/post_card.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -569,6 +570,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
+          // People you may know strip
+          const SliverToBoxAdapter(child: PeopleYouMayKnow()),
           // Feed items
           SliverList(
             delegate: SliverChildBuilderDelegate(
