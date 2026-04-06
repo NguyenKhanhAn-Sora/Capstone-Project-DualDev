@@ -76,7 +76,7 @@ import RolesSection from "@/components/RolesSection/RolesSection";
 import ServerInteractionsSection from "@/components/ServerInteractionsSection/ServerInteractionsSection";
 import ServerAccessSection from "@/components/ServerAccessSection/ServerAccessSection";
 import ServerProfileSection from "@/components/ServerProfileSection/ServerProfileSection";
-import AuditLogSection from "@/components/AuditLogSection/AuditLogSection";
+import AutoModSection from "@/components/AutoModSection/AutoModSection";
 import ServerSafetySection from "@/components/ServerSafetySection/ServerSafetySection";
 import { mapSectionToSafetyTab } from "@/components/ServerSafetySection/safety-tab-map";
 import ServerBansSection from "@/components/ServerBansSection/ServerBansSection";
@@ -122,6 +122,7 @@ interface UIMessage {
   isPinned?: boolean;
   replyTo?: string;
   stickerReplyWelcomeEnabled?: boolean;
+  contentModerationResult?: "none" | "blurred" | "rejected";
   replyToMessage?: {
     id: string;
     senderId?: string;
@@ -354,6 +355,59 @@ const PollMessage = memo(
 
 PollMessage.displayName = "PollMessage";
 
+function BlurredImage({ blurredUrl, canReveal, className, onError }: {
+  blurredUrl: string;
+  canReveal: boolean;
+  className?: string;
+  onError?: React.ReactEventHandler<HTMLImageElement>;
+}) {
+  const [revealed, setRevealed] = useState(false);
+  const displayUrl = revealed ? blurredUrl.replace(/e_blur:\d+\//, "") : blurredUrl;
+
+  return (
+    <div style={{ position: "relative" }}>
+      <img src={displayUrl} alt="Ảnh được chia sẻ" className={className} onError={onError} />
+      {!revealed && (
+        <>
+          {canReveal && (
+            <button
+              type="button"
+              onClick={() => setRevealed(true)}
+              style={{
+                position: "absolute", top: "50%", left: "50%",
+                transform: "translate(-50%, -50%)",
+                background: "rgba(0,0,0,0.75)", border: "none",
+                borderRadius: 8, padding: "10px 20px",
+                color: "#fff", fontSize: 14, fontWeight: 600,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+                backdropFilter: "blur(4px)", transition: "background 0.15s",
+                zIndex: 2,
+              }}
+              onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.9)"; }}
+              onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.75)"; }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              Xem hình ảnh
+            </button>
+          )}
+          <div style={{
+            position: "absolute", bottom: 8, left: 8, right: 8,
+            background: "rgba(0,0,0,0.7)", borderRadius: 4,
+            padding: "4px 8px", fontSize: 11, color: "#faa61a",
+            display: "flex", alignItems: "center", gap: 4, zIndex: 1,
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            Nội dung nhạy cảm đã bị làm mờ
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // Custom comparison function for memo - only re-render if message content or read status changed
 function areMessagesEqual(
   prevProps: {
@@ -369,9 +423,7 @@ function areMessagesEqual(
     senderColor?: string;
   },
 ) {
-  // Re-render if senderColor changed (role color)
   if (prevProps.senderColor !== nextProps.senderColor) return false;
-  // Re-render if message ID changed (different message)
   if (prevProps.message.id !== nextProps.message.id) return false;
 
   // Re-render if read status changed (THIS IS KEY!)
@@ -1009,6 +1061,7 @@ export default function MessagesPage() {
   const [verificationRulesAgreed, setVerificationRulesAgreed] = useState(false);
   const [verificationRulesSubmitting, setVerificationRulesSubmitting] = useState(false);
   const [ageAcknowledgeLoading, setAgeAcknowledgeLoading] = useState(false);
+  const isAgeRestrictedRef = useRef(false);
   const [localWaitAccountSec, setLocalWaitAccountSec] = useState<number | null>(null);
   const [localWaitMemberSec, setLocalWaitMemberSec] = useState<number | null>(null);
   const [emailOtpSent, setEmailOtpSent] = useState(false);
@@ -1233,6 +1286,7 @@ export default function MessagesPage() {
       voiceUrl: msg.voiceUrl ?? undefined,
       voiceDuration: msg.voiceDuration ?? undefined,
       stickerReplyWelcomeEnabled: msg.stickerReplyWelcomeEnabled,
+      contentModerationResult: msg.contentModerationResult ?? "none",
       reactions: normalizeReactions(msg.reactions),
       replyTo: msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo._id : typeof msg.replyTo === "string" ? msg.replyTo : undefined,
       replyToMessage: mapReplyToMessage(msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo : null),
@@ -2545,6 +2599,7 @@ export default function MessagesPage() {
         voiceUrl: (msg as any).voiceUrl ?? undefined,
         voiceDuration: (msg as any).voiceDuration ?? undefined,
         stickerReplyWelcomeEnabled: (msg as any).stickerReplyWelcomeEnabled,
+        contentModerationResult: (msg as any).contentModerationResult ?? "none",
         reactions: normalizeReactions(msg.reactions),
         replyTo:
           msg.replyTo && typeof msg.replyTo === "object"
@@ -3022,9 +3077,14 @@ export default function MessagesPage() {
       setReplyingTo(null);
       serversApi.markChannelAsRead(selectedChannel).catch(() => {});
     } catch (err) {
-      console.error("Failed to send message", err);
-      setError("Không gửi được tin nhắn");
-      setMessageText(content);
+      const msg = err instanceof Error ? err.message : "Không gửi được tin nhắn";
+      const isSpamBlock =
+        msg.includes("spam đề cập") ||
+        msg.includes("chặn đề cập") ||
+        msg.includes("hạn chế gửi tin nhắn");
+      setError(msg);
+      if (!isSpamBlock) setMessageText(content);
+      setTimeout(() => setError((prev) => (prev === msg ? null : prev)), 5000);
     }
   };
 
@@ -4273,25 +4333,66 @@ export default function MessagesPage() {
 
       if (imageMatch) {
         const imageUrl = imageMatch[1];
+        const isBlurred = imageUrl.includes("e_blur:");
+        const modResult = message.contentModerationResult;
+
+        if (isBlurred) {
+          return (
+            <div>
+              <div className={styles.mediaMessage}>
+                <BlurredImage
+                  blurredUrl={imageUrl}
+                  canReveal={isAgeRestrictedRef.current}
+                  className={styles.messageImage}
+                />
+              </div>
+              {modResult === "rejected" && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "6px 10px", borderRadius: 4,
+                  background: "rgba(237, 66, 69, 0.15)", color: "#ed4245",
+                  fontSize: 12, marginTop: 4,
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                  Hình ảnh đã bị xóa do vi phạm chính sách nội dung.
+                </div>
+              )}
+            </div>
+          );
+        }
+
         return (
-          <div className={styles.mediaMessage}>
-            <img
-              src={imageUrl}
-              alt="Ảnh được chia sẻ"
-              className={styles.messageImage}
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-                e.currentTarget.nextElementSibling?.classList.remove(
-                  styles.hidden,
-                );
-              }}
-            />
-            <span
-              className={styles.hidden}
-              style={{ fontSize: "12px", color: "var(--color-text-muted)" }}
-            >
-              Không tải được ảnh
-            </span>
+          <div>
+            <div className={styles.mediaMessage}>
+              <img
+                src={imageUrl}
+                alt="Ảnh được chia sẻ"
+                className={styles.messageImage}
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                  e.currentTarget.nextElementSibling?.classList.remove(
+                    styles.hidden,
+                  );
+                }}
+              />
+              <span
+                className={styles.hidden}
+                style={{ fontSize: "12px", color: "var(--color-text-muted)" }}
+              >
+                Không tải được ảnh
+              </span>
+            </div>
+            {modResult === "rejected" && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 10px", borderRadius: 4,
+                background: "rgba(237, 66, 69, 0.15)", color: "#ed4245",
+                fontSize: 12, marginTop: 4,
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                Hình ảnh đã bị xóa do vi phạm chính sách nội dung.
+              </div>
+            )}
           </div>
         );
       }
@@ -4345,6 +4446,21 @@ export default function MessagesPage() {
             <a href={fullUrl} style={{ color: "#00a8fc", fontSize: 14, wordBreak: "break-all" }}>{fullUrl}</a>
             <ServerInviteCard serverId={sid} inviteUrl={fullUrl} />
             {textAfter && <div style={{ marginTop: 4 }}>{textAfter}</div>}
+          </div>
+        );
+      }
+
+      // Moderation rejection notice in text
+      if (text.includes("⚠️ Hình ảnh đã bị xóa do vi phạm chính sách nội dung.")) {
+        return (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "6px 10px", borderRadius: 4,
+            background: "rgba(237, 66, 69, 0.15)", color: "#ed4245",
+            fontSize: 13,
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            Hình ảnh đã bị xóa do vi phạm chính sách nội dung.
           </div>
         );
       }
@@ -4781,6 +4897,7 @@ export default function MessagesPage() {
   }
 
   const currentServer = servers.find((s) => s._id === selectedServer);
+  isAgeRestrictedRef.current = Boolean(currentServer?.isAgeRestricted);
 
   return (
     <div className={styles.container}>
@@ -7859,9 +7976,6 @@ export default function MessagesPage() {
               />
             );
           }
-          if (section === "audit-log" && serverSettingsTarget?.serverId) {
-            return <AuditLogSection serverId={serverSettingsTarget.serverId} />;
-          }
           if (section === "bans" && serverSettingsTarget?.serverId) {
             return (
               <ServerBansSection
@@ -7873,7 +7987,18 @@ export default function MessagesPage() {
               />
             );
           }
-          if ((section === "safety" || section === "automod" || section === "privileges") && serverSettingsTarget?.serverId) {
+          if (section === "automod" && serverSettingsTarget?.serverId) {
+            return (
+              <AutoModSection
+                serverId={serverSettingsTarget.serverId}
+                canManageSettings={
+                  Boolean(serverSettingsPermissions?.isOwner) ||
+                  Boolean(serverSettingsPermissions?.canManageServer)
+                }
+              />
+            );
+          }
+          if ((section === "safety" || section === "privileges") && serverSettingsTarget?.serverId) {
             const initialTab = mapSectionToSafetyTab(section);
             return (
               <ServerSafetySection

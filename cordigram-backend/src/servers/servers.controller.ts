@@ -562,4 +562,29 @@ export class ServersController {
   async getCategories(@Param('id') serverId: string) {
     return this.serversService.getCategories(serverId);
   }
+
+  @Get(':id/mention-restricted')
+  async getMentionRestrictedMembers(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getMentionRestrictedMembers(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  @Post(':id/unrestrict/:memberId')
+  async unrestrictMember(
+    @Param('id') serverId: string,
+    @Param('memberId') memberId: string,
+    @Request() req: any,
+  ) {
+    await this.serversService.unrestrictMember(
+      serverId,
+      req.user.userId,
+      memberId,
+    );
+    return { success: true };
+  }
 }

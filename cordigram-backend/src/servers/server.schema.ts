@@ -18,7 +18,9 @@ export interface ServerMember {
   userId: Types.ObjectId;
   role: 'owner' | 'moderator' | 'member';
   joinedAt: Date;
-  timeoutUntil?: Date | null; // Thời điểm hết timeout (null = không bị timeout)
+  timeoutUntil?: Date | null;
+  mentionBlockedUntil?: Date | null;
+  mentionRestricted?: boolean;
 }
 
 export interface BannedUser {
@@ -43,6 +45,22 @@ export interface ServerInteractionSettings {
   systemChannelId?: Types.ObjectId | null;
 }
 
+export type ContentFilterLevel = 'none' | 'all_members' | 'no_role_members';
+
+export interface MentionSpamFilter {
+  enabled: boolean;
+  mentionLimit: number;
+  responses: {
+    blockMessage: boolean;
+    sendWarning: boolean;
+    restrictMember: boolean;
+  };
+  customNotification: string;
+  blockDurationHours: number;
+  exemptRoleIds: string[];
+  exemptChannelIds: string[];
+}
+
 export interface ServerSafetySettings {
   spamProtection: {
     verificationLevel: 'none' | 'low' | 'medium' | 'high';
@@ -52,20 +70,15 @@ export interface ServerSafetySettings {
     hideSpamMessages: boolean;
     deleteSpammerMessages: boolean;
   };
+  contentFilter: {
+    level: ContentFilterLevel;
+  };
   automod: {
     bannedWords: string[];
     blockInUsername: boolean;
     bannedWordResponse: 'warn' | 'delete';
     exemptRoleIds: string[];
-    spamSuspectEnabled: boolean;
-    spamSuspectResponse: 'warn' | 'block';
-    spamAllowedChannelIds: string[];
-    spamAllowedRoleIds: string[];
-    mentionSpamLimit: number;
-    mentionSpamWindowMinutes: number;
-    mentionAttackDetection: boolean;
-    mentionSpamResponse: 'warn' | 'block24h' | 'timeout';
-    mentionTimeoutMinutes: number;
+    mentionSpamFilter: MentionSpamFilter;
   };
   privileges: {
     bypassRoleIds: string[];
@@ -133,7 +146,9 @@ export class Server extends Document {
           default: 'member',
         },
         joinedAt: { type: Date, default: Date.now },
-        timeoutUntil: { type: Date, default: null }, // Thời điểm hết timeout
+        timeoutUntil: { type: Date, default: null },
+        mentionBlockedUntil: { type: Date, default: null },
+        mentionRestricted: { type: Boolean, default: false },
       },
     ],
     default: [],
@@ -231,6 +246,13 @@ export class Server extends Document {
         hideSpamMessages: { type: Boolean, default: false },
         deleteSpammerMessages: { type: Boolean, default: false },
       },
+      contentFilter: {
+        level: {
+          type: String,
+          enum: ['none', 'all_members', 'no_role_members'],
+          default: 'none',
+        },
+      },
       automod: {
         bannedWords: { type: [String], default: [] },
         blockInUsername: { type: Boolean, default: false },
@@ -240,23 +262,19 @@ export class Server extends Document {
           default: 'warn',
         },
         exemptRoleIds: { type: [String], default: [] },
-        spamSuspectEnabled: { type: Boolean, default: false },
-        spamSuspectResponse: {
-          type: String,
-          enum: ['warn', 'block'],
-          default: 'warn',
+        mentionSpamFilter: {
+          enabled: { type: Boolean, default: false },
+          mentionLimit: { type: Number, default: 20 },
+          responses: {
+            blockMessage: { type: Boolean, default: true },
+            sendWarning: { type: Boolean, default: false },
+            restrictMember: { type: Boolean, default: false },
+          },
+          customNotification: { type: String, default: '' },
+          blockDurationHours: { type: Number, default: 8 },
+          exemptRoleIds: { type: [String], default: [] },
+          exemptChannelIds: { type: [String], default: [] },
         },
-        spamAllowedChannelIds: { type: [String], default: [] },
-        spamAllowedRoleIds: { type: [String], default: [] },
-        mentionSpamLimit: { type: Number, default: 8 },
-        mentionSpamWindowMinutes: { type: Number, default: 10 },
-        mentionAttackDetection: { type: Boolean, default: false },
-        mentionSpamResponse: {
-          type: String,
-          enum: ['warn', 'block24h', 'timeout'],
-          default: 'warn',
-        },
-        mentionTimeoutMinutes: { type: Number, default: 30 },
       },
       privileges: {
         bypassRoleIds: { type: [String], default: [] },
@@ -272,20 +290,27 @@ export class Server extends Document {
         hideSpamMessages: false,
         deleteSpammerMessages: false,
       },
+      contentFilter: {
+        level: 'none',
+      },
       automod: {
         bannedWords: [],
         blockInUsername: false,
         bannedWordResponse: 'warn',
         exemptRoleIds: [],
-        spamSuspectEnabled: false,
-        spamSuspectResponse: 'warn',
-        spamAllowedChannelIds: [],
-        spamAllowedRoleIds: [],
-        mentionSpamLimit: 8,
-        mentionSpamWindowMinutes: 10,
-        mentionAttackDetection: false,
-        mentionSpamResponse: 'warn',
-        mentionTimeoutMinutes: 30,
+        mentionSpamFilter: {
+          enabled: false,
+          mentionLimit: 20,
+          responses: {
+            blockMessage: true,
+            sendWarning: false,
+            restrictMember: false,
+          },
+          customNotification: '',
+          blockDurationHours: 8,
+          exemptRoleIds: [],
+          exemptChannelIds: [],
+        },
       },
       privileges: {
         bypassRoleIds: [],

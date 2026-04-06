@@ -23,6 +23,9 @@ import {
   normalizeServerVerificationLevel,
   type ChatGateBlockReason,
 } from './channel-chat-gate.util';
+import { MediaModerationService } from '../posts/media-moderation.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import type { ContentFilterLevel } from '../servers/server.schema';
 
 @Injectable()
 export class MessagesService {
@@ -39,7 +42,100 @@ export class MessagesService {
     private readonly ignoredService: IgnoredService,
     @Inject(forwardRef(() => RolesService))
     private readonly rolesService: RolesService,
+    private readonly mediaModerationService: MediaModerationService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
+
+  private async handleMentionSpamViolation(
+    server: any,
+    userId: string,
+    channelId: string,
+    msf: any,
+  ): Promise<void> {
+    const responses = msf.responses || {};
+    const serverId = server._id.toString();
+
+    if (responses.blockMessage) {
+      const blockHours = Number(msf.blockDurationHours || 8);
+      await this.serverModel.updateOne(
+        {
+          _id: server._id,
+          'members.userId': new Types.ObjectId(userId),
+        },
+        {
+          $set: {
+            'members.$.mentionBlockedUntil': new Date(
+              Date.now() + blockHours * 3600000,
+            ),
+          },
+        },
+      );
+    }
+
+    if (responses.restrictMember) {
+      await this.serverModel.updateOne(
+        {
+          _id: server._id,
+          'members.userId': new Types.ObjectId(userId),
+        },
+        { $set: { 'members.$.mentionRestricted': true } },
+      );
+    }
+
+    if (responses.sendWarning) {
+      try {
+        const serverDoc = await this.serverModel
+          .findById(serverId)
+          .select('name ownerId')
+          .lean()
+          .exec();
+        const serverName = (serverDoc as any)?.name || 'Máy chủ';
+        const notifContent = `Bạn đã bị cảnh báo vì spam đề cập trong kênh của máy chủ "${serverName}". Vui lòng giảm số lần đề cập trong tin nhắn.`;
+        const notifModel = this.serverModel.db.model('ServerNotification');
+        await notifModel.create({
+          serverId: new Types.ObjectId(serverId),
+          createdBy: new Types.ObjectId(
+            (server as any).ownerId?.toString() ?? serverId,
+          ),
+          title: '⚠️ Cảnh báo spam đề cập',
+          content: notifContent,
+          targetType: 'role',
+          targetRoleName: null,
+          targetRoleId: null,
+          recipientUserIds: [new Types.ObjectId(userId)],
+        });
+      } catch {
+        /* non-critical */
+      }
+    }
+
+    if (msf.customNotification) {
+      try {
+        const profile = await this.profileModel
+          .findOne({ userId: new Types.ObjectId(userId) })
+          .select('displayName username')
+          .lean()
+          .exec();
+        const displayName =
+          (profile as any)?.displayName ||
+          (profile as any)?.username ||
+          'Người dùng';
+        const systemMsg = new this.messageModel({
+          channelId: new Types.ObjectId(channelId),
+          senderId: new Types.ObjectId(
+            (server as any).ownerId?.toString() ?? userId,
+          ),
+          content: `⚠️ @${displayName}: ${msf.customNotification}`,
+          messageType: 'system',
+          attachments: [],
+          mentions: [new Types.ObjectId(userId)],
+        });
+        await systemMsg.save();
+      } catch {
+        /* non-critical */
+      }
+    }
+  }
 
   private containsExternalLink(content: string): boolean {
     const urls = content.match(/https?:\/\/[^\s]+/gi) || [];
@@ -64,6 +160,111 @@ export class MessagesService {
         return false;
       }
     });
+  }
+
+  private isImageUrl(url: string): boolean {
+    try {
+      const pathname = new URL(url).pathname.toLowerCase();
+      return /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(pathname);
+    } catch {
+      return /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(url);
+    }
+  }
+
+  private insertCloudinaryBlur(url: string): string | null {
+    const match = url.match(
+      /^(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(v\d+\/.+)$/,
+    );
+    if (match) return `${match[1]}e_blur:1800/${match[2]}`;
+    return null;
+  }
+
+  private async moderateAttachments(
+    attachments: string[],
+  ): Promise<string[]> {
+    const result: string[] = [];
+
+    for (const url of attachments) {
+      if (!this.isImageUrl(url)) {
+        result.push(url);
+        continue;
+      }
+
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) {
+          result.push(url);
+          continue;
+        }
+        const buffer = Buffer.from(await resp.arrayBuffer());
+        const modResult =
+          await this.mediaModerationService.moderateImage({
+            buffer,
+            mimetype: resp.headers.get('content-type') || 'image/jpeg',
+          });
+
+        if (modResult.decision === 'reject') {
+          continue;
+        }
+
+        if (modResult.decision === 'blur') {
+          const blurred = this.insertCloudinaryBlur(url);
+          result.push(blurred || url);
+          continue;
+        }
+
+        result.push(url);
+      } catch {
+        result.push(url);
+      }
+    }
+
+    return result;
+  }
+
+  private async moderateEmbeddedImages(
+    content: string,
+  ): Promise<{ content: string; decision: 'none' | 'blurred' | 'rejected' }> {
+    const imagePattern = /📷 \[Image\]: (https?:\/\/[^\s]+)/g;
+    let match: RegExpExecArray | null;
+    let result = content;
+    let decision: 'none' | 'blurred' | 'rejected' = 'none';
+
+    const matches: { full: string; url: string }[] = [];
+    while ((match = imagePattern.exec(content)) !== null) {
+      matches.push({ full: match[0], url: match[1] });
+    }
+
+    for (const m of matches) {
+      try {
+        const resp = await fetch(m.url);
+        if (!resp.ok) continue;
+        const buffer = Buffer.from(await resp.arrayBuffer());
+        const modResult =
+          await this.mediaModerationService.moderateImage({
+            buffer,
+            mimetype: resp.headers.get('content-type') || 'image/jpeg',
+          });
+
+        if (modResult.decision === 'reject') {
+          result = result.replace(
+            m.full,
+            '⚠️ Hình ảnh đã bị xóa do vi phạm chính sách nội dung.',
+          );
+          decision = 'rejected';
+        } else if (modResult.decision === 'blur') {
+          const blurred = this.insertCloudinaryBlur(m.url);
+          if (blurred) {
+            result = result.replace(m.full, `📷 [Image]: ${blurred}`);
+          }
+          if (decision !== 'rejected') decision = 'blurred';
+        }
+      } catch {
+        // moderation error → keep original
+      }
+    }
+
+    return { content: result, decision };
   }
 
   private async canAccessPrivateChannel(serverId: string, userId: string): Promise<boolean> {
@@ -271,15 +472,91 @@ export class MessagesService {
         throw new ForbiddenException('Tin nhắn chứa từ bị cấm và đã bị chặn');
       }
 
-      const mentionLimit = Number(automod.mentionSpamLimit || 8);
-      const mentionMatches =
-        (createMessageDto.content || '').match(
-          /@(?:everyone|here|[^\s@]+)/gi,
-        ) || [];
-      if (mentionMatches.length > mentionLimit) {
+      const member = (server as any).members?.find(
+        (m: any) => (m?.userId?._id ?? m?.userId)?.toString() === userId,
+      );
+      if (member?.mentionRestricted) {
         throw new ForbiddenException(
-          'Phát hiện spam đề cập. Tin nhắn đã bị chặn.',
+          'Bạn đã bị hạn chế gửi tin nhắn do spam đề cập.',
         );
+      }
+
+      const msf = automod.mentionSpamFilter || {};
+      if (msf.enabled) {
+        const channelExempt = (msf.exemptChannelIds || []).includes(channelId);
+        let roleExempt = false;
+        if ((msf.exemptRoleIds || []).length > 0) {
+          const userRoles = await this.rolesService.getMemberRoles(
+            channel.serverId.toString(),
+            userId,
+          );
+          const userRoleIds = (userRoles || []).map((r: any) =>
+            (r._id ?? r).toString(),
+          );
+          roleExempt = (msf.exemptRoleIds as string[]).some((rid: string) =>
+            userRoleIds.includes(rid),
+          );
+        }
+
+        if (!channelExempt && !roleExempt) {
+          if (
+            member?.mentionBlockedUntil &&
+            new Date(member.mentionBlockedUntil) > new Date()
+          ) {
+            const mentionMatches =
+              (createMessageDto.content || '').match(
+                /@(?:everyone|here|[^\s@]+)/gi,
+              ) || [];
+            if (mentionMatches.length > 0) {
+              throw new ForbiddenException(
+                'Bạn đang bị chặn đề cập. Vui lòng thử lại sau.',
+              );
+            }
+          }
+
+          const mentionLimit = Number(msf.mentionLimit || 20);
+          const currentMentions =
+            (createMessageDto.content || '').match(
+              /@(?:everyone|here|[^\s@]+)/gi,
+            ) || [];
+
+          if (currentMentions.length > 0) {
+            const windowMs = 10 * 60 * 1000;
+            const since = new Date(Date.now() - windowMs);
+            const recentMsgs = await this.messageModel
+              .find({
+                channelId: new Types.ObjectId(channelId),
+                senderId: userObjectId,
+                createdAt: { $gte: since },
+              })
+              .select('content')
+              .lean()
+              .exec();
+
+            let totalMentions = currentMentions.length;
+            for (const msg of recentMsgs) {
+              const m =
+                ((msg as any).content || '').match(
+                  /@(?:everyone|here|[^\s@]+)/gi,
+                ) || [];
+              totalMentions += m.length;
+            }
+
+            if (totalMentions > mentionLimit) {
+              await this.handleMentionSpamViolation(
+                server as any,
+                userId,
+                channelId,
+                msf,
+              );
+              if (msf.responses?.blockMessage) {
+                throw new ForbiddenException(
+                  'Phát hiện spam đề cập. Tin nhắn đã bị chặn.',
+                );
+              }
+            }
+          }
+        }
       }
     }
 
@@ -303,11 +580,49 @@ export class MessagesService {
         ? `⚠️ Cảnh báo: liên kết ngoài danh sách tin cậy.\n\n${createMessageDto.content}`
         : createMessageDto.content;
 
+    let finalAttachments = createMessageDto.attachments || [];
+    let contentModerationResult = 'none';
+    let moderatedContent = contentWithWarning;
+    const contentFilterLevel: ContentFilterLevel =
+      (safety.contentFilter?.level as ContentFilterLevel) || 'none';
+
+    if (contentFilterLevel !== 'none' && !isBypass) {
+      let shouldFilter = contentFilterLevel === 'all_members';
+      if (!shouldFilter && contentFilterLevel === 'no_role_members') {
+        const hasRole = await this.rolesService.hasAnyRole(
+          channel.serverId.toString(),
+          userId,
+        );
+        shouldFilter = !hasRole;
+      }
+
+      if (shouldFilter) {
+        if (finalAttachments.length > 0) {
+          const origLen = finalAttachments.length;
+          finalAttachments = await this.moderateAttachments(finalAttachments);
+          const imageRemoved = finalAttachments.length < origLen;
+          const hasBlurred = finalAttachments.some((u) =>
+            u.includes('e_blur:'),
+          );
+          if (imageRemoved) contentModerationResult = 'rejected';
+          else if (hasBlurred) contentModerationResult = 'blurred';
+        }
+
+        const embeddedResult =
+          await this.moderateEmbeddedImages(moderatedContent);
+        moderatedContent = embeddedResult.content;
+        if (embeddedResult.decision !== 'none') {
+          contentModerationResult = embeddedResult.decision;
+        }
+      }
+    }
+
     const message = new this.messageModel({
       channelId: new Types.ObjectId(channelId),
       senderId: userObjectId,
-      content: contentWithWarning,
-      attachments: createMessageDto.attachments || [],
+      content: moderatedContent,
+      attachments: finalAttachments,
+      contentModerationResult,
       replyTo: createMessageDto.replyTo
         ? new Types.ObjectId(createMessageDto.replyTo)
         : null,

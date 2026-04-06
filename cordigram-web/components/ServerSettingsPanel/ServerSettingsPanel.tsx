@@ -15,7 +15,6 @@ export type ServerSettingsSection =
   | "invites"
   | "access"
   | "safety"
-  | "audit-log"
   | "bans"
   | "automod"
   | "community"
@@ -61,7 +60,6 @@ const SIDEBAR_SECTIONS: { title: string; items: SidebarEntry[]; key: string }[] 
     title: "ĐIỀU CHỈNH",
     items: [
       { id: "safety", label: "Thiết lập An toàn" },
-      { id: "audit-log", label: "Nhật Ký Chỉnh Sửa" },
       { id: "bans", label: "Chặn" },
       { id: "automod", label: "AutoMod" },
     ],
@@ -91,7 +89,6 @@ const SECTION_LABELS: Record<ServerSettingsSection, string> = {
   invites: "Lời mời",
   access: "Truy cập",
   safety: "Thiết lập An toàn",
-  "audit-log": "Nhật Ký Chỉnh Sửa",
   bans: "Chặn",
   automod: "AutoMod",
   community: "Cài Đặt Cộng Đồng",

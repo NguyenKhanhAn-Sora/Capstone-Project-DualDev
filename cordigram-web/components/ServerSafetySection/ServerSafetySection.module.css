@@ -185,3 +185,11 @@
 .radioInput:disabled {
   cursor: not-allowed;
 }
+
+/* ── Divider ── */
+
+.divider {
+  height: 1px;
+  background: var(--color-panel-border, #3f4147);
+  margin: 24px 0;
+}

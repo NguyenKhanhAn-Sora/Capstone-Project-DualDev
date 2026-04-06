@@ -52,6 +52,7 @@ export interface Server {
   memberCount: number;
   isActive: boolean;
   isPublic?: boolean;
+  isAgeRestricted?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -75,6 +76,22 @@ export interface ServerAuditLogRow {
 
 export type ServerVerificationLevel = "none" | "low" | "medium" | "high";
 
+export type ContentFilterLevel = "none" | "all_members" | "no_role_members";
+
+export interface MentionSpamFilter {
+  enabled: boolean;
+  mentionLimit: number;
+  responses: {
+    blockMessage: boolean;
+    sendWarning: boolean;
+    restrictMember: boolean;
+  };
+  customNotification: string;
+  blockDurationHours: number;
+  exemptRoleIds: string[];
+  exemptChannelIds: string[];
+}
+
 export interface ServerSafetySettings {
   spamProtection: {
     verificationLevel: ServerVerificationLevel;
@@ -84,20 +101,15 @@ export interface ServerSafetySettings {
     hideSpamMessages: boolean;
     deleteSpammerMessages: boolean;
   };
+  contentFilter: {
+    level: ContentFilterLevel;
+  };
   automod: {
     bannedWords: string[];
     blockInUsername: boolean;
     bannedWordResponse: "warn" | "delete";
     exemptRoleIds: string[];
-    spamSuspectEnabled: boolean;
-    spamSuspectResponse: "warn" | "block";
-    spamAllowedChannelIds: string[];
-    spamAllowedRoleIds: string[];
-    mentionSpamLimit: number;
-    mentionSpamWindowMinutes: number;
-    mentionAttackDetection: boolean;
-    mentionSpamResponse: "warn" | "block24h" | "timeout";
-    mentionTimeoutMinutes: number;
+    mentionSpamFilter: MentionSpamFilter;
   };
   privileges: {
     bypassRoleIds: string[];
@@ -167,6 +179,7 @@ export interface Message {
   voiceUrl?: string;
   voiceDuration?: number;
   stickerReplyWelcomeEnabled?: boolean;
+  contentModerationResult?: "none" | "blurred" | "rejected";
 }
 
 export interface Friend {
@@ -1045,6 +1058,38 @@ export async function declineServerInvite(inviteId: string): Promise<void> {
     const text = await response.text();
     throw new Error(text || "Không từ chối được lời mời");
   }
+}
+
+// Mention Spam Restricted Members
+export interface MentionRestrictedMember {
+  userId: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string;
+  mentionBlockedUntil: string | null;
+  mentionRestricted: boolean;
+}
+
+export async function getMentionRestrictedMembers(
+  serverId: string,
+): Promise<MentionRestrictedMember[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/mention-restricted`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function unrestrictMember(
+  serverId: string,
+  memberId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/unrestrict/${memberId}`,
+    { method: "POST", headers: getHeaders() },
+  );
+  if (!response.ok) throw new Error("Không mở hạn chế được");
 }
 
 // Mentions

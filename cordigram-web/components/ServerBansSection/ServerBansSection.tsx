@@ -1,7 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { getBannedUsers, unbanMember, type BannedUser } from "@/lib/servers-api";
+import {
+  getBannedUsers,
+  unbanMember,
+  getMentionRestrictedMembers,
+  unrestrictMember,
+  type BannedUser,
+  type MentionRestrictedMember,
+} from "@/lib/servers-api";
 import styles from "./ServerBansSection.module.css";
 
 interface ServerBansSectionProps {
@@ -19,6 +26,22 @@ export default function ServerBansSection({
   const [searchQuery, setSearchQuery] = useState("");
   const [confirmTarget, setConfirmTarget] = useState<BannedUser | null>(null);
   const [unbanLoading, setUnbanLoading] = useState(false);
+  const [restricted, setRestricted] = useState<MentionRestrictedMember[]>([]);
+
+  const loadRestricted = useCallback(async () => {
+    if (!canManageBans) return;
+    try {
+      const data = await getMentionRestrictedMembers(serverId);
+      setRestricted(data);
+    } catch { /* */ }
+  }, [serverId, canManageBans]);
+
+  const handleUnrestrict = async (memberId: string) => {
+    try {
+      await unrestrictMember(serverId, memberId);
+      setRestricted((prev) => prev.filter((r) => r.userId !== memberId));
+    } catch { /* */ }
+  };
 
   const loadBans = useCallback(async () => {
     try {
@@ -35,7 +58,8 @@ export default function ServerBansSection({
 
   useEffect(() => {
     loadBans();
-  }, [loadBans]);
+    loadRestricted();
+  }, [loadBans, loadRestricted]);
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return bannedUsers;
@@ -192,6 +216,44 @@ export default function ServerBansSection({
           </>
         )}
       </div>
+
+      {/* ── Restricted members from mention spam ── */}
+      {canManageBans && (
+        <div className={styles.restrictedSection}>
+          <h4 className={styles.restrictedTitle}>Thành viên bị hạn chế (Spam đề cập)</h4>
+          {restricted.length === 0 ? (
+            <p className={styles.restrictedEmpty}>Không có thành viên nào bị hạn chế.</p>
+          ) : (
+            restricted.map((m) => (
+              <div key={m.userId} className={styles.restrictedRow}>
+                {m.avatarUrl ? (
+                  <img src={m.avatarUrl} alt="" className={styles.restrictedAvatar} />
+                ) : (
+                  <div className={styles.restrictedAvatar}>
+                    {(m.displayName || "?")[0].toUpperCase()}
+                  </div>
+                )}
+                <div className={styles.restrictedInfo}>
+                  <p className={styles.restrictedName}>{m.displayName}</p>
+                  <p className={styles.restrictedMeta}>
+                    {m.mentionRestricted && "Bị hạn chế gửi tin nhắn"}
+                    {m.mentionBlockedUntil && (
+                      <> · Chặn đề cập đến {new Date(m.mentionBlockedUntil).toLocaleString("vi-VN")}</>
+                    )}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={styles.unrestrictBtn}
+                  onClick={() => handleUnrestrict(m.userId)}
+                >
+                  Mở hạn chế
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {confirmTarget && (
         <div

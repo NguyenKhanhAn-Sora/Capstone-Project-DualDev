@@ -18,6 +18,7 @@ import { RolesModule } from '../roles/roles.module';
 import { InboxSeen, InboxSeenSchema } from '../inbox/inbox-seen.schema';
 import { UserServer, UserServerSchema } from '../access/user-server.schema';
 import { User, UserSchema } from '../users/user.schema';
+import { MediaModerationService } from '../posts/media-moderation.service';
 
 @Module({
   imports: [
@@ -37,7 +38,7 @@ import { User, UserSchema } from '../users/user.schema';
       secret: process.env.JWT_SECRET || 'your_secret_key',
     }),
   ],
-  providers: [MessagesService, ChannelMessagesGateway],
+  providers: [MessagesService, ChannelMessagesGateway, MediaModerationService],
   controllers: [MessageSearchController, MessagesController],
   exports: [MessagesService, ChannelMessagesGateway],
 })

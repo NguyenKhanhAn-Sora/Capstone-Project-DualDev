@@ -315,11 +315,20 @@ export class RolesService {
         serverId: new Types.ObjectId(serverId),
         $or: [
           { memberIds: new Types.ObjectId(memberId) },
-          { isDefault: true }, // @everyone áp dụng cho tất cả
+          { isDefault: true },
         ],
       })
       .sort({ position: -1 })
       .exec();
+  }
+
+  async hasAnyRole(serverId: string, memberId: string): Promise<boolean> {
+    const count = await this.roleModel.countDocuments({
+      serverId: new Types.ObjectId(serverId),
+      memberIds: new Types.ObjectId(memberId),
+      isDefault: { $ne: true },
+    });
+    return count > 0;
   }
 
   /**

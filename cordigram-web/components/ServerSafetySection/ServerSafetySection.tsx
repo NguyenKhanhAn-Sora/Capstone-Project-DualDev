@@ -17,6 +17,38 @@ interface VerificationOption {
   desc: string;
 }
 
+interface ContentFilterOption {
+  value: serversApi.ContentFilterLevel;
+  accent: string;
+  title: string;
+  desc: string;
+}
+
+const CONTENT_FILTER_OPTIONS: ContentFilterOption[] = [
+  {
+    value: "all_members",
+    accent: styles.accentHigh,
+    title: "Lọc tin nhắn từ tất cả thành viên",
+    desc: "Tất cả tin nhắn sẽ được lọc để phát hiện nội dung đa phương tiện có hình ảnh nội dung nhạy cảm.",
+  },
+  {
+    value: "no_role_members",
+    accent: styles.accentMedium,
+    title: "Lọc tin nhắn từ các thành viên máy chủ không giữ vai trò",
+    desc: "Các tin nhắn từ những thành viên máy chủ không giữ vai trò sẽ bị lọc để phát hiện nội dung đa phương tiện có hình ảnh nhạy cảm.",
+  },
+  {
+    value: "none",
+    accent: styles.accentNone,
+    title: "Không lọc",
+    desc: "Các tin nhắn sẽ không bị lọc đối với nội dung đa phương tiện có hình ảnh nhạy cảm.",
+  },
+];
+
+function findContentFilterOption(level: serversApi.ContentFilterLevel): ContentFilterOption {
+  return CONTENT_FILTER_OPTIONS.find((o) => o.value === level) ?? CONTENT_FILTER_OPTIONS[2];
+}
+
 const VERIFICATION_OPTIONS: VerificationOption[] = [
   {
     value: "none",
@@ -54,6 +86,7 @@ export default function ServerSafetySection({
 }: Props) {
   const [settings, setSettings] = useState<serversApi.ServerSafetySettings | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [contentFilterExpanded, setContentFilterExpanded] = useState(false);
 
   useEffect(() => {
     serversApi.getServerSafetySettings(serverId).then(setSettings).catch(() => setSettings(null));
@@ -73,10 +106,21 @@ export default function ServerSafetySection({
     });
   };
 
+  const setContentFilterLevel = (value: serversApi.ContentFilterLevel) => {
+    if (!settings) return;
+    save({
+      ...settings,
+      contentFilter: { ...(settings.contentFilter || {}), level: value },
+    });
+  };
+
   if (!settings) return <div>Không tải được thiết lập an toàn.</div>;
 
   const currentLevel = settings.spamProtection.verificationLevel ?? "none";
   const current = findOption(currentLevel);
+
+  const currentFilterLevel = settings.contentFilter?.level ?? "none";
+  const currentFilter = findContentFilterOption(currentFilterLevel);
 
   return (
     <div className={styles.container}>
@@ -124,6 +168,59 @@ export default function ServerSafetySection({
                   onChange={() => {
                     setVerificationLevel(opt.value);
                     setExpanded(false);
+                  }}
+                />
+              </label>
+            );
+          })}
+        </div>
+      )}
+
+      <div className={styles.divider} />
+
+      <h3 className={styles.sectionTitle}>Bộ lọc nội dung nhạy cảm</h3>
+      <p className={styles.sectionDesc}>
+        Chọn nếu thành viên máy chủ có thể chia sẻ nội dung đa phương tiện có hình ảnh được bộ lọc nội dung nhạy cảm
+        phát hiện. Cài đặt này sẽ áp dụng cho các kênh không giới hạn độ tuổi.{" "}
+        <a href="#" style={{ color: "#00a8fc", textDecoration: "none" }}>Tìm hiểu thêm</a>
+      </p>
+
+      <div className={styles.summary}>
+        <span className={`${styles.summaryAccent} ${currentFilter.accent}`} />
+        <div className={styles.summaryBody}>
+          <p className={styles.summaryTitle}>{currentFilter.title}</p>
+          <p className={styles.summaryDesc}>{currentFilter.desc}</p>
+        </div>
+        <button
+          type="button"
+          className={styles.changeBtn}
+          disabled={!canManageSettings}
+          onClick={() => setContentFilterExpanded((v) => !v)}
+        >
+          Thay đổi
+        </button>
+      </div>
+
+      {contentFilterExpanded && (
+        <div className={styles.radioList} role="radiogroup" aria-label="Bộ lọc nội dung nhạy cảm">
+          {CONTENT_FILTER_OPTIONS.map((opt) => {
+            const selected = currentFilterLevel === opt.value;
+            return (
+              <label key={opt.value} className={styles.radioItem}>
+                <span className={`${styles.accent} ${opt.accent}`} />
+                <div className={styles.radioBody}>
+                  <p className={styles.radioTitle}>{opt.title}</p>
+                  <p className={styles.radioDesc}>{opt.desc}</p>
+                </div>
+                <input
+                  type="radio"
+                  name={`content-filter-${serverId}`}
+                  className={styles.radioInput}
+                  checked={selected}
+                  disabled={!canManageSettings}
+                  onChange={() => {
+                    setContentFilterLevel(opt.value);
+                    setContentFilterExpanded(false);
                   }}
                 />
               </label>

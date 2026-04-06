@@ -40,6 +40,13 @@ export class Message extends Document {
   attachments: string[];
 
   @Prop({
+    type: String,
+    enum: ['none', 'blurred', 'rejected'],
+    default: 'none',
+  })
+  contentModerationResult: string;
+
+  @Prop({
     type: [
       {
         userId: { type: Types.ObjectId, ref: 'User' },

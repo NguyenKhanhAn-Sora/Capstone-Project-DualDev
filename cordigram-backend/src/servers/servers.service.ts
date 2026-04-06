@@ -663,7 +663,11 @@ export class ServersService {
     userId: string,
     patch: Record<string, any>,
   ) {
-    const server = await this.serverModel.findById(serverId).exec();
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('ownerId safetySettings')
+      .lean()
+      .exec();
     if (!server)
       throw new NotFoundException(`Server with id ${serverId} not found`);
     const canManage =
@@ -673,11 +677,22 @@ export class ServersService {
       throw new ForbiddenException(
         'Bạn không có quyền cập nhật thiết lập an toàn',
       );
-    (server as any).safetySettings = {
-      ...((server as any).safetySettings || {}),
-      ...(patch || {}),
-    };
-    const saved = await server.save();
+
+    const current = (server as any).safetySettings
+      ? JSON.parse(JSON.stringify((server as any).safetySettings))
+      : {};
+    const merged = { ...current, ...(patch || {}) };
+
+    const updated = await this.serverModel
+      .findByIdAndUpdate(
+        serverId,
+        { $set: { safetySettings: merged } },
+        { new: true },
+      )
+      .select('safetySettings')
+      .lean()
+      .exec();
+
     await this.auditLogService.logServerEvent({
       serverId,
       actorUserId: userId,
@@ -686,7 +701,7 @@ export class ServersService {
       targetId: serverId,
       changes: [{ field: 'safetySettings', to: patch }],
     });
-    return (saved as any).safetySettings || {};
+    return (updated as any)?.safetySettings || {};
   }
 
   async getServerAuditLogs(
@@ -2720,5 +2735,77 @@ export class ServersService {
     }
     await server.save();
     return server;
+  }
+
+  async getMentionRestrictedMembers(
+    serverId: string,
+    userId: string,
+  ): Promise<
+    Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl: string;
+      mentionBlockedUntil: string | null;
+      mentionRestricted: boolean;
+    }>
+  > {
+    await this.assertCanManageServer(serverId, userId);
+    const server = await this.serverModel.findById(serverId).lean().exec();
+    if (!server)
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+
+    const restricted = ((server as any).members || []).filter(
+      (m: any) =>
+        m.mentionRestricted ||
+        (m.mentionBlockedUntil && new Date(m.mentionBlockedUntil) > new Date()),
+    );
+    if (!restricted.length) return [];
+
+    const userIds = restricted.map(
+      (m: any) => new Types.ObjectId(m.userId),
+    );
+    const profiles = await this.profileModel
+      .find({ userId: { $in: userIds } })
+      .select('userId displayName username avatarUrl')
+      .lean()
+      .exec();
+    const profileMap = new Map(
+      (profiles as any[]).map((p) => [p.userId.toString(), p]),
+    );
+
+    return restricted.map((m: any) => {
+      const p = profileMap.get(m.userId.toString()) || {};
+      return {
+        userId: m.userId.toString(),
+        displayName: (p as any).displayName || 'Người dùng',
+        username: (p as any).username || '',
+        avatarUrl: (p as any).avatarUrl || '',
+        mentionBlockedUntil: m.mentionBlockedUntil
+          ? new Date(m.mentionBlockedUntil).toISOString()
+          : null,
+        mentionRestricted: !!m.mentionRestricted,
+      };
+    });
+  }
+
+  async unrestrictMember(
+    serverId: string,
+    actorId: string,
+    memberId: string,
+  ): Promise<void> {
+    await this.assertCanManageServer(serverId, actorId);
+    await this.serverModel.updateOne(
+      {
+        _id: new Types.ObjectId(serverId),
+        'members.userId': new Types.ObjectId(memberId),
+      },
+      {
+        $set: {
+          'members.$.mentionRestricted': false,
+          'members.$.mentionBlockedUntil': null,
+        },
+      },
+    );
   }
 }
