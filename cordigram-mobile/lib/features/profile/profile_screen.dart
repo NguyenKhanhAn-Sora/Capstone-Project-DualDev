@@ -6,6 +6,7 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/services/auth_storage.dart';
 import '../report/report_comment_sheet.dart';
+import 'follow_list_sheet.dart';
 import 'models/profile_detail.dart';
 import 'profile_edit_sheet.dart';
 import 'services/profile_service.dart';
@@ -240,6 +241,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showToast(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  void _openFollowSheet(ProfileDetail p, FollowTab tab) {
+    showFollowListSheet(
+      context,
+      ownerUserId: p.userId,
+      ownerUsername: p.username,
+      initialTab: tab,
+      viewerId: _decodeViewerId(),
+      onCountsChange: ({int? followersDelta, int? followingDelta}) {
+        setState(() {
+          _profile = _profile?.copyWith(
+            stats: ProfileStats(
+              posts: (_profile?.stats.posts ?? 0),
+              reels: (_profile?.stats.reels ?? 0),
+              totalPosts: (_profile?.stats.totalPosts ?? 0),
+              followers:
+                  (_profile?.stats.followers ?? 0) + (followersDelta ?? 0),
+              following:
+                  (_profile?.stats.following ?? 0) + (followingDelta ?? 0),
+            ),
+          );
+        });
+      },
+      onNavigateToProfile: (userId) {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ProfileScreen(userId: userId),
+          ),
+        );
+      },
+    );
   }
 
   void _showMoreMenu() {
@@ -959,7 +992,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: 'Followers',
             value: canFollowers ? _formatCount(p.stats.followers) : '—',
             onTap: canFollowers
-                ? () => _showToast('Followers list coming soon')
+                ? () => _openFollowSheet(p, FollowTab.followers)
                 : () => _showToast(
                     _visibilityRestriction(vis?.followers, 'followers list'),
                   ),
@@ -970,7 +1003,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: 'Following',
             value: canFollowing ? _formatCount(p.stats.following) : '—',
             onTap: canFollowing
-                ? () => _showToast('Following list coming soon')
+                ? () => _openFollowSheet(p, FollowTab.following)
                 : () => _showToast(
                     _visibilityRestriction(vis?.following, 'following list'),
                   ),

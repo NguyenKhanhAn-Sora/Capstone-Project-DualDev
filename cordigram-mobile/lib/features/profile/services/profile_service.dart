@@ -38,7 +38,7 @@ class ProfileService {
     final token = AuthStorage.accessToken;
     if (token == null) throw const ApiException('Not authenticated');
     await ApiService.post(
-      '/follows/$userId',
+      '/users/${Uri.encodeComponent(userId)}/follow',
       extraHeaders: {'Authorization': 'Bearer $token'},
     );
   }
@@ -47,7 +47,7 @@ class ProfileService {
     final token = AuthStorage.accessToken;
     if (token == null) throw const ApiException('Not authenticated');
     await ApiService.delete(
-      '/follows/$userId',
+      '/users/${Uri.encodeComponent(userId)}/follow',
       extraHeaders: {'Authorization': 'Bearer $token'},
     );
   }
@@ -109,6 +109,40 @@ class ProfileService {
       extraHeaders: {'Authorization': 'Bearer $token'},
     );
     return ProfileDetail.fromJson(data);
+  }
+
+  /// Fetch paginated followers list for a user.
+  static Future<Map<String, dynamic>> fetchFollowers(
+    String userId, {
+    int limit = 20,
+    String? cursor,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    final qs = <String, String>{'limit': '$limit'};
+    if (cursor != null) qs['cursor'] = cursor;
+    final query = Uri(queryParameters: qs).query;
+    return ApiService.get(
+      '/users/${Uri.encodeComponent(userId)}/followers?$query',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Fetch paginated following list for a user.
+  static Future<Map<String, dynamic>> fetchFollowing(
+    String userId, {
+    int limit = 20,
+    String? cursor,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    final qs = <String, String>{'limit': '$limit'};
+    if (cursor != null) qs['cursor'] = cursor;
+    final query = Uri(queryParameters: qs).query;
+    return ApiService.get(
+      '/users/${Uri.encodeComponent(userId)}/following?$query',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
   }
 
   /// Check if a username is available.
