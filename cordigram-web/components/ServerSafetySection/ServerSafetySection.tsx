@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
+import styles from "./ServerSafetySection.module.css";
 
 interface Props {
   serverId: string;
@@ -9,13 +10,50 @@ interface Props {
   initialTab?: "spam" | "automod" | "privileges";
 }
 
-export default function ServerSafetySection({ serverId, canManageSettings, initialTab = "spam" }: Props) {
-  const [settings, setSettings] = useState<serversApi.ServerSafetySettings | null>(null);
-  const [tab, setTab] = useState<"spam" | "automod" | "privileges">(initialTab);
+interface VerificationOption {
+  value: serversApi.ServerVerificationLevel;
+  accent: string;
+  title: string;
+  desc: string;
+}
 
-  useEffect(() => {
-    setTab(initialTab);
-  }, [initialTab]);
+const VERIFICATION_OPTIONS: VerificationOption[] = [
+  {
+    value: "none",
+    accent: styles.accentNone,
+    title: "Không",
+    desc: "Không giới hạn",
+  },
+  {
+    value: "low",
+    accent: styles.accentLow,
+    title: "Thấp",
+    desc: "Bạn cần xác nhận email đăng kí Cordigram.",
+  },
+  {
+    value: "medium",
+    accent: styles.accentMedium,
+    title: "Trung bình",
+    desc: "Phải đăng kí Cordigram lâu hơn 5 phút.",
+  },
+  {
+    value: "high",
+    accent: styles.accentHigh,
+    title: "Cao",
+    desc: "Phải là thành viên trong máy chủ này lâu hơn 10 phút.",
+  },
+];
+
+function findOption(level: serversApi.ServerVerificationLevel): VerificationOption {
+  return VERIFICATION_OPTIONS.find((o) => o.value === level) ?? VERIFICATION_OPTIONS[0];
+}
+
+export default function ServerSafetySection({
+  serverId,
+  canManageSettings,
+}: Props) {
+  const [settings, setSettings] = useState<serversApi.ServerSafetySettings | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     serversApi.getServerSafetySettings(serverId).then(setSettings).catch(() => setSettings(null));
@@ -27,80 +65,72 @@ export default function ServerSafetySection({ serverId, canManageSettings, initi
     await serversApi.updateServerSafetySettings(serverId, next);
   };
 
+  const setVerificationLevel = (value: serversApi.ServerVerificationLevel) => {
+    if (!settings) return;
+    save({
+      ...settings,
+      spamProtection: { ...settings.spamProtection, verificationLevel: value },
+    });
+  };
+
   if (!settings) return <div>Không tải được thiết lập an toàn.</div>;
 
+  const currentLevel = settings.spamProtection.verificationLevel ?? "none";
+  const current = findOption(currentLevel);
+
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" onClick={() => setTab("spam")}>Ngăn chặn spam</button>
-        <button type="button" onClick={() => setTab("automod")}>AutoMod</button>
-        <button type="button" onClick={() => setTab("privileges")}>Quyền hạn</button>
+    <div className={styles.container}>
+      <h3 className={styles.sectionTitle}>Mức xác minh</h3>
+      <p className={styles.sectionDesc}>
+        Thành viên của máy chủ phải đáp ứng được các tiêu chí sau để gửi tin nhắn trong kênh văn bản hoặc bắt đầu
+        cuộc trò chuyện bằng tin nhắn trực tiếp. Nếu thành viên đã được chỉ định vai trò và hướng dẫn làm quen trên
+        máy chủ không bật thì không cần sử dụng các tiêu chí này nữa.{" "}
+        <strong>Chúng tôi khuyến nghị bạn nên cài đặt mức xác minh cho Máy Chủ Cộng Đồng.</strong>
+      </p>
+
+      <div className={styles.summary}>
+        <span className={`${styles.summaryAccent} ${current.accent}`} />
+        <div className={styles.summaryBody}>
+          <p className={styles.summaryTitle}>{current.title}</p>
+          <p className={styles.summaryDesc}>{current.desc}</p>
+        </div>
+        <button
+          type="button"
+          className={styles.changeBtn}
+          disabled={!canManageSettings}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          Thay đổi
+        </button>
       </div>
 
-      {tab === "spam" && (
-        <div style={{ display: "grid", gap: 8 }}>
-          <label>Mức xác minh</label>
-          <select
-            disabled={!canManageSettings}
-            value={settings.spamProtection.verificationLevel}
-            onChange={(e) => save({ ...settings, spamProtection: { ...settings.spamProtection, verificationLevel: e.target.value as any } })}
-          >
-            <option value="low">Thấp (email)</option>
-            <option value="medium">Trung bình (account &gt; 5 phút)</option>
-            <option value="high">Cao (join server &gt; 10 phút)</option>
-          </select>
-          <label><input type="checkbox" checked={settings.spamProtection.warnExternalLinks} onChange={(e) => save({ ...settings, spamProtection: { ...settings.spamProtection, warnExternalLinks: e.target.checked } })} /> Cảnh báo link ngoài whitelist</label>
-          <label><input type="checkbox" checked={settings.spamProtection.hideSpamMessages} onChange={(e) => save({ ...settings, spamProtection: { ...settings.spamProtection, hideSpamMessages: e.target.checked } })} /> Ẩn tin nhắn spam</label>
-          <label><input type="checkbox" checked={settings.spamProtection.deleteSpammerMessages} onChange={(e) => save({ ...settings, spamProtection: { ...settings.spamProtection, deleteSpammerMessages: e.target.checked } })} /> Xóa tin nhắn của spammer</label>
-        </div>
-      )}
-
-      {tab === "automod" && (
-        <div style={{ display: "grid", gap: 8 }}>
-          <label>Từ cấm (phân tách dấu phẩy)</label>
-          <input
-            disabled={!canManageSettings}
-            value={settings.automod.bannedWords.join(", ")}
-            onChange={(e) => save({ ...settings, automod: { ...settings.automod, bannedWords: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } })}
-          />
-          <label>Phản hồi từ cấm</label>
-          <select
-            disabled={!canManageSettings}
-            value={settings.automod.bannedWordResponse}
-            onChange={(e) => save({ ...settings, automod: { ...settings.automod, bannedWordResponse: e.target.value as any } })}
-          >
-            <option value="warn">Cảnh báo</option>
-            <option value="delete">Xóa/chặn tin nhắn</option>
-          </select>
-          <label>Số mention tối đa trong {settings.automod.mentionSpamWindowMinutes} phút</label>
-          <input
-            type="number"
-            min={1}
-            max={50}
-            disabled={!canManageSettings}
-            value={settings.automod.mentionSpamLimit}
-            onChange={(e) => save({ ...settings, automod: { ...settings.automod, mentionSpamLimit: Number(e.target.value || 1) } })}
-          />
-        </div>
-      )}
-
-      {tab === "privileges" && (
-        <div style={{ display: "grid", gap: 8 }}>
-          <label>Role bypass (IDs, dấu phẩy)</label>
-          <input
-            disabled={!canManageSettings}
-            value={settings.privileges.bypassRoleIds.join(", ")}
-            onChange={(e) => save({ ...settings, privileges: { ...settings.privileges, bypassRoleIds: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } })}
-          />
-          <label>Role quản lý safety (IDs, dấu phẩy)</label>
-          <input
-            disabled={!canManageSettings}
-            value={settings.privileges.managerRoleIds.join(", ")}
-            onChange={(e) => save({ ...settings, privileges: { ...settings.privileges, managerRoleIds: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } })}
-          />
+      {expanded && (
+        <div className={styles.radioList} role="radiogroup" aria-label="Mức xác minh">
+          {VERIFICATION_OPTIONS.map((opt) => {
+            const selected = currentLevel === opt.value;
+            return (
+              <label key={opt.value} className={styles.radioItem}>
+                <span className={`${styles.accent} ${opt.accent}`} />
+                <div className={styles.radioBody}>
+                  <p className={styles.radioTitle}>{opt.title}</p>
+                  <p className={styles.radioDesc}>{opt.desc}</p>
+                </div>
+                <input
+                  type="radio"
+                  name={`verification-${serverId}`}
+                  className={styles.radioInput}
+                  checked={selected}
+                  disabled={!canManageSettings}
+                  onChange={() => {
+                    setVerificationLevel(opt.value);
+                    setExpanded(false);
+                  }}
+                />
+              </label>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
-

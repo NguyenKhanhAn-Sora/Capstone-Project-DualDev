@@ -10,6 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { Injectable } from '@nestjs/common';
+import { MessagesService } from './messages.service';
 
 @WebSocketGateway({
   namespace: '/channel-messages',
@@ -23,7 +24,10 @@ export class ChannelMessagesGateway
 
   private readonly userSockets = new Map<string, Set<string>>();
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly messagesService: MessagesService,
+  ) {}
 
   async handleConnection(socket: Socket) {
     try {
@@ -57,15 +61,27 @@ export class ChannelMessagesGateway
   }
 
   @SubscribeMessage('join-channel')
-  handleJoinChannel(
+  async handleJoinChannel(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { channelId: string },
   ) {
     if (!client?.join) return;
     const channelId = body?.channelId;
-    if (channelId && typeof channelId === 'string') {
-      client.join(`channel:${channelId}`);
+    if (!channelId || typeof channelId !== 'string') return;
+    const userId = client.data?.userId as string | undefined;
+    if (!userId) {
+      client.emit('join-channel-denied', { channelId, reason: 'auth' });
+      return;
     }
+    const ok = await this.messagesService.userCanJoinChannelRoom(
+      channelId,
+      userId,
+    );
+    if (!ok) {
+      client.emit('join-channel-denied', { channelId, reason: 'gate' });
+      return;
+    }
+    client.join(`channel:${channelId}`);
   }
 
   @SubscribeMessage('leave-channel')

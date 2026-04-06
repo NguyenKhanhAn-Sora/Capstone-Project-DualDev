@@ -906,10 +906,20 @@ export class ServersService {
   /** Join a public server (used from event link). Fails if server is private. */
   async joinServer(serverId: string, userId: string): Promise<Server> {
     await this.serverAccessService.joinServer(userId, serverId);
-    // Khi join qua access flow, vẫn cần gửi welcome message (để frontend hiện block chào mừng + nút vẫy tay).
     this.sendWelcomeMessage(serverId, userId).catch((err) => {
       console.error('[sendWelcomeMessage] Failed:', err?.message || err);
     });
+    this.serverInviteModel
+      .updateMany(
+        {
+          toUserId: new Types.ObjectId(userId),
+          serverId: new Types.ObjectId(serverId),
+          status: 'pending',
+        },
+        { $set: { status: 'accepted', respondedAt: new Date() } },
+      )
+      .exec()
+      .catch(() => {});
     return this.getServerById(serverId);
   }
 

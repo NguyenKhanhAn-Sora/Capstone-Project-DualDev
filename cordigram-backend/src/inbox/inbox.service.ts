@@ -252,13 +252,14 @@ export class InboxService {
             channelId,
           );
         if (unreadCount <= 0) continue;
-        const messages = await this.messagesService.getMessagesByChannelId(
+        const pack = await this.messagesService.getMessagesByChannelId(
           channelId,
           1,
           0,
           userId,
         );
-        const lastMsg = messages[0];
+        if (pack.chatViewBlocked) continue;
+        const lastMsg = pack.messages[0];
         if (!lastMsg) continue;
         const senderId = lastMsg.senderId?._id ?? lastMsg.senderId;
         const senderStr = senderId?.toString?.();

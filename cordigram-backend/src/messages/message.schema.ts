@@ -30,6 +30,12 @@ export class Message extends Document {
   @Prop({ type: String, default: null })
   giphyId: string | null;
 
+  @Prop({ type: String, default: null })
+  voiceUrl: string | null;
+
+  @Prop({ type: Number, default: null })
+  voiceDuration: number | null;
+
   @Prop({ type: [String], default: [] })
   attachments: string[];
 

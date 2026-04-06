@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import styles from "../InviteToVoiceChannelPopup/InviteToVoiceChannelPopup.module.css";
 import type { Friend } from "@/lib/servers-api";
 import { createServerInvite } from "@/lib/servers-api";
+import { sendDirectMessage } from "@/lib/api";
 
 interface InviteToServerPopupProps {
   isOpen: boolean;
@@ -59,6 +60,11 @@ export default function InviteToServerPopup({
     setSendingId(friend._id);
     try {
       await createServerInvite(serverId, friend._id);
+      try {
+        await sendDirectMessage(friend._id, { content: inviteLink });
+      } catch {
+        // DM send failure is non-critical
+      }
       setInvitedIds((prev) => new Set(prev).add(friend._id));
       onInviteSent?.();
     } catch (e) {

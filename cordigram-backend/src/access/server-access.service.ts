@@ -10,21 +10,23 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ServersService } from '../servers/servers.service';
 import { ServerInvitesService } from '../server-invites/server-invites.service';
+import { OtpService } from '../otp/otp.service';
+import { MailService } from '../mail/mail.service';
 import { Profile } from '../profiles/profile.schema';
 import { Server, ServerAccessMode } from '../servers/server.schema';
 import { Rule } from './rule.schema';
 import { UserServer, UserServerStatus } from './user-server.schema';
-
-function calcAgeFromBirthdate(
-  birthdate: Date | null | undefined,
-): number | null {
-  if (!birthdate) return null;
-  const now = new Date();
-  let age = now.getFullYear() - birthdate.getFullYear();
-  const m = now.getMonth() - birthdate.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < birthdate.getDate())) age -= 1;
-  return age;
-}
+import { User } from '../users/user.schema';
+import { RolesService } from '../roles/roles.service';
+import {
+  calcAgeFromBirthdate,
+  computeVerificationChecks,
+  evaluateChannelChatGate,
+  getVerificationWaitSeconds,
+  normalizeServerVerificationLevel,
+  type ChatGateBlockReason,
+  type ServerVerificationLevel,
+} from '../messages/channel-chat-gate.util';
 
 function defaultStatusForAccessMode(
   accessMode: ServerAccessMode,
@@ -44,9 +46,14 @@ export class ServerAccessService {
     @Inject(forwardRef(() => ServersService))
     private readonly serversService: ServersService,
     private readonly serverInvitesService: ServerInvitesService,
+    @Inject(forwardRef(() => RolesService))
+    private readonly rolesService: RolesService,
+    private readonly otpService: OtpService,
+    private readonly mailService: MailService,
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
     @InjectModel(Rule.name) private ruleModel: Model<Rule>,
     @InjectModel(UserServer.name) private userServerModel: Model<UserServer>,
+    @InjectModel(User.name) private userModel: Model<User>,
   ) {}
 
   private getEffectiveAccessMode(server: Server): ServerAccessMode {
@@ -166,13 +173,37 @@ export class ServerAccessService {
     acceptedRules: boolean;
     hasRules: boolean;
     accessMode: ServerAccessMode;
+    isAgeRestricted: boolean;
+    ageRestrictedAcknowledged: boolean;
+    ageYears: number | null;
+    verificationLevel: ServerVerificationLevel;
+    verificationChecks: {
+      emailVerified: boolean;
+      accountOver5Min: boolean;
+      memberOver10Min: boolean;
+    };
+    verificationWait: {
+      waitAccountSec: number | null;
+      waitMemberSec: number | null;
+    };
+    chatViewBlocked: boolean;
+    chatBlockReason: ChatGateBlockReason | null;
+    /** Cảnh báo trên kênh khi server bật NSFW/age — chỉ khi user đã được phép vào chat. */
+    showAgeRestrictedChannelNotice: boolean;
   }> {
     const server = await this.serversService.getServerById(serverId);
-    const isMember = this.serversService.isMember(server, userId);
+    const ownerCheck =
+      (server as any).ownerId?.toString?.() === userId ||
+      String((server as any).ownerId) === String(userId);
+    const isMember = ownerCheck || this.serversService.isMember(server, userId);
     if (!isMember) throw new ForbiddenException('Bạn chưa tham gia máy chủ');
 
     const accessMode = this.getEffectiveAccessMode(server);
     const hasRules = Boolean((server as any).hasRules);
+    const isAgeRestricted = Boolean((server as any).isAgeRestricted);
+    const verificationLevel = normalizeServerVerificationLevel(
+      (server as any).safetySettings?.spamProtection?.verificationLevel,
+    );
 
     const doc = await this.userServerModel
       .findOne({
@@ -182,23 +213,135 @@ export class ServerAccessService {
       .lean()
       .exec();
 
-    if (!doc) {
-      const fallbackStatus: UserServerStatus =
-        accessMode === 'apply' ? 'pending' : 'accepted';
-      return {
-        status: fallbackStatus,
-        acceptedRules: !hasRules,
-        hasRules,
-        accessMode,
-      };
+    const ageRestrictedAcknowledged = Boolean(
+      (doc as any)?.ageRestrictedAcknowledged,
+    );
+
+    const [userRow, profileRow] = await Promise.all([
+      this.userModel
+        .findById(userId)
+        .select('createdAt isVerified')
+        .lean()
+        .exec(),
+      this.profileModel
+        .findOne({ userId: new Types.ObjectId(userId) })
+        .select('birthdate')
+        .lean()
+        .exec(),
+    ]);
+
+    const memberRow = ((server as any).members || []).find(
+      (m: any) => (m?.userId?._id ?? m?.userId)?.toString() === userId,
+    );
+    const memberJoinedAt = memberRow?.joinedAt
+      ? new Date(memberRow.joinedAt)
+      : null;
+
+    const isOwner =
+      (server as any).ownerId?.toString?.() === userId ||
+      String((server as any).ownerId) === String(userId);
+    const canManageServer = await this.rolesService.hasPermission(
+      serverId,
+      userId,
+      'manageServer',
+    );
+    const isBypass = isOwner || canManageServer;
+
+    const birthdate = (profileRow as any)?.birthdate ?? null;
+    const accountCreatedAt = new Date((userRow as any)?.createdAt || Date.now());
+    const isServerEmailVerified = Boolean((doc as any)?.serverEmailVerified);
+    const verificationChecks = computeVerificationChecks({
+      isVerified: isServerEmailVerified,
+      accountCreatedAt,
+      memberJoinedAt,
+    });
+    const verificationWait = getVerificationWaitSeconds({
+      level: verificationLevel,
+      isBypass,
+      accountCreatedAt,
+      memberJoinedAt,
+    });
+    const gate = evaluateChannelChatGate({
+      isAgeRestricted,
+      ageRestrictedAcknowledged,
+      birthdate,
+      verificationLevel,
+      isVerified: isServerEmailVerified,
+      accountCreatedAt,
+      memberJoinedAt,
+      isBypass,
+    });
+
+    const ageYears = calcAgeFromBirthdate(birthdate);
+
+    const base = !doc
+      ? {
+          status: (accessMode === 'apply'
+            ? 'pending'
+            : 'accepted') as UserServerStatus,
+          acceptedRules: !hasRules,
+        }
+      : {
+          status: doc.status ?? null,
+          acceptedRules: Boolean(doc.acceptedRules),
+        };
+
+    if (isBypass) {
+      base.acceptedRules = true;
+      base.status = 'accepted';
     }
 
     return {
-      status: doc.status ?? null,
-      acceptedRules: Boolean(doc.acceptedRules),
+      ...base,
       hasRules,
       accessMode,
+      isAgeRestricted,
+      ageRestrictedAcknowledged: isBypass ? true : ageRestrictedAcknowledged,
+      ageYears,
+      verificationLevel,
+      verificationChecks,
+      verificationWait,
+      chatViewBlocked: !gate.allowed,
+      chatBlockReason: gate.allowed ? null : (gate.reason ?? null),
+      showAgeRestrictedChannelNotice:
+        isAgeRestricted && gate.allowed && !isBypass && (ageYears ?? 0) >= 18,
     };
+  }
+
+  /**
+   * User đủ 18 tuổi xác nhận đã đọc cảnh báo máy chủ giới hạn độ tuổi.
+   */
+  async acknowledgeAgeRestriction(
+    serverId: string,
+    userId: string,
+  ): Promise<{ ok: boolean }> {
+    const server = await this.serversService.getServerById(serverId);
+    if (!this.serversService.isMember(server as any, userId)) {
+      throw new ForbiddenException('Bạn chưa tham gia máy chủ');
+    }
+    if (!server.isAgeRestricted) {
+      return { ok: true };
+    }
+    const profile = await this.profileModel
+      .findOne({ userId: new Types.ObjectId(userId) })
+      .select('birthdate')
+      .lean()
+      .exec();
+    const age = calcAgeFromBirthdate((profile as any)?.birthdate ?? null);
+    if (age == null || age < 18) {
+      throw new ForbiddenException('Tài khoản chưa đủ 18 tuổi');
+    }
+    await this.userServerModel
+      .findOneAndUpdate(
+        {
+          userId: new Types.ObjectId(userId),
+          serverId: new Types.ObjectId(serverId),
+        },
+        { $set: { ageRestrictedAcknowledged: true } },
+        { upsert: true, new: true },
+      )
+      .exec();
+    return { ok: true };
   }
 
   /**
@@ -423,6 +566,68 @@ export class ServerAccessService {
     return updated as any;
   }
 
+  async requestServerEmailOtp(
+    serverId: string,
+    userId: string,
+  ): Promise<{ ok: boolean; retryAfterSec?: number }> {
+    const server = await this.serversService.getServerById(serverId);
+    if (!this.serversService.isMember(server as any, userId)) {
+      throw new ForbiddenException('Bạn chưa tham gia máy chủ');
+    }
+    const userRow = await this.userModel
+      .findById(userId)
+      .select('email')
+      .lean()
+      .exec();
+    const email = (userRow as any)?.email;
+    if (!email) throw new BadRequestException('Tài khoản không có email');
+
+    try {
+      const { code, expiresMs } = await this.otpService.requestOtp(email);
+      const expiresMinutes = Math.ceil(expiresMs / 60000);
+      await this.mailService.sendOtpEmail(email, code, expiresMinutes);
+      return { ok: true };
+    } catch (err: any) {
+      if (err?.response?.retryAfterSec) {
+        return { ok: false, retryAfterSec: err.response.retryAfterSec };
+      }
+      throw err;
+    }
+  }
+
+  async verifyServerEmailOtp(
+    serverId: string,
+    userId: string,
+    code: string,
+  ): Promise<{ ok: boolean }> {
+    const server = await this.serversService.getServerById(serverId);
+    if (!this.serversService.isMember(server as any, userId)) {
+      throw new ForbiddenException('Bạn chưa tham gia máy chủ');
+    }
+    const userRow = await this.userModel
+      .findById(userId)
+      .select('email')
+      .lean()
+      .exec();
+    const email = (userRow as any)?.email;
+    if (!email) throw new BadRequestException('Tài khoản không có email');
+
+    await this.otpService.verifyOtp(email, code);
+
+    await this.userServerModel
+      .findOneAndUpdate(
+        {
+          userId: new Types.ObjectId(userId),
+          serverId: new Types.ObjectId(serverId),
+        },
+        { $set: { serverEmailVerified: true } },
+        { upsert: true, new: true },
+      )
+      .exec();
+
+    return { ok: true };
+  }
+
   private async ensureMemberInServer(
     serverId: string,
     userId: string,
@@ -430,8 +635,6 @@ export class ServerAccessService {
   ) {
     const server = await this.serversService.getServerById(serverId);
     if (this.serversService.isMember(server as any, userId)) return;
-    // addMemberToServer chỉ chấp nhận moderator/member trong code hiện tại.
-    // Ở đây chỉ dùng member.
     await this.serversService.addMemberToServer(
       serverId,
       userId,

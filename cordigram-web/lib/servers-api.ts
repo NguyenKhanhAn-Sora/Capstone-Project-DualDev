@@ -73,9 +73,11 @@ export interface ServerAuditLogRow {
   createdAt: string;
 }
 
+export type ServerVerificationLevel = "none" | "low" | "medium" | "high";
+
 export interface ServerSafetySettings {
   spamProtection: {
-    verificationLevel: "low" | "medium" | "high";
+    verificationLevel: ServerVerificationLevel;
     hideMutedDm: boolean;
     filterDmSpam: boolean;
     warnExternalLinks: boolean;
@@ -162,6 +164,8 @@ export interface Message {
   mentions?: string[];
   messageType?: string;
   giphyId?: string;
+  voiceUrl?: string;
+  voiceDuration?: number;
   stickerReplyWelcomeEnabled?: boolean;
 }
 
@@ -1437,6 +1441,8 @@ export async function createServerEvent(
 }
 
 // Messages
+export type ChatGateBlockReason = "verification" | "age_under_18" | "age_ack";
+
 export async function createMessage(
   channelId: string,
   content: string,
@@ -1445,6 +1451,8 @@ export async function createMessage(
   mentions?: string[],
   messageType?: string,
   giphyId?: string,
+  voiceUrl?: string,
+  voiceDuration?: number,
 ): Promise<Message> {
   const body: Record<string, unknown> = {
     content,
@@ -1453,6 +1461,8 @@ export async function createMessage(
     ...(mentions?.length ? { mentions } : {}),
     ...(messageType && messageType !== "text" ? { messageType } : {}),
     ...(giphyId ? { giphyId } : {}),
+    ...(voiceUrl ? { voiceUrl } : {}),
+    ...(voiceDuration != null ? { voiceDuration } : {}),
   };
   const response = await fetch(
     `${API_BASE_URL}/channels/${channelId}/messages`,
@@ -1501,11 +1511,17 @@ export async function sendWaveSticker(
   return response.json();
 }
 
+export interface GetChannelMessagesResponse {
+  messages: Message[];
+  chatViewBlocked: boolean;
+  chatBlockReason: ChatGateBlockReason | null;
+}
+
 export async function getMessages(
   channelId: string,
   limit: number = 50,
   skip: number = 0,
-): Promise<Message[]> {
+): Promise<GetChannelMessagesResponse> {
   const url = new URL(`${API_BASE_URL}/channels/${channelId}/messages`);
   url.searchParams.append("limit", limit.toString());
   url.searchParams.append("skip", skip.toString());
@@ -1519,7 +1535,15 @@ export async function getMessages(
     throw new Error(data.message || "Không tải được tin nhắn");
   }
 
-  return response.json();
+  const raw = await response.json();
+  if (Array.isArray(raw)) {
+    return {
+      messages: raw as Message[],
+      chatViewBlocked: false,
+      chatBlockReason: null,
+    };
+  }
+  return raw as GetChannelMessagesResponse;
 }
 
 /** Đánh dấu toàn bộ tin nhắn trong kênh là đã đọc (để thông báo chưa đọc trong Hộp thư biến mất). */
@@ -1782,6 +1806,22 @@ export interface MyServerAccessStatus {
   acceptedRules: boolean;
   hasRules: boolean;
   accessMode: ServerAccessMode;
+  isAgeRestricted: boolean;
+  ageRestrictedAcknowledged: boolean;
+  ageYears: number | null;
+  verificationLevel: ServerVerificationLevel;
+  verificationChecks?: {
+    emailVerified: boolean;
+    accountOver5Min: boolean;
+    memberOver10Min: boolean;
+  };
+  verificationWait?: {
+    waitAccountSec: number | null;
+    waitMemberSec: number | null;
+  };
+  chatViewBlocked: boolean;
+  chatBlockReason: ChatGateBlockReason | null;
+  showAgeRestrictedChannelNotice: boolean;
 }
 
 export async function getServerAccessSettings(serverId: string): Promise<ServerAccessSettings> {
@@ -1853,6 +1893,47 @@ export async function acceptServerRules(serverId: string): Promise<void> {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.message || "Không thể đồng ý quy định");
   }
+}
+
+export async function acknowledgeServerAgeRestriction(serverId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/acknowledge-age`, {
+    method: "POST",
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không thể xác nhận");
+  }
+}
+
+export async function requestServerEmailOtp(serverId: string): Promise<{ ok: boolean; retryAfterSec?: number }> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/request-email-otp`, {
+    method: "POST",
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không thể gửi mã xác minh");
+  }
+
+  return response.json();
+}
+
+export async function verifyServerEmailOtp(serverId: string, code: string): Promise<{ ok: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/verify-email-otp`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ code }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Mã xác minh không hợp lệ");
+  }
+
+  return response.json();
 }
 
 export async function approveServerAccessUser(

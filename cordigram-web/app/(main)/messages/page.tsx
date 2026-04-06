@@ -42,6 +42,7 @@ import OutgoingCallPopup from "@/components/OutgoingCallPopup";
 import GiphyPicker from "@/components/GiphyPicker";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import VoiceMessage from "@/components/VoiceMessage";
+import ServerInviteCard from "@/components/ServerInviteCard/ServerInviteCard";
 import { getGifById, getRandomWaveSticker, type GiphyGif } from "@/lib/giphy-api";
 import QuickReactionBar from "@/components/QuickReactionBar";
 import EmojiReactionPicker from "@/components/EmojiReactionPicker";
@@ -78,6 +79,7 @@ import ServerProfileSection from "@/components/ServerProfileSection/ServerProfil
 import AuditLogSection from "@/components/AuditLogSection/AuditLogSection";
 import ServerSafetySection from "@/components/ServerSafetySection/ServerSafetySection";
 import { mapSectionToSafetyTab } from "@/components/ServerSafetySection/safety-tab-map";
+import ServerBansSection from "@/components/ServerBansSection/ServerBansSection";
 import MessageSearchPanel from "@/components/MessageSearchPanel/MessageSearchPanel";
 import MentionDropdown from "@/components/MentionDropdown/MentionDropdown";
 import { fetchInboxForYou } from "@/lib/inbox-api";
@@ -1001,6 +1003,20 @@ export default function MessagesPage() {
     useState<serversApi.MyServerAccessStatus | null>(null);
   const [showAcceptRulesModal, setShowAcceptRulesModal] = useState(false);
   const [acceptRulesLoading, setAcceptRulesLoading] = useState(false);
+  const [verificationRulesOpen, setVerificationRulesOpen] = useState(false);
+  const [verificationAccessSettings, setVerificationAccessSettings] =
+    useState<serversApi.ServerAccessSettings | null>(null);
+  const [verificationRulesAgreed, setVerificationRulesAgreed] = useState(false);
+  const [verificationRulesSubmitting, setVerificationRulesSubmitting] = useState(false);
+  const [ageAcknowledgeLoading, setAgeAcknowledgeLoading] = useState(false);
+  const [localWaitAccountSec, setLocalWaitAccountSec] = useState<number | null>(null);
+  const [localWaitMemberSec, setLocalWaitMemberSec] = useState<number | null>(null);
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailOtpCode, setEmailOtpCode] = useState("");
+  const [emailOtpSending, setEmailOtpSending] = useState(false);
+  const [emailOtpVerifying, setEmailOtpVerifying] = useState(false);
+  const [emailOtpError, setEmailOtpError] = useState<string | null>(null);
+  const [emailOtpCooldown, setEmailOtpCooldown] = useState(0);
   const [dmProfileSidebarOpen, setDmProfileSidebarOpen] = useState(true);
   const [voiceInviteDismissed, setVoiceInviteDismissed] = useState<Set<string>>(new Set());
   const [inviteToVoiceTarget, setInviteToVoiceTarget] = useState<{
@@ -1192,6 +1208,10 @@ export default function MessagesPage() {
   // ✅ New message in channel from WebSocket (thành viên khác gửi → hiện ngay không cần reload)
   useEffect(() => {
     if (!newMessageChannel?.message || !selectedChannel) return;
+    if (myServerAccessStatus?.chatViewBlocked) {
+      clearNewMessageChannel();
+      return;
+    }
     const msg = newMessageChannel.message as any;
     const channelId = typeof msg.channelId === "string" ? msg.channelId : msg.channelId?._id ?? msg.channelId;
     if (channelId !== selectedChannel) return;
@@ -1210,6 +1230,8 @@ export default function MessagesPage() {
       type: "server",
       messageType: msg.messageType || "text",
       giphyId: msg.giphyId || undefined,
+      voiceUrl: msg.voiceUrl ?? undefined,
+      voiceDuration: msg.voiceDuration ?? undefined,
       stickerReplyWelcomeEnabled: msg.stickerReplyWelcomeEnabled,
       reactions: normalizeReactions(msg.reactions),
       replyTo: msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo._id : typeof msg.replyTo === "string" ? msg.replyTo : undefined,
@@ -1218,7 +1240,13 @@ export default function MessagesPage() {
     setMessages((prev) => appendServerMessage(prev, uiMessage));
     shouldAutoScrollRef.current = true;
     clearNewMessageChannel();
-  }, [newMessageChannel, selectedChannel, currentUserId, clearNewMessageChannel]);
+  }, [
+    newMessageChannel,
+    selectedChannel,
+    currentUserId,
+    clearNewMessageChannel,
+    myServerAccessStatus?.chatViewBlocked,
+  ]);
 
   // Cleanup typing timeout on unmount or friend change
   useEffect(() => {
@@ -1839,7 +1867,20 @@ export default function MessagesPage() {
         const status = await serversApi.getMyServerAccessStatus(selectedServer);
         if (cancelled) return;
         setMyServerAccessStatus(status);
-        setShowAcceptRulesModal(Boolean(status.hasRules && !status.acceptedRules));
+        const needsRules = status.hasRules && !status.acceptedRules && !status.chatViewBlocked;
+        if (needsRules) {
+          try {
+            const s = await serversApi.getServerAccessSettings(selectedServer);
+            if (cancelled) return;
+            setVerificationAccessSettings(s);
+            setVerificationRulesAgreed(false);
+            setShowAcceptRulesModal(true);
+          } catch {
+            if (!cancelled) setShowAcceptRulesModal(true);
+          }
+        } else {
+          setShowAcceptRulesModal(false);
+        }
       } catch {
         if (cancelled) return;
         setMyServerAccessStatus(null);
@@ -1851,6 +1892,82 @@ export default function MessagesPage() {
       cancelled = true;
     };
   }, [selectedServer, selectedDirectMessageFriend]);
+
+  // Khi bị chặn bởi mức xác minh (thời gian), refetch trạng thái để mở chat khi đủ điều kiện.
+  useEffect(() => {
+    if (!selectedServer || selectedDirectMessageFriend) return;
+    if (myServerAccessStatus?.verificationLevel === "none") return;
+    if (myServerAccessStatus?.chatBlockReason !== "verification") return;
+    const t = setInterval(async () => {
+      try {
+        const status = await serversApi.getMyServerAccessStatus(selectedServer);
+        setMyServerAccessStatus(status);
+        if (status.hasRules && !status.acceptedRules && !status.chatViewBlocked) {
+          const s = await serversApi.getServerAccessSettings(selectedServer);
+          setVerificationAccessSettings(s);
+          setVerificationRulesAgreed(false);
+          setShowAcceptRulesModal(true);
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 35000);
+    return () => clearInterval(t);
+  }, [
+    selectedServer,
+    selectedDirectMessageFriend,
+    myServerAccessStatus?.chatBlockReason,
+    myServerAccessStatus?.verificationLevel,
+  ]);
+
+  useEffect(() => {
+    if ((!verificationRulesOpen && !showAcceptRulesModal) || !selectedServer || selectedDirectMessageFriend) return;
+    const id = setInterval(async () => {
+      try {
+        const s = await serversApi.getMyServerAccessStatus(selectedServer);
+        setMyServerAccessStatus(s);
+        const stillBlocked = s.chatViewBlocked || (s.hasRules && !s.acceptedRules);
+        if (!stillBlocked) {
+          setVerificationRulesOpen(false);
+          setShowAcceptRulesModal(false);
+          setVerificationAccessSettings(null);
+          const ch = selectedChannelRef.current;
+          if (ch) await loadMessages(ch);
+        }
+      } catch { /* ignore */ }
+    }, 3000);
+    return () => clearInterval(id);
+  }, [verificationRulesOpen, showAcceptRulesModal, selectedServer, selectedDirectMessageFriend]);
+
+  useEffect(() => {
+    setLocalWaitAccountSec(myServerAccessStatus?.verificationWait?.waitAccountSec ?? null);
+    setLocalWaitMemberSec(myServerAccessStatus?.verificationWait?.waitMemberSec ?? null);
+  }, [myServerAccessStatus?.verificationWait?.waitAccountSec, myServerAccessStatus?.verificationWait?.waitMemberSec]);
+
+  useEffect(() => {
+    if (localWaitAccountSec == null && localWaitMemberSec == null) return;
+    if ((localWaitAccountSec ?? 0) <= 0 && (localWaitMemberSec ?? 0) <= 0) return;
+    const id = setInterval(() => {
+      setLocalWaitAccountSec(prev => (prev != null && prev > 0 ? prev - 1 : prev));
+      setLocalWaitMemberSec(prev => (prev != null && prev > 0 ? prev - 1 : prev));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [localWaitAccountSec != null && localWaitAccountSec > 0, localWaitMemberSec != null && localWaitMemberSec > 0]);
+
+  useEffect(() => {
+    if (emailOtpCooldown <= 0) return;
+    const id = setInterval(() => {
+      setEmailOtpCooldown(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [emailOtpCooldown > 0]);
+
+  useEffect(() => {
+    setEmailOtpSent(false);
+    setEmailOtpCode("");
+    setEmailOtpError(null);
+    setEmailOtpCooldown(0);
+  }, [selectedServer]);
 
   // Refetch active events mỗi 60s khi đang chọn server → sự kiện xuất hiện đúng lúc khi đến giờ
   useEffect(() => {
@@ -2217,8 +2334,6 @@ export default function MessagesPage() {
       prevChannelRef.current = selectedChannel;
       joinChannel(selectedChannel);
       loadMessages(selectedChannel);
-      // Đánh dấu kênh đã đọc để thông báo chưa đọc trong Hộp thư biến mất
-      serversApi.markChannelAsRead(selectedChannel).catch(() => {});
     }
   }, [selectedChannel, selectedChatTextChannel?._id, joinChannel, leaveChannel]);
 
@@ -2391,11 +2506,16 @@ export default function MessagesPage() {
       // Guard chống race condition: chỉ apply kết quả nếu request này vẫn là request mới nhất của kênh đang được chọn.
       const requestKey = `${channelId}:${Date.now()}:${Math.random().toString(16).slice(2)}`;
       (loadMessages as any)._lastKey = requestKey;
-      const backendMessages = await serversApi.getMessages(channelId, 50, 0);
+      const pack = await serversApi.getMessages(channelId, 50, 0);
       // Nếu trong lúc chờ user đã chuyển kênh, bỏ qua kết quả cũ để tránh "tin nhắn bị dính sang kênh khác".
       if ((loadMessages as any)._lastKey !== requestKey) return;
       if (selectedChannelRef.current !== channelId) return;
 
+      if (!pack.chatViewBlocked) {
+        serversApi.markChannelAsRead(channelId).catch(() => {});
+      }
+
+      const backendMessages = pack.messages;
       const uiMessages: UIMessage[] = backendMessages.map((msg: serversApi.Message) => ({
         id: msg._id,
         text: msg.content,
@@ -2422,6 +2542,8 @@ export default function MessagesPage() {
         type: "server",
         messageType: (msg as any).messageType || "text",
         giphyId: (msg as any).giphyId || undefined,
+        voiceUrl: (msg as any).voiceUrl ?? undefined,
+        voiceDuration: (msg as any).voiceDuration ?? undefined,
         stickerReplyWelcomeEnabled: (msg as any).stickerReplyWelcomeEnabled,
         reactions: normalizeReactions(msg.reactions),
         replyTo:
@@ -2813,8 +2935,9 @@ export default function MessagesPage() {
   const shouldBlockServerChatInput = Boolean(
     selectedServer &&
       !selectedDirectMessageFriend &&
-      myServerAccessStatus?.hasRules &&
-      !myServerAccessStatus?.acceptedRules,
+      (myServerAccessStatus?.chatViewBlocked === true ||
+        (myServerAccessStatus?.hasRules === true &&
+          !myServerAccessStatus?.acceptedRules)),
   );
 
   useEffect(() => {
@@ -2827,7 +2950,7 @@ export default function MessagesPage() {
 
   const handleSendMessage = async () => {
     if (shouldBlockServerChatInput) {
-      setShowAcceptRulesModal(true);
+      void openVerificationRulesModal();
       return;
     }
     if (!messageText.trim() || !selectedChannel) return;
@@ -2876,6 +2999,8 @@ export default function MessagesPage() {
         type: "server",
         messageType: (newMessage as any).messageType || "text",
         giphyId: (newMessage as any).giphyId || undefined,
+        voiceUrl: (newMessage as any).voiceUrl ?? undefined,
+        voiceDuration: (newMessage as any).voiceDuration ?? undefined,
         replyTo: replyingTo?.id ?? (newMessage.replyTo && typeof newMessage.replyTo === "object" ? (newMessage.replyTo as any)._id : typeof newMessage.replyTo === "string" ? newMessage.replyTo : undefined),
         replyToMessage:
           mapReplyToMessage(
@@ -2912,10 +3037,78 @@ export default function MessagesPage() {
       const status = await serversApi.getMyServerAccessStatus(selectedServer);
       setMyServerAccessStatus(status);
       setShowAcceptRulesModal(false);
+      const ch = selectedChannelRef.current;
+      if (ch) await loadMessages(ch);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể chấp nhận quy định");
     } finally {
       setAcceptRulesLoading(false);
+    }
+  };
+
+  const openVerificationRulesModal = async () => {
+    if (!selectedServer) return;
+    setVerificationRulesAgreed(false);
+    try {
+      const s = await serversApi.getServerAccessSettings(selectedServer);
+      setVerificationAccessSettings(s);
+      setVerificationRulesOpen(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không tải được quy định");
+    }
+  };
+
+  const submitVerificationRulesModal = async () => {
+    if (!selectedServer) return;
+    const needsAgree = verificationAccessSettings?.hasRules && (verificationAccessSettings?.rules?.length ?? 0) > 0;
+    if (needsAgree && !verificationRulesAgreed) return;
+    setVerificationRulesSubmitting(true);
+    setError(null);
+    try {
+      if (needsAgree && !myServerAccessStatus?.acceptedRules) {
+        await serversApi.acceptServerRules(selectedServer);
+      }
+      const status = await serversApi.getMyServerAccessStatus(selectedServer);
+      setMyServerAccessStatus(status);
+      const stillBlocked =
+        status.chatViewBlocked ||
+        (status.hasRules && !status.acceptedRules);
+      if (!stillBlocked) {
+        setVerificationRulesOpen(false);
+        setVerificationAccessSettings(null);
+        setShowAcceptRulesModal(false);
+        const ch = selectedChannelRef.current;
+        if (ch) await loadMessages(ch);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không hoàn thành được");
+    } finally {
+      setVerificationRulesSubmitting(false);
+    }
+  };
+
+  const handleAgeAcknowledgeContinue = async () => {
+    if (!selectedServer) return;
+    setAgeAcknowledgeLoading(true);
+    setError(null);
+    try {
+      await serversApi.acknowledgeServerAgeRestriction(selectedServer);
+      const status = await serversApi.getMyServerAccessStatus(selectedServer);
+      setMyServerAccessStatus(status);
+      if (status.hasRules && !status.acceptedRules && !status.chatViewBlocked) {
+        try {
+          const s = await serversApi.getServerAccessSettings(selectedServer);
+          setVerificationAccessSettings(s);
+          setVerificationRulesAgreed(false);
+        } catch { /* ignore */ }
+        setShowAcceptRulesModal(true);
+      }
+      const ch = selectedChannelRef.current;
+      if (ch) await loadMessages(ch);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không xác nhận được");
+    } finally {
+      setAgeAcknowledgeLoading(false);
     }
   };
 
@@ -3137,6 +3330,66 @@ export default function MessagesPage() {
     duration: number,
     metadata?: { mimeType: string; fileExtension: string },
   ) => {
+    const isServerChannel = !selectedDirectMessageFriend && selectedChannel && selectedServer;
+
+    if (isServerChannel) {
+      try {
+        setIsRecordingVoice(false);
+        setIsUploadingVoice(true);
+
+        const fileName = metadata?.fileExtension
+          ? `voice-message.${metadata.fileExtension}`
+          : "voice-message.m4a";
+        const mimeType = metadata?.mimeType || "audio/mp4";
+        const audioFile = new File([audioBlob], fileName, { type: mimeType });
+
+        const uploadResponse = await uploadMedia({ token, file: audioFile });
+        if (!uploadResponse || (!uploadResponse.secureUrl && !uploadResponse.url)) {
+          throw new Error("Failed to upload voice message");
+        }
+        const voiceUrl = uploadResponse.secureUrl || uploadResponse.url;
+
+        const newMessage = await serversApi.createMessage(
+          selectedChannel!,
+          "Tin nhắn thoại",
+          undefined,
+          replyingTo?.id,
+          undefined,
+          "voice",
+          undefined,
+          voiceUrl,
+          duration,
+        );
+
+        const uiMessage: UIMessage = {
+          id: newMessage._id,
+          text: newMessage.content,
+          senderId: typeof newMessage.senderId === "string" ? newMessage.senderId : (newMessage.senderId as any)?._id,
+          senderEmail: typeof newMessage.senderId === "string" ? "" : (newMessage.senderId as any)?.email ?? "",
+          senderName: typeof newMessage.senderId === "string" ? currentUserProfile?.username || "" : (newMessage.senderId as any)?.username || "",
+          senderDisplayName: typeof newMessage.senderId === "string" ? currentUserProfile?.displayName || undefined : (newMessage.senderId as any)?.displayName ?? undefined,
+          senderAvatar: typeof newMessage.senderId === "string" ? currentUserProfile?.avatar : (newMessage.senderId as any)?.avatarUrl ?? (newMessage.senderId as any)?.avatar ?? currentUserProfile?.avatar,
+          timestamp: new Date(newMessage.createdAt),
+          isFromCurrentUser: true,
+          type: "server",
+          messageType: "voice",
+          voiceUrl: (newMessage as any).voiceUrl ?? voiceUrl,
+          voiceDuration: (newMessage as any).voiceDuration ?? duration,
+        };
+
+        shouldAutoScrollRef.current = true;
+        setMessages((prev) => appendServerMessage(prev, uiMessage));
+        setReplyingTo(null);
+        setIsUploadingVoice(false);
+      } catch (err) {
+        console.error("Failed to send voice message:", err);
+        setError("Không gửi được tin nhắn thoại");
+        setIsUploadingVoice(false);
+        setIsRecordingVoice(false);
+      }
+      return;
+    }
+
     if (!selectedDirectMessageFriend) return;
 
     const friendId = selectedDirectMessageFriend._id;
@@ -3147,7 +3400,6 @@ export default function MessagesPage() {
       setIsRecordingVoice(false);
       setIsUploadingVoice(true);
 
-      // Upload audio file to Cloudinary with correct extension and type
       const fileName = metadata?.fileExtension 
         ? `voice-message.${metadata.fileExtension}`
         : "voice-message.m4a";
@@ -4076,6 +4328,23 @@ export default function MessagesPage() {
         return (
           <div className={styles.mediaMessage}>
             <img src={gifUrl} alt="Ảnh GIF" className={styles.messageGif} />
+          </div>
+        );
+      }
+
+      // Server invite link detection
+      const inviteLinkMatch = text.match(/(https?:\/\/[^\s]+\/invite\/server\/([a-f0-9]{24}))/i);
+      if (inviteLinkMatch) {
+        const fullUrl = inviteLinkMatch[1];
+        const sid = inviteLinkMatch[2];
+        const textBefore = text.slice(0, inviteLinkMatch.index).trim();
+        const textAfter = text.slice((inviteLinkMatch.index ?? 0) + fullUrl.length).trim();
+        return (
+          <div>
+            {textBefore && <div style={{ marginBottom: 4 }}>{textBefore}</div>}
+            <a href={fullUrl} style={{ color: "#00a8fc", fontSize: 14, wordBreak: "break-all" }}>{fullUrl}</a>
+            <ServerInviteCard serverId={sid} inviteUrl={fullUrl} />
+            {textAfter && <div style={{ marginTop: 4 }}>{textAfter}</div>}
           </div>
         );
       }
@@ -5713,11 +5982,30 @@ export default function MessagesPage() {
                     </button>
                   </div>
                 </div>
+                {!selectedDirectMessageFriend &&
+                  selectedServer &&
+                  myServerAccessStatus?.showAgeRestrictedChannelNotice &&
+                  !myServerAccessStatus?.chatViewBlocked && (
+                    <div
+                      style={{
+                        flexShrink: 0,
+                        padding: "8px 16px",
+                        fontSize: 13,
+                        lineHeight: 1.4,
+                        color: "#faa61a",
+                        background: "rgba(250, 166, 26, 0.12)",
+                        borderBottom: "1px solid rgba(250, 166, 26, 0.25)",
+                      }}
+                    >
+                      Máy chủ này có nội dung được gắn nhãn giới hạn độ tuổi (18+). Hãy cư xử phù hợp.
+                    </div>
+                  )}
                 {/* Sticky reaction bar (DM): hiện reaction của tin nhắn khi kéo lên gần header */}
                 {/* Messages Container */}
                 <div
                   ref={messagesContainerRef}
                   className={styles.messagesContainer}
+                  style={{ position: "relative" }}
                   onScroll={(e) => {
                     const container = e.currentTarget;
                     const isNearBottom =
@@ -5728,6 +6016,150 @@ export default function MessagesPage() {
                     shouldAutoScrollRef.current = isNearBottom;
                   }}
                 >
+                  {!selectedDirectMessageFriend &&
+                    selectedServer &&
+                    myServerAccessStatus?.chatBlockReason === "age_under_18" && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          zIndex: 40,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "rgba(15, 16, 20, 0.94)",
+                          padding: 24,
+                        }}
+                      >
+                        <div
+                          style={{
+                            maxWidth: 440,
+                            textAlign: "center",
+                            background: "var(--color-panel-bg)",
+                            border: "1px solid var(--color-panel-border)",
+                            borderRadius: 12,
+                            padding: "28px 24px",
+                            boxShadow: "0 16px 48px rgba(0,0,0,.45)",
+                          }}
+                        >
+                          <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>
+                            Máy chủ giới hạn độ tuổi
+                          </h3>
+                          <p
+                            style={{
+                              marginTop: 12,
+                              color: "var(--color-panel-text-muted)",
+                              fontSize: 14,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            Máy chủ này yêu cầu từ đủ 18 tuổi. Tài khoản của bạn chưa đủ điều kiện hoặc
+                            chưa có ngày sinh trên hồ sơ, nên không thể xem tin nhắn trong các kênh.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedChannel(null)}
+                            style={{
+                              marginTop: 20,
+                              padding: "10px 20px",
+                              borderRadius: 6,
+                              border: "none",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              background: "var(--color-panel-accent)",
+                              color: "#fff",
+                            }}
+                          >
+                            Quay lại
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  {!selectedDirectMessageFriend &&
+                    selectedServer &&
+                    myServerAccessStatus?.chatBlockReason === "age_ack" && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          zIndex: 40,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "rgba(15, 16, 20, 0.94)",
+                          padding: 24,
+                        }}
+                      >
+                        <div
+                          style={{
+                            maxWidth: 440,
+                            textAlign: "center",
+                            background: "var(--color-panel-bg)",
+                            border: "1px solid var(--color-panel-border)",
+                            borderRadius: 12,
+                            padding: "28px 24px",
+                            boxShadow: "0 16px 48px rgba(0,0,0,.45)",
+                          }}
+                        >
+                          <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>
+                            Máy chủ giới hạn độ tuổi
+                          </h3>
+                          <p
+                            style={{
+                              marginTop: 12,
+                              color: "var(--color-panel-text-muted)",
+                              fontSize: 14,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            Máy chủ này có chứa nội dung nhạy cảm dán nhãn giới hạn độ tuổi. Bạn có muốn
+                            tiếp tục không?
+                          </p>
+                          <div
+                            style={{
+                              marginTop: 22,
+                              display: "flex",
+                              gap: 12,
+                              justifyContent: "center",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setSelectedChannel(null)}
+                              disabled={ageAcknowledgeLoading}
+                              style={{
+                                padding: "10px 18px",
+                                borderRadius: 6,
+                                border: "1px solid var(--color-panel-border)",
+                                fontWeight: 700,
+                                cursor: ageAcknowledgeLoading ? "not-allowed" : "pointer",
+                                background: "transparent",
+                                color: "var(--color-text)",
+                              }}
+                            >
+                              Quay lại
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleAgeAcknowledgeContinue()}
+                              disabled={ageAcknowledgeLoading}
+                              style={{
+                                padding: "10px 18px",
+                                borderRadius: 6,
+                                border: "none",
+                                fontWeight: 700,
+                                cursor: ageAcknowledgeLoading ? "not-allowed" : "pointer",
+                                background: "var(--color-panel-accent)",
+                                color: "#fff",
+                              }}
+                            >
+                              {ageAcknowledgeLoading ? "Đang xử lý..." : "Tiếp tục"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   {selectedDirectMessageFriend ? (
                     loadingDirectMessages ? (
                       <div
@@ -5970,6 +6402,52 @@ export default function MessagesPage() {
                     onClose={() => setReplyingTo(null)}
                   />
                 )}
+
+                {!selectedDirectMessageFriend &&
+                  selectedServer &&
+                  shouldBlockServerChatInput && (
+                    <div
+                      style={{
+                        flexShrink: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 14,
+                        padding: "12px 16px",
+                        background: "#1e1f22",
+                        borderTop: "1px solid var(--color-border, #2b2d31)",
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 14,
+                          lineHeight: 1.45,
+                          color: "#dbdee1",
+                          flex: 1,
+                        }}
+                      >
+                        Bạn phải hoàn thành thêm một vài bước nữa trước khi có thể trò chuyện trong máy chủ này
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void openVerificationRulesModal()}
+                        style={{
+                          flexShrink: 0,
+                          border: "none",
+                          borderRadius: 4,
+                          padding: "8px 16px",
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: "pointer",
+                          background: "#5865f2",
+                          color: "#fff",
+                        }}
+                      >
+                        Hoàn thành
+                      </button>
+                    </div>
+                  )}
 
                 {/* Input Area */}
                 <div
@@ -6217,7 +6695,7 @@ export default function MessagesPage() {
                               }
 
                               if (!selectedDirectMessageFriend && shouldBlockServerChatInput) {
-                                setShowAcceptRulesModal(true);
+                                void openVerificationRulesModal();
                                 return;
                               }
 
@@ -6488,70 +6966,423 @@ export default function MessagesPage() {
         </div>
       </div>
 
+      {/* Popup quy định (tab Truy cập) — mở từ nút Hoàn thành khi chưa đủ xác minh */}
+      {(verificationRulesOpen || showAcceptRulesModal) && selectedServer && !selectedDirectMessageFriend && (() => {
+        const srv = currentServer;
+        const hasRulesContent = (verificationAccessSettings?.rules?.length ?? 0) > 0;
+        const rulesAccepted = myServerAccessStatus?.acceptedRules !== false;
+        const needsRulesStep = verificationAccessSettings?.hasRules && hasRulesContent && !rulesAccepted;
+        const needsAgree = needsRulesStep;
+
+        const lvl = myServerAccessStatus?.verificationLevel ?? "none";
+        const chatBlocked = myServerAccessStatus?.chatViewBlocked === true;
+        const blockReason = myServerAccessStatus?.chatBlockReason;
+        const needsVerificationStep = chatBlocked && blockReason === "verification" && lvl !== "none";
+
+        const chk = myServerAccessStatus?.verificationChecks ?? {
+          emailVerified: false,
+          accountOver5Min: false,
+          memberOver10Min: false,
+        };
+        const wait = {
+          waitAccountSec: localWaitAccountSec,
+          waitMemberSec: localWaitMemberSec,
+        };
+        const fmt = (sec: number | null | undefined) =>
+          sec == null || sec <= 0
+            ? null
+            : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+
+        const submitDisabled = verificationRulesSubmitting || Boolean(needsAgree && !verificationRulesAgreed);
+
+        return (
+          <div
+            role="dialog"
+            aria-modal
+            aria-label="Trước khi bạn bắt đầu trò chuyện"
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0, 0, 0, 0.7)",
+              zIndex: 20001,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 24,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                display: "flex",
+                width: "min(780px, 96vw)",
+                maxHeight: "min(680px, 90vh)",
+                background: "#313338",
+                borderRadius: 12,
+                boxShadow: "0 16px 48px rgba(0,0,0,.55)",
+                overflow: "hidden",
+              }}
+            >
+              {/* Left: Server profile card */}
+              <div
+                style={{
+                  width: 220,
+                  flexShrink: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  padding: "32px 16px 24px",
+                  background: "#2b2d31",
+                  borderRight: "1px solid #3f4147",
+                  gap: 10,
+                }}
+              >
+                <div
+                  style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 16,
+                    background: srv?.avatarUrl ? `url(${srv.avatarUrl}) center/cover no-repeat` : "#5865f2",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 32,
+                    fontWeight: 800,
+                    color: "#fff",
+                    flexShrink: 0,
+                  }}
+                >
+                  {!srv?.avatarUrl && (srv?.name?.charAt(0)?.toUpperCase() ?? "S")}
+                </div>
+                <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: "#f2f3f5", textAlign: "center" }}>
+                  {srv?.name ?? "Máy chủ"}
+                </p>
+                <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#b5bac1", marginTop: 4 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3ba55d", display: "inline-block" }} />
+                    {srv?.members?.filter(() => true).length ?? 0} thành viên
+                  </span>
+                </div>
+                <p style={{ margin: "4px 0 0", fontSize: 11, color: "#949ba4" }}>
+                  Thành lập từ tháng {srv?.createdAt ? new Date(srv.createdAt).toLocaleDateString("vi-VN", { month: "numeric", year: "numeric" }) : ""}
+                </p>
+              </div>
+
+              {/* Right: Content */}
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  padding: "24px 28px",
+                  overflow: "auto",
+                  minWidth: 0,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#f2f3f5" }}>
+                      Trước khi bạn bắt đầu trò chuyện ở đây...
+                    </h3>
+                    <p style={{ margin: "6px 0 0", fontSize: 14, color: "#b5bac1", lineHeight: 1.45 }}>
+                      Bạn sẽ phải hoàn thành các bước dưới đây.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Đóng"
+                    onClick={() => {
+                      setVerificationRulesOpen(false);
+                      setShowAcceptRulesModal(false);
+                      setVerificationAccessSettings(null);
+                    }}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      color: "#b5bac1",
+                      fontSize: 22,
+                      lineHeight: 1,
+                      cursor: "pointer",
+                      padding: 4,
+                      flexShrink: 0,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Step 1: Rules (access tab) */}
+                {hasRulesContent && (
+                  <div style={{ marginTop: 20 }}>
+                    <p style={{ margin: "0 0 10px", fontWeight: 800, fontSize: 12, textTransform: "uppercase", color: "#b5bac1", letterSpacing: "0.02em", display: "flex", alignItems: "center", gap: 8 }}>
+                      Đồng ý với quy định
+                      {rulesAccepted && <span style={{ color: "#3ba55d", fontSize: 14 }}>✓</span>}
+                    </p>
+                    <div
+                      style={{
+                        padding: 16,
+                        borderRadius: 8,
+                        background: "#1e1f22",
+                        border: "1px solid #3f4147",
+                        fontSize: 14,
+                        lineHeight: 1.65,
+                        color: "#dbdee1",
+                      }}
+                    >
+                      <ol style={{ margin: 0, paddingLeft: 22 }}>
+                        {verificationAccessSettings!.rules.map((r, i) => (
+                          <li key={r.id} style={{ marginBottom: i < verificationAccessSettings!.rules.length - 1 ? 12 : 0, color: "#dbdee1" }}>
+                            {r.content}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+
+                    {needsAgree && (
+                      <label
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          marginTop: 16,
+                          fontSize: 14,
+                          cursor: "pointer",
+                          color: "#dbdee1",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={verificationRulesAgreed}
+                          onChange={(e) => setVerificationRulesAgreed(e.target.checked)}
+                          style={{ width: 18, height: 18, accentColor: "#5865f2", flexShrink: 0 }}
+                        />
+                        <span>Tôi đã đọc và đồng ý với các quy định</span>
+                      </label>
+                    )}
+                  </div>
+                )}
+
+                {/* Step 2: Verification (safety settings) - shown after rules accepted */}
+                {needsVerificationStep && rulesAccepted && (
+                  <div style={{ marginTop: 20 }}>
+                    <p style={{ margin: "0 0 10px", fontWeight: 800, fontSize: 12, textTransform: "uppercase", color: "#b5bac1", letterSpacing: "0.02em" }}>
+                      Xác minh máy chủ — Mức{" "}
+                      {lvl === "low" ? "Thấp" : lvl === "medium" ? "Trung bình" : lvl === "high" ? "Cao" : ""}
+                    </p>
+                    <div
+                      style={{
+                        padding: 16,
+                        borderRadius: 8,
+                        background: "#1e1f22",
+                        border: "1px solid #3f4147",
+                        fontSize: 14,
+                        lineHeight: 1.7,
+                        color: "#dbdee1",
+                      }}
+                    >
+                      <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+                        {(lvl === "low" || lvl === "medium" || lvl === "high") && (
+                          <li style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8, color: chk.emailVerified ? "#3ba55d" : "#dbdee1" }}>
+                            <span style={{ flexShrink: 0 }}>{chk.emailVerified ? "✓" : "○"}</span>
+                            <div style={{ flex: 1 }}>
+                              <span>Xác minh email đăng ký</span>
+                              {!chk.emailVerified && (
+                                <div style={{ marginTop: 8 }}>
+                                  {!emailOtpSent ? (
+                                    <button
+                                      onClick={async () => {
+                                        if (!selectedServer) return;
+                                        setEmailOtpSending(true);
+                                        setEmailOtpError(null);
+                                        try {
+                                          const res = await serversApi.requestServerEmailOtp(selectedServer);
+                                          if (res.ok) {
+                                            setEmailOtpSent(true);
+                                            setEmailOtpCooldown(60);
+                                          } else if (res.retryAfterSec) {
+                                            setEmailOtpCooldown(res.retryAfterSec);
+                                            setEmailOtpError(`Vui lòng đợi ${res.retryAfterSec}s`);
+                                          }
+                                        } catch (e: any) {
+                                          setEmailOtpError(e?.message || "Không thể gửi mã");
+                                        } finally {
+                                          setEmailOtpSending(false);
+                                        }
+                                      }}
+                                      disabled={emailOtpSending || emailOtpCooldown > 0}
+                                      style={{
+                                        padding: "6px 16px",
+                                        borderRadius: 4,
+                                        border: "none",
+                                        background: emailOtpSending || emailOtpCooldown > 0 ? "#4e5058" : "#5865f2",
+                                        color: "#fff",
+                                        fontWeight: 600,
+                                        fontSize: 13,
+                                        cursor: emailOtpSending || emailOtpCooldown > 0 ? "not-allowed" : "pointer",
+                                      }}
+                                    >
+                                      {emailOtpSending ? "Đang gửi..." : emailOtpCooldown > 0 ? `Gửi lại (${emailOtpCooldown}s)` : "Gửi mã xác minh"}
+                                    </button>
+                                  ) : (
+                                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                      <input
+                                        type="text"
+                                        maxLength={6}
+                                        placeholder="Nhập mã OTP"
+                                        value={emailOtpCode}
+                                        onChange={(e) => { setEmailOtpCode(e.target.value.replace(/\D/g, "")); setEmailOtpError(null); }}
+                                        style={{
+                                          padding: "6px 10px",
+                                          borderRadius: 4,
+                                          border: "1px solid #4e5058",
+                                          background: "#1e1f22",
+                                          color: "#fff",
+                                          fontSize: 14,
+                                          width: 100,
+                                          letterSpacing: 4,
+                                          textAlign: "center",
+                                        }}
+                                      />
+                                      <button
+                                        onClick={async () => {
+                                          if (!selectedServer || !emailOtpCode.trim()) return;
+                                          setEmailOtpVerifying(true);
+                                          setEmailOtpError(null);
+                                          try {
+                                            await serversApi.verifyServerEmailOtp(selectedServer, emailOtpCode.trim());
+                                            const status = await serversApi.getMyServerAccessStatus(selectedServer);
+                                            setMyServerAccessStatus(status);
+                                            setEmailOtpCode("");
+                                            setEmailOtpSent(false);
+                                          } catch (e: any) {
+                                            setEmailOtpError(e?.message || "Mã không hợp lệ");
+                                          } finally {
+                                            setEmailOtpVerifying(false);
+                                          }
+                                        }}
+                                        disabled={emailOtpVerifying || emailOtpCode.length < 4}
+                                        style={{
+                                          padding: "6px 16px",
+                                          borderRadius: 4,
+                                          border: "none",
+                                          background: emailOtpVerifying || emailOtpCode.length < 4 ? "#4e5058" : "#3ba55d",
+                                          color: "#fff",
+                                          fontWeight: 600,
+                                          fontSize: 13,
+                                          cursor: emailOtpVerifying || emailOtpCode.length < 4 ? "not-allowed" : "pointer",
+                                        }}
+                                      >
+                                        {emailOtpVerifying ? "Đang xác minh..." : "Xác minh"}
+                                      </button>
+                                      {emailOtpCooldown <= 0 && (
+                                        <button
+                                          onClick={async () => {
+                                            if (!selectedServer) return;
+                                            setEmailOtpSending(true);
+                                            setEmailOtpError(null);
+                                            try {
+                                              const res = await serversApi.requestServerEmailOtp(selectedServer);
+                                              if (res.ok) {
+                                                setEmailOtpCooldown(60);
+                                              } else if (res.retryAfterSec) {
+                                                setEmailOtpCooldown(res.retryAfterSec);
+                                              }
+                                            } catch (e: any) {
+                                              setEmailOtpError(e?.message || "Không thể gửi lại");
+                                            } finally {
+                                              setEmailOtpSending(false);
+                                            }
+                                          }}
+                                          disabled={emailOtpSending}
+                                          style={{
+                                            padding: "6px 12px",
+                                            borderRadius: 4,
+                                            border: "none",
+                                            background: "transparent",
+                                            color: "#5865f2",
+                                            fontWeight: 600,
+                                            fontSize: 12,
+                                            cursor: emailOtpSending ? "not-allowed" : "pointer",
+                                          }}
+                                        >
+                                          Gửi lại mã
+                                        </button>
+                                      )}
+                                      {emailOtpCooldown > 0 && (
+                                        <span style={{ fontSize: 12, color: "#949ba4" }}>Gửi lại sau {emailOtpCooldown}s</span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {emailOtpError && (
+                                    <div style={{ color: "#ed4245", fontSize: 12, marginTop: 4 }}>{emailOtpError}</div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </li>
+                        )}
+                        {(lvl === "medium" || lvl === "high") && (
+                          <li style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8, color: chk.accountOver5Min ? "#3ba55d" : "#dbdee1" }}>
+                            <span style={{ flexShrink: 0 }}>{chk.accountOver5Min ? "✓" : "○"}</span>
+                            <span>
+                              Tài khoản đã đăng ký Cordigram trên 5 phút
+                              {!chk.accountOver5Min && wait.waitAccountSec != null && wait.waitAccountSec > 0 && (
+                                <span style={{ color: "#949ba4", marginLeft: 6 }}>
+                                  Còn khoảng {fmt(wait.waitAccountSec)}
+                                </span>
+                              )}
+                            </span>
+                          </li>
+                        )}
+                        {lvl === "high" && (
+                          <li style={{ display: "flex", gap: 8, alignItems: "flex-start", color: chk.memberOver10Min ? "#3ba55d" : "#dbdee1" }}>
+                            <span style={{ flexShrink: 0 }}>{chk.memberOver10Min ? "✓" : "○"}</span>
+                            <span>
+                              Đã là thành viên máy chủ trên 10 phút
+                              {!chk.memberOver10Min && wait.waitMemberSec != null && wait.waitMemberSec > 0 && (
+                                <span style={{ color: "#949ba4", marginLeft: 6 }}>
+                                  Còn khoảng {fmt(wait.waitMemberSec)}
+                                </span>
+                              )}
+                            </span>
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "auto", paddingTop: 20, gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => void submitVerificationRulesModal()}
+                    disabled={submitDisabled}
+                    style={{
+                      border: "none",
+                      background: submitDisabled ? "#3ba55d80" : "#3ba55d",
+                      color: "white",
+                      padding: "10px 20px",
+                      borderRadius: 4,
+                      cursor: submitDisabled ? "not-allowed" : "pointer",
+                      fontWeight: 700,
+                      fontSize: 14,
+                    }}
+                  >
+                    {verificationRulesSubmitting ? "Đang gửi…" : "Gửi"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Create Server Modal */}
       <CreateServerModal
         isOpen={showCreateServerModal}
         onClose={() => setShowCreateServerModal(false)}
         onServerCreated={handleServerCreated}
       />
-
-      {/* Accept Server Rules Modal */}
-      {showAcceptRulesModal && selectedServer && !selectedDirectMessageFriend && (
-        <div
-          role="dialog"
-          aria-modal
-          aria-label="Đồng ý quy định"
-          onClick={() => {
-            // Modal chỉ để người dùng đồng ý, không cho đóng tắt để tránh phá luồng chat.
-          }}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(10, 18, 40, 0.45)",
-            zIndex: 20000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "min(520px, 92vw)",
-              background: "var(--color-panel-bg)",
-              borderRadius: 12,
-              border: "1px solid var(--color-panel-border)",
-              boxShadow: "0 16px 48px rgba(0,0,0,.4)",
-              padding: 20,
-            }}
-          >
-            <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Đồng ý quy định</h3>
-            <p style={{ marginTop: 8, color: "var(--color-panel-text-muted)", fontSize: 13, lineHeight: 1.45 }}>
-              Máy chủ này yêu cầu bạn chấp nhận quy định trước khi có thể gửi tin nhắn.
-            </p>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16, gap: 10 }}>
-              <button
-                type="button"
-                onClick={handleAcceptServerRules}
-                disabled={acceptRulesLoading}
-                style={{
-                  border: "1px solid var(--color-panel-accent)",
-                  background: "var(--color-panel-accent)",
-                  color: "white",
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  cursor: acceptRulesLoading ? "not-allowed" : "pointer",
-                  fontWeight: 800,
-                }}
-              >
-                {acceptRulesLoading ? "Đang xử lý..." : "Đồng ý"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showMessagesInbox && (
         <MessagesInbox
@@ -7030,6 +7861,17 @@ export default function MessagesPage() {
           }
           if (section === "audit-log" && serverSettingsTarget?.serverId) {
             return <AuditLogSection serverId={serverSettingsTarget.serverId} />;
+          }
+          if (section === "bans" && serverSettingsTarget?.serverId) {
+            return (
+              <ServerBansSection
+                serverId={serverSettingsTarget.serverId}
+                canManageBans={
+                  Boolean(serverSettingsPermissions?.isOwner) ||
+                  Boolean(serverSettingsPermissions?.canBan)
+                }
+              />
+            );
           }
           if ((section === "safety" || section === "automod" || section === "privileges") && serverSettingsTarget?.serverId) {
             const initialTab = mapSectionToSafetyTab(section);

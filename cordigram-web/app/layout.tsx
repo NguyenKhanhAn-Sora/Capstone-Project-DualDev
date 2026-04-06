@@ -1,15 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Roboto } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "../component/theme-provider";
 import { NextIntlClientProvider } from "next-intl";
 import { cookies } from "next/headers";
 import { LanguageProvider } from "../component/language-provider";
-
-const roboto = Roboto({
-  variable: "--font-roboto",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Cordigram",
@@ -33,7 +27,7 @@ export default async function MainLayout({
   const messages = (await import(`../messages/${locale}.json`)).default;
   return (
     <html lang={locale} suppressHydrationWarning>
-      <body className={`${roboto.variable} antialiased`}>
+      <body className="antialiased">
         <NextIntlClientProvider messages={messages} locale={locale}>
           <LanguageProvider>
             <ThemeProvider>{children}</ThemeProvider>

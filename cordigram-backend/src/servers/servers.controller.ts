@@ -465,6 +465,42 @@ export class ServersController {
     return this.serverAccessService.acceptRules(serverId, req.user.userId);
   }
 
+  @Post(':id/access/acknowledge-age')
+  async acknowledgeAgeRestricted(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serverAccessService.acknowledgeAgeRestriction(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  @Post(':id/access/request-email-otp')
+  async requestServerEmailOtp(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serverAccessService.requestServerEmailOtp(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  @Post(':id/access/verify-email-otp')
+  async verifyServerEmailOtp(
+    @Param('id') serverId: string,
+    @Body() body: { code: string },
+    @Request() req: any,
+  ) {
+    if (!body?.code) throw new BadRequestException('code is required');
+    return this.serverAccessService.verifyServerEmailOtp(
+      serverId,
+      req.user.userId,
+      body.code,
+    );
+  }
+
   @Post(':id/leave')
   async leaveServer(@Param('id') serverId: string, @Request() req: any) {
     await this.serversService.leaveServer(serverId, req.user.userId);

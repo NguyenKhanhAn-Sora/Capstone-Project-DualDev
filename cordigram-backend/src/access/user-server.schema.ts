@@ -23,6 +23,14 @@ export class UserServer extends Document {
   // Khi user đã chấp nhận quy định của server (nếu server có bật rules)
   @Prop({ type: Boolean, default: false })
   acceptedRules: boolean;
+
+  /** User 18+ đã xác nhận cảnh báo máy chủ giới hạn độ tuổi (Tiếp tục). */
+  @Prop({ type: Boolean, default: false })
+  ageRestrictedAcknowledged: boolean;
+
+  /** User đã xác minh email cho server này (per-server email verification). */
+  @Prop({ type: Boolean, default: false })
+  serverEmailVerified: boolean;
 }
 
 export const UserServerSchema = SchemaFactory.createForClass(UserServer);

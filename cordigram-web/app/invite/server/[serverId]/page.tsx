@@ -68,6 +68,7 @@ export default function InviteServerPage() {
 
   useEffect(() => {
     if (!server || !isMember) return;
+    serversApi.acceptServerInviteByServer(serverId).catch(() => {});
     router.replace(`/messages?server=${serverId}`);
   }, [server, isMember, serverId, router]);
 

@@ -45,7 +45,7 @@ export interface ServerInteractionSettings {
 
 export interface ServerSafetySettings {
   spamProtection: {
-    verificationLevel: 'low' | 'medium' | 'high';
+    verificationLevel: 'none' | 'low' | 'medium' | 'high';
     hideMutedDm: boolean;
     filterDmSpam: boolean;
     warnExternalLinks: boolean;
@@ -222,8 +222,8 @@ export class Server extends Document {
       spamProtection: {
         verificationLevel: {
           type: String,
-          enum: ['low', 'medium', 'high'],
-          default: 'low',
+          enum: ['none', 'low', 'medium', 'high'],
+          default: 'none',
         },
         hideMutedDm: { type: Boolean, default: false },
         filterDmSpam: { type: Boolean, default: false },
@@ -265,7 +265,7 @@ export class Server extends Document {
     },
     default: () => ({
       spamProtection: {
-        verificationLevel: 'low',
+        verificationLevel: 'none',
         hideMutedDm: false,
         filterDmSpam: false,
         warnExternalLinks: true,

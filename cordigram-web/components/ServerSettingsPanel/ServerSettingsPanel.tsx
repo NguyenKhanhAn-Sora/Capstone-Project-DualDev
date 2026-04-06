@@ -19,7 +19,6 @@ export type ServerSettingsSection =
   | "bans"
   | "automod"
   | "community"
-  | "template"
   | "delete-server";
 
 interface SidebarEntry {
@@ -72,7 +71,6 @@ const SIDEBAR_SECTIONS: { title: string; items: SidebarEntry[]; key: string }[] 
     title: "",
     items: [
       { id: "community", label: "Cài Đặt Cộng Đồng" },
-      { id: "template", label: "Mẫu Máy Chủ" },
     ],
   },
   {
@@ -97,7 +95,6 @@ const SECTION_LABELS: Record<ServerSettingsSection, string> = {
   bans: "Chặn",
   automod: "AutoMod",
   community: "Cài Đặt Cộng Đồng",
-  template: "Mẫu Máy Chủ",
   "delete-server": "Xóa máy chủ",
 };
 
