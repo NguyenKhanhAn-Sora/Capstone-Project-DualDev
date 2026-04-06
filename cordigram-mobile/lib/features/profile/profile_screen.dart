@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/services/auth_storage.dart';
+import '../post/post_detail_screen.dart';
 import '../report/report_comment_sheet.dart';
 import 'follow_list_sheet.dart';
+import 'profile_item_viewer_screen.dart';
 import 'models/profile_detail.dart';
 import 'profile_edit_sheet.dart';
 import 'services/profile_service.dart';
@@ -107,7 +109,8 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with TickerProviderStateMixin {
   ProfileDetail? _profile;
   bool _loading = true;
   String? _error;
@@ -118,6 +121,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _followLoading = false;
   bool _bioExpanded = false;
   bool _avatarLoading = false;
+
+  // ── Tab state ──────────────────────────────────────────────────────────────
+  late final TabController _tabController;
+  static const List<String> _tabKeys = ['posts', 'reels', 'saved', 'repost'];
+
+  final Map<String, List<Map<String, dynamic>>> _tabItems = {
+    'posts': [],
+    'reels': [],
+    'saved': [],
+    'repost': [],
+  };
+  final Map<String, bool> _tabLoading = {
+    'posts': false,
+    'reels': false,
+    'saved': false,
+    'repost': false,
+  };
+  final Map<String, bool> _tabLoaded = {
+    'posts': false,
+    'reels': false,
+    'saved': false,
+    'repost': false,
+  };
+  final Map<String, String> _tabError = {
+    'posts': '',
+    'reels': '',
+    'saved': '',
+    'repost': '',
+  };
 
   late final String? _viewerId;
 
@@ -134,8 +166,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _viewerId = _decodeViewerId();
     _loadProfile();
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProfile() async {
@@ -159,6 +204,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!_canView(vis, isOwner, isFollowing)) {
         setState(() => _privateView = true);
       }
+      // Prefetch tabs now that we have the userId
+      _prefetchTab('posts');
+      _prefetchTab('reels');
+      _prefetchTab('repost');
+      if (isOwner) _prefetchTab('saved');
     } catch (e) {
       if (!mounted) return;
       final msg = e.toString().toLowerCase();
@@ -191,6 +241,112 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     }
+  }
+
+  // ── Tab fetching ───────────────────────────────────────────────────────────
+
+  Future<void> _prefetchTab(String key) async {
+    if (_tabLoading[key] == true || _tabLoaded[key] == true) return;
+    final ownerId = _profile?.userId;
+    if (ownerId == null) return;
+
+    if (!mounted) return;
+    setState(() => _tabLoading[key] = true);
+
+    try {
+      List<Map<String, dynamic>> items;
+
+      if (key == 'posts') {
+        final raw = await ProfileService.fetchUserPosts(ownerId, limit: 30);
+        // Exclude reposts (items that have repostOf set)
+        items = raw
+            .where((m) => m['repostOf'] == null || m['repostOf'] == '')
+            .toList();
+      } else if (key == 'reels') {
+        items = await ProfileService.fetchUserReels(ownerId, limit: 30);
+      } else if (key == 'repost') {
+        // Combine posts + reels, keep only items with repostOf
+        final results = await Future.wait([
+          ProfileService.fetchUserPosts(ownerId, limit: 60),
+          ProfileService.fetchUserReels(ownerId, limit: 60),
+        ]);
+        final combined = [...results[0], ...results[1]];
+        final seen = <String>{};
+        final deduped = <Map<String, dynamic>>[];
+        for (final item in combined) {
+          final id = item['id'] as String? ?? '';
+          if (id.isNotEmpty && seen.add(id)) deduped.add(item);
+        }
+        items = deduped
+            .where((m) => m['repostOf'] != null && m['repostOf'] != '')
+            .toList();
+        items.sort((a, b) {
+          final aT =
+              DateTime.tryParse(
+                a['createdAt'] as String? ?? '',
+              )?.millisecondsSinceEpoch ??
+              0;
+          final bT =
+              DateTime.tryParse(
+                b['createdAt'] as String? ?? '',
+              )?.millisecondsSinceEpoch ??
+              0;
+          return bT.compareTo(aT);
+        });
+      } else {
+        // saved
+        final raw = await ProfileService.fetchSavedItems(limit: 60);
+        raw.sort((a, b) {
+          final aT =
+              DateTime.tryParse(
+                a['createdAt'] as String? ?? '',
+              )?.millisecondsSinceEpoch ??
+              0;
+          final bT =
+              DateTime.tryParse(
+                b['createdAt'] as String? ?? '',
+              )?.millisecondsSinceEpoch ??
+              0;
+          return bT.compareTo(aT);
+        });
+        items = raw;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _tabItems[key] = items;
+        _tabLoaded[key] = true;
+        _tabLoading[key] = false;
+        _tabError[key] = '';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _tabLoading[key] = false;
+        _tabLoaded[key] = true;
+        _tabError[key] = e.toString().replaceFirst(
+          RegExp(r'^.*?Exception: '),
+          '',
+        );
+      });
+    }
+  }
+
+  // ── Tab item navigation ────────────────────────────────────────────────────
+
+  void _navigateToItem(Map<String, dynamic> item, int index) {
+    final key = _tabKeys[_tabController.index];
+    final items = _tabItems[key]!;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProfileItemViewerScreen(
+          items: items,
+          initialIndex: index,
+          viewerId: _viewerId,
+          profileUsername: _profile?.username,
+        ),
+      ),
+    );
   }
 
   Future<void> _toggleFollow() async {
@@ -466,7 +622,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(backgroundColor: _bg, body: _buildBody());
+    try {
+      return Scaffold(backgroundColor: _bg, body: _buildBody());
+    } catch (e, st) {
+      debugPrint('ProfileScreen build failed: $e');
+      debugPrint('$st');
+      return Scaffold(
+        backgroundColor: _bg,
+        body: _SpecialStateView(
+          icon: Icons.error_outline_rounded,
+          iconColor: _danger,
+          title: 'Cannot render profile',
+          body: e.toString(),
+          buttonLabel: 'Retry',
+          onButton: _loadProfile,
+        ),
+      );
+    }
   }
 
   Widget _buildBody() {
@@ -475,7 +647,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_privateView && _profile == null) return _buildPrivateView();
     if (_error != null && _profile == null) return _buildErrorView();
 
-    final p = _profile!;
+    if (_profile == null) {
+      return _buildErrorView(
+        message: 'Profile data is unavailable. Please try again.',
+      );
+    }
+
+    final p = _profile as ProfileDetail;
     final isOwner = _viewerId != null && p.userId == _viewerId;
     final vis = p.visibility;
 
@@ -494,11 +672,132 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildActionButtons(p, isOwner),
               if (_hasBio(p, isOwner, vis)) _buildBioSection(p, isOwner, vis),
               _buildInfoSection(p, isOwner, vis),
-              const SizedBox(height: 32),
+              const SizedBox(height: 12),
             ],
           ),
         ),
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _ProfileTabBarDelegate(
+            TabBar(
+              controller: _tabController,
+              labelColor: _accent,
+              unselectedLabelColor: _textSecondary,
+              indicatorColor: _accent,
+              indicatorWeight: 2.5,
+              labelStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+              ),
+              tabs: const [
+                Tab(text: 'Posts'),
+                Tab(text: 'Reels'),
+                Tab(text: 'Saved'),
+                Tab(text: 'Repost'),
+              ],
+            ),
+            backgroundColor: _bg,
+            borderColor: _border,
+          ),
+        ),
+        _buildActiveTabSliver(isOwner),
       ],
+    );
+  }
+
+  Widget _buildActiveTabSliver(bool isOwner) {
+    final key = _tabKeys[_tabController.index];
+    final items = _tabItems[key]!;
+    final loading = _tabLoading[key]!;
+    final loaded = _tabLoaded[key]!;
+    final error = _tabError[key]!;
+
+    const emptyTexts = {
+      'posts': 'No posts yet.',
+      'reels': 'No reels yet.',
+      'saved': 'No saved items yet.',
+      'repost': 'No reposts yet.',
+    };
+
+    const gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 3,
+      mainAxisSpacing: 2,
+      crossAxisSpacing: 2,
+    );
+
+    // Saved tab locked for non-owners
+    if (key == 'saved' && !isOwner) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20, 28, 20, 28),
+          child: Text(
+            'You cannot view saved items here.',
+            style: TextStyle(color: Color(0xFF9BAECF), fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    // Loading skeleton
+    if (loading && !loaded) {
+      return SliverGrid(
+        gridDelegate: gridDelegate,
+        delegate: SliverChildBuilderDelegate(
+          (_, __) => const ColoredBox(color: Color(0xFF1A2740)),
+          childCount: 9,
+        ),
+      );
+    }
+
+    // Error
+    if (error.isNotEmpty) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
+          child: Text(
+            error,
+            style: const TextStyle(color: Color(0xFFE57373), fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    // Empty
+    if (loaded && items.isEmpty) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
+          child: Text(
+            emptyTexts[key] ?? 'Nothing here.',
+            style: const TextStyle(color: Color(0xFF9BAECF), fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    // Not yet started
+    if (!loading && !loaded) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+
+    // Grid
+    return SliverGrid(
+      gridDelegate: gridDelegate,
+      delegate: SliverChildBuilderDelegate(
+        (context, i) => _GridTile(
+          item: items[i],
+          showRepostBadge: key == 'repost',
+          onTap: () => _navigateToItem(items[i], i),
+        ),
+        childCount: items.length,
+      ),
     );
   }
 
@@ -571,9 +870,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ── Identity: avatar + name ───────────────────────────────────────────────
 
   Widget _buildIdentitySection(ProfileDetail p, bool isOwner) {
-    final initial =
-        (p.displayName.isNotEmpty ? p.displayName[0] : p.username[0])
-            .toUpperCase();
+    final display = p.displayName.trim();
+    final username = p.username.trim();
+    final initialSource = display.isNotEmpty
+        ? display
+        : (username.isNotEmpty ? username : 'U');
+    final initial = initialSource[0].toUpperCase();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
       child: Row(
@@ -1019,11 +1321,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildActionButtons(ProfileDetail p, bool isOwner) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-      child: isOwner ? _buildOwnerActions() : _buildViewerActions(p),
+      child: isOwner ? _buildOwnerActions(p) : _buildViewerActions(p),
     );
   }
 
-  Widget _buildOwnerActions() {
+  Widget _buildOwnerActions(ProfileDetail p) {
     return Row(
       children: [
         Expanded(
@@ -1031,10 +1333,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: _PrimaryButton(
             label: 'Edit profile',
             onTap: () {
-              if (_profile == null) return;
               showProfileEditSheet(
                 context,
-                profile: _profile!,
+                profile: p,
                 onSaved: (updated) => setState(() => _profile = updated),
               );
             },
@@ -1097,7 +1398,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     bool isOwner,
     ProfileVisibility? vis,
   ) {
-    final bio = p.bio!.trim();
+    final bio = (p.bio ?? '').trim();
+    if (bio.isEmpty) return const SizedBox.shrink();
     const maxLines = 4;
     final style = const TextStyle(
       color: Color(0xFFBCC8E0),
@@ -1331,12 +1633,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildErrorView() {
+  Widget _buildErrorView({String? message}) {
     return _SpecialStateView(
       icon: Icons.error_outline_rounded,
       iconColor: _danger,
       title: 'Unable to load profile',
-      body: _error ?? 'Something went wrong',
+      body: message ?? _error ?? 'Something went wrong',
       buttonLabel: 'Retry',
       onButton: _loadProfile,
     );
@@ -1744,6 +2046,304 @@ class _SkeletonBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF1A2740),
         borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+}
+
+// ── Profile tab bar delegate (sticky) ─────────────────────────────────────────
+
+class _ProfileTabBarDelegate extends SliverPersistentHeaderDelegate {
+  const _ProfileTabBarDelegate(
+    this._tabBar, {
+    required this.backgroundColor,
+    required this.borderColor,
+  });
+
+  final TabBar _tabBar;
+  final Color backgroundColor;
+  final Color borderColor;
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
+      ),
+      child: SizedBox(height: maxExtent, child: _tabBar),
+    );
+  }
+
+  @override
+  bool shouldRebuild(_ProfileTabBarDelegate oldDelegate) =>
+      oldDelegate._tabBar != _tabBar;
+}
+
+// ── Profile tab content (grid) ────────────────────────────────────────────────
+
+class _ProfileTabContent extends StatelessWidget {
+  const _ProfileTabContent({
+    required this.tabKey,
+    required this.items,
+    required this.loading,
+    required this.loaded,
+    required this.error,
+    required this.emptyText,
+    required this.onTap,
+    this.isOwner = true,
+  });
+
+  final String tabKey;
+  final List<Map<String, dynamic>> items;
+  final bool loading;
+  final bool loaded;
+  final String error;
+  final String emptyText;
+  final void Function(Map<String, dynamic>) onTap;
+  final bool isOwner;
+
+  // Helper: non-grid states wrapped in scrollable so NestedScrollView works
+  Widget _centeredScrollable(Widget child) {
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverFillRemaining(hasScrollBody: false, child: Center(child: child)),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Saved tab: non-owners see lockout message
+    if (tabKey == 'saved' && !isOwner) {
+      return _centeredScrollable(
+        const Padding(
+          padding: EdgeInsets.all(32),
+          child: Text(
+            'You cannot view saved items here.',
+            style: TextStyle(color: Color(0xFF9BAECF), fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    // Loading skeleton: 9 grey boxes
+    if (loading && !loaded) {
+      return GridView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: 2,
+          crossAxisSpacing: 2,
+        ),
+        itemCount: 9,
+        itemBuilder: (_, __) => const ColoredBox(color: Color(0xFF1A2740)),
+      );
+    }
+
+    // Error
+    if (error.isNotEmpty) {
+      return _centeredScrollable(
+        Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            error,
+            style: const TextStyle(color: Color(0xFFE57373), fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    // Empty
+    if (loaded && items.isEmpty) {
+      return _centeredScrollable(
+        Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            emptyText,
+            style: const TextStyle(color: Color(0xFF9BAECF), fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    // Initial state (not yet loading, not yet loaded) → empty scrollable placeholder
+    if (!loading && !loaded) {
+      return CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: const [SliverToBoxAdapter(child: SizedBox.shrink())],
+      );
+    }
+
+    // Grid
+    return GridView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 2,
+        crossAxisSpacing: 2,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, i) => _GridTile(
+        item: items[i],
+        showRepostBadge: tabKey == 'repost',
+        onTap: () => onTap(items[i]),
+      ),
+    );
+  }
+}
+
+// ── Grid tile ─────────────────────────────────────────────────────────────────
+
+class _GridTile extends StatelessWidget {
+  const _GridTile({
+    required this.item,
+    required this.onTap,
+    this.showRepostBadge = false,
+  });
+
+  final Map<String, dynamic> item;
+  final VoidCallback onTap;
+  final bool showRepostBadge;
+
+  /// Convert a Cloudinary video URL to a static thumbnail image URL.
+  /// e.g. .../video/upload/v123/file.mp4 → .../video/upload/so_0/v123/file.jpg
+  static String? _cloudinaryVideoThumb(String url) {
+    const marker = '/video/upload/';
+    final idx = url.indexOf(marker);
+    if (idx == -1) return null;
+    final before = url.substring(0, idx + marker.length);
+    final after = url.substring(idx + marker.length);
+    final dotIdx = after.lastIndexOf('.');
+    final pathNoExt = dotIdx >= 0 ? after.substring(0, dotIdx) : after;
+    return '${before}so_0/$pathNoExt.jpg';
+  }
+
+  String? _thumbnailUrl() {
+    final media = item['media'] as List?;
+    if (media != null && media.isNotEmpty) {
+      final first = media[0] as Map?;
+      if (first != null) {
+        final thumb = first['thumbnailUrl'] as String?;
+        if (thumb != null && thumb.isNotEmpty) return thumb;
+        final url = first['url'] as String?;
+        if (url == null) return null;
+        // For video items, try to derive a static thumbnail from Cloudinary
+        final type = first['type'] as String?;
+        if (type == 'video') return _cloudinaryVideoThumb(url) ?? url;
+        return url;
+      }
+    }
+    final thumbnail = item['thumbnail'] as String?;
+    if (thumbnail != null) return thumbnail;
+    final coverImage = item['coverImage'] as String?;
+    if (coverImage != null) return coverImage;
+    return null;
+  }
+
+  bool _isVideo() {
+    final kind = item['kind'] as String?;
+    if (kind == 'reel') return true;
+    final media = item['media'] as List?;
+    if (media != null && media.isNotEmpty) {
+      final first = media[0] as Map?;
+      if (first != null && first['type'] == 'video') return true;
+    }
+    return false;
+  }
+
+  String _formatCount(dynamic raw) {
+    final n = (raw is int)
+        ? raw
+        : (raw is double)
+        ? raw.toInt()
+        : int.tryParse(raw?.toString() ?? '') ?? 0;
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
+    return n.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final thumb = _thumbnailUrl();
+    final views = (item['stats'] as Map?)?['views'];
+    final isVideo = _isVideo();
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Thumbnail
+          if (thumb != null)
+            Image.network(
+              thumb,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) =>
+                  const ColoredBox(color: Color(0xFF1A2740)),
+            )
+          else
+            const ColoredBox(color: Color(0xFF1A2740)),
+
+          // Video play indicator (top-right)
+          if (isVideo)
+            const Positioned(
+              top: 6,
+              right: 6,
+              child: Icon(
+                Icons.play_circle_filled,
+                color: Colors.white70,
+                size: 18,
+              ),
+            ),
+
+          // Repost badge (top-left)
+          if (showRepostBadge)
+            const Positioned(
+              top: 6,
+              left: 6,
+              child: Icon(Icons.repeat, color: Colors.white70, size: 16),
+            ),
+
+          // Views count (bottom-left)
+          if (views != null)
+            Positioned(
+              bottom: 4,
+              left: 4,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.visibility, color: Colors.white, size: 12),
+                  const SizedBox(width: 2),
+                  Text(
+                    _formatCount(views),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      shadows: [Shadow(blurRadius: 3, color: Colors.black54)],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

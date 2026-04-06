@@ -145,6 +145,48 @@ class ProfileService {
     );
   }
 
+  /// Fetch posts authored by a user (profile Posts tab).
+  /// Excludes reposts (items where repostOf is set).
+  static Future<List<Map<String, dynamic>>> fetchUserPosts(
+    String userId, {
+    int limit = 30,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    final list = await ApiService.getList(
+      '/posts/user/${Uri.encodeComponent(userId)}?limit=$limit',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+    return list.whereType<Map<String, dynamic>>().toList();
+  }
+
+  /// Fetch reels authored by a user (profile Reels tab).
+  static Future<List<Map<String, dynamic>>> fetchUserReels(
+    String userId, {
+    int limit = 30,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    final list = await ApiService.getList(
+      '/reels/user/${Uri.encodeComponent(userId)}?limit=$limit',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+    return list.whereType<Map<String, dynamic>>().toList();
+  }
+
+  /// Fetch saved items for the authenticated user (profile Saved tab).
+  static Future<List<Map<String, dynamic>>> fetchSavedItems({
+    int limit = 60,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    final list = await ApiService.getList(
+      '/posts/saved?limit=$limit',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+    return list.whereType<Map<String, dynamic>>().toList();
+  }
+
   /// Check if a username is available.
   static Future<bool> checkUsername(
     String username, {

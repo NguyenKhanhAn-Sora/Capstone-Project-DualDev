@@ -24,6 +24,7 @@ This app is configured to connect to the existing Cordigram backend.
 4. Run app with API base URL:
 
 	flutter run --dart-define=API_BASE_URL=http://localhost:9999
+	flutter run --dart-define=API_BASE_URL=http://localhost:9999 --no-enable-impeller
 
 ## Phone Setup Required
 
