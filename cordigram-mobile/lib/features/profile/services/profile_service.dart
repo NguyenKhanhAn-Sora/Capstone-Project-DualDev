@@ -1,0 +1,130 @@
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/services/api_service.dart';
+import '../../../core/services/auth_storage.dart';
+import '../models/profile_detail.dart';
+
+class ProfileService {
+  /// Fetch profile detail by userId (MongoDB ObjectId string).
+  static Future<ProfileDetail> fetchProfile(String userId) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    final data = await ApiService.get(
+      '/profiles/${Uri.encodeComponent(userId)}',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+    return ProfileDetail.fromJson(data);
+  }
+
+  /// Fetch the current user's own profile via /profiles/me
+  static Future<ProfileDetail> fetchMyProfile() async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    final data = await ApiService.get(
+      '/profiles/me',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+    // /profiles/me returns slightly different shape; normalise userId field
+    final id = (data['userId'] as String?) ?? (data['id'] as String?) ?? '';
+    if (!data.containsKey('userId')) data['userId'] = id;
+    if (!data.containsKey('id')) data['id'] = id;
+    return ProfileDetail.fromJson(data);
+  }
+
+  static Future<void> followUser(String userId) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    await ApiService.post(
+      '/follows/$userId',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  static Future<void> unfollowUser(String userId) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    await ApiService.delete(
+      '/follows/$userId',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Upload a new avatar (original + cropped bytes).
+  static Future<Map<String, dynamic>> uploadAvatar({
+    required Uint8List originalBytes,
+    required String originalName,
+    required Uint8List croppedBytes,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}/profiles/avatar/upload');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'original',
+          originalBytes,
+          filename: originalName,
+          contentType: MediaType('image', 'jpeg'),
+        ),
+      )
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'cropped',
+          croppedBytes,
+          filename: 'avatar-cropped.jpg',
+          contentType: MediaType('image', 'jpeg'),
+        ),
+      );
+    final streamed = await request.send().timeout(const Duration(seconds: 60));
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw ApiException('Avatar upload failed (${response.statusCode})');
+  }
+
+  /// Remove avatar – resets to default.
+  static Future<Map<String, dynamic>> removeAvatar() async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.delete(
+      '/profiles/avatar',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Update own profile (PATCH /profiles/me).
+  static Future<ProfileDetail> updateProfile(
+    Map<String, dynamic> payload,
+  ) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    final data = await ApiService.patch(
+      '/profiles/me',
+      body: payload,
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+    return ProfileDetail.fromJson(data);
+  }
+
+  /// Check if a username is available.
+  static Future<bool> checkUsername(
+    String username, {
+    String? excludeUserId,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    final qs = <String, String>{'username': username};
+    if (excludeUserId != null) qs['excludeUserId'] = excludeUserId;
+    final query = Uri(queryParameters: qs).query;
+    final data = await ApiService.get(
+      '/profiles/check-username?$query',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+    return data['available'] as bool? ?? false;
+  }
+}

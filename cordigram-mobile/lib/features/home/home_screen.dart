@@ -5,6 +5,7 @@ import '../../core/services/auth_storage.dart';
 import '../auth/login_screen.dart';
 import '../post/create_tab_screen.dart';
 import '../post/post_detail_screen.dart';
+import '../profile/profile_screen.dart';
 import '../report/report_problem_screen.dart';
 import 'models/feed_post.dart';
 import 'services/feed_service.dart';
@@ -406,6 +407,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Navigator.pop(ctx);
           _logout();
         },
+        onProfile: () {
+          Navigator.pop(ctx);
+          if (_viewerId != null) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ProfileScreen(userId: _viewerId!),
+              ),
+            );
+          }
+        },
         onReportProblem: () {
           Navigator.pop(ctx);
           Navigator.of(context).push(
@@ -709,6 +720,7 @@ class _ProfileMenuSheet extends StatelessWidget {
     required this.avatarLetter,
     required this.onLogout,
     required this.onReportProblem,
+    required this.onProfile,
     this.avatarUrl,
     this.displayName,
     this.username,
@@ -719,6 +731,7 @@ class _ProfileMenuSheet extends StatelessWidget {
   final String? username;
   final VoidCallback onLogout;
   final VoidCallback onReportProblem;
+  final VoidCallback onProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -789,12 +802,7 @@ class _ProfileMenuSheet extends StatelessWidget {
           _SheetItem(
             icon: Icons.person_outline_rounded,
             label: 'Profile',
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Profile coming soon')),
-              );
-            },
+            onTap: onProfile,
           ),
           _SheetItem(
             icon: Icons.settings_outlined,
