@@ -101,6 +101,7 @@ class FeedPost {
     this.repostOfAuthor,
     this.repostSourceContent,
     this.repostSourceMedia,
+    this.primaryVideoDurationMs,
   });
 
   final String id;
@@ -132,6 +133,7 @@ class FeedPost {
   final FeedAuthor? repostOfAuthor;
   final String? repostSourceContent;
   final List<FeedMedia>? repostSourceMedia;
+  final int? primaryVideoDurationMs;
 
   /// Returns display name: author.displayName > authorDisplayName > username > "Unknown"
   String get displayName {
@@ -237,6 +239,7 @@ class FeedPost {
       repostOfAuthor: repostOfAuthor,
       repostSourceContent: json['repostSourceContent'] as String?,
       repostSourceMedia: repostSourceMedia,
+      primaryVideoDurationMs: (json['primaryVideoDurationMs'] as num?)?.toInt(),
     );
   }
 }

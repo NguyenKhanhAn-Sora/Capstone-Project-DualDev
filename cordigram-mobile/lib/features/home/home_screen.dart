@@ -6,6 +6,7 @@ import '../auth/login_screen.dart';
 import '../post/create_tab_screen.dart';
 import '../post/post_detail_screen.dart';
 import '../profile/profile_screen.dart';
+import '../reels/reels_screen.dart';
 import '../report/report_problem_screen.dart';
 import 'models/feed_post.dart';
 import 'services/feed_service.dart';
@@ -556,7 +557,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _buildFeedTab(),
         const _PlaceholderTab(label: 'Following'),
         const _PlaceholderTab(label: 'Explore'),
-        const _PlaceholderTab(label: 'Reels'),
+        const ReelsScreen(),
         const CreateTabScreen(),
       ],
     );
