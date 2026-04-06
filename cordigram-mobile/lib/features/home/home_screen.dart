@@ -5,6 +5,7 @@ import '../../core/services/auth_storage.dart';
 import '../auth/login_screen.dart';
 import '../post/create_tab_screen.dart';
 import '../post/post_detail_screen.dart';
+import '../report/report_problem_screen.dart';
 import 'models/feed_post.dart';
 import 'services/feed_service.dart';
 import 'services/post_interaction_service.dart';
@@ -405,6 +406,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Navigator.pop(ctx);
           _logout();
         },
+        onReportProblem: () {
+          Navigator.pop(ctx);
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ReportProblemScreen()),
+          );
+        },
       ),
     );
   }
@@ -701,6 +708,7 @@ class _ProfileMenuSheet extends StatelessWidget {
   const _ProfileMenuSheet({
     required this.avatarLetter,
     required this.onLogout,
+    required this.onReportProblem,
     this.avatarUrl,
     this.displayName,
     this.username,
@@ -710,6 +718,7 @@ class _ProfileMenuSheet extends StatelessWidget {
   final String? displayName;
   final String? username;
   final VoidCallback onLogout;
+  final VoidCallback onReportProblem;
 
   @override
   Widget build(BuildContext context) {
@@ -810,12 +819,7 @@ class _ProfileMenuSheet extends StatelessWidget {
           _SheetItem(
             icon: Icons.flag_outlined,
             label: 'Report a problem',
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Report a problem coming soon')),
-              );
-            },
+            onTap: onReportProblem,
           ),
           _SheetItem(
             icon: Icons.logout_rounded,
