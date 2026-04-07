@@ -936,6 +936,7 @@ export class PostsService {
         : undefined,
       repostSourceContent: repostSourcePost?.content ?? null,
       repostSourceMedia: repostSourcePost?.media ?? null,
+      primaryVideoDurationMs: doc.primaryVideoDurationMs ?? null,
       flags: {
         liked: userFlags?.liked ?? false,
         saved: userFlags?.saved ?? false,

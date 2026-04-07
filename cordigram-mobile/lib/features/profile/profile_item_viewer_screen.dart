@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -175,6 +176,20 @@ FeedPostState? _toFeedPostState(
   }
 }
 
+int? _extractExpectedDurationMs(Map<String, dynamic> item) {
+  final normalized = _normalizeItem(item);
+  final raw = normalized['primaryVideoDurationMs'];
+  int? ms;
+  if (raw is num) {
+    ms = raw.toInt();
+  } else if (raw is String) {
+    ms = int.tryParse(raw);
+  }
+  if (ms == null || ms <= 0) return null;
+  // Defensive normalization: some payloads may provide seconds.
+  return ms < 1000 ? ms * 1000 : ms;
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 /// Full-screen horizontal swipe viewer for posts/reels shown in a profile tab.
@@ -274,6 +289,30 @@ class _ProfileItemViewerScreenState extends State<ProfileItemViewerScreen> {
     try {
       await ctrl.initialize();
       if (!mounted) return;
+
+      final nativeDurMs = ctrl.value.duration.inMilliseconds;
+      final expectedMs = _extractExpectedDurationMs(widget.items[index]);
+      final shouldPatch =
+          expectedMs != null &&
+          (nativeDurMs <= 0 ||
+              nativeDurMs < 1000 ||
+              nativeDurMs < (expectedMs * 0.2));
+
+      if (shouldPatch) {
+        ctrl.value = ctrl.value.copyWith(
+          duration: Duration(milliseconds: expectedMs),
+        );
+      }
+
+      if (kDebugMode) {
+        final itemId = (widget.items[index]['id'] as String?) ?? '';
+        debugPrint(
+          '[ProfileReelDuration] id=$itemId '
+          'native=${nativeDurMs}ms expected=${expectedMs}ms '
+          'effective=${ctrl.value.duration.inMilliseconds}ms',
+        );
+      }
+
       ctrl.setLooping(true);
       if (index == _currentIndex) ctrl.play();
       if (mounted) setState(() {});
@@ -437,6 +476,30 @@ class _ProfileReelViewerScreenState extends State<ProfileReelViewerScreen> {
     try {
       await ctrl.initialize();
       if (!mounted) return;
+
+      final nativeDurMs = ctrl.value.duration.inMilliseconds;
+      final expectedMs = _extractExpectedDurationMs(widget.items[index]);
+      final shouldPatch =
+          expectedMs != null &&
+          (nativeDurMs <= 0 ||
+              nativeDurMs < 1000 ||
+              nativeDurMs < (expectedMs * 0.2));
+
+      if (shouldPatch) {
+        ctrl.value = ctrl.value.copyWith(
+          duration: Duration(milliseconds: expectedMs),
+        );
+      }
+
+      if (kDebugMode) {
+        final itemId = (widget.items[index]['id'] as String?) ?? '';
+        debugPrint(
+          '[ProfileReelDuration] id=$itemId '
+          'native=${nativeDurMs}ms expected=${expectedMs}ms '
+          'effective=${ctrl.value.duration.inMilliseconds}ms',
+        );
+      }
+
       ctrl.setLooping(true);
       if (index == _currentIndex) ctrl.play();
       if (mounted) setState(() {});
@@ -1715,13 +1778,13 @@ class _ItemPageState extends State<_ItemPage> {
                   icon: _liked
                       ? Icons.favorite_rounded
                       : Icons.favorite_border_rounded,
-                  color: _liked ? const Color(0xFFE53935) : Colors.white,
+                  color: Colors.white,
                   label: hideLikesForViewer ? '' : _fmtCountInt(hearts),
                   onTap: _onLikeTap,
                 ),
                 const SizedBox(height: 20),
                 _ActionButton(
-                  icon: Icons.chat_bubble_outline_rounded,
+                  icon: Icons.mode_comment_outlined,
                   color: commentsLocked ? Colors.white54 : Colors.white,
                   label: commentsLocked ? 'Off' : _fmtCountInt(comments),
                   onTap: commentsLocked ? () {} : _openReelCommentsSheet,
@@ -1731,7 +1794,7 @@ class _ItemPageState extends State<_ItemPage> {
                   icon: _saved
                       ? Icons.bookmark_rounded
                       : Icons.bookmark_border_rounded,
-                  color: _saved ? const Color(0xFF4AA3E4) : Colors.white,
+                  color: Colors.white,
                   label: _fmtCountInt(saves),
                   onTap: _onSaveTap,
                 ),
@@ -1744,7 +1807,10 @@ class _ItemPageState extends State<_ItemPage> {
               bottom: 0,
               left: 0,
               right: 0,
-              child: _VideoProgressBar(controller: ctrl),
+              child: _VideoProgressBar(
+                controller: ctrl,
+                expectedDurationMs: _extractExpectedDurationMs(normalized),
+              ),
             ),
         ],
       ),
@@ -2213,9 +2279,10 @@ class _VolumeControl extends StatelessWidget {
 }
 
 class _VideoProgressBar extends StatefulWidget {
-  const _VideoProgressBar({required this.controller});
+  const _VideoProgressBar({required this.controller, this.expectedDurationMs});
 
   final VideoPlayerController controller;
+  final int? expectedDurationMs;
 
   @override
   State<_VideoProgressBar> createState() => _VideoProgressBarState();
@@ -2247,51 +2314,37 @@ class _VideoProgressBarState extends State<_VideoProgressBar> {
     super.dispose();
   }
 
-  static String _fmt(Duration d) {
-    final mm = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final ss = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$mm:$ss';
-  }
-
   @override
   Widget build(BuildContext context) {
     final value = widget.controller.value;
-    final dur = value.duration;
-    final pos = value.position;
+    final posMs = value.position.inMilliseconds;
+    final nativeDurMs = value.duration.inMilliseconds;
 
-    if (!value.isInitialized || dur.inMilliseconds <= 0) {
+    int? expectedMs;
+    if (widget.expectedDurationMs != null && widget.expectedDurationMs! > 0) {
+      expectedMs = widget.expectedDurationMs! < 1000
+          ? widget.expectedDurationMs! * 1000
+          : widget.expectedDurationMs!;
+    }
+
+    var effectiveDurMs = nativeDurMs;
+    if (expectedMs != null &&
+        (effectiveDurMs <= 0 ||
+            effectiveDurMs < 1000 ||
+            effectiveDurMs < (expectedMs * 0.2) ||
+            effectiveDurMs < posMs)) {
+      effectiveDurMs = expectedMs;
+    }
+
+    if (!value.isInitialized || effectiveDurMs <= 1000) {
       return Container(height: 3, color: Colors.white12);
     }
 
-    final progress = (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0);
+    final progress = (posMs / effectiveDurMs).clamp(0.0, 1.0);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 1),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _fmt(pos),
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 10,
-                  shadows: [Shadow(blurRadius: 3, color: Colors.black)],
-                ),
-              ),
-              Text(
-                _fmt(dur),
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 10,
-                  shadows: [Shadow(blurRadius: 3, color: Colors.black)],
-                ),
-              ),
-            ],
-          ),
-        ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
             trackHeight: 2.5,
@@ -2308,7 +2361,7 @@ class _VideoProgressBarState extends State<_VideoProgressBar> {
             min: 0.0,
             max: 1.0,
             onChanged: (v) {
-              final ms = (v * dur.inMilliseconds).round();
+              final ms = (v * effectiveDurMs).round();
               widget.controller.seekTo(Duration(milliseconds: ms));
             },
           ),

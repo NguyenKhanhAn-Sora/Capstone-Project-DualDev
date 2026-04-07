@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -163,11 +164,36 @@ class _ReelsScreenState extends State<ReelsScreen> {
       // duration from Cloudinary metadata. Patch controller.value.duration so
       // that _updatePosition's clamp and seekTo() both work correctly.
       final backendDurMs = _reels[index].post.primaryVideoDurationMs;
-      if (backendDurMs != null &&
-          backendDurMs > 0 &&
-          controller.value.duration.inMilliseconds < backendDurMs) {
+      final nativeDurMs = controller.value.duration.inMilliseconds;
+
+      int? normalizedBackendDurMs;
+      if (backendDurMs != null && backendDurMs > 0) {
+        // Defensive: if backend accidentally returns seconds instead of ms
+        // (e.g. 26), normalize it to ms.
+        normalizedBackendDurMs = backendDurMs < 1000
+            ? backendDurMs * 1000
+            : backendDurMs;
+      }
+
+      final shouldPatchWithBackend =
+          normalizedBackendDurMs != null &&
+          normalizedBackendDurMs > 0 &&
+          (nativeDurMs <= 0 ||
+              nativeDurMs < 1000 ||
+              nativeDurMs < (normalizedBackendDurMs * 0.2));
+
+      if (shouldPatchWithBackend) {
         controller.value = controller.value.copyWith(
-          duration: Duration(milliseconds: backendDurMs),
+          duration: Duration(milliseconds: normalizedBackendDurMs),
+        );
+      }
+
+      if (kDebugMode) {
+        debugPrint(
+          '[ReelDuration] id=${_reels[index].post.id} '
+          'native=${nativeDurMs}ms backendRaw=${backendDurMs}ms '
+          'backendNorm=${normalizedBackendDurMs}ms '
+          'effective=${controller.value.duration.inMilliseconds}ms',
         );
       }
 
@@ -1308,9 +1334,7 @@ class _ReelPageState extends State<_ReelPage> {
                   icon: widget.state.liked
                       ? Icons.favorite_rounded
                       : Icons.favorite_border_rounded,
-                  color: widget.state.liked
-                      ? const Color(0xFFE53935)
-                      : Colors.white,
+                  color: Colors.white,
                   label: hideLikesForViewer
                       ? ''
                       : _formatCount(widget.state.stats.hearts),
@@ -1319,9 +1343,7 @@ class _ReelPageState extends State<_ReelPage> {
                 const SizedBox(height: 20),
                 // Comment
                 _ActionButton(
-                  icon: commentsLocked
-                      ? Icons.chat_bubble_outline_rounded
-                      : Icons.chat_bubble_outline_rounded,
+                  icon: Icons.mode_comment_outlined,
                   color: commentsLocked ? Colors.white54 : Colors.white,
                   label: commentsLocked
                       ? 'Off'
@@ -1334,9 +1356,7 @@ class _ReelPageState extends State<_ReelPage> {
                   icon: widget.state.saved
                       ? Icons.bookmark_rounded
                       : Icons.bookmark_border_rounded,
-                  color: widget.state.saved
-                      ? const Color(0xFF4AA3E4)
-                      : Colors.white,
+                  color: Colors.white,
                   label: _formatCount(widget.state.stats.saves),
                   onTap: widget.onSave,
                 ),
@@ -1361,7 +1381,10 @@ class _ReelPageState extends State<_ReelPage> {
               bottom: 0,
               left: 0,
               right: 0,
-              child: _VideoProgressBar(controller: ctrl),
+              child: _VideoProgressBar(
+                controller: ctrl,
+                expectedDurationMs: reel.primaryVideoDurationMs,
+              ),
             ),
         ],
       ),
@@ -1558,19 +1581,14 @@ class _VolumeControl extends StatelessWidget {
 // ── Seekable progress bar ─────────────────────────────────────────────────────
 
 class _VideoProgressBar extends StatefulWidget {
-  const _VideoProgressBar({required this.controller});
+  const _VideoProgressBar({required this.controller, this.expectedDurationMs});
   final VideoPlayerController controller;
+  final int? expectedDurationMs;
   @override
   State<_VideoProgressBar> createState() => _VideoProgressBarState();
 }
 
 class _VideoProgressBarState extends State<_VideoProgressBar> {
-  static String _fmt(Duration d) {
-    final mm = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final ss = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$mm:$ss';
-  }
-
   // Mirror of web's "timeupdate" listener: fires on every position tick
   void _onUpdate() {
     if (mounted) setState(() {});
@@ -1600,44 +1618,36 @@ class _VideoProgressBarState extends State<_VideoProgressBar> {
   @override
   Widget build(BuildContext context) {
     final value = widget.controller.value;
-    final dur = value.duration;
-    final pos = value.position;
+    final posMs = value.position.inMilliseconds;
+    final nativeDurMs = value.duration.inMilliseconds;
+
+    int? expectedMs;
+    if (widget.expectedDurationMs != null && widget.expectedDurationMs! > 0) {
+      expectedMs = widget.expectedDurationMs! < 1000
+          ? widget.expectedDurationMs! * 1000
+          : widget.expectedDurationMs!;
+    }
+
+    var effectiveDurMs = nativeDurMs;
+    if (expectedMs != null &&
+        (effectiveDurMs <= 0 ||
+            effectiveDurMs < 1000 ||
+            effectiveDurMs < (expectedMs * 0.2) ||
+            effectiveDurMs < posMs)) {
+      effectiveDurMs = expectedMs;
+    }
 
     // Mirror of web: `const percent = duration ? ... : 0`
     // Show thin placeholder until duration is known (equivalent to loadedmetadata)
-    if (!value.isInitialized || dur.inMilliseconds <= 0) {
+    if (!value.isInitialized || effectiveDurMs <= 1000) {
       return Container(height: 3, color: Colors.white12);
     }
 
-    final progress = (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0);
+    final progress = (posMs / effectiveDurMs).clamp(0.0, 1.0);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 1),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _fmt(pos),
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 10,
-                  shadows: [Shadow(blurRadius: 3, color: Colors.black)],
-                ),
-              ),
-              Text(
-                _fmt(dur),
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 10,
-                  shadows: [Shadow(blurRadius: 3, color: Colors.black)],
-                ),
-              ),
-            ],
-          ),
-        ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
             trackHeight: 2.5,
@@ -1654,7 +1664,7 @@ class _VideoProgressBarState extends State<_VideoProgressBar> {
             min: 0.0,
             max: 1.0,
             onChanged: (v) {
-              final ms = (v * dur.inMilliseconds).round();
+              final ms = (v * effectiveDurMs).round();
               widget.controller.seekTo(Duration(milliseconds: ms));
             },
           ),
