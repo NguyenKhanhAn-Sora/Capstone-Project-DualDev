@@ -4,10 +4,17 @@ import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
 import '../../home/models/feed_post.dart';
 
+class ExploreFeedResult {
+  const ExploreFeedResult({required this.items, required this.fetchedCount});
+
+  final List<FeedPost> items;
+  final int fetchedCount;
+}
+
 class ExploreService {
   static const int pageSize = 30;
 
-  static Future<List<FeedPost>> fetchExploreFeed({
+  static Future<ExploreFeedResult> fetchExploreFeed({
     int page = 1,
     int limit = pageSize,
     List<String> kinds = const ['post', 'reel'],
@@ -31,10 +38,20 @@ class ExploreService {
       extraHeaders: {'Authorization': 'Bearer $token'},
     );
 
-    return raw
+    final allItems = raw
         .whereType<Map<String, dynamic>>()
         .map(FeedPost.fromJson)
         .toList();
+
+    final visibleItems = allItems.where((post) {
+      if (post.media.isEmpty) return false;
+      return !post.media.any((m) => m.isBlurredByModeration);
+    }).toList();
+
+    return ExploreFeedResult(
+      items: visibleItems,
+      fetchedCount: allItems.length,
+    );
   }
 
   static Future<void> recordImpression({

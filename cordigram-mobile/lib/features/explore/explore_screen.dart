@@ -70,7 +70,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     });
 
     try {
-      final data = await ExploreService.fetchExploreFeed(page: _page);
+      final result = await ExploreService.fetchExploreFeed(page: _page);
+      final data = result.items;
       if (!mounted) return;
 
       setState(() {
@@ -87,7 +88,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           }
         }
 
-        _hasMore = data.length >= ExploreService.pageSize;
+        _hasMore = result.fetchedCount >= ExploreService.pageSize;
         _page += 1;
       });
     } on ApiException catch (e) {

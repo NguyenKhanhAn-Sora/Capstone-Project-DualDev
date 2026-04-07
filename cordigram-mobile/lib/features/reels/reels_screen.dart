@@ -29,7 +29,10 @@ import '../report/report_post_sheet.dart';
 // ── Reels screen ──────────────────────────────────────────────────────────────
 
 class ReelsScreen extends StatefulWidget {
-  const ReelsScreen({super.key});
+  const ReelsScreen({super.key, this.scope = 'all', this.initialReelId});
+
+  final String scope;
+  final String? initialReelId;
 
   @override
   State<ReelsScreen> createState() => _ReelsScreenState();
@@ -52,6 +55,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
 
   bool _muted = false;
   String? _viewerId;
+  bool _initialTargetHandled = false;
 
   /// Per-reel view cooldown (reel id → last-viewed timestamp ms).
   final Map<String, int> _viewCooldown = {};
@@ -276,8 +280,12 @@ class _ReelsScreenState extends State<ReelsScreen> {
     });
 
     try {
+      final normalizedScope = widget.scope.trim().toLowerCase();
+      final scopeQuery = normalizedScope == 'following'
+          ? '&scope=following'
+          : '';
       final rawList = await ApiService.getList(
-        '/reels/feed?limit=$_kPageSize&page=$_page',
+        '/reels/feed?limit=$_kPageSize&page=$_page$scopeQuery',
         extraHeaders: _authHeader,
       );
       if (!mounted) return;
@@ -294,9 +302,17 @@ class _ReelsScreenState extends State<ReelsScreen> {
         _loading = false;
       });
 
+      _maybeJumpToInitialTarget();
+
+      if (!_initialTargetHandled && widget.initialReelId != null && _hasMore) {
+        await _loadReels();
+        return;
+      }
+
       // Initialize and play the first reel after initial load.
       if (_currentPage == 0 &&
           _reels.isNotEmpty &&
+          widget.initialReelId == null &&
           !_controllers.containsKey(0)) {
         await _initAndPlay(0);
         _ensureControllerInitialized(1);
@@ -308,6 +324,34 @@ class _ReelsScreenState extends State<ReelsScreen> {
       if (!mounted) return;
       setState(() => _loading = false);
     }
+  }
+
+  void _maybeJumpToInitialTarget() {
+    if (_initialTargetHandled) return;
+    final targetId = widget.initialReelId;
+    if (targetId == null || targetId.isEmpty) {
+      _initialTargetHandled = true;
+      return;
+    }
+
+    final targetIndex = _reels.indexWhere((s) => s.post.id == targetId);
+    if (targetIndex < 0) {
+      if (!_hasMore) {
+        _initialTargetHandled = true;
+      }
+      return;
+    }
+
+    _initialTargetHandled = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      _currentPage = targetIndex;
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(targetIndex);
+      }
+      _onPageChanged(targetIndex);
+    });
   }
 
   // ── Interactions ───────────────────────────────────────────────────────────
