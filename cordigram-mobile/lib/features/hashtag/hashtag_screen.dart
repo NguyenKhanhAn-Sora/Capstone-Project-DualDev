@@ -1,30 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../home/models/feed_post.dart';
-import '../home/services/feed_service.dart';
 import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostCard, PostMenuAction;
 import '../post/post_detail_screen.dart';
+import '../post/utils/post_edit_utils.dart';
 import '../post/utils/repost_flow_utils.dart';
+import '../profile/profile_item_viewer_screen.dart';
 import '../profile/profile_screen.dart';
-import '../reels/reels_screen.dart';
 import '../report/report_post_sheet.dart';
+import 'services/hashtag_feed_service.dart';
 
-class FollowingScreen extends StatefulWidget {
-  const FollowingScreen({super.key});
+class HashtagScreen extends StatefulWidget {
+  const HashtagScreen({super.key, required this.tag});
+
+  final String tag;
 
   @override
-  State<FollowingScreen> createState() => _FollowingScreenState();
+  State<HashtagScreen> createState() => _HashtagScreenState();
 }
 
-class _FollowingScreenState extends State<FollowingScreen> {
+class _HashtagScreenState extends State<HashtagScreen> {
   final List<FeedPostState> _items = [];
   final ScrollController _scrollController = ScrollController();
-  final Set<String> _revealedReels = <String>{};
   final Map<String, int> _viewCooldownMap = <String, int>{};
+  final Set<String> _revealedReelPostIds = <String>{};
 
   bool _loading = false;
   bool _initialLoad = true;
@@ -34,16 +36,15 @@ class _FollowingScreenState extends State<FollowingScreen> {
   String? _viewerId;
 
   static const int _kViewCooldownMs = 300000;
-  static final RegExp _adMarkerRegex = RegExp(
-    r'\[\[AD_(PRIMARY_TEXT|HEADLINE|DESCRIPTION|CTA|URL)\]\]',
-    caseSensitive: false,
-  );
+
+  String get _normalizedTag =>
+      widget.tag.replaceAll('#', '').trim().toLowerCase();
 
   @override
   void initState() {
     super.initState();
     _fetchViewerId();
-    _loadFeed();
+    _loadFeed(refresh: true);
     _scrollController.addListener(_onScroll);
   }
 
@@ -57,7 +58,7 @@ class _FollowingScreenState extends State<FollowingScreen> {
     try {
       final data = await ApiService.get(
         '/profiles/me',
-        extraHeaders: _authHeader,
+        extraHeaders: {'Authorization': 'Bearer ${AuthStorage.accessToken}'},
       );
       if (!mounted) return;
       setState(() {
@@ -65,10 +66,6 @@ class _FollowingScreenState extends State<FollowingScreen> {
       });
     } catch (_) {}
   }
-
-  Map<String, String> get _authHeader => {
-    'Authorization': 'Bearer ${AuthStorage.accessToken}',
-  };
 
   void _onScroll() {
     if (_scrollController.position.pixels >=
@@ -92,23 +89,31 @@ class _FollowingScreenState extends State<FollowingScreen> {
     });
 
     try {
-      final allItems = await FeedService.fetchFeed(
+      final bundle = await HashtagFeedService.fetchByTag(
+        tag: _normalizedTag,
         page: _page,
-        scope: 'following',
-        kinds: const ['post', 'reel'],
       );
       if (!mounted) return;
 
-      final visibleItems = allItems.where((p) => !_isAdItem(p)).toList();
+      final merged = <FeedPost>[...bundle.posts, ...bundle.reels];
+      merged.sort((a, b) {
+        final aTime =
+            DateTime.tryParse(a.createdAt)?.millisecondsSinceEpoch ?? 0;
+        final bTime =
+            DateTime.tryParse(b.createdAt)?.millisecondsSinceEpoch ?? 0;
+        return bTime.compareTo(aTime);
+      });
 
-      final expectedLimit = _page * FeedService.pageSize;
+      final expectedLimit = _page * HashtagFeedService.pageSize;
 
       setState(() {
         final existingIds = {for (final s in _items) s.post.id};
-        final fresh = visibleItems.where((p) => !existingIds.contains(p.id));
+        final fresh = merged.where((p) => !existingIds.contains(p.id));
         _items.addAll(fresh.map((p) => FeedPostState(post: p)));
         _page++;
-        _hasMore = allItems.length >= expectedLimit;
+        _hasMore =
+            bundle.posts.length >= expectedLimit ||
+            bundle.reels.length >= expectedLimit;
         _initialLoad = false;
       });
     } on ApiException catch (e) {
@@ -120,30 +125,13 @@ class _FollowingScreenState extends State<FollowingScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load following feed.';
+        _error = 'Failed to load hashtag feed.';
         _initialLoad = false;
       });
     } finally {
       if (!mounted) return;
       setState(() => _loading = false);
     }
-  }
-
-  void _trackView(FeedPostState state) {
-    final id = state.post.id;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final last = _viewCooldownMap[id] ?? 0;
-    if (now - last < _kViewCooldownMs) return;
-    _viewCooldownMap[id] = now;
-    PostInteractionService.view(id).catchError((_) {
-      _viewCooldownMap.remove(id);
-    });
-  }
-
-  bool _isAdItem(FeedPost post) {
-    if ((post.kind).toLowerCase() == 'ad') return true;
-    if (post.sponsored == true) return true;
-    return _adMarkerRegex.hasMatch(post.content);
   }
 
   void _showSnack(String message, {bool error = false}) {
@@ -156,6 +144,17 @@ class _FollowingScreenState extends State<FollowingScreen> {
             : const Color(0xFF1A2235),
       ),
     );
+  }
+
+  void _trackView(FeedPostState state) {
+    final id = state.post.id;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final last = _viewCooldownMap[id] ?? 0;
+    if (now - last < _kViewCooldownMs) return;
+    _viewCooldownMap[id] = now;
+    PostInteractionService.view(id).catchError((_) {
+      _viewCooldownMap.remove(id);
+    });
   }
 
   Future<void> _onLike(FeedPostState state) async {
@@ -353,83 +352,24 @@ class _FollowingScreenState extends State<FollowingScreen> {
     setState(() => _items.remove(state));
     try {
       await PostInteractionService.hide(state.post.id);
+      _showSnack('Post hidden');
     } catch (_) {
       if (!mounted) return;
       setState(() => _items.add(state));
+      _showSnack('Failed to hide post', error: true);
     }
   }
 
-  Future<void> _onPostMenuAction(
-    PostMenuAction action,
-    FeedPostState state,
-  ) async {
-    final post = state.post;
-    switch (action) {
-      case PostMenuAction.followToggle:
-        final authorId = post.authorId;
-        if (authorId == null || authorId.isEmpty) return;
-        await _onFollow(authorId, !state.following);
-        return;
-      case PostMenuAction.saveToggle:
-        await _onSave(state);
-        return;
-      case PostMenuAction.hidePost:
-        await _onHide(state);
-        _showSnack('Post hidden');
-        return;
-      case PostMenuAction.copyLink:
-        final link = post.kind.toLowerCase() == 'reel'
-            ? PostInteractionService.reelPermalink(post.id)
-            : PostInteractionService.permalink(post.id);
-        await Clipboard.setData(ClipboardData(text: link));
-        _showSnack('Link copied');
-        return;
-      case PostMenuAction.reportPost:
-        final token = AuthStorage.accessToken;
-        if (token == null) {
-          _showSnack('Please sign in first', error: true);
-          return;
-        }
-        final reported = await showReportPostSheet(
-          context,
-          postId: post.id,
-          authHeader: {'Authorization': 'Bearer $token'},
-        );
-        if (reported) _showSnack('Report submitted');
-        return;
-      case PostMenuAction.blockAccount:
-        final userId = post.authorId;
-        if (userId == null || userId.isEmpty) return;
-        try {
-          await PostInteractionService.blockUser(userId);
-          if (!mounted) return;
-          setState(() {
-            _items.removeWhere((s) => s.post.authorId == userId);
-          });
-          _showSnack('Account blocked');
-        } catch (_) {
-          _showSnack('Failed to block account', error: true);
-        }
-        return;
-      case PostMenuAction.deletePost:
-        final snapshot = state;
-        setState(() => _items.removeWhere((s) => s.post.id == post.id));
-        try {
-          await PostInteractionService.deletePost(post.id);
-          _showSnack('Post deleted');
-        } catch (_) {
-          if (!mounted) return;
-          setState(() => _items.insert(0, snapshot));
-          _showSnack('Failed to delete post', error: true);
-        }
-        return;
-      case PostMenuAction.editPost:
-      case PostMenuAction.editVisibility:
-      case PostMenuAction.toggleComments:
-      case PostMenuAction.toggleHideLike:
-        _showSnack('This action is not available in Following yet');
-        return;
-    }
+  FeedPostState? _findState(String postId) {
+    final idx = _items.indexWhere((s) => s.post.id == postId);
+    if (idx < 0) return null;
+    return _items[idx];
+  }
+
+  void _replaceState(String postId, FeedPostState next) {
+    final idx = _items.indexWhere((s) => s.post.id == postId);
+    if (idx < 0) return;
+    setState(() => _items[idx] = next);
   }
 
   Future<void> _onFollow(String authorId, bool nextFollow) async {
@@ -455,7 +395,224 @@ class _FollowingScreenState extends State<FollowingScreen> {
     }
   }
 
+  Future<void> _onPostMenuAction(
+    PostMenuAction action,
+    FeedPostState state,
+  ) async {
+    final post = state.post;
+    switch (action) {
+      case PostMenuAction.editPost:
+        final updated = await showEditPostSheet(
+          context,
+          post: post,
+          entityLabel: post.kind == 'reel' ? 'reel' : 'post',
+        );
+        if (updated == null) return;
+        _replaceState(
+          post.id,
+          state.copyWith(
+            post: updated,
+            liked: updated.liked ?? state.liked,
+            saved: updated.saved ?? state.saved,
+            following: updated.following ?? state.following,
+            stats: updated.stats,
+          ),
+        );
+        _showSnack('Post updated');
+        return;
+      case PostMenuAction.editVisibility:
+        final nextVisibility = await showEditVisibilitySheet(
+          context,
+          postId: post.id,
+          currentVisibility: post.visibility ?? 'public',
+        );
+        if (nextVisibility == null) return;
+        _replaceState(
+          post.id,
+          state.copyWith(post: post.copyWith(visibility: nextVisibility)),
+        );
+        _showSnack('Visibility updated');
+        return;
+      case PostMenuAction.toggleComments:
+        final currentAllowed = post.allowComments != false;
+        final nextAllowed = !currentAllowed;
+        _replaceState(
+          post.id,
+          state.copyWith(post: post.copyWith(allowComments: nextAllowed)),
+        );
+        try {
+          await PostInteractionService.setAllowComments(post.id, nextAllowed);
+          _showSnack(
+            nextAllowed ? 'Comments turned on' : 'Comments turned off',
+          );
+        } catch (_) {
+          _replaceState(
+            post.id,
+            state.copyWith(post: post.copyWith(allowComments: currentAllowed)),
+          );
+          _showSnack('Failed to update comments', error: true);
+        }
+        return;
+      case PostMenuAction.toggleHideLike:
+        final currentHidden = post.hideLikeCount == true;
+        final nextHidden = !currentHidden;
+        _replaceState(
+          post.id,
+          state.copyWith(post: post.copyWith(hideLikeCount: nextHidden)),
+        );
+        try {
+          await PostInteractionService.setHideLikeCount(post.id, nextHidden);
+          _showSnack(nextHidden ? 'Like count hidden' : 'Like count visible');
+        } catch (_) {
+          _replaceState(
+            post.id,
+            state.copyWith(post: post.copyWith(hideLikeCount: currentHidden)),
+          );
+          _showSnack('Failed to update like visibility', error: true);
+        }
+        return;
+      case PostMenuAction.followToggle:
+        final authorId = post.authorId;
+        if (authorId == null || authorId.isEmpty) return;
+        await _onFollow(authorId, !state.following);
+        return;
+      case PostMenuAction.saveToggle:
+        await _onSave(state);
+        return;
+      case PostMenuAction.hidePost:
+        await _onHide(state);
+        return;
+      case PostMenuAction.copyLink:
+        final link = post.kind.toLowerCase() == 'reel'
+            ? PostInteractionService.reelPermalink(post.id)
+            : PostInteractionService.permalink(post.id);
+        await Clipboard.setData(ClipboardData(text: link));
+        _showSnack('Link copied');
+        return;
+      case PostMenuAction.reportPost:
+        final token = AuthStorage.accessToken;
+        if (token == null) {
+          _showSnack('Please sign in first', error: true);
+          return;
+        }
+        final reported = await showReportPostSheet(
+          context,
+          postId: post.id,
+          authHeader: {'Authorization': 'Bearer $token'},
+        );
+        if (reported) _showSnack('Report submitted');
+        return;
+      case PostMenuAction.deletePost:
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF111827),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: const Text(
+              'Delete post',
+              style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
+            ),
+            content: const Text(
+              'This action cannot be undone.',
+              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Color(0xFF7A8BB0)),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+
+        final snapshot = _findState(post.id);
+        setState(() => _items.removeWhere((s) => s.post.id == post.id));
+        try {
+          await PostInteractionService.deletePost(post.id);
+          _showSnack('Post deleted');
+        } catch (_) {
+          if (!mounted) return;
+          if (snapshot != null) {
+            setState(() => _items.insert(0, snapshot));
+          }
+          _showSnack('Failed to delete post', error: true);
+        }
+        return;
+      case PostMenuAction.blockAccount:
+        final userId = post.authorId;
+        if (userId == null || userId.isEmpty) return;
+        final username =
+            post.authorUsername ?? post.author?.username ?? post.displayName;
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF111827),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: Text(
+              'Block @$username?',
+              style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
+            ),
+            content: const Text(
+              'You will no longer see posts from this account.',
+              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Color(0xFF7A8BB0)),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Block',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+
+        try {
+          await PostInteractionService.blockUser(userId);
+          if (!mounted) return;
+          setState(() {
+            _items.removeWhere((s) => s.post.authorId == userId);
+          });
+          _showSnack('Account blocked');
+        } catch (_) {
+          _showSnack('Failed to block account', error: true);
+        }
+        return;
+    }
+  }
+
   void _openAuthor(String authorId) {
+    if (authorId.isEmpty) return;
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => ProfileScreen(userId: authorId)));
@@ -473,16 +630,121 @@ class _FollowingScreenState extends State<FollowingScreen> {
     );
   }
 
+  Map<String, dynamic> _toViewerItem(FeedPost post) {
+    final author = post.author;
+    return {
+      'id': post.id,
+      'kind': post.kind,
+      'content': post.content,
+      'media': post.media
+          .map(
+            (m) => <String, dynamic>{
+              'type': m.type,
+              'url': m.url,
+              'originalUrl': m.originalUrl,
+              'originalSecureUrl': m.originalSecureUrl,
+              'moderationDecision': m.moderationDecision,
+            },
+          )
+          .toList(),
+      'hashtags': post.hashtags,
+      'stats': {
+        'hearts': post.stats.hearts,
+        'comments': post.stats.comments,
+        'saves': post.stats.saves,
+        'reposts': post.stats.reposts,
+        'views': post.stats.views,
+        'impressions': post.stats.impressions,
+      },
+      'createdAt': post.createdAt,
+      'location': post.location,
+      'authorId': post.authorId,
+      'authorUsername': post.authorUsername,
+      'authorDisplayName': post.authorDisplayName,
+      'authorAvatarUrl': post.authorAvatarUrl,
+      'authorIsCreatorVerified':
+          post.authorIsCreatorVerified ?? author?.isCreatorVerified,
+      'author': {
+        'id': author?.id ?? post.authorId,
+        'username': author?.username ?? post.authorUsername,
+        'displayName': author?.displayName ?? post.authorDisplayName,
+        'avatarUrl': author?.avatarUrl ?? post.authorAvatarUrl,
+        'isCreatorVerified':
+            author?.isCreatorVerified ?? post.authorIsCreatorVerified,
+      },
+      'liked': post.liked,
+      'saved': post.saved,
+      'following': post.following,
+      'repostOf': post.repostOf,
+      'allowComments': post.allowComments,
+      'allowDownload': post.allowDownload,
+      'hideLikeCount': post.hideLikeCount,
+      'visibility': post.visibility,
+      'primaryVideoDurationMs': post.primaryVideoDurationMs,
+      'repostOfAuthorId': post.repostOfAuthorId,
+      'repostOfAuthorDisplayName': post.repostOfAuthorDisplayName,
+      'repostOfAuthorUsername': post.repostOfAuthorUsername,
+      'repostOfAuthorAvatarUrl': post.repostOfAuthorAvatarUrl,
+      'repostOfAuthor': post.repostOfAuthor == null
+          ? null
+          : {
+              'id': post.repostOfAuthor!.id,
+              'username': post.repostOfAuthor!.username,
+              'displayName': post.repostOfAuthor!.displayName,
+              'avatarUrl': post.repostOfAuthor!.avatarUrl,
+              'isCreatorVerified': post.repostOfAuthor!.isCreatorVerified,
+            },
+    };
+  }
+
   void _openReel(FeedPost reel) {
+    final reels = _items
+        .map((s) => s.post)
+        .where((p) => p.kind.toLowerCase() == 'reel')
+        .toList(growable: false);
+    final initialIndex = reels.indexWhere((r) => r.id == reel.id);
+    final reelMaps = reels.map(_toViewerItem).toList(growable: false);
+
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ReelsScreen(scope: 'following', initialReelId: reel.id),
+        builder: (_) => ProfileReelViewerScreen(
+          items: reelMaps,
+          initialIndex: initialIndex >= 0 ? initialIndex : 0,
+          viewerId: _viewerId,
+        ),
       ),
     );
   }
 
+  void _openHashtag(String tag) {
+    final normalized = tag.replaceAll('#', '').trim().toLowerCase();
+    if (normalized.isEmpty) return;
+    if (normalized == _normalizedTag) return;
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => HashtagScreen(tag: normalized)));
+  }
+
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B1020),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0B1020),
+        elevation: 0,
+        title: Text(
+          '#$_normalizedTag',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
     if (_initialLoad && _loading) {
       return const Center(
         child: CircularProgressIndicator(color: Color(0xFF4AA3E4)),
@@ -490,14 +752,17 @@ class _FollowingScreenState extends State<FollowingScreen> {
     }
 
     if (_error != null && _items.isEmpty) {
-      return _FollowingErrorState(
+      return _HashtagErrorState(
         message: _error!,
         onRetry: () => _loadFeed(refresh: true),
       );
     }
 
     if (!_initialLoad && _items.isEmpty && !_loading) {
-      return _FollowingEmptyState(onRefresh: () => _loadFeed(refresh: true));
+      return _HashtagEmptyState(
+        tag: _normalizedTag,
+        onRefresh: () => _loadFeed(refresh: true),
+      );
     }
 
     return RefreshIndicator(
@@ -521,12 +786,12 @@ class _FollowingScreenState extends State<FollowingScreen> {
 
           final state = _items[index];
           if (state.post.kind.toLowerCase() == 'reel') {
-            final revealed = _revealedReels.contains(state.post.id);
-            return _ReelFeedCard(
+            final revealed = _revealedReelPostIds.contains(state.post.id);
+            return _HashtagReelCard(
               post: state.post,
               revealed: revealed,
               onReveal: () {
-                setState(() => _revealedReels.add(state.post.id));
+                setState(() => _revealedReelPostIds.add(state.post.id));
               },
               onTap: () => _openReel(state.post),
             );
@@ -545,6 +810,7 @@ class _FollowingScreenState extends State<FollowingScreen> {
             onComment: () => _openPostDetail(state),
             onMenuAction: (action, postState) =>
                 _onPostMenuAction(action, postState),
+            onHashtagTap: _openHashtag,
           );
         },
       ),
@@ -552,8 +818,8 @@ class _FollowingScreenState extends State<FollowingScreen> {
   }
 }
 
-class _ReelFeedCard extends StatelessWidget {
-  const _ReelFeedCard({
+class _HashtagReelCard extends StatelessWidget {
+  const _HashtagReelCard({
     required this.post,
     required this.revealed,
     required this.onTap,
@@ -574,8 +840,6 @@ class _ReelFeedCard extends StatelessWidget {
     final displayName =
         post.authorDisplayName ?? post.authorUsername ?? 'Unknown';
     final subtitle = '@${post.authorUsername ?? 'user'}';
-
-    final previewUrl = _previewUrl(media: media, revealed: revealed);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -598,7 +862,7 @@ class _ReelFeedCard extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       Image.network(
-                        previewUrl,
+                        _previewUrl(media: media, revealed: revealed),
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) =>
                             const ColoredBox(color: Color(0xFF1E293B)),
@@ -750,8 +1014,8 @@ class _ReelFeedCard extends StatelessWidget {
   }
 }
 
-class _FollowingErrorState extends StatelessWidget {
-  const _FollowingErrorState({required this.message, required this.onRetry});
+class _HashtagErrorState extends StatelessWidget {
+  const _HashtagErrorState({required this.message, required this.onRetry});
 
   final String message;
   final Future<void> Function() onRetry;
@@ -780,9 +1044,10 @@ class _FollowingErrorState extends StatelessWidget {
   }
 }
 
-class _FollowingEmptyState extends StatelessWidget {
-  const _FollowingEmptyState({required this.onRefresh});
+class _HashtagEmptyState extends StatelessWidget {
+  const _HashtagEmptyState({required this.tag, required this.onRefresh});
 
+  final String tag;
   final Future<void> Function() onRefresh;
 
   @override
@@ -793,21 +1058,16 @@ class _FollowingEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.people_outline, color: Colors.white54, size: 42),
+            const Icon(Icons.tag, color: Colors.white54, size: 42),
             const SizedBox(height: 10),
-            const Text(
-              'No following posts yet',
-              style: TextStyle(
+            Text(
+              'No posts found for #$tag',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Follow more creators to fill this feed.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 14),
             ElevatedButton(onPressed: onRefresh, child: const Text('Refresh')),

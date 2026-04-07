@@ -6,6 +6,7 @@ import '../../core/services/auth_storage.dart';
 import '../auth/login_screen.dart';
 import '../explore/explore_screen.dart';
 import '../following/following_screen.dart';
+import '../hashtag/hashtag_screen.dart';
 import '../post/create_tab_screen.dart';
 import '../post/post_detail_screen.dart';
 import '../post/utils/post_edit_utils.dart';
@@ -769,6 +770,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _openHashtag(String hashtag) {
+    final normalized = hashtag.replaceAll('#', '').trim().toLowerCase();
+    if (normalized.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => HashtagScreen(tag: normalized)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -997,6 +1006,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 onView: () => _onView(itemState.post.id),
                 onFollow: _onFollow,
                 onAuthorTap: _openUserProfile,
+                onHashtagTap: _openHashtag,
                 onComment: () => _openPostDetail(itemState),
                 onMenuAction: _onPostMenuAction,
               );

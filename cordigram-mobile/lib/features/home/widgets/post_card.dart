@@ -160,6 +160,7 @@ class PostCard extends StatefulWidget {
     this.viewerId,
     this.onFollow,
     this.onAuthorTap,
+    this.onHashtagTap,
     this.onComment,
     this.onMenuAction,
     this.fullWidth = false,
@@ -184,6 +185,9 @@ class PostCard extends StatefulWidget {
 
   /// Called when the user taps the post author's avatar/username.
   final void Function(String authorId)? onAuthorTap;
+
+  /// Called when the user taps a hashtag chip.
+  final void Function(String hashtag)? onHashtagTap;
 
   /// Called when the user taps the Comment button. If null the button is a
   /// no-op (e.g. when already on the post detail screen).
@@ -473,7 +477,10 @@ class _PostCardState extends State<PostCard> {
               ],
               if (post.hashtags.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                _HashtagRow(hashtags: post.hashtags),
+                _HashtagRow(
+                  hashtags: post.hashtags,
+                  onTap: widget.onHashtagTap,
+                ),
               ],
               if (post.media.isNotEmpty) ...[
                 const SizedBox(height: 12),
@@ -939,8 +946,9 @@ class _PostContentState extends State<_PostContent> {
 // ── Hashtag chips ─────────────────────────────────────────────────────────────
 
 class _HashtagRow extends StatelessWidget {
-  const _HashtagRow({required this.hashtags});
+  const _HashtagRow({required this.hashtags, this.onTap});
   final List<String> hashtags;
+  final void Function(String hashtag)? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -949,21 +957,27 @@ class _HashtagRow extends StatelessWidget {
       runSpacing: 4,
       children: hashtags.map((tag) {
         final label = tag.startsWith('#') ? tag : '#$tag';
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: const Color(0xFF4AA3E4).withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: const Color(0xFF4AA3E4).withValues(alpha: 0.35),
+        final normalized = label.replaceFirst(RegExp(r'^#+'), '').trim();
+        return GestureDetector(
+          onTap: onTap != null && normalized.isNotEmpty
+              ? () => onTap!(normalized)
+              : null,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF4AA3E4).withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: const Color(0xFF4AA3E4).withValues(alpha: 0.35),
+              ),
             ),
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF4AA3E4),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF4AA3E4),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         );
