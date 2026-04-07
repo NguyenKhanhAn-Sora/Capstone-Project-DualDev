@@ -27,6 +27,15 @@ class MediaCarousel extends StatefulWidget {
 class _MediaCarouselState extends State<MediaCarousel> {
   final PageController _pageController = PageController();
   int _currentIndex = 0;
+  final Map<String, bool> _revealedMap = {};
+
+  FeedMedia get _currentMedia => widget.media[_currentIndex];
+  String get _currentMediaKey => _currentMedia.url;
+  bool get _shouldRevealCurrent =>
+      _revealedMap[_currentMediaKey] == true &&
+      _currentMedia.isBlurredByModeration;
+  bool get _showModerationRevealOverlay =>
+      _currentMedia.isBlurredByModeration && !_shouldRevealCurrent;
 
   @override
   void dispose() {
@@ -130,6 +139,12 @@ class _MediaCarouselState extends State<MediaCarousel> {
     }
   }
 
+  void _revealCurrentMedia() {
+    setState(() {
+      _revealedMap[_currentMediaKey] = true;
+    });
+  }
+
   Future<Directory> _resolveDownloadDirectory() async {
     if (Platform.isAndroid) {
       final direct = Directory('/storage/emulated/0/Download');
@@ -202,9 +217,66 @@ class _MediaCarouselState extends State<MediaCarousel> {
                   itemBuilder: (_, i) => GestureDetector(
                     onTap: () => _openViewer(i),
                     onLongPress: () => _showMediaActions(media[i]),
-                    child: _MediaItem(media: media[i]),
+                    child: _MediaItem(
+                      media: media[i],
+                      revealed: _revealedMap[media[i].url] == true,
+                    ),
                   ),
                 ),
+                if (_showModerationRevealOverlay)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      ignoring: false,
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        alignment: Alignment.center,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 18),
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFF2A3345,
+                            ).withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'This image has been blurred due to violation of our standards.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Color(0xFFE8ECF8),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              ElevatedButton(
+                                onPressed: _revealCurrentMedia,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0F1F3B),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 8,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: const Text('View image'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 // Prev button
                 if (!isSingle && _currentIndex > 0)
                   _NavButton(
@@ -327,6 +399,15 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
   late final PageController _pageController;
   // Track whether the current page is zoomed in — disables PageView swipe
   bool _isZoomed = false;
+  final Map<String, bool> _revealedMap = {};
+
+  FeedMedia get _currentMedia => widget.media[_index];
+  String get _currentMediaKey => _currentMedia.url;
+  bool get _shouldRevealCurrent =>
+      _revealedMap[_currentMediaKey] == true &&
+      _currentMedia.isBlurredByModeration;
+  bool get _showModerationRevealOverlay =>
+      _currentMedia.isBlurredByModeration && !_shouldRevealCurrent;
 
   @override
   void initState() {
@@ -408,6 +489,12 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
     await widget.onDownloadRequested(item);
   }
 
+  void _revealCurrentMedia() {
+    setState(() {
+      _revealedMap[_currentMediaKey] = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final media = widget.media;
@@ -452,7 +539,9 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 980),
                               child: _ZoomableImage(
-                                url: item.url,
+                                url: item.displayUrl(
+                                  revealed: _revealedMap[item.url] == true,
+                                ),
                                 onZoomChanged: (zoomed) {
                                   // Only update if this is the current visible page
                                   if (i == _index && zoomed != _isZoomed) {
@@ -467,6 +556,60 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
                     );
                   },
                 ),
+                if (_showModerationRevealOverlay)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      ignoring: false,
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.24),
+                        alignment: Alignment.center,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 22),
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFF2A3345,
+                            ).withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'This image has been blurred due to violation of our standards.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Color(0xFFE8ECF8),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              ElevatedButton(
+                                onPressed: _revealCurrentMedia,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0F1F3B),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 8,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: const Text('View image'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
 
                 // ── Close button — top-right ─────────────────────────────
                 Positioned(
@@ -670,14 +813,15 @@ class _OverlayIconButton extends StatelessWidget {
 }
 
 class _MediaItem extends StatelessWidget {
-  const _MediaItem({required this.media});
+  const _MediaItem({required this.media, required this.revealed});
   final FeedMedia media;
+  final bool revealed;
 
   @override
   Widget build(BuildContext context) {
     // object-fit: contain — shows full image, letterboxed with dark background
     return Image.network(
-      media.url,
+      media.displayUrl(revealed: revealed),
       fit: BoxFit.contain,
       width: double.infinity,
       height: double.infinity,

@@ -37,6 +37,7 @@ class ReelsScreen extends StatefulWidget {
 
 class _ReelsScreenState extends State<ReelsScreen> {
   final List<FeedPostState> _reels = [];
+  final Set<String> _revealedMediaPostIds = <String>{};
 
   /// Map of page-index → VideoPlayerController (lazily initialized).
   final Map<int, VideoPlayerController> _controllers = {};
@@ -149,7 +150,9 @@ class _ReelsScreenState extends State<ReelsScreen> {
     if (_controllers.containsKey(index)) return;
 
     final videoUrl = _reels[index].post.media.isNotEmpty
-        ? _reels[index].post.media.first.url
+        ? _reels[index].post.media.first.displayUrl(
+            revealed: _revealedMediaPostIds.contains(_reels[index].post.id),
+          )
         : null;
     if (videoUrl == null || videoUrl.isEmpty) return;
 
@@ -204,6 +207,33 @@ class _ReelsScreenState extends State<ReelsScreen> {
     } catch (_) {
       _controllers.remove(index)?.dispose();
     }
+  }
+
+  bool _isBlurredMediaAt(int index) {
+    if (index < 0 || index >= _reels.length) return false;
+    final post = _reels[index].post;
+    if (post.media.isEmpty) return false;
+    final media = post.media.first;
+    return media.isBlurredByModeration &&
+        !_revealedMediaPostIds.contains(post.id);
+  }
+
+  Future<void> _revealMediaAt(int index) async {
+    if (index < 0 || index >= _reels.length) return;
+    final post = _reels[index].post;
+    if (post.media.isEmpty || !post.media.first.isBlurredByModeration) return;
+
+    setState(() {
+      _revealedMediaPostIds.add(post.id);
+    });
+
+    _controllers.remove(index)?.dispose();
+    await _ensureControllerInitialized(index);
+    if (!mounted) return;
+    if (index == _currentPage) {
+      _controllers[index]?.play();
+    }
+    setState(() {});
   }
 
   void _disposeDistantControllers(int currentPage) {
@@ -910,6 +940,8 @@ class _ReelsScreenState extends State<ReelsScreen> {
               onFollow: () => _onFollow(index),
               onMenuAction: (action) => _onReelMenuAction(index, action),
               onDownloadReel: () => _downloadReelAt(index),
+              showModerationRevealOverlay: _isBlurredMediaAt(index),
+              onRevealMedia: () => _revealMediaAt(index),
             ),
           ),
           // Loading indicator when fetching more reels.
@@ -953,6 +985,8 @@ class _ReelPage extends StatefulWidget {
     required this.onFollow,
     required this.onMenuAction,
     required this.onDownloadReel,
+    required this.showModerationRevealOverlay,
+    required this.onRevealMedia,
   });
 
   final FeedPostState state;
@@ -968,6 +1002,8 @@ class _ReelPage extends StatefulWidget {
   final VoidCallback onFollow;
   final Future<void> Function(PostMenuAction action) onMenuAction;
   final Future<void> Function() onDownloadReel;
+  final bool showModerationRevealOverlay;
+  final VoidCallback onRevealMedia;
 
   @override
   State<_ReelPage> createState() => _ReelPageState();
@@ -1176,6 +1212,52 @@ class _ReelPageState extends State<_ReelPage> {
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 color: Colors.white54,
+              ),
+            ),
+
+          if (widget.showModerationRevealOverlay)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.22),
+                alignment: Alignment.center,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A3345).withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'This image has been blurred due to violation of our standards.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFFE8ECF8),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: widget.onRevealMedia,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F1F3B),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('View image'),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
 

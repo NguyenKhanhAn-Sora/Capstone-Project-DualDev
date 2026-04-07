@@ -2568,7 +2568,7 @@ class _ProfileTabContent extends StatelessWidget {
 
 // ── Grid tile ─────────────────────────────────────────────────────────────────
 
-class _GridTile extends StatelessWidget {
+class _GridTile extends StatefulWidget {
   const _GridTile({
     required this.item,
     required this.onTap,
@@ -2578,6 +2578,13 @@ class _GridTile extends StatelessWidget {
   final Map<String, dynamic> item;
   final VoidCallback onTap;
   final bool showRepostBadge;
+
+  @override
+  State<_GridTile> createState() => _GridTileState();
+}
+
+class _GridTileState extends State<_GridTile> {
+  bool _revealed = false;
 
   /// Convert a Cloudinary video URL to a static thumbnail image URL.
   /// e.g. .../video/upload/v123/file.mp4 → .../video/upload/so_0/v123/file.jpg
@@ -2592,11 +2599,50 @@ class _GridTile extends StatelessWidget {
     return '${before}so_0/$pathNoExt.jpg';
   }
 
+  static String? _pickString(List<dynamic> values) {
+    for (final v in values) {
+      if (v is String) {
+        final s = v.trim();
+        if (s.isNotEmpty) return s;
+      }
+    }
+    return null;
+  }
+
+  static Map<String, dynamic>? _asStringMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      return raw.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return null;
+  }
+
   String? _thumbnailUrl() {
-    final media = item['media'] as List?;
+    final media = widget.item['media'] as List?;
     if (media != null && media.isNotEmpty) {
       final first = media[0] as Map?;
       if (first != null) {
+        final meta = _asStringMap(first['metadata']);
+        final decision = _pickString([
+          first['moderationDecision'],
+          meta?['moderationDecision'],
+        ]);
+        final originalUrl = _pickString([
+          first['originalSecureUrl'],
+          meta?['originalSecureUrl'],
+          first['originalUrl'],
+          meta?['originalUrl'],
+        ]);
+        final isBlurred =
+            (decision ?? '').toLowerCase() == 'blur' &&
+            originalUrl != null &&
+            originalUrl.isNotEmpty;
+        if (_revealed && isBlurred) {
+          return originalUrl.startsWith('http://')
+              ? 'https://${originalUrl.substring(7)}'
+              : originalUrl;
+        }
+
         final thumb = first['thumbnailUrl'] as String?;
         if (thumb != null && thumb.isNotEmpty) return thumb;
         final url = first['url'] as String?;
@@ -2607,17 +2653,39 @@ class _GridTile extends StatelessWidget {
         return url;
       }
     }
-    final thumbnail = item['thumbnail'] as String?;
+    final thumbnail = widget.item['thumbnail'] as String?;
     if (thumbnail != null) return thumbnail;
-    final coverImage = item['coverImage'] as String?;
+    final coverImage = widget.item['coverImage'] as String?;
     if (coverImage != null) return coverImage;
     return null;
   }
 
+  bool _isBlurredByModeration() {
+    final media = widget.item['media'] as List?;
+    if (media == null || media.isEmpty) return false;
+    final first = media.first;
+    if (first is! Map) return false;
+    final map = _asStringMap(first);
+    final meta = _asStringMap(map?['metadata']);
+    final decision = _pickString([
+      map?['moderationDecision'],
+      meta?['moderationDecision'],
+    ]);
+    final original = _pickString([
+      map?['originalSecureUrl'],
+      meta?['originalSecureUrl'],
+      map?['originalUrl'],
+      meta?['originalUrl'],
+    ]);
+    return (decision ?? '').toLowerCase() == 'blur' &&
+        original != null &&
+        original.isNotEmpty;
+  }
+
   bool _isVideo() {
-    final kind = item['kind'] as String?;
+    final kind = widget.item['kind'] as String?;
     if (kind == 'reel') return true;
-    final media = item['media'] as List?;
+    final media = widget.item['media'] as List?;
     if (media != null && media.isNotEmpty) {
       final first = media[0] as Map?;
       if (first != null && first['type'] == 'video') return true;
@@ -2639,11 +2707,12 @@ class _GridTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final thumb = _thumbnailUrl();
-    final views = (item['stats'] as Map?)?['views'];
+    final views = (widget.item['stats'] as Map?)?['views'];
     final isVideo = _isVideo();
+    final showRevealOverlay = _isBlurredByModeration() && !_revealed;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -2671,7 +2740,7 @@ class _GridTile extends StatelessWidget {
             ),
 
           // Repost badge (top-left)
-          if (showRepostBadge)
+          if (widget.showRepostBadge)
             const Positioned(
               top: 6,
               left: 6,
@@ -2679,6 +2748,59 @@ class _GridTile extends StatelessWidget {
             ),
 
           // Views count (bottom-left)
+          if (showRevealOverlay)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.22),
+                alignment: Alignment.center,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A3345).withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'This image has been blurred due to violation of our standards.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFFE8ECF8),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ElevatedButton(
+                        onPressed: () => setState(() => _revealed = true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F1F3B),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        child: const Text('View image'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           if (views != null)
             Positioned(
               bottom: 4,

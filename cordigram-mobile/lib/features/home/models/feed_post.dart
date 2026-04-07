@@ -1,8 +1,43 @@
 class FeedMedia {
-  const FeedMedia({required this.type, required this.url});
+  const FeedMedia({
+    required this.type,
+    required this.url,
+    this.originalUrl,
+    this.originalSecureUrl,
+    this.moderationDecision,
+  });
 
   final String type; // "image" | "video"
   final String url;
+  final String? originalUrl;
+  final String? originalSecureUrl;
+  final String? moderationDecision;
+
+  bool get isBlurredByModeration {
+    final decision = (moderationDecision ?? '').toLowerCase().trim();
+    return decision == 'blur' &&
+        ((originalSecureUrl?.isNotEmpty ?? false) ||
+            (originalUrl?.isNotEmpty ?? false));
+  }
+
+  String get originalBestUrl {
+    final secure = originalSecureUrl?.trim();
+    if (secure != null && secure.isNotEmpty) {
+      return secure.startsWith('http://')
+          ? 'https://${secure.substring(7)}'
+          : secure;
+    }
+    final raw = originalUrl?.trim();
+    if (raw != null && raw.isNotEmpty) {
+      return raw.startsWith('http://') ? 'https://${raw.substring(7)}' : raw;
+    }
+    return url;
+  }
+
+  String displayUrl({bool revealed = false}) {
+    if (isBlurredByModeration && revealed) return originalBestUrl;
+    return url;
+  }
 
   factory FeedMedia.fromJson(Map<String, dynamic> json) {
     // Prefer secureUrl (HTTPS) — Cloudinary returns both url (HTTP) and
@@ -13,7 +48,36 @@ class FeedMedia {
         '';
     // Normalize any leftover http:// → https://
     final url = raw.startsWith('http://') ? 'https://${raw.substring(7)}' : raw;
-    return FeedMedia(type: (json['type'] as String?) ?? 'image', url: url);
+    final metadata = json['metadata'] is Map<String, dynamic>
+        ? json['metadata'] as Map<String, dynamic>
+        : (json['metadata'] is Map
+              ? (json['metadata'] as Map).map(
+                  (k, v) => MapEntry(k.toString(), v),
+                )
+              : null);
+
+    final originalSecureRaw =
+        (json['originalSecureUrl'] as String?) ??
+        (metadata?['originalSecureUrl'] as String?);
+    final originalRaw =
+        (json['originalUrl'] as String?) ??
+        (metadata?['originalUrl'] as String?);
+    final decisionRaw =
+        (json['moderationDecision'] as String?) ??
+        (metadata?['moderationDecision'] as String?);
+
+    final originalSecure = originalSecureRaw?.trim();
+    final original = originalRaw?.trim();
+
+    return FeedMedia(
+      type: (json['type'] as String?) ?? 'image',
+      url: url,
+      originalSecureUrl: (originalSecure != null && originalSecure.isNotEmpty)
+          ? originalSecure
+          : null,
+      originalUrl: (original != null && original.isNotEmpty) ? original : null,
+      moderationDecision: decisionRaw?.trim(),
+    );
   }
 }
 

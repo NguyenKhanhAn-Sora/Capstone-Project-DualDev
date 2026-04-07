@@ -29,6 +29,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   final String _sessionId =
       '${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
   final Set<String> _sentImpressions = <String>{};
+  final Set<String> _revealedMediaKeys = <String>{};
 
   @override
   void initState() {
@@ -63,6 +64,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _hasMore = true;
         _items.clear();
         _sentImpressions.clear();
+        _revealedMediaKeys.clear();
         _initialLoading = true;
       }
     });
@@ -231,6 +233,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
       return const SizedBox.shrink();
     }
 
+    final mediaKey = '${item.id}:0';
+    final revealed = _revealedMediaKeys.contains(mediaKey);
+    final showRevealOverlay = media.isBlurredByModeration && !revealed;
+
     return SizedBox(
       height: tileHeight,
       child: VisibilityDetector(
@@ -248,7 +254,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               fit: StackFit.expand,
               children: [
                 Image.network(
-                  media.url,
+                  media.displayUrl(revealed: revealed),
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => const ColoredBox(
                     color: Color(0xFF1C2740),
@@ -308,6 +314,65 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         Icons.smart_display_outlined,
                         color: Colors.white,
                         size: 16,
+                      ),
+                    ),
+                  ),
+                if (showRevealOverlay)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.22),
+                      alignment: Alignment.center,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 10),
+                        padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
+                        decoration: BoxDecoration(
+                          color: const Color(
+                            0xFF2A3345,
+                          ).withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'This image has been blurred due to violation of our standards.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Color(0xFFE8ECF8),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _revealedMediaKeys.add(mediaKey);
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0F1F3B),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                textStyle: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text('View image'),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

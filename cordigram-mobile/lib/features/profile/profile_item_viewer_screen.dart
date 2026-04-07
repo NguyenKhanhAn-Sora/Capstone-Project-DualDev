@@ -438,6 +438,42 @@ class _ProfileReelViewerScreenState extends State<ProfileReelViewerScreen> {
   late final PageController _pageController;
   int _currentIndex = 0;
   final Map<int, VideoPlayerController> _controllers = {};
+  final Set<String> _revealedPostIds = <String>{};
+
+  String _itemIdAt(int index) {
+    if (index < 0 || index >= widget.items.length) return '';
+    return (widget.items[index]['id'] as String?) ?? '';
+  }
+
+  Map<String, dynamic>? _mediaAt(int index) {
+    if (index < 0 || index >= widget.items.length) return null;
+    final media = widget.items[index]['media'] as List?;
+    if (media == null || media.isEmpty) return null;
+    return _asStringKeyMap(media.first);
+  }
+
+  bool _isBlurredMediaAt(int index) {
+    final media = _mediaAt(index);
+    if (media == null) return false;
+    final meta = _asStringKeyMap(media['metadata']) ?? const {};
+    final decision =
+        _pickString([
+          media['moderationDecision'],
+          meta['moderationDecision'],
+        ]) ??
+        '';
+    final original = _pickString([
+      media['originalSecureUrl'],
+      meta['originalSecureUrl'],
+      media['originalUrl'],
+      meta['originalUrl'],
+    ]);
+    final id = _itemIdAt(index);
+    return decision.toLowerCase() == 'blur' &&
+        original != null &&
+        original.isNotEmpty &&
+        !_revealedPostIds.contains(id);
+  }
 
   @override
   void initState() {
@@ -461,10 +497,49 @@ class _ProfileReelViewerScreenState extends State<ProfileReelViewerScreen> {
   String? _videoUrl(Map<String, dynamic> item) {
     final media = item['media'] as List?;
     if (media != null && media.isNotEmpty) {
-      final first = media[0] as Map?;
-      return first?['url'] as String?;
+      final first = _asStringKeyMap(media[0]);
+      if (first == null) return null;
+      final id = (item['id'] as String?) ?? '';
+      final meta = _asStringKeyMap(first['metadata']) ?? const {};
+      final decision =
+          _pickString([
+            first['moderationDecision'],
+            meta['moderationDecision'],
+          ]) ??
+          '';
+      final original = _pickString([
+        first['originalSecureUrl'],
+        meta['originalSecureUrl'],
+        first['originalUrl'],
+        meta['originalUrl'],
+      ]);
+      if (decision.toLowerCase() == 'blur' &&
+          original != null &&
+          original.isNotEmpty &&
+          _revealedPostIds.contains(id)) {
+        return original.startsWith('http://')
+            ? 'https://${original.substring(7)}'
+            : original;
+      }
+      return first['url'] as String?;
     }
     return null;
+  }
+
+  Future<void> _revealMediaAt(int index) async {
+    if (index < 0 || index >= widget.items.length) return;
+    final id = _itemIdAt(index);
+    if (id.isEmpty) return;
+    setState(() {
+      _revealedPostIds.add(id);
+    });
+    _controllers.remove(index)?.dispose();
+    await _initController(index);
+    if (!mounted) return;
+    if (index == _currentIndex) {
+      _controllers[index]?.play();
+    }
+    setState(() {});
   }
 
   Future<void> _initController(int index) async {
@@ -553,6 +628,8 @@ class _ProfileReelViewerScreenState extends State<ProfileReelViewerScreen> {
                 profileDisplayName: widget.profileDisplayName,
                 profileAvatarUrl: widget.profileAvatarUrl,
                 profileUserId: widget.profileUserId,
+                showModerationRevealOverlay: _isBlurredMediaAt(index),
+                onRevealMedia: () => _revealMediaAt(index),
               ),
             ),
           ],
@@ -579,6 +656,8 @@ class _ItemPage extends StatefulWidget {
     this.profileDisplayName,
     this.profileAvatarUrl,
     this.profileUserId,
+    this.showModerationRevealOverlay = false,
+    this.onRevealMedia,
   });
 
   final Map<String, dynamic> item;
@@ -593,6 +672,8 @@ class _ItemPage extends StatefulWidget {
   final String? profileDisplayName;
   final String? profileAvatarUrl;
   final String? profileUserId;
+  final bool showModerationRevealOverlay;
+  final VoidCallback? onRevealMedia;
 
   @override
   State<_ItemPage> createState() => _ItemPageState();
@@ -608,6 +689,7 @@ class _ItemPageState extends State<_ItemPage> {
   bool _liked = false;
   bool _saved = false;
   bool _following = false;
+  final Map<String, bool> _revealedMediaKeys = {};
 
   void _showSnack(String message, {bool error = false}) {
     if (!mounted) return;
@@ -741,12 +823,52 @@ class _ItemPageState extends State<_ItemPage> {
   String? _mediaDisplayUrl(int index) {
     if (index < 0 || index >= _mediaItems.length) return null;
     final m = _mediaItems[index];
+    final original = _mediaOriginalUrl(index);
+    final shouldReveal =
+        _revealedMediaKeys[_mediaRevealKey(index)] == true &&
+        _isMediaBlurredByModeration(index);
+    if (shouldReveal && original != null) {
+      return original.startsWith('http://')
+          ? 'https://${original.substring(7)}'
+          : original;
+    }
     final type = (m['type'] as String?) ?? '';
     if (type == 'video') {
       final thumb = m['thumbnailUrl'] as String?;
       if (thumb != null && thumb.isNotEmpty) return thumb;
     }
     return m['url'] as String?;
+  }
+
+  String _mediaRevealKey(int index) {
+    if (index < 0 || index >= _mediaItems.length) return 'media-$index';
+    final m = _mediaItems[index];
+    return (m['url'] as String?) ?? 'media-$index';
+  }
+
+  String? _mediaOriginalUrl(int index) {
+    if (index < 0 || index >= _mediaItems.length) return null;
+    final m = _mediaItems[index];
+    final meta = _asStringKeyMap(m['metadata']) ?? const {};
+    return _pickString([
+      m['originalSecureUrl'],
+      meta['originalSecureUrl'],
+      m['originalUrl'],
+      meta['originalUrl'],
+    ]);
+  }
+
+  bool _isMediaBlurredByModeration(int index) {
+    if (index < 0 || index >= _mediaItems.length) return false;
+    final m = _mediaItems[index];
+    final meta = _asStringKeyMap(m['metadata']) ?? const {};
+    final decision =
+        _pickString([m['moderationDecision'], meta['moderationDecision']]) ??
+        '';
+    final original = _mediaOriginalUrl(index);
+    return decision.toLowerCase() == 'blur' &&
+        original != null &&
+        original.isNotEmpty;
   }
 
   int _asInt(dynamic v) {
@@ -1563,6 +1685,51 @@ class _ItemPageState extends State<_ItemPage> {
                 color: Colors.white54,
               ),
             ),
+          if (widget.showModerationRevealOverlay)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.22),
+                alignment: Alignment.center,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A3345).withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'This image has been blurred due to violation of our standards.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFFE8ECF8),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: widget.onRevealMedia,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F1F3B),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('View image'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           if (_showPauseIcon)
             Center(
               child: Container(
@@ -2058,6 +2225,10 @@ class _ItemPageState extends State<_ItemPage> {
   Widget _buildImagePage() {
     final mediaCount = _mediaItems.length;
     final hasMany = mediaCount > 1;
+    final currentIndex = mediaCount > 0 ? _mediaIndex : 0;
+    final showRevealOverlay =
+        _isMediaBlurredByModeration(currentIndex) &&
+        !(_revealedMediaKeys[_mediaRevealKey(currentIndex)] == true);
 
     return Stack(
       fit: StackFit.expand,
@@ -2081,34 +2252,91 @@ class _ItemPageState extends State<_ItemPage> {
                   ),
                 );
               }
-              return Center(
-                child: InteractiveViewer(
-                  minScale: 0.8,
-                  maxScale: 4.0,
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (_, child, progress) => progress == null
-                        ? child
-                        : Center(
-                            child: CircularProgressIndicator(
-                              value: progress.expectedTotalBytes != null
-                                  ? progress.cumulativeBytesLoaded /
-                                        progress.expectedTotalBytes!
-                                  : null,
-                              strokeWidth: 2,
-                              color: Colors.white54,
-                            ),
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  Center(
+                    child: InteractiveViewer(
+                      minScale: 0.8,
+                      maxScale: 4.0,
+                      child: Image.network(
+                        url,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (_, child, progress) => progress == null
+                            ? child
+                            : Center(
+                                child: CircularProgressIndicator(
+                                  value: progress.expectedTotalBytes != null
+                                      ? progress.cumulativeBytesLoaded /
+                                            progress.expectedTotalBytes!
+                                      : null,
+                                  strokeWidth: 2,
+                                  color: Colors.white54,
+                                ),
+                              ),
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            size: 56,
+                            color: Colors.white.withValues(alpha: 0.3),
                           ),
-                    errorBuilder: (_, __, ___) => Center(
-                      child: Icon(
-                        Icons.broken_image_outlined,
-                        size: 56,
-                        color: Colors.white.withValues(alpha: 0.3),
+                        ),
                       ),
                     ),
                   ),
-                ),
+                  if (i == _mediaIndex && showRevealOverlay)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.24),
+                        alignment: Alignment.center,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 18),
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFF2A3345,
+                            ).withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'This image has been blurred due to violation of our standards.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Color(0xFFE8ECF8),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              ElevatedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _revealedMediaKeys[_mediaRevealKey(i)] =
+                                        true;
+                                  });
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0F1F3B),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: const Text('View image'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
           )
