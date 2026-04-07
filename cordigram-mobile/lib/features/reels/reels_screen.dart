@@ -22,6 +22,7 @@ import '../home/widgets/post_card.dart' show PostMenuAction;
 import '../profile/profile_screen.dart';
 import '../post/post_detail_screen.dart' show CommentItem, CommentLinkPreview;
 import '../post/utils/post_edit_utils.dart';
+import '../post/utils/repost_flow_utils.dart';
 import '../report/report_comment_sheet.dart';
 import '../report/report_post_sheet.dart';
 
@@ -355,6 +356,119 @@ class _ReelsScreenState extends State<ReelsScreen> {
       });
       _showSnack('Failed to update save', error: true);
     });
+  }
+
+  String _resolveOriginalPostId(FeedPost post) {
+    final repostOf = post.repostOf;
+    if (repostOf != null && repostOf.isNotEmpty) return repostOf;
+    return post.id;
+  }
+
+  void _incrementRepostStatById(String postId) {
+    final idx = _reels.indexWhere((s) => s.post.id == postId);
+    if (idx < 0) return;
+    final s = _reels[idx];
+    setState(() {
+      s.stats = FeedStats(
+        hearts: s.stats.hearts,
+        comments: s.stats.comments,
+        saves: s.stats.saves,
+        reposts: (s.stats.reposts + 1).clamp(0, 999999999),
+        views: s.stats.views,
+        impressions: s.stats.impressions,
+      );
+    });
+  }
+
+  Future<void> _onRepost(int index) async {
+    if (index >= _reels.length) return;
+    final token = AuthStorage.accessToken;
+    if (token == null) {
+      _showSnack('Please sign in to repost', error: true);
+      return;
+    }
+
+    final state = _reels[index];
+    final post = state.post;
+    final originalId = _resolveOriginalPostId(post);
+    final targetId = post.id;
+
+    final selection = await showRepostFlowSheet(
+      context: context,
+      label: '@${post.authorUsername ?? post.displayName}',
+      kind: post.kind,
+      initialAllowDownload: post.allowDownload == true,
+    );
+    if (selection == null) return;
+
+    if (selection.action == RepostFlowAction.quick) {
+      try {
+        await PostInteractionService.quickRepost(originalId);
+        _incrementRepostStatById(originalId);
+        if (originalId != targetId) {
+          _incrementRepostStatById(targetId);
+          try {
+            await PostInteractionService.repost(targetId);
+          } catch (_) {}
+        }
+        _showSnack('Reposted');
+      } on ApiException catch (e) {
+        try {
+          await PostInteractionService.repost(originalId);
+          _incrementRepostStatById(originalId);
+          if (originalId != targetId) {
+            _incrementRepostStatById(targetId);
+            try {
+              await PostInteractionService.repost(targetId);
+            } catch (_) {}
+          }
+          _showSnack('Reposted');
+        } catch (_) {
+          _showSnack(
+            e.message.isNotEmpty ? e.message : 'Failed to repost',
+            error: true,
+          );
+        }
+      } catch (_) {
+        _showSnack('Failed to repost', error: true);
+      }
+      return;
+    }
+
+    final input = selection.quoteInput;
+    if (input == null) return;
+    final payload = RepostQuotePayload(
+      content: input.content,
+      hashtags: input.hashtags,
+      location: input.location,
+      visibility: input.visibility,
+      allowComments: input.allowComments,
+      allowDownload: post.allowDownload == true,
+      hideLikeCount: input.hideLikeCount,
+    );
+
+    try {
+      await PostInteractionService.quoteRepost(
+        originalPostId: originalId,
+        payload: payload,
+        kind: post.kind,
+      );
+      _incrementRepostStatById(originalId);
+      if (originalId != targetId) {
+        _incrementRepostStatById(targetId);
+        try {
+          await PostInteractionService.repost(targetId);
+        } catch (_) {}
+      }
+      _showSnack('Reposted with quote');
+    } on ApiException catch (e) {
+      _showSnack(
+        e.message.isNotEmpty ? e.message : 'Failed to repost with quote',
+        error: true,
+      );
+    } catch (_) {
+      _showSnack('Failed to repost with quote', error: true);
+    }
   }
 
   void _onFollow(int index) {
@@ -789,6 +903,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
               muted: _muted,
               viewerId: _viewerId,
               onLike: () => _onLike(index),
+              onRepost: () => _onRepost(index),
               onSave: () => _onSave(index),
               onComment: () => _openComments(index),
               onMuteToggle: _toggleMute,
@@ -831,6 +946,7 @@ class _ReelPage extends StatefulWidget {
     required this.muted,
     required this.viewerId,
     required this.onLike,
+    required this.onRepost,
     required this.onSave,
     required this.onComment,
     required this.onMuteToggle,
@@ -845,6 +961,7 @@ class _ReelPage extends StatefulWidget {
   final bool muted;
   final String? viewerId;
   final VoidCallback onLike;
+  final VoidCallback onRepost;
   final VoidCallback onSave;
   final VoidCallback onComment;
   final VoidCallback onMuteToggle;
@@ -1349,6 +1466,14 @@ class _ReelPageState extends State<_ReelPage> {
                       ? 'Off'
                       : _formatCount(widget.state.stats.comments),
                   onTap: commentsLocked ? () {} : widget.onComment,
+                ),
+                const SizedBox(height: 20),
+                // Repost
+                _ActionButton(
+                  icon: Icons.repeat_rounded,
+                  color: Colors.white,
+                  label: _formatCount(widget.state.stats.reposts),
+                  onTap: widget.onRepost,
                 ),
                 const SizedBox(height: 20),
                 // Save

@@ -7,6 +7,7 @@ import '../auth/login_screen.dart';
 import '../post/create_tab_screen.dart';
 import '../post/post_detail_screen.dart';
 import '../post/utils/post_edit_utils.dart';
+import '../post/utils/repost_flow_utils.dart';
 import '../profile/profile_screen.dart';
 import '../reels/reels_screen.dart';
 import '../report/report_problem_screen.dart';
@@ -361,7 +362,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _handleQuoteRepost(
     FeedPostState targetState,
-    _QuoteRepostInput input,
+    RepostQuoteInput input,
   ) async {
     if (AuthStorage.accessToken == null) {
       _showSnack('Please sign in to repost', error: true);
@@ -413,36 +414,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     try {
-      final label = state.post.authorUsername ?? state.post.displayName;
-      final action = await showModalBottomSheet<_RepostIntent>(
+      final label = '@${state.post.authorUsername ?? state.post.displayName}';
+      final selection = await showRepostFlowSheet(
         context: context,
-        backgroundColor: const Color(0xFF0B1732),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (_) => _RepostMenuSheet(label: '@$label · ${state.post.kind}'),
+        label: label,
+        kind: state.post.kind,
+        initialAllowDownload: state.post.allowDownload == true,
       );
-
-      if (action == null || action == _RepostIntent.cancel) return;
-
-      if (action == _RepostIntent.quick) {
+      if (selection == null) return;
+      if (selection.action == RepostFlowAction.quick) {
         await _handleQuickRepost(state);
         return;
       }
-
-      final quoteInput = await showModalBottomSheet<_QuoteRepostInput>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: const Color(0xFF0E1A35),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (_) => _QuoteComposerSheet(
-          label: '@$label · ${state.post.kind}',
-          initialAllowDownload: state.post.allowDownload == true,
-        ),
-      );
-
+      final quoteInput = selection.quoteInput;
       if (quoteInput == null) return;
       await _handleQuoteRepost(state, quoteInput);
     } catch (_) {
