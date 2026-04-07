@@ -92,6 +92,7 @@ class FeedPost {
     this.repostOf,
     this.hideLikeCount,
     this.allowComments,
+    this.allowDownload,
     this.visibility,
     this.sponsored,
     this.repostOfAuthorId,
@@ -124,6 +125,7 @@ class FeedPost {
   final String? repostOf;
   final bool? hideLikeCount;
   final bool? allowComments;
+  final bool? allowDownload;
   final String? visibility;
   final bool? sponsored;
   final String? repostOfAuthorId;
@@ -134,6 +136,79 @@ class FeedPost {
   final String? repostSourceContent;
   final List<FeedMedia>? repostSourceMedia;
   final int? primaryVideoDurationMs;
+
+  FeedPost copyWith({
+    String? id,
+    String? kind,
+    String? content,
+    List<FeedMedia>? media,
+    List<String>? hashtags,
+    FeedStats? stats,
+    String? createdAt,
+    String? location,
+    FeedAuthor? author,
+    String? authorId,
+    String? authorUsername,
+    String? authorDisplayName,
+    String? authorAvatarUrl,
+    bool? authorIsCreatorVerified,
+    bool? liked,
+    bool? saved,
+    bool? following,
+    String? repostOf,
+    bool? hideLikeCount,
+    bool? allowComments,
+    bool? allowDownload,
+    String? visibility,
+    bool? sponsored,
+    String? repostOfAuthorId,
+    String? repostOfAuthorDisplayName,
+    String? repostOfAuthorUsername,
+    String? repostOfAuthorAvatarUrl,
+    FeedAuthor? repostOfAuthor,
+    String? repostSourceContent,
+    List<FeedMedia>? repostSourceMedia,
+    int? primaryVideoDurationMs,
+  }) {
+    return FeedPost(
+      id: id ?? this.id,
+      kind: kind ?? this.kind,
+      content: content ?? this.content,
+      media: media ?? this.media,
+      hashtags: hashtags ?? this.hashtags,
+      stats: stats ?? this.stats,
+      createdAt: createdAt ?? this.createdAt,
+      location: location ?? this.location,
+      author: author ?? this.author,
+      authorId: authorId ?? this.authorId,
+      authorUsername: authorUsername ?? this.authorUsername,
+      authorDisplayName: authorDisplayName ?? this.authorDisplayName,
+      authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
+      authorIsCreatorVerified:
+          authorIsCreatorVerified ?? this.authorIsCreatorVerified,
+      liked: liked ?? this.liked,
+      saved: saved ?? this.saved,
+      following: following ?? this.following,
+      repostOf: repostOf ?? this.repostOf,
+      hideLikeCount: hideLikeCount ?? this.hideLikeCount,
+      allowComments: allowComments ?? this.allowComments,
+      allowDownload: allowDownload ?? this.allowDownload,
+      visibility: visibility ?? this.visibility,
+      sponsored: sponsored ?? this.sponsored,
+      repostOfAuthorId: repostOfAuthorId ?? this.repostOfAuthorId,
+      repostOfAuthorDisplayName:
+          repostOfAuthorDisplayName ?? this.repostOfAuthorDisplayName,
+      repostOfAuthorUsername:
+          repostOfAuthorUsername ?? this.repostOfAuthorUsername,
+      repostOfAuthorAvatarUrl:
+          repostOfAuthorAvatarUrl ?? this.repostOfAuthorAvatarUrl,
+      repostOfAuthor: repostOfAuthor ?? this.repostOfAuthor,
+      repostSourceContent: repostSourceContent ?? this.repostSourceContent,
+      repostSourceMedia: repostSourceMedia ?? this.repostSourceMedia,
+      primaryVideoDurationMs:
+          primaryVideoDurationMs ?? this.primaryVideoDurationMs,
+    );
+  }
 
   /// Returns display name: author.displayName > authorDisplayName > username > "Unknown"
   String get displayName {
@@ -230,6 +305,7 @@ class FeedPost {
       repostOf: json['repostOf'] as String?,
       hideLikeCount: json['hideLikeCount'] as bool?,
       allowComments: json['allowComments'] as bool?,
+      allowDownload: json['allowDownload'] as bool?,
       visibility: json['visibility'] as String?,
       sponsored: json['sponsored'] as bool?,
       repostOfAuthorId: json['repostOfAuthorId'] as String?,
@@ -268,11 +344,17 @@ class FeedPostState {
     if (updated.saved != null) saved = updated.saved!;
   }
 
-  FeedPostState copyWith({bool? liked, bool? saved, FeedStats? stats}) {
-    final next = FeedPostState(post: post);
+  FeedPostState copyWith({
+    FeedPost? post,
+    bool? liked,
+    bool? saved,
+    bool? following,
+    FeedStats? stats,
+  }) {
+    final next = FeedPostState(post: post ?? this.post);
     next.liked = liked ?? this.liked;
     next.saved = saved ?? this.saved;
-    next.following = this.following;
+    next.following = following ?? this.following;
     next.stats = stats ?? this.stats;
     return next;
   }

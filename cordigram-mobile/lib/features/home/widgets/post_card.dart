@@ -129,6 +129,20 @@ _SponsoredCreative? _parseSponsoredCreative(String value) {
 const int _kDwellMs = 2000;
 const int _kCardCooldownMs = 300000;
 
+enum PostMenuAction {
+  editPost,
+  editVisibility,
+  toggleComments,
+  toggleHideLike,
+  copyLink,
+  deletePost,
+  followToggle,
+  saveToggle,
+  hidePost,
+  reportPost,
+  blockAccount,
+}
+
 /// A single post card for the home feed.
 /// Receives a [FeedPostState] and callbacks for interactions.
 /// Uses [VisibilityDetector] (≥50 % visible) + a 2-second dwell timer
@@ -145,6 +159,7 @@ class PostCard extends StatefulWidget {
     this.onFollow,
     this.onAuthorTap,
     this.onComment,
+    this.onMenuAction,
     this.fullWidth = false,
     this.detailMode = false,
   });
@@ -170,6 +185,10 @@ class PostCard extends StatefulWidget {
   /// Called when the user taps the Comment button. If null the button is a
   /// no-op (e.g. when already on the post detail screen).
   final VoidCallback? onComment;
+
+  /// Called when the user taps a more-menu action.
+  final Future<void> Function(PostMenuAction action, FeedPostState state)?
+  onMenuAction;
 
   /// When true the card renders edge-to-edge: no horizontal/vertical margin,
   /// no rounded corners, and no border — intended for the post detail screen.
@@ -223,6 +242,127 @@ class _PostCardState extends State<PostCard> {
       // Scrolled away — cancel pending dwell
       _dwellTimer?.cancel();
       _dwellTimer = null;
+    }
+  }
+
+  Future<void> _onMenuAction(PostMenuAction action) async {
+    final handler = widget.onMenuAction;
+    if (handler == null) return;
+    await handler(action, widget.state);
+  }
+
+  Future<void> _openMoreMenu(BuildContext triggerContext) async {
+    final isOwner =
+        widget.viewerId != null &&
+        widget.state.post.authorId != null &&
+        widget.viewerId == widget.state.post.authorId;
+    final post = widget.state.post;
+
+    final entries = <({String id, String label, bool danger})>[];
+    if (isOwner) {
+      entries.add((id: 'editPost', label: 'Edit post', danger: false));
+      entries.add((
+        id: 'editVisibility',
+        label: 'Edit visibility',
+        danger: false,
+      ));
+      entries.add((
+        id: 'toggleComments',
+        label: post.allowComments == false
+            ? 'Turn on comments'
+            : 'Turn off comments',
+        danger: false,
+      ));
+      entries.add((
+        id: 'toggleHideLike',
+        label: post.hideLikeCount == true ? 'Show like' : 'Hide like',
+        danger: false,
+      ));
+      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+      entries.add((id: 'deletePost', label: 'Delete post', danger: true));
+    } else {
+      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+      entries.add((
+        id: 'followToggle',
+        label: widget.state.following ? 'Unfollow' : 'Follow',
+        danger: false,
+      ));
+      entries.add((
+        id: 'saveToggle',
+        label: widget.state.saved ? 'Unsave this post' : 'Save this post',
+        danger: false,
+      ));
+      entries.add((id: 'hidePost', label: 'Hide this post', danger: false));
+      entries.add((id: 'reportPost', label: 'Report', danger: false));
+      entries.add((
+        id: 'blockAccount',
+        label: 'Block this account',
+        danger: true,
+      ));
+    }
+
+    final overlay =
+        Overlay.of(triggerContext).context.findRenderObject() as RenderBox;
+    final box = triggerContext.findRenderObject() as RenderBox;
+    final rect = Rect.fromPoints(
+      box.localToGlobal(Offset.zero, ancestor: overlay),
+      box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
+    );
+
+    final selected = await showMenu<String>(
+      context: context,
+      color: const Color(0xFF0E1730),
+      surfaceTintColor: Colors.transparent,
+      position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      items: entries
+          .map(
+            (item) => PopupMenuItem<String>(
+              value: item.id,
+              child: Text(
+                item.label,
+                style: TextStyle(
+                  color: item.danger
+                      ? const Color(0xFFF87171)
+                      : const Color(0xFFE5E7EB),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+
+    if (!mounted || selected == null) return;
+
+    switch (selected) {
+      case 'editPost':
+        return _onMenuAction(PostMenuAction.editPost);
+      case 'editVisibility':
+        return _onMenuAction(PostMenuAction.editVisibility);
+      case 'toggleComments':
+        return _onMenuAction(PostMenuAction.toggleComments);
+      case 'toggleHideLike':
+        return _onMenuAction(PostMenuAction.toggleHideLike);
+      case 'copyLink':
+        return _onMenuAction(PostMenuAction.copyLink);
+      case 'deletePost':
+        return _onMenuAction(PostMenuAction.deletePost);
+      case 'followToggle':
+        setState(() => _followToggled = true);
+        return _onMenuAction(PostMenuAction.followToggle);
+      case 'saveToggle':
+        return _onMenuAction(PostMenuAction.saveToggle);
+      case 'hidePost':
+        return _onMenuAction(PostMenuAction.hidePost);
+      case 'reportPost':
+        return _onMenuAction(PostMenuAction.reportPost);
+      case 'blockAccount':
+        return _onMenuAction(PostMenuAction.blockAccount);
     }
   }
 
@@ -305,6 +445,8 @@ class _PostCardState extends State<PostCard> {
               _PostHeader(
                 post: post,
                 onHide: widget.onHide,
+                onOpenMenu: _openMoreMenu,
+                showMenuButton: widget.onMenuAction != null,
                 hideCloseButton: widget.detailMode,
                 useUsername: widget.detailMode,
                 isSponsored: isAdPost,
@@ -345,6 +487,7 @@ class _PostCardState extends State<PostCard> {
               const SizedBox(height: 12),
               _StatsRow(
                 state: state,
+                viewerId: widget.viewerId,
                 hideReposts: widget.detailMode,
                 onLike: widget.detailMode ? widget.onLike : null,
               ),
@@ -372,6 +515,8 @@ class _PostHeader extends StatelessWidget {
   const _PostHeader({
     required this.post,
     required this.onHide,
+    required this.onOpenMenu,
+    this.showMenuButton = true,
     this.hideCloseButton = false,
     this.useUsername = false,
     this.isSponsored = false,
@@ -382,6 +527,8 @@ class _PostHeader extends StatelessWidget {
   });
   final FeedPost post;
   final VoidCallback onHide;
+  final Future<void> Function(BuildContext triggerContext) onOpenMenu;
+  final bool showMenuButton;
   final bool hideCloseButton;
   final bool useUsername;
   final bool isSponsored;
@@ -499,10 +646,14 @@ class _PostHeader extends StatelessWidget {
           ),
         ),
         // 3-dot menu button (UI stub)
-        _HeaderIconBtn(icon: Icons.more_horiz_rounded, onTap: () {}),
+        if (showMenuButton)
+          _HeaderIconBtn(
+            icon: Icons.more_horiz_rounded,
+            onTap: (ctx) => onOpenMenu(ctx),
+          ),
         if (!hideCloseButton) ...[
           const SizedBox(width: 2),
-          _HeaderIconBtn(icon: Icons.close_rounded, onTap: onHide),
+          _HeaderIconBtn(icon: Icons.close_rounded, onTap: (_) => onHide()),
         ],
       ],
     );
@@ -556,12 +707,12 @@ class _PostHeader extends StatelessWidget {
 class _HeaderIconBtn extends StatelessWidget {
   const _HeaderIconBtn({required this.icon, required this.onTap});
   final IconData icon;
-  final VoidCallback onTap;
+  final void Function(BuildContext triggerContext) onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () => onTap(context),
       child: Padding(
         padding: const EdgeInsets.all(4),
         child: Icon(icon, color: const Color(0xFF7A8BB0), size: 18),
@@ -1017,8 +1168,14 @@ class _AdCtaBanner extends StatelessWidget {
 // ── Stats row ─────────────────────────────────────────────────────────────────
 
 class _StatsRow extends StatelessWidget {
-  const _StatsRow({required this.state, this.hideReposts = false, this.onLike});
+  const _StatsRow({
+    required this.state,
+    this.viewerId,
+    this.hideReposts = false,
+    this.onLike,
+  });
   final FeedPostState state;
+  final String? viewerId;
   final bool hideReposts;
   final VoidCallback? onLike;
 
@@ -1031,7 +1188,11 @@ class _StatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stats = state.stats;
-    final hideLikes = state.post.hideLikeCount ?? false;
+    final isOwner =
+        viewerId != null &&
+        state.post.authorId != null &&
+        viewerId == state.post.authorId;
+    final hideLikes = (state.post.hideLikeCount ?? false) && !isOwner;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -1160,46 +1321,57 @@ class _ActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final commentsLocked = state.post.allowComments == false;
+
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _ActionButton(
-            iconWidget: _PostIconLike(
-              size: 18,
-              filled: state.liked,
+          Expanded(
+            child: _ActionButton(
+              iconWidget: _PostIconLike(
+                size: 18,
+                filled: state.liked,
+                color: state.liked
+                    ? const Color(0xFF2b74b0)
+                    : const Color(0xFF7A8BB0),
+              ),
+              label: 'Like',
               color: state.liked
                   ? const Color(0xFF2b74b0)
                   : const Color(0xFF7A8BB0),
+              onTap: onLike,
             ),
-            label: 'Like',
-            color: state.liked
-                ? const Color(0xFF2b74b0)
-                : const Color(0xFF7A8BB0),
-            onTap: onLike,
           ),
-          _ActionButton(
-            icon: Icons.chat_bubble_outline_rounded,
-            label: 'Comment',
-            color: const Color(0xFF7A8BB0),
-            onTap: onComment ?? () {},
+          Expanded(
+            child: _ActionButton(
+              icon: Icons.chat_bubble_outline_rounded,
+              label: commentsLocked ? 'Comments off' : 'Comment',
+              color: commentsLocked
+                  ? const Color(0xFF5A6786)
+                  : const Color(0xFF7A8BB0),
+              onTap: commentsLocked ? () {} : (onComment ?? () {}),
+            ),
           ),
-          _ActionButton(
-            icon: Icons.repeat_rounded,
-            label: 'Repost',
-            color: const Color(0xFF7A8BB0),
-            onTap: () {},
+          Expanded(
+            child: _ActionButton(
+              icon: Icons.repeat_rounded,
+              label: 'Repost',
+              color: const Color(0xFF7A8BB0),
+              onTap: () {},
+            ),
           ),
-          _ActionButton(
-            icon: state.saved
-                ? Icons.bookmark_rounded
-                : Icons.bookmark_border_rounded,
-            label: 'Save',
-            color: state.saved
-                ? const Color(0xFF4AA3E4)
-                : const Color(0xFF7A8BB0),
-            onTap: onSave,
+          Expanded(
+            child: _ActionButton(
+              icon: state.saved
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              label: 'Save',
+              color: state.saved
+                  ? const Color(0xFF4AA3E4)
+                  : const Color(0xFF7A8BB0),
+              onTap: onSave,
+            ),
           ),
         ],
       ),
@@ -1230,16 +1402,20 @@ class _ActionButton extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             iconWidget ?? Icon(icon!, size: 18, color: color),
             const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],

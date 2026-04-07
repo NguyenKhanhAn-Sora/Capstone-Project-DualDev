@@ -1,18 +1,21 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../auth/login_screen.dart';
 import '../post/create_tab_screen.dart';
 import '../post/post_detail_screen.dart';
+import '../post/utils/post_edit_utils.dart';
 import '../profile/profile_screen.dart';
 import '../reels/reels_screen.dart';
 import '../report/report_problem_screen.dart';
+import '../report/report_post_sheet.dart';
 import 'models/feed_post.dart';
 import 'services/feed_service.dart';
 import 'services/post_interaction_service.dart';
-import 'widgets/people_you_may_know.dart';
 import 'widgets/post_card.dart';
+import 'widgets/people_you_may_know.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -265,8 +268,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     try {
       if (!wasSaved) {
         await PostInteractionService.save(postId);
+        _showSnack('Saved');
       } else {
         await PostInteractionService.unsave(postId);
+        _showSnack('Removed from saved');
       }
     } catch (_) {
       // Roll back on failure
@@ -282,6 +287,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           impressions: s.stats.impressions,
         );
       });
+      _showSnack('Failed to update save', error: true);
     }
   }
 
@@ -294,6 +300,240 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       await PostInteractionService.hide(postId);
     } catch (_) {
       // Silent failure — post stays hidden locally
+    }
+  }
+
+  FeedPostState? _findState(String postId) {
+    final idx = _states.indexWhere((s) => s.post.id == postId);
+    if (idx < 0) return null;
+    return _states[idx];
+  }
+
+  void _replaceState(String postId, FeedPostState next) {
+    final idx = _states.indexWhere((s) => s.post.id == postId);
+    if (idx < 0) return;
+    setState(() => _states[idx] = next);
+  }
+
+  void _showSnack(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error
+            ? const Color(0xFFB91C1C)
+            : const Color(0xFF1A2235),
+      ),
+    );
+  }
+
+  Future<void> _onPostMenuAction(
+    PostMenuAction action,
+    FeedPostState state,
+  ) async {
+    final post = state.post;
+    switch (action) {
+      case PostMenuAction.editPost:
+        final updated = await showEditPostSheet(context, post: post);
+        if (updated == null) return;
+        _replaceState(
+          post.id,
+          state.copyWith(
+            post: updated,
+            liked: updated.liked ?? state.liked,
+            saved: updated.saved ?? state.saved,
+            following: updated.following ?? state.following,
+            stats: updated.stats,
+          ),
+        );
+        _showSnack('Post updated');
+        return;
+      case PostMenuAction.editVisibility:
+        final nextVisibility = await showEditVisibilitySheet(
+          context,
+          postId: post.id,
+          currentVisibility: post.visibility ?? 'public',
+        );
+        if (nextVisibility == null) return;
+        _replaceState(
+          post.id,
+          state.copyWith(post: post.copyWith(visibility: nextVisibility)),
+        );
+        _showSnack('Visibility updated');
+        return;
+      case PostMenuAction.toggleComments:
+        final currentAllowed = post.allowComments != false;
+        final nextAllowed = !currentAllowed;
+        _replaceState(
+          post.id,
+          state.copyWith(post: post.copyWith(allowComments: nextAllowed)),
+        );
+        try {
+          await PostInteractionService.setAllowComments(post.id, nextAllowed);
+          _showSnack(
+            nextAllowed ? 'Comments turned on' : 'Comments turned off',
+          );
+        } catch (_) {
+          _replaceState(
+            post.id,
+            state.copyWith(post: post.copyWith(allowComments: currentAllowed)),
+          );
+          _showSnack('Failed to update comments', error: true);
+        }
+        return;
+      case PostMenuAction.toggleHideLike:
+        final currentHidden = post.hideLikeCount == true;
+        final nextHidden = !currentHidden;
+        _replaceState(
+          post.id,
+          state.copyWith(post: post.copyWith(hideLikeCount: nextHidden)),
+        );
+        try {
+          await PostInteractionService.setHideLikeCount(post.id, nextHidden);
+          _showSnack(nextHidden ? 'Like count hidden' : 'Like count visible');
+        } catch (_) {
+          _replaceState(
+            post.id,
+            state.copyWith(post: post.copyWith(hideLikeCount: currentHidden)),
+          );
+          _showSnack('Failed to update like visibility', error: true);
+        }
+        return;
+      case PostMenuAction.copyLink:
+        final link = PostInteractionService.permalink(post.id);
+        await Clipboard.setData(ClipboardData(text: link));
+        _showSnack('Link copied');
+        return;
+      case PostMenuAction.deletePost:
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF111827),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: const Text(
+              'Delete post',
+              style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
+            ),
+            content: const Text(
+              'This action cannot be undone.',
+              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Color(0xFF7A8BB0)),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+
+        final snapshot = _findState(post.id);
+        setState(() => _states.removeWhere((s) => s.post.id == post.id));
+        try {
+          await PostInteractionService.deletePost(post.id);
+          _showSnack('Post deleted');
+        } catch (_) {
+          if (snapshot != null) {
+            setState(() => _states.insert(0, snapshot));
+          }
+          _showSnack('Failed to delete post', error: true);
+        }
+        return;
+      case PostMenuAction.followToggle:
+        final authorId = post.authorId;
+        if (authorId == null || authorId.isEmpty) return;
+        await _onFollow(authorId, !state.following);
+        return;
+      case PostMenuAction.saveToggle:
+        await _onSave(post.id);
+        return;
+      case PostMenuAction.hidePost:
+        await _onHide(post.id);
+        _showSnack('Post hidden');
+        return;
+      case PostMenuAction.reportPost:
+        final token = AuthStorage.accessToken;
+        if (token == null) {
+          _showSnack('Please sign in first', error: true);
+          return;
+        }
+        final reported = await showReportPostSheet(
+          context,
+          postId: post.id,
+          authHeader: {'Authorization': 'Bearer $token'},
+        );
+        if (reported) _showSnack('Report submitted');
+        return;
+      case PostMenuAction.blockAccount:
+        final userId = post.authorId;
+        if (userId == null || userId.isEmpty) return;
+        final username =
+            post.authorUsername ?? post.author?.username ?? post.displayName;
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF111827),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: Text(
+              'Block @$username?',
+              style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
+            ),
+            content: const Text(
+              'You will no longer see posts from this account.',
+              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Color(0xFF7A8BB0)),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Block',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+
+        try {
+          await PostInteractionService.blockUser(userId);
+          if (!mounted) return;
+          setState(() {
+            _states.removeWhere((s) => s.post.authorId == userId);
+          });
+          _showSnack('Account blocked');
+        } catch (_) {
+          _showSnack('Failed to block account', error: true);
+        }
+        return;
     }
   }
 
@@ -611,6 +851,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 onFollow: _onFollow,
                 onAuthorTap: _openUserProfile,
                 onComment: () => _openPostDetail(_states[index]),
+                onMenuAction: _onPostMenuAction,
               ),
               childCount: _states.length,
             ),

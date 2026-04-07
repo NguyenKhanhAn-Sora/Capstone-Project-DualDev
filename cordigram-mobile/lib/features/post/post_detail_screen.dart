@@ -562,6 +562,18 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     _CommentMediaData? media,
     String? parentId,
   }) async {
+    final commentsLocked = _postState?.post.allowComments == false;
+    if (commentsLocked) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Comments are turned off for this post'),
+          backgroundColor: Color(0xFF1A2235),
+        ),
+      );
+      return;
+    }
+
     Map<String, dynamic>? mediaJson;
     if (media != null) {
       if (media.file != null) {
@@ -629,6 +641,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final commentsLocked = _postState?.post.allowComments == false;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0B1020),
       appBar: AppBar(
@@ -664,11 +678,28 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       body: Column(
         children: [
           Expanded(child: _buildBody()),
-          _CommentInputBar(
-            onSubmit: _onCommentSubmit,
-            replyTarget: _replyTarget,
-            onCancelReply: () => setState(() => _replyTarget = null),
-          ),
+          if (commentsLocked)
+            Container(
+              width: double.infinity,
+              color: const Color(0xFF0D1526),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                12,
+                16,
+                12 + MediaQuery.of(context).viewPadding.bottom,
+              ),
+              child: const Text(
+                'Comments are turned off for this post.',
+                style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            _CommentInputBar(
+              onSubmit: _onCommentSubmit,
+              replyTarget: _replyTarget,
+              onCancelReply: () => setState(() => _replyTarget = null),
+            ),
         ],
       ),
     );
@@ -730,7 +761,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             SliverToBoxAdapter(
               child: PostCard(
                 state: _postState!,
-                viewerId: widget.viewerId,
+                viewerId: _viewerId,
                 fullWidth: true,
                 detailMode: true,
                 onLike: _onLike,
