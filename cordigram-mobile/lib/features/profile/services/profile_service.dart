@@ -52,6 +52,34 @@ class ProfileService {
     );
   }
 
+  static Future<void> blockUser(String userId) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    await ApiService.post(
+      '/users/${Uri.encodeComponent(userId)}/block',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  static Future<void> reportUser({
+    required String userId,
+    required String category,
+    required String reason,
+    String? note,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    await ApiService.post(
+      '/report-users/${Uri.encodeComponent(userId)}',
+      body: {
+        'category': category,
+        'reason': reason,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      },
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
   /// Upload a new avatar (original + cropped bytes).
   static Future<Map<String, dynamic>> uploadAvatar({
     required Uint8List originalBytes,

@@ -6,7 +6,7 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/services/auth_storage.dart';
 import '../post/post_detail_screen.dart';
-import '../report/report_comment_sheet.dart';
+import '../report/report_user_sheet.dart';
 import 'follow_list_sheet.dart';
 import 'profile_item_viewer_screen.dart';
 import 'models/profile_detail.dart';
@@ -121,10 +121,17 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _followLoading = false;
   bool _bioExpanded = false;
   bool _avatarLoading = false;
+  bool _isOwnerProfile = false;
 
   // ── Tab state ──────────────────────────────────────────────────────────────
-  late final TabController _tabController;
-  static const List<String> _tabKeys = ['posts', 'reels', 'saved', 'repost'];
+  late TabController _tabController;
+  static const List<String> _ownerTabKeys = [
+    'posts',
+    'reels',
+    'saved',
+    'repost',
+  ];
+  static const List<String> _viewerTabKeys = ['posts', 'reels', 'repost'];
 
   final Map<String, List<Map<String, dynamic>>> _tabItems = {
     'posts': [],
@@ -169,10 +176,33 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: _viewerTabKeys.length, vsync: this);
     _tabController.addListener(_onTabChanged);
     _viewerId = _decodeViewerId();
     _loadProfile();
+  }
+
+  List<String> get _visibleTabKeys =>
+      _isOwnerProfile ? _ownerTabKeys : _viewerTabKeys;
+
+  void _reconfigureTabs(bool isOwner) {
+    final oldKeys = _visibleTabKeys;
+    final oldIndex = _tabController.index.clamp(0, oldKeys.length - 1);
+    final currentKey = oldKeys[oldIndex];
+
+    _isOwnerProfile = isOwner;
+    final newKeys = _visibleTabKeys;
+    final nextIndex = newKeys.indexOf(currentKey);
+    final initialIndex = nextIndex >= 0 ? nextIndex : 0;
+
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
+    _tabController = TabController(
+      length: newKeys.length,
+      vsync: this,
+      initialIndex: initialIndex,
+    );
+    _tabController.addListener(_onTabChanged);
   }
 
   void _onTabChanged() {
@@ -204,6 +234,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       final vis = data.visibility?.profile ?? 'public';
       final isOwner = _viewerId != null && data.userId == _viewerId;
       final isFollowing = data.isFollowing;
+      if (_isOwnerProfile != isOwner) {
+        _reconfigureTabs(isOwner);
+      } else {
+        _isOwnerProfile = isOwner;
+      }
       if (!_canView(vis, isOwner, isFollowing)) {
         setState(() => _privateView = true);
       }
@@ -491,7 +526,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ── Tab item navigation ────────────────────────────────────────────────────
 
   void _navigateToItem(Map<String, dynamic> item, int index) {
-    final key = _tabKeys[_tabController.index];
+    final key = _visibleTabKeys[_tabController.index];
     final items = _tabItems[key]!;
 
     // Only the dedicated Reels tab should open vertical reel-only navigation.
@@ -636,7 +671,6 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _showMoreMenu() {
-    final p = _profile;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF141D30),
@@ -669,7 +703,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               label: 'Block this user',
               onTap: () {
                 Navigator.pop(context);
-                _showToast('Block coming soon');
+                _onBlockUser();
               },
             ),
             _MoreMenuItem(
@@ -677,7 +711,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               label: 'Report',
               onTap: () {
                 Navigator.pop(context);
-                _showToast('Report user coming soon');
+                _onReportUser();
               },
             ),
             _MoreMenuItem(
@@ -693,6 +727,90 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
       ),
     );
+  }
+
+  Map<String, String>? _authHeader() {
+    final token = AuthStorage.accessToken;
+    if (token == null || token.isEmpty) return null;
+    return {'Authorization': 'Bearer $token'};
+  }
+
+  Future<void> _onBlockUser() async {
+    final p = _profile;
+    if (p == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF111827),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'Block @${p.username}?',
+          style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
+        ),
+        content: const Text(
+          'Blocking this user will hide their content from you.',
+          style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFF7A8BB0)),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Block',
+              style: TextStyle(
+                color: Color(0xFFEF4444),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ProfileService.blockUser(p.userId);
+      if (!mounted) return;
+      setState(() {
+        _blockedView = true;
+        _profile = null;
+      });
+      _showToast('Blocked @${p.username}');
+    } catch (e) {
+      final msg = e.toString().replaceFirst(RegExp(r'^.*?Exception: '), '');
+      _showToast(msg.isEmpty ? 'Unable to block user' : msg);
+    }
+  }
+
+  Future<void> _onReportUser() async {
+    final p = _profile;
+    if (p == null) return;
+    if (_viewerId != null && _viewerId == p.userId) {
+      _showToast('You cannot report yourself');
+      return;
+    }
+    final authHeader = _authHeader();
+    if (authHeader == null) {
+      _showToast('Session expired. Please sign in again.');
+      return;
+    }
+
+    final reported = await showReportUserSheet(
+      context,
+      userId: p.userId,
+      authHeader: authHeader,
+    );
+    if (reported && mounted) {
+      _showToast('Report submitted');
+    }
   }
 
   void _showAboutSheet() {
@@ -812,6 +930,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       return _AboutRow(icon: icon, label: label, value: badge, muted: true);
     }
     final trimmed = value?.trim() ?? '';
+    if (!isOwner && trimmed.isEmpty) {
+      return const SizedBox.shrink();
+    }
     if (trimmed.isEmpty) {
       return _AboutRow(icon: icon, label: label, value: '—', muted: true);
     }
@@ -895,11 +1016,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                 fontSize: 13,
                 fontWeight: FontWeight.w400,
               ),
-              tabs: const [
-                Tab(text: 'Posts'),
-                Tab(text: 'Reels'),
-                Tab(text: 'Saved'),
-                Tab(text: 'Repost'),
+              tabs: [
+                const Tab(text: 'Posts'),
+                const Tab(text: 'Reels'),
+                if (isOwner) const Tab(text: 'Saved'),
+                const Tab(text: 'Repost'),
               ],
             ),
             backgroundColor: _bg,
@@ -912,7 +1033,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildActiveTabSliver(bool isOwner) {
-    final key = _tabKeys[_tabController.index];
+    final key = _visibleTabKeys[_tabController.index];
     final items = _tabItems[key]!;
     final loading = _tabLoading[key]!;
     final loaded = _tabLoaded[key]!;
@@ -930,20 +1051,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       mainAxisSpacing: 2,
       crossAxisSpacing: 2,
     );
-
-    // Saved tab locked for non-owners
-    if (key == 'saved' && !isOwner) {
-      return const SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(20, 28, 20, 28),
-          child: Text(
-            'You cannot view saved items here.',
-            style: TextStyle(color: Color(0xFF9BAECF), fontSize: 14),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
 
     // Loading skeleton
     if (loading && !loaded) {
@@ -1567,11 +1674,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                   label: 'Updating...',
                   onTap: null,
                   ghost: p.isFollowing,
+                  followStyle: true,
                 )
               : _PrimaryButton(
                   label: p.isFollowing ? 'Following' : 'Follow',
                   onTap: _toggleFollow,
                   ghost: p.isFollowing,
+                  followStyle: true,
                 ),
         ),
         const SizedBox(width: 8),
@@ -1663,15 +1772,12 @@ class _ProfileScreenState extends State<ProfileScreen>
       p.isFollowing,
     );
     final locValue = canLocation ? (p.location?.trim() ?? '') : '';
-    if (isOwner || canLocation) {
+    if ((isOwner && canLocation) ||
+        (!isOwner && canLocation && locValue.isNotEmpty)) {
       rows.add(
         _InfoRow(
           icon: Icons.location_on_outlined,
-          value: locValue.isEmpty
-              ? (canLocation
-                    ? null
-                    : _visibilityBadge(vis?.location ?? 'public'))
-              : locValue,
+          value: locValue.isEmpty ? null : locValue,
           muted: locValue.isEmpty,
           lockedBadge: !canLocation && !isOwner
               ? _visibilityBadge(vis?.location ?? 'public')
@@ -1687,7 +1793,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       p.isFollowing,
     );
     final workValue = canWork ? (p.workplace?.companyName.trim() ?? '') : '';
-    if (isOwner || canWork) {
+    if ((isOwner && canWork) || (!isOwner && canWork && workValue.isNotEmpty)) {
       rows.add(
         _InfoRow(
           icon: Icons.business_center_outlined,
@@ -1707,7 +1813,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       p.isFollowing,
     );
     final birthValue = canBirth ? _formatBirthdate(p.birthdate) : '';
-    if (isOwner || (canBirth && birthValue.isNotEmpty)) {
+    if ((isOwner && canBirth) ||
+        (!isOwner && canBirth && birthValue.isNotEmpty)) {
       rows.add(
         _InfoRow(
           icon: Icons.cake_outlined,
@@ -1723,7 +1830,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     // Gender
     final canGender = _canView(vis?.gender ?? 'public', isOwner, p.isFollowing);
     final genderValue = canGender ? _formatGender(p.gender) : '';
-    if (isOwner || (canGender && genderValue.isNotEmpty)) {
+    if ((isOwner && canGender) ||
+        (!isOwner && canGender && genderValue.isNotEmpty)) {
       rows.add(
         _InfoRow(
           icon: Icons.person_outline_rounded,
@@ -1915,10 +2023,12 @@ class _PrimaryButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.ghost = false,
+    this.followStyle = false,
   });
   final String label;
   final VoidCallback? onTap;
   final bool ghost;
+  final bool followStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -1927,10 +2037,23 @@ class _PrimaryButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 11),
         decoration: BoxDecoration(
-          color: ghost ? Colors.transparent : const Color(0xFF2563EB),
+          color: ghost
+              ? Colors.transparent
+              : (followStyle
+                    ? const Color(0xFF1F5FCC)
+                    : const Color(0xFF2563EB)),
+          gradient: (!ghost && followStyle)
+              ? const LinearGradient(
+                  colors: [Color(0xFF2F79F3), Color(0xFF1F5FCC)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: ghost ? const Color(0xFF2563EB) : Colors.transparent,
+            color: ghost
+                ? const Color(0xFF2563EB)
+                : (followStyle ? const Color(0xFF3A7DE0) : Colors.transparent),
           ),
         ),
         alignment: Alignment.center,
