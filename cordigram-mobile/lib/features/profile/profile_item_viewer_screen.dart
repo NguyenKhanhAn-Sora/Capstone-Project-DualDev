@@ -1,12 +1,21 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
+import '../../core/services/auth_storage.dart';
 import '../home/models/feed_post.dart';
 import '../home/services/post_interaction_service.dart';
+import '../home/widgets/post_card.dart' show PostMenuAction;
 import '../post/post_detail_screen.dart';
+import '../post/utils/post_edit_utils.dart';
 import '../profile/profile_screen.dart';
 import '../reels/reels_screen.dart' show ReelCommentSheet;
+import '../report/report_post_sheet.dart';
 
 Map<String, dynamic>? _asStringKeyMap(dynamic raw) {
   if (raw is Map<String, dynamic>) return raw;
@@ -535,6 +544,18 @@ class _ItemPageState extends State<_ItemPage> {
   bool _saved = false;
   bool _following = false;
 
+  void _showSnack(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error
+            ? const Color(0xFFB91C1C)
+            : const Color(0xFF1A2235),
+      ),
+    );
+  }
+
   void _openUserProfile(String userId) {
     if (userId.isEmpty) return;
     Navigator.of(context).push(
@@ -669,6 +690,13 @@ class _ItemPageState extends State<_ItemPage> {
     return int.tryParse(v?.toString() ?? '') ?? 0;
   }
 
+  bool _asBool(dynamic v) {
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    final s = (v?.toString() ?? '').toLowerCase();
+    return s == 'true' || s == '1';
+  }
+
   String _fmtCountInt(int n) {
     if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
     if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
@@ -679,7 +707,16 @@ class _ItemPageState extends State<_ItemPage> {
     final id = widget.item['id'] as String? ?? '';
     if (id.isEmpty) return;
     final before = _liked;
-    setState(() => _liked = !before);
+    final stats = widget.item['stats'] as Map<String, dynamic>?;
+    final prevHearts = _asInt(stats?['hearts'] ?? stats?['likes']);
+    setState(() {
+      _liked = !before;
+      if (stats != null) {
+        final next = (prevHearts + (before ? -1 : 1)).clamp(0, 999999999);
+        stats['hearts'] = next;
+        stats['likes'] = next;
+      }
+    });
     try {
       if (before) {
         await PostInteractionService.unlike(id);
@@ -688,7 +725,13 @@ class _ItemPageState extends State<_ItemPage> {
       }
     } catch (_) {
       if (!mounted) return;
-      setState(() => _liked = before);
+      setState(() {
+        _liked = before;
+        if (stats != null) {
+          stats['hearts'] = prevHearts;
+          stats['likes'] = prevHearts;
+        }
+      });
     }
   }
 
@@ -696,16 +739,28 @@ class _ItemPageState extends State<_ItemPage> {
     final id = widget.item['id'] as String? ?? '';
     if (id.isEmpty) return;
     final before = _saved;
-    setState(() => _saved = !before);
+    final stats = widget.item['stats'] as Map<String, dynamic>?;
+    final prevSaves = _asInt(stats?['saves']);
+    setState(() {
+      _saved = !before;
+      if (stats != null) {
+        stats['saves'] = (prevSaves + (before ? -1 : 1)).clamp(0, 999999999);
+      }
+    });
     try {
       if (before) {
         await PostInteractionService.unsave(id);
       } else {
         await PostInteractionService.save(id);
       }
+      _showSnack(before ? 'Removed from saved' : 'Saved');
     } catch (_) {
       if (!mounted) return;
-      setState(() => _saved = before);
+      setState(() {
+        _saved = before;
+        if (stats != null) stats['saves'] = prevSaves;
+      });
+      _showSnack('Failed to update save', error: true);
     }
   }
 
@@ -726,6 +781,449 @@ class _ItemPageState extends State<_ItemPage> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _following = before);
+    }
+  }
+
+  Future<void> _downloadCurrentReel() async {
+    final normalized = _normalizeItem(
+      widget.item,
+      fallbackAuthorId: widget.profileUserId,
+      fallbackAuthorUsername: widget.profileUsername,
+      fallbackAuthorDisplayName: widget.profileDisplayName,
+      fallbackAuthorAvatarUrl: widget.profileAvatarUrl,
+    );
+    final allowDownload = _asBool(normalized['allowDownload']);
+    final media = (normalized['media'] as List?)
+        ?.whereType<Map<String, dynamic>>()
+        .toList();
+
+    if (!allowDownload || media == null || media.isEmpty) {
+      _showSnack('Download is disabled for this reel', error: true);
+      return;
+    }
+
+    final chosen = media.firstWhere(
+      (m) => (m['type'] as String?) == 'video',
+      orElse: () => media.first,
+    );
+    final url = (chosen['url'] as String?) ?? '';
+    if (url.isEmpty) {
+      _showSnack('Failed to download reel', error: true);
+      return;
+    }
+
+    try {
+      final res = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 45));
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception('download failed');
+      }
+
+      final bytes = res.bodyBytes;
+      final dir = await _resolveDownloadDirectory();
+      final filename = _buildFilename(url, chosen['type'] as String?, bytes);
+      final file = File('${dir.path}${Platform.pathSeparator}$filename');
+      await file.writeAsBytes(bytes, flush: true);
+      _showSnack('Downloaded: ${file.path}');
+    } catch (_) {
+      _showSnack('Failed to download reel', error: true);
+    }
+  }
+
+  Future<Directory> _resolveDownloadDirectory() async {
+    if (Platform.isAndroid) {
+      final direct = Directory('/storage/emulated/0/Download');
+      if (await direct.exists()) return direct;
+    }
+
+    final external = await getExternalStorageDirectory();
+    if (external != null) return external;
+    return getApplicationDocumentsDirectory();
+  }
+
+  String _buildFilename(String url, String? type, Uint8List bytes) {
+    final uri = Uri.tryParse(url);
+    final segment = uri?.pathSegments.isNotEmpty == true
+        ? uri!.pathSegments.last
+        : '';
+    final fromUrl = segment.split('?').first.trim();
+    final ts = DateTime.now().millisecondsSinceEpoch;
+
+    if (fromUrl.isNotEmpty && fromUrl.contains('.')) {
+      final safe = fromUrl.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      return 'cordigram_reel_$ts\_$safe';
+    }
+
+    String ext = type == 'video' ? 'mp4' : 'jpg';
+    if (bytes.length >= 12) {
+      if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E) ext = 'png';
+      if (bytes[0] == 0xFF && bytes[1] == 0xD8) ext = 'jpg';
+    }
+    return 'cordigram_reel_$ts.$ext';
+  }
+
+  Future<void> _onReelMenuAction(PostMenuAction action) async {
+    final normalized = _normalizeItem(
+      widget.item,
+      fallbackAuthorId: widget.profileUserId,
+      fallbackAuthorUsername: widget.profileUsername,
+      fallbackAuthorDisplayName: widget.profileDisplayName,
+      fallbackAuthorAvatarUrl: widget.profileAvatarUrl,
+    );
+    final id = (normalized['id'] as String?) ?? '';
+    if (id.isEmpty) return;
+
+    switch (action) {
+      case PostMenuAction.editPost:
+        final state = _toFeedPostState(
+          normalized,
+          fallbackAuthorId: widget.profileUserId,
+          fallbackAuthorUsername: widget.profileUsername,
+          fallbackAuthorDisplayName: widget.profileDisplayName,
+          fallbackAuthorAvatarUrl: widget.profileAvatarUrl,
+        );
+        if (state == null) return;
+        final updated = await showEditPostSheet(
+          context,
+          post: state.post,
+          entityLabel: 'reel',
+        );
+        if (updated == null || !mounted) return;
+        setState(() {
+          widget.item['content'] = updated.content;
+          widget.item['caption'] = updated.content;
+          widget.item['location'] = updated.location;
+          widget.item['hashtags'] = updated.hashtags;
+          widget.item['allowComments'] = updated.allowComments;
+          widget.item['allowDownload'] = updated.allowDownload;
+          widget.item['hideLikeCount'] = updated.hideLikeCount;
+          widget.item['visibility'] = updated.visibility;
+        });
+        _showSnack('Reel updated');
+        return;
+      case PostMenuAction.editVisibility:
+        final currentVisibility =
+            (normalized['visibility'] as String?) ?? 'public';
+        final nextVisibility = await showEditVisibilitySheet(
+          context,
+          postId: id,
+          currentVisibility: currentVisibility,
+        );
+        if (nextVisibility == null || !mounted) return;
+        setState(() => widget.item['visibility'] = nextVisibility);
+        _showSnack('Visibility updated');
+        return;
+      case PostMenuAction.toggleComments:
+        final currentAllowed = !_asBool(normalized['allowComments'])
+            ? false
+            : true;
+        final nextAllowed = !currentAllowed;
+        setState(() => widget.item['allowComments'] = nextAllowed);
+        try {
+          await PostInteractionService.setAllowComments(id, nextAllowed);
+          _showSnack(
+            nextAllowed ? 'Comments turned on' : 'Comments turned off',
+          );
+        } catch (_) {
+          if (!mounted) return;
+          setState(() => widget.item['allowComments'] = currentAllowed);
+          _showSnack('Failed to update comments', error: true);
+        }
+        return;
+      case PostMenuAction.toggleHideLike:
+        final currentHidden = _asBool(normalized['hideLikeCount']);
+        final nextHidden = !currentHidden;
+        setState(() => widget.item['hideLikeCount'] = nextHidden);
+        try {
+          await PostInteractionService.setHideLikeCount(id, nextHidden);
+          _showSnack(nextHidden ? 'Like count hidden' : 'Like count visible');
+        } catch (_) {
+          if (!mounted) return;
+          setState(() => widget.item['hideLikeCount'] = currentHidden);
+          _showSnack('Failed to update like visibility', error: true);
+        }
+        return;
+      case PostMenuAction.copyLink:
+        await Clipboard.setData(
+          ClipboardData(text: PostInteractionService.reelPermalink(id)),
+        );
+        _showSnack('Link copied');
+        return;
+      case PostMenuAction.deletePost:
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF111827),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: const Text(
+              'Delete reel',
+              style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
+            ),
+            content: const Text(
+              'This action cannot be undone.',
+              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Color(0xFF7A8BB0)),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+        try {
+          await PostInteractionService.deletePost(id);
+          _showSnack('Reel deleted');
+          if (mounted) Navigator.of(context).pop();
+        } catch (_) {
+          _showSnack('Failed to delete reel', error: true);
+        }
+        return;
+      case PostMenuAction.followToggle:
+        return _onFollowTap();
+      case PostMenuAction.saveToggle:
+        return _onSaveTap();
+      case PostMenuAction.hidePost:
+        try {
+          await PostInteractionService.hide(id);
+          _showSnack('Reel hidden');
+          if (mounted) Navigator.of(context).pop();
+        } catch (_) {
+          _showSnack('Failed to hide reel', error: true);
+        }
+        return;
+      case PostMenuAction.reportPost:
+        final token = AuthStorage.accessToken;
+        if (token == null) {
+          _showSnack('Please sign in first', error: true);
+          return;
+        }
+        final reported = await showReportPostSheet(
+          context,
+          postId: id,
+          authHeader: {'Authorization': 'Bearer $token'},
+          subjectLabel: 'reel',
+        );
+        if (reported) _showSnack('Report submitted');
+        return;
+      case PostMenuAction.blockAccount:
+        final author = _asStringKeyMap(normalized['author']);
+        final userId =
+            (normalized['authorId'] as String?) ?? (author?['id'] as String?);
+        if (userId == null || userId.isEmpty) return;
+        final username =
+            (normalized['authorUsername'] as String?) ??
+            (author?['username'] as String?) ??
+            'user';
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF111827),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: Text(
+              'Block @$username?',
+              style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
+            ),
+            content: const Text(
+              'You will no longer see reels from this account.',
+              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Color(0xFF7A8BB0)),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Block',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+        try {
+          await PostInteractionService.blockUser(userId);
+          _showSnack('Account blocked');
+          if (mounted) Navigator.of(context).pop();
+        } catch (_) {
+          _showSnack('Failed to block account', error: true);
+        }
+        return;
+    }
+  }
+
+  Future<void> _openReelMenu(BuildContext triggerContext) async {
+    final normalized = _normalizeItem(
+      widget.item,
+      fallbackAuthorId: widget.profileUserId,
+      fallbackAuthorUsername: widget.profileUsername,
+      fallbackAuthorDisplayName: widget.profileDisplayName,
+      fallbackAuthorAvatarUrl: widget.profileAvatarUrl,
+    );
+
+    final author = _asStringKeyMap(normalized['author']);
+    final authorId =
+        (normalized['authorId'] as String?) ?? (author?['id'] as String?) ?? '';
+    final isOwner =
+        widget.viewerId != null &&
+        widget.viewerId!.isNotEmpty &&
+        authorId == widget.viewerId;
+
+    final media = (normalized['media'] as List?)
+        ?.whereType<Map<String, dynamic>>()
+        .toList();
+    final canDownload =
+        _asBool(normalized['allowDownload']) &&
+        media != null &&
+        media.isNotEmpty;
+    final allowComments = normalized['allowComments'] != false;
+    final hideLike = _asBool(normalized['hideLikeCount']);
+
+    final entries = <({String id, String label, bool danger})>[];
+    if (isOwner) {
+      entries.add((id: 'editReel', label: 'Edit reel', danger: false));
+      entries.add((
+        id: 'editVisibility',
+        label: 'Edit visibility',
+        danger: false,
+      ));
+      entries.add((
+        id: 'toggleComments',
+        label: allowComments ? 'Turn off comments' : 'Turn on comments',
+        danger: false,
+      ));
+      entries.add((
+        id: 'toggleHideLike',
+        label: hideLike ? 'Show like' : 'Hide like',
+        danger: false,
+      ));
+      if (canDownload) {
+        entries.add((
+          id: 'downloadReel',
+          label: 'Download this reel',
+          danger: false,
+        ));
+      }
+      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+      entries.add((id: 'deleteReel', label: 'Delete reel', danger: true));
+    } else {
+      if (canDownload) {
+        entries.add((
+          id: 'downloadReel',
+          label: 'Download this reel',
+          danger: false,
+        ));
+      }
+      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+      entries.add((
+        id: 'followToggle',
+        label: _following ? 'Unfollow' : 'Follow',
+        danger: false,
+      ));
+      entries.add((
+        id: 'saveToggle',
+        label: _saved ? 'Unsave this reel' : 'Save this reel',
+        danger: false,
+      ));
+      entries.add((id: 'hideReel', label: 'Hide this reel', danger: false));
+      entries.add((id: 'reportReel', label: 'Report', danger: false));
+      entries.add((
+        id: 'blockAccount',
+        label: 'Block this account',
+        danger: true,
+      ));
+    }
+
+    final overlay =
+        Overlay.of(triggerContext).context.findRenderObject() as RenderBox;
+    final box = triggerContext.findRenderObject() as RenderBox;
+    final rect = Rect.fromPoints(
+      box.localToGlobal(Offset.zero, ancestor: overlay),
+      box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
+    );
+
+    final selected = await showMenu<String>(
+      context: context,
+      color: const Color(0xFF0E1730),
+      surfaceTintColor: Colors.transparent,
+      position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      items: entries
+          .map(
+            (item) => PopupMenuItem<String>(
+              value: item.id,
+              child: Text(
+                item.label,
+                style: TextStyle(
+                  color: item.danger
+                      ? const Color(0xFFF87171)
+                      : const Color(0xFFE5E7EB),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+
+    if (!mounted || selected == null) return;
+    switch (selected) {
+      case 'editReel':
+        return _onReelMenuAction(PostMenuAction.editPost);
+      case 'editVisibility':
+        return _onReelMenuAction(PostMenuAction.editVisibility);
+      case 'toggleComments':
+        return _onReelMenuAction(PostMenuAction.toggleComments);
+      case 'toggleHideLike':
+        return _onReelMenuAction(PostMenuAction.toggleHideLike);
+      case 'downloadReel':
+        return _downloadCurrentReel();
+      case 'copyLink':
+        return _onReelMenuAction(PostMenuAction.copyLink);
+      case 'deleteReel':
+        return _onReelMenuAction(PostMenuAction.deletePost);
+      case 'followToggle':
+        return _onReelMenuAction(PostMenuAction.followToggle);
+      case 'saveToggle':
+        return _onReelMenuAction(PostMenuAction.saveToggle);
+      case 'hideReel':
+        return _onReelMenuAction(PostMenuAction.hidePost);
+      case 'reportReel':
+        return _onReelMenuAction(PostMenuAction.reportPost);
+      case 'blockAccount':
+        return _onReelMenuAction(PostMenuAction.blockAccount);
     }
   }
 
@@ -763,6 +1261,18 @@ class _ItemPageState extends State<_ItemPage> {
     final authorId =
         (widget.item['authorId'] as String?) ??
         ((widget.item['author'] as Map?)?['id'] as String?);
+    final normalized = _normalizeItem(
+      widget.item,
+      fallbackAuthorId: widget.profileUserId,
+      fallbackAuthorUsername: widget.profileUsername,
+      fallbackAuthorDisplayName: widget.profileDisplayName,
+      fallbackAuthorAvatarUrl: widget.profileAvatarUrl,
+    );
+    final commentsLocked = normalized['allowComments'] == false;
+    if (commentsLocked) {
+      _showSnack('Comments are turned off for this reel');
+      return;
+    }
 
     showModalBottomSheet<void>(
       context: context,
@@ -773,6 +1283,7 @@ class _ItemPageState extends State<_ItemPage> {
           postId: itemId,
           viewerId: widget.viewerId,
           postAuthorId: authorId,
+          allowComments: normalized['allowComments'] != false,
           onCommentAdded: () {
             if (!mounted) return;
             final stats = widget.item['stats'] as Map<String, dynamic>?;
@@ -829,11 +1340,20 @@ class _ItemPageState extends State<_ItemPage> {
         (normalized['authorId'] as String?) ?? (author?['id'] as String?) ?? '';
     final repostOf = normalized['repostOf'] as String?;
     final isRepost = repostOf != null && repostOf.isNotEmpty;
-    final repostOriginName = _resolveRepostOriginName(normalized);
+    final repostUsername =
+        (normalized['repostOfAuthorUsername'] as String?) ??
+        (_asStringKeyMap(normalized['repostOfAuthor'])?['username'] as String?);
     final isOwn =
         widget.viewerId != null &&
         widget.viewerId!.isNotEmpty &&
         authorId == widget.viewerId;
+    final hideLikesForViewer = _asBool(normalized['hideLikeCount']) && !isOwn;
+    final commentsLocked = normalized['allowComments'] == false;
+    final location = (normalized['location'] as String?)?.trim();
+    final hashtags = ((normalized['hashtags'] as List?) ?? const [])
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
 
     return GestureDetector(
       onTap: _handleVideoTap,
@@ -983,24 +1503,18 @@ class _ItemPageState extends State<_ItemPage> {
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: RichText(
-                          overflow: TextOverflow.ellipsis,
-                          text: TextSpan(
-                            style: const TextStyle(
-                              color: Color(0xFF7A8BB0),
-                              fontSize: 12,
-                            ),
-                            children: [
-                              const TextSpan(text: 'Reposted from '),
-                              TextSpan(
-                                text: repostOriginName,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
+                        child: Text(
+                          repostUsername != null && repostUsername.isNotEmpty
+                              ? 'Reposted from @$repostUsername'
+                              : 'Reposted',
+                          style: const TextStyle(
+                            color: Color(0xFF9FB0CC),
+                            fontSize: 12,
+                            shadows: [
+                              Shadow(blurRadius: 4, color: Colors.black54),
                             ],
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -1093,7 +1607,102 @@ class _ItemPageState extends State<_ItemPage> {
                   const SizedBox(height: 10),
                   _ExpandableCaption(text: content),
                 ],
+                if (location != null && location.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      final q = Uri.encodeQueryComponent(location);
+                      final uri = Uri.parse(
+                        'https://www.google.com/maps/search/?api=1&query=$q',
+                      );
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    },
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.place_outlined,
+                          size: 14,
+                          color: Color(0xFF9FB0CC),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            location,
+                            style: const TextStyle(
+                              color: Color(0xFFCDD5E0),
+                              fontSize: 12,
+                              shadows: [
+                                Shadow(blurRadius: 4, color: Colors.black54),
+                              ],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (hashtags.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: hashtags.map((tag) {
+                      final label = tag.startsWith('#') ? tag : '#$tag';
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(
+                            0xFF4AA3E4,
+                          ).withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            color: Color(0xFFE8F3FF),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
+            ),
+          ),
+          Positioned(
+            top: widget.forceReelUi
+                ? MediaQuery.of(context).padding.top + 56
+                : MediaQuery.of(context).padding.top + 12,
+            right: 12,
+            child: Builder(
+              builder: (menuCtx) => GestureDetector(
+                onTap: () => _openReelMenu(menuCtx),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.more_horiz_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
             ),
           ),
           Positioned(
@@ -1107,15 +1716,15 @@ class _ItemPageState extends State<_ItemPage> {
                       ? Icons.favorite_rounded
                       : Icons.favorite_border_rounded,
                   color: _liked ? const Color(0xFFE53935) : Colors.white,
-                  label: _fmtCountInt(hearts),
+                  label: hideLikesForViewer ? '' : _fmtCountInt(hearts),
                   onTap: _onLikeTap,
                 ),
                 const SizedBox(height: 20),
                 _ActionButton(
                   icon: Icons.chat_bubble_outline_rounded,
-                  color: Colors.white,
-                  label: _fmtCountInt(comments),
-                  onTap: _openReelCommentsSheet,
+                  color: commentsLocked ? Colors.white54 : Colors.white,
+                  label: commentsLocked ? 'Off' : _fmtCountInt(comments),
+                  onTap: commentsLocked ? () {} : _openReelCommentsSheet,
                 ),
                 const SizedBox(height: 20),
                 _ActionButton(
