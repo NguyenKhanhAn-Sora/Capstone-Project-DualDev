@@ -13,6 +13,7 @@ import '../post/utils/post_edit_utils.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../profile/profile_screen.dart';
 import '../reels/reels_screen.dart';
+import '../search/search_screen.dart';
 import '../report/report_problem_screen.dart';
 import '../report/report_post_sheet.dart';
 import 'models/feed_post.dart';
@@ -844,14 +845,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       surfaceTintColor: Colors.transparent,
       centerTitle: false,
       titleSpacing: 14,
-      title: const Text(
-        'CORDIGRAM',
-        style: TextStyle(
-          color: Color(0xFFE8ECF8),
-          fontWeight: FontWeight.w800,
-          fontSize: 17,
-          letterSpacing: 1.2,
-        ),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Image(
+            image: AssetImage('assets/images/cordigram-logo.png'),
+            width: 32,
+            height: 32,
+          ),
+          SizedBox(width: 8),
+          Text(
+            'CORDIGRAM',
+            style: TextStyle(
+              color: Color(0xFFE8ECF8),
+              fontWeight: FontWeight.w800,
+              fontSize: 17,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ],
       ),
       actions: [
         // Search
@@ -862,9 +874,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             size: 27,
           ),
           tooltip: 'Search',
-          onPressed: () => ScaffoldMessenger.of(
+          onPressed: () => Navigator.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Search coming soon'))),
+          ).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
         ),
         // Notifications with badge
         _NavBadgeButton(
