@@ -74,22 +74,32 @@ Future<bool> showReportPostSheet(
   BuildContext context, {
   required String postId,
   required Map<String, String> authHeader,
+  String subjectLabel = 'post',
 }) async {
   final result = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _ReportPostSheet(postId: postId, authHeader: authHeader),
+    builder: (_) => _ReportPostSheet(
+      postId: postId,
+      authHeader: authHeader,
+      subjectLabel: subjectLabel,
+    ),
   );
 
   return result == true;
 }
 
 class _ReportPostSheet extends StatefulWidget {
-  const _ReportPostSheet({required this.postId, required this.authHeader});
+  const _ReportPostSheet({
+    required this.postId,
+    required this.authHeader,
+    required this.subjectLabel,
+  });
 
   final String postId;
   final Map<String, String> authHeader;
+  final String subjectLabel;
 
   @override
   State<_ReportPostSheet> createState() => _ReportPostSheetState();
@@ -186,9 +196,9 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
                       ),
                     ),
                   ),
-                const Text(
-                  'Report post',
-                  style: TextStyle(
+                Text(
+                  'Report ${widget.subjectLabel}',
+                  style: const TextStyle(
                     color: Color(0xFFE8ECF8),
                     fontSize: 16,
                     fontWeight: FontWeight.w700,

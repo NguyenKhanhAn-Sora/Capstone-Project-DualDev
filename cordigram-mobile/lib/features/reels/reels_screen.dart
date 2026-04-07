@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import '../../core/services/api_service.dart';
@@ -15,9 +17,12 @@ import '../../core/services/auth_storage.dart';
 import '../../core/widgets/comment_sheet_widgets.dart';
 import '../home/models/feed_post.dart';
 import '../home/services/post_interaction_service.dart';
+import '../home/widgets/post_card.dart' show PostMenuAction;
 import '../profile/profile_screen.dart';
 import '../post/post_detail_screen.dart' show CommentItem, CommentLinkPreview;
+import '../post/utils/post_edit_utils.dart';
 import '../report/report_comment_sheet.dart';
+import '../report/report_post_sheet.dart';
 
 // ── Reels screen ──────────────────────────────────────────────────────────────
 
@@ -54,6 +59,18 @@ class _ReelsScreenState extends State<ReelsScreen> {
   static Map<String, String> get _authHeader => {
     'Authorization': 'Bearer ${AuthStorage.accessToken}',
   };
+
+  void _showSnack(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error
+            ? const Color(0xFFB91C1C)
+            : const Color(0xFF1A2235),
+      ),
+    );
+  }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -292,6 +309,11 @@ class _ReelsScreenState extends State<ReelsScreen> {
     final future = wasSaved
         ? PostInteractionService.unsave(s.post.id)
         : PostInteractionService.save(s.post.id);
+    if (!wasSaved) {
+      _showSnack('Saved');
+    } else {
+      _showSnack('Removed from saved');
+    }
     future.catchError((_) {
       if (!mounted) return;
       setState(() {
@@ -305,6 +327,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
           impressions: s.stats.impressions,
         );
       });
+      _showSnack('Failed to update save', error: true);
     });
   }
 
@@ -312,16 +335,321 @@ class _ReelsScreenState extends State<ReelsScreen> {
     if (index >= _reels.length) return;
     final s = _reels[index];
     final wasFollowing = s.following;
-    setState(() => s.following = !wasFollowing);
     final authorId = s.post.authorId ?? s.post.author?.id ?? '';
     if (authorId.isEmpty) return;
+    final nextFollow = !wasFollowing;
+
+    setState(() {
+      for (final reelState in _reels) {
+        final id = reelState.post.authorId ?? reelState.post.author?.id;
+        if (id == authorId) reelState.following = nextFollow;
+      }
+    });
+
     final future = wasFollowing
         ? PostInteractionService.unfollow(authorId)
         : PostInteractionService.follow(authorId);
     future.catchError((_) {
       if (!mounted) return;
-      setState(() => s.following = wasFollowing);
+      setState(() {
+        for (final reelState in _reels) {
+          final id = reelState.post.authorId ?? reelState.post.author?.id;
+          if (id == authorId) reelState.following = wasFollowing;
+        }
+      });
     });
+  }
+
+  Future<void> _downloadReelAt(int index) async {
+    if (index < 0 || index >= _reels.length) return;
+    final reel = _reels[index].post;
+    if (reel.allowDownload != true || reel.media.isEmpty) {
+      _showSnack('Download is disabled for this reel', error: true);
+      return;
+    }
+
+    final media = reel.media.firstWhere(
+      (m) => m.type == 'video',
+      orElse: () => reel.media.first,
+    );
+
+    try {
+      final res = await http
+          .get(Uri.parse(media.url))
+          .timeout(const Duration(seconds: 45));
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception('download failed');
+      }
+
+      final bytes = res.bodyBytes;
+      final dir = await _resolveDownloadDirectory();
+      final filename = _buildFilename(media, bytes);
+      final file = File('${dir.path}${Platform.pathSeparator}$filename');
+      await file.writeAsBytes(bytes, flush: true);
+
+      _showSnack('Downloaded: ${file.path}');
+    } catch (_) {
+      _showSnack('Failed to download reel', error: true);
+    }
+  }
+
+  Future<Directory> _resolveDownloadDirectory() async {
+    if (Platform.isAndroid) {
+      final direct = Directory('/storage/emulated/0/Download');
+      if (await direct.exists()) return direct;
+    }
+
+    final external = await getExternalStorageDirectory();
+    if (external != null) return external;
+
+    return getApplicationDocumentsDirectory();
+  }
+
+  String _buildFilename(FeedMedia media, Uint8List bytes) {
+    final uri = Uri.tryParse(media.url);
+    final segment = uri?.pathSegments.isNotEmpty == true
+        ? uri!.pathSegments.last
+        : '';
+    final fromUrl = segment.split('?').first.trim();
+    final ext = _detectExtension(media, fromUrl, bytes);
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    if (fromUrl.isNotEmpty && fromUrl.contains('.')) {
+      final safe = fromUrl.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+      return 'cordigram_reel_$ts\_$safe';
+    }
+    return 'cordigram_reel_$ts.$ext';
+  }
+
+  String _detectExtension(FeedMedia media, String fromUrl, Uint8List bytes) {
+    final lower = fromUrl.toLowerCase();
+    for (final ext in ['mp4', 'mov', 'm4v', 'webm', 'jpg', 'jpeg', 'png']) {
+      if (lower.endsWith('.$ext')) return ext;
+    }
+    if (bytes.length >= 12) {
+      if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E) {
+        return 'png';
+      }
+      if (bytes[0] == 0xFF && bytes[1] == 0xD8) {
+        return 'jpg';
+      }
+    }
+    return media.type == 'video' ? 'mp4' : 'jpg';
+  }
+
+  Future<void> _onReelMenuAction(int index, PostMenuAction action) async {
+    if (index < 0 || index >= _reels.length) return;
+    final state = _reels[index];
+    final reel = state.post;
+
+    switch (action) {
+      case PostMenuAction.editPost:
+        final updated = await showEditPostSheet(
+          context,
+          post: reel,
+          entityLabel: 'reel',
+        );
+        if (updated == null || !mounted || index >= _reels.length) return;
+        setState(() {
+          _reels[index] = state.copyWith(
+            post: updated,
+            liked: updated.liked ?? state.liked,
+            saved: updated.saved ?? state.saved,
+            following: updated.following ?? state.following,
+            stats: updated.stats,
+          );
+        });
+        _showSnack('Reel updated');
+        return;
+      case PostMenuAction.editVisibility:
+        final nextVisibility = await showEditVisibilitySheet(
+          context,
+          postId: reel.id,
+          currentVisibility: reel.visibility ?? 'public',
+        );
+        if (nextVisibility == null || !mounted || index >= _reels.length) {
+          return;
+        }
+        setState(() {
+          _reels[index] = state.copyWith(
+            post: reel.copyWith(visibility: nextVisibility),
+          );
+        });
+        _showSnack('Visibility updated');
+        return;
+      case PostMenuAction.toggleComments:
+        final currentAllowed = reel.allowComments != false;
+        final nextAllowed = !currentAllowed;
+        setState(() {
+          _reels[index] = state.copyWith(
+            post: reel.copyWith(allowComments: nextAllowed),
+          );
+        });
+        try {
+          await PostInteractionService.setAllowComments(reel.id, nextAllowed);
+          _showSnack(
+            nextAllowed ? 'Comments turned on' : 'Comments turned off',
+          );
+        } catch (_) {
+          if (!mounted || index >= _reels.length) return;
+          setState(() {
+            _reels[index] = state.copyWith(
+              post: reel.copyWith(allowComments: currentAllowed),
+            );
+          });
+          _showSnack('Failed to update comments', error: true);
+        }
+        return;
+      case PostMenuAction.toggleHideLike:
+        final currentHidden = reel.hideLikeCount == true;
+        final nextHidden = !currentHidden;
+        setState(() {
+          _reels[index] = state.copyWith(
+            post: reel.copyWith(hideLikeCount: nextHidden),
+          );
+        });
+        try {
+          await PostInteractionService.setHideLikeCount(reel.id, nextHidden);
+          _showSnack(nextHidden ? 'Like count hidden' : 'Like count visible');
+        } catch (_) {
+          if (!mounted || index >= _reels.length) return;
+          setState(() {
+            _reels[index] = state.copyWith(
+              post: reel.copyWith(hideLikeCount: currentHidden),
+            );
+          });
+          _showSnack('Failed to update like visibility', error: true);
+        }
+        return;
+      case PostMenuAction.copyLink:
+        final link = PostInteractionService.reelPermalink(reel.id);
+        await Clipboard.setData(ClipboardData(text: link));
+        _showSnack('Link copied');
+        return;
+      case PostMenuAction.deletePost:
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF111827),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: const Text(
+              'Delete reel',
+              style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
+            ),
+            content: const Text(
+              'This action cannot be undone.',
+              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Color(0xFF7A8BB0)),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+        try {
+          await PostInteractionService.deletePost(reel.id);
+          _showSnack('Reel deleted');
+          await _loadReels(refresh: true);
+        } catch (_) {
+          _showSnack('Failed to delete reel', error: true);
+        }
+        return;
+      case PostMenuAction.followToggle:
+        _onFollow(index);
+        return;
+      case PostMenuAction.saveToggle:
+        _onSave(index);
+        return;
+      case PostMenuAction.hidePost:
+        try {
+          await PostInteractionService.hide(reel.id);
+          _showSnack('Reel hidden');
+          await _loadReels(refresh: true);
+        } catch (_) {
+          _showSnack('Failed to hide reel', error: true);
+        }
+        return;
+      case PostMenuAction.reportPost:
+        final token = AuthStorage.accessToken;
+        if (token == null) {
+          _showSnack('Please sign in first', error: true);
+          return;
+        }
+        final reported = await showReportPostSheet(
+          context,
+          postId: reel.id,
+          authHeader: {'Authorization': 'Bearer $token'},
+          subjectLabel: 'reel',
+        );
+        if (reported) _showSnack('Report submitted');
+        return;
+      case PostMenuAction.blockAccount:
+        final userId = reel.authorId ?? reel.author?.id;
+        if (userId == null || userId.isEmpty) return;
+        final username = reel.authorUsername ?? reel.author?.username ?? 'user';
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF111827),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: Text(
+              'Block @$username?',
+              style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
+            ),
+            content: const Text(
+              'You will no longer see reels from this account.',
+              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: Color(0xFF7A8BB0)),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Block',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+        try {
+          await PostInteractionService.blockUser(userId);
+          _showSnack('Account blocked');
+          await _loadReels(refresh: true);
+        } catch (_) {
+          _showSnack('Failed to block account', error: true);
+        }
+        return;
+    }
   }
 
   void _toggleMute() {
@@ -336,6 +664,11 @@ class _ReelsScreenState extends State<ReelsScreen> {
   void _openComments(int index) {
     if (index >= _reels.length) return;
     final s = _reels[index];
+    final commentsLocked = s.post.allowComments == false;
+    if (commentsLocked) {
+      _showSnack('Comments are turned off for this reel');
+      return;
+    }
     _controllers[index]?.pause();
 
     showModalBottomSheet<void>(
@@ -346,6 +679,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
         postId: s.post.id,
         viewerId: _viewerId,
         postAuthorId: s.post.authorId ?? s.post.author?.id,
+        allowComments: s.post.allowComments != false,
         onCommentAdded: () {
           if (!mounted) return;
           setState(() {
@@ -433,6 +767,8 @@ class _ReelsScreenState extends State<ReelsScreen> {
               onComment: () => _openComments(index),
               onMuteToggle: _toggleMute,
               onFollow: () => _onFollow(index),
+              onMenuAction: (action) => _onReelMenuAction(index, action),
+              onDownloadReel: () => _downloadReelAt(index),
             ),
           ),
           // Loading indicator when fetching more reels.
@@ -473,6 +809,8 @@ class _ReelPage extends StatefulWidget {
     required this.onComment,
     required this.onMuteToggle,
     required this.onFollow,
+    required this.onMenuAction,
+    required this.onDownloadReel,
   });
 
   final FeedPostState state;
@@ -485,6 +823,8 @@ class _ReelPage extends StatefulWidget {
   final VoidCallback onComment;
   final VoidCallback onMuteToggle;
   final VoidCallback onFollow;
+  final Future<void> Function(PostMenuAction action) onMenuAction;
+  final Future<void> Function() onDownloadReel;
 
   @override
   State<_ReelPage> createState() => _ReelPageState();
@@ -517,6 +857,137 @@ class _ReelPageState extends State<_ReelPage> {
     }
   }
 
+  Future<void> _openReelMenu(BuildContext triggerContext) async {
+    final reel = widget.state.post;
+    final isOwner =
+        widget.viewerId != null &&
+        widget.viewerId!.isNotEmpty &&
+        (reel.authorId == widget.viewerId ||
+            reel.author?.id == widget.viewerId);
+
+    final entries = <({String id, String label, bool danger})>[];
+    final canDownload = reel.allowDownload == true && reel.media.isNotEmpty;
+    if (isOwner) {
+      entries.add((id: 'editReel', label: 'Edit reel', danger: false));
+      entries.add((
+        id: 'editVisibility',
+        label: 'Edit visibility',
+        danger: false,
+      ));
+      entries.add((
+        id: 'toggleComments',
+        label: reel.allowComments == false
+            ? 'Turn on comments'
+            : 'Turn off comments',
+        danger: false,
+      ));
+      entries.add((
+        id: 'toggleHideLike',
+        label: reel.hideLikeCount == true ? 'Show like' : 'Hide like',
+        danger: false,
+      ));
+      if (canDownload) {
+        entries.add((
+          id: 'downloadReel',
+          label: 'Download this reel',
+          danger: false,
+        ));
+      }
+      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+      entries.add((id: 'deleteReel', label: 'Delete reel', danger: true));
+    } else {
+      if (canDownload) {
+        entries.add((
+          id: 'downloadReel',
+          label: 'Download this reel',
+          danger: false,
+        ));
+      }
+      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+      entries.add((
+        id: 'followToggle',
+        label: widget.state.following ? 'Unfollow' : 'Follow',
+        danger: false,
+      ));
+      entries.add((
+        id: 'saveToggle',
+        label: widget.state.saved ? 'Unsave this reel' : 'Save this reel',
+        danger: false,
+      ));
+      entries.add((id: 'hideReel', label: 'Hide this reel', danger: false));
+      entries.add((id: 'reportReel', label: 'Report', danger: false));
+      entries.add((
+        id: 'blockAccount',
+        label: 'Block this account',
+        danger: true,
+      ));
+    }
+
+    final overlay =
+        Overlay.of(triggerContext).context.findRenderObject() as RenderBox;
+    final box = triggerContext.findRenderObject() as RenderBox;
+    final rect = Rect.fromPoints(
+      box.localToGlobal(Offset.zero, ancestor: overlay),
+      box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
+    );
+
+    final selected = await showMenu<String>(
+      context: context,
+      color: const Color(0xFF0E1730),
+      surfaceTintColor: Colors.transparent,
+      position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      items: entries
+          .map(
+            (item) => PopupMenuItem<String>(
+              value: item.id,
+              child: Text(
+                item.label,
+                style: TextStyle(
+                  color: item.danger
+                      ? const Color(0xFFF87171)
+                      : const Color(0xFFE5E7EB),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+
+    if (!mounted || selected == null) return;
+    switch (selected) {
+      case 'editReel':
+        return widget.onMenuAction(PostMenuAction.editPost);
+      case 'editVisibility':
+        return widget.onMenuAction(PostMenuAction.editVisibility);
+      case 'toggleComments':
+        return widget.onMenuAction(PostMenuAction.toggleComments);
+      case 'toggleHideLike':
+        return widget.onMenuAction(PostMenuAction.toggleHideLike);
+      case 'copyLink':
+        return widget.onMenuAction(PostMenuAction.copyLink);
+      case 'downloadReel':
+        return widget.onDownloadReel();
+      case 'deleteReel':
+        return widget.onMenuAction(PostMenuAction.deletePost);
+      case 'followToggle':
+        return widget.onMenuAction(PostMenuAction.followToggle);
+      case 'saveToggle':
+        return widget.onMenuAction(PostMenuAction.saveToggle);
+      case 'hideReel':
+        return widget.onMenuAction(PostMenuAction.hidePost);
+      case 'reportReel':
+        return widget.onMenuAction(PostMenuAction.reportPost);
+      case 'blockAccount':
+        return widget.onMenuAction(PostMenuAction.blockAccount);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctrl = widget.controller;
@@ -527,6 +998,10 @@ class _ReelPageState extends State<_ReelPage> {
         (reel.authorId == widget.viewerId ||
             reel.author?.id == widget.viewerId);
     final authorId = reel.authorId ?? reel.author?.id ?? '';
+    final hideLikesForViewer = (reel.hideLikeCount == true) && !isOwn;
+    final commentsLocked = reel.allowComments == false;
+    final repostUsername =
+        reel.repostOfAuthor?.username ?? reel.repostOfAuthorUsername;
 
     return GestureDetector(
       onTap: _handleTap,
@@ -607,6 +1082,34 @@ class _ReelPageState extends State<_ReelPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (reel.repostOf != null && reel.repostOf!.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.repeat_rounded,
+                        size: 14,
+                        color: Color(0xFF7A8BB0),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          repostUsername != null && repostUsername.isNotEmpty
+                              ? 'Reposted from @$repostUsername'
+                              : 'Reposted',
+                          style: const TextStyle(
+                            color: Color(0xFF9FB0CC),
+                            fontSize: 12,
+                            shadows: [
+                              Shadow(blurRadius: 4, color: Colors.black54),
+                            ],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 // Author row
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -693,7 +1196,103 @@ class _ReelPageState extends State<_ReelPage> {
                   const SizedBox(height: 10),
                   _ExpandableCaption(text: reel.content),
                 ],
+                if (reel.location != null &&
+                    reel.location!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      final q = Uri.encodeQueryComponent(reel.location!.trim());
+                      final uri = Uri.parse(
+                        'https://www.google.com/maps/search/?api=1&query=$q',
+                      );
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    },
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.place_outlined,
+                          size: 14,
+                          color: Color(0xFF9FB0CC),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            reel.location!,
+                            style: const TextStyle(
+                              color: Color(0xFFCDD5E0),
+                              fontSize: 12,
+                              shadows: [
+                                Shadow(blurRadius: 4, color: Colors.black54),
+                              ],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (reel.hashtags.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: reel.hashtags.map((tag) {
+                      final label = tag.startsWith('#') ? tag : '#$tag';
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(
+                            0xFF4AA3E4,
+                          ).withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            color: Color(0xFFE8F3FF),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
+            ),
+          ),
+
+          // ── Menu button (top-right) ───────────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            right: 12,
+            child: Builder(
+              builder: (menuCtx) => GestureDetector(
+                onTap: () => _openReelMenu(menuCtx),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.more_horiz_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
             ),
           ),
 
@@ -712,16 +1311,22 @@ class _ReelPageState extends State<_ReelPage> {
                   color: widget.state.liked
                       ? const Color(0xFFE53935)
                       : Colors.white,
-                  label: _formatCount(widget.state.stats.hearts),
+                  label: hideLikesForViewer
+                      ? ''
+                      : _formatCount(widget.state.stats.hearts),
                   onTap: widget.onLike,
                 ),
                 const SizedBox(height: 20),
                 // Comment
                 _ActionButton(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  color: Colors.white,
-                  label: _formatCount(widget.state.stats.comments),
-                  onTap: widget.onComment,
+                  icon: commentsLocked
+                      ? Icons.chat_bubble_outline_rounded
+                      : Icons.chat_bubble_outline_rounded,
+                  color: commentsLocked ? Colors.white54 : Colors.white,
+                  label: commentsLocked
+                      ? 'Off'
+                      : _formatCount(widget.state.stats.comments),
+                  onTap: commentsLocked ? () {} : widget.onComment,
                 ),
                 const SizedBox(height: 20),
                 // Save
@@ -1087,12 +1692,14 @@ class ReelCommentSheet extends StatelessWidget {
     required this.postId,
     this.viewerId,
     this.postAuthorId,
+    this.allowComments = true,
     this.onCommentAdded,
   });
 
   final String postId;
   final String? viewerId;
   final String? postAuthorId;
+  final bool allowComments;
   final VoidCallback? onCommentAdded;
 
   @override
@@ -1101,6 +1708,7 @@ class ReelCommentSheet extends StatelessWidget {
       postId: postId,
       viewerId: viewerId,
       postAuthorId: postAuthorId,
+      allowComments: allowComments,
       onCommentAdded: onCommentAdded,
     );
   }
@@ -1113,12 +1721,14 @@ class _ReelCommentSheet extends StatefulWidget {
     required this.postId,
     this.viewerId,
     this.postAuthorId,
+    this.allowComments = true,
     this.onCommentAdded,
   });
 
   final String postId;
   final String? viewerId;
   final String? postAuthorId;
+  final bool allowComments;
   final VoidCallback? onCommentAdded;
 
   @override
@@ -1258,6 +1868,17 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
     _RCommentMediaData? media,
     String? parentId,
   }) async {
+    if (!widget.allowComments) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Comments are turned off for this reel'),
+          backgroundColor: Color(0xFF1A2235),
+        ),
+      );
+      return;
+    }
+
     Map<String, dynamic>? mediaJson;
     if (media != null) {
       if (media.file != null) {
@@ -1419,11 +2040,28 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
               ),
 
               // Input bar
-              _RCommentInputBar(
-                onSubmit: _onCommentSubmit,
-                replyTarget: _replyTarget,
-                onCancelReply: () => setState(() => _replyTarget = null),
-              ),
+              if (widget.allowComments)
+                _RCommentInputBar(
+                  onSubmit: _onCommentSubmit,
+                  replyTarget: _replyTarget,
+                  onCancelReply: () => setState(() => _replyTarget = null),
+                )
+              else
+                Container(
+                  width: double.infinity,
+                  color: const Color(0xFF0D1526),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    12,
+                    16,
+                    12 + MediaQuery.of(context).viewPadding.bottom,
+                  ),
+                  child: const Text(
+                    'Comments are turned off for this reel.',
+                    style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
             ],
           ),
         );

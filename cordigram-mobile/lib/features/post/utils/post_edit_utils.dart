@@ -47,6 +47,7 @@ extension PostVisibilityOptionX on PostVisibilityOption {
 Future<FeedPost?> showEditPostSheet(
   BuildContext context, {
   required FeedPost post,
+  String entityLabel = 'post',
 }) {
   return showModalBottomSheet<FeedPost>(
     context: context,
@@ -55,7 +56,7 @@ Future<FeedPost?> showEditPostSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
     ),
-    builder: (_) => _EditPostSheet(post: post),
+    builder: (_) => _EditPostSheet(post: post, entityLabel: entityLabel),
   );
 }
 
@@ -78,9 +79,10 @@ Future<String?> showEditVisibilitySheet(
 }
 
 class _EditPostSheet extends StatefulWidget {
-  const _EditPostSheet({required this.post});
+  const _EditPostSheet({required this.post, required this.entityLabel});
 
   final FeedPost post;
+  final String entityLabel;
 
   @override
   State<_EditPostSheet> createState() => _EditPostSheetState();
@@ -282,9 +284,9 @@ class _EditPostSheetState extends State<_EditPostSheet> {
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
-              'Edit post',
-              style: TextStyle(
+            Text(
+              'Edit ${widget.entityLabel}',
+              style: const TextStyle(
                 color: Color(0xFFE8ECF8),
                 fontSize: 17,
                 fontWeight: FontWeight.w700,

@@ -44,6 +44,9 @@ class PostInteractionService {
   static String permalink(String postId) =>
       '${AppConfig.webBaseUrl}/post/$postId';
 
+  static String reelPermalink(String reelId) =>
+      '${AppConfig.webBaseUrl}/reels/$reelId';
+
   // ── Like / Unlike ────────────────────────────────────────────────────────
 
   /// POST /posts/:id/like
