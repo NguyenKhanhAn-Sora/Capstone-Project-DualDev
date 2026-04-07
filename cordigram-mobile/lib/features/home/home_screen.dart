@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../auth/login_screen.dart';
+import '../explore/explore_screen.dart';
 import '../post/create_tab_screen.dart';
 import '../post/post_detail_screen.dart';
 import '../post/utils/post_edit_utils.dart';
@@ -946,7 +947,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       children: [
         _buildFeedTab(),
         const _PlaceholderTab(label: 'Following'),
-        const _PlaceholderTab(label: 'Explore'),
+        const ExploreScreen(),
         const ReelsScreen(),
         const CreateTabScreen(),
       ],

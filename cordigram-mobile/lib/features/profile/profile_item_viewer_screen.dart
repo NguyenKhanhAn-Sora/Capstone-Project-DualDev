@@ -8,12 +8,14 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
+import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../home/models/feed_post.dart';
 import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostMenuAction;
 import '../post/post_detail_screen.dart';
 import '../post/utils/post_edit_utils.dart';
+import '../post/utils/repost_flow_utils.dart';
 import '../profile/profile_screen.dart';
 import '../reels/reels_screen.dart' show ReelCommentSheet;
 import '../report/report_post_sheet.dart';
@@ -847,6 +849,112 @@ class _ItemPageState extends State<_ItemPage> {
     }
   }
 
+  String _resolveOriginalPostId(Map<String, dynamic> normalized, String id) {
+    final repostOf = (normalized['repostOf'] as String?)?.trim();
+    if (repostOf != null && repostOf.isNotEmpty) return repostOf;
+    return id;
+  }
+
+  void _incrementRepostStat(dynamic statsRaw) {
+    if (statsRaw is! Map) return;
+    final stats = statsRaw.cast<String, dynamic>();
+    final curr = _asInt(stats['reposts'] ?? stats['shares']);
+    final next = (curr + 1).clamp(0, 999999999);
+    setState(() {
+      stats['reposts'] = next;
+      stats['shares'] = next;
+    });
+  }
+
+  Future<void> _onRepostTap() async {
+    final token = AuthStorage.accessToken;
+    if (token == null) {
+      _showSnack('Please sign in to repost', error: true);
+      return;
+    }
+
+    final normalized = _normalizeItem(
+      widget.item,
+      fallbackAuthorId: widget.profileUserId,
+      fallbackAuthorUsername: widget.profileUsername,
+      fallbackAuthorDisplayName: widget.profileDisplayName,
+      fallbackAuthorAvatarUrl: widget.profileAvatarUrl,
+    );
+    final id = (normalized['id'] as String?)?.trim() ?? '';
+    if (id.isEmpty) return;
+
+    final kind =
+        ((normalized['repostKind'] as String?) ??
+                (normalized['kind'] as String?) ??
+                'reel')
+            .trim();
+    final authorLabel =
+        (normalized['authorUsername'] as String?) ??
+        (normalized['authorDisplayName'] as String?) ??
+        'user';
+    final originalId = _resolveOriginalPostId(normalized, id);
+
+    final selection = await showRepostFlowSheet(
+      context: context,
+      label: '@$authorLabel',
+      kind: kind,
+      initialAllowDownload: _asBool(normalized['allowDownload']),
+    );
+    if (selection == null) return;
+
+    if (selection.action == RepostFlowAction.quick) {
+      try {
+        await PostInteractionService.quickRepost(originalId);
+        _incrementRepostStat(normalized['stats']);
+        _showSnack('Reposted');
+      } on ApiException catch (e) {
+        try {
+          await PostInteractionService.repost(originalId);
+          _incrementRepostStat(normalized['stats']);
+          _showSnack('Reposted');
+        } catch (_) {
+          _showSnack(
+            e.message.isNotEmpty ? e.message : 'Failed to repost',
+            error: true,
+          );
+        }
+      } catch (_) {
+        _showSnack('Failed to repost', error: true);
+      }
+      return;
+    }
+
+    final input = selection.quoteInput;
+    if (input == null) return;
+
+    final payload = RepostQuotePayload(
+      content: input.content,
+      hashtags: input.hashtags,
+      location: input.location,
+      visibility: input.visibility,
+      allowComments: input.allowComments,
+      allowDownload: _asBool(normalized['allowDownload']),
+      hideLikeCount: input.hideLikeCount,
+    );
+
+    try {
+      await PostInteractionService.quoteRepost(
+        originalPostId: originalId,
+        payload: payload,
+        kind: kind,
+      );
+      _incrementRepostStat(normalized['stats']);
+      _showSnack('Reposted with quote');
+    } on ApiException catch (e) {
+      _showSnack(
+        e.message.isNotEmpty ? e.message : 'Failed to repost with quote',
+        error: true,
+      );
+    } catch (_) {
+      _showSnack('Failed to repost with quote', error: true);
+    }
+  }
+
   Future<void> _downloadCurrentReel() async {
     final normalized = _normalizeItem(
       widget.item,
@@ -1383,6 +1491,7 @@ class _ItemPageState extends State<_ItemPage> {
     final stats = normalized['stats'] as Map?;
     final hearts = _asInt(stats?['hearts'] ?? stats?['likes']);
     final comments = _asInt(stats?['comments']);
+    final reposts = _asInt(stats?['reposts'] ?? stats?['shares']);
     final saves = _asInt(stats?['saves']);
     final content =
         (normalized['caption'] as String? ??
@@ -1795,6 +1904,13 @@ class _ItemPageState extends State<_ItemPage> {
                   color: commentsLocked ? Colors.white54 : Colors.white,
                   label: commentsLocked ? 'Off' : _fmtCountInt(comments),
                   onTap: commentsLocked ? () {} : _openReelCommentsSheet,
+                ),
+                const SizedBox(height: 20),
+                _ActionButton(
+                  icon: Icons.repeat_rounded,
+                  color: Colors.white,
+                  label: _fmtCountInt(reposts),
+                  onTap: _onRepostTap,
                 ),
                 const SizedBox(height: 20),
                 _ActionButton(
