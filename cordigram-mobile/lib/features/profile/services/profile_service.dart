@@ -187,6 +187,17 @@ class ProfileService {
     return list.whereType<Map<String, dynamic>>().toList();
   }
 
+  /// Fetch a single post/reel detail by id.
+  static Future<Map<String, dynamic>> fetchPostDetail(String postId) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    final data = await ApiService.get(
+      '/posts/${Uri.encodeComponent(postId)}',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+    return data;
+  }
+
   /// Check if a username is available.
   static Future<bool> checkUsername(
     String username, {

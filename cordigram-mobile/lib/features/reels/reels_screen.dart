@@ -1078,6 +1078,32 @@ class _RReplyTarget {
   final String? username;
 }
 
+/// Public wrapper so other screens can reuse the exact reels comment UI.
+class ReelCommentSheet extends StatelessWidget {
+  const ReelCommentSheet({
+    super.key,
+    required this.postId,
+    this.viewerId,
+    this.postAuthorId,
+    this.onCommentAdded,
+  });
+
+  final String postId;
+  final String? viewerId;
+  final String? postAuthorId;
+  final VoidCallback? onCommentAdded;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ReelCommentSheet(
+      postId: postId,
+      viewerId: viewerId,
+      postAuthorId: postAuthorId,
+      onCommentAdded: onCommentAdded,
+    );
+  }
+}
+
 // ── Comment sheet ─────────────────────────────────────────────────────────────
 
 class _ReelCommentSheet extends StatefulWidget {

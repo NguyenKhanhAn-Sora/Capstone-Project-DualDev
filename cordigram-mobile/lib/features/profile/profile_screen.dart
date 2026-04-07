@@ -151,6 +151,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     'repost': '',
   };
 
+  // repostOf postId -> resolved origin author fields
+  final Map<String, Map<String, String?>> _repostOriginCache = {};
+
   late final String? _viewerId;
 
   static const Color _bg = Color(0xFF0B1020);
@@ -245,6 +248,154 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   // ── Tab fetching ───────────────────────────────────────────────────────────
 
+  bool _hasRepostOrigin(Map<String, dynamic> item) {
+    final repostOf = item['repostOf'] as String?;
+    if (repostOf == null || repostOf.isEmpty) return true;
+    final username =
+        (item['repostOfAuthorUsername'] as String?) ??
+        ((item['repostOfAuthor'] as Map?)?['username'] as String?);
+    final displayName =
+        (item['repostOfAuthorDisplayName'] as String?) ??
+        ((item['repostOfAuthor'] as Map?)?['displayName'] as String?);
+    return (username != null && username.isNotEmpty) ||
+        (displayName != null && displayName.isNotEmpty);
+  }
+
+  Future<Map<String, String?>> _resolveRepostOrigin(String repostOf) async {
+    final cached = _repostOriginCache[repostOf];
+    if (cached != null) return cached;
+
+    try {
+      final data = await ProfileService.fetchPostDetail(repostOf);
+      final author = data['author'] as Map<String, dynamic>?;
+      final repostOfAuthor = (data['repostOfAuthor'] as Map?)
+          ?.cast<String, dynamic>();
+
+      String? originId =
+          (data['authorId'] as String?) ??
+          (author?['id'] as String?) ??
+          (data['repostOfAuthorId'] as String?) ??
+          (repostOfAuthor?['id'] as String?);
+      String? originUsername =
+          (data['authorUsername'] as String?) ??
+          (author?['username'] as String?) ??
+          (data['repostOfAuthorUsername'] as String?) ??
+          (repostOfAuthor?['username'] as String?);
+      String? originDisplayName =
+          (data['authorDisplayName'] as String?) ??
+          (author?['displayName'] as String?) ??
+          (data['repostOfAuthorDisplayName'] as String?) ??
+          (repostOfAuthor?['displayName'] as String?);
+      String? originAvatarUrl =
+          (data['authorAvatarUrl'] as String?) ??
+          (author?['avatarUrl'] as String?) ??
+          (data['repostOfAuthorAvatarUrl'] as String?) ??
+          (repostOfAuthor?['avatarUrl'] as String?);
+
+      // Fallback: resolve username/displayName via profile endpoint by authorId.
+      if ((originUsername == null || originUsername.isEmpty) &&
+          (originDisplayName == null || originDisplayName.isEmpty) &&
+          originId != null &&
+          originId.isNotEmpty) {
+        try {
+          final profile = await ProfileService.fetchProfile(originId);
+          originUsername = profile.username;
+          originDisplayName = profile.displayName;
+          originAvatarUrl = profile.avatarUrl;
+        } catch (_) {
+          // Keep origin fields as-is; caller will fall back to label.
+        }
+      }
+
+      final resolved = <String, String?>{
+        'id': originId,
+        'username': originUsername,
+        'displayName': originDisplayName,
+        'avatarUrl': originAvatarUrl,
+      };
+
+      final hasName =
+          (originUsername != null && originUsername.isNotEmpty) ||
+          (originDisplayName != null && originDisplayName.isNotEmpty);
+      // Cache only meaningful results; avoid pinning empty failures forever.
+      if (hasName) {
+        _repostOriginCache[repostOf] = resolved;
+      }
+      return resolved;
+    } catch (_) {
+      return <String, String?>{
+        'id': repostOf,
+        'username': null,
+        'displayName': null,
+        'avatarUrl': null,
+      };
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _hydrateRepostOrigins(
+    List<Map<String, dynamic>> items,
+  ) async {
+    final needed = <String>{};
+    for (final item in items) {
+      final repostOf = item['repostOf'] as String?;
+      if (repostOf != null && repostOf.isNotEmpty && !_hasRepostOrigin(item)) {
+        needed.add(repostOf);
+      }
+    }
+
+    if (needed.isNotEmpty) {
+      await Future.wait(needed.map(_resolveRepostOrigin));
+    }
+
+    return items.map((raw) {
+      final item = Map<String, dynamic>.from(raw);
+      final repostOf = item['repostOf'] as String?;
+      if (repostOf == null || repostOf.isEmpty) return item;
+      final origin = _repostOriginCache[repostOf];
+      if (origin == null) return item;
+
+      item['repostOfAuthorId'] ??= origin['id'];
+      item['repostOfAuthorUsername'] ??= origin['username'];
+      item['repostOfAuthorDisplayName'] ??= origin['displayName'];
+      item['repostOfAuthorAvatarUrl'] ??= origin['avatarUrl'];
+
+      final repostOfAuthor =
+          (item['repostOfAuthor'] as Map?)?.cast<String, dynamic>() ??
+          <String, dynamic>{};
+      repostOfAuthor['id'] ??= origin['id'];
+      repostOfAuthor['username'] ??= origin['username'];
+      repostOfAuthor['displayName'] ??= origin['displayName'];
+      repostOfAuthor['avatarUrl'] ??= origin['avatarUrl'];
+      item['repostOfAuthor'] = repostOfAuthor;
+
+      return item;
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _normalizeRepostOwner(
+    List<Map<String, dynamic>> items,
+  ) {
+    final p = _profile;
+    if (p == null) return items;
+    return items.map((raw) {
+      final item = Map<String, dynamic>.from(raw);
+      item['authorId'] = p.userId;
+      item['authorUsername'] = p.username;
+      item['authorDisplayName'] = p.displayName;
+      item['authorAvatarUrl'] = p.avatarUrl;
+      final author =
+          (item['author'] as Map?)?.cast<String, dynamic>() ??
+          <String, dynamic>{};
+      author['id'] = p.userId;
+      author['username'] = p.username;
+      author['displayName'] = p.displayName;
+      author['avatarUrl'] = p.avatarUrl;
+      author['isCreatorVerified'] = p.isCreatorVerified;
+      item['author'] = author;
+      return item;
+    }).toList();
+  }
+
   Future<void> _prefetchTab(String key) async {
     if (_tabLoading[key] == true || _tabLoaded[key] == true) return;
     final ownerId = _profile?.userId;
@@ -312,6 +463,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         items = raw;
       }
 
+      items = await _hydrateRepostOrigins(items);
+      if (key == 'repost') {
+        items = _normalizeRepostOwner(items);
+      }
+
       if (!mounted) return;
       setState(() {
         _tabItems[key] = items;
@@ -337,6 +493,51 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _navigateToItem(Map<String, dynamic> item, int index) {
     final key = _tabKeys[_tabController.index];
     final items = _tabItems[key]!;
+
+    // Only the dedicated Reels tab should open vertical reel-only navigation.
+    if (key == 'reels') {
+      final kind =
+          (item['repostKind'] as String?) ?? (item['kind'] as String?) ?? '';
+      final media =
+          (item['media'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          [];
+      final isReel =
+          kind == 'reel' ||
+          (media.isNotEmpty && media.first['type'] == 'video');
+
+      if (isReel) {
+        final reelItems = items.where((m) {
+          final k =
+              (m['repostKind'] as String?) ?? (m['kind'] as String?) ?? '';
+          final med =
+              (m['media'] as List?)
+                  ?.whereType<Map<String, dynamic>>()
+                  .toList() ??
+              [];
+          return k == 'reel' ||
+              (med.isNotEmpty && med.first['type'] == 'video');
+        }).toList();
+
+        final reelIndex = reelItems.indexWhere((m) => m['id'] == item['id']);
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ProfileReelViewerScreen(
+              items: reelItems,
+              initialIndex: reelIndex >= 0 ? reelIndex : 0,
+              viewerId: _viewerId,
+              profileUsername: _profile?.username,
+              profileDisplayName: _profile?.displayName,
+              profileAvatarUrl: _profile?.avatarUrl,
+              profileUserId: _profile?.userId,
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ProfileItemViewerScreen(
@@ -344,6 +545,9 @@ class _ProfileScreenState extends State<ProfileScreen>
           initialIndex: index,
           viewerId: _viewerId,
           profileUsername: _profile?.username,
+          profileDisplayName: _profile?.displayName,
+          profileAvatarUrl: _profile?.avatarUrl,
+          profileUserId: _profile?.userId,
         ),
       ),
     );
@@ -624,9 +828,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget build(BuildContext context) {
     try {
       return Scaffold(backgroundColor: _bg, body: _buildBody());
-    } catch (e, st) {
-      debugPrint('ProfileScreen build failed: $e');
-      debugPrint('$st');
+    } catch (e) {
       return Scaffold(
         backgroundColor: _bg,
         body: _SpecialStateView(

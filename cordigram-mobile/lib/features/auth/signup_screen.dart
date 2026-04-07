@@ -341,8 +341,7 @@ class _SignupScreenState extends State<SignupScreen> {
         _avatarCroppedPath = cropped.path;
         _avatarPreviewBytes = bytes;
       });
-    } catch (e, st) {
-      debugPrint('_pickAndCropAvatar error: $e\n$st');
+    } catch (_) {
       if (mounted)
         setState(() => _error = 'Could not access photos. Please try again.');
     }
@@ -428,8 +427,7 @@ class _SignupScreenState extends State<SignupScreen> {
         _error = e.message;
         _loading = false;
       });
-    } catch (e, st) {
-      debugPrint('_handleAvatarFinish error: $e\n$st');
+    } catch (e) {
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -453,8 +451,7 @@ class _SignupScreenState extends State<SignupScreen> {
         _error = e.message;
         _loading = false;
       });
-    } catch (e, st) {
-      debugPrint('_handleAvatarSkip error: $e\n$st');
+    } catch (e) {
       setState(() {
         _error = e.toString();
         _loading = false;

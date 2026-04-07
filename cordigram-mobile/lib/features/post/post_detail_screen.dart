@@ -253,8 +253,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (widget.initialState != null) {
       _postState = widget.initialState;
       _postLoading = false;
+    } else {
+      _loadPost();
     }
-    _loadPost();
     _loadComments();
     _scrollController.addListener(_onScroll);
     _startPolling();
