@@ -12,6 +12,7 @@ import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/widgets/comment_sheet_widgets.dart';
 import '../profile/profile_screen.dart';
 import '../report/report_comment_sheet.dart';
 import '../home/models/feed_post.dart';
@@ -1075,20 +1076,46 @@ class _CommentTileState extends State<_CommentTile> {
 
   void _showCommentMenu() {
     final isReply = widget.depth > 0;
+    final actions = <CommentSheetAction>[
+      if (_isPostOwner && !isReply)
+        CommentSheetAction(
+          icon: Icons.push_pin_rounded,
+          label: widget.comment.pinnedAt != null
+              ? 'Unpin comment'
+              : 'Pin comment',
+          onTap: _onPinComment,
+        ),
+      if (_isOwnComment) ...[
+        CommentSheetAction(
+          icon: Icons.edit_outlined,
+          label: 'Edit comment',
+          onTap: _onEditComment,
+        ),
+        CommentSheetAction(
+          icon: Icons.delete_outline_rounded,
+          label: 'Delete comment',
+          onTap: _onDeleteComment,
+          danger: true,
+        ),
+      ] else ...[
+        CommentSheetAction(
+          icon: Icons.flag_outlined,
+          label: 'Report comment',
+          onTap: _onReportComment,
+        ),
+        CommentSheetAction(
+          icon: Icons.block_rounded,
+          label: 'Block this user',
+          onTap: _onBlockUser,
+          danger: true,
+        ),
+      ],
+    ];
+
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _CommentMenuSheet(
-        isOwnComment: _isOwnComment,
-        isPostOwner: _isPostOwner,
-        isReply: isReply,
-        isPinned: widget.comment.pinnedAt != null,
-        onEdit: _isOwnComment ? _onEditComment : null,
-        onDelete: _isOwnComment ? _onDeleteComment : null,
-        onReport: _isOwnComment ? null : _onReportComment,
-        onBlock: _isOwnComment ? null : _onBlockUser,
-        onPin: (_isPostOwner && !isReply) ? _onPinComment : null,
-      ),
+      builder: (_) => CommentActionSheet(actions: actions),
     );
   }
 
@@ -1097,7 +1124,7 @@ class _CommentTileState extends State<_CommentTile> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _EditCommentSheet(
+      builder: (_) => EditCommentSheet(
         initialContent: _content,
         onSubmit: (newContent) async {
           await ApiService.patch(
@@ -3112,315 +3139,6 @@ class _CommentVideoOverlayState extends State<_CommentVideoOverlay> {
                   ],
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Comment menu bottom sheet ─────────────────────────────────────────────────
-
-class _CommentMenuSheet extends StatelessWidget {
-  const _CommentMenuSheet({
-    required this.isOwnComment,
-    required this.isPostOwner,
-    required this.isReply,
-    required this.isPinned,
-    this.onEdit,
-    this.onDelete,
-    this.onReport,
-    this.onBlock,
-    this.onPin,
-  });
-
-  final bool isOwnComment;
-  final bool isPostOwner;
-  final bool isReply;
-  final bool isPinned;
-  final VoidCallback? onEdit;
-  final VoidCallback? onDelete;
-  final VoidCallback? onReport;
-  final VoidCallback? onBlock;
-  final VoidCallback? onPin;
-
-  void _act(BuildContext ctx, VoidCallback? fn) {
-    Navigator.of(ctx).pop();
-    fn?.call();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF111827),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFF374151),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const Divider(height: 1, color: Color(0xFF1F2A3D)),
-          if (isPostOwner && !isReply) ...[
-            _MenuTile(
-              icon: Icons.push_pin_rounded,
-              label: isPinned ? 'Unpin comment' : 'Pin comment',
-              color: const Color(0xFFE8ECF8),
-              onTap: () => _act(context, onPin),
-            ),
-          ],
-          if (isOwnComment) ...[
-            _MenuTile(
-              icon: Icons.edit_outlined,
-              label: 'Edit comment',
-              color: const Color(0xFFE8ECF8),
-              onTap: () => _act(context, onEdit),
-            ),
-            _MenuTile(
-              icon: Icons.delete_outline_rounded,
-              label: 'Delete comment',
-              color: const Color(0xFFEF4444),
-              onTap: () => _act(context, onDelete),
-            ),
-          ] else ...[
-            _MenuTile(
-              icon: Icons.flag_outlined,
-              label: 'Report comment',
-              color: const Color(0xFFE8ECF8),
-              onTap: () => _act(context, onReport),
-            ),
-            _MenuTile(
-              icon: Icons.block_rounded,
-              label: 'Block this user',
-              color: const Color(0xFFEF4444),
-              onTap: () => _act(context, onBlock),
-            ),
-          ],
-          SizedBox(height: MediaQuery.of(context).viewPadding.bottom + 8),
-        ],
-      ),
-    );
-  }
-}
-
-class _MenuTile extends StatelessWidget {
-  const _MenuTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: color),
-            const SizedBox(width: 14),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Edit comment bottom sheet ─────────────────────────────────────────────────
-
-class _EditCommentSheet extends StatefulWidget {
-  const _EditCommentSheet({
-    required this.initialContent,
-    required this.onSubmit,
-  });
-  final String initialContent;
-  final Future<void> Function(String newContent) onSubmit;
-
-  @override
-  State<_EditCommentSheet> createState() => _EditCommentSheetState();
-}
-
-class _EditCommentSheetState extends State<_EditCommentSheet> {
-  late final TextEditingController _ctrl;
-  bool _submitting = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = TextEditingController(text: widget.initialContent);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final text = _ctrl.text.trim();
-    if (text.isEmpty || _submitting) return;
-    setState(() => _submitting = true);
-    try {
-      await widget.onSubmit(text);
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comment updated'),
-          backgroundColor: Color(0xFF1A2235),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to update comment'),
-          backgroundColor: Color(0xFFEF4444),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomPad =
-        MediaQuery.of(context).viewInsets.bottom +
-        MediaQuery.of(context).viewPadding.bottom;
-
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF111827),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 4),
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFF374151),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              children: [
-                const Text(
-                  'Edit Comment',
-                  style: TextStyle(
-                    color: Color(0xFFE8ECF8),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: const Icon(
-                    Icons.close_rounded,
-                    color: Color(0xFF7A8BB0),
-                    size: 22,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: Color(0xFF1F2A3D)),
-          Padding(
-            padding: EdgeInsets.fromLTRB(16, 14, 16, 14 + bottomPad),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextField(
-                  controller: _ctrl,
-                  autofocus: true,
-                  maxLines: 5,
-                  minLines: 2,
-                  style: const TextStyle(
-                    color: Color(0xFFE8ECF8),
-                    fontSize: 14,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Edit your comment…',
-                    hintStyle: const TextStyle(color: Color(0xFF4A5568)),
-                    filled: true,
-                    fillColor: const Color(0xFF1A2235),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF1F2A3D)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF1F2A3D)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF2b74b0)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _submitting ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2b74b0),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: _submitting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Save',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                ),
-              ],
             ),
           ),
         ],
