@@ -143,6 +143,7 @@ export interface Channel {
   /** ID danh mục người dùng tạo */
   categoryId?: string | null;
   position?: number;
+  isRulesChannel?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -410,10 +411,7 @@ export interface RolePermissions {
   addReactions: boolean;
   manageMessages: boolean;
   pinMessages: boolean;
-  bypassSlowMode: boolean;
-  manageThreads: boolean;
   viewMessageHistory: boolean;
-  sendTTS: boolean;
   sendVoiceMessages: boolean;
   createPolls: boolean;
 
@@ -1090,6 +1088,47 @@ export async function unrestrictMember(
     { method: "POST", headers: getHeaders() },
   );
   if (!response.ok) throw new Error("Không mở hạn chế được");
+}
+
+// ===================== COMMUNITY SETTINGS =====================
+
+export interface CommunitySettings {
+  enabled: boolean;
+  rulesChannelId: string | null;
+  updatesChannelId: string | null;
+  activatedAt: string | null;
+}
+
+export async function getCommunitySettings(
+  serverId: string,
+): Promise<CommunitySettings> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/community`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) throw new Error("Không tải được cài đặt cộng đồng");
+  return response.json();
+}
+
+export async function activateCommunity(
+  serverId: string,
+  body: {
+    rulesChannelId?: string | null;
+    updatesChannelId?: string | null;
+    createRulesChannel?: boolean;
+    createUpdatesChannel?: boolean;
+  },
+): Promise<CommunitySettings> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/community/activate`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(body),
+    },
+  );
+  if (!response.ok) throw new Error("Không kích hoạt được cộng đồng");
+  return response.json();
 }
 
 // Mentions

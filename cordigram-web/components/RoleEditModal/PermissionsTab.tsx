@@ -133,7 +133,6 @@ const PERMISSION_SECTIONS: PermissionSection[] = [
         label: "Quản lý tin nhắn",
         description:
           "Cho phép thành viên xóa hoặc gỡ bỏ các nội dung nhúng khối tin nhắn của thành viên khác.",
-        warning: "Quyền hạn này không còn cho phép ghim tin nhắn hoặc bỏ qua chế độ chậm nữa.",
       },
       {
         key: "pinMessages",
@@ -141,29 +140,10 @@ const PERMISSION_SECTIONS: PermissionSection[] = [
         description: "Cho phép thành viên ghim hoặc bỏ ghim tin nhắn bất kỳ.",
       },
       {
-        key: "bypassSlowMode",
-        label: "Bỏ Qua Chế Độ Chậm",
-        description:
-          "Cho phép thành viên gửi tin nhắn mà không chịu ảnh hưởng từ chế độ chậm.",
-      },
-      {
-        key: "manageThreads",
-        label: "Quản lý chủ đề và bài đăng",
-        description:
-          "Cho phép các thành viên đổi tên, xóa, đóng và bật chế độ chậm cho chủ đề và bài đăng. Họ cũng có thể xem các chủ đề riêng tư.",
-        warning: "Quyền hạn này không còn cho phép bỏ qua chế độ chậm nữa.",
-      },
-      {
         key: "viewMessageHistory",
         label: "Xem lịch sử tin nhắn",
         description:
           "Cho phép thành viên đọc các tin nhắn đã được gửi trước đó trong kênh. Nếu không cấp quyền này, thành viên sẽ chỉ nhìn thấy các tin nhắn được gửi khi họ đang trực tuyến. Tùy chọn này không áp dụng hoàn toàn với các bài đăng chủ đề và diễn đàn.",
-      },
-      {
-        key: "sendTTS",
-        label: "Gửi Tin Nhắn Văn Bản Thành Giọng Nói",
-        description:
-          'Cho phép thành viên gửi tin nhắn "văn bản thành giọng nói" bằng cách nhập lệnh /tts vào đầu tin nhắn. Tất cả thành viên đang hoạt động trong kênh đều có thể nghe được tin nhắn này.',
       },
       {
         key: "sendVoiceMessages",

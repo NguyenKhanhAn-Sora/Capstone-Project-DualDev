@@ -587,4 +587,35 @@ export class ServersController {
     );
     return { success: true };
   }
+
+  // =====================================================
+  // Community Settings
+  // =====================================================
+
+  @Get(':id/community')
+  async getCommunitySettings(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getCommunitySettings(serverId, req.user.userId);
+  }
+
+  @Post(':id/community/activate')
+  async activateCommunity(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      rulesChannelId?: string | null;
+      updatesChannelId?: string | null;
+      createRulesChannel?: boolean;
+      createUpdatesChannel?: boolean;
+    },
+    @Request() req: any,
+  ) {
+    return this.serversService.activateCommunity(
+      serverId,
+      req.user.userId,
+      body,
+    );
+  }
 }

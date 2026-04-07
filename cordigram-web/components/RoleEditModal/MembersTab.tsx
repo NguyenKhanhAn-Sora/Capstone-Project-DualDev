@@ -24,14 +24,19 @@ export default function MembersTab({
   const [showAddModal, setShowAddModal] = useState(false);
   const [addSearchQuery, setAddSearchQuery] = useState("");
   const [saving, setSaving] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const fetchMembers = useCallback(async () => {
     try {
       setLoading(true);
+      setPermissionDenied(false);
       const members = await serversApi.getServerMembers(serverId);
       setAllMembers(members);
     } catch (err) {
-      console.error("Failed to fetch members:", err);
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("quyền") || msg.includes("403") || msg.includes("Forbidden")) {
+        setPermissionDenied(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -96,6 +101,22 @@ export default function MembersTab({
     return (
       <div className={styles.container}>
         <div className={styles.loading}>Đang tải danh sách thành viên...</div>
+      </div>
+    );
+  }
+
+  if (permissionDenied) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.defaultRoleMessage}>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+          </svg>
+          <h3>Không có quyền truy cập</h3>
+          <p>
+            Chỉ chủ máy chủ hoặc thành viên có vai trò Quản lý máy chủ mới có thể xem và quản lý danh sách thành viên.
+          </p>
+        </div>
       </div>
     );
   }

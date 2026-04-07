@@ -56,6 +56,9 @@ export class Channel extends Document {
 
   @Prop({ type: Number, default: 0 })
   position: number;
+
+  @Prop({ type: Boolean, default: false })
+  isRulesChannel: boolean;
 }
 
 export const ChannelSchema = SchemaFactory.createForClass(Channel);

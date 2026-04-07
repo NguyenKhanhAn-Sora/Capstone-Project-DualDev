@@ -30,10 +30,7 @@ export interface RolePermissions {
   addReactions: boolean; // Thêm biểu cảm
   manageMessages: boolean; // Quản lý tin nhắn (xóa, gỡ bỏ)
   pinMessages: boolean; // Ghim tin nhắn
-  bypassSlowMode: boolean; // Bỏ qua chế độ chậm
-  manageThreads: boolean; // Quản lý chủ đề và bài đăng
   viewMessageHistory: boolean; // Xem lịch sử tin nhắn
-  sendTTS: boolean; // Gửi tin nhắn văn bản thành giọng nói
   sendVoiceMessages: boolean; // Gửi tin nhắn thoại
   createPolls: boolean; // Tạo khảo sát
 
@@ -75,10 +72,7 @@ export const DEFAULT_EVERYONE_PERMISSIONS: RolePermissions = {
   addReactions: true,
   manageMessages: false,
   pinMessages: false,
-  bypassSlowMode: false,
-  manageThreads: false,
   viewMessageHistory: true,
-  sendTTS: false,
   sendVoiceMessages: true,
   createPolls: false,
 
@@ -120,10 +114,7 @@ export const DEFAULT_NEW_ROLE_PERMISSIONS: RolePermissions = {
   addReactions: true,
   manageMessages: false,
   pinMessages: false,
-  bypassSlowMode: false,
-  manageThreads: false,
   viewMessageHistory: true,
-  sendTTS: false,
   sendVoiceMessages: true,
   createPolls: false,
 
@@ -189,10 +180,7 @@ export class Role extends Document {
       addReactions: { type: Boolean, default: true },
       manageMessages: { type: Boolean, default: false },
       pinMessages: { type: Boolean, default: false },
-      bypassSlowMode: { type: Boolean, default: false },
-      manageThreads: { type: Boolean, default: false },
       viewMessageHistory: { type: Boolean, default: true },
-      sendTTS: { type: Boolean, default: false },
       sendVoiceMessages: { type: Boolean, default: true },
       createPolls: { type: Boolean, default: false },
 

@@ -363,10 +363,7 @@ export class RolesService {
       addReactions: false,
       manageMessages: false,
       pinMessages: false,
-      bypassSlowMode: false,
-      manageThreads: false,
       viewMessageHistory: false,
-      sendTTS: false,
       sendVoiceMessages: false,
       createPolls: false,
       connect: false,
@@ -610,8 +607,17 @@ export class RolesService {
       })
       .exec();
 
-    if (!server) {
-      throw new ForbiddenException('Only server owner can manage roles');
+    if (server) return;
+
+    const canManage = await this.hasPermission(
+      serverId,
+      userId,
+      'manageServer',
+    );
+    if (!canManage) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ hoặc thành viên có quyền Quản lý máy chủ mới có thể thực hiện',
+      );
     }
   }
 

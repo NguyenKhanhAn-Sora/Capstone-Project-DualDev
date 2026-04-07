@@ -76,6 +76,7 @@ import RolesSection from "@/components/RolesSection/RolesSection";
 import ServerInteractionsSection from "@/components/ServerInteractionsSection/ServerInteractionsSection";
 import ServerAccessSection from "@/components/ServerAccessSection/ServerAccessSection";
 import ServerProfileSection from "@/components/ServerProfileSection/ServerProfileSection";
+import CommunitySection from "@/components/CommunitySection/CommunitySection";
 import AutoModSection from "@/components/AutoModSection/AutoModSection";
 import ServerSafetySection from "@/components/ServerSafetySection/ServerSafetySection";
 import { mapSectionToSafetyTab } from "@/components/ServerSafetySection/safety-tab-map";
@@ -1005,6 +1006,7 @@ export default function MessagesPage() {
     serverId: string;
     serverName: string;
   } | null>(null);
+  const [communityEnabled, setCommunityEnabled] = useState(false);
   const [hideMutedChannels, setHideMutedChannels] = useState(false);
   const [showAllChannels, setShowAllChannels] = useState(false);
   const [serverNotificationLevel, setServerNotificationLevel] = useState<"all" | "mentions" | "none">("all");
@@ -5515,7 +5517,16 @@ export default function MessagesPage() {
                         }}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
-                          <span style={{ fontSize: "18px" }}>#{channel.name}</span>
+                          {channel.isRulesChannel ? (
+                            <span title="Kênh quy định" style={{ fontSize: "16px", flexShrink: 0 }}>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}>
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2v6h2v-6zm0-4h-2v2h2V7z" />
+                              </svg>
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: "18px" }}>#</span>
+                          )}
+                          <span style={{ fontSize: "18px" }}>{channel.name}</span>
                         </div>
                       </div>
                     ))}
@@ -5737,7 +5748,16 @@ export default function MessagesPage() {
                                   style={{ cursor: canDragChannels ? "grab" : "pointer" }}
                                 >
                                   <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
-                                    <span style={{ fontSize: "18px" }}>#{channel.name}</span>
+                                    {channel.isRulesChannel ? (
+                                      <span title="Kênh quy định" style={{ fontSize: "16px", flexShrink: 0 }}>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}>
+                                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2v6h2v-6zm0-4h-2v2h2V7z" />
+                                        </svg>
+                                      </span>
+                                    ) : (
+                                      <span style={{ fontSize: "18px" }}>#</span>
+                                    )}
+                                    <span style={{ fontSize: "18px" }}>{channel.name}</span>
                                   </div>
                                 </div>
                                 {isChDropTarget && dragPosition === "after" && <div className={styles.dropIndicator} style={{ bottom: 0 }} />}
@@ -5782,6 +5802,12 @@ export default function MessagesPage() {
                                 <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
                                 <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                               </svg>
+                            ) : channel.isRulesChannel ? (
+                              <span title="Kênh quy định" style={{ fontSize: "16px", flexShrink: 0 }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}>
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2v6h2v-6zm0-4h-2v2h2V7z" />
+                                </svg>
+                              </span>
                             ) : (
                               <span style={{ fontSize: "18px" }}>#</span>
                             )}
@@ -7676,6 +7702,9 @@ export default function MessagesPage() {
               serverName: serverContextMenu.server.name || "Máy chủ",
             });
             setServerSettingsPermissions(serverContextMenu.permissions ?? null);
+            serversApi.getCommunitySettings(serverContextMenu.server._id)
+              .then((c) => setCommunityEnabled(c.enabled))
+              .catch(() => setCommunityEnabled(false));
             setShowServerSettingsPanel(true);
             setServerContextMenu(null);
           }}
@@ -7859,6 +7888,8 @@ export default function MessagesPage() {
             servers.find((s) => s._id === serverSettingsTarget.serverId)?.ownerId === currentUserId
           )
         }
+        communityEnabled={communityEnabled}
+        onCommunityActivated={() => setCommunityEnabled(true)}
         onDeleteServer={async (serverIdToDelete) => {
           await serversApi.deleteServer(serverIdToDelete);
           setShowServerSettingsPanel(false);
@@ -7945,10 +7976,8 @@ export default function MessagesPage() {
               <RolesSection
                 serverId={serverSettingsTarget.serverId}
                 isOwner={
-                  !!(
-                    currentUserId &&
-                    servers.find((s) => s._id === serverSettingsTarget?.serverId)?.ownerId === currentUserId
-                  )
+                  Boolean(serverSettingsPermissions?.isOwner) ||
+                  Boolean(serverSettingsPermissions?.canManageServer)
                 }
               />
             );
@@ -8009,6 +8038,34 @@ export default function MessagesPage() {
                 }
                 initialTab={initialTab}
               />
+            );
+          }
+          if (section === "community" && serverSettingsTarget?.serverId) {
+            return (
+              <CommunitySection
+                serverId={serverSettingsTarget.serverId}
+                canManageSettings={
+                  Boolean(serverSettingsPermissions?.isOwner) ||
+                  Boolean(serverSettingsPermissions?.canManageServer)
+                }
+                onCommunityActivated={() => setCommunityEnabled(true)}
+              />
+            );
+          }
+          if (section === "community-overview" && serverSettingsTarget?.serverId) {
+            return (
+              <div style={{ padding: 24, color: "#dcddde" }}>
+                <h2 style={{ color: "#fff", marginBottom: 8 }}>Tổng Quan Cộng Đồng</h2>
+                <p>Quản lý tổng quan và thống kê cộng đồng máy chủ của bạn.</p>
+              </div>
+            );
+          }
+          if (section === "community-onboarding" && serverSettingsTarget?.serverId) {
+            return (
+              <div style={{ padding: 24, color: "#dcddde" }}>
+                <h2 style={{ color: "#fff", marginBottom: 8 }}>Hướng Dẫn Làm Quen</h2>
+                <p>Thiết lập trải nghiệm chào mừng cho thành viên mới tham gia cộng đồng của bạn.</p>
+              </div>
             );
           }
           return undefined;

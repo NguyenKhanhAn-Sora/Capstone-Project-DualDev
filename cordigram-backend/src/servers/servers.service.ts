@@ -1016,9 +1016,17 @@ export class ServersService {
     if (!server) {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
-    if (server.ownerId.toString() !== requesterUserId) {
+    const isOwner = server.ownerId.toString() === requesterUserId;
+    const canManage =
+      isOwner ||
+      (await this.rolesService.hasPermission(
+        serverId,
+        requesterUserId,
+        'manageServer',
+      ));
+    if (!canManage) {
       throw new ForbiddenException(
-        'Chỉ chủ máy chủ mới có thể xem danh sách thành viên',
+        'Bạn không có quyền xem danh sách thành viên',
       );
     }
 
@@ -2807,5 +2815,113 @@ export class ServersService {
         },
       },
     );
+  }
+
+  // =====================================================
+  // Community Settings
+  // =====================================================
+
+  async getCommunitySettings(serverId: string, userId: string) {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('ownerId communitySettings')
+      .lean()
+      .exec();
+    if (!server)
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    const isOwner = (server as any).ownerId?.toString() === userId;
+    const canManage =
+      isOwner ||
+      (await this.rolesService.hasPermission(
+        serverId,
+        userId,
+        'manageServer',
+      ));
+    if (!canManage)
+      throw new ForbiddenException('Bạn không có quyền xem cài đặt cộng đồng');
+    return (server as any).communitySettings || {
+      enabled: false,
+      rulesChannelId: null,
+      updatesChannelId: null,
+      activatedAt: null,
+    };
+  }
+
+  async activateCommunity(
+    serverId: string,
+    userId: string,
+    body: {
+      rulesChannelId?: string | null;
+      updatesChannelId?: string | null;
+      createRulesChannel?: boolean;
+      createUpdatesChannel?: boolean;
+    },
+  ) {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server)
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    if ((server as any).ownerId?.toString() !== userId)
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ mới có thể kích hoạt cộng đồng',
+      );
+
+    let rulesChannelId = body.rulesChannelId || null;
+    let updatesChannelId = body.updatesChannelId || null;
+
+    if (body.createRulesChannel) {
+      const ch = await this.channelModel.create({
+        name: 'luật-server',
+        type: 'text',
+        serverId: new Types.ObjectId(serverId),
+        createdBy: new Types.ObjectId(userId),
+        isDefault: false,
+        isPrivate: false,
+        isRulesChannel: true,
+        position: 0,
+      });
+      rulesChannelId = (ch as any)._id.toString();
+      server.channels.push((ch as any)._id);
+    } else if (rulesChannelId) {
+      await this.channelModel.updateMany(
+        { serverId: new Types.ObjectId(serverId), isRulesChannel: true },
+        { $set: { isRulesChannel: false } },
+      );
+      await this.channelModel.updateOne(
+        { _id: new Types.ObjectId(rulesChannelId) },
+        { $set: { isRulesChannel: true } },
+      );
+    }
+
+    if (body.createUpdatesChannel) {
+      const ch = await this.channelModel.create({
+        name: 'community-updates',
+        type: 'text',
+        serverId: new Types.ObjectId(serverId),
+        createdBy: new Types.ObjectId(userId),
+        isDefault: false,
+        isPrivate: false,
+        position: 1,
+      });
+      updatesChannelId = (ch as any)._id.toString();
+      server.channels.push((ch as any)._id);
+    }
+
+    await this.serverModel.findByIdAndUpdate(serverId, {
+      $set: {
+        'communitySettings.enabled': true,
+        'communitySettings.rulesChannelId': rulesChannelId,
+        'communitySettings.updatesChannelId': updatesChannelId,
+        'communitySettings.activatedAt': new Date(),
+        'safetySettings.spamProtection.verificationLevel': 'high',
+        'safetySettings.contentFilter.level': 'all_members',
+      },
+    });
+
+    return {
+      enabled: true,
+      rulesChannelId,
+      updatesChannelId,
+      activatedAt: new Date(),
+    };
   }
 }

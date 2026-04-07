@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import styles from "./ServerSettingsPanel.module.css";
 import DeleteServerModal from "@/components/DeleteServerModal";
 
@@ -18,6 +18,8 @@ export type ServerSettingsSection =
   | "bans"
   | "automod"
   | "community"
+  | "community-overview"
+  | "community-onboarding"
   | "delete-server";
 
 interface SidebarEntry {
@@ -92,6 +94,8 @@ const SECTION_LABELS: Record<ServerSettingsSection, string> = {
   bans: "Chặn",
   automod: "AutoMod",
   community: "Cài Đặt Cộng Đồng",
+  "community-overview": "Tổng Quan Cộng Đồng",
+  "community-onboarding": "Hướng Dẫn Làm Quen",
   "delete-server": "Xóa máy chủ",
 };
 
@@ -102,8 +106,10 @@ export interface ServerSettingsPanelProps {
   serverId: string;
   /** Chỉ người tạo (chủ sở hữu) máy chủ mới xóa được. Khi false sẽ ẩn mục "Xóa máy chủ". */
   isOwner?: boolean;
+  communityEnabled?: boolean;
   /** Render nội dung cho từng mục (Hồ Sơ Máy Chủ, v.v.). Nếu không truyền thì hiển thị placeholder. */
   renderSection?: (section: ServerSettingsSection) => React.ReactNode;
+  onCommunityActivated?: () => void;
   /** Gọi khi người dùng xác nhận xóa máy chủ. Sau khi xóa xong nên đóng panel và cập nhật danh sách. */
   onDeleteServer?: (serverId: string) => Promise<void>;
 }
@@ -114,11 +120,15 @@ export default function ServerSettingsPanel({
   serverName,
   serverId,
   isOwner = true,
+  communityEnabled = false,
   renderSection,
+  onCommunityActivated,
   onDeleteServer,
 }: ServerSettingsPanelProps) {
   const [activeSection, setActiveSection] = useState<ServerSettingsSection>("profile");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [localCommunityEnabled, setLocalCommunityEnabled] = useState(communityEnabled);
+  useEffect(() => setLocalCommunityEnabled(communityEnabled), [communityEnabled]);
 
   const handleSidebarClick = (section: ServerSettingsSection) => {
     if (section === "delete-server") {
@@ -156,12 +166,21 @@ export default function ServerSettingsPanel({
           <div className={styles.sidebarTitle} style={{ paddingTop: 8 }}>
             MÁY CHỦ CỦA {serverName.toUpperCase()}
           </div>
-          {SIDEBAR_SECTIONS.filter((group) => (group.key === "group-delete" ? isOwner : true)).map((group) => (
+          {SIDEBAR_SECTIONS.filter((group) => (group.key === "group-delete" ? isOwner : true)).map((group) => {
+            let items = group.items;
+            if (group.key === "group-community" && localCommunityEnabled) {
+              items = [
+                ...group.items,
+                { id: "community-overview" as ServerSettingsSection, label: "Tổng Quan Cộng Đồng" },
+                { id: "community-onboarding" as ServerSettingsSection, label: "Hướng Dẫn Làm Quen" },
+              ];
+            }
+            return (
             <div key={group.key}>
               {group.title ? (
                 <div className={styles.sidebarTitle}>{group.title}</div>
               ) : null}
-              {group.items.map((item) => (
+              {items.map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -181,7 +200,8 @@ export default function ServerSettingsPanel({
                 </button>
               ))}
             </div>
-          ))}
+            );
+          })}
         </aside>
         <div className={styles.contentWrapper}>
           <button

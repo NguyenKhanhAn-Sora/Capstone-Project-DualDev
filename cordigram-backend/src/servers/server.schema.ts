@@ -319,6 +319,29 @@ export class Server extends Document {
     }),
   })
   safetySettings: ServerSafetySettings;
+
+  @Prop({
+    type: {
+      enabled: { type: Boolean, default: false },
+      rulesChannelId: { type: String, default: null },
+      updatesChannelId: { type: String, default: null },
+      activatedAt: { type: Date, default: null },
+    },
+    default: () => ({
+      enabled: false,
+      rulesChannelId: null,
+      updatesChannelId: null,
+      activatedAt: null,
+    }),
+  })
+  communitySettings: CommunitySettings;
+}
+
+export interface CommunitySettings {
+  enabled: boolean;
+  rulesChannelId: string | null;
+  updatesChannelId: string | null;
+  activatedAt: Date | null;
 }
 
 export const ServerSchema = SchemaFactory.createForClass(Server);
