@@ -431,8 +431,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     }).toList();
   }
 
-  Future<void> _prefetchTab(String key) async {
-    if (_tabLoading[key] == true || _tabLoaded[key] == true) return;
+  Future<void> _prefetchTab(String key, {bool force = false}) async {
+    if (!force && (_tabLoading[key] == true || _tabLoaded[key] == true)) {
+      return;
+    }
     final ownerId = _profile?.userId;
     if (ownerId == null) return;
 
@@ -523,9 +525,31 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
+  Future<void> _refreshProfilePage() async {
+    await _loadProfile();
+    if (!mounted) return;
+    final activeKey = _visibleTabKeys[_tabController.index];
+    await _prefetchTab(activeKey, force: true);
+  }
+
+  void _applyViewerResult(dynamic result) {
+    if (result is! Map) return;
+    final deletedId = (result['deletedPostId'] as String?)?.trim();
+    if (deletedId == null || deletedId.isEmpty) return;
+
+    if (!mounted) return;
+    setState(() {
+      for (final key in _tabItems.keys) {
+        _tabItems[key] = _tabItems[key]!
+            .where((item) => (item['id'] as String?) != deletedId)
+            .toList();
+      }
+    });
+  }
+
   // ── Tab item navigation ────────────────────────────────────────────────────
 
-  void _navigateToItem(Map<String, dynamic> item, int index) {
+  Future<void> _navigateToItem(Map<String, dynamic> item, int index) async {
     final key = _visibleTabKeys[_tabController.index];
     final items = _tabItems[key]!;
 
@@ -556,8 +580,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         }).toList();
 
         final reelIndex = reelItems.indexWhere((m) => m['id'] == item['id']);
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
+        final result = await Navigator.of(context).push(
+          MaterialPageRoute<dynamic>(
             builder: (_) => ProfileReelViewerScreen(
               items: reelItems,
               initialIndex: reelIndex >= 0 ? reelIndex : 0,
@@ -569,12 +593,13 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ),
         );
+        _applyViewerResult(result);
         return;
       }
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute<dynamic>(
         builder: (_) => ProfileItemViewerScreen(
           items: items,
           initialIndex: index,
@@ -586,6 +611,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
       ),
     );
+    _applyViewerResult(result);
   }
 
   Future<void> _toggleFollow() async {
@@ -983,52 +1009,58 @@ class _ProfileScreenState extends State<ProfileScreen>
     // Profile-level private (we have data but visibility says private)
     if (_privateView && !isOwner) return _buildPrivateView();
 
-    return CustomScrollView(
-      slivers: [
-        _buildSliverAppBar(p, isOwner),
-        SliverToBoxAdapter(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildIdentitySection(p, isOwner),
-              _buildStatsRow(p, isOwner, vis),
-              _buildActionButtons(p, isOwner),
-              if (_hasBio(p, isOwner, vis)) _buildBioSection(p, isOwner, vis),
-              _buildInfoSection(p, isOwner, vis),
-              const SizedBox(height: 12),
-            ],
-          ),
-        ),
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _ProfileTabBarDelegate(
-            TabBar(
-              controller: _tabController,
-              labelColor: _accent,
-              unselectedLabelColor: _textSecondary,
-              indicatorColor: _accent,
-              indicatorWeight: 2.5,
-              labelStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-              ),
-              tabs: [
-                const Tab(text: 'Posts'),
-                const Tab(text: 'Reels'),
-                if (isOwner) const Tab(text: 'Saved'),
-                const Tab(text: 'Repost'),
+    return RefreshIndicator(
+      color: _accent,
+      backgroundColor: _surface,
+      onRefresh: _refreshProfilePage,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          _buildSliverAppBar(p, isOwner),
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildIdentitySection(p, isOwner),
+                _buildStatsRow(p, isOwner, vis),
+                _buildActionButtons(p, isOwner),
+                if (_hasBio(p, isOwner, vis)) _buildBioSection(p, isOwner, vis),
+                _buildInfoSection(p, isOwner, vis),
+                const SizedBox(height: 12),
               ],
             ),
-            backgroundColor: _bg,
-            borderColor: _border,
           ),
-        ),
-        _buildActiveTabSliver(isOwner),
-      ],
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _ProfileTabBarDelegate(
+              TabBar(
+                controller: _tabController,
+                labelColor: _accent,
+                unselectedLabelColor: _textSecondary,
+                indicatorColor: _accent,
+                indicatorWeight: 2.5,
+                labelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                ),
+                tabs: [
+                  const Tab(text: 'Posts'),
+                  const Tab(text: 'Reels'),
+                  if (isOwner) const Tab(text: 'Saved'),
+                  const Tab(text: 'Repost'),
+                ],
+              ),
+              backgroundColor: _bg,
+              borderColor: _border,
+            ),
+          ),
+          _buildActiveTabSliver(isOwner),
+        ],
+      ),
     );
   }
 

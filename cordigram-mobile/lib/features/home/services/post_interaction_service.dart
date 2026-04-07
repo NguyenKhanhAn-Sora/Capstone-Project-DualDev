@@ -36,6 +36,38 @@ class UpdatePostPayload {
   }
 }
 
+class RepostQuotePayload {
+  const RepostQuotePayload({
+    this.content,
+    this.hashtags,
+    this.location,
+    this.allowComments,
+    this.allowDownload,
+    this.hideLikeCount,
+    this.visibility,
+  });
+
+  final String? content;
+  final List<String>? hashtags;
+  final String? location;
+  final bool? allowComments;
+  final bool? allowDownload;
+  final bool? hideLikeCount;
+  final PostVisibility? visibility;
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (content != null && content!.trim().isNotEmpty) 'content': content,
+      if (hashtags != null && hashtags!.isNotEmpty) 'hashtags': hashtags,
+      if (location != null && location!.trim().isNotEmpty) 'location': location,
+      if (allowComments != null) 'allowComments': allowComments,
+      if (allowDownload != null) 'allowDownload': allowDownload,
+      if (hideLikeCount != null) 'hideLikeCount': hideLikeCount,
+      if (visibility != null) 'visibility': visibility,
+    };
+  }
+}
+
 class PostInteractionService {
   static Map<String, String> get _authHeader => {
     'Authorization': 'Bearer ${AuthStorage.accessToken}',
@@ -69,6 +101,36 @@ class PostInteractionService {
   /// DELETE /posts/:id/save
   static Future<void> unsave(String postId) async {
     await ApiService.delete('/posts/$postId/save', extraHeaders: _authHeader);
+  }
+
+  // ── Repost / Quote ───────────────────────────────────────────────────────
+
+  /// Web-parity quick repost flow: create a new post with repostOf.
+  static Future<void> quickRepost(String originalPostId) async {
+    await ApiService.post(
+      '/posts',
+      body: {'repostOf': originalPostId},
+      extraHeaders: _authHeader,
+    );
+  }
+
+  /// Quote repost: creates either a post or reel with repostOf + quote fields.
+  static Future<void> quoteRepost({
+    required String originalPostId,
+    required RepostQuotePayload payload,
+    required String kind,
+  }) async {
+    final body = <String, dynamic>{
+      'repostOf': originalPostId,
+      ...payload.toJson(),
+    };
+    final path = kind == 'reel' ? '/reels' : '/posts';
+    await ApiService.post(path, body: body, extraHeaders: _authHeader);
+  }
+
+  /// Optional secondary endpoint used by web when targeting a repost item.
+  static Future<void> repost(String postId) async {
+    await ApiService.post('/posts/$postId/repost', extraHeaders: _authHeader);
   }
 
   // ── Hide ─────────────────────────────────────────────────────────────────

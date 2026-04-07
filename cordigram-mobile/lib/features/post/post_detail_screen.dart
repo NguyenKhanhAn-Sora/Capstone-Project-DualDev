@@ -691,7 +691,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         try {
           await PostInteractionService.deletePost(post.id);
           if (!mounted) return;
-          Navigator.of(context).pop();
+          Navigator.of(context).pop({'deletedPostId': post.id});
         } catch (_) {
           _showSnack('Failed to delete post', error: true);
         }

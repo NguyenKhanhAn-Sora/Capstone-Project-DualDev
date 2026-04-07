@@ -1054,7 +1054,9 @@ class _ItemPageState extends State<_ItemPage> {
         try {
           await PostInteractionService.deletePost(id);
           _showSnack('Reel deleted');
-          if (mounted) Navigator.of(context).pop();
+          if (mounted) {
+            Navigator.of(context).pop({'deletedPostId': id});
+          }
         } catch (_) {
           _showSnack('Failed to delete reel', error: true);
         }
@@ -1303,7 +1305,7 @@ class _ItemPageState extends State<_ItemPage> {
     widget.controller?.pause();
     Navigator.of(context)
         .push(
-          MaterialPageRoute<void>(
+          MaterialPageRoute<dynamic>(
             builder: (_) => PostDetailScreen(
               postId: itemId,
               initialState: initialState,
@@ -1311,8 +1313,13 @@ class _ItemPageState extends State<_ItemPage> {
             ),
           ),
         )
-        .then((_) {
-          if (mounted && widget.isActive) widget.controller?.play();
+        .then((result) {
+          if (!mounted) return;
+          if (result is Map && result['deletedPostId'] is String) {
+            Navigator.of(context).pop(result);
+            return;
+          }
+          if (widget.isActive) widget.controller?.play();
         });
   }
 

@@ -155,6 +155,7 @@ class PostCard extends StatefulWidget {
     required this.onSave,
     required this.onHide,
     required this.onView,
+    this.onRepost,
     this.viewerId,
     this.onFollow,
     this.onAuthorTap,
@@ -168,6 +169,7 @@ class PostCard extends StatefulWidget {
   final VoidCallback onLike;
   final VoidCallback onSave;
   final VoidCallback onHide;
+  final VoidCallback? onRepost;
 
   /// Called once the post has been continuously visible for ≥2 s AND the
   /// per-card 5-minute cooldown has elapsed.
@@ -501,6 +503,7 @@ class _PostCardState extends State<PostCard> {
                   state: state,
                   onLike: widget.onLike,
                   onSave: widget.onSave,
+                  onRepost: widget.onRepost,
                   onComment: widget.onComment,
                 ),
               ],
@@ -1315,11 +1318,13 @@ class _ActionBar extends StatelessWidget {
     required this.state,
     required this.onLike,
     required this.onSave,
+    this.onRepost,
     this.onComment,
   });
   final FeedPostState state;
   final VoidCallback onLike;
   final VoidCallback onSave;
+  final VoidCallback? onRepost;
   final VoidCallback? onComment;
 
   @override
@@ -1361,7 +1366,16 @@ class _ActionBar extends StatelessWidget {
               icon: Icons.repeat_rounded,
               label: 'Repost',
               color: const Color(0xFF7A8BB0),
-              onTap: () {},
+              onTap:
+                  onRepost ??
+                  () {
+                    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                      const SnackBar(
+                        content: Text('Repost is not available right now'),
+                        backgroundColor: Color(0xFFB91C1C),
+                      ),
+                    );
+                  },
             ),
           ),
           Expanded(

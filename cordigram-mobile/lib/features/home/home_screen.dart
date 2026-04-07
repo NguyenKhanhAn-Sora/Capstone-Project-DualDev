@@ -291,6 +291,165 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  // ── Repost ───────────────────────────────────────────────────────────────
+
+  String _resolveOriginalPostId(FeedPost post) {
+    final repostOf = post.repostOf;
+    if (repostOf != null && repostOf.isNotEmpty) return repostOf;
+    return post.id;
+  }
+
+  void _incrementRepostStat(String postId) {
+    final idx = _states.indexWhere((s) => s.post.id == postId);
+    if (idx < 0) return;
+    final s = _states[idx];
+    setState(() {
+      s.stats = FeedStats(
+        hearts: s.stats.hearts,
+        comments: s.stats.comments,
+        saves: s.stats.saves,
+        reposts: (s.stats.reposts + 1).clamp(0, 999999999),
+        views: s.stats.views,
+        impressions: s.stats.impressions,
+      );
+    });
+  }
+
+  Future<void> _handleQuickRepost(FeedPostState targetState) async {
+    if (AuthStorage.accessToken == null) {
+      _showSnack('Please sign in to repost', error: true);
+      return;
+    }
+
+    final targetPost = targetState.post;
+    final originalId = _resolveOriginalPostId(targetPost);
+    final targetId = targetPost.id;
+
+    try {
+      await PostInteractionService.quickRepost(originalId);
+      _incrementRepostStat(originalId);
+      if (originalId != targetId) {
+        _incrementRepostStat(targetId);
+        try {
+          await PostInteractionService.repost(targetId);
+        } catch (_) {}
+      }
+      _showSnack('Reposted');
+    } on ApiException catch (e) {
+      // Compatibility fallback: some backends reject create-repost but support
+      // interaction-style repost endpoint.
+      try {
+        await PostInteractionService.repost(originalId);
+        _incrementRepostStat(originalId);
+        if (originalId != targetId) {
+          _incrementRepostStat(targetId);
+          try {
+            await PostInteractionService.repost(targetId);
+          } catch (_) {}
+        }
+        _showSnack('Reposted');
+      } catch (_) {
+        _showSnack(
+          e.message.isNotEmpty ? e.message : 'Failed to repost',
+          error: true,
+        );
+      }
+    } catch (_) {
+      _showSnack('Failed to repost', error: true);
+    }
+  }
+
+  Future<void> _handleQuoteRepost(
+    FeedPostState targetState,
+    _QuoteRepostInput input,
+  ) async {
+    if (AuthStorage.accessToken == null) {
+      _showSnack('Please sign in to repost', error: true);
+      return;
+    }
+
+    final targetPost = targetState.post;
+    final originalId = _resolveOriginalPostId(targetPost);
+    final targetId = targetPost.id;
+
+    final payload = RepostQuotePayload(
+      content: input.content,
+      hashtags: input.hashtags,
+      location: input.location,
+      visibility: input.visibility,
+      allowComments: input.allowComments,
+      allowDownload: targetPost.allowDownload == true,
+      hideLikeCount: input.hideLikeCount,
+    );
+
+    try {
+      await PostInteractionService.quoteRepost(
+        originalPostId: originalId,
+        payload: payload,
+        kind: targetPost.kind,
+      );
+      _incrementRepostStat(originalId);
+      if (originalId != targetId) {
+        _incrementRepostStat(targetId);
+        try {
+          await PostInteractionService.repost(targetId);
+        } catch (_) {}
+      }
+      _showSnack('Reposted with quote');
+    } on ApiException catch (e) {
+      _showSnack(
+        e.message.isNotEmpty ? e.message : 'Failed to repost with quote',
+        error: true,
+      );
+    } catch (_) {
+      _showSnack('Failed to repost with quote', error: true);
+    }
+  }
+
+  Future<void> _onRepost(FeedPostState state) async {
+    if (AuthStorage.accessToken == null) {
+      _showSnack('Please sign in to repost', error: true);
+      return;
+    }
+
+    try {
+      final label = state.post.authorUsername ?? state.post.displayName;
+      final action = await showModalBottomSheet<_RepostIntent>(
+        context: context,
+        backgroundColor: const Color(0xFF0B1732),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => _RepostMenuSheet(label: '@$label · ${state.post.kind}'),
+      );
+
+      if (action == null || action == _RepostIntent.cancel) return;
+
+      if (action == _RepostIntent.quick) {
+        await _handleQuickRepost(state);
+        return;
+      }
+
+      final quoteInput = await showModalBottomSheet<_QuoteRepostInput>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: const Color(0xFF0E1A35),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => _QuoteComposerSheet(
+          label: '@$label · ${state.post.kind}',
+          initialAllowDownload: state.post.allowDownload == true,
+        ),
+      );
+
+      if (quoteInput == null) return;
+      await _handleQuoteRepost(state, quoteInput);
+    } catch (_) {
+      _showSnack('Unable to open repost menu', error: true);
+    }
+  }
+
   // ── Hide ──────────────────────────────────────────────────────────────────
 
   Future<void> _onHide(String postId) async {
@@ -840,21 +999,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           const SliverToBoxAdapter(child: PeopleYouMayKnow()),
           // Feed items
           SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => PostCard(
-                state: _states[index],
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final itemState = _states[index];
+              return PostCard(
+                state: itemState,
                 viewerId: _viewerId,
-                onLike: () => _onLike(_states[index].post.id),
-                onSave: () => _onSave(_states[index].post.id),
-                onHide: () => _onHide(_states[index].post.id),
-                onView: () => _onView(_states[index].post.id),
+                onLike: () => _onLike(itemState.post.id),
+                onSave: () => _onSave(itemState.post.id),
+                onRepost: () => _onRepost(itemState),
+                onHide: () => _onHide(itemState.post.id),
+                onView: () => _onView(itemState.post.id),
                 onFollow: _onFollow,
                 onAuthorTap: _openUserProfile,
-                onComment: () => _openPostDetail(_states[index]),
+                onComment: () => _openPostDetail(itemState),
                 onMenuAction: _onPostMenuAction,
-              ),
-              childCount: _states.length,
-            ),
+              );
+            }, childCount: _states.length),
           ),
           // Loading indicator at end
           if (_loading && !_initialLoad)
@@ -1088,6 +1248,327 @@ class _ProfileMenuSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
+      ),
+    );
+  }
+}
+
+enum _RepostIntent { quick, quote, cancel }
+
+class _RepostMenuSheet extends StatelessWidget {
+  const _RepostMenuSheet({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final dividerColor = Colors.white.withValues(alpha: 0.08);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0B1732),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              const Text(
+                'Repost',
+                style: TextStyle(
+                  color: Color(0xFFE8ECF8),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 29 / 2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFF93A2C5),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Divider(height: 1, color: dividerColor),
+              _RepostMenuButton(
+                text: 'Repost',
+                color: const Color(0xFF3AA6E5),
+                onTap: () => Navigator.of(context).pop(_RepostIntent.quick),
+              ),
+              Divider(height: 1, color: dividerColor),
+              _RepostMenuButton(
+                text: 'Quote',
+                onTap: () => Navigator.of(context).pop(_RepostIntent.quote),
+              ),
+              Divider(height: 1, color: dividerColor),
+              _RepostMenuButton(
+                text: 'Cancel',
+                onTap: () => Navigator.of(context).pop(_RepostIntent.cancel),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RepostMenuButton extends StatelessWidget {
+  const _RepostMenuButton({
+    required this.text,
+    required this.onTap,
+    this.color,
+  });
+
+  final String text;
+  final VoidCallback onTap;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          foregroundColor: color ?? const Color(0xFFE8ECF8),
+          shape: const RoundedRectangleBorder(),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: color ?? const Color(0xFFE8ECF8),
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuoteRepostInput {
+  const _QuoteRepostInput({
+    required this.content,
+    required this.visibility,
+    required this.allowComments,
+    required this.hideLikeCount,
+    required this.location,
+    required this.hashtags,
+  });
+
+  final String content;
+  final String visibility;
+  final bool allowComments;
+  final bool hideLikeCount;
+  final String location;
+  final List<String> hashtags;
+}
+
+class _QuoteComposerSheet extends StatefulWidget {
+  const _QuoteComposerSheet({
+    required this.label,
+    required this.initialAllowDownload,
+  });
+
+  final String label;
+  final bool initialAllowDownload;
+
+  @override
+  State<_QuoteComposerSheet> createState() => _QuoteComposerSheetState();
+}
+
+class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
+  final TextEditingController _contentCtrl = TextEditingController();
+  final TextEditingController _hashtagsCtrl = TextEditingController();
+  final TextEditingController _locationCtrl = TextEditingController();
+
+  bool _allowComments = true;
+  bool _hideLikeCount = false;
+  String _visibility = 'public';
+
+  @override
+  void dispose() {
+    _contentCtrl.dispose();
+    _hashtagsCtrl.dispose();
+    _locationCtrl.dispose();
+    super.dispose();
+  }
+
+  List<String> _parseHashtags(String raw) {
+    final items = raw
+        .split(RegExp(r'[,\s]+'))
+        .map((e) => e.trim().replaceFirst('#', ''))
+        .where((e) => e.isNotEmpty)
+        .map((e) => e.toLowerCase())
+        .toSet()
+        .toList();
+    return items;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(14, 12, 14, 12 + bottomInset),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Quote repost',
+                style: TextStyle(
+                  color: Color(0xFFE8ECF8),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                widget.label,
+                style: const TextStyle(color: Color(0xFF93A2C5), fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _contentCtrl,
+                maxLines: 5,
+                maxLength: 500,
+                style: const TextStyle(color: Color(0xFFE8ECF8)),
+                decoration: _sheetInputDecoration('Write your quote...'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _hashtagsCtrl,
+                style: const TextStyle(color: Color(0xFFE8ECF8)),
+                decoration: _sheetInputDecoration('Hashtags (comma separated)'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _locationCtrl,
+                style: const TextStyle(color: Color(0xFFE8ECF8)),
+                decoration: _sheetInputDecoration('Location (optional)'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _visibility,
+                items: const [
+                  DropdownMenuItem(value: 'public', child: Text('Public')),
+                  DropdownMenuItem(
+                    value: 'followers',
+                    child: Text('Followers'),
+                  ),
+                  DropdownMenuItem(value: 'private', child: Text('Private')),
+                ],
+                dropdownColor: const Color(0xFF111C37),
+                iconEnabledColor: const Color(0xFF9BAECF),
+                style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 14),
+                decoration: _sheetInputDecoration('Visibility'),
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() => _visibility = v);
+                },
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile.adaptive(
+                value: _allowComments,
+                onChanged: (v) => setState(() => _allowComments = v),
+                title: const Text(
+                  'Allow comments',
+                  style: TextStyle(color: Color(0xFFE8ECF8)),
+                ),
+                contentPadding: EdgeInsets.zero,
+                activeColor: const Color(0xFF4AA3E4),
+              ),
+              SwitchListTile.adaptive(
+                value: widget.initialAllowDownload,
+                onChanged: null,
+                title: const Text(
+                  'Allow downloads (inherits original)',
+                  style: TextStyle(color: Color(0xFF7A8BB0)),
+                ),
+                contentPadding: EdgeInsets.zero,
+                activeColor: const Color(0xFF4AA3E4),
+              ),
+              SwitchListTile.adaptive(
+                value: _hideLikeCount,
+                onChanged: (v) => setState(() => _hideLikeCount = v),
+                title: const Text(
+                  'Hide like count',
+                  style: TextStyle(color: Color(0xFFE8ECF8)),
+                ),
+                contentPadding: EdgeInsets.zero,
+                activeColor: const Color(0xFF4AA3E4),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.18),
+                        ),
+                        foregroundColor: const Color(0xFFE8ECF8),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(
+                          _QuoteRepostInput(
+                            content: _contentCtrl.text.trim(),
+                            visibility: _visibility,
+                            allowComments: _allowComments,
+                            hideLikeCount: _hideLikeCount,
+                            location: _locationCtrl.text.trim(),
+                            hashtags: _parseHashtags(_hashtagsCtrl.text),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4AA3E4),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                      ),
+                      child: const Text('Share quote'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _sheetInputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Color(0xFF6F82A8)),
+      filled: true,
+      fillColor: const Color(0xFF111C37),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF4AA3E4)),
       ),
     );
   }
