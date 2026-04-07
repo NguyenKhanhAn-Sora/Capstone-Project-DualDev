@@ -157,6 +157,11 @@ String _resolveRepostOriginName(Map<String, dynamic> item) {
   return resolved ?? 'Original Author';
 }
 
+String _resolveRepostOriginId(Map<String, dynamic> item) {
+  final repostOfAuthor = _asStringKeyMap(item['repostOfAuthor']);
+  return _pickString([repostOfAuthor?['id'], item['repostOfAuthorId']]) ?? '';
+}
+
 FeedPostState? _toFeedPostState(
   Map<String, dynamic> raw, {
   String? fallbackAuthorId,
@@ -1644,6 +1649,12 @@ class _ItemPageState extends State<_ItemPage> {
     final repostUsername =
         (normalized['repostOfAuthorUsername'] as String?) ??
         (_asStringKeyMap(normalized['repostOfAuthor'])?['username'] as String?);
+    final repostAuthorId =
+        _pickString([
+          normalized['repostOfAuthorId'],
+          _asStringKeyMap(normalized['repostOfAuthor'])?['id'],
+        ]) ??
+        '';
     final isOwn =
         widget.viewerId != null &&
         widget.viewerId!.isNotEmpty &&
@@ -1849,18 +1860,45 @@ class _ItemPageState extends State<_ItemPage> {
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(
-                          repostUsername != null && repostUsername.isNotEmpty
-                              ? 'Reposted from @$repostUsername'
-                              : 'Reposted',
-                          style: const TextStyle(
-                            color: Color(0xFF9FB0CC),
-                            fontSize: 12,
-                            shadows: [
-                              Shadow(blurRadius: 4, color: Colors.black54),
-                            ],
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          children: [
+                            const Text(
+                              'Reposted from ',
+                              style: TextStyle(
+                                color: Color(0xFF9FB0CC),
+                                fontSize: 12,
+                                shadows: [
+                                  Shadow(blurRadius: 4, color: Colors.black54),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: repostAuthorId.isNotEmpty
+                                    ? () => _openUserProfile(repostAuthorId)
+                                    : null,
+                                child: Text(
+                                  repostUsername != null &&
+                                          repostUsername.isNotEmpty
+                                      ? '@$repostUsername'
+                                      : 'unknown',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    shadows: [
+                                      Shadow(
+                                        blurRadius: 4,
+                                        color: Colors.black54,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -2783,6 +2821,7 @@ class _ItemInfoOverlay extends StatelessWidget {
     final repostOf = normalized['repostOf'] as String?;
     final isRepost = repostOf != null && repostOf.isNotEmpty;
     final repostOriginName = _resolveRepostOriginName(normalized);
+    final repostOriginId = _resolveRepostOriginId(normalized);
     final itemId = normalized['id'] as String? ?? '';
     final initialState = _toFeedPostState(
       normalized,
@@ -2810,24 +2849,37 @@ class _ItemInfoOverlay extends StatelessWidget {
                 const Icon(Icons.repeat, color: Colors.white70, size: 14),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: RichText(
-                    overflow: TextOverflow.ellipsis,
-                    text: TextSpan(
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Reposted from ',
+                        style: TextStyle(color: Colors.white70, fontSize: 13),
                       ),
-                      children: [
-                        const TextSpan(text: 'Reposted from '),
-                        TextSpan(
-                          text: repostOriginName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: repostOriginId.isNotEmpty
+                              ? () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          ProfileScreen(userId: repostOriginId),
+                                    ),
+                                  );
+                                }
+                              : null,
+                          child: Text(
+                            repostOriginName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],

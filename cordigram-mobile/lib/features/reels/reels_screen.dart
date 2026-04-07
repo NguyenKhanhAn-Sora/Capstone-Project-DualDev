@@ -1057,6 +1057,13 @@ class _ReelPageState extends State<_ReelPage> {
   bool _showPauseIcon = false;
   Timer? _pauseIconTimer;
 
+  void _openUserProfile(String userId) {
+    if (userId.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: userId)),
+    );
+  }
+
   @override
   void dispose() {
     _pauseIconTimer?.cancel();
@@ -1225,6 +1232,8 @@ class _ReelPageState extends State<_ReelPage> {
     final commentsLocked = reel.allowComments == false;
     final repostUsername =
         reel.repostOfAuthor?.username ?? reel.repostOfAuthorUsername;
+    final repostAuthorId =
+        reel.repostOfAuthor?.id ?? reel.repostOfAuthorId ?? '';
 
     return GestureDetector(
       onTap: _handleTap,
@@ -1361,18 +1370,45 @@ class _ReelPageState extends State<_ReelPage> {
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(
-                          repostUsername != null && repostUsername.isNotEmpty
-                              ? 'Reposted from @$repostUsername'
-                              : 'Reposted',
-                          style: const TextStyle(
-                            color: Color(0xFF9FB0CC),
-                            fontSize: 12,
-                            shadows: [
-                              Shadow(blurRadius: 4, color: Colors.black54),
-                            ],
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          children: [
+                            const Text(
+                              'Reposted from ',
+                              style: TextStyle(
+                                color: Color(0xFF9FB0CC),
+                                fontSize: 12,
+                                shadows: [
+                                  Shadow(blurRadius: 4, color: Colors.black54),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: repostAuthorId.isNotEmpty
+                                    ? () => _openUserProfile(repostAuthorId)
+                                    : null,
+                                child: Text(
+                                  repostUsername != null &&
+                                          repostUsername.isNotEmpty
+                                      ? '@$repostUsername'
+                                      : 'unknown',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFFE8ECF8),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    shadows: [
+                                      Shadow(
+                                        blurRadius: 4,
+                                        color: Colors.black54,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

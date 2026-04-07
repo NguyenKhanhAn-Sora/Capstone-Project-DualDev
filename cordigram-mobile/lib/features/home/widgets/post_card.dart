@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import '../models/feed_post.dart';
+import '../../profile/profile_screen.dart';
 import 'media_carousel.dart';
 
 // ── Sponsored ad creative ────────────────────────────────────────────────────
@@ -979,26 +980,45 @@ class _RepostBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final repostAuthorId =
+        post.repostOfAuthor?.id ?? post.repostOfAuthorId ?? '';
+
     return Row(
       children: [
         const Icon(Icons.repeat_rounded, size: 15, color: Color(0xFF7A8BB0)),
         const SizedBox(width: 6),
         Flexible(
-          child: RichText(
-            overflow: TextOverflow.ellipsis,
-            text: TextSpan(
-              style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
-              children: [
-                const TextSpan(text: 'Reposted from '),
-                TextSpan(
-                  text: post.repostAuthorName,
-                  style: const TextStyle(
-                    color: Color(0xFFE8ECF8),
-                    fontWeight: FontWeight.w700,
+          child: Row(
+            children: [
+              const Text(
+                'Reposted from ',
+                style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: repostAuthorId.isNotEmpty
+                      ? () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  ProfileScreen(userId: repostAuthorId),
+                            ),
+                          );
+                        }
+                      : null,
+                  child: Text(
+                    post.repostAuthorName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFFE8ECF8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ],
