@@ -1,15 +1,24 @@
+import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import '../models/feed_post.dart';
 
 /// Carousel for a list of images/videos within a post card.
 /// Shows one media item at a time with prev/next arrows and a counter badge.
 /// Tapping the image opens a full-screen [_ImageViewerOverlay].
 class MediaCarousel extends StatefulWidget {
-  const MediaCarousel({super.key, required this.media});
+  const MediaCarousel({
+    super.key,
+    required this.media,
+    this.allowDownload = false,
+  });
 
   final List<FeedMedia> media;
+  final bool allowDownload;
 
   @override
   State<MediaCarousel> createState() => _MediaCarouselState();
@@ -35,9 +44,135 @@ class _MediaCarouselState extends State<MediaCarousel> {
   }
 
   void _openViewer(int startIndex) {
-    Navigator.of(
-      context,
-    ).push(_ImageViewerRoute(media: widget.media, initialIndex: startIndex));
+    Navigator.of(context).push(
+      _ImageViewerRoute(
+        media: widget.media,
+        initialIndex: startIndex,
+        allowDownload: widget.allowDownload,
+        onDownloadRequested: _downloadOriginalMedia,
+      ),
+    );
+  }
+
+  Future<void> _showMediaActions(FeedMedia item) async {
+    if (!widget.allowDownload) return;
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF141D30),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.download_rounded,
+                color: Color(0xFF9BAECF),
+              ),
+              title: const Text(
+                'Download',
+                style: TextStyle(color: Color(0xFFD0D8EE)),
+              ),
+              onTap: () => Navigator.of(ctx).pop('download'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || action != 'download') return;
+    await _downloadOriginalMedia(item);
+  }
+
+  Future<void> _downloadOriginalMedia(FeedMedia item) async {
+    try {
+      final res = await http
+          .get(Uri.parse(item.url))
+          .timeout(const Duration(seconds: 30));
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception('download failed');
+      }
+
+      final bytes = res.bodyBytes;
+      final dir = await _resolveDownloadDirectory();
+      final filename = _buildFilename(item, bytes);
+      final file = File('${dir.path}${Platform.pathSeparator}$filename');
+      await file.writeAsBytes(bytes, flush: true);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Downloaded: ${file.path}'),
+          backgroundColor: const Color(0xFF1A2235),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to download media'),
+          backgroundColor: Color(0xFFB91C1C),
+        ),
+      );
+    }
+  }
+
+  Future<Directory> _resolveDownloadDirectory() async {
+    if (Platform.isAndroid) {
+      final direct = Directory('/storage/emulated/0/Download');
+      if (await direct.exists()) return direct;
+    }
+
+    final external = await getExternalStorageDirectory();
+    if (external != null) return external;
+
+    return getApplicationDocumentsDirectory();
+  }
+
+  String _buildFilename(FeedMedia item, Uint8List bytes) {
+    final uri = Uri.tryParse(item.url);
+    final segment = uri?.pathSegments.isNotEmpty == true
+        ? uri!.pathSegments.last
+        : '';
+    final fromUrl = segment.split('?').first.trim();
+
+    final ext = _detectExtension(item, fromUrl, bytes);
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    if (fromUrl.isNotEmpty && fromUrl.contains('.')) {
+      return 'cordigram_$ts\_${fromUrl.replaceAll(RegExp(r"[^a-zA-Z0-9._-]"), "_")}';
+    }
+    return 'cordigram_$ts.$ext';
+  }
+
+  String _detectExtension(FeedMedia item, String fromUrl, Uint8List bytes) {
+    final lower = fromUrl.toLowerCase();
+    for (final ext in ['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4', 'mov']) {
+      if (lower.endsWith('.$ext')) return ext;
+    }
+
+    if (bytes.length >= 12) {
+      if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E) {
+        return 'png';
+      }
+      if (bytes[0] == 0xFF && bytes[1] == 0xD8) {
+        return 'jpg';
+      }
+    }
+
+    return item.type == 'video' ? 'mp4' : 'jpg';
   }
 
   @override
@@ -66,6 +201,7 @@ class _MediaCarouselState extends State<MediaCarousel> {
                   onPageChanged: (i) => setState(() => _currentIndex = i),
                   itemBuilder: (_, i) => GestureDetector(
                     onTap: () => _openViewer(i),
+                    onLongPress: () => _showMediaActions(media[i]),
                     child: _MediaItem(media: media[i]),
                   ),
                 ),
@@ -124,11 +260,17 @@ class _MediaCarouselState extends State<MediaCarousel> {
 /// directly over the page without any slide transition — mirrors the web's
 /// `position: fixed; inset: 0; backdrop-filter: blur(6px)` overlay.
 class _ImageViewerRoute extends PageRoute<void> {
-  _ImageViewerRoute({required this.media, required this.initialIndex})
-    : super(fullscreenDialog: true);
+  _ImageViewerRoute({
+    required this.media,
+    required this.initialIndex,
+    required this.allowDownload,
+    required this.onDownloadRequested,
+  }) : super(fullscreenDialog: true);
 
   final List<FeedMedia> media;
   final int initialIndex;
+  final bool allowDownload;
+  final Future<void> Function(FeedMedia media) onDownloadRequested;
 
   @override
   Color get barrierColor => Colors.transparent;
@@ -153,16 +295,28 @@ class _ImageViewerRoute extends PageRoute<void> {
   ) {
     return FadeTransition(
       opacity: animation,
-      child: _ImageViewerOverlay(media: media, initialIndex: initialIndex),
+      child: _ImageViewerOverlay(
+        media: media,
+        initialIndex: initialIndex,
+        allowDownload: allowDownload,
+        onDownloadRequested: onDownloadRequested,
+      ),
     );
   }
 }
 
 class _ImageViewerOverlay extends StatefulWidget {
-  const _ImageViewerOverlay({required this.media, required this.initialIndex});
+  const _ImageViewerOverlay({
+    required this.media,
+    required this.initialIndex,
+    required this.allowDownload,
+    required this.onDownloadRequested,
+  });
 
   final List<FeedMedia> media;
   final int initialIndex;
+  final bool allowDownload;
+  final Future<void> Function(FeedMedia media) onDownloadRequested;
 
   @override
   State<_ImageViewerOverlay> createState() => _ImageViewerOverlayState();
@@ -211,6 +365,49 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
     );
   }
 
+  Future<void> _showOverlayMediaActions(FeedMedia item) async {
+    if (!widget.allowDownload) return;
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF141D30),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.download_rounded,
+                color: Color(0xFF9BAECF),
+              ),
+              title: const Text(
+                'Download',
+                style: TextStyle(color: Color(0xFFD0D8EE)),
+              ),
+              onTap: () => Navigator.of(ctx).pop('download'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || action != 'download') return;
+    await widget.onDownloadRequested(item);
+  }
+
   @override
   Widget build(BuildContext context) {
     final media = widget.media;
@@ -244,6 +441,7 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
                     return GestureDetector(
                       // Stop tap from reaching the background GestureDetector
                       onTap: () {},
+                      onLongPress: () => _showOverlayMediaActions(item),
                       child: SafeArea(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(

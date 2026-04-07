@@ -474,7 +474,10 @@ class _PostCardState extends State<PostCard> {
               ],
               if (post.media.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                MediaCarousel(media: post.media),
+                MediaCarousel(
+                  media: post.media,
+                  allowDownload: post.allowDownload == true,
+                ),
               ],
               if (isAdPost &&
                   creative != null &&
