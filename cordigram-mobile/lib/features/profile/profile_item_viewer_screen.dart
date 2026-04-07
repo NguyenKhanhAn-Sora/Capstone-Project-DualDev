@@ -5,6 +5,7 @@ import 'package:video_player/video_player.dart';
 import '../home/models/feed_post.dart';
 import '../home/services/post_interaction_service.dart';
 import '../post/post_detail_screen.dart';
+import '../profile/profile_screen.dart';
 import '../reels/reels_screen.dart' show ReelCommentSheet;
 
 Map<String, dynamic>? _asStringKeyMap(dynamic raw) {
@@ -534,6 +535,13 @@ class _ItemPageState extends State<_ItemPage> {
   bool _saved = false;
   bool _following = false;
 
+  void _openUserProfile(String userId) {
+    if (userId.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: userId)),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1002,48 +1010,54 @@ class _ItemPageState extends State<_ItemPage> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    _AuthorAvatar(
-                      avatarUrl: avatarUrl,
-                      displayName: displayName,
+                    GestureDetector(
+                      onTap: () => _openUserProfile(authorId),
+                      child: _AuthorAvatar(
+                        avatarUrl: avatarUrl,
+                        displayName: displayName,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  displayName,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
+                      child: GestureDetector(
+                        onTap: () => _openUserProfile(authorId),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    displayName,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                              if (isVerified) ...[
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.verified_rounded,
-                                  size: 14,
-                                  color: Color(0xFF4AA3E4),
-                                ),
+                                if (isVerified) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.verified_rounded,
+                                    size: 14,
+                                    color: Color(0xFF4AA3E4),
+                                  ),
+                                ],
                               ],
-                            ],
-                          ),
-                          if (username.isNotEmpty)
-                            Text(
-                              '@$username',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
                             ),
-                        ],
+                            if (username.isNotEmpty)
+                              Text(
+                                '@$username',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                     if (!isOwn && authorId.isNotEmpty) ...[
@@ -1749,6 +1763,10 @@ class _ItemInfoOverlay extends StatelessWidget {
         (normalized['authorUsername'] as String?) ??
         (normalized['author'] as Map?)?['username'] as String? ??
         '';
+    final authorId =
+        (normalized['authorId'] as String?) ??
+        ((normalized['author'] as Map?)?['id'] as String?) ??
+        '';
     final repostOf = normalized['repostOf'] as String?;
     final isRepost = repostOf != null && repostOf.isNotEmpty;
     final repostOriginName = _resolveRepostOriginName(normalized);
@@ -1803,17 +1821,28 @@ class _ItemInfoOverlay extends StatelessWidget {
             ),
 
           if (authorUsername.isNotEmpty)
-            Row(
-              children: [
-                Text(
-                  '@$authorUsername',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+            GestureDetector(
+              onTap: authorId.isNotEmpty
+                  ? () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ProfileScreen(userId: authorId),
+                        ),
+                      );
+                    }
+                  : null,
+              child: Row(
+                children: [
+                  Text(
+                    '@$authorUsername',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
 
           if (caption.isNotEmpty) ...[

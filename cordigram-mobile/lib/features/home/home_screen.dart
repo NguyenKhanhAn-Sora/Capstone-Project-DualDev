@@ -377,6 +377,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _openUserProfile(String userId) {
+    if (userId.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: userId)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -602,6 +609,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 onHide: () => _onHide(_states[index].post.id),
                 onView: () => _onView(_states[index].post.id),
                 onFollow: _onFollow,
+                onAuthorTap: _openUserProfile,
                 onComment: () => _openPostDetail(_states[index]),
               ),
               childCount: _states.length,

@@ -12,6 +12,7 @@ import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../profile/profile_screen.dart';
 import '../report/report_comment_sheet.dart';
 import '../home/models/feed_post.dart';
 import '../home/widgets/media_carousel.dart';
@@ -411,6 +412,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     _callFollowApi(authorId, nextFollow, prev);
   }
 
+  void _openUserProfile(String userId) {
+    if (userId.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: userId)),
+    );
+  }
+
   Future<void> _callFollowApi(
     String authorId,
     bool nextFollow,
@@ -727,6 +735,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 onLike: _onLike,
                 onSave: _onSave,
                 onFollow: _onFollow,
+                onAuthorTap: _openUserProfile,
                 onHide: () => Navigator.of(context).pop(),
                 onView: () {}, // no-op — already viewed from feed
                 onComment: null, // already on the detail page
@@ -1024,6 +1033,16 @@ class _CommentTileState extends State<_CommentTile> {
   bool get _isPostOwner {
     if (widget.viewerId == null || widget.postAuthorId == null) return false;
     return widget.viewerId == widget.postAuthorId;
+  }
+
+  void _openCommentAuthorProfile() {
+    final uid = (widget.comment.author?.id?.isNotEmpty == true)
+        ? widget.comment.author!.id!
+        : (widget.comment.authorId ?? '');
+    if (uid.isEmpty) return;
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: uid)));
   }
 
   Future<void> _onPinComment() async {
@@ -1357,7 +1376,10 @@ class _CommentTileState extends State<_CommentTile> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _CommentAvatar(comment: comment),
+                      GestureDetector(
+                        onTap: _openCommentAuthorProfile,
+                        child: _CommentAvatar(comment: comment),
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -1366,12 +1388,15 @@ class _CommentTileState extends State<_CommentTile> {
                             // Header: username + verified + pinned + time
                             Row(
                               children: [
-                                Text(
-                                  comment.displayUsername,
-                                  style: const TextStyle(
-                                    color: Color(0xFFE8ECF8),
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
+                                GestureDetector(
+                                  onTap: _openCommentAuthorProfile,
+                                  child: Text(
+                                    comment.displayUsername,
+                                    style: const TextStyle(
+                                      color: Color(0xFFE8ECF8),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ),
                                 if (comment.isVerified) ...[

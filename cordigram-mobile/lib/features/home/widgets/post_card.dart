@@ -143,6 +143,7 @@ class PostCard extends StatefulWidget {
     required this.onView,
     this.viewerId,
     this.onFollow,
+    this.onAuthorTap,
     this.onComment,
     this.fullWidth = false,
     this.detailMode = false,
@@ -162,6 +163,9 @@ class PostCard extends StatefulWidget {
 
   /// Called when the user taps Follow / Following on this card.
   final void Function(String authorId, bool nextFollow)? onFollow;
+
+  /// Called when the user taps the post author's avatar/username.
+  final void Function(String authorId)? onAuthorTap;
 
   /// Called when the user taps the Comment button. If null the button is a
   /// no-op (e.g. when already on the post detail screen).
@@ -306,6 +310,7 @@ class _PostCardState extends State<PostCard> {
                 isSponsored: isAdPost,
                 isFollowing: state.following,
                 showInlineFollow: showInlineFollow,
+                onAuthorTap: widget.onAuthorTap,
                 onFollow: showInlineFollow && post.authorId != null
                     ? (nextFollow) {
                         setState(() => _followToggled = true);
@@ -373,6 +378,7 @@ class _PostHeader extends StatelessWidget {
     this.isFollowing = false,
     this.showInlineFollow = false,
     this.onFollow,
+    this.onAuthorTap,
   });
   final FeedPost post;
   final VoidCallback onHide;
@@ -381,93 +387,115 @@ class _PostHeader extends StatelessWidget {
   final bool isSponsored;
   final bool isFollowing;
   final bool showInlineFollow;
+  final void Function(String authorId)? onAuthorTap;
 
   /// Called with `true` to follow, `false` to unfollow.
   final void Function(bool nextFollow)? onFollow;
 
   @override
   Widget build(BuildContext context) {
+    final canOpenProfile =
+        post.authorId != null &&
+        post.authorId!.isNotEmpty &&
+        onAuthorTap != null;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        _Avatar(avatarUrl: post.avatarUrl, displayName: post.displayName),
+        GestureDetector(
+          onTap: canOpenProfile
+              ? () => onAuthorTap!.call(post.authorId!)
+              : null,
+          child: _Avatar(
+            avatarUrl: post.avatarUrl,
+            displayName: post.displayName,
+          ),
+        ),
         const SizedBox(width: 10),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      useUsername && post.username.isNotEmpty
-                          ? post.username
-                          : post.displayName,
-                      style: const TextStyle(
-                        color: Color(0xFFE8ECF8),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (post.isVerified) ...[
-                    const SizedBox(width: 4),
-                    const _VerifiedBadge(),
-                  ],
-                  if (showInlineFollow) ...[
-                    const Text(
-                      ' · ',
-                      style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
-                    ),
-                    GestureDetector(
-                      onTap: () => onFollow?.call(!isFollowing),
+          child: GestureDetector(
+            onTap: canOpenProfile
+                ? () => onAuthorTap!.call(post.authorId!)
+                : null,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
                       child: Text(
-                        isFollowing ? 'Following' : 'Follow',
+                        useUsername && post.username.isNotEmpty
+                            ? post.username
+                            : post.displayName,
+                        style: const TextStyle(
+                          color: Color(0xFFE8ECF8),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (post.isVerified) ...[
+                      const SizedBox(width: 4),
+                      const _VerifiedBadge(),
+                    ],
+                    if (showInlineFollow) ...[
+                      const Text(
+                        ' · ',
                         style: TextStyle(
-                          color: isFollowing
-                              ? const Color(0xFF7A8BB0)
-                              : const Color(0xFF4AA3E4),
-                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF7A8BB0),
                           fontSize: 13,
                         ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 2),
-              if (isSponsored)
-                Row(
-                  children: [
-                    if (post.username.isNotEmpty) ...[
-                      Text(
-                        '${post.username} · ',
-                        style: const TextStyle(
-                          color: Color(0xFF7A8BB0),
-                          fontSize: 12,
+                      GestureDetector(
+                        onTap: () => onFollow?.call(!isFollowing),
+                        child: Text(
+                          isFollowing ? 'Following' : 'Follow',
+                          style: TextStyle(
+                            color: isFollowing
+                                ? const Color(0xFF7A8BB0)
+                                : const Color(0xFF4AA3E4),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
-                    const Text(
-                      'Sponsored',
-                      style: TextStyle(
-                        color: Color(0xFF4AA3E4),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
                   ],
-                )
-              else
-                Text(
-                  _timeAgo(post.createdAt),
-                  style: const TextStyle(
-                    color: Color(0xFF7A8BB0),
-                    fontSize: 12,
-                  ),
                 ),
-            ],
+                const SizedBox(height: 2),
+                if (isSponsored)
+                  Row(
+                    children: [
+                      if (post.username.isNotEmpty) ...[
+                        Text(
+                          '${post.username} · ',
+                          style: const TextStyle(
+                            color: Color(0xFF7A8BB0),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                      const Text(
+                        'Sponsored',
+                        style: TextStyle(
+                          color: Color(0xFF4AA3E4),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Text(
+                    _timeAgo(post.createdAt),
+                    style: const TextStyle(
+                      color: Color(0xFF7A8BB0),
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
         // 3-dot menu button (UI stub)

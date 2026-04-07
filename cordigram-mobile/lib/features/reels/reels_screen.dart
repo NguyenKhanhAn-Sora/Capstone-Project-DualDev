@@ -14,6 +14,7 @@ import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../home/models/feed_post.dart';
 import '../home/services/post_interaction_service.dart';
+import '../profile/profile_screen.dart';
 import '../post/post_detail_screen.dart' show CommentItem, CommentLinkPreview;
 import '../report/report_comment_sheet.dart';
 
@@ -1562,6 +1563,16 @@ class _RCommentTileState extends State<_RCommentTile> {
       widget.postAuthorId != null &&
       widget.viewerId == widget.postAuthorId;
 
+  void _openCommentAuthorProfile() {
+    final uid = (widget.comment.author?.id?.isNotEmpty == true)
+        ? widget.comment.author!.id!
+        : (widget.comment.authorId ?? '');
+    if (uid.isEmpty) return;
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: uid)));
+  }
+
   Future<void> _onPinComment() async {
     final isPinned = widget.comment.pinnedAt != null;
     widget.onPinToggled?.call(widget.comment.id, !isPinned);
@@ -1888,7 +1899,10 @@ class _RCommentTileState extends State<_RCommentTile> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _RCommentAvatar(comment: comment),
+                      GestureDetector(
+                        onTap: _openCommentAuthorProfile,
+                        child: _RCommentAvatar(comment: comment),
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -1897,12 +1911,15 @@ class _RCommentTileState extends State<_RCommentTile> {
                             // Header row: name + badges + time
                             Row(
                               children: [
-                                Text(
-                                  comment.displayUsername,
-                                  style: const TextStyle(
-                                    color: Color(0xFFE8ECF8),
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
+                                GestureDetector(
+                                  onTap: _openCommentAuthorProfile,
+                                  child: Text(
+                                    comment.displayUsername,
+                                    style: const TextStyle(
+                                      color: Color(0xFFE8ECF8),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ),
                                 if (comment.isVerified) ...[
