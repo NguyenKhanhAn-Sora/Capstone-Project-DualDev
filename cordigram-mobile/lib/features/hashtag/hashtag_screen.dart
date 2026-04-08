@@ -95,7 +95,10 @@ class _HashtagScreenState extends State<HashtagScreen> {
       );
       if (!mounted) return;
 
-      final merged = <FeedPost>[...bundle.posts, ...bundle.reels];
+      final merged = <FeedPost>[
+        ...bundle.posts.where((p) => !isAdLikeFeedPost(p)),
+        ...bundle.reels.where((r) => !isAdLikeFeedPost(r)),
+      ];
       merged.sort((a, b) {
         final aTime =
             DateTime.tryParse(a.createdAt)?.millisecondsSinceEpoch ?? 0;
@@ -607,6 +610,12 @@ class _HashtagScreenState extends State<HashtagScreen> {
         } catch (_) {
           _showSnack('Failed to block account', error: true);
         }
+        return;
+      case PostMenuAction.goToAdsPost:
+        _openPostDetail(state);
+        return;
+      case PostMenuAction.detailAds:
+        _showSnack('Ads detail is available from Home feed', error: true);
         return;
     }
   }

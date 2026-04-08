@@ -776,6 +776,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           _showSnack('Failed to block account', error: true);
         }
         return;
+      case PostMenuAction.goToAdsPost:
+        _showSnack('Already on this ads post');
+        return;
+      case PostMenuAction.detailAds:
+        _showSnack('Ads detail is available from Home feed', error: true);
+        return;
     }
   }
 

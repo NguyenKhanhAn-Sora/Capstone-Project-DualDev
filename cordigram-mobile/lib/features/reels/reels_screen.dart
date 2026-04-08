@@ -290,15 +290,18 @@ class _ReelsScreenState extends State<ReelsScreen> {
       );
       if (!mounted) return;
 
-      final List<FeedPost> posts = rawList
+      final List<FeedPost> pageItems = rawList
           .whereType<Map<String, dynamic>>()
           .map(FeedPost.fromJson)
+          .toList();
+      final List<FeedPost> posts = pageItems
+          .where((post) => !isAdLikeFeedPost(post))
           .toList();
 
       setState(() {
         _reels.addAll(posts.map((p) => FeedPostState(post: p)));
         _page++;
-        _hasMore = posts.length >= _kPageSize;
+        _hasMore = pageItems.length >= _kPageSize;
         _loading = false;
       });
 
@@ -862,6 +865,10 @@ class _ReelsScreenState extends State<ReelsScreen> {
         } catch (_) {
           _showSnack('Failed to block account', error: true);
         }
+        return;
+      case PostMenuAction.goToAdsPost:
+      case PostMenuAction.detailAds:
+        _showSnack('Ads actions are only available in Home feed', error: true);
         return;
     }
   }

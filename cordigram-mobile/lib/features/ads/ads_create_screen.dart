@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import 'ads_dashboard_screen.dart';
@@ -394,6 +396,9 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
     if (_submitting) return;
     if (!_validate()) return;
 
+    final acceptedTerms = await _showStripeConfirmPaymentDialog();
+    if (acceptedTerms != true) return;
+
     setState(() {
       _submitting = true;
       _error = null;
@@ -497,6 +502,255 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  String _formatVndSymbol(int value) {
+    return 'đ${_formatVnd(value).replaceAll(' VND', '')}';
+  }
+
+  String _objectiveLabel(_Objective value) {
+    switch (value) {
+      case _Objective.awareness:
+        return 'Awareness';
+      case _Objective.traffic:
+        return 'Traffic';
+      case _Objective.engagement:
+        return 'Engagement';
+      case _Objective.leads:
+        return 'Leads';
+      case _Objective.sales:
+        return 'Sales';
+      case _Objective.messages:
+        return 'Messages';
+    }
+  }
+
+  String _adFormatLabel(_AdFormat value) {
+    switch (value) {
+      case _AdFormat.single:
+        return 'Single';
+      case _AdFormat.carousel:
+        return 'Carousel';
+      case _AdFormat.video:
+        return 'Video';
+    }
+  }
+
+  Future<void> _openTermsPage() async {
+    final uri = Uri.parse('${AppConfig.webBaseUrl}/terms');
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<bool?> _showStripeConfirmPaymentDialog() {
+    var accepted = false;
+
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: !_submitting,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            return Dialog(
+              backgroundColor: const Color(0xFF081734),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+                side: BorderSide(
+                  color: const Color(0xFF1D4E7C).withValues(alpha: 0.6),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Confirm Payment',
+                            style: TextStyle(
+                              color: Color(0xFFE8ECF8),
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(999),
+                          onTap: () => Navigator.of(dialogContext).pop(false),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF263956),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              color: Color(0xFFD7E6FF),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'You will be redirected to Stripe Checkout to complete payment.',
+                      style: TextStyle(color: Color(0xFFA9B9D4), fontSize: 13),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F2A4D),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF2A6A9A).withValues(alpha: 0.7),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          _InvoiceLine(
+                            label: 'Boost package',
+                            value:
+                                '${_selectedBoost.title} • ${_formatVndSymbol(_selectedBoost.price)}',
+                          ),
+                          const SizedBox(height: 6),
+                          _InvoiceLine(
+                            label: 'Duration package',
+                            value:
+                                '${_selectedDuration.days} days • ${_formatVndSymbol(_selectedDuration.price)}',
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 10),
+                            child: Divider(color: Color(0xFF2A5D87), height: 1),
+                          ),
+                          _InvoiceLine(
+                            label: 'Total',
+                            value: _formatVndSymbol(_totalBudget),
+                            emphasis: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Checkbox(
+                          value: accepted,
+                          visualDensity: VisualDensity.compact,
+                          side: const BorderSide(color: Color(0xFF7CA5CE)),
+                          activeColor: const Color(0xFF31C3E8),
+                          onChanged: (value) {
+                            setLocalState(() {
+                              accepted = value == true;
+                            });
+                          },
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: RichText(
+                              text: TextSpan(
+                                style: const TextStyle(
+                                  color: Color(0xFFAFC0DA),
+                                  fontSize: 13,
+                                  height: 1.3,
+                                ),
+                                children: [
+                                  const TextSpan(text: 'I agree to the '),
+                                  WidgetSpan(
+                                    alignment: PlaceholderAlignment.baseline,
+                                    baseline: TextBaseline.alphabetic,
+                                    child: GestureDetector(
+                                      onTap: _openTermsPage,
+                                      child: const Text(
+                                        'Term',
+                                        style: TextStyle(
+                                          color: Color(0xFF7FD8FF),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          decoration: TextDecoration.underline,
+                                          decorationColor: Color(0xFF7FD8FF),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const TextSpan(
+                                    text:
+                                        ' and advertising rules of Cordigram.',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.of(dialogContext).pop(false),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFFD4E0F3),
+                            backgroundColor: const Color(0xFF0D2343),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: const Color(
+                                  0xFF2A4C77,
+                                ).withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ),
+                          child: const Text(
+                            'Back',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton(
+                          onPressed: accepted
+                              ? () => Navigator.of(dialogContext).pop(true)
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF3BC7E8),
+                            disabledBackgroundColor: const Color(0xFF2C5D77),
+                            foregroundColor: const Color(0xFF062137),
+                            disabledForegroundColor: const Color(0xFF89A6BC),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Pay with Stripe',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -1196,6 +1450,60 @@ class _FormatTab extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _InvoiceLine extends StatelessWidget {
+  const _InvoiceLine({
+    required this.label,
+    required this.value,
+    this.emphasis = false,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasis;
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = TextStyle(
+      color: emphasis ? const Color(0xFFD3E6FF) : const Color(0xFFC7D7EC),
+      fontSize: emphasis ? 16 : 14,
+      fontWeight: emphasis ? FontWeight.w700 : FontWeight.w600,
+    );
+    final valueStyle = TextStyle(
+      color: emphasis ? const Color(0xFF7FD8FF) : const Color(0xFFE8EEF8),
+      fontSize: emphasis ? 18 : 14,
+      fontWeight: emphasis ? FontWeight.w800 : FontWeight.w700,
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 122,
+          child: Text(label, style: labelStyle, maxLines: 2, softWrap: true),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          flex: emphasis ? 2 : 3,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                value,
+                maxLines: 1,
+                softWrap: false,
+                textAlign: TextAlign.right,
+                style: valueStyle,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

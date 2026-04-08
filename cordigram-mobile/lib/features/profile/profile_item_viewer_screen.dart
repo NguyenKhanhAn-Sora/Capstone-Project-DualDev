@@ -197,6 +197,119 @@ int? _extractExpectedDurationMs(Map<String, dynamic> item) {
   return ms < 1000 ? ms * 1000 : ms;
 }
 
+class _AdCreativePreview {
+  const _AdCreativePreview({
+    required this.primaryText,
+    required this.headline,
+    required this.description,
+    required this.destinationUrl,
+    required this.cta,
+  });
+
+  final String primaryText;
+  final String headline;
+  final String description;
+  final String? destinationUrl;
+  final String cta;
+}
+
+bool _hasAdStructuredMarkers(String value) => RegExp(
+  r'\[\[/?AD_(PRIMARY_TEXT|HEADLINE|DESCRIPTION|CTA|URL)\]\]',
+  caseSensitive: false,
+).hasMatch(value);
+
+String _stripAdMarkup(String value) {
+  if (value.trim().isEmpty) return '';
+  return value
+      .replaceAll(RegExp(r'\[\[/?AD_[A-Z_]+\]\]', caseSensitive: false), '')
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
+}
+
+_AdCreativePreview? _parseAdCreativePreview(String value) {
+  final raw = value.replaceAll('\r', '').trim();
+  if (raw.isEmpty) return null;
+
+  String extractBlock(String name) {
+    final pattern = RegExp(
+      r'\[\[AD_' + name + r'\]\]([\s\S]*?)\[\[/AD_' + name + r'\]\]',
+      caseSensitive: false,
+    );
+    final m = pattern.firstMatch(raw);
+    if (m == null) return '';
+    return (m.group(1) ?? '').replaceAll(RegExp(r'^\n+|\n+$'), '');
+  }
+
+  final pt = extractBlock('PRIMARY_TEXT').trim();
+  final hl = extractBlock('HEADLINE').trim();
+  final desc = extractBlock('DESCRIPTION').trim();
+  final url = extractBlock('URL').trim();
+  final cta = extractBlock('CTA').trim();
+
+  if (pt.isNotEmpty || hl.isNotEmpty || desc.isNotEmpty || url.isNotEmpty) {
+    return _AdCreativePreview(
+      primaryText: pt,
+      headline: hl,
+      description: desc,
+      destinationUrl: url.isNotEmpty ? url : null,
+      cta: cta,
+    );
+  }
+
+  final plain = _stripAdMarkup(raw);
+  if (plain.isEmpty) return null;
+  return _AdCreativePreview(
+    primaryText: plain,
+    headline: '',
+    description: '',
+    destinationUrl: null,
+    cta: '',
+  );
+}
+
+String _resolveAdDisplayText(String rawContent, _AdCreativePreview? creative) {
+  if (creative != null && creative.primaryText.trim().isNotEmpty) {
+    return creative.primaryText.trim();
+  }
+  return _stripAdMarkup(rawContent);
+}
+
+bool _isAdNormalizedItem(Map<String, dynamic> normalized) {
+  final rawContent =
+      (normalized['caption'] as String? ??
+              normalized['content'] as String? ??
+              '')
+          .trim();
+  final rawSource = (normalized['repostSourceContent'] as String? ?? '').trim();
+  final kind = (normalized['kind'] as String? ?? '').toLowerCase();
+  return normalized['sponsored'] == true ||
+      kind == 'ad' ||
+      _hasAdStructuredMarkers(rawContent) ||
+      _hasAdStructuredMarkers(rawSource);
+}
+
+_AdCreativePreview? _resolveAdCreative(Map<String, dynamic> normalized) {
+  final rawContent =
+      (normalized['caption'] as String? ??
+              normalized['content'] as String? ??
+              '')
+          .trim();
+  final rawSource = (normalized['repostSourceContent'] as String? ?? '').trim();
+  final source = _hasAdStructuredMarkers(rawSource) ? rawSource : rawContent;
+  return _parseAdCreativePreview(source);
+}
+
+Future<void> _openAdDestinationUrl(BuildContext context, String? rawUrl) async {
+  final value = (rawUrl ?? '').trim();
+  if (value.isEmpty) return;
+  final normalized = value.startsWith('http://') || value.startsWith('https://')
+      ? value
+      : 'https://$value';
+  final uri = Uri.tryParse(normalized);
+  if (uri == null || uri.host.isEmpty) return;
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 /// Full-screen horizontal swipe viewer for posts/reels shown in a profile tab.
@@ -1377,6 +1490,10 @@ class _ItemPageState extends State<_ItemPage> {
           _showSnack('Failed to block account', error: true);
         }
         return;
+      case PostMenuAction.goToAdsPost:
+      case PostMenuAction.detailAds:
+        _showSnack('Ads actions are only available in Home feed', error: true);
+        return;
     }
   }
 
@@ -1620,11 +1737,20 @@ class _ItemPageState extends State<_ItemPage> {
     final comments = _asInt(stats?['comments']);
     final reposts = _asInt(stats?['reposts'] ?? stats?['shares']);
     final saves = _asInt(stats?['saves']);
-    final content =
+    final rawContent =
         (normalized['caption'] as String? ??
                 normalized['content'] as String? ??
                 '')
             .trim();
+    final isAdPost = _isAdNormalizedItem(normalized);
+    final adCreative = isAdPost ? _resolveAdCreative(normalized) : null;
+    final content = isAdPost
+        ? _resolveAdDisplayText(rawContent, adCreative)
+        : rawContent;
+    final adHeadline = (adCreative?.headline ?? '').trim();
+    final adDescription = (adCreative?.description ?? '').trim();
+    final adCta = (adCreative?.cta ?? '').trim();
+    final adUrl = (adCreative?.destinationUrl ?? '').trim();
     final author = _asStringKeyMap(normalized['author']);
     final displayName =
         (normalized['authorDisplayName'] as String?) ??
@@ -1954,6 +2080,33 @@ class _ItemPageState extends State<_ItemPage> {
                                   fontSize: 12,
                                 ),
                               ),
+                            if (isAdPost)
+                              Container(
+                                margin: const EdgeInsets.only(top: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF1D4ED8,
+                                  ).withValues(alpha: 0.28),
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: const Color(
+                                      0xFF93C5FD,
+                                    ).withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Sponsored',
+                                  style: TextStyle(
+                                    color: Color(0xFFDCEBFF),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -1989,7 +2142,59 @@ class _ItemPageState extends State<_ItemPage> {
                 ),
                 if (content.isNotEmpty) ...[
                   const SizedBox(height: 10),
+                  if (isAdPost && adHeadline.isNotEmpty) ...[
+                    Text(
+                      adHeadline,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFEAF3FF),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        shadows: [Shadow(blurRadius: 4, color: Colors.black54)],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
                   _ExpandableCaption(text: content),
+                  if (isAdPost && adDescription.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      adDescription,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFD1DDEF),
+                        fontSize: 12,
+                        height: 1.3,
+                        shadows: [Shadow(blurRadius: 4, color: Colors.black54)],
+                      ),
+                    ),
+                  ],
+                  if (isAdPost && (adCta.isNotEmpty || adUrl.isNotEmpty)) ...[
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () => _openAdDestinationUrl(context, adUrl),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          adCta.isNotEmpty ? adCta : 'Learn more',
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
                 if (location != null && location.isNotEmpty) ...[
                   const SizedBox(height: 8),
@@ -2805,11 +3010,20 @@ class _ItemInfoOverlay extends StatelessWidget {
     final likes = stats?['hearts'] ?? stats?['likes'] ?? 0;
     final comments = stats?['comments'] ?? 0;
     final views = stats?['views'] ?? 0;
-    final caption =
+    final rawCaption =
         (normalized['caption'] as String? ??
                 normalized['content'] as String? ??
                 '')
             .trim();
+    final isAdPost = _isAdNormalizedItem(normalized);
+    final adCreative = isAdPost ? _resolveAdCreative(normalized) : null;
+    final caption = isAdPost
+        ? _resolveAdDisplayText(rawCaption, adCreative)
+        : rawCaption;
+    final adHeadline = (adCreative?.headline ?? '').trim();
+    final adDescription = (adCreative?.description ?? '').trim();
+    final adCta = (adCreative?.cta ?? '').trim();
+    final adUrl = (adCreative?.destinationUrl ?? '').trim();
     final authorUsername =
         (normalized['authorUsername'] as String?) ??
         (normalized['author'] as Map?)?['username'] as String? ??
@@ -2906,9 +3120,44 @@ class _ItemInfoOverlay extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  if (isAdPost) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1D4ED8).withValues(alpha: 0.28),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'Sponsored',
+                        style: TextStyle(
+                          color: Color(0xFFDCEBFF),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
+
+          if (isAdPost && adHeadline.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              adHeadline,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFFEAF3FF),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
 
           if (caption.isNotEmpty) ...[
             const SizedBox(height: 4),
@@ -2920,6 +3169,41 @@ class _ItemInfoOverlay extends StatelessWidget {
                 color: Color(0xFFDDEEFF),
                 fontSize: 13,
                 height: 1.4,
+              ),
+            ),
+          ],
+
+          if (isAdPost && adDescription.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              adDescription,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xFFC9D7ED), fontSize: 12),
+            ),
+          ],
+
+          if (isAdPost && (adCta.isNotEmpty || adUrl.isNotEmpty)) ...[
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: () => _openAdDestinationUrl(context, adUrl),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  adCta.isNotEmpty ? adCta : 'Learn more',
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
           ],

@@ -135,6 +135,8 @@ enum PostMenuAction {
   editVisibility,
   toggleComments,
   toggleHideLike,
+  goToAdsPost,
+  detailAds,
   copyLink,
   deletePost,
   followToggle,
@@ -163,6 +165,7 @@ class PostCard extends StatefulWidget {
     this.onHashtagTap,
     this.onComment,
     this.onMenuAction,
+    this.useAdsMenuMode = false,
     this.fullWidth = false,
     this.detailMode = false,
   });
@@ -196,6 +199,10 @@ class PostCard extends StatefulWidget {
   /// Called when the user taps a more-menu action.
   final Future<void> Function(PostMenuAction action, FeedPostState state)?
   onMenuAction;
+
+  /// Enables Home-specific ads menu behavior:
+  /// owner menu for ads and label substitutions for non-owner ads items.
+  final bool useAdsMenuMode;
 
   /// When true the card renders edge-to-edge: no horizontal/vertical margin,
   /// no rounded corners, and no border — intended for the post detail screen.
@@ -264,9 +271,24 @@ class _PostCardState extends State<PostCard> {
         widget.state.post.authorId != null &&
         widget.viewerId == widget.state.post.authorId;
     final post = widget.state.post;
+    final bool hasStructuredContent = _hasStructuredMarkers(post.content);
+    final bool hasStructuredSource = _hasStructuredMarkers(
+      post.repostSourceContent ?? '',
+    );
+    final bool isAdPost =
+        (post.sponsored == true) || hasStructuredContent || hasStructuredSource;
 
     final entries = <({String id, String label, bool danger})>[];
-    if (isOwner) {
+    if (isOwner && isAdPost && widget.useAdsMenuMode) {
+      entries.add((id: 'goToAdsPost', label: 'Go to ads', danger: false));
+      entries.add((id: 'detailAds', label: 'Detail ads', danger: false));
+      entries.add((
+        id: 'toggleHideLike',
+        label: post.hideLikeCount == true ? 'Show like' : 'Hide like',
+        danger: false,
+      ));
+      entries.add((id: 'copyLink', label: 'Copy link', danger: false));
+    } else if (isOwner) {
       entries.add((id: 'editPost', label: 'Edit post', danger: false));
       entries.add((
         id: 'editVisibility',
@@ -296,10 +318,18 @@ class _PostCardState extends State<PostCard> {
       ));
       entries.add((
         id: 'saveToggle',
-        label: widget.state.saved ? 'Unsave this post' : 'Save this post',
+        label: (isAdPost && widget.useAdsMenuMode)
+            ? (widget.state.saved ? 'Unsave this ads' : 'Save this ads')
+            : (widget.state.saved ? 'Unsave this post' : 'Save this post'),
         danger: false,
       ));
-      entries.add((id: 'hidePost', label: 'Hide this post', danger: false));
+      entries.add((
+        id: 'hidePost',
+        label: (isAdPost && widget.useAdsMenuMode)
+            ? 'Hide this ads'
+            : 'Hide this post',
+        danger: false,
+      ));
       entries.add((id: 'reportPost', label: 'Report', danger: false));
       entries.add((
         id: 'blockAccount',
@@ -347,6 +377,10 @@ class _PostCardState extends State<PostCard> {
     if (!mounted || selected == null) return;
 
     switch (selected) {
+      case 'goToAdsPost':
+        return _onMenuAction(PostMenuAction.goToAdsPost);
+      case 'detailAds':
+        return _onMenuAction(PostMenuAction.detailAds);
       case 'editPost':
         return _onMenuAction(PostMenuAction.editPost);
       case 'editVisibility':

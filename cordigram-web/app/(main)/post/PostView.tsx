@@ -5166,15 +5166,7 @@ export default function PostView({ postId, asModal }: PostViewProps) {
           {showMoreMenu ? (
             <div className={styles.moreMenu} role="menu">
               {showAdsOwnerMenu ? (
-                  <>
-                    <button
-                      type="button"
-                      className={styles.moreMenuItem}
-                      role="menuitem"
-                      onClick={copyPermalink}
-                    >
-                      Copy link
-                    </button>
+                <>
                     <button
                       type="button"
                       className={styles.moreMenuItem}
@@ -5189,7 +5181,23 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       role="menuitem"
                       onClick={openAdsDetailPage}
                     >
-                      Ads detail
+                      Detail ads
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.moreMenuItem}
+                      role="menuitem"
+                      onClick={toggleHideLikeCount}
+                    >
+                      {hideLikeToggleLabel}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.moreMenuItem}
+                      role="menuitem"
+                      onClick={copyPermalink}
+                    >
+                      Copy link
                     </button>
                   </>
               ) : isAuthor ? (
@@ -5289,7 +5297,13 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       toggleSave();
                     }}
                   >
-                    {saved ? "Unsave this post" : "Save this post"}
+                    {isSponsoredPostUi
+                      ? saved
+                        ? "Unsave this ads"
+                        : "Save this ads"
+                      : saved
+                        ? "Unsave this post"
+                        : "Save this post"}
                   </button>
                   {post?.authorId ? (
                     <button

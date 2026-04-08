@@ -34,10 +34,6 @@ class _FollowingScreenState extends State<FollowingScreen> {
   String? _viewerId;
 
   static const int _kViewCooldownMs = 300000;
-  static final RegExp _adMarkerRegex = RegExp(
-    r'\[\[AD_(PRIMARY_TEXT|HEADLINE|DESCRIPTION|CTA|URL)\]\]',
-    caseSensitive: false,
-  );
 
   @override
   void initState() {
@@ -99,7 +95,7 @@ class _FollowingScreenState extends State<FollowingScreen> {
       );
       if (!mounted) return;
 
-      final visibleItems = allItems.where((p) => !_isAdItem(p)).toList();
+      final visibleItems = allItems.where((p) => !isAdLikeFeedPost(p)).toList();
 
       final expectedLimit = _page * FeedService.pageSize;
 
@@ -138,12 +134,6 @@ class _FollowingScreenState extends State<FollowingScreen> {
     PostInteractionService.view(id).catchError((_) {
       _viewCooldownMap.remove(id);
     });
-  }
-
-  bool _isAdItem(FeedPost post) {
-    if ((post.kind).toLowerCase() == 'ad') return true;
-    if (post.sponsored == true) return true;
-    return _adMarkerRegex.hasMatch(post.content);
   }
 
   void _showSnack(String message, {bool error = false}) {
@@ -427,6 +417,8 @@ class _FollowingScreenState extends State<FollowingScreen> {
       case PostMenuAction.editVisibility:
       case PostMenuAction.toggleComments:
       case PostMenuAction.toggleHideLike:
+      case PostMenuAction.goToAdsPost:
+      case PostMenuAction.detailAds:
         _showSnack('This action is not available in Following yet');
         return;
     }

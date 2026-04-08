@@ -209,6 +209,12 @@ class _SearchScreenState extends State<SearchScreen> {
           results[2] as ({List<HashtagSearchItem> items, bool hasMore});
       final postsPage = results[3] as SearchPostsPage;
       final reelsPage = results[4] as SearchPostsPage;
+      final filteredInitialPosts = postsPage.items
+          .where((p) => !isAdLikeFeedPost(p))
+          .toList(growable: false);
+      final filteredInitialReels = reelsPage.items
+          .where((r) => !isAdLikeFeedPost(r))
+          .toList(growable: false);
 
       setState(() {
         _people = people;
@@ -218,10 +224,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
         _posts
           ..clear()
-          ..addAll(postsPage.items.map((p) => FeedPostState(post: p)));
+          ..addAll(filteredInitialPosts.map((p) => FeedPostState(post: p)));
         _postsHasMore = postsPage.hasMore;
 
-        _reels = reelsPage.items;
+        _reels = filteredInitialReels;
         _reelsHasMore = reelsPage.hasMore;
 
         _allPreviewPosts = _posts
@@ -325,11 +331,13 @@ class _SearchScreenState extends State<SearchScreen> {
 
       for (final bundle in bundles) {
         for (final post in bundle.posts) {
+          if (isAdLikeFeedPost(post)) continue;
           if (postSeen.add(post.id)) {
             mergedPosts.add(FeedPostState(post: post));
           }
         }
         for (final reel in bundle.reels) {
+          if (isAdLikeFeedPost(reel)) continue;
           if (reelSeen.add(reel.id)) {
             mergedReels.add(reel);
           }
@@ -385,10 +393,11 @@ class _SearchScreenState extends State<SearchScreen> {
         limit: 20,
         page: nextPage,
       );
+      final filteredPosts = res.items.where((p) => !isAdLikeFeedPost(p));
       if (!mounted) return;
       setState(() {
         _postsPage = nextPage;
-        _posts.addAll(res.items.map((p) => FeedPostState(post: p)));
+        _posts.addAll(filteredPosts.map((p) => FeedPostState(post: p)));
         _postsHasMore = res.hasMore;
       });
     } catch (_) {
@@ -410,10 +419,13 @@ class _SearchScreenState extends State<SearchScreen> {
         limit: 24,
         page: nextPage,
       );
+      final filteredReels = res.items
+          .where((r) => !isAdLikeFeedPost(r))
+          .toList(growable: false);
       if (!mounted) return;
       setState(() {
         _reelsPage = nextPage;
-        _reels = [..._reels, ...res.items];
+        _reels = [..._reels, ...filteredReels];
         _reelsHasMore = res.hasMore;
       });
     } catch (_) {
@@ -770,6 +782,12 @@ class _SearchScreenState extends State<SearchScreen> {
           );
           _showSnack('Failed to update like visibility', error: true);
         }
+        return;
+      case PostMenuAction.goToAdsPost:
+        _openPost(state);
+        return;
+      case PostMenuAction.detailAds:
+        _showSnack('Ads detail is available from Home feed', error: true);
         return;
       case PostMenuAction.followToggle:
         return;

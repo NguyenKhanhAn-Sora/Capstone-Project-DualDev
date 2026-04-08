@@ -98,6 +98,99 @@ String _formatGender(String? g) {
   }
 }
 
+Map<String, dynamic>? _asMap(dynamic raw) {
+  if (raw is Map<String, dynamic>) return raw;
+  if (raw is Map) {
+    return raw.map((k, v) => MapEntry(k.toString(), v));
+  }
+  return null;
+}
+
+String _asLower(dynamic raw) {
+  final s = raw?.toString().trim() ?? '';
+  return s.toLowerCase();
+}
+
+bool _hasStructuredAdMarkers(String value) {
+  return RegExp(
+    r'\[\[/?AD_(PRIMARY_TEXT|HEADLINE|DESCRIPTION|CTA|URL)\]\]',
+    caseSensitive: false,
+  ).hasMatch(value);
+}
+
+bool _isAdLikeProfileItem(Map<String, dynamic> item) {
+  final kind = _asLower(item['kind']);
+  final repostKind = _asLower(item['repostKind']);
+  if (kind == 'ad' || repostKind == 'ad') return true;
+
+  if (item['sponsored'] == true || item['repostSourceSponsored'] == true) {
+    return true;
+  }
+
+  final content = (item['content'] as String? ?? '').trim();
+  final caption = (item['caption'] as String? ?? '').trim();
+  final repostSourceContent = (item['repostSourceContent'] as String? ?? '')
+      .trim();
+  if (_hasStructuredAdMarkers(content) ||
+      _hasStructuredAdMarkers(caption) ||
+      _hasStructuredAdMarkers(repostSourceContent)) {
+    return true;
+  }
+
+  final nestedCampaignStatus =
+      _asLower(_asMap(item['campaign'])?['status']) == 'active' ||
+      _asLower(_asMap(item['promotion'])?['status']) == 'active';
+  if (nestedCampaignStatus) return true;
+
+  final adStatus = _asLower(item['adStatus']);
+  final campaignStatus = _asLower(item['campaignStatus']);
+  final promotionStatus = _asLower(item['promotionStatus']);
+  if (adStatus.isNotEmpty ||
+      campaignStatus.isNotEmpty ||
+      promotionStatus.isNotEmpty) {
+    return true;
+  }
+
+  if ((item['promotedPostId'] as String?)?.trim().isNotEmpty == true) {
+    return true;
+  }
+
+  return false;
+}
+
+bool _isActiveAdProfileItem(Map<String, dynamic> item) {
+  if (item['sponsored'] == true || item['repostSourceSponsored'] == true) {
+    return true;
+  }
+
+  if (item['active'] == true || item['isActive'] == true) {
+    return true;
+  }
+
+  final statuses = <String>[
+    _asLower(item['status']),
+    _asLower(item['adStatus']),
+    _asLower(item['campaignStatus']),
+    _asLower(item['promotionStatus']),
+    _asLower(_asMap(item['campaign'])?['status']),
+    _asLower(_asMap(item['promotion'])?['status']),
+    _asLower(_asMap(item['repostSourceCampaign'])?['status']),
+  ];
+
+  return statuses.contains('active');
+}
+
+List<Map<String, dynamic>> _filterProfileInactiveAds(
+  List<Map<String, dynamic>> items,
+) {
+  return items
+      .where((item) {
+        if (!_isAdLikeProfileItem(item)) return true;
+        return _isActiveAdProfileItem(item);
+      })
+      .toList(growable: false);
+}
+
 // ── Screen ───────────────────────────────────────────────────────────────────
 
 class ProfileScreen extends StatefulWidget {
@@ -504,6 +597,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (key == 'repost') {
         items = _normalizeRepostOwner(items);
       }
+      items = _filterProfileInactiveAds(items);
 
       if (!mounted) return;
       setState(() {

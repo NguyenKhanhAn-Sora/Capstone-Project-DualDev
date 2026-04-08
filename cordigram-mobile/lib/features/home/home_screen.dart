@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../ads/ads_campaign_detail_screen.dart';
 import '../ads/ads_entry_screen.dart';
+import '../ads/ads_service.dart';
 import '../auth/login_screen.dart';
 import '../explore/explore_screen.dart';
 import '../following/following_screen.dart';
@@ -59,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   static const Duration _pollInterval = Duration(seconds: 5);
   final Map<String, int> _viewCooldownMap = {};
   static const int _kViewCooldownMs = 300000;
+  final Map<String, String> _campaignIdByPromotedPostId = {};
 
   @override
   void initState() {
@@ -175,10 +178,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // Mirror web: fetch limit=_page*pageSize from page 1 (no ?page= offset).
       // Then only add posts we don't already have (by ID) to avoid duplicates.
       final allPosts = await FeedService.fetchFeed(page: _page);
+      final visiblePosts = allPosts.where(_shouldShowInHomeFeed).toList();
       final expectedLimit = _page * FeedService.pageSize;
       setState(() {
         final existingIds = {for (final s in _states) s.post.id};
-        final newPosts = allPosts
+        final newPosts = visiblePosts
             .where((p) => !existingIds.contains(p.id))
             .toList();
         _states.addAll(newPosts.map((p) => FeedPostState(post: p)));
@@ -200,6 +204,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } finally {
       setState(() => _loading = false);
     }
+  }
+
+  bool _hasStructuredAdMarkers(String value) {
+    return RegExp(
+      r'\[\[AD_(PRIMARY_TEXT|HEADLINE|DESCRIPTION|CTA|URL)\]\]',
+      caseSensitive: false,
+    ).hasMatch(value);
+  }
+
+  bool _isAdsPost(FeedPost post) {
+    return (post.sponsored == true) ||
+        _hasStructuredAdMarkers(post.content) ||
+        _hasStructuredAdMarkers(post.repostSourceContent ?? '');
+  }
+
+  bool _shouldShowInHomeFeed(FeedPost post) {
+    if (!_isAdsPost(post)) return true;
+    // Only render active ads in Home.
+    return post.sponsored == true;
   }
 
   // ── Like ──────────────────────────────────────────────────────────────────
@@ -547,6 +570,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _showSnack('Failed to update like visibility', error: true);
         }
         return;
+      case PostMenuAction.goToAdsPost:
+        _openPostDetail(state);
+        return;
+      case PostMenuAction.detailAds:
+        await _openAdsDetailByPostId(post.id);
+        return;
       case PostMenuAction.copyLink:
         final link = PostInteractionService.permalink(post.id);
         await Clipboard.setData(ClipboardData(text: link));
@@ -763,6 +792,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
       ),
     );
+  }
+
+  Future<void> _openAdsDetailByPostId(String postId) async {
+    Future<String?> resolveCampaignId() async {
+      if (_campaignIdByPromotedPostId.containsKey(postId)) {
+        return _campaignIdByPromotedPostId[postId];
+      }
+
+      final data = await AdsService.getAdsDashboard();
+      for (final campaign in data.campaigns) {
+        final promotedPostId = campaign.promotedPostId.trim();
+        final campaignId = campaign.id.trim();
+        if (promotedPostId.isNotEmpty && campaignId.isNotEmpty) {
+          _campaignIdByPromotedPostId[promotedPostId] = campaignId;
+        }
+      }
+
+      return _campaignIdByPromotedPostId[postId];
+    }
+
+    try {
+      final campaignId = await resolveCampaignId();
+      if (!mounted) return;
+      if (campaignId == null || campaignId.isEmpty) {
+        _showSnack('Cannot find ads campaign detail for this ads', error: true);
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AdsCampaignDetailScreen(campaignId: campaignId),
+        ),
+      );
+    } on ApiException catch (e) {
+      _showSnack(e.message, error: true);
+    } catch (_) {
+      _showSnack('Failed to open ads detail', error: true);
+    }
   }
 
   void _openUserProfile(String userId) {
@@ -1018,6 +1085,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               return PostCard(
                 state: itemState,
                 viewerId: _viewerId,
+                useAdsMenuMode: true,
                 onLike: () => _onLike(itemState.post.id),
                 onSave: () => _onSave(itemState.post.id),
                 onRepost: () => _onRepost(itemState),

@@ -71,7 +71,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
     try {
       final result = await ExploreService.fetchExploreFeed(page: _page);
-      final data = result.items;
+      final data = result.items
+          .where((item) => !isAdLikeFeedPost(item))
+          .toList(growable: false);
       if (!mounted) return;
 
       setState(() {

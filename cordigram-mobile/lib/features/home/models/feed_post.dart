@@ -423,3 +423,16 @@ class FeedPostState {
     return next;
   }
 }
+
+final RegExp _adMarkerRegex = RegExp(
+  r'\[\[AD_(PRIMARY_TEXT|HEADLINE|DESCRIPTION|CTA|URL)\]\]',
+  caseSensitive: false,
+);
+
+bool isAdLikeFeedPost(FeedPost post) {
+  if (post.kind.toLowerCase() == 'ad') return true;
+  if (post.sponsored == true) return true;
+  if (_adMarkerRegex.hasMatch(post.content)) return true;
+  if (_adMarkerRegex.hasMatch(post.repostSourceContent ?? '')) return true;
+  return false;
+}

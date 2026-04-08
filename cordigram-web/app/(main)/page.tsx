@@ -12,6 +12,7 @@ import RepostOverlay, {
 } from "@/ui/repost-overlay/repost-overlay";
 import {
   fetchFeed,
+  getAdsDashboard,
   hidePost,
   likePost,
   unlikePost,
@@ -256,6 +257,22 @@ const hasStructuredSponsoredMarkers = (value: string) =>
   /\[\[AD_(PRIMARY_TEXT|HEADLINE|DESCRIPTION|CTA|URL)\]\]/i.test(
     value || "",
   );
+
+const isAdLikeFeedItem = (item: FeedItem) => {
+  return Boolean(
+    item.sponsored ||
+      hasStructuredSponsoredMarkers(item.content || "") ||
+      hasStructuredSponsoredMarkers(item.repostSourceContent || ""),
+  );
+};
+
+const shouldRenderInHomeFeed = (item: FeedItem) => {
+  if (!isAdLikeFeedItem(item)) return true;
+  // Only active ads should appear in Home feed.
+  return Boolean(item.sponsored);
+};
+
+const campaignIdByPromotedPostId = new Map<string, string>();
 
 const findActiveMention = (value: string, caret: number) => {
   const beforeCaret = value.slice(0, caret);
@@ -893,7 +910,7 @@ export default function HomePage({
       const posts = filterFeedItemsByBlockedAuthors(
         onlyPostItems(Array.isArray(data) ? data : []),
         blockedIds,
-      );
+      ).filter(shouldRenderInHomeFeed);
       const map = new Map(posts.map((item) => [item.id, item]));
       setItems((prev) =>
         prev.map((p) => {
@@ -952,7 +969,7 @@ export default function HomePage({
         const posts = filterFeedItemsByBlockedAuthors(
           onlyPostItems(rawItems),
           blockedIds,
-        );
+        ).filter(shouldRenderInHomeFeed);
         const nextHasMore = Array.isArray(data)
           ? rawItems.length >= limit
           : Boolean(data.hasMore);
@@ -2935,6 +2952,38 @@ function FeedCard({
     }
   }, [targetPostId, router, persistResume, onPersistFeedCache]);
 
+  const openAdsDetail = useCallback(async () => {
+    if (!token || !promotedAdPostId) return;
+
+    const promotedId = String(promotedAdPostId).trim();
+    if (!promotedId) return;
+
+    const cachedCampaignId = campaignIdByPromotedPostId.get(promotedId);
+    if (cachedCampaignId) {
+      setMenuOpen(false);
+      router.push(`/ads/campaigns/${encodeURIComponent(cachedCampaignId)}`);
+      return;
+    }
+
+    try {
+      const dashboard = await getAdsDashboard({ token });
+      dashboard.campaigns.forEach((campaign) => {
+        const postId = String(campaign.promotedPostId || "").trim();
+        const campaignId = String(campaign.id || "").trim();
+        if (postId && campaignId) {
+          campaignIdByPromotedPostId.set(postId, campaignId);
+        }
+      });
+
+      const resolvedCampaignId = campaignIdByPromotedPostId.get(promotedId);
+      if (!resolvedCampaignId) return;
+      setMenuOpen(false);
+      router.push(`/ads/campaigns/${encodeURIComponent(resolvedCampaignId)}`);
+    } catch {
+      // Ignore lookup errors from quick menu action.
+    }
+  }, [token, promotedAdPostId, router]);
+
   const quickOpenPost = useCallback(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem(FEED_CACHE_INTENT_KEY, "1");
@@ -4015,7 +4064,34 @@ function FeedCard({
             </button>
             {menuOpen ? (
               <div className={styles.menuPopover} role="menu">
-                {isSelf ? (
+                {isSelf && isAdLikePost ? (
+                  <div className={styles.menuContent}>
+                    <button className={styles.menuItem} onClick={goToPost}>
+                      Go to ads
+                    </button>
+                    <button className={styles.menuItem} onClick={openAdsDetail}>
+                      Detail ads
+                    </button>
+                    <button
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onToggleHideLikeCount(id, !hideLikeCount);
+                      }}
+                    >
+                      {hideLikeToggleLabel}
+                    </button>
+                    <button
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onCopyLink(id);
+                      }}
+                    >
+                      {t("menu.copyLink")}
+                    </button>
+                  </div>
+                ) : isSelf ? (
                   <div className={styles.menuContent}>
                     <button
                       className={styles.menuItem}
@@ -4133,7 +4209,13 @@ function FeedCard({
                         onSave(id, !saved);
                       }}
                     >
-                      {saved ? t("menu.unsave") : t("menu.save")}
+                      {isAdLikePost
+                        ? saved
+                          ? "Unsave this ads"
+                          : "Save this ads"
+                        : saved
+                          ? t("menu.unsave")
+                          : t("menu.save")}
                     </button>
                     <button
                       className={styles.menuItem}
@@ -4142,7 +4224,7 @@ function FeedCard({
                         onHide(id);
                       }}
                     >
-                      {t("menu.hidePost")}
+                      {isAdLikePost ? "Hide this ads" : t("menu.hidePost")}
                     </button>
                     <button
                       className={styles.menuItem}

@@ -1456,7 +1456,7 @@ export default function AdsCreatePage() {
             </div>
 
             <p className={styles.paymentSubtext}>
-              You will be redirected to Stripe Checkout (test mode) to complete payment.
+              You will be redirected to Stripe Checkout to complete payment.
             </p>
 
             <div className={styles.paymentSummary}>
