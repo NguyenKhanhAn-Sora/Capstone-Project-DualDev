@@ -221,9 +221,12 @@ export class PostsController {
     }
     if (
       !file.mimetype.startsWith('image/') &&
-      !file.mimetype.startsWith('video/')
+      !file.mimetype.startsWith('video/') &&
+      !file.mimetype.startsWith('audio/')
     ) {
-      throw new BadRequestException('Only image or video files are allowed');
+      throw new BadRequestException(
+        'Only image, video, or audio files are allowed',
+      );
     }
     return this.postsService.uploadMedia(user.userId, file);
   }
@@ -253,11 +256,14 @@ export class PostsController {
     const invalid = files.find(
       (file) =>
         !file.mimetype.startsWith('image/') &&
-        !file.mimetype.startsWith('video/'),
+        !file.mimetype.startsWith('video/') &&
+        !file.mimetype.startsWith('audio/'),
     );
 
     if (invalid) {
-      throw new BadRequestException('Only image or video files are allowed');
+      throw new BadRequestException(
+        'Only image, video, or audio files are allowed',
+      );
     }
 
     return this.postsService.uploadMediaBatch(user.userId, files);

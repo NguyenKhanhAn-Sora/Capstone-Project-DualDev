@@ -15,7 +15,7 @@ import {
   type InboxMentionItem,
 } from "@/lib/inbox-api";
 import { getApiBaseUrl } from "@/lib/api";
-import { acceptServerInvite, declineServerInvite } from "@/lib/servers-api";
+import { acceptServerInvite, declineServerInvite, getServerAccessSettings } from "@/lib/servers-api";
 type TabKey = "for-you" | "unread" | "mentions";
 
 interface MessagesInboxProps {
@@ -27,6 +27,11 @@ interface MessagesInboxProps {
   onMarkSeen?: () => void;
   /** Sau khi chấp nhận lời mời: parent load lại danh sách server và chọn server vừa tham gia. */
   onAcceptInvite?: (serverId: string) => Promise<void>;
+  /**
+   * Nếu server bật apply-to-join, gọi callback để parent mở modal câu hỏi thay vì accept invite ngay.
+   * Trả true nếu đã mở popup apply (inbox sẽ dừng luồng accept).
+   */
+  onApplyToJoinBeforeAccept?: (serverId: string, inviteId: string) => Promise<boolean>;
 }
 
 function formatTimeAgo(iso: string): string {
@@ -48,6 +53,7 @@ export default function MessagesInbox({
   onNavigateToDM,
   onMarkSeen,
   onAcceptInvite,
+  onApplyToJoinBeforeAccept,
 }: MessagesInboxProps) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("for-you");
@@ -192,6 +198,24 @@ export default function MessagesInbox({
   /** Chấp nhận lời mời vào máy chủ (nút ✓). */
   const handleAcceptInvite = async (item: InboxServerInviteItem) => {
     try {
+      // Nếu server bật apply-to-join, để parent mở modal câu hỏi trước.
+      if (onApplyToJoinBeforeAccept) {
+        try {
+          const settings = await getServerAccessSettings(item.serverId);
+          if (settings.accessMode === "apply") {
+            const opened = await onApplyToJoinBeforeAccept(item.serverId, item._id);
+            if (opened) {
+              await markInboxSeen("server_invite", item._id);
+              removeInviteFromList(item._id);
+              onClose();
+              return;
+            }
+          }
+        } catch {
+          // Nếu không lấy được settings, tiếp tục luồng accept bình thường.
+        }
+      }
+
       await acceptServerInvite(item._id);
       await markInboxSeen("server_invite", item._id);
       removeInviteFromList(item._id);

@@ -307,6 +307,7 @@ export default function ServerMembersSidebar({
 
   const renderMemberItem = (member: MemberWithRoles) => {
     const isSelf = member.userId === currentUserId;
+    const displayName = member.nickname?.trim() ? member.nickname.trim() : member.displayName;
 
     return (
       <div
@@ -326,7 +327,7 @@ export default function ServerMembersSidebar({
           }}
         >
           {!member.avatarUrl && (
-            <span>{(member.displayName || member.username || "?").charAt(0).toUpperCase()}</span>
+            <span>{(displayName || member.username || "?").charAt(0).toUpperCase()}</span>
           )}
           {/* Owner crown icon */}
           {member.isOwner && <span className={styles.ownerBadge}>👑</span>}
@@ -337,7 +338,7 @@ export default function ServerMembersSidebar({
           className={styles.memberName}
           style={{ color: member.displayColor }}
         >
-          {member.displayName || member.username}
+          {displayName || member.username}
           {isSelf && <span className={styles.selfBadge}> (bạn)</span>}
         </span>
       </div>

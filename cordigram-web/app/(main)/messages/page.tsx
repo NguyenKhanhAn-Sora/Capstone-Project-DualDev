@@ -75,6 +75,9 @@ import ServerMembersSection from "@/components/ServerMembersSection/ServerMember
 import RolesSection from "@/components/RolesSection/RolesSection";
 import ServerInteractionsSection from "@/components/ServerInteractionsSection/ServerInteractionsSection";
 import ServerAccessSection from "@/components/ServerAccessSection/ServerAccessSection";
+import ServerJoinApplicationsPanel from "@/components/ServerJoinApplicationsPanel/ServerJoinApplicationsPanel";
+import type { ExploreServer } from "@/lib/servers-api";
+import ApplyToJoinQuestionsModal from "@/components/ApplyToJoinQuestionsModal/ApplyToJoinQuestionsModal";
 import ServerProfileSection from "@/components/ServerProfileSection/ServerProfileSection";
 import CommunitySection from "@/components/CommunitySection/CommunitySection";
 import AutoModSection from "@/components/AutoModSection/AutoModSection";
@@ -88,6 +91,7 @@ import { fetchInboxForYou } from "@/lib/inbox-api";
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
 const CallRoom = dynamic(() => import("@/components/CallRoom"), { ssr: false });
 const VoiceChannelCall = dynamic(() => import("@/components/VoiceChannelCall"), { ssr: false });
+const UNCATEGORIZED_CATEGORY_ID = "__uncategorized__";
 
 interface BackendServer extends serversApi.Server {
   infoChannels?: serversApi.Channel[];
@@ -943,10 +947,22 @@ function mapReplyToMessage(raw: any): UIMessage["replyToMessage"] {
 }
 
 export default function MessagesPage() {
-  const canRender = useRequireAuth();
   const searchParams = useSearchParams();
+
+  const isAdminView = searchParams.get("from") === "admin";
+  const adminReturnUrl = searchParams.get("returnUrl");
+  const adminViewServerId = isAdminView ? searchParams.get("server") : null;
+  const adminTokenFromUrl = isAdminView ? searchParams.get("adminToken") : null;
+
+  // Skip login redirect entirely for admin view
+  const canRender = useRequireAuth({ skip: isAdminView });
+
   const [servers, setServers] = useState<BackendServer[]>([]);
   const [selectedServer, setSelectedServer] = useState<string | null>(null);
+  const serversRef = useRef(servers);
+  serversRef.current = servers;
+  const selectedServerRef = useRef(selectedServer);
+  selectedServerRef.current = selectedServer;
   const [infoChannels, setInfoChannels] = useState<serversApi.Channel[]>([]);
   const [textChannels, setTextChannels] = useState<serversApi.Channel[]>([]);
   const [voiceChannels, setVoiceChannels] = useState<serversApi.Channel[]>([]);
@@ -986,6 +1002,7 @@ export default function MessagesPage() {
     server: BackendServer;
     permissions?: serversApi.CurrentUserServerPermissions;
   } | null>(null);
+  const [adminServerContextMenu, setAdminServerContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [channelContextMenu, setChannelContextMenu] = useState<{
     x: number;
     y: number;
@@ -999,6 +1016,7 @@ export default function MessagesPage() {
   } | null>(null);
   const [renamingCategoryId, setRenamingCategoryId] = useState<string | null>(null);
   const [renamingCategoryName, setRenamingCategoryName] = useState("");
+  const renameCancelledRef = useRef(false);
   const [serverSettingsPermissions, setServerSettingsPermissions] =
     useState<serversApi.CurrentUserServerPermissions | null>(null);
   const [showServerSettingsPanel, setShowServerSettingsPanel] = useState(false);
@@ -1039,6 +1057,10 @@ export default function MessagesPage() {
   const [activeServerEvents, setActiveServerEvents] = useState<serversApi.ServerEvent[]>([]);
   /** Tổng số sự kiện (active + upcoming) để hiển thị badge bên cạnh "Sự Kiện", không giảm khi user đóng banner Đang Diễn Ra */
   const [serverEventsTotalCount, setServerEventsTotalCount] = useState(0);
+  const [showJoinApplicationsView, setShowJoinApplicationsView] = useState(false);
+  const [showExploreView, setShowExploreView] = useState(false);
+  const [joinApplicationsRefreshTick, setJoinApplicationsRefreshTick] = useState(0);
+  const [joinAppPendingCount, setJoinAppPendingCount] = useState(0);
   const [selectedEventDetail, setSelectedEventDetail] = useState<serversApi.ServerEvent | null>(null);
   const [eventDetailInterested, setEventDetailInterested] = useState(false);
 
@@ -1272,13 +1294,20 @@ export default function MessagesPage() {
     if (channelId !== selectedChannel) return;
     const senderId = typeof msg.senderId === "string" ? msg.senderId : msg.senderId?._id;
     if (senderId === currentUserId) return;
+    const srvId = selectedServerRef.current;
+    const senderNickname = srvId
+      ? serversRef.current
+          .find((s) => s._id === srvId)
+          ?.members?.find((m) => String(m.userId) === String(senderId))?.nickname ?? null
+      : null;
+    const trimmedNick = typeof senderNickname === "string" ? senderNickname.trim() : "";
     const uiMessage: UIMessage = {
       id: msg._id,
       text: msg.content,
       senderId: senderId ?? "",
       senderEmail: typeof msg.senderId === "object" ? msg.senderId?.email ?? "" : "",
       senderName: typeof msg.senderId === "object" ? (msg.senderId?.username || msg.senderId?.email) ?? "" : "",
-      senderDisplayName: typeof msg.senderId === "object" ? msg.senderId?.displayName : undefined,
+      senderDisplayName: trimmedNick || (typeof msg.senderId === "object" ? msg.senderId?.displayName : undefined),
       senderAvatar: typeof msg.senderId === "object" ? (msg.senderId?.avatarUrl ?? msg.senderId?.avatar) : undefined,
       timestamp: new Date(msg.createdAt),
       isFromCurrentUser: false,
@@ -1730,6 +1759,14 @@ export default function MessagesPage() {
     };
   }, []);
 
+  // Store admin token in localStorage before the init effect reads it.
+  // Effects fire in declaration order, so this runs first.
+  useEffect(() => {
+    if (adminTokenFromUrl) {
+      localStorage.setItem("accessToken", adminTokenFromUrl);
+    }
+  }, [adminTokenFromUrl]);
+
   // Load servers on mount
   useEffect(() => {
     const authToken =
@@ -1741,16 +1778,26 @@ export default function MessagesPage() {
         const userId = payload.userId || payload.sub;
         setCurrentUserId(userId);
         console.log("Current User ID:", userId);
-        setError(null); // Clear error when token found
-        loadServers();
-        loadAvailableUsers();
-        loadCurrentUserProfile(authToken);
+        setError(null);
+        if (!isAdminView) {
+          loadServers();
+          loadAvailableUsers();
+          loadCurrentUserProfile(authToken);
+        } else {
+          setLoading(false);
+        }
       } catch (e) {
         console.error("Failed to parse token", e);
-        setError("Mã token không hợp lệ");
+        if (!isAdminView) {
+          setError("Mã token không hợp lệ");
+        } else {
+          setLoading(false);
+        }
       }
-    } else {
+    } else if (!isAdminView) {
       setError("Vui lòng đăng nhập trước");
+      setLoading(false);
+    } else {
       setLoading(false);
     }
   }, []);
@@ -1860,35 +1907,44 @@ export default function MessagesPage() {
       loadActiveEvents(selectedServer);
       setSelectedDirectMessageFriend(null); // Clear selected DM friend when selecting server
       
-      // Fetch member role colors cho server
-      serversApi.getServerMembersWithRoles(selectedServer)
-        .then((response) => {
-          const colorMap: Record<string, string> = {};
-          response.members.forEach((member) => {
-            if (member.displayColor && member.displayColor !== "#99AAB5") {
-              colorMap[member.userId] = member.displayColor;
-            }
+      const isAdminViewedServer = Boolean(isAdminView && adminViewServerId && selectedServer === adminViewServerId);
+      if (!isAdminViewedServer) {
+        // Fetch member role colors cho server
+        serversApi.getServerMembersWithRoles(selectedServer)
+          .then((response) => {
+            const colorMap: Record<string, string> = {};
+            response.members.forEach((member) => {
+              if (member.displayColor && member.displayColor !== "#99AAB5") {
+                colorMap[member.userId] = member.displayColor;
+              }
+            });
+            setMemberRoleColors(colorMap);
+          })
+          .catch((err) => {
+            console.error("[MessagesPage] Failed to fetch member role colors:", err);
+            setMemberRoleColors({});
           });
-          setMemberRoleColors(colorMap);
-        })
-        .catch((err) => {
-          console.error("[MessagesPage] Failed to fetch member role colors:", err);
-          setMemberRoleColors({});
-        });
-      // Fetch permissions to determine if user can drag channels
-      serversApi.getCurrentUserPermissions(selectedServer)
-        .then((perms) => {
-          setCanDragChannels(perms.isOwner || perms.canManageChannels);
-          setCanUseMentions(Boolean(perms.isOwner || perms.mentionEveryone));
-        })
-        .catch(() => {
-          setCanDragChannels(false);
-          setCanUseMentions(false);
-        });
-      // Fetch interaction settings for welcome banner
-      serversApi.getInteractionSettings(selectedServer)
-        .then((s) => setServerInteractionSettings(s))
-        .catch(() => setServerInteractionSettings(null));
+        // Fetch permissions to determine if user can drag channels
+        serversApi.getCurrentUserPermissions(selectedServer)
+          .then((perms) => {
+            setCanDragChannels(perms.isOwner || perms.canManageChannels);
+            setCanUseMentions(Boolean(perms.isOwner || perms.mentionEveryone));
+          })
+          .catch(() => {
+            setCanDragChannels(false);
+            setCanUseMentions(false);
+          });
+        // Fetch interaction settings for welcome banner
+        serversApi.getInteractionSettings(selectedServer)
+          .then((s) => setServerInteractionSettings(s))
+          .catch(() => setServerInteractionSettings(null));
+      } else {
+        // Admin view: do not call member-only endpoints (will 403).
+        setMemberRoleColors({});
+        setCanDragChannels(false);
+        setCanUseMentions(false);
+        setServerInteractionSettings(null);
+      }
     } else {
       setInfoChannels([]);
       setTextChannels([]);
@@ -1911,6 +1967,22 @@ export default function MessagesPage() {
       setMyServerAccessStatus(null);
       setShowAcceptRulesModal(false);
       setAcceptRulesLoading(false);
+      return;
+    }
+
+    // Admin view: bypass all restrictions
+    if (isAdminView && selectedServer === adminViewServerId) {
+      setMyServerAccessStatus({
+        chatViewBlocked: false,
+        chatBlockReason: null,
+        hasRules: false,
+        acceptedRules: true,
+        verificationLevel: "none",
+        verificationChecks: { emailVerified: true, accountOver5Min: true, memberOver10Min: true },
+        verificationWait: { waitAccountSec: 0, waitMemberSec: 0 },
+        showAgeRestrictedChannelNotice: false,
+      } as any);
+      setShowAcceptRulesModal(false);
       return;
     }
 
@@ -2144,6 +2216,43 @@ export default function MessagesPage() {
       if (exists) setSelectedServer(serverIdFromUrl);
     }
   }, [searchParams, servers]);
+
+  // Admin read-only view: load server data via admin endpoint (no membership needed)
+  useEffect(() => {
+    if (!isAdminView || !adminViewServerId) return;
+    const authToken = localStorage.getItem("accessToken") || localStorage.getItem("token") || "";
+    if (!authToken) return;
+
+    serversApi.adminGetServerView(adminViewServerId, authToken).then((data) => {
+      const srv = data.server as any;
+      const chs = (data.channels || []) as serversApi.Channel[];
+      const cats = (data.categories || []) as serversApi.ServerCategory[];
+      const bs: BackendServer = {
+        _id: srv._id,
+        name: srv.name,
+        description: srv.description,
+        avatarUrl: srv.avatarUrl,
+        bannerUrl: srv.bannerUrl,
+        ownerId: typeof srv.ownerId === "object" ? srv.ownerId._id : srv.ownerId,
+        members: srv.members || [],
+        channels: chs,
+        memberCount: srv.memberCount,
+        isActive: srv.isActive,
+        isPublic: srv.isPublic,
+        createdAt: srv.createdAt,
+        updatedAt: srv.updatedAt,
+        infoChannels: chs.filter((c) => c.type === "text" && c.category === "info" && !c.categoryId),
+        textChannels: chs.filter((c) => c.type === "text" && c.category !== "info"),
+        voiceChannels: chs.filter((c) => c.type === "voice"),
+        serverCategories: cats,
+      };
+      setServers((prev) => {
+        const without = prev.filter((s) => s._id !== bs._id);
+        return [...without, bs];
+      });
+      setSelectedServer(bs._id);
+    }).catch((err) => console.error("Admin view: failed to load server", err));
+  }, [isAdminView, adminViewServerId]);
 
   // ✅ Handle message-sent event (sender confirmation)
   useEffect(() => {
@@ -2491,7 +2600,9 @@ export default function MessagesPage() {
       const serversWithChannels: BackendServer[] = await Promise.all(
         serversList.map(async (server) => {
           const channels = server.channels as serversApi.Channel[];
-          const infoChannels = channels.filter((c) => c.type === "text" && c.category === "info");
+          const infoChannels = channels.filter(
+            (c) => c.type === "text" && c.category === "info" && !c.categoryId,
+          );
           const textChannels = channels.filter((c) => c.type === "text" && c.category !== "info");
           const voiceChannels = channels.filter((c) => c.type === "voice");
           return {
@@ -2527,23 +2638,38 @@ export default function MessagesPage() {
     }
   };
 
-  const loadChannels = async (serverId: string) => {
+  const loadChannels = async (serverId: string, opts?: { keepSelectedChannel?: boolean }) => {
     try {
-      const [channels, cats] = await Promise.all([
-        serversApi.getChannels(serverId),
-        serversApi.getCategories(serverId).catch(() => [] as serversApi.ServerCategory[]),
-      ]);
+      let channels: serversApi.Channel[];
+      let cats: serversApi.ServerCategory[];
+      if (isAdminView && serverId === adminViewServerId) {
+        const adminToken = localStorage.getItem("accessToken") || localStorage.getItem("token") || "";
+        const view = await serversApi.adminGetServerView(serverId, adminToken);
+        channels = view.channels || [];
+        cats = view.categories || [];
+      } else {
+        [channels, cats] = await Promise.all([
+          serversApi.getChannels(serverId),
+          serversApi.getCategories(serverId).catch(() => [] as serversApi.ServerCategory[]),
+        ]);
+      }
       const sorted = (channels || []).sort(
         (a: serversApi.Channel, b: serversApi.Channel) => (a.position ?? 0) - (b.position ?? 0),
       );
       setAllChannels(sorted);
-      const info = sorted.filter((c: serversApi.Channel) => c.type === "text" && c.category === "info");
+      const info = sorted.filter(
+        (c: serversApi.Channel) => c.type === "text" && c.category === "info" && !c.categoryId,
+      );
       const text = sorted.filter((c: serversApi.Channel) => c.type === "text" && c.category !== "info");
       const voice = sorted.filter((c: serversApi.Channel) => c.type === "voice");
       setInfoChannels(info);
       setTextChannels(text);
       setVoiceChannels(voice);
       setServerCategories(cats);
+      if (opts?.keepSelectedChannel && selectedChannelRef.current) {
+        const stillExists = sorted.some((c) => c._id === selectedChannelRef.current);
+        if (stillExists) return;
+      }
       if (text.length > 0) {
         setSelectedChannel(text[0]._id);
       } else if (info.length > 0) {
@@ -2559,10 +2685,15 @@ export default function MessagesPage() {
 
   const loadMessages = async (channelId: string) => {
     try {
-      // Guard chống race condition: chỉ apply kết quả nếu request này vẫn là request mới nhất của kênh đang được chọn.
       const requestKey = `${channelId}:${Date.now()}:${Math.random().toString(16).slice(2)}`;
       (loadMessages as any)._lastKey = requestKey;
-      const pack = await serversApi.getMessages(channelId, 50, 0);
+      let pack;
+      if (isAdminView && selectedServer && selectedServer === adminViewServerId) {
+        const adminToken = localStorage.getItem("accessToken") || localStorage.getItem("token") || "";
+        pack = await serversApi.adminGetChannelMessages(selectedServer, channelId, adminToken, 50, 0);
+      } else {
+        pack = await serversApi.getMessages(channelId, 50, 0);
+      }
       // Nếu trong lúc chờ user đã chuyển kênh, bỏ qua kết quả cũ để tránh "tin nhắn bị dính sang kênh khác".
       if ((loadMessages as any)._lastKey !== requestKey) return;
       if (selectedChannelRef.current !== channelId) return;
@@ -2572,6 +2703,12 @@ export default function MessagesPage() {
       }
 
       const backendMessages = pack.messages;
+      const nickByUserId = new Map<string, string>();
+      const srv = selectedServer ? servers.find((s) => s._id === selectedServer) : null;
+      (srv?.members || []).forEach((m: any) => {
+        const n = typeof m?.nickname === "string" ? m.nickname.trim() : "";
+        if (n) nickByUserId.set(String(m.userId), n);
+      });
       const uiMessages: UIMessage[] = backendMessages.map((msg: serversApi.Message) => ({
         id: msg._id,
         text: msg.content,
@@ -2585,7 +2722,7 @@ export default function MessagesPage() {
         senderDisplayName:
           typeof msg.senderId === "string"
             ? undefined
-            : (msg.senderId as any).displayName || undefined,
+            : nickByUserId.get(String((msg.senderId as any)._id)) || (msg.senderId as any).displayName || undefined,
         senderAvatar:
           typeof msg.senderId === "string"
             ? undefined
@@ -3028,6 +3165,18 @@ export default function MessagesPage() {
         replyingTo?.id,
       );
 
+      const myServerNickname =
+        servers
+          .find((s) => s._id === selectedServer)
+          ?.members?.find((m) => String(m.userId) === String(currentUserId))
+          ?.nickname?.trim() ?? "";
+      const senderDisplayNameResolved =
+        myServerNickname ||
+        (typeof newMessage.senderId === "string"
+          ? currentUserProfile?.displayName
+          : ((newMessage.senderId as any)?.displayName ?? currentUserProfile?.displayName)) ||
+        undefined;
+
       const uiMessage: UIMessage = {
         id: newMessage._id,
         text: newMessage.content,
@@ -3043,10 +3192,7 @@ export default function MessagesPage() {
           typeof newMessage.senderId === "string"
             ? currentUserProfile?.username || ""
             : (newMessage.senderId as any)?.username || (newMessage.senderId as any)?.email || currentUserProfile?.username || "",
-        senderDisplayName:
-          typeof newMessage.senderId === "string"
-            ? currentUserProfile?.displayName || undefined
-            : (newMessage.senderId as any)?.displayName ?? currentUserProfile?.displayName ?? undefined,
+        senderDisplayName: senderDisplayNameResolved,
         senderAvatar:
           typeof newMessage.senderId === "string"
             ? currentUserProfile?.avatar
@@ -3117,6 +3263,71 @@ export default function MessagesPage() {
       setVerificationRulesOpen(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không tải được quy định");
+    }
+  };
+
+  // Apply-to-join: show join application popup before calling joinServer
+  const [applyJoinOpen, setApplyJoinOpen] = useState(false);
+  const [applyJoinServerId, setApplyJoinServerId] = useState<string | null>(null);
+  const [applyJoinForm, setApplyJoinForm] = useState<{ enabled: boolean; questions: Array<{ id: string; title: string; type: "short" | "paragraph" | "multiple_choice"; required: boolean; options?: string[] }> } | null>(null);
+  const [applyJoinSubmitting, setApplyJoinSubmitting] = useState(false);
+
+  const openApplyJoinModalIfNeeded = async (serverId: string): Promise<boolean> => {
+    try {
+      const settings = await serversApi.getServerAccessSettings(serverId);
+      if (settings.accessMode !== "apply") return false;
+      const form = settings.joinApplicationForm ?? { enabled: false, questions: [] };
+      setApplyJoinServerId(serverId);
+      setApplyJoinForm({
+        enabled: Boolean(form.enabled),
+        questions: form.questions ?? [],
+      });
+      setApplyJoinOpen(true);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không tải được đơn đăng ký tham gia");
+      return false;
+    }
+  };
+
+  const submitApplyJoin = async (applyJoinAnswers: Record<string, { text?: string; selectedOption?: string }>) => {
+    if (!applyJoinServerId || !applyJoinForm) return;
+
+    for (const q of applyJoinForm.questions) {
+      if (!q.required) continue;
+      const a = applyJoinAnswers[q.id];
+      if (q.type === "multiple_choice") {
+        if (!a?.selectedOption) {
+          setError("Vui lòng trả lời tất cả câu hỏi bắt buộc");
+          return;
+        }
+      } else if (!a?.text?.trim()) {
+        setError("Vui lòng trả lời tất cả câu hỏi bắt buộc");
+        return;
+      }
+    }
+
+    setApplyJoinSubmitting(true);
+    setError(null);
+    try {
+      await serversApi.joinServer(applyJoinServerId, {
+        applicationAnswers: applyJoinForm.questions.map((q) => {
+          const a = applyJoinAnswers[q.id] || {};
+          return {
+            questionId: q.id,
+            text: q.type === "multiple_choice" ? undefined : (a.text ?? ""),
+            selectedOption: q.type === "multiple_choice" ? a.selectedOption : undefined,
+          };
+        }),
+      });
+      setApplyJoinOpen(false);
+      setApplyJoinServerId(null);
+      setApplyJoinForm(null);
+      alert("Đơn đăng ký đã được gửi thành công. Vui lòng chờ chủ máy chủ hoặc quản trị viên duyệt đơn.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không tham gia được máy chủ");
+    } finally {
+      setApplyJoinSubmitting(false);
     }
   };
 
@@ -3323,7 +3534,13 @@ export default function MessagesPage() {
           senderId: typeof newMsg.senderId === "string" ? newMsg.senderId : newMsg.senderId._id,
           senderEmail: "",
           senderName: currentUserProfile?.username || "",
-          senderDisplayName: currentUserProfile?.displayName || undefined,
+          senderDisplayName:
+            servers
+              .find((s) => s._id === selectedServer)
+              ?.members?.find((m) => String(m.userId) === String(currentUserId))
+              ?.nickname?.trim() ||
+            currentUserProfile?.displayName ||
+            undefined,
           senderAvatar: currentUserProfile?.avatar,
           timestamp: new Date(newMsg.createdAt),
           isFromCurrentUser: true,
@@ -3626,7 +3843,9 @@ export default function MessagesPage() {
       const allCh = newServer.channels as serversApi.Channel[];
       const serverWithChannels: BackendServer = {
         ...newServer,
-        infoChannels: allCh.filter((c) => c.type === "text" && c.category === "info"),
+        infoChannels: allCh.filter(
+          (c) => c.type === "text" && c.category === "info" && !c.categoryId,
+        ),
         textChannels: allCh.filter((c) => c.type === "text" && c.category !== "info"),
         voiceChannels: allCh.filter((c) => c.type === "voice"),
       };
@@ -3649,7 +3868,9 @@ export default function MessagesPage() {
 
       const serverWithChannels: BackendServer = {
         ...newServer,
-        infoChannels: allChannels.filter((c) => c.type === "text" && c.category === "info"),
+        infoChannels: allChannels.filter(
+          (c) => c.type === "text" && c.category === "info" && !c.categoryId,
+        ),
         textChannels: allChannels.filter((c) => c.type === "text" && c.category !== "info"),
         voiceChannels: allChannels.filter((c) => c.type === "voice"),
       };
@@ -3687,40 +3908,79 @@ export default function MessagesPage() {
   const handleEditChannel = async (channelId: string, newName: string) => {
     if (!selectedServer) return;
     await serversApi.updateChannel(selectedServer, channelId, newName);
-    await loadChannels(selectedServer);
+    const updateName = (list: serversApi.Channel[]) =>
+      list.map((c) => (c._id === channelId ? { ...c, name: newName } : c));
+    setAllChannels((prev) => updateName(prev));
+    setTextChannels((prev) => updateName(prev));
+    setInfoChannels((prev) => updateName(prev));
+    setVoiceChannels((prev) => updateName(prev));
   };
 
   const handleDeleteChannel = async (channelId: string) => {
     if (!selectedServer) return;
     await serversApi.deleteChannel(selectedServer, channelId);
+    const removeChannel = (list: serversApi.Channel[]) => list.filter((c) => c._id !== channelId);
+    setAllChannels((prev) => removeChannel(prev));
+    setTextChannels((prev) => removeChannel(prev));
+    setInfoChannels((prev) => removeChannel(prev));
+    setVoiceChannels((prev) => removeChannel(prev));
     if (selectedChannel === channelId) {
       const remaining = textChannels.filter((c) => c._id !== channelId);
       setSelectedChannel(remaining.length > 0 ? remaining[0]._id : null);
     }
-    await loadChannels(selectedServer);
   };
 
   const handleCreateCategory = async (name: string, isPrivate: boolean) => {
     if (!selectedServer) return;
-    await serversApi.createCategory(selectedServer, name, isPrivate);
-    await loadChannels(selectedServer);
+    const created = await serversApi.createCategory(selectedServer, name, isPrivate);
+    setServerCategories((prev) => [...prev, created]);
   };
 
   const handleDeleteCategory = async (categoryId: string) => {
     if (!selectedServer) return;
     try {
       await serversApi.deleteCategory(selectedServer, categoryId);
-      await loadChannels(selectedServer);
+      setServerCategories((prev) => prev.filter((c) => c._id !== categoryId));
+      setAllChannels((prev) =>
+        prev.map((c) => {
+          const cid = typeof c.categoryId === "string" ? c.categoryId : String((c.categoryId as any)?._id ?? c.categoryId);
+          return cid === categoryId ? { ...c, categoryId: null as any } : c;
+        }),
+      );
+      await loadChannels(selectedServer, { keepSelectedChannel: true });
     } catch (err) {
       console.error("Failed to delete category", err);
+    }
+  };
+
+  const handleDeleteUncategorizedCategory = async () => {
+    if (!selectedServer) return;
+    const uncategorized = getUncategorizedChannels().filter((ch) => !ch.isDefault);
+    if (uncategorized.length === 0) return;
+    try {
+      for (const ch of uncategorized) {
+        await serversApi.deleteChannel(selectedServer, ch._id);
+      }
+      if (selectedChannel && uncategorized.some((ch) => ch._id === selectedChannel)) {
+        const remaining = textChannels.filter(
+          (c) => !uncategorized.some((deleted) => deleted._id === c._id),
+        );
+        setSelectedChannel(remaining.length > 0 ? remaining[0]._id : null);
+      }
+      await loadChannels(selectedServer);
+    } catch (err) {
+      console.error("Failed to delete uncategorized channels", err);
     }
   };
 
   const handleRenameCategory = async (categoryId: string, newName: string) => {
     if (!selectedServer || !newName.trim()) return;
     try {
-      await serversApi.updateCategory(selectedServer, categoryId, newName.trim());
-      await loadChannels(selectedServer);
+      const trimmed = newName.trim();
+      await serversApi.updateCategory(selectedServer, categoryId, trimmed);
+      setServerCategories((prev) =>
+        prev.map((c) => (c._id === categoryId ? { ...c, name: trimmed } : c)),
+      );
     } catch (err) {
       console.error("Failed to rename category", err);
     }
@@ -3835,7 +4095,6 @@ export default function MessagesPage() {
     (categoryId: string) =>
       allChannels
         .filter((c) => {
-          if (c.category === "info") return false;
           const cid =
             typeof c.categoryId === "string"
               ? c.categoryId
@@ -3852,7 +4111,6 @@ export default function MessagesPage() {
     () =>
       allChannels
         .filter((c) => {
-          if (c.category === "info") return false;
           if (!c.categoryId) return true;
           const cid =
             typeof c.categoryId === "string"
@@ -4280,18 +4538,6 @@ export default function MessagesPage() {
             </div>
           </div>
         );
-      }
-
-      if (messageType === "voice" || voiceUrl) {
-        console.log("[RENDER-DEBUG] Voice message check:", {
-          messageType,
-          voiceUrl,
-          voiceDuration,
-          hasVoiceUrl: !!voiceUrl,
-          hasVoiceDuration: !!voiceDuration,
-          voiceDurationType: typeof voiceDuration,
-          voiceDurationValue: voiceDuration,
-        });
       }
 
       if (messageType === "voice" && voiceUrl) {
@@ -4826,6 +5072,10 @@ export default function MessagesPage() {
       setCurrentServerPermissions(null);
       return;
     }
+    if (isAdminView && adminViewServerId && selectedServer === adminViewServerId) {
+      setCurrentServerPermissions(null);
+      return;
+    }
     let cancelled = false;
     serversApi
       .getCurrentUserPermissions(selectedServer)
@@ -4872,6 +5122,30 @@ export default function MessagesPage() {
     return !!(p?.canManageServer || p?.canManageChannels);
   }, [currentUserId, selectedServerEntity, currentServerPermissions]);
 
+  const canManageJoinApplications = useMemo(() => {
+    if (!currentUserId || !selectedServerEntity) return false;
+    const ownerId = String(
+      (selectedServerEntity as any).ownerId?._id ?? (selectedServerEntity as any).ownerId ?? "",
+    );
+    if (ownerId === currentUserId) return true;
+    return Boolean(currentServerPermissions?.canManageServer);
+  }, [currentUserId, selectedServerEntity, currentServerPermissions]);
+
+  useEffect(() => {
+    setShowJoinApplicationsView(false);
+  }, [selectedServer]);
+
+  useEffect(() => {
+    if (!selectedServer || !canManageJoinApplications) {
+      setJoinAppPendingCount(0);
+      return;
+    }
+    serversApi
+      .listJoinApplications(selectedServer, "pending")
+      .then((r) => setJoinAppPendingCount(r.pendingCount))
+      .catch(() => setJoinAppPendingCount(0));
+  }, [selectedServer, canManageJoinApplications, joinApplicationsRefreshTick]);
+
   const trySelectChannel = useCallback(
     (channelId: string) => {
       const channel = allChannels.find((c) => c._id === channelId);
@@ -4879,10 +5153,20 @@ export default function MessagesPage() {
         setError("Vai trò của bạn không được phép vào kênh riêng tư này");
         return;
       }
+      // Apply mode: pending/rejected applicants cannot access channels yet
+      if (
+        myServerAccessStatus?.accessMode === "apply" &&
+        (myServerAccessStatus?.status === "pending" ||
+          myServerAccessStatus?.status === "rejected")
+      ) {
+        setSelectedChannel(null);
+        return;
+      }
       setError(null);
+      setShowJoinApplicationsView(false);
       setSelectedChannel(channelId);
     },
-    [allChannels, canAccessPrivateChannel],
+    [allChannels, canAccessPrivateChannel, myServerAccessStatus?.accessMode, myServerAccessStatus?.status],
   );
 
   const getCategoryCollapseState = useCallback(
@@ -4899,7 +5183,13 @@ export default function MessagesPage() {
   }
 
   const currentServer = servers.find((s) => s._id === selectedServer);
+  const applyJoinServerMeta =
+    (applyJoinServerId && servers.find((s) => s._id === applyJoinServerId)) || currentServer;
   isAgeRestrictedRef.current = Boolean(currentServer?.isAgeRestricted);
+
+  const currentServerNickname = currentServer?.members?.find(
+    (m) => String(m.userId) === currentUserId,
+  )?.nickname;
 
   return (
     <div className={styles.container}>
@@ -4959,6 +5249,8 @@ export default function MessagesPage() {
           onClick={() => {
             setSelectedServer(null);
             setSelectedChannel(null);
+            setShowExploreView(false);
+            setShowJoinApplicationsView(false);
           }}
           style={{ cursor: "pointer" }}
         />
@@ -4980,6 +5272,23 @@ export default function MessagesPage() {
           </svg>
         </button>
 
+        <button
+          className={`${styles.exploreBtn} ${showExploreView ? styles.exploreBtnActive : ""}`}
+          title="Khám phá"
+          onClick={() => {
+            setShowExploreView(true);
+            setShowJoinApplicationsView(false);
+            setSelectedDirectMessageFriend(null);
+            setSelectedServer(null);
+            setSelectedChannel(null);
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M14.5 9.5l-2.2 6.4-1.1-2.5-2.5-1.1 6.4-2.2z" />
+          </svg>
+        </button>
+
         {/* Servers List */}
         <div
           style={{
@@ -4993,6 +5302,7 @@ export default function MessagesPage() {
           {servers.map((server) => {
             const hasAvatar = isValidAvatarUrl(server.avatarUrl);
             const initial = server.name.charAt(0).toUpperCase();
+            const isAdminViewedServer = isAdminView && server._id === adminViewServerId;
             return (
               <button
                 key={server._id}
@@ -5000,17 +5310,19 @@ export default function MessagesPage() {
                 onClick={() => setSelectedServer(server._id)}
                 onContextMenu={async (e) => {
                   e.preventDefault();
-                  // Fetch permissions cho server này
+                  if (isAdminViewedServer) {
+                    setAdminServerContextMenu({ x: e.clientX, y: e.clientY });
+                    return;
+                  }
                   let permissions: serversApi.CurrentUserServerPermissions | undefined;
                   try {
                     permissions = await serversApi.getCurrentUserPermissions(server._id);
                   } catch {
-                    // Fallback: tính toán từ isOwner
                     const isOwner = currentUserId !== "" && 
                       String((server as any).ownerId?._id ?? (server as any).ownerId) === currentUserId;
                     permissions = {
                       isOwner,
-                      hasCustomRole: isOwner, // Fallback: chỉ owner có quyền
+                      hasCustomRole: isOwner,
                       canKick: isOwner,
                       canBan: isOwner,
                       canTimeout: isOwner,
@@ -5022,19 +5334,14 @@ export default function MessagesPage() {
                     };
                   }
                   
-                  // Nếu backend chưa trả field `hasCustomRole` (response cũ) => fallback suy ra từ members-with-roles
                   if (permissions && typeof (permissions as any).hasCustomRole !== "boolean") {
                     try {
                       const membersResp = await serversApi.getServerMembersWithRoles(server._id);
                       const me = membersResp.members.find((m) => m.userId === currentUserId);
                       (permissions as any).hasCustomRole = Boolean(me?.roles?.length);
-                    } catch {
-                      // ignore - giữ nguyên giá trị đang có
-                    }
+                    } catch {}
                   }
 
-                  // Hiện context menu cho tất cả thành viên (kể cả member thường)
-                  // Component ServerContextMenu tự xử lý ẩn/hiện options theo quyền hạn
                   setServerContextMenu({
                     x: e.clientX,
                     y: e.clientY,
@@ -5447,6 +5754,36 @@ export default function MessagesPage() {
                   </svg>
                   <span>Nâng Cấp Máy Chủ</span>
                 </button>
+                {canManageJoinApplications && selectedServer && (
+                  <button
+                    type="button"
+                    className={`${styles.serverMenuItem} ${showJoinApplicationsView ? styles.serverMenuItemActive : ""}`}
+                    onClick={() => {
+                      setShowJoinApplicationsView(true);
+                      setSelectedChannel(null);
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                    <span>Thành viên</span>
+                    {joinAppPendingCount > 0 && (
+                      <span
+                        style={{
+                          marginLeft: "auto",
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: "var(--color-panel-danger)",
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                  </button>
+                )}
                 {/* Thông Tin section - only shown when info channels exist */}
                 {infoChannels.length > 0 && (() => {
                   const infoCatId = infoChannels.find(c => c.categoryId)?.categoryId;
@@ -5496,9 +5833,9 @@ export default function MessagesPage() {
                           onChange={(e) => setRenamingCategoryName(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") handleRenameCategory(infoCat._id, renamingCategoryName);
-                            if (e.key === "Escape") { setRenamingCategoryId(null); setRenamingCategoryName(""); }
+                            if (e.key === "Escape") { renameCancelledRef.current = true; setRenamingCategoryId(null); setRenamingCategoryName(""); }
                           }}
-                          onBlur={() => handleRenameCategory(infoCat._id, renamingCategoryName)}
+                          onBlur={() => { if (renameCancelledRef.current) { renameCancelledRef.current = false; return; } handleRenameCategory(infoCat._id, renamingCategoryName); }}
                         />
                       ) : (
                         <h3 className={styles.sectionTitle} style={{ flex: 1, margin: 0 }}>{infoCat?.name ?? "Thông Tin"}</h3>
@@ -5536,8 +5873,7 @@ export default function MessagesPage() {
 
                 {/* Dynamic categories with drag-and-drop */}
                 {(() => {
-                  const infoCatIds = new Set(infoChannels.map(c => c.categoryId).filter(Boolean));
-                  const visibleCategories = serverCategories.filter(cat => !infoCatIds.has(cat._id));
+                  const visibleCategories = serverCategories;
                   return visibleCategories.length > 0 ? (
                   <>
                   {visibleCategories.map((cat) => {
@@ -5614,9 +5950,9 @@ export default function MessagesPage() {
                               onChange={(e) => setRenamingCategoryName(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") handleRenameCategory(cat._id, renamingCategoryName);
-                                if (e.key === "Escape") { setRenamingCategoryId(null); setRenamingCategoryName(""); }
+                                if (e.key === "Escape") { renameCancelledRef.current = true; setRenamingCategoryId(null); setRenamingCategoryName(""); }
                               }}
-                              onBlur={() => handleRenameCategory(cat._id, renamingCategoryName)}
+                              onBlur={() => { if (renameCancelledRef.current) { renameCancelledRef.current = false; return; } handleRenameCategory(cat._id, renamingCategoryName); }}
                             />
                           ) : (
                             <h3 className={styles.sectionTitle} style={{ flex: 1, margin: 0 }}>{cat.name}</h3>
@@ -5778,40 +6114,66 @@ export default function MessagesPage() {
                   })}
                   {getUncategorizedChannels().length > 0 && (
                     <div className={styles.section}>
-                      <div className={styles.sectionHeader}>
+                      <div
+                        className={styles.sectionHeader}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setCategoryContextMenu({
+                            x: e.clientX,
+                            y: e.clientY,
+                            category: {
+                              _id: UNCATEGORIZED_CATEGORY_ID,
+                              name: "Kênh khác",
+                            },
+                          });
+                        }}
+                      >
                         <h3 className={styles.sectionTitle}>Kênh khác</h3>
                       </div>
                       {getUncategorizedChannels().map((channel) => (
                         <div
                           key={channel._id}
-                          className={`${styles.conversationItem} ${selectedChannel === channel._id ? styles.active : ""}`}
-                          onClick={() => trySelectChannel(channel._id)}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            setChannelContextMenu({
-                              x: e.clientX,
-                              y: e.clientY,
-                              channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault },
-                              categoryId: channel.categoryId ?? null,
-                            });
+                          className={`${styles.channelDragItem} ${dragType === "channel" && dragId === channel._id ? styles.dragging : ""}`}
+                          draggable={canDragChannels}
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            handleChannelDragStart(e, channel._id);
                           }}
+                          onDragEnd={handleDragEnd}
+                          style={{ position: "relative" }}
                         >
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
-                            {channel.type === "voice" ? (
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, opacity: 0.7 }}>
-                                <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
-                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                              </svg>
-                            ) : channel.isRulesChannel ? (
-                              <span title="Kênh quy định" style={{ fontSize: "16px", flexShrink: 0 }}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}>
-                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2v6h2v-6zm0-4h-2v2h2V7z" />
+                          <div
+                            className={`${styles.conversationItem} ${selectedChannel === channel._id ? styles.active : ""}`}
+                            onClick={() => trySelectChannel(channel._id)}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              setChannelContextMenu({
+                                x: e.clientX,
+                                y: e.clientY,
+                                channel: { _id: channel._id, name: channel.name, isDefault: channel.isDefault },
+                                categoryId: channel.categoryId ?? null,
+                              });
+                            }}
+                            style={{ cursor: canDragChannels ? "grab" : "pointer" }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+                              {channel.type === "voice" ? (
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, opacity: 0.7 }}>
+                                  <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
+                                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                                 </svg>
-                              </span>
-                            ) : (
-                              <span style={{ fontSize: "18px" }}>#</span>
-                            )}
-                            <span style={{ fontSize: channel.type === "voice" ? "14px" : "18px" }}>{channel.name}</span>
+                              ) : channel.isRulesChannel ? (
+                                <span title="Kênh quy định" style={{ fontSize: "16px", flexShrink: 0 }}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}>
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2v6h2v-6zm0-4h-2v2h2V7z" />
+                                  </svg>
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: "18px" }}>#</span>
+                              )}
+                              <span style={{ fontSize: channel.type === "voice" ? "14px" : "18px" }}>{channel.name}</span>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -5874,6 +6236,27 @@ export default function MessagesPage() {
                   </>
                 );
                 })()}
+                {isAdminView && adminReturnUrl && (
+                  <button
+                    type="button"
+                    className={styles.adminReturnBtn}
+                    onClick={async () => {
+                      const t = localStorage.getItem("accessToken") || "";
+                      console.log("[AdminReturn] Leaving server:", adminViewServerId, "token exists:", !!t);
+                      if (adminViewServerId && t) {
+                        await serversApi.adminLeaveServer(adminViewServerId, t);
+                      }
+                      localStorage.removeItem("accessToken");
+                      if (adminReturnUrl) window.location.href = adminReturnUrl;
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 12H5" />
+                      <path d="M12 19l-7-7 7-7" />
+                    </svg>
+                    Quay lại Admin
+                  </button>
+                )}
                 </div>{/* end conversationsScrollArea */}
 
                 {/* Voice Controls Footer - cùng vị trí như bên DM */}
@@ -5893,7 +6276,7 @@ export default function MessagesPage() {
                     >
                       {!isValidAvatarUrl(currentUserProfile?.avatarUrl) && (
                         <span>
-                          {currentUserProfile?.displayName
+                          {(currentServerNickname || currentUserProfile?.displayName)
                             ?.charAt(0)
                             ?.toUpperCase() ||
                             currentUserProfile?.username
@@ -5906,7 +6289,8 @@ export default function MessagesPage() {
                     </div>
                     <div className={styles.userTextInfo}>
                       <div className={styles.userDisplayName}>
-                        {currentUserProfile?.displayName ||
+                        {currentServerNickname ||
+                          currentUserProfile?.displayName ||
                           currentUserProfile?.username ||
                           "Người dùng"}
                       </div>
@@ -5968,7 +6352,114 @@ export default function MessagesPage() {
         <div className={styles.rightContent}>
           {/* Chat Area */}
           <div className={styles.chatArea}>
-            {(selectedChannel && currentServer) ||
+            {currentServer &&
+            !selectedDirectMessageFriend &&
+            myServerAccessStatus?.accessMode === "apply" &&
+            myServerAccessStatus?.status === "pending" ? (
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+                <div
+                  style={{
+                    width: "min(520px, 92vw)",
+                    borderRadius: 12,
+                    background: "#2b2d31",
+                    border: "1px solid #3f4147",
+                    boxShadow: "0 16px 48px rgba(0,0,0,.45)",
+                    padding: 22,
+                    textAlign: "center",
+                  }}
+                >
+                  <div style={{ fontSize: 28, marginBottom: 10 }}>⏳</div>
+                  <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: "#f2f3f5" }}>
+                    Đơn đăng ký tham gia {currentServer.name || "máy chủ"} của bạn đang được xem xét!
+                  </div>
+                  <div style={{ fontSize: 13, color: "#b5bac1", marginBottom: 18 }}>
+                    Bạn sẽ nhận được thông báo khi có bản cập nhật.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await serversApi.withdrawMyJoinApplication(currentServer._id);
+                        await loadServers();
+                        setSelectedServer(null);
+                        setSelectedChannel(null);
+                      } catch (e) {
+                        alert(e instanceof Error ? e.message : "Không thu hồi được");
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      border: "none",
+                      borderRadius: 6,
+                      padding: "10px 14px",
+                      background: "#ed4245",
+                      color: "#fff",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Thu hồi
+                  </button>
+                </div>
+              </div>
+            ) : showExploreView && !selectedDirectMessageFriend ? (
+              <ExploreServersView
+                onJoin={async (serverId) => {
+                  try {
+                    const opened = await openApplyJoinModalIfNeeded(serverId);
+                    if (opened) return;
+                    await serversApi.joinServer(serverId);
+                    await loadServers();
+                    setShowExploreView(false);
+                    setSelectedServer(serverId);
+                  } catch (e) {
+                    alert(e instanceof Error ? e.message : "Không tham gia được máy chủ");
+                  }
+                }}
+              />
+            ) : showJoinApplicationsView && currentServer && !selectedDirectMessageFriend ? (
+              <div style={{ flex: 1, display: "flex", minHeight: 0, minWidth: 0 }}>
+                <ServerJoinApplicationsPanel
+                  serverId={currentServer._id}
+                  serverName={currentServer.name || "Máy chủ"}
+                  canBan={Boolean(currentServerPermissions?.canBan)}
+                  canKick={Boolean(currentServerPermissions?.canKick)}
+                  canTimeout={Boolean(currentServerPermissions?.canTimeout)}
+                  ownerId={String((currentServer as any).ownerId?._id ?? (currentServer as any).ownerId ?? "")}
+                  onApplicationsChanged={() => setJoinApplicationsRefreshTick((t) => t + 1)}
+                  onViewProfile={(userId) => {
+                    const existing = friends.find((f) => f._id === userId);
+                    const friend: serversApi.Friend = existing ?? {
+                      _id: userId,
+                      displayName: "",
+                      username: "",
+                      avatarUrl: "",
+                      email: "",
+                    };
+                    if (!existing) setFriends((prev) => (prev.some((f) => f._id === userId) ? prev : [...prev, friend]));
+                    setSelectedDirectMessageFriend(friend);
+                    setSelectedServer(null);
+                    setSelectedChannel(null);
+                    loadDirectMessages(userId);
+                  }}
+                  onSendMessage={(userId) => {
+                    const existing = friends.find((f) => f._id === userId);
+                    const friend: serversApi.Friend = existing ?? {
+                      _id: userId,
+                      displayName: "",
+                      username: "",
+                      avatarUrl: "",
+                      email: "",
+                    };
+                    if (!existing) setFriends((prev) => (prev.some((f) => f._id === userId) ? prev : [...prev, friend]));
+                    setSelectedDirectMessageFriend(friend);
+                    setSelectedServer(null);
+                    setSelectedChannel(null);
+                    loadDirectMessages(userId);
+                  }}
+                />
+              </div>
+            ) : (selectedChannel && currentServer) ||
             selectedDirectMessageFriend ? (
               selectedVoiceChannel ? (
                 <>
@@ -6593,6 +7084,11 @@ export default function MessagesPage() {
                   )}
 
                 {/* Input Area */}
+                {isAdminView && selectedServer === adminViewServerId ? (
+                  <div className={styles.inputArea} style={{ justifyContent: "center", opacity: 0.7 }}>
+                    <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Chế độ xem Admin — chỉ đọc</span>
+                  </div>
+                ) : (
                 <div
                   className={styles.inputArea}
                   style={{
@@ -7002,6 +7498,7 @@ export default function MessagesPage() {
                     </>
                   )}
                 </div>
+                )}
               </>
               )
             ) : (
@@ -7120,7 +7617,19 @@ export default function MessagesPage() {
         const lvl = myServerAccessStatus?.verificationLevel ?? "none";
         const chatBlocked = myServerAccessStatus?.chatViewBlocked === true;
         const blockReason = myServerAccessStatus?.chatBlockReason;
-        const needsVerificationStep = chatBlocked && blockReason === "verification" && lvl !== "none";
+        const needsVerificationStep = (() => {
+          if (lvl === "none") return false;
+          if (chatBlocked && blockReason === "verification") return true;
+          // Fail-safe: if status is stale/missing reason, still show verification when checks are not satisfied.
+          const c = myServerAccessStatus?.verificationChecks;
+          const w = myServerAccessStatus?.verificationWait;
+          const emailOk = Boolean(c?.emailVerified);
+          const accountOk = lvl === "low" ? true : Boolean(c?.accountOver5Min);
+          const memberOk = lvl === "high" ? Boolean(c?.memberOver10Min) : true;
+          const waitAccountOk = (w?.waitAccountSec ?? 0) <= 0;
+          const waitMemberOk = (w?.waitMemberSec ?? 0) <= 0;
+          return !(emailOk && accountOk && memberOk && waitAccountOk && waitMemberOk);
+        })();
 
         const chk = myServerAccessStatus?.verificationChecks ?? {
           emailVerified: false,
@@ -7572,6 +8081,10 @@ export default function MessagesPage() {
             setSelectedServer(serverId);
             setSelectedChannel(null);
           }}
+          onApplyToJoinBeforeAccept={async (serverId, _inviteId) => {
+            const opened = await openApplyJoinModalIfNeeded(serverId);
+            return opened;
+          }}
         />
       )}
 
@@ -7632,6 +8145,54 @@ export default function MessagesPage() {
           serverName={inviteToServerTarget.serverName}
           friends={inviteToServerCandidates}
         />
+      )}
+
+      {adminServerContextMenu && (
+        <>
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 9998 }}
+            onClick={() => setAdminServerContextMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setAdminServerContextMenu(null); }}
+          />
+          <div
+            style={{
+              position: "fixed",
+              left: adminServerContextMenu.x,
+              top: adminServerContextMenu.y,
+              zIndex: 9999,
+              background: "var(--color-panel-bg)",
+              borderRadius: 6,
+              boxShadow: "0 4px 16px rgba(0,0,0,.4)",
+              padding: "4px 0",
+              minWidth: 180,
+            }}
+          >
+            <button
+              type="button"
+              onClick={async () => {
+                setAdminServerContextMenu(null);
+                const t = localStorage.getItem("accessToken") || "";
+                console.log("[AdminContextMenu] Leaving server:", adminViewServerId, "token exists:", !!t);
+                if (adminViewServerId && t) {
+                  await serversApi.adminLeaveServer(adminViewServerId, t);
+                }
+                localStorage.removeItem("accessToken");
+                if (adminReturnUrl) window.location.href = adminReturnUrl;
+              }}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                width: "100%", padding: "8px 12px", border: "none",
+                background: "transparent", color: "var(--color-text)",
+                fontSize: 14, cursor: "pointer", textAlign: "left",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--color-primary)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              Rời khỏi
+            </button>
+          </div>
+        </>
       )}
 
       {serverContextMenu && (
@@ -7800,6 +8361,8 @@ export default function MessagesPage() {
               bumpSidebarPrefs();
             }}
             onJoinServerThenOpenChannel={async () => {
+              const opened = await openApplyJoinModalIfNeeded(selectedServer);
+              if (opened) return;
               await serversApi.joinServer(selectedServer);
               await loadServers();
             }}
@@ -7808,6 +8371,27 @@ export default function MessagesPage() {
           />
         );
       })()}
+
+      <ApplyToJoinQuestionsModal
+        open={Boolean(applyJoinOpen && applyJoinForm && applyJoinServerId)}
+        onClose={() => {
+          if (applyJoinSubmitting) return;
+          setApplyJoinOpen(false);
+          setApplyJoinServerId(null);
+          setApplyJoinForm(null);
+          setError(null);
+        }}
+        server={{
+          name: applyJoinServerMeta?.name ?? "Máy chủ",
+          avatarUrl: applyJoinServerMeta?.avatarUrl,
+          memberCount: applyJoinServerMeta?.memberCount,
+          createdAt: applyJoinServerMeta?.createdAt,
+        }}
+        questions={applyJoinForm?.questions ?? []}
+        submitting={applyJoinSubmitting}
+        error={applyJoinOpen ? error : null}
+        onSubmit={submitApplyJoin}
+      />
 
       {categoryContextMenu && selectedServer && currentUserId && (() => {
         const sp = sidebarPrefs.getServerPrefs(currentUserId, selectedServer);
@@ -7829,7 +8413,10 @@ export default function MessagesPage() {
             categoryMuted={categoryMuted}
             onClose={() => setCategoryContextMenu(null)}
             onMarkAsRead={async () => {
-              const list = allChannels.filter((ch) => ch.categoryId === catId);
+              const list =
+                catId === UNCATEGORIZED_CATEGORY_ID
+                  ? getUncategorizedChannels()
+                  : allChannels.filter((ch) => ch.categoryId === catId);
               for (const ch of list) {
                 await serversApi.markChannelAsRead(ch._id).catch(() => {});
               }
@@ -7860,12 +8447,18 @@ export default function MessagesPage() {
               setRenamingCategoryName(categoryContextMenu.category.name);
             }}
             onDeleteCategory={() => {
-              if (
-                confirm(
-                  `Bạn có chắc muốn xóa danh mục "${categoryContextMenu.category.name}"? Các kênh bên trong sẽ không bị xóa.`,
-                )
-              ) {
-                handleDeleteCategory(categoryContextMenu.category._id);
+              if (catId === UNCATEGORIZED_CATEGORY_ID) {
+                if (
+                  confirm(
+                    'Bạn có chắc muốn xóa danh mục "Kênh khác"? Tất cả kênh bên trong (trừ kênh mặc định) sẽ bị xóa.',
+                  )
+                ) {
+                  handleDeleteUncategorizedCategory();
+                }
+                return;
+              }
+              if (confirm(`Bạn có chắc muốn xóa danh mục "${categoryContextMenu.category.name}"? Các kênh bên trong sẽ không bị xóa.`)) {
+                handleDeleteCategory(catId);
               }
             }}
           />
@@ -7881,6 +8474,11 @@ export default function MessagesPage() {
         }}
         serverName={serverSettingsTarget?.serverName ?? ""}
         serverId={serverSettingsTarget?.serverId ?? ""}
+        locale={
+          ((serverSettingsTarget?.serverId
+            ? (servers.find((s) => s._id === serverSettingsTarget.serverId) as any)?.primaryLanguage
+            : undefined) as "vi" | "en" | undefined) || "vi"
+        }
         isOwner={
           !!(
             serverSettingsTarget?.serverId &&
@@ -7889,7 +8487,10 @@ export default function MessagesPage() {
           )
         }
         communityEnabled={communityEnabled}
-        onCommunityActivated={() => setCommunityEnabled(true)}
+        onCommunityActivated={() => {
+          setCommunityEnabled(true);
+          if (selectedServer) loadChannels(selectedServer);
+        }}
         onDeleteServer={async (serverIdToDelete) => {
           await serversApi.deleteServer(serverIdToDelete);
           setShowServerSettingsPanel(false);
@@ -8048,16 +8649,34 @@ export default function MessagesPage() {
                   Boolean(serverSettingsPermissions?.isOwner) ||
                   Boolean(serverSettingsPermissions?.canManageServer)
                 }
-                onCommunityActivated={() => setCommunityEnabled(true)}
+                onCommunityActivated={() => {
+                  setCommunityEnabled(true);
+                  if (selectedServer) loadChannels(selectedServer);
+                }}
               />
             );
           }
           if (section === "community-overview" && serverSettingsTarget?.serverId) {
+            const serverData =
+              servers.find((s) => s._id === serverSettingsTarget.serverId) ?? null;
             return (
-              <div style={{ padding: 24, color: "#dcddde" }}>
-                <h2 style={{ color: "#fff", marginBottom: 8 }}>Tổng Quan Cộng Đồng</h2>
-                <p>Quản lý tổng quan và thống kê cộng đồng máy chủ của bạn.</p>
-              </div>
+              <CommunityOverviewSection
+                serverId={serverSettingsTarget.serverId}
+                canManageSettings={
+                  Boolean(serverSettingsPermissions?.isOwner) ||
+                  Boolean(serverSettingsPermissions?.canManageServer)
+                }
+                initialServer={serverData as any}
+                onUpdated={(patch) => {
+                  setServers((prev) =>
+                    prev.map((s) =>
+                      s._id === serverSettingsTarget.serverId
+                        ? ({ ...s, ...patch } as any)
+                        : s,
+                    ),
+                  );
+                }}
+              />
             );
           }
           if (section === "community-onboarding" && serverSettingsTarget?.serverId) {
@@ -8546,6 +9165,294 @@ export default function MessagesPage() {
         >
           {toastMessage}
         </div>
+      )}
+    </div>
+  );
+}
+
+function ExploreServersView({
+  onJoin,
+}: {
+  onJoin: (serverId: string) => void | Promise<void>;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [servers, setServers] = useState<ExploreServer[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    serversApi
+      .listExploreServers()
+      .then((data) => {
+        if (cancelled) return;
+        setServers(Array.isArray(data) ? data : []);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "Không tải được");
+        setServers([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div className={styles.explorePage}>
+      <div className={styles.exploreHero}>
+        <h2 className={styles.exploreHeroTitle}>Khám phá</h2>
+        <p className={styles.exploreHeroSub}>
+          Tìm những cộng đồng được duyệt để tham gia. Khi máy chủ có “Đăng ký tham gia”, bạn sẽ cần điền đơn trước khi vào.
+        </p>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 28, color: "var(--color-text-muted)" }}>Đang tải…</div>
+      ) : error ? (
+        <div style={{ padding: 28, color: "var(--color-danger)" }}>{error}</div>
+      ) : servers.length === 0 ? (
+        <div style={{ padding: 28, color: "var(--color-text-muted)" }}>
+          Chưa có máy chủ nào được duyệt để hiển thị.
+        </div>
+      ) : (
+        <div className={styles.exploreGrid}>
+          {servers.map((s) => (
+            <div key={s.id} className={styles.exploreCard}>
+              <div
+                className={styles.exploreCardBanner}
+                style={{
+                  backgroundImage: s.bannerUrl ? `url(${s.bannerUrl})` : undefined,
+                }}
+              />
+              <div className={styles.exploreCardBody}>
+                <div className={styles.exploreCardHeader}>
+                  <div
+                    className={styles.exploreCardAvatar}
+                    style={{
+                      backgroundImage: s.avatarUrl ? `url(${s.avatarUrl})` : undefined,
+                    }}
+                    aria-hidden
+                  />
+                  <div style={{ minWidth: 0 }}>
+                    <div className={styles.exploreCardName}>{s.name}</div>
+                    <div className={styles.exploreCardMeta}>
+                      {Number(s.memberCount || 0).toLocaleString("vi-VN")} thành viên
+                      {s.accessMode === "apply" ? " • Đăng ký tham gia" : s.accessMode === "invite_only" ? " • Chỉ mời" : ""}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.exploreCardDesc}>{s.description || " "}</div>
+
+                <button
+                  type="button"
+                  className={styles.exploreJoinBtn}
+                  onClick={() => onJoin(s.id)}
+                  disabled={s.accessMode === "invite_only"}
+                  title={s.accessMode === "invite_only" ? "Máy chủ này chỉ tham gia bằng lời mời" : "Tham gia"}
+                  style={s.accessMode === "invite_only" ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
+                >
+                  {s.accessMode === "invite_only" ? "Chỉ mời" : "Tham gia"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CommunityOverviewSection({
+  serverId,
+  canManageSettings,
+  initialServer,
+  onUpdated,
+}: {
+  serverId: string;
+  canManageSettings: boolean;
+  initialServer: (serversApi.Server & { primaryLanguage?: "vi" | "en" }) | null;
+  onUpdated?: (patch: Partial<serversApi.Server>) => void;
+}) {
+  const [channels, setChannels] = useState<serversApi.Channel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [rulesChannelId, setRulesChannelId] = useState<string | null>(null);
+  const [primaryLanguage, setPrimaryLanguage] = useState<"vi" | "en">(
+    (initialServer as any)?.primaryLanguage || "vi",
+  );
+  const [description, setDescription] = useState<string>(
+    (initialServer as any)?.description || "",
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    Promise.all([serversApi.getChannels(serverId), serversApi.getCommunitySettings(serverId)])
+      .then(([chs, community]) => {
+        if (cancelled) return;
+        setChannels(chs);
+        setRulesChannelId(community.rulesChannelId ?? null);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Không tải được");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [serverId]);
+
+  const textChannels = channels.filter((c) => c.type !== "voice");
+
+  return (
+    <div style={{ padding: 24 }}>
+      <div style={{ marginBottom: 14 }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: "var(--color-text)" }}>
+          Tổng quan cộng đồng
+        </h2>
+        <p style={{ margin: "6px 0 0", color: "var(--color-text-muted)", fontSize: 13, lineHeight: 1.5 }}>
+          Thiết lập kênh quy tắc/hướng dẫn, ngôn ngữ chính của máy chủ và mô tả máy chủ.
+        </p>
+      </div>
+
+      {loading ? (
+        <div style={{ color: "var(--color-text-muted)" }}>Đang tải…</div>
+      ) : (
+        <>
+          {error && (
+            <div style={{ marginBottom: 10, color: "var(--color-danger)" }}>{error}</div>
+          )}
+
+          <div style={{ display: "grid", gap: 18, maxWidth: 760 }}>
+            <div>
+              <div style={{ fontWeight: 800, color: "var(--color-text)", marginBottom: 6 }}>
+                Kênh quy tắc hoặc hướng dẫn
+              </div>
+              <div style={{ color: "var(--color-text-muted)", fontSize: 13, marginBottom: 10, lineHeight: 1.5 }}>
+                Chọn kênh sẽ hiển thị quy tắc/hướng dẫn cho thành viên (ví dụ: <code>#chào-mừng-và-nội-quy</code>).
+              </div>
+              <select
+                value={rulesChannelId ?? ""}
+                onChange={(e) => setRulesChannelId(e.target.value || null)}
+                disabled={!canManageSettings}
+                style={{
+                  width: "100%",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  background: "var(--color-surface)",
+                  color: "var(--color-text)",
+                }}
+              >
+                <option value="">— Không chọn —</option>
+                {textChannels.map((ch) => (
+                  <option key={ch._id} value={ch._id}>
+                    #{ch.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div style={{ fontWeight: 800, color: "var(--color-text)", marginBottom: 6 }}>
+                Ngôn ngữ chính của máy chủ
+              </div>
+              <div style={{ color: "var(--color-text-muted)", fontSize: 13, marginBottom: 10, lineHeight: 1.5 }}>
+                Chỉ hỗ trợ <b>Tiếng Việt</b> và <b>English</b>.
+              </div>
+              <select
+                value={primaryLanguage}
+                onChange={(e) => setPrimaryLanguage(e.target.value as any)}
+                disabled={!canManageSettings}
+                style={{
+                  width: "100%",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  background: "var(--color-surface)",
+                  color: "var(--color-text)",
+                }}
+              >
+                <option value="vi">Tiếng Việt</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+
+            <div>
+              <div style={{ fontWeight: 800, color: "var(--color-text)", marginBottom: 6 }}>
+                Mô tả máy chủ
+              </div>
+              <div style={{ color: "var(--color-text-muted)", fontSize: 13, marginBottom: 10, lineHeight: 1.5 }}>
+                Mô tả này sẽ hiển thị bên dưới link mời trong thẻ invite.
+              </div>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={!canManageSettings}
+                rows={4}
+                placeholder="Hãy giới thiệu một chút về máy chủ này với thế giới."
+                style={{
+                  width: "100%",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  background: "var(--color-surface)",
+                  color: "var(--color-text)",
+                  resize: "vertical",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                type="button"
+                disabled={!canManageSettings || saving}
+                onClick={async () => {
+                  setSaving(true);
+                  setError(null);
+                  try {
+                    const res = await serversApi.updateCommunityOverview(serverId, {
+                      rulesChannelId,
+                      primaryLanguage,
+                      description,
+                    });
+                    onUpdated?.({
+                      description: res.description ?? undefined,
+                      primaryLanguage: res.primaryLanguage,
+                    } as any);
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : "Không lưu được");
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                style={{
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  background: "var(--color-primary)",
+                  color: "#fff",
+                  fontWeight: 900,
+                  cursor: !canManageSettings || saving ? "not-allowed" : "pointer",
+                  opacity: !canManageSettings || saving ? 0.6 : 1,
+                }}
+              >
+                {saving ? "Đang lưu…" : "Lưu thay đổi"}
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

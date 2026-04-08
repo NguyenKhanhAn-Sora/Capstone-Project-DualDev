@@ -46,6 +46,41 @@ export class ServersService {
     private readonly auditLogService: AuditLogService,
   ) {}
 
+  /** Internal helper: create notification for specific users (no permission checks). */
+  async createUserNotification(params: {
+    serverId: string;
+    actorId: string;
+    recipientUserIds: string[];
+    title: string;
+    content: string;
+  }): Promise<{ notificationId: string; recipients: number }> {
+    const title = params.title?.trim?.() ?? '';
+    const content = params.content?.trim?.() ?? '';
+    if (!title || !content) {
+      throw new BadRequestException('title và content là bắt buộc');
+    }
+    const uniqueRecipientIds = Array.from(new Set(params.recipientUserIds))
+      .filter(Boolean)
+      .map((id) => new Types.ObjectId(id));
+    if (uniqueRecipientIds.length === 0) {
+      return { notificationId: '', recipients: 0 };
+    }
+    const notification = await this.serverNotificationModel.create({
+      serverId: new Types.ObjectId(params.serverId),
+      createdBy: new Types.ObjectId(params.actorId),
+      title,
+      content,
+      targetType: 'everyone',
+      targetRoleId: null,
+      targetRoleName: null,
+      recipientUserIds: uniqueRecipientIds,
+    });
+    return {
+      notificationId: notification._id.toString(),
+      recipients: uniqueRecipientIds.length,
+    };
+  }
+
   /**
    * Prune (bulk kick) members who are inactive for N days.
    *
@@ -150,6 +185,9 @@ export class ServersService {
     );
     server.memberCount = server.members.length;
     await server.save();
+    for (const id of ids) {
+      await this.cleanupAfterMemberRemoved(serverId, id);
+    }
     return ids.length;
   }
 
@@ -761,6 +799,7 @@ export class ServersService {
     serverId: string,
     memberId: string,
     role: 'moderator' | 'member' = 'member',
+    nickname?: string | null,
   ): Promise<Server> {
     const server = await this.serverModel.findById(serverId);
 
@@ -782,7 +821,8 @@ export class ServersService {
       userId: memberObjectId,
       role,
       joinedAt: new Date(),
-    });
+      nickname: nickname?.trim() || null,
+    } as any);
 
     server.memberCount = server.members.length;
 
@@ -799,6 +839,13 @@ export class ServersService {
    * Create a single welcome message when a user joins.
    * The frontend renders it as a special block (text + wave button).
    */
+  async sendWelcomeMessagePublic(
+    serverId: string,
+    newMemberId: string,
+  ): Promise<void> {
+    return this.sendWelcomeMessage(serverId, newMemberId);
+  }
+
   private async sendWelcomeMessage(
     serverId: string,
     newMemberId: string,
@@ -919,11 +966,37 @@ export class ServersService {
   }
 
   /** Join a public server (used from event link). Fails if server is private. */
-  async joinServer(serverId: string, userId: string): Promise<Server> {
-    await this.serverAccessService.joinServer(userId, serverId);
-    this.sendWelcomeMessage(serverId, userId).catch((err) => {
-      console.error('[sendWelcomeMessage] Failed:', err?.message || err);
-    });
+  async joinServer(
+    serverId: string,
+    userId: string,
+    joinOpts?: {
+      rulesAccepted?: boolean;
+      nickname?: string;
+      applicationAnswers?: Array<{
+        questionId: string;
+        text?: string;
+        selectedOption?: string;
+      }>;
+    },
+  ): Promise<Server> {
+    const userServer = await this.serverAccessService.joinServer(userId, serverId, joinOpts);
+    const isPending = userServer?.status === 'pending';
+
+    if (joinOpts?.nickname?.trim() && !isPending) {
+      await this.serverModel
+        .updateOne(
+          { _id: new Types.ObjectId(serverId), 'members.userId': new Types.ObjectId(userId) },
+          { $set: { 'members.$.nickname': joinOpts.nickname.trim() } },
+        )
+        .exec();
+    }
+
+    if (!isPending) {
+      this.sendWelcomeMessage(serverId, userId).catch((err) => {
+        console.error('[sendWelcomeMessage] Failed:', err?.message || err);
+      });
+    }
+
     this.serverInviteModel
       .updateMany(
         {
@@ -938,8 +1011,36 @@ export class ServersService {
     return this.getServerById(serverId);
   }
 
+  async setMemberNickname(
+    serverId: string,
+    userId: string,
+    nickname: string,
+  ): Promise<void> {
+    await this.serverModel
+      .updateOne(
+        { _id: new Types.ObjectId(serverId), 'members.userId': new Types.ObjectId(userId) },
+        { $set: { 'members.$.nickname': nickname.trim() } },
+      )
+      .exec();
+  }
+
   isMember(server: Server, userId: string): boolean {
     return server.members.some((m) => m.userId.toString() === userId);
+  }
+
+  /**
+   * Sau khi xóa user khỏi server.members: gỡ khỏi mọi role (trừ @everyone) và xóa UserServer.
+   * Tránh ghost: badge đơn pending / đếm thành viên vai trò.
+   */
+  private async cleanupAfterMemberRemoved(
+    serverId: string,
+    memberId: string,
+  ): Promise<void> {
+    await this.rolesService.removeMemberFromAllNonDefaultRoles(
+      serverId,
+      memberId,
+    );
+    await this.serverAccessService.deleteUserServerRecord(serverId, memberId);
   }
 
   async removeMemberFromServer(
@@ -964,7 +1065,9 @@ export class ServersService {
 
     server.memberCount = server.members.length;
 
-    return server.save();
+    const saved = await server.save();
+    await this.cleanupAfterMemberRemoved(serverId, memberId);
+    return saved;
   }
 
   /** Thành viên (không phải chủ) rời máy chủ. Chủ không thể rời. */
@@ -993,6 +1096,51 @@ export class ServersService {
     );
     server.memberCount = server.members.length;
     await server.save();
+    await this.cleanupAfterMemberRemoved(serverId, userId);
+  }
+
+  /**
+   * Đảm bảo chủ server luôn có trong `server.members` và `role === 'owner'`.
+   * Một số bản ghi lệch (chỉ có ownerId, thiếu phần tử trong members) khiến tab Thành viên không hiện chủ.
+   */
+  async ensureOwnerMemberRow(server: Server): Promise<void> {
+    const oid = server.ownerId;
+    if (!oid) return;
+    const ownerStr = oid.toString();
+    if (!server.members) server.members = [];
+
+    const idx = server.members.findIndex(
+      (m) => m?.userId && m.userId.toString() === ownerStr,
+    );
+
+    let needsSave = false;
+    const created =
+      (server as { createdAt?: Date }).createdAt ?? new Date();
+
+    if (idx < 0) {
+      server.members.push({
+        userId: new Types.ObjectId(ownerStr),
+        role: 'owner',
+        joinedAt: created instanceof Date ? created : new Date(created),
+      });
+      needsSave = true;
+    } else if (server.members[idx].role !== 'owner') {
+      server.members[idx].role = 'owner';
+      needsSave = true;
+    }
+
+    if (needsSave) {
+      server.memberCount = server.members.length;
+      await this.serverModel.updateOne(
+        { _id: server._id },
+        {
+          $set: {
+            members: server.members,
+            memberCount: server.memberCount,
+          },
+        },
+      );
+    }
   }
 
   /** Danh sách thành viên máy chủ (chỉ chủ server). Trả về: tên, avatar, gia nhập server từ, đã tham gia Cordigram, cách gia nhập (link / mời bởi). */
@@ -1016,6 +1164,8 @@ export class ServersService {
     if (!server) {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
+    await this.ensureOwnerMemberRow(server);
+
     const isOwner = server.ownerId.toString() === requesterUserId;
     const canManage =
       isOwner ||
@@ -1193,6 +1343,8 @@ export class ServersService {
     if (!server) {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
+
+    await this.ensureOwnerMemberRow(server as Server);
 
     const isMember = server.members.some(
       (m) => m.userId.toString() === requesterUserId,
@@ -2019,6 +2171,7 @@ export class ServersService {
   ): Promise<{
     members: Array<{
       userId: string;
+      nickname?: string | null;
       displayName: string;
       username: string;
       avatarUrl: string;
@@ -2054,6 +2207,8 @@ export class ServersService {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
 
+    await this.ensureOwnerMemberRow(server);
+
     // Kiểm tra người yêu cầu có phải member không
     const isMember = server.members.some(
       (m) => m.userId.toString() === requesterUserId,
@@ -2077,6 +2232,7 @@ export class ServersService {
     // Lấy thông tin role cho từng member
     const membersResult: Array<{
       userId: string;
+      nickname?: string | null;
       displayName: string;
       username: string;
       avatarUrl: string;
@@ -2104,6 +2260,7 @@ export class ServersService {
 
       membersResult.push({
         userId: uid,
+        nickname: (m as any)?.nickname ?? null,
         displayName: profile?.displayName ?? 'Người dùng',
         username: profile?.username ?? uid,
         avatarUrl: profile?.avatarUrl ?? '',
@@ -2420,19 +2577,7 @@ export class ServersService {
     server.memberCount = server.members.length;
     await server.save();
 
-    // Xóa member khỏi tất cả roles
-    const roles = await this.rolesService.getRolesByServer(serverId);
-    for (const role of roles) {
-      if (
-        !role.isDefault &&
-        role.memberIds.some((id) => id.toString() === targetId)
-      ) {
-        role.memberIds = role.memberIds.filter(
-          (id) => id.toString() !== targetId,
-        );
-        await role.save();
-      }
-    }
+    await this.cleanupAfterMemberRemoved(serverId, targetId);
 
     return {
       success: true,
@@ -2491,19 +2636,7 @@ export class ServersService {
     server.memberCount = server.members.length;
     await server.save();
 
-    // Xóa member khỏi tất cả roles
-    const roles = await this.rolesService.getRolesByServer(serverId);
-    for (const role of roles) {
-      if (
-        !role.isDefault &&
-        role.memberIds.some((id) => id.toString() === targetId)
-      ) {
-        role.memberIds = role.memberIds.filter(
-          (id) => id.toString() !== targetId,
-        );
-        await role.save();
-      }
-    }
+    await this.cleanupAfterMemberRemoved(serverId, targetId);
 
     return {
       success: true,
@@ -2821,6 +2954,115 @@ export class ServersService {
   // Community Settings
   // =====================================================
 
+  async getDiscoveryEligibility(serverId: string, userId: string) {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('ownerId memberCount members createdAt communitySettings')
+      .lean()
+      .exec();
+    if (!server)
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+
+    const memberCount = Number(
+      (server as any).memberCount ||
+        ((server as any).members || []).length ||
+        0,
+    );
+    const createdAt = new Date((server as any).createdAt || Date.now());
+    const ageMinutes = Math.floor(
+      (Date.now() - createdAt.getTime()) / (60 * 1000),
+    );
+
+    const minMembers = 3;
+    const minAgeMinutes = 5;
+    const minMembersToEvaluate = 2;
+
+    const canEvaluate = memberCount >= minMembersToEvaluate;
+    const hasEnoughMembers = memberCount >= minMembers;
+    const isOldEnough = ageMinutes >= minAgeMinutes;
+
+    const communityEnabled = Boolean(
+      (server as any).communitySettings?.enabled,
+    );
+
+    const contentPassed = true;
+
+    const checks = [
+      {
+        id: 'evaluate',
+        label: canEvaluate
+          ? 'Đủ Thành Viên Để Đánh Giá'
+          : 'Các Số Liệu Về Hoạt Động Máy Chủ Đang Chờ Xử Lý',
+        description: canEvaluate
+          ? 'Máy chủ đã có đủ thành viên để bắt đầu đánh giá các điều kiện.'
+          : `Chúng tôi không thể tính toán số liệu hoạt động máy chủ cho đến khi máy chủ có ít nhất ${minMembersToEvaluate} thành viên. Máy Chủ trong Khám Phá phải đáp ứng các yêu cầu nhất định về hoạt động.`,
+        passed: canEvaluate,
+        warning: !canEvaluate,
+      },
+      {
+        id: 'members',
+        label: hasEnoughMembers
+          ? `Hơn ${minMembers} Thành Viên`
+          : `Ít Hơn ${minMembers} Thành Viên`,
+        description: `Máy chủ của bạn cần có ít nhất ${minMembers} thành viên để đạt điều kiện.`,
+        passed: hasEnoughMembers,
+      },
+      {
+        id: 'age',
+        label: isOldEnough
+          ? 'Máy Chủ Đủ Tuổi'
+          : 'Máy Chủ "Quá Trẻ"',
+        description: isOldEnough
+          ? 'Máy chủ đã đủ tuổi để lên Khám Phá.'
+          : `Máy chủ trong Khám Phá cần có tuổi thọ ít nhất là ${minAgeMinutes} phút. Vui lòng kiểm tra lại sau.`,
+        passed: isOldEnough,
+      },
+      {
+        id: 'content',
+        label: 'Không Có Nội Dung Xấu',
+        description: contentPassed
+          ? 'Tài nguyên máy chủ của bạn có vẻ phù hợp với Khám Phá!'
+          : 'Máy chủ của bạn đã vi phạm Điều Khoản Dịch Vụ hoặc Nguyên Tắc Máy Chủ Cộng Đồng của chúng tôi.',
+        passed: contentPassed,
+      },
+    ];
+
+    const allPassed = checks.every((c) => c.passed);
+
+    return {
+      eligible: allPassed,
+      communityEnabled,
+      memberCount,
+      serverAgeMinutes: ageMinutes,
+      checks,
+    };
+  }
+
+  async listExploreServers() {
+    const servers = await this.serverModel
+      .find({
+        'communitySettings.enabled': true,
+        communityDiscoveryStatus: 'approved',
+        isActive: true,
+      })
+      .select(
+        'name description avatarUrl bannerUrl memberCount accessMode isPublic',
+      )
+      .lean()
+      .exec();
+
+    return servers.map((s: any) => ({
+      id: String(s._id),
+      name: s.name,
+      description: s.description ?? null,
+      avatarUrl: s.avatarUrl ?? null,
+      bannerUrl: s.bannerUrl ?? null,
+      memberCount: s.memberCount ?? 0,
+      accessMode: s.accessMode ?? 'discoverable',
+      isPublic: Boolean(s.isPublic),
+    }));
+  }
+
   async getCommunitySettings(serverId: string, userId: string) {
     const server = await this.serverModel
       .findById(serverId)
@@ -2867,6 +3109,23 @@ export class ServersService {
 
     let rulesChannelId = body.rulesChannelId || null;
     let updatesChannelId = body.updatesChannelId || null;
+    let updatesTargetCategoryId: Types.ObjectId | null = null;
+
+    const pickUpdatesTargetCategoryId = async (): Promise<Types.ObjectId | null> => {
+      const firstTextWithCategory = await this.channelModel
+        .findOne({
+          serverId: new Types.ObjectId(serverId),
+          type: 'text',
+          category: { $ne: 'info' },
+          categoryId: { $ne: null },
+        })
+        .sort({ position: 1 })
+        .select('categoryId')
+        .lean()
+        .exec();
+      const raw = (firstTextWithCategory as any)?.categoryId;
+      return raw ? new Types.ObjectId(raw) : null;
+    };
 
     if (body.createRulesChannel) {
       const ch = await this.channelModel.create({
@@ -2893,6 +3152,17 @@ export class ServersService {
     }
 
     if (body.createUpdatesChannel) {
+      updatesTargetCategoryId = await pickUpdatesTargetCategoryId();
+      if (updatesTargetCategoryId) {
+        await this.channelModel.updateMany(
+          {
+            serverId: new Types.ObjectId(serverId),
+            type: 'text',
+            categoryId: updatesTargetCategoryId,
+          },
+          { $inc: { position: 1 } },
+        );
+      }
       const ch = await this.channelModel.create({
         name: 'community-updates',
         type: 'text',
@@ -2900,10 +3170,44 @@ export class ServersService {
         createdBy: new Types.ObjectId(userId),
         isDefault: false,
         isPrivate: false,
-        position: 1,
+        categoryId: updatesTargetCategoryId,
+        position: 0,
       });
       updatesChannelId = (ch as any)._id.toString();
       server.channels.push((ch as any)._id);
+    }
+
+    // Create "Kênh khác" category for private channels
+    const privateChannels = await this.channelModel
+      .find({
+        serverId: new Types.ObjectId(serverId),
+        isPrivate: true,
+      })
+      .select('_id')
+      .lean()
+      .exec();
+
+    if (privateChannels.length > 0) {
+      const maxPos = await this.channelCategoryModel
+        .findOne({ serverId: new Types.ObjectId(serverId) })
+        .sort({ position: -1 })
+        .select('position')
+        .lean();
+      const nextPosition = ((maxPos as any)?.position ?? -1) + 1;
+
+      const otherCat = await this.channelCategoryModel.create({
+        name: 'Kênh khác',
+        serverId: new Types.ObjectId(serverId),
+        position: nextPosition,
+        type: 'mixed',
+      });
+
+      await this.channelModel.updateMany(
+        {
+          _id: { $in: privateChannels.map((c: any) => c._id) },
+        },
+        { $set: { categoryId: (otherCat as any)._id } },
+      );
     }
 
     await this.serverModel.findByIdAndUpdate(serverId, {
@@ -2922,6 +3226,68 @@ export class ServersService {
       rulesChannelId,
       updatesChannelId,
       activatedAt: new Date(),
+    };
+  }
+
+  async updateCommunityOverview(
+    serverId: string,
+    userId: string,
+    body: {
+      rulesChannelId?: string | null;
+      primaryLanguage?: 'vi' | 'en';
+      description?: string | null;
+    },
+  ) {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server)
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+
+    const isOwner = (server as any).ownerId?.toString() === userId;
+    const canManage =
+      isOwner ||
+      (await this.rolesService.hasPermission(serverId, userId, 'manageServer'));
+    if (!canManage)
+      throw new ForbiddenException('Bạn không có quyền chỉnh sửa tổng quan');
+
+    if (typeof body.description !== 'undefined') {
+      (server as any).description = body.description?.trim?.() || null;
+    }
+    if (typeof body.primaryLanguage !== 'undefined') {
+      const lang = body.primaryLanguage;
+      if (lang !== 'vi' && lang !== 'en') {
+        throw new BadRequestException('Invalid primaryLanguage');
+      }
+      (server as any).primaryLanguage = lang;
+    }
+
+    if (typeof body.rulesChannelId !== 'undefined') {
+      const rulesChannelId = body.rulesChannelId;
+      (server as any).communitySettings = (server as any).communitySettings || {
+        enabled: false,
+        rulesChannelId: null,
+        updatesChannelId: null,
+        activatedAt: null,
+      };
+      (server as any).communitySettings.rulesChannelId = rulesChannelId || null;
+
+      if (rulesChannelId) {
+        await this.channelModel.updateMany(
+          { serverId: new Types.ObjectId(serverId), isRulesChannel: true },
+          { $set: { isRulesChannel: false } },
+        );
+        await this.channelModel.updateOne(
+          { _id: new Types.ObjectId(rulesChannelId) },
+          { $set: { isRulesChannel: true } },
+        );
+      }
+    }
+
+    await server.save();
+    return {
+      ok: true,
+      description: (server as any).description ?? null,
+      primaryLanguage: (server as any).primaryLanguage ?? 'vi',
+      rulesChannelId: (server as any).communitySettings?.rulesChannelId ?? null,
     };
   }
 }

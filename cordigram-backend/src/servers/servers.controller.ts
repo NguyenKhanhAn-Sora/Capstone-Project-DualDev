@@ -25,6 +25,14 @@ export class ServersController {
     private readonly serverAccessService: ServerAccessService,
   ) {}
 
+  /**
+   * Explore servers list (approved only)
+   */
+  @Get('explore')
+  async listExploreServers() {
+    return this.serversService.listExploreServers();
+  }
+
   @Post()
   async createServer(
     @Body() createServerDto: CreateServerDto,
@@ -395,8 +403,21 @@ export class ServersController {
   }
 
   @Post(':id/join')
-  async joinServer(@Param('id') serverId: string, @Request() req: any) {
-    return this.serversService.joinServer(serverId, req.user.userId);
+  async joinServer(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      rulesAccepted?: boolean;
+      nickname?: string;
+      applicationAnswers?: Array<{
+        questionId: string;
+        text?: string;
+        selectedOption?: string;
+      }>;
+    },
+    @Request() req: any,
+  ) {
+    return this.serversService.joinServer(serverId, req.user.userId, body ?? {});
   }
 
   // =====================================================
@@ -441,6 +462,35 @@ export class ServersController {
     );
   }
 
+  @Get(':id/access/join-form')
+  async getJoinApplicationForm(@Param('id') serverId: string, @Request() req: any) {
+    return this.serverAccessService.getJoinApplicationForm(serverId, req.user.userId);
+  }
+
+  @Patch(':id/access/join-form')
+  async updateJoinApplicationForm(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      enabled?: boolean;
+      questions?: Array<{
+        id: string;
+        title: string;
+        type: 'short' | 'paragraph' | 'multiple_choice';
+        required?: boolean;
+        options?: string[];
+      }>;
+    },
+    @Request() req: any,
+  ) {
+    if (!body) throw new BadRequestException('Missing body');
+    return this.serverAccessService.updateJoinApplicationForm(
+      serverId,
+      req.user.userId,
+      body,
+    );
+  }
+
   @Get(':id/access/my-status')
   async getMyAccessStatus(@Param('id') serverId: string, @Request() req: any) {
     return this.serverAccessService.getMyStatus(serverId, req.user.userId);
@@ -458,6 +508,51 @@ export class ServersController {
       req.user.userId,
       body.userId,
     );
+  }
+
+  @Post(':id/access/reject')
+  async rejectAccessUser(
+    @Param('id') serverId: string,
+    @Body() body: { userId: string },
+    @Request() req: any,
+  ) {
+    if (!body?.userId) throw new BadRequestException('userId is required');
+    return this.serverAccessService.rejectUser(
+      serverId,
+      req.user.userId,
+      body.userId,
+    );
+  }
+
+  @Get(':id/access/join-applications')
+  async listJoinApplications(
+    @Param('id') serverId: string,
+    @Query('status') status: string = 'pending',
+    @Request() req: any,
+  ) {
+    return this.serverAccessService.listJoinApplications(
+      serverId,
+      req.user.userId,
+      status,
+    );
+  }
+
+  @Get(':id/access/join-applications/:applicantUserId')
+  async getJoinApplicationDetail(
+    @Param('id') serverId: string,
+    @Param('applicantUserId') applicantUserId: string,
+    @Request() req: any,
+  ) {
+    return this.serverAccessService.getJoinApplicationDetail(
+      serverId,
+      req.user.userId,
+      applicantUserId,
+    );
+  }
+
+  @Post(':id/access/withdraw')
+  async withdrawMyJoinApplication(@Param('id') serverId: string, @Request() req: any) {
+    return this.serverAccessService.withdrawJoinApplication(serverId, req.user.userId);
   }
 
   @Post(':id/access/accept-rules')
@@ -589,6 +684,21 @@ export class ServersController {
   }
 
   // =====================================================
+  // Discovery Eligibility
+  // =====================================================
+
+  @Get(':id/discovery-eligibility')
+  async getDiscoveryEligibility(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getDiscoveryEligibility(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  // =====================================================
   // Community Settings
   // =====================================================
 
@@ -613,6 +723,24 @@ export class ServersController {
     @Request() req: any,
   ) {
     return this.serversService.activateCommunity(
+      serverId,
+      req.user.userId,
+      body,
+    );
+  }
+
+  @Post(':id/community/overview')
+  async updateCommunityOverview(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      rulesChannelId?: string | null;
+      primaryLanguage?: 'vi' | 'en';
+      description?: string | null;
+    },
+    @Request() req: any,
+  ) {
+    return this.serversService.updateCommunityOverview(
       serverId,
       req.user.userId,
       body,

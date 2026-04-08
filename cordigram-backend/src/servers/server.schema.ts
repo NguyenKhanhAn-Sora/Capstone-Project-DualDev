@@ -13,11 +13,35 @@ export type ServerTemplate =
 export type ServerPurpose = 'club-community' | 'me-and-friends';
 
 export type ServerAccessMode = 'invite_only' | 'apply' | 'discoverable';
+export type CommunityDiscoveryStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'removed';
+
+export type ServerPrimaryLanguage = 'vi' | 'en';
+
+export type JoinFormQuestionType = 'short' | 'paragraph' | 'multiple_choice';
+
+export interface JoinFormQuestion {
+  id: string;
+  title: string;
+  type: JoinFormQuestionType;
+  required: boolean;
+  options?: string[]; // for multiple_choice
+}
+
+export interface JoinApplicationFormSettings {
+  enabled: boolean;
+  questions: JoinFormQuestion[];
+  updatedAt: Date | null;
+}
 
 export interface ServerMember {
   userId: Types.ObjectId;
   role: 'owner' | 'moderator' | 'member';
   joinedAt: Date;
+  nickname?: string | null;
   timeoutUntil?: Date | null;
   mentionBlockedUntil?: Date | null;
   mentionRestricted?: boolean;
@@ -94,6 +118,13 @@ export class Server extends Document {
   @Prop({ type: String, default: null })
   description: string | null;
 
+  @Prop({
+    type: String,
+    enum: ['vi', 'en'],
+    default: 'vi',
+  })
+  primaryLanguage: ServerPrimaryLanguage;
+
   @Prop({ type: String, default: null })
   avatarUrl: string | null;
 
@@ -146,6 +177,7 @@ export class Server extends Document {
           default: 'member',
         },
         joinedAt: { type: Date, default: Date.now },
+        nickname: { type: String, default: null },
         timeoutUntil: { type: Date, default: null },
         mentionBlockedUntil: { type: Date, default: null },
         mentionRestricted: { type: Boolean, default: false },
@@ -209,6 +241,39 @@ export class Server extends Document {
 
   @Prop({ type: Boolean, default: false })
   hasRules: boolean;
+
+  /**
+   * Application form used when accessMode = 'apply'.
+   * Stored separately from Rules; UI will prepend an implicit rules-accept question if hasRules=true.
+   */
+  @Prop({
+    type: {
+      enabled: { type: Boolean, default: false },
+      questions: {
+        type: [
+          {
+            id: { type: String, required: true },
+            title: { type: String, trim: true, maxlength: 200, required: true },
+            type: {
+              type: String,
+              enum: ['short', 'paragraph', 'multiple_choice'],
+              required: true,
+            },
+            required: { type: Boolean, default: true },
+            options: { type: [String], default: [] },
+          },
+        ],
+        default: [],
+      },
+      updatedAt: { type: Date, default: null },
+    },
+    default: () => ({
+      enabled: false,
+      questions: [],
+      updatedAt: null,
+    }),
+  })
+  joinApplicationForm: JoinApplicationFormSettings;
 
   @Prop({
     type: {
@@ -335,6 +400,19 @@ export class Server extends Document {
     }),
   })
   communitySettings: CommunitySettings;
+
+  /**
+   * Approval status for appearing in public Explore/Discovery surfaces.
+   * - pending: waiting for admin review (default once community enabled)
+   * - approved: can show in Explore list
+   * - rejected: hidden from Explore list
+   */
+  @Prop({
+    type: String,
+    enum: ['pending', 'approved', 'rejected', 'removed'],
+    default: 'pending',
+  })
+  communityDiscoveryStatus: CommunityDiscoveryStatus;
 }
 
 export interface CommunitySettings {

@@ -204,16 +204,18 @@ export default function MembersTab({
                 {member.avatarUrl ? (
                   <img
                     src={member.avatarUrl}
-                    alt={member.displayName}
+                    alt={member.nickname?.trim() ? member.nickname.trim() : member.displayName}
                     className={styles.memberAvatar}
                   />
                 ) : (
                   <div className={styles.memberAvatarPlaceholder}>
-                    {member.displayName.charAt(0).toUpperCase()}
+                    {(member.nickname?.trim() ? member.nickname.trim() : member.displayName).charAt(0).toUpperCase()}
                   </div>
                 )}
                 <div className={styles.memberText}>
-                  <span className={styles.memberName}>{member.displayName}</span>
+                  <span className={styles.memberName}>
+                    {member.nickname?.trim() ? member.nickname.trim() : member.displayName}
+                  </span>
                   <span className={styles.memberUsername}>@{member.username}</span>
                 </div>
               </div>

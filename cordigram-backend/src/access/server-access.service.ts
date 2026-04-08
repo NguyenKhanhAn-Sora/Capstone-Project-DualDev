@@ -69,6 +69,16 @@ export class ServerAccessService {
     isAgeRestricted: boolean;
     hasRules: boolean;
     rules: Array<{ id: string; content: string }>;
+    joinApplicationForm: {
+      enabled: boolean;
+      questions: Array<{
+        id: string;
+        title: string;
+        type: 'short' | 'paragraph' | 'multiple_choice';
+        required: boolean;
+        options?: string[];
+      }>;
+    };
   }> {
     const server = await this.serversService.getServerById(serverId);
     const accessMode = this.getEffectiveAccessMode(server);
@@ -86,7 +96,551 @@ export class ServerAccessService {
         id: String(r._id),
         content: r.content,
       })),
+      joinApplicationForm: {
+        enabled: Boolean((server as any)?.joinApplicationForm?.enabled),
+        questions: Array.isArray((server as any)?.joinApplicationForm?.questions)
+          ? (server as any).joinApplicationForm.questions
+          : [],
+      },
     };
+  }
+
+  async updateJoinApplicationForm(
+    serverId: string,
+    requesterUserId: string,
+    payload: {
+      enabled?: boolean;
+      questions?: Array<{
+        id: string;
+        title: string;
+        type: 'short' | 'paragraph' | 'multiple_choice';
+        required?: boolean;
+        options?: string[];
+      }>;
+    },
+  ): Promise<{
+    enabled: boolean;
+    questions: Array<{
+      id: string;
+      title: string;
+      type: 'short' | 'paragraph' | 'multiple_choice';
+      required: boolean;
+      options?: string[];
+    }>;
+  }> {
+    const server = await this.serversService.getServerById(serverId);
+    const isOwner = String(server.ownerId) === String(requesterUserId);
+    const canManageServer = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'manageServer',
+    );
+    if (!isOwner && !canManageServer) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới có thể chỉnh sửa',
+      );
+    }
+
+    const enabled = payload.enabled ?? Boolean((server as any)?.joinApplicationForm?.enabled);
+    const rawQuestions = Array.isArray(payload.questions)
+      ? payload.questions
+      : (server as any)?.joinApplicationForm?.questions ?? [];
+
+    const normalized = (rawQuestions as any[])
+      .map((q) => ({
+        id: String(q.id || ''),
+        title: String(q.title || '').trim(),
+        type:
+          q.type === 'paragraph'
+            ? 'paragraph'
+            : q.type === 'multiple_choice'
+              ? 'multiple_choice'
+              : 'short',
+        required: q.required !== false,
+        options: Array.isArray(q.options)
+          ? q.options.map((x: any) => String(x || '').trim()).filter(Boolean).slice(0, 25)
+          : [],
+      }))
+      .filter((q) => q.id && q.title);
+
+    if (normalized.length > 5) {
+      throw new BadRequestException('Tối đa 5 câu hỏi trong đơn đăng ký tham gia');
+    }
+    for (const q of normalized) {
+      if (q.type === 'multiple_choice' && (q.options?.length ?? 0) < 1) {
+        throw new BadRequestException('Câu hỏi nhiều lựa chọn phải có ít nhất 1 tùy chọn');
+      }
+    }
+
+    (server as any).joinApplicationForm = {
+      enabled: Boolean(enabled),
+      questions: normalized,
+      updatedAt: new Date(),
+    };
+    await server.save();
+
+    return {
+      enabled: Boolean((server as any).joinApplicationForm.enabled),
+      questions: (server as any).joinApplicationForm.questions ?? [],
+    };
+  }
+
+  async getJoinApplicationForm(
+    serverId: string,
+    requesterUserId: string,
+  ): Promise<{
+    enabled: boolean;
+    questions: Array<{
+      id: string;
+      title: string;
+      type: 'short' | 'paragraph' | 'multiple_choice';
+      required: boolean;
+      options?: string[];
+    }>;
+  }> {
+    const server = await this.serversService.getServerById(serverId);
+    const isOwner = String(server.ownerId) === String(requesterUserId);
+    const canManageServer = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'manageServer',
+    );
+    if (!isOwner && !canManageServer) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới xem được',
+      );
+    }
+    return {
+      enabled: Boolean((server as any)?.joinApplicationForm?.enabled),
+      questions: Array.isArray((server as any)?.joinApplicationForm?.questions)
+        ? (server as any).joinApplicationForm.questions
+        : [],
+    };
+  }
+
+  private async assertCanReviewJoinApplications(
+    serverId: string,
+    requesterUserId: string,
+  ): Promise<void> {
+    const server = await this.serversService.getServerById(serverId);
+    const isOwner = String(server.ownerId) === String(requesterUserId);
+    const canManageServer = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'manageServer',
+    );
+    if (!isOwner && !canManageServer) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới xem được đơn đăng ký',
+      );
+    }
+  }
+
+  private validateJoinApplicationForJoin(
+    server: Server,
+    opts?: {
+      rulesAccepted?: boolean;
+      applicationAnswers?: Array<{
+        questionId: string;
+        text?: string;
+        selectedOption?: string;
+      }>;
+    },
+  ): void {
+    const form = (server as any).joinApplicationForm;
+    if (!form?.enabled || !Array.isArray(form.questions) || form.questions.length === 0) {
+      return;
+    }
+    // Client cũ gửi POST /join không body: không chặn; client mới gửi `applicationAnswers` thì validate đủ.
+    if (opts?.applicationAnswers === undefined) {
+      return;
+    }
+    const answers = opts.applicationAnswers ?? [];
+    for (const q of form.questions as any[]) {
+      const qid = String(q.id ?? '');
+      const a = answers.find(
+        (x) => x && String(x.questionId) === qid,
+      );
+      const required = q.required !== false;
+      if (!required) continue;
+      if (q.type === 'multiple_choice') {
+        const v = String(a?.selectedOption ?? '').trim();
+        if (!v) {
+          throw new BadRequestException(
+            `Vui lòng trả lời: ${String(q.title || '').trim() || qid}`,
+          );
+        }
+      } else {
+        const v = String(a?.text ?? '').trim();
+        if (!v) {
+          throw new BadRequestException(
+            `Vui lòng trả lời: ${String(q.title || '').trim() || qid}`,
+          );
+        }
+      }
+    }
+  }
+
+  private normalizeJoinAnswersForStorage(
+    server: Server,
+    opts?: {
+      applicationAnswers?: Array<{
+        questionId: string;
+        text?: string;
+        selectedOption?: string;
+      }>;
+    },
+  ): Array<{ questionId: string; text?: string; selectedOption?: string }> {
+    const form = (server as any).joinApplicationForm;
+    if (!form?.enabled || !Array.isArray(form.questions) || form.questions.length === 0) {
+      return [];
+    }
+    const raw = opts?.applicationAnswers ?? [];
+    return (form.questions as any[]).map((q) => {
+      const qid = String(q.id ?? '');
+      const a = raw.find((x) => x && String(x.questionId) === qid);
+      if (q.type === 'multiple_choice') {
+        return {
+          questionId: qid,
+          selectedOption: String(a?.selectedOption ?? '').trim() || undefined,
+        };
+      }
+      return {
+        questionId: qid,
+        text: String(a?.text ?? '').trim() || undefined,
+      };
+    });
+  }
+
+  async listJoinApplications(
+    serverId: string,
+    requesterUserId: string,
+    statusRaw: string,
+  ): Promise<{
+    pendingCount: number;
+    items: Array<{
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl?: string;
+      status: UserServerStatus;
+      registeredAt: string;
+      acceptedRules: boolean;
+    }>;
+  }> {
+    await this.assertCanReviewJoinApplications(serverId, requesterUserId);
+    const server = await this.serversService.getServerById(serverId);
+    await this.serversService.ensureOwnerMemberRow(server as any);
+    const status =
+      statusRaw === 'all' ||
+      statusRaw === 'pending' ||
+      statusRaw === 'rejected' ||
+      statusRaw === 'approved'
+        ? statusRaw
+        : 'pending';
+
+    const members = ((server as any).members || []) as Array<{
+      userId: Types.ObjectId | { _id?: Types.ObjectId };
+      joinedAt?: Date;
+    }>;
+    const memberIds = members
+      .map((m) => String(m.userId?._id ?? m.userId))
+      .filter(Boolean);
+    const oidList = memberIds.map((id) => new Types.ObjectId(id));
+
+    // Chỉ đếm pending trong số user vẫn còn trong server.members (tránh ghost sau khi rời mà chưa xóa UserServer)
+    const pendingCount =
+      oidList.length === 0
+        ? 0
+        : await this.userServerModel.countDocuments({
+            serverId: new Types.ObjectId(serverId),
+            status: 'pending',
+            userId: { $in: oidList },
+          });
+
+    const [profiles, users, userServers] = await Promise.all([
+      oidList.length
+        ? this.profileModel
+            .find({ userId: { $in: oidList } })
+            .select('userId displayName username avatarUrl')
+            .lean()
+            .exec()
+        : [],
+      oidList.length
+        ? this.userModel
+            .find({ _id: { $in: oidList } })
+            .select('_id username createdAt')
+            .lean()
+            .exec()
+        : [],
+      this.userServerModel
+        .find({ serverId: new Types.ObjectId(serverId) })
+        .lean()
+        .exec(),
+    ]);
+
+    const profileByUser = new Map(
+      (profiles as any[]).map((p) => [String(p.userId), p]),
+    );
+    const userById = new Map((users as any[]).map((u) => [String(u._id), u]));
+    const usByUser = new Map(
+      (userServers as any[]).map((u) => [String(u.userId), u]),
+    );
+
+    type Row = {
+      userId: string;
+      displayName: string;
+      username: string;
+      avatarUrl?: string;
+      status: UserServerStatus;
+      registeredAt: string;
+      acceptedRules: boolean;
+    };
+
+    const rows: Row[] = [];
+    for (const m of members) {
+      const uid = String(m.userId?._id ?? m.userId);
+      if (!uid) continue;
+      const prof = profileByUser.get(uid);
+      const urow = userById.get(uid);
+      const us = usByUser.get(uid) as any;
+      const st: UserServerStatus = (us?.status as UserServerStatus) ?? 'accepted';
+      const acceptedRules = Boolean(us?.acceptedRules);
+      const registeredAt = us?.applicationSubmittedAt
+        ? new Date(us.applicationSubmittedAt)
+        : us?.createdAt
+          ? new Date(us.createdAt)
+          : m.joinedAt
+            ? new Date(m.joinedAt)
+            : new Date();
+      rows.push({
+        userId: uid,
+        displayName: String(prof?.displayName || urow?.username || 'User'),
+        username: String(prof?.username || urow?.username || ''),
+        avatarUrl: prof?.avatarUrl ? String(prof.avatarUrl) : undefined,
+        status: st,
+        registeredAt: registeredAt.toISOString(),
+        acceptedRules,
+      });
+    }
+
+    let filtered = rows;
+    if (status === 'all')
+      filtered = rows.filter((r) => r.status === 'accepted');
+    else if (status === 'pending')
+      filtered = rows.filter((r) => r.status === 'pending');
+    else if (status === 'rejected')
+      filtered = rows.filter((r) => r.status === 'rejected');
+    else if (status === 'approved')
+      filtered = rows.filter((r) => r.status === 'accepted');
+
+    filtered.sort(
+      (a, b) =>
+        new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime(),
+    );
+
+    return { pendingCount, items: filtered };
+  }
+
+  async getJoinApplicationDetail(
+    serverId: string,
+    requesterUserId: string,
+    applicantUserId: string,
+  ): Promise<{
+    userId: string;
+    displayName: string;
+    username: string;
+    avatarUrl?: string;
+    status: UserServerStatus;
+    acceptedRules: boolean;
+    accountCreatedAt: string | null;
+    applicationSubmittedAt: string | null;
+    questionsWithAnswers: Array<{
+      questionId: string;
+      title: string;
+      type: string;
+      answerText?: string;
+      selectedOption?: string;
+    }>;
+  }> {
+    await this.assertCanReviewJoinApplications(serverId, requesterUserId);
+    const server = await this.serversService.getServerById(serverId);
+    if (!this.serversService.isMember(server as any, applicantUserId)) {
+      throw new NotFoundException('Người dùng không thuộc máy chủ');
+    }
+
+    const [prof, urow, us] = await Promise.all([
+      this.profileModel
+        .findOne({ userId: new Types.ObjectId(applicantUserId) })
+        .select('displayName username avatarUrl')
+        .lean()
+        .exec(),
+      this.userModel
+        .findById(applicantUserId)
+        .select('username createdAt')
+        .lean()
+        .exec(),
+      this.userServerModel
+        .findOne({
+          userId: new Types.ObjectId(applicantUserId),
+          serverId: new Types.ObjectId(serverId),
+        })
+        .lean()
+        .exec(),
+    ]);
+
+    const formQs = Array.isArray((server as any)?.joinApplicationForm?.questions)
+      ? ((server as any).joinApplicationForm.questions as any[])
+      : [];
+    const answers = (us as any)?.joinApplicationAnswers as
+      | Array<{
+          questionId: string;
+          text?: string;
+          selectedOption?: string;
+        }>
+      | undefined;
+
+    const questionsWithAnswers = formQs.map((q) => {
+      const qid = String(q.id ?? '');
+      const a = (answers || []).find((x) => String(x.questionId) === qid);
+      return {
+        questionId: qid,
+        title: String(q.title ?? ''),
+        type: String(q.type ?? 'short'),
+        answerText: a?.text,
+        selectedOption: a?.selectedOption,
+      };
+    });
+
+    const st: UserServerStatus =
+      ((us as any)?.status as UserServerStatus) ?? 'accepted';
+
+    return {
+      userId: applicantUserId,
+      displayName: String(
+        (prof as any)?.displayName || (urow as any)?.username || 'User',
+      ),
+      username: String((prof as any)?.username || (urow as any)?.username || ''),
+      avatarUrl: (prof as any)?.avatarUrl
+        ? String((prof as any).avatarUrl)
+        : undefined,
+      status: st,
+      acceptedRules: Boolean((us as any)?.acceptedRules),
+      accountCreatedAt: (urow as any)?.createdAt
+        ? new Date((urow as any).createdAt).toISOString()
+        : null,
+      applicationSubmittedAt: (us as any)?.applicationSubmittedAt
+        ? new Date((us as any).applicationSubmittedAt).toISOString()
+        : (us as any)?.createdAt
+          ? new Date((us as any).createdAt).toISOString()
+          : null,
+      questionsWithAnswers,
+    };
+  }
+
+  async rejectUser(
+    serverId: string,
+    requesterUserId: string,
+    targetUserId: string,
+  ): Promise<UserServer> {
+    const server = await this.serversService.getServerById(serverId);
+    const isOwner = String(server.ownerId) === String(requesterUserId);
+    const canManageServer = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'manageServer',
+    );
+    if (!isOwner && !canManageServer) {
+      throw new ForbiddenException('Bạn không có quyền từ chối đơn đăng ký');
+    }
+
+    const target = await this.userServerModel
+      .findOne({
+        userId: new Types.ObjectId(targetUserId),
+        serverId: new Types.ObjectId(serverId),
+      })
+      .lean()
+      .exec();
+
+    if (!target || target.status !== 'pending') {
+      throw new BadRequestException('Người dùng không ở trạng thái chờ duyệt');
+    }
+
+    const updated = await this.userServerModel
+      .findOneAndUpdate(
+        {
+          userId: new Types.ObjectId(targetUserId),
+          serverId: new Types.ObjectId(serverId),
+        },
+        { $set: { status: 'rejected' } },
+        { upsert: true, new: true },
+      )
+      .lean()
+      .exec();
+
+    // Notify applicant (Dành cho bạn)
+    this.serversService
+      .createUserNotification({
+        serverId,
+        actorId: requesterUserId,
+        recipientUserIds: [targetUserId],
+        title: 'Đơn đăng ký đã bị từ chối',
+        content: 'Đơn đăng ký tham gia máy chủ của bạn đã bị từ chối.',
+      })
+      .catch(() => {});
+
+    return updated as any;
+  }
+
+  /** Applicant rút đơn khi đang pending. */
+  /**
+   * Xóa bản ghi UserServer khi member không còn trong máy chủ (rời/kick/ban/dọn dữ liệu).
+   */
+  async deleteUserServerRecord(serverId: string, userId: string): Promise<void> {
+    await this.userServerModel
+      .deleteOne({
+        userId: new Types.ObjectId(userId),
+        serverId: new Types.ObjectId(serverId),
+      })
+      .exec();
+  }
+
+  async withdrawJoinApplication(
+    serverId: string,
+    userId: string,
+  ): Promise<{ ok: boolean }> {
+    const server = await this.serversService.getServerById(serverId);
+    const accessMode = this.getEffectiveAccessMode(server);
+    if (accessMode !== 'apply') {
+      throw new BadRequestException('Máy chủ không bật chế độ đơn đăng ký');
+    }
+
+    const doc = await this.userServerModel
+      .findOne({
+        userId: new Types.ObjectId(userId),
+        serverId: new Types.ObjectId(serverId),
+      })
+      .lean()
+      .exec();
+
+    if (!doc || doc.status !== 'pending') {
+      throw new BadRequestException('Bạn không có đơn đang chờ xử lý');
+    }
+
+    // joinServer (apply) đã ensure member; rút đơn => remove khỏi server
+    const before = (server as any).members?.length ?? 0;
+    (server as any).members = ((server as any).members || []).filter(
+      (m: any) => String(m.userId?._id ?? m.userId) !== String(userId),
+    );
+    const after = (server as any).members.length;
+    if (after !== before) {
+      (server as any).memberCount = after;
+      await (server as any).save();
+    }
+
+    await this.deleteUserServerRecord(serverId, userId);
+
+    return { ok: true };
   }
 
   async updateAccessSettings(
@@ -104,8 +658,16 @@ export class ServerAccessService {
   }> {
     const server = await this.serversService.getServerById(serverId);
     const isOwner = String(server.ownerId) === String(requesterUserId);
-    if (!isOwner)
-      throw new ForbiddenException('Chỉ chủ máy chủ mới có thể chỉnh sửa');
+    const canManageServer = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'manageServer',
+    );
+    if (!isOwner && !canManageServer) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới có thể chỉnh sửa',
+      );
+    }
 
     const prevHasRules = Boolean((server as any).hasRules);
 
@@ -150,8 +712,16 @@ export class ServerAccessService {
   ): Promise<{ id: string; content: string }> {
     const server = await this.serversService.getServerById(serverId);
     const isOwner = String(server.ownerId) === String(requesterUserId);
-    if (!isOwner)
-      throw new ForbiddenException('Chỉ chủ máy chủ mới có thể thêm quy định');
+    const canManageServer = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'manageServer',
+    );
+    if (!isOwner && !canManageServer) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới có thể thêm quy định',
+      );
+    }
 
     const trimmed = (content ?? '').trim();
     if (!trimmed)
@@ -233,9 +803,18 @@ export class ServerAccessService {
     const memberRow = ((server as any).members || []).find(
       (m: any) => (m?.userId?._id ?? m?.userId)?.toString() === userId,
     );
-    const memberJoinedAt = memberRow?.joinedAt
+    const rawMemberJoinedAt = memberRow?.joinedAt
       ? new Date(memberRow.joinedAt)
       : null;
+
+    // Apply-to-join: only start the "member over 10 minutes" timer after approval.
+    // Otherwise, users could wait while pending and instantly pass verification after being accepted.
+    const memberJoinedAt =
+      accessMode === 'apply' &&
+      (doc as any)?.status === 'accepted' &&
+      (doc as any)?.acceptedAt
+        ? new Date((doc as any).acceptedAt)
+        : rawMemberJoinedAt;
 
     const isOwner =
       (server as any).ownerId?.toString?.() === userId ||
@@ -274,11 +853,11 @@ export class ServerAccessService {
 
     const ageYears = calcAgeFromBirthdate(birthdate);
 
+    // Thành viên đã có trong server trước khi bật "apply": không áp dụng ngược.
+    // Nếu chưa có bản ghi UserServer (dữ liệu cũ), coi như đã được chấp thuận.
     const base = !doc
       ? {
-          status: (accessMode === 'apply'
-            ? 'pending'
-            : 'accepted') as UserServerStatus,
+          status: 'accepted' as UserServerStatus,
           acceptedRules: !hasRules,
         }
       : {
@@ -351,9 +930,36 @@ export class ServerAccessService {
    * - discoverable: tạo accepted.
    * - age restriction: nếu < 18 => rejected (để chặn chat).
    */
-  async joinServer(userId: string, serverId: string): Promise<UserServer> {
+  async joinServer(
+    userId: string,
+    serverId: string,
+    opts?: {
+      rulesAccepted?: boolean;
+      nickname?: string;
+      applicationAnswers?: Array<{
+        questionId: string;
+        text?: string;
+        selectedOption?: string;
+      }>;
+    },
+  ): Promise<UserServer> {
     const server = await this.serversService.getServerById(serverId);
     if (!server) throw new NotFoundException('Server not found');
+
+    // If user is (re)joining (not currently a member), ensure no stale role membership remains.
+    // This enforces "rejoin as a new member" semantics for server roles.
+    if (!this.serversService.isMember(server as any, userId)) {
+      await this.rolesService.removeMemberFromAllNonDefaultRoles(
+        serverId,
+        userId,
+      );
+      await this.userServerModel
+        .deleteOne({
+          userId: new Types.ObjectId(userId),
+          serverId: new Types.ObjectId(serverId),
+        })
+        .exec();
+    }
 
     // Tính tuổi nếu bật
     let statusOverride: UserServerStatus | null = null;
@@ -390,7 +996,43 @@ export class ServerAccessService {
       return updated as any;
     }
 
+    // Đã là thành viên: chế độ apply chỉ áp dụng lần gia nhập đầu tiên, không ghi đè pending.
+    if (this.serversService.isMember(server as any, userId)) {
+      const existing = await this.userServerModel
+        .findOne({
+          userId: new Types.ObjectId(userId),
+          serverId: new Types.ObjectId(serverId),
+        })
+        .lean()
+        .exec();
+      if (existing) {
+        return existing as any;
+      }
+      const grandfatherAcceptedRules = !serverHasRules;
+      const created = await this.userServerModel
+        .findOneAndUpdate(
+          {
+            userId: new Types.ObjectId(userId),
+            serverId: new Types.ObjectId(serverId),
+          },
+          {
+            $set: {
+              status: 'accepted',
+              acceptedRules: grandfatherAcceptedRules,
+            },
+          },
+          { upsert: true, new: true },
+        )
+        .lean()
+        .exec();
+      return created as any;
+    }
+
     const accessMode: ServerAccessMode = this.getEffectiveAccessMode(server);
+
+    if (accessMode === 'apply' && !statusOverride) {
+      this.validateJoinApplicationForJoin(server, opts);
+    }
 
     // resolve status theo accessMode
     if (accessMode === 'invite_only') {
@@ -409,7 +1051,10 @@ export class ServerAccessService {
 
       await this.serverInvitesService.acceptByServer(serverId, userId);
     } else if (accessMode === 'apply') {
-      await this.ensureMemberInServer(serverId, userId, 'member');
+      // Nếu user có pending invite, mark nó là accepted để inbox dọn dẹp.
+      await this.serverInvitesService
+        .acceptByServer(serverId, userId)
+        .catch(() => {});
     } else if (accessMode === 'discoverable') {
       await this.ensureMemberInServer(serverId, userId, 'member');
     } else {
@@ -424,6 +1069,28 @@ export class ServerAccessService {
         }
       : defaultStatusForAccessMode(accessMode, serverHasRules);
 
+    let acceptedRulesFinal = acceptedRules;
+    if (!statusOverride && accessMode === 'apply' && opts?.rulesAccepted === true) {
+      acceptedRulesFinal = true;
+    }
+
+    const setPayload: Record<string, unknown> = {
+      status,
+      acceptedRules: acceptedRulesFinal,
+    };
+
+    if (opts?.nickname?.trim()) {
+      setPayload.nickname = opts.nickname.trim();
+    }
+
+    if (!statusOverride && accessMode === 'apply') {
+      setPayload.applicationSubmittedAt = new Date();
+      if (opts?.applicationAnswers !== undefined) {
+        setPayload.joinApplicationAnswers =
+          this.normalizeJoinAnswersForStorage(server, opts);
+      }
+    }
+
     const updated = await this.userServerModel
       .findOneAndUpdate(
         {
@@ -431,10 +1098,7 @@ export class ServerAccessService {
           serverId: new Types.ObjectId(serverId),
         },
         {
-          $set: {
-            status,
-            acceptedRules,
-          },
+          $set: setPayload,
         },
         { upsert: true, new: true },
       )
@@ -454,8 +1118,16 @@ export class ServerAccessService {
   ): Promise<UserServer> {
     const server = await this.serversService.getServerById(serverId);
     const isOwner = String(server.ownerId) === String(requesterUserId);
-    if (!isOwner)
-      throw new ForbiddenException('Chỉ chủ máy chủ mới duyệt được');
+    const canManageServer = await this.rolesService.hasPermission(
+      serverId,
+      requesterUserId,
+      'manageServer',
+    );
+    if (!isOwner && !canManageServer) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ hoặc người có quyền Quản Lý Máy Chủ mới duyệt được',
+      );
+    }
 
     const target = await this.userServerModel
       .findOne({
@@ -480,12 +1152,36 @@ export class ServerAccessService {
           $set: {
             status: 'accepted',
             acceptedRules: !serverHasRules,
+            acceptedAt: new Date(),
           },
         },
         { upsert: true, new: true },
       )
       .lean()
       .exec();
+
+    await this.ensureMemberInServer(serverId, targetUserId, 'member');
+
+    if ((target as any).nickname) {
+      await this.serversService
+        .setMemberNickname(serverId, targetUserId, (target as any).nickname)
+        .catch(() => {});
+    }
+
+    this.serversService
+      .sendWelcomeMessagePublic(serverId, targetUserId)
+      .catch(() => {});
+
+    // Notify applicant (Dành cho bạn)
+    this.serversService
+      .createUserNotification({
+        serverId,
+        actorId: requesterUserId,
+        recipientUserIds: [targetUserId],
+        title: 'Đơn đăng ký đã được chấp thuận',
+        content: 'Bạn đã được chấp thuận tham gia máy chủ.',
+      })
+      .catch(() => {});
 
     return updated as any;
   }

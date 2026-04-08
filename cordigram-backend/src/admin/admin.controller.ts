@@ -607,4 +607,147 @@ export class AdminController {
       adminId,
     });
   }
+
+  @Get('community-discovery')
+  async getCommunityDiscoveryServers(
+    @Query('status') statusRaw: string | undefined,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const status =
+      statusRaw === 'pending' ||
+      statusRaw === 'approved' ||
+      statusRaw === 'rejected' ||
+      statusRaw === 'removed'
+        ? statusRaw
+        : 'all';
+    return this.adminService.getCommunityDiscoveryServers({ status });
+  }
+
+  @Post('community-discovery/:serverId/approve')
+  async approveCommunityDiscoveryServer(
+    @Param('serverId') serverId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    return this.adminService.setCommunityDiscoveryApproval({
+      serverId,
+      status: 'approved',
+      adminId: req.user?.userId,
+    });
+  }
+
+  @Post('community-discovery/:serverId/reject')
+  async rejectCommunityDiscoveryServer(
+    @Param('serverId') serverId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    return this.adminService.setCommunityDiscoveryApproval({
+      serverId,
+      status: 'rejected',
+      adminId: req.user?.userId,
+    });
+  }
+
+  @Post('community-discovery/:serverId/remove')
+  async removeCommunityDiscoveryServer(
+    @Param('serverId') serverId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const adminId = req.user?.userId ?? '';
+    return this.adminService.removeFromDiscovery({ serverId, adminId });
+  }
+
+  @Post('community-discovery/:serverId/restore')
+  async restoreCommunityDiscoveryServer(
+    @Param('serverId') serverId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const adminId = req.user?.userId ?? '';
+    return this.adminService.restoreDiscovery({ serverId, adminId });
+  }
+
+  @Get('community-discovery/history')
+  async getCommunityDiscoveryHistory(
+    @Query('serverId') serverId: string | undefined,
+    @Query('limit') limitRaw: string | undefined,
+    @Query('offset') offsetRaw: string | undefined,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const limit = Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : 50;
+    const offset = Number.isFinite(Number(offsetRaw)) ? Number(offsetRaw) : 0;
+    return this.adminService.getCommunityDiscoveryHistory({
+      serverId,
+      limit,
+      offset,
+    });
+  }
+
+  @Get('community-discovery/:serverId/view')
+  async adminGetServerView(
+    @Param('serverId') serverId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const adminUserId = req.user?.userId;
+    return this.adminService.adminGetServerView(serverId, adminUserId);
+  }
+
+  @Post('community-discovery/:serverId/leave')
+  async adminLeaveServer(
+    @Param('serverId') serverId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const adminUserId = req.user?.userId;
+    return this.adminService.adminLeaveServer(serverId, adminUserId);
+  }
+
+  @Get('community-discovery/:serverId/channels/:channelId/messages')
+  async adminGetChannelMessages(
+    @Param('serverId') serverId: string,
+    @Param('channelId') channelId: string,
+    @Query('limit') limit: number = 50,
+    @Query('skip') skip: number = 0,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    return this.adminService.adminGetChannelMessages(
+      serverId,
+      channelId,
+      +limit || 50,
+      +skip || 0,
+    );
+  }
 }

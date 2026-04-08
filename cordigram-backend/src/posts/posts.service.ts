@@ -30,7 +30,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ActivityLogService } from '../activity/activity.service';
 import { PostSchedulerService } from './post-scheduler.service';
 import { User } from '../users/user.schema';
-import { MediaModerationService } from './media-moderation.service';
+import {
+  MediaModerationService,
+  type ImageModerationResult,
+} from './media-moderation.service';
 import { ModerationAction } from '../moderation/moderation-action.schema';
 import { PaymentTransaction } from '../payments/payment-transaction.schema';
 import { ReportPost } from '../reportpost/reportpost.schema';
@@ -1542,9 +1545,19 @@ export class PostsService {
   }
 
   private async uploadSingle(authorId: string, file: UploadedFile) {
-    const resourceType = file.mimetype.startsWith('video/') ? 'video' : 'image';
-    const moderation =
-      resourceType === 'image'
+    const isAudio = file.mimetype.startsWith('audio/');
+    const isVideo = file.mimetype.startsWith('video/');
+    // Cloudinary handles audio under resource_type "video" by default.
+    const resourceType = isVideo || isAudio ? 'video' : 'image';
+
+    const moderation = isAudio
+      ? {
+          decision: 'approve' as const,
+          reasons: ['audio upload - moderation skipped'],
+          provider: 'skipped',
+          scores: {},
+        }
+      : resourceType === 'image'
         ? await this.mediaModerationService.moderateImage({
             buffer: file.buffer,
             filename: file.originalname,

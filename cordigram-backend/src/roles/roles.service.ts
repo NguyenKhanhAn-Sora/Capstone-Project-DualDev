@@ -54,6 +54,27 @@ export class RolesService {
   }
 
   /**
+   * Remove a member from all non-default roles in a server.
+   * Used to prevent stale role carry-over when a member leaves/rejoins.
+   */
+  async removeMemberFromAllNonDefaultRoles(
+    serverId: string,
+    memberId: string,
+  ): Promise<void> {
+    const memberObjectId = new Types.ObjectId(memberId);
+    await this.roleModel
+      .updateMany(
+        {
+          serverId: new Types.ObjectId(serverId),
+          isDefault: { $ne: true },
+          memberIds: memberObjectId,
+        },
+        { $pull: { memberIds: memberObjectId } },
+      )
+      .exec();
+  }
+
+  /**
    * Lấy chi tiết một role
    */
   async getRoleById(serverId: string, roleId: string): Promise<Role> {

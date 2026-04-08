@@ -25,6 +25,8 @@ export default function CommunitySection({
 
   const [showWizard, setShowWizard] = useState(false);
   const [step, setStep] = useState(1);
+  const [discoveryEligible, setDiscoveryEligible] = useState<boolean | null>(null);
+  const [eligibilityChecking, setEligibilityChecking] = useState(false);
 
   const [rulesChannelId, setRulesChannelId] = useState<string>(CREATE_FOR_ME);
   const [updatesChannelId, setUpdatesChannelId] = useState<string>(CREATE_FOR_ME);
@@ -41,12 +43,14 @@ export default function CommunitySection({
       serversApi.getChannels(serverId),
       serversApi.getRoles(serverId),
       serversApi.getServerSafetySettings(serverId),
+      serversApi.getDiscoveryEligibility(serverId),
     ])
-      .then(([c, ch, r, s]) => {
+      .then(([c, ch, r, s, de]) => {
         setCommunity(c);
         setChannels(ch);
         setRoles(r);
         setSafety(s);
+        setDiscoveryEligible(de.eligible);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -151,7 +155,7 @@ export default function CommunitySection({
         </p>
         <button
           className={styles.activateBtn}
-          disabled={!canManageSettings}
+          disabled={!canManageSettings || discoveryEligible === false}
           onClick={() => {
             setStep(1);
             setAgreed(false);
@@ -162,6 +166,11 @@ export default function CommunitySection({
         >
           Kích Hoạt Cộng Đồng
         </button>
+        {discoveryEligible === false && (
+          <p style={{ color: "var(--color-panel-danger)", fontSize: 13, marginTop: 8 }}>
+            Máy chủ chưa đạt đủ điều kiện Khám Phá. Vui lòng kiểm tra điều kiện trong phần Truy cập.
+          </p>
+        )}
 
         <hr className={styles.bannerDivider} />
 

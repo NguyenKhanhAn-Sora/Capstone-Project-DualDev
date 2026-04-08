@@ -65,6 +65,7 @@ export default function ChannelContextMenu({
 }: ChannelContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [submenu, setSubmenu] = useState<"mute" | "notify" | null>(null);
   const [submenuPos, setSubmenuPos] = useState({ left: 0, top: 0 });
   const [showEdit, setShowEdit] = useState(false);
@@ -84,6 +85,7 @@ export default function ChannelContextMenu({
     const handleClick = (e: MouseEvent) => {
       const t = e.target as Node;
       if (menuRef.current?.contains(t)) return;
+      if (dialogRef.current?.contains(t)) return;
       const sub = document.querySelector("[data-channel-context-submenu]");
       if (sub?.contains(t)) return;
       onClose();
@@ -203,7 +205,7 @@ export default function ChannelContextMenu({
   if (showEdit) {
     return (
       <div className={styles.editOverlay} onClick={() => { setShowEdit(false); onClose(); }}>
-        <div className={styles.editBox} onClick={(e) => e.stopPropagation()}>
+        <div ref={dialogRef} className={styles.editBox} onClick={(e) => e.stopPropagation()}>
           <h3 className={styles.editTitle}>Chỉnh sửa kênh</h3>
           <input
             ref={editInputRef}
@@ -239,7 +241,7 @@ export default function ChannelContextMenu({
   if (showDelete) {
     return (
       <div className={styles.confirmOverlay} onClick={() => { setShowDelete(false); onClose(); }}>
-        <div className={styles.confirmBox} onClick={(e) => e.stopPropagation()}>
+        <div ref={dialogRef} className={styles.confirmBox} onClick={(e) => e.stopPropagation()}>
           <h3 className={styles.confirmTitle}>Xóa kênh</h3>
           <p className={styles.confirmDesc}>
             Bạn có chắc chắn muốn xóa kênh <strong>#{channel.name}</strong>? Hành động này không thể hoàn tác và tất cả tin nhắn trong kênh sẽ bị mất.

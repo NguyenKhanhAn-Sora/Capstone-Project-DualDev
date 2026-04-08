@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import * as serversApi from "@/lib/servers-api";
 import { blockUser, ignoreUser } from "@/lib/api";
-import MemberContextMenu from "@/components/MemberContextMenu/MemberContextMenu";
 import MemberProfilePopup from "@/components/MemberProfilePopup/MemberProfilePopup";
 import IgnoreUserPopup from "@/components/IgnoreUserPopup/IgnoreUserPopup";
 import ModeratorViewToggle from "@/components/ModeratorViewToggle/ModeratorViewToggle";
@@ -34,8 +33,14 @@ interface ExtendedMember extends serversApi.MemberWithRoles {
 function normalizeMemberRow(m: unknown): ExtendedMember {
   const rec = m as Record<string, unknown>;
   const isOwner = Boolean(rec.isOwner);
+  const rawNick = typeof rec.nickname === "string" ? rec.nickname.trim() : "";
+  const nickname = rawNick ? rawNick : null;
+  const baseDisplayName = typeof rec.displayName === "string" ? rec.displayName : "";
   return {
     ...(m as unknown as ExtendedMember),
+    nickname,
+    // Ưu tiên nickname của server nếu có
+    displayName: nickname || baseDisplayName || (typeof rec.username === "string" ? rec.username : "Người dùng"),
     serverMemberRole: (rec.serverMemberRole as ExtendedMember["serverMemberRole"]) ?? (isOwner ? "owner" : "member"),
     accountCreatedAt: (rec.accountCreatedAt as string) ?? String(rec.joinedAt ?? ""),
     accountAgeDays: typeof rec.accountAgeDays === "number" ? rec.accountAgeDays : 0,
@@ -601,24 +606,26 @@ export default function ServerMembersSection({
                       </span>
                       <span className={styles.username}>{row.username}</span>
                     </div>
-                    <button
-                      type="button"
-                      className={styles.iconBtn}
-                      title="Tùy chọn"
-                      aria-label="Tùy chọn"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                        setMemberMenu({ row, x: rect.left, y: rect.bottom + 4 });
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <circle cx="12" cy="6" r="1.5" />
-                        <circle cx="12" cy="12" r="1.5" />
-                        <circle cx="12" cy="18" r="1.5" />
-                      </svg>
-                    </button>
+                    {!row.isOwner && (
+                      <button
+                        type="button"
+                        className={styles.iconBtn}
+                        title="Tùy chọn"
+                        aria-label="Tùy chọn"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          setMemberMenu({ row, x: rect.left, y: rect.bottom + 4 });
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="12" cy="6" r="1.5" />
+                          <circle cx="12" cy="12" r="1.5" />
+                          <circle cx="12" cy="18" r="1.5" />
+                        </svg>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -792,87 +799,86 @@ export default function ServerMembersSection({
         </div>
       )}
 
-      {/* Context Menu - truyền đầy đủ moderation actions */}
+      {/* Context Menu - chỉ hiện Hồ sơ + Nhắn tin */}
       {memberMenu && (
-        <MemberContextMenu
-          x={memberMenu.x}
-          y={memberMenu.y}
-          member={{
-            userId: memberMenu.row.userId,
-            displayName: memberMenu.row.displayName,
-            username: memberMenu.row.username,
-            avatarUrl: memberMenu.row.avatarUrl,
-            joinedAt: memberMenu.row.joinedAt,
-            joinedCordigramAt: memberMenu.row.joinedCordigramAt || memberMenu.row.joinedAt,
-            joinMethod: memberMenu.row.joinMethod || (memberMenu.row.isOwner ? "owner" : "link"),
-            invitedBy: memberMenu.row.invitedBy,
-            role: memberMenu.row.isOwner ? "owner" : (memberMenu.row.role || "member"),
-          }}
-          isServerOwner={permissions.isOwner}
-          // Truyền permissions để context menu biết có hiện moderation options không
-          canKick={permissions.canKick && canAffectMember(memberMenu.row)}
-          canBan={permissions.canBan && canAffectMember(memberMenu.row)}
-          canTimeout={permissions.canTimeout && canAffectMember(memberMenu.row)}
-          onClose={() => setMemberMenu(null)}
-          onProfile={() => {
-            setProfileMember(memberMenu.row);
-            setMemberMenu(null);
-          }}
-          onMessage={() => {
-            if (onNavigateToDM) {
-              onNavigateToDM(
-                memberMenu.row.userId,
-                memberMenu.row.displayName || memberMenu.row.username,
-                memberMenu.row.username,
-                memberMenu.row.avatarUrl,
-              );
-            }
-            setMemberMenu(null);
-          }}
-          onNickname={() => {
-            const name = memberMenu.row.displayName || memberMenu.row.username;
-            alert(`Đổi biệt danh cho ${name} - tính năng sẽ được bổ sung.`);
-            setMemberMenu(null);
-          }}
-          onIgnore={() => {
-            setIgnoreMember(memberMenu.row);
-            setMemberMenu(null);
-          }}
-          onBlock={async () => {
-            if (!token) return;
-            try {
-              await blockUser({ token, userId: memberMenu.row.userId });
-              setMembers((prev) => prev.filter((m) => m.userId !== memberMenu.row.userId));
-            } catch (err) {
-              console.error(err);
-            }
-            setMemberMenu(null);
-          }}
-          // Moderation actions - chỉ truyền nếu có quyền và có thể tác động
-          onKick={
-            permissions.canKick && canAffectMember(memberMenu.row)
-              ? () => openModerationModal("kick", memberMenu.row)
-              : undefined
-          }
-          onBan={
-            permissions.canBan && canAffectMember(memberMenu.row)
-              ? () => openModerationModal("ban", memberMenu.row)
-              : undefined
-          }
-          onTimeout={
-            permissions.canTimeout && canAffectMember(memberMenu.row)
-              ? () => openModerationModal("timeout", memberMenu.row)
-              : undefined
-          }
-          onTransferOwnership={
-            permissions.isOwner && !memberMenu.row.isOwner && memberMenu.row.userId !== currentUserId
-              ? () => {
-                  setTransferConfirmMember(memberMenu.row);
-                  setMemberMenu(null);
+        <>
+          <div
+            className={styles.menuBackdrop}
+            onClick={() => setMemberMenu(null)}
+          />
+          <div
+            className={styles.simpleMenu}
+            style={{
+              left: Math.min(memberMenu.x, typeof window !== "undefined" ? window.innerWidth - 200 : memberMenu.x),
+              top: memberMenu.y,
+            }}
+          >
+            <button
+              type="button"
+              className={styles.simpleMenuItem}
+              onClick={() => {
+                setProfileMember(memberMenu.row);
+                setMemberMenu(null);
+              }}
+            >
+              Hồ sơ
+            </button>
+            <button
+              type="button"
+              className={styles.simpleMenuItem}
+              onClick={() => {
+                if (onNavigateToDM) {
+                  onNavigateToDM(
+                    memberMenu.row.userId,
+                    memberMenu.row.displayName || memberMenu.row.username,
+                    memberMenu.row.username,
+                    memberMenu.row.avatarUrl,
+                  );
                 }
-              : undefined
-          }
-        />
+                setMemberMenu(null);
+              }}
+            >
+              Nhắn tin
+            </button>
+
+            {/* Moderation actions - chỉ hiện cho owner hoặc role có quyền */}
+            {canAffectMember(memberMenu.row) && (permissions.canTimeout || permissions.canKick || permissions.canBan) && (
+              <>
+                <div style={{ height: 1, background: "var(--color-panel-border)", margin: "6px 8px" }} />
+                {permissions.canTimeout && (
+                  <button
+                    type="button"
+                    className={styles.simpleMenuItem}
+                    style={{ color: "var(--color-panel-warning)" }}
+                    onClick={() => openModerationModal("timeout", memberMenu.row)}
+                  >
+                    Hạn chế {memberMenu.row.username}
+                  </button>
+                )}
+                {permissions.canKick && (
+                  <button
+                    type="button"
+                    className={styles.simpleMenuItem}
+                    style={{ color: "var(--color-panel-danger)" }}
+                    onClick={() => openModerationModal("kick", memberMenu.row)}
+                  >
+                    Đuổi {memberMenu.row.username}
+                  </button>
+                )}
+                {permissions.canBan && (
+                  <button
+                    type="button"
+                    className={styles.simpleMenuItem}
+                    style={{ color: "var(--color-panel-danger)" }}
+                    onClick={() => openModerationModal("ban", memberMenu.row)}
+                  >
+                    Cấm {memberMenu.row.username}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </>
       )}
 
       {/* Moderation Modal */}

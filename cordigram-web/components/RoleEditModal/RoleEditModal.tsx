@@ -42,6 +42,8 @@ export default function RoleEditModal({
   const [localRoles, setLocalRoles] = useState<Role[]>(roles);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  /** Chỉ đếm memberIds còn thật sự trong server (tránh ghost ID sau khi user rời). */
+  const [serverMemberIdSet, setServerMemberIdSet] = useState<Set<string> | null>(null);
 
   const selectedRole = localRoles.find((r) => r._id === selectedRoleId) || role;
 
@@ -59,6 +61,21 @@ export default function RoleEditModal({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [contextMenu]);
+
+  useEffect(() => {
+    let cancelled = false;
+    serversApi
+      .getServerMembers(serverId)
+      .then((rows) => {
+        if (!cancelled) setServerMemberIdSet(new Set(rows.map((m) => m.userId)));
+      })
+      .catch(() => {
+        if (!cancelled) setServerMemberIdSet(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [serverId]);
 
   const handleRoleContextMenu = (e: React.MouseEvent, r: Role) => {
     e.preventDefault();
@@ -139,7 +156,11 @@ export default function RoleEditModal({
   const customRoles = localRoles.filter((r) => !r.isDefault);
   const defaultRole = localRoles.find((r) => r.isDefault);
 
-  const memberCount = selectedRole.memberIds?.length || 0;
+  const rawMemberIds = selectedRole.memberIds || [];
+  const memberCount =
+    serverMemberIdSet !== null
+      ? rawMemberIds.filter((id) => serverMemberIdSet.has(id)).length
+      : rawMemberIds.length;
 
   return (
     <div className={styles.overlay} onClick={onClose}>

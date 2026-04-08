@@ -31,6 +31,37 @@ export class UserServer extends Document {
   /** User đã xác minh email cho server này (per-server email verification). */
   @Prop({ type: Boolean, default: false })
   serverEmailVerified: boolean;
+
+  /** Câu trả lời đơn đăng ký tham gia (chế độ apply + form bật). */
+  @Prop({
+    type: [
+      {
+        questionId: { type: String, required: true },
+        text: { type: String },
+        selectedOption: { type: String },
+      },
+    ],
+    default: undefined,
+  })
+  joinApplicationAnswers?: Array<{
+    questionId: string;
+    text?: string;
+    selectedOption?: string;
+  }>;
+
+  /** Thời điểm gửi / cập nhật đơn (apply). */
+  @Prop({ type: Date })
+  applicationSubmittedAt?: Date;
+
+  /**
+   * Thời điểm được chấp thuận (apply to join).
+   * Dùng để tính "đã là thành viên > 10 phút" kể từ lúc được duyệt, không phải lúc nộp đơn.
+   */
+  @Prop({ type: Date, default: null })
+  acceptedAt?: Date | null;
+
+  @Prop({ type: String, default: null })
+  nickname?: string | null;
 }
 
 export const UserServerSchema = SchemaFactory.createForClass(UserServer);
