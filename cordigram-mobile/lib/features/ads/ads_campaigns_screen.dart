@@ -1,0 +1,866 @@
+import 'package:flutter/material.dart';
+
+import '../../core/services/api_service.dart';
+import 'ads_campaign_detail_screen.dart';
+import 'ads_service.dart';
+
+enum _CampaignStatusFilter { all, active, hidden, canceled, completed }
+
+enum _CampaignSort { newest, oldest, spent, ctr }
+
+class AdsCampaignsScreen extends StatefulWidget {
+  const AdsCampaignsScreen({super.key});
+
+  @override
+  State<AdsCampaignsScreen> createState() => _AdsCampaignsScreenState();
+}
+
+class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
+  bool _loading = true;
+  String? _error;
+  List<AdsDashboardCampaign> _campaigns = const [];
+
+  final TextEditingController _searchCtrl = TextEditingController();
+  _CampaignStatusFilter _statusFilter = _CampaignStatusFilter.all;
+  _CampaignSort _sortBy = _CampaignSort.newest;
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final data = await AdsService.getAdsDashboard();
+      if (!mounted) return;
+      setState(() {
+        _campaigns = data.campaigns;
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Failed to load campaigns.';
+        _loading = false;
+      });
+    }
+  }
+
+  String _intFmt(int value) {
+    final s = value.toString();
+    final chars = s.split('').reversed.toList();
+    final chunks = <String>[];
+    for (int i = 0; i < chars.length; i += 3) {
+      chunks.add(chars.skip(i).take(3).toList().reversed.join());
+    }
+    return chunks.reversed.join(',');
+  }
+
+  String _money(int value) => '${_intFmt(value)} VND';
+
+  String _pct(double value) => '${value.toStringAsFixed(2)}%';
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'hidden':
+        return 'Hidden';
+      case 'paused':
+        return 'Paused';
+      case 'canceled':
+        return 'Canceled';
+      default:
+        return 'Completed';
+    }
+  }
+
+  Color _statusBg(String status) {
+    switch (status) {
+      case 'active':
+        return const Color(0x1F10B981);
+      case 'hidden':
+      case 'paused':
+        return const Color(0x3364758B);
+      case 'canceled':
+        return const Color(0x33DC2626);
+      default:
+        return const Color(0x3338BDF8);
+    }
+  }
+
+  Color _statusFg(String status) {
+    switch (status) {
+      case 'active':
+        return const Color(0xFF63E6B2);
+      case 'hidden':
+      case 'paused':
+        return const Color(0xFFCBD5E1);
+      case 'canceled':
+        return const Color(0xFFFCA5A5);
+      default:
+        return const Color(0xFFBAE6FD);
+    }
+  }
+
+  String _statusFilterLabel(_CampaignStatusFilter value) {
+    switch (value) {
+      case _CampaignStatusFilter.all:
+        return 'All status';
+      case _CampaignStatusFilter.active:
+        return 'Active';
+      case _CampaignStatusFilter.hidden:
+        return 'Hidden';
+      case _CampaignStatusFilter.canceled:
+        return 'Canceled';
+      case _CampaignStatusFilter.completed:
+        return 'Completed';
+    }
+  }
+
+  String _sortLabel(_CampaignSort value) {
+    switch (value) {
+      case _CampaignSort.newest:
+        return 'Newest';
+      case _CampaignSort.oldest:
+        return 'Oldest';
+      case _CampaignSort.spent:
+        return 'Highest spent';
+      case _CampaignSort.ctr:
+        return 'Highest CTR';
+    }
+  }
+
+  DateTime _toStartOfDay(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
+  DateTime _toEndOfDay(DateTime date) {
+    return DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
+  }
+
+  String _dateText(DateTime? date) {
+    if (date == null) return '--/--/----';
+    final dd = date.day.toString().padLeft(2, '0');
+    final mm = date.month.toString().padLeft(2, '0');
+    final yy = date.year.toString();
+    return '$dd/$mm/$yy';
+  }
+
+  String _dateLite(DateTime? date) {
+    if (date == null) return '--';
+    final dd = date.day.toString().padLeft(2, '0');
+    final mm = date.month.toString().padLeft(2, '0');
+    return '$dd/$mm';
+  }
+
+  Future<void> _pickFromDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateFrom ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: _dateTo ?? DateTime.now().add(const Duration(days: 3650)),
+    );
+    if (picked == null) return;
+    setState(() {
+      _dateFrom = picked;
+    });
+  }
+
+  Future<void> _pickToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateTo ?? DateTime.now(),
+      firstDate: _dateFrom ?? DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+    );
+    if (picked == null) return;
+    setState(() {
+      _dateTo = picked;
+    });
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _searchCtrl.clear();
+      _statusFilter = _CampaignStatusFilter.all;
+      _sortBy = _CampaignSort.newest;
+      _dateFrom = null;
+      _dateTo = null;
+    });
+  }
+
+  bool get _hasActiveFilters {
+    return _searchCtrl.text.trim().isNotEmpty ||
+        _statusFilter != _CampaignStatusFilter.all ||
+        _sortBy != _CampaignSort.newest ||
+        _dateFrom != null ||
+        _dateTo != null;
+  }
+
+  String? _statusValueFromFilter(_CampaignStatusFilter value) {
+    switch (value) {
+      case _CampaignStatusFilter.all:
+        return null;
+      case _CampaignStatusFilter.active:
+        return 'active';
+      case _CampaignStatusFilter.hidden:
+        return 'hidden';
+      case _CampaignStatusFilter.canceled:
+        return 'canceled';
+      case _CampaignStatusFilter.completed:
+        return 'completed';
+    }
+  }
+
+  List<AdsDashboardCampaign> get _filtered {
+    final needle = _searchCtrl.text.trim().toLowerCase();
+    final statusValue = _statusValueFromFilter(_statusFilter);
+
+    final fromTime = _dateFrom != null
+        ? _toStartOfDay(_dateFrom!).millisecondsSinceEpoch
+        : null;
+    final toTime = _dateTo != null
+        ? _toEndOfDay(_dateTo!).millisecondsSinceEpoch
+        : null;
+
+    final rangeStart = fromTime != null && toTime != null
+        ? (fromTime < toTime ? fromTime : toTime)
+        : fromTime;
+    final rangeEnd = fromTime != null && toTime != null
+        ? (fromTime > toTime ? fromTime : toTime)
+        : toTime;
+
+    final list = _campaigns.where((item) {
+      if (needle.isNotEmpty &&
+          !item.campaignName.toLowerCase().contains(needle)) {
+        return false;
+      }
+      if (statusValue != null && item.status != statusValue) return false;
+
+      final startsAtMs = item.startsAt?.millisecondsSinceEpoch;
+      if (startsAtMs == null) return true;
+
+      if (rangeStart != null && startsAtMs < rangeStart) return false;
+      if (rangeEnd != null && startsAtMs > rangeEnd) return false;
+      return true;
+    }).toList();
+
+    list.sort((a, b) {
+      if (_sortBy == _CampaignSort.newest) {
+        final bt = b.startsAt?.millisecondsSinceEpoch ?? 0;
+        final at = a.startsAt?.millisecondsSinceEpoch ?? 0;
+        return bt.compareTo(at);
+      }
+      if (_sortBy == _CampaignSort.oldest) {
+        final bt = b.startsAt?.millisecondsSinceEpoch ?? 0;
+        final at = a.startsAt?.millisecondsSinceEpoch ?? 0;
+        return at.compareTo(bt);
+      }
+      if (_sortBy == _CampaignSort.spent) {
+        return b.spent.compareTo(a.spent);
+      }
+      return b.ctr.compareTo(a.ctr);
+    });
+
+    return list;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const bg = Color(0xFF0B1020);
+    const card = Color(0xFF111827);
+    const textPrimary = Color(0xFFE8ECF8);
+    const textSecondary = Color(0xFF7A8BB0);
+    const accent = Color(0xFF4AA3E4);
+
+    final campaigns = _filtered;
+    final total = _campaigns.length;
+    final active = _campaigns.where((e) => e.status == 'active').length;
+    final totalSpent = _campaigns.fold<int>(0, (sum, e) => sum + e.spent);
+    final totalImpressions = _campaigns.fold<int>(
+      0,
+      (sum, e) => sum + e.impressions,
+    );
+
+    return Scaffold(
+      backgroundColor: bg,
+      appBar: AppBar(
+        backgroundColor: bg,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: textPrimary),
+        title: const Text(
+          'All Ad Campaigns',
+          style: TextStyle(color: textPrimary),
+        ),
+      ),
+      body: SafeArea(
+        child: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: accent, strokeWidth: 2),
+              )
+            : RefreshIndicator(
+                color: accent,
+                onRefresh: _load,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_error != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Text(
+                            _error!,
+                            style: const TextStyle(color: Colors.redAccent),
+                          ),
+                        ),
+                      GridView.count(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: 1.55,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: [
+                          _StatCard(label: 'Total campaigns', value: '$total'),
+                          _StatCard(label: 'Active', value: '$active'),
+                          _StatCard(
+                            label: 'Total spent',
+                            value: _money(totalSpent),
+                          ),
+                          _StatCard(
+                            label: 'Total impressions',
+                            value: _intFmt(totalImpressions),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: card,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF1E2D48)),
+                        ),
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: _searchCtrl,
+                              onChanged: (_) => setState(() {}),
+                              decoration: InputDecoration(
+                                hintText: 'Search campaign name...',
+                                hintStyle: const TextStyle(
+                                  color: textSecondary,
+                                ),
+                                filled: true,
+                                fillColor: const Color(0xFF0F1B33),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF20365A),
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF20365A),
+                                  ),
+                                ),
+                              ),
+                              style: const TextStyle(color: textPrimary),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _PickerButton(
+                                    label: 'Status',
+                                    value: _statusFilterLabel(_statusFilter),
+                                    onTap: () async {
+                                      final value =
+                                          await showModalBottomSheet<
+                                            _CampaignStatusFilter
+                                          >(
+                                            context: context,
+                                            backgroundColor: const Color(
+                                              0xFF0F1B33,
+                                            ),
+                                            builder: (_) =>
+                                                _SimpleSheet<
+                                                  _CampaignStatusFilter
+                                                >(
+                                                  title: 'Status filter',
+                                                  selected: _statusFilter,
+                                                  items: _CampaignStatusFilter
+                                                      .values
+                                                      .map(
+                                                        (e) => _SheetItem(
+                                                          value: e,
+                                                          label:
+                                                              _statusFilterLabel(
+                                                                e,
+                                                              ),
+                                                        ),
+                                                      )
+                                                      .toList(),
+                                                ),
+                                          );
+                                      if (value == null) return;
+                                      setState(() => _statusFilter = value);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _PickerButton(
+                                    label: 'Sort by',
+                                    value: _sortLabel(_sortBy),
+                                    onTap: () async {
+                                      final value =
+                                          await showModalBottomSheet<
+                                            _CampaignSort
+                                          >(
+                                            context: context,
+                                            backgroundColor: const Color(
+                                              0xFF0F1B33,
+                                            ),
+                                            builder: (_) =>
+                                                _SimpleSheet<_CampaignSort>(
+                                                  title: 'Sort campaigns',
+                                                  selected: _sortBy,
+                                                  items: _CampaignSort.values
+                                                      .map(
+                                                        (e) => _SheetItem(
+                                                          value: e,
+                                                          label: _sortLabel(e),
+                                                        ),
+                                                      )
+                                                      .toList(),
+                                                ),
+                                          );
+                                      if (value == null) return;
+                                      setState(() => _sortBy = value);
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _PickerButton(
+                                    label: 'From',
+                                    value: _dateText(_dateFrom),
+                                    onTap: _pickFromDate,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _PickerButton(
+                                    label: 'To',
+                                    value: _dateText(_dateTo),
+                                    onTap: _pickToDate,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Text(
+                                  '${campaigns.length} result${campaigns.length == 1 ? '' : 's'}',
+                                  style: const TextStyle(
+                                    color: textSecondary,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                                const Spacer(),
+                                TextButton(
+                                  onPressed: _hasActiveFilters
+                                      ? _clearFilters
+                                      : null,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: const Color(0xFF9CC7EF),
+                                  ),
+                                  child: const Text('Clear'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (campaigns.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 18),
+                          child: Text(
+                            'No campaigns match your filters.',
+                            style: TextStyle(color: textSecondary),
+                          ),
+                        )
+                      else
+                        Column(
+                          children: campaigns.map((item) {
+                            return InkWell(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => AdsCampaignDetailScreen(
+                                      campaignId: item.id,
+                                    ),
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: 10),
+                                decoration: BoxDecoration(
+                                  color: card,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: const Color(0xFF1E2D48),
+                                  ),
+                                ),
+                                padding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  12,
+                                  12,
+                                  12,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            item.campaignName,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: textPrimary,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: _statusBg(item.status),
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _statusLabel(item.status),
+                                            style: TextStyle(
+                                              color: _statusFg(item.status),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Start: ${_dateLite(item.startsAt)}   End: ${_dateLite(item.expiresAt)}',
+                                      style: const TextStyle(
+                                        color: textSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _MiniMetric(
+                                            label: 'Spent (VND)',
+                                            value: _intFmt(item.spent),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: _MiniMetric(
+                                            label: 'Impr.',
+                                            value: _intFmt(item.impressions),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: _MiniMetric(
+                                            label: 'CTR',
+                                            value: _pct(item.ctr),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: _MiniMetric(
+                                            label: 'Clicks',
+                                            value: _intFmt(item.clicks),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if ((item.adminCancelReason ?? '')
+                                        .trim()
+                                        .isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 8),
+                                        child: Text(
+                                          'Admin reason: ${item.adminCancelReason!.trim()}',
+                                          style: const TextStyle(
+                                            color: textSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111827),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF1E2D48)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF7A8BB0),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFFE8ECF8),
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PickerButton extends StatelessWidget {
+  const _PickerButton({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Ink(
+        padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F1B33),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFF20365A)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF7A8BB0),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFFE8ECF8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: Color(0xFF9CC7EF),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniMetric extends StatelessWidget {
+  const _MiniMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 11),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFFE8ECF8),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SheetItem<T> {
+  const _SheetItem({required this.value, required this.label});
+
+  final T value;
+  final String label;
+}
+
+class _SimpleSheet<T> extends StatelessWidget {
+  const _SimpleSheet({
+    required this.title,
+    required this.selected,
+    required this.items,
+  });
+
+  final String title;
+  final T selected;
+  final List<_SheetItem<T>> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: Color(0xFFE8ECF8),
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ...items.map((item) {
+              final active = item.value == selected;
+              return ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                title: Text(
+                  item.label,
+                  style: TextStyle(
+                    color: active
+                        ? const Color(0xFF7CD1FF)
+                        : const Color(0xFFE8ECF8),
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+                trailing: active
+                    ? const Icon(
+                        Icons.check_circle_rounded,
+                        color: Color(0xFF7CD1FF),
+                        size: 18,
+                      )
+                    : null,
+                onTap: () => Navigator.of(context).pop(item.value),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+}

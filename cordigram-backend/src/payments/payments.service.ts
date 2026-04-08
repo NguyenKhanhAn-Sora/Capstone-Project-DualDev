@@ -51,6 +51,42 @@ export class PaymentsService {
     strong: 0.6,
   };
 
+  private buildCheckoutSuccessUrl(raw?: string): string {
+    const fallback = `${this.config.frontendUrl}/ads/payment/success?session_id={CHECKOUT_SESSION_ID}`;
+    const trimmed = raw?.trim();
+    if (!trimmed) return fallback;
+
+    if (/^cordigram:\/\//i.test(trimmed)) {
+      return trimmed.includes('{CHECKOUT_SESSION_ID}')
+        ? trimmed
+        : `${trimmed}${trimmed.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`;
+    }
+
+    if (!/^https?:\/\//i.test(trimmed)) {
+      throw new BadRequestException('Invalid successUrl');
+    }
+
+    return trimmed.includes('{CHECKOUT_SESSION_ID}')
+      ? trimmed
+      : `${trimmed}${trimmed.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`;
+  }
+
+  private buildCheckoutCancelUrl(raw?: string): string {
+    const fallback = `${this.config.frontendUrl}/ads/payment/cancel`;
+    const trimmed = raw?.trim();
+    if (!trimmed) return fallback;
+
+    if (/^cordigram:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+
+    if (!/^https?:\/\//i.test(trimmed)) {
+      throw new BadRequestException('Invalid cancelUrl');
+    }
+
+    return trimmed;
+  }
+
   private getCampaignStatus(
     tx: Pick<
       PaymentTransaction,
@@ -949,6 +985,8 @@ export class PaymentsService {
     let description =
       dto.description ||
       'Payment for promoted campaign in Cordigram Home Feed.';
+    const successUrl = this.buildCheckoutSuccessUrl(dto.successUrl);
+    const cancelUrl = this.buildCheckoutCancelUrl(dto.cancelUrl);
 
     if (actionType === 'campaign_upgrade') {
       if (
@@ -1017,8 +1055,8 @@ export class PaymentsService {
           },
         },
       ],
-      success_url: `${this.config.frontendUrl}/ads/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${this.config.frontendUrl}/ads/payment/cancel`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       metadata: {
         userId,
         actionType,

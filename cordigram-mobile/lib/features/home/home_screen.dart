@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../ads/ads_entry_screen.dart';
 import '../auth/login_screen.dart';
 import '../explore/explore_screen.dart';
 import '../following/following_screen.dart';
@@ -826,6 +827,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             MaterialPageRoute(builder: (_) => const ReportProblemScreen()),
           );
         },
+        onAds: () {
+          Navigator.pop(ctx);
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const AdsEntryScreen()));
+        },
       ),
     );
   }
@@ -1139,6 +1146,7 @@ class _ProfileMenuSheet extends StatelessWidget {
     required this.onLogout,
     required this.onReportProblem,
     required this.onProfile,
+    required this.onAds,
     this.avatarUrl,
     this.displayName,
     this.username,
@@ -1150,6 +1158,7 @@ class _ProfileMenuSheet extends StatelessWidget {
   final VoidCallback onLogout;
   final VoidCallback onReportProblem;
   final VoidCallback onProfile;
+  final VoidCallback onAds;
 
   @override
   Widget build(BuildContext context) {
@@ -1242,6 +1251,7 @@ class _ProfileMenuSheet extends StatelessWidget {
               );
             },
           ),
+          _SheetItem(icon: Icons.campaign_outlined, label: 'Ads', onTap: onAds),
           _SheetItem(
             icon: Icons.flag_outlined,
             label: 'Report a problem',
