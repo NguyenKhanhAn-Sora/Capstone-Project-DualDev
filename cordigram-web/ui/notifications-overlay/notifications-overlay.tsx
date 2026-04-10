@@ -16,9 +16,13 @@ import {
 } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import {
+  NOTIFICATION_DELETED_EVENT,
   NOTIFICATION_RECEIVED_EVENT,
+  NOTIFICATION_STATE_CHANGED_EVENT,
   emitNotificationRead,
+  type NotificationDeletedDetail,
   type NotificationReceivedDetail,
+  type NotificationStateChangedDetail,
 } from "@/lib/events";
 import { DateSelect } from "@/ui/date-select/date-select";
 import { TimeSelect } from "@/ui/time-select/time-select";
@@ -720,6 +724,38 @@ export default function NotificationsOverlay(props: {
         NOTIFICATION_RECEIVED_EVENT,
         handleNotification,
       );
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleStateChanged = (event: Event) => {
+      const detail = (event as CustomEvent<NotificationStateChangedDetail>)
+        .detail;
+      if (!detail?.id) return;
+      setItems((prev) =>
+        prev.map((entry) =>
+          entry.id === detail.id ? { ...entry, readAt: detail.readAt } : entry,
+        ),
+      );
+    };
+
+    const handleDeleted = (event: Event) => {
+      const detail = (event as CustomEvent<NotificationDeletedDetail>).detail;
+      if (!detail?.id) return;
+      setItems((prev) => prev.filter((entry) => entry.id !== detail.id));
+    };
+
+    window.addEventListener(NOTIFICATION_STATE_CHANGED_EVENT, handleStateChanged);
+    window.addEventListener(NOTIFICATION_DELETED_EVENT, handleDeleted);
+
+    return () => {
+      window.removeEventListener(
+        NOTIFICATION_STATE_CHANGED_EVENT,
+        handleStateChanged,
+      );
+      window.removeEventListener(NOTIFICATION_DELETED_EVENT, handleDeleted);
+    };
   }, [open]);
 
   useEffect(() => {

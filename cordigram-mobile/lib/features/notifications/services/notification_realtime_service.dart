@@ -26,6 +26,25 @@ class NotificationSeenEvent {
   final int unreadCount;
 }
 
+class NotificationStateEvent {
+  const NotificationStateEvent({
+    required this.id,
+    required this.readAt,
+    required this.unreadCount,
+  });
+
+  final String id;
+  final String? readAt;
+  final int unreadCount;
+}
+
+class NotificationDeletedEvent {
+  const NotificationDeletedEvent({required this.id, required this.unreadCount});
+
+  final String id;
+  final int unreadCount;
+}
+
 class NotificationRealtimeService {
   NotificationRealtimeService._();
 
@@ -36,9 +55,17 @@ class NotificationRealtimeService {
       StreamController<NotificationRealtimeEvent>.broadcast();
   static final StreamController<NotificationSeenEvent> _seenController =
       StreamController<NotificationSeenEvent>.broadcast();
+  static final StreamController<NotificationStateEvent> _stateController =
+      StreamController<NotificationStateEvent>.broadcast();
+  static final StreamController<NotificationDeletedEvent> _deletedController =
+      StreamController<NotificationDeletedEvent>.broadcast();
 
   static Stream<NotificationRealtimeEvent> get events => _controller.stream;
   static Stream<NotificationSeenEvent> get seenEvents => _seenController.stream;
+  static Stream<NotificationStateEvent> get stateEvents =>
+      _stateController.stream;
+  static Stream<NotificationDeletedEvent> get deletedEvents =>
+      _deletedController.stream;
 
   static Future<void> connect() async {
     final token = AuthStorage.accessToken;
@@ -98,6 +125,36 @@ class NotificationRealtimeService {
       );
     });
 
+    socket.on('notification:state', (payload) {
+      if (payload is! Map) return;
+      final id = payload['id'];
+      if (id is! String || id.isEmpty) return;
+      final readAtRaw = payload['readAt'];
+      final readAt = readAtRaw is String ? readAtRaw : null;
+      final unreadCountRaw = payload['unreadCount'];
+      final unreadCount = (unreadCountRaw is num) ? unreadCountRaw.toInt() : 0;
+
+      _stateController.add(
+        NotificationStateEvent(
+          id: id,
+          readAt: readAt,
+          unreadCount: unreadCount,
+        ),
+      );
+    });
+
+    socket.on('notification:deleted', (payload) {
+      if (payload is! Map) return;
+      final id = payload['id'];
+      if (id is! String || id.isEmpty) return;
+      final unreadCountRaw = payload['unreadCount'];
+      final unreadCount = (unreadCountRaw is num) ? unreadCountRaw.toInt() : 0;
+
+      _deletedController.add(
+        NotificationDeletedEvent(id: id, unreadCount: unreadCount),
+      );
+    });
+
     socket.connect();
     _socket = socket;
   }
@@ -107,6 +164,8 @@ class NotificationRealtimeService {
     if (socket != null) {
       socket.off('notification:new');
       socket.off('notification:seen');
+      socket.off('notification:state');
+      socket.off('notification:deleted');
       socket.disconnect();
       socket.dispose();
     }

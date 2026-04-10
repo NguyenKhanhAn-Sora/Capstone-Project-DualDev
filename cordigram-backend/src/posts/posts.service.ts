@@ -318,7 +318,10 @@ export class PostsService {
     await this.assertInteractionNotMuted(authorId);
 
     const normalizedHashtags = this.normalizeHashtags(dto.hashtags ?? []);
-    const normalizedMentions = this.normalizeMentions(dto.mentions ?? []);
+    const normalizedMentions = this.normalizeMentions(
+      dto.mentions ?? [],
+      dto.content,
+    );
     const normalizedTopics = this.normalizeTopics(dto.topics ?? []);
 
     let media = (dto.media ?? []).map((item) => ({
@@ -499,7 +502,10 @@ export class PostsService {
     let addedMentions: string[] = [];
     if (dto.mentions !== undefined) {
       const prevMentions = Array.isArray(post.mentions) ? post.mentions : [];
-      const nextMentions = this.normalizeMentions(dto.mentions ?? []);
+      const nextMentions = this.normalizeMentions(
+        dto.mentions ?? [],
+        typeof dto.content === 'string' ? dto.content : undefined,
+      );
       update.mentions = nextMentions;
       const prevSet = new Set(prevMentions);
       addedMentions = nextMentions.filter((m) => !prevSet.has(m));
@@ -572,7 +578,10 @@ export class PostsService {
     await this.assertInteractionNotMuted(authorId);
 
     const normalizedHashtags = this.normalizeHashtags(dto.hashtags ?? []);
-    const normalizedMentions = this.normalizeMentions(dto.mentions ?? []);
+    const normalizedMentions = this.normalizeMentions(
+      dto.mentions ?? [],
+      dto.content,
+    );
     const normalizedTopics = this.normalizeTopics(dto.topics ?? []);
 
     const media = (dto.media ?? []).map((item) => ({
@@ -793,14 +802,22 @@ export class PostsService {
     );
   }
 
-  private normalizeMentions(handles: string[]): string[] {
-    return Array.from(
-      new Set(
-        (handles ?? [])
+  private normalizeMentions(handles: string[], content?: string): string[] {
+    const normalized = new Set(
+      (handles ?? [])
           .map((h) => h?.toString().trim().replace(/^@/, '').toLowerCase())
           .filter(Boolean),
-      ),
-    ).slice(0, 30);
+    );
+
+    const text = typeof content === 'string' ? content : '';
+    const regex = /@([a-zA-Z0-9_.]{1,30})/g;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(text)) !== null) {
+      const username = (match[1] ?? '').toLowerCase().trim();
+      if (username) normalized.add(username);
+    }
+
+    return Array.from(normalized).slice(0, 30);
   }
 
   private normalizeTopics(topics: string[]): string[] {

@@ -3208,10 +3208,17 @@ class _RCommentInputBar extends StatefulWidget {
 }
 
 class _RCommentInputBarState extends State<_RCommentInputBar> {
+  static final RegExp _mentionCharRegex = RegExp(r'^[A-Za-z0-9_.]{0,30}$');
+
   final _textCtrl = TextEditingController();
   final _focusNode = FocusNode();
   _RCommentMediaData? _media;
   bool _sending = false;
+  Timer? _mentionDebounce;
+  bool _mentionOpen = false;
+  bool _mentionLoading = false;
+  List<_RCommentMentionSuggestion> _mentionSuggestions = [];
+  _RMentionToken? _activeMentionToken;
 
   @override
   void didUpdateWidget(_RCommentInputBar old) {
@@ -3225,9 +3232,134 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
 
   @override
   void dispose() {
+    _mentionDebounce?.cancel();
     _textCtrl.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _onTextChanged(String value) {
+    final token = _extractMentionToken(value);
+    final query = token?.query ?? '';
+    if (query.isEmpty) {
+      _activeMentionToken = null;
+      _clearMentionState();
+      return;
+    }
+    _activeMentionToken = token;
+
+    _mentionDebounce?.cancel();
+    _mentionDebounce = Timer(const Duration(milliseconds: 250), () {
+      _searchMentions(query);
+    });
+
+    if (!_mentionOpen) {
+      setState(() {
+        _mentionOpen = true;
+        _mentionLoading = true;
+      });
+    }
+  }
+
+  void _clearMentionState() {
+    _mentionDebounce?.cancel();
+    if (!_mentionOpen && _mentionSuggestions.isEmpty && !_mentionLoading) {
+      return;
+    }
+    setState(() {
+      _mentionOpen = false;
+      _mentionLoading = false;
+      _mentionSuggestions = [];
+    });
+  }
+
+  _RMentionToken? _extractMentionToken(String text) {
+    final selection = _textCtrl.selection;
+    var caret = selection.baseOffset;
+    if (caret < 0 || caret > text.length) caret = text.length;
+
+    final prefix = text.substring(0, caret);
+    final atIndex = prefix.lastIndexOf('@');
+    if (atIndex < 0) return null;
+
+    if (atIndex > 0) {
+      final prev = prefix[atIndex - 1];
+      final isBoundary = RegExp(r'\s').hasMatch(prev);
+      if (!isBoundary) return null;
+    }
+
+    final query = prefix.substring(atIndex + 1);
+    if (!_mentionCharRegex.hasMatch(query)) return null;
+    if (query.isEmpty)
+      return _RMentionToken(start: atIndex, end: caret, query: '');
+
+    return _RMentionToken(start: atIndex, end: caret, query: query);
+  }
+
+  Future<void> _searchMentions(String query) async {
+    final token = AuthStorage.accessToken;
+    if (token == null || query.trim().isEmpty) {
+      if (mounted) _clearMentionState();
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _mentionOpen = true;
+        _mentionLoading = true;
+      });
+    }
+
+    try {
+      final result = await ApiService.get(
+        '/profiles/search?q=${Uri.encodeQueryComponent(query)}&limit=6',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+      final items =
+          (result['items'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .map(_RCommentMentionSuggestion.fromJson)
+              .toList() ??
+          [];
+
+      if (!mounted) return;
+      setState(() {
+        _mentionSuggestions = items;
+        _mentionOpen = true;
+        _mentionLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _mentionSuggestions = [];
+        _mentionOpen = true;
+        _mentionLoading = false;
+      });
+    }
+  }
+
+  void _insertMention(_RCommentMentionSuggestion suggestion) {
+    final text = _textCtrl.text;
+    final token = _activeMentionToken ?? _extractMentionToken(text);
+    if (token == null) return;
+
+    final before = text.substring(0, token.start);
+    final after = text.substring(token.end);
+    final inserted = '$before@${suggestion.username} $after';
+
+    _textCtrl.value = TextEditingValue(
+      text: inserted,
+      selection: TextSelection.collapsed(
+        offset: before.length + suggestion.username.length + 2,
+      ),
+    );
+
+    setState(() {
+      _mentionOpen = false;
+      _mentionLoading = false;
+      _mentionSuggestions = [];
+    });
+    _activeMentionToken = null;
   }
 
   Future<void> _pickMedia() async {
@@ -3272,6 +3404,9 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
       setState(() {
         _media = null;
         _sending = false;
+        _mentionOpen = false;
+        _mentionLoading = false;
+        _mentionSuggestions = [];
       });
     } catch (e) {
       if (!mounted) return;
@@ -3339,6 +3474,116 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
               media: _media!,
               onRemove: () => setState(() => _media = null),
             ),
+          if (_mentionOpen)
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+              decoration: BoxDecoration(
+                color: const Color(0xFF131929),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: _mentionLoading
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF4AA3E4),
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Searching users…',
+                            style: TextStyle(
+                              color: Color(0xFF9BAECF),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _mentionSuggestions.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text(
+                        'No users found',
+                        style: TextStyle(
+                          color: Color(0xFF9BAECF),
+                          fontSize: 12,
+                        ),
+                      ),
+                    )
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: _mentionSuggestions.map((s) {
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _insertMention(s),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor: const Color(0xFF1A2235),
+                                    backgroundImage:
+                                        (s.avatarUrl != null &&
+                                            s.avatarUrl!.isNotEmpty)
+                                        ? NetworkImage(s.avatarUrl!)
+                                        : null,
+                                    child:
+                                        (s.avatarUrl == null ||
+                                            s.avatarUrl!.isEmpty)
+                                        ? const Icon(
+                                            Icons.person,
+                                            color: Color(0xFF7A8BB0),
+                                            size: 14,
+                                          )
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '@${s.username}',
+                                          style: const TextStyle(
+                                            color: Color(0xFFE8ECF8),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        if ((s.displayName ?? '').isNotEmpty)
+                                          Text(
+                                            s.displayName!,
+                                            style: const TextStyle(
+                                              color: Color(0xFF7A8BB0),
+                                              fontSize: 12,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ),
           // Input row
           Padding(
             padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + bottomInset),
@@ -3361,7 +3606,10 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                           child: TextField(
                             controller: _textCtrl,
                             focusNode: _focusNode,
-                            onChanged: (_) => setState(() {}),
+                            onChanged: (value) {
+                              _onTextChanged(value);
+                              setState(() {});
+                            },
                             maxLines: 4,
                             minLines: 1,
                             style: const TextStyle(
@@ -3488,6 +3736,38 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
       ),
     );
   }
+}
+
+class _RCommentMentionSuggestion {
+  const _RCommentMentionSuggestion({
+    required this.username,
+    this.displayName,
+    this.avatarUrl,
+  });
+
+  final String username;
+  final String? displayName;
+  final String? avatarUrl;
+
+  static _RCommentMentionSuggestion fromJson(Map<String, dynamic> json) {
+    return _RCommentMentionSuggestion(
+      username: (json['username'] as String? ?? '').trim(),
+      displayName: json['displayName'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
+    );
+  }
+}
+
+class _RMentionToken {
+  const _RMentionToken({
+    required this.start,
+    required this.end,
+    required this.query,
+  });
+
+  final int start;
+  final int end;
+  final String query;
 }
 
 // ── Media preview chip ────────────────────────────────────────────────────────

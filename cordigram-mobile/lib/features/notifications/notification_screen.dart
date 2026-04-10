@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import '../../core/services/api_service.dart';
+import '../post/post_detail_screen.dart';
+import '../profile/profile_screen.dart';
 import 'models/app_notification_item.dart';
 import 'services/notification_realtime_service.dart';
 import 'services/notification_service.dart';
@@ -30,6 +32,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
   _NotificationTab _activeTab = _NotificationTab.all;
   String? _pressedItemId;
   StreamSubscription<NotificationRealtimeEvent>? _notificationRtSub;
+  StreamSubscription<NotificationStateEvent>? _notificationStateSub;
+  StreamSubscription<NotificationDeletedEvent>? _notificationDeletedSub;
 
   static const Set<String> _realtimeNotificationTypes = {
     'post_like',
@@ -47,13 +51,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _load(silent: true);
     _startNotificationRealtime();
   }
 
   @override
   void dispose() {
     _notificationRtSub?.cancel();
+    _notificationStateSub?.cancel();
+    _notificationDeletedSub?.cancel();
     super.dispose();
   }
 
@@ -79,18 +85,76 @@ class _NotificationScreenState extends State<NotificationScreen> {
         _items = [event.notification, ..._items];
       });
     });
+
+    _notificationStateSub?.cancel();
+    _notificationStateSub = NotificationRealtimeService.stateEvents.listen((
+      event,
+    ) {
+      if (!mounted) return;
+      setState(() {
+        _items = _items
+            .map(
+              (entry) => entry.id == event.id
+                  ? (event.readAt == null
+                        ? entry.copyWith(resetReadAt: true)
+                        : entry.copyWith(readAt: event.readAt))
+                  : entry,
+            )
+            .toList(growable: false);
+      });
+    });
+
+    _notificationDeletedSub?.cancel();
+    _notificationDeletedSub = NotificationRealtimeService.deletedEvents.listen((
+      event,
+    ) {
+      if (!mounted) return;
+      setState(() {
+        _items = _items
+            .where((entry) => entry.id != event.id)
+            .toList(growable: false);
+      });
+    });
   }
 
-  Future<void> _load() async {
+  int _activityEpoch(AppNotificationItem item) {
+    final activity = DateTime.tryParse(item.activityAt)?.millisecondsSinceEpoch;
+    if (activity != null) return activity;
+    final created = DateTime.tryParse(item.createdAt)?.millisecondsSinceEpoch;
+    return created ?? 0;
+  }
+
+  List<AppNotificationItem> _mergeFetchedWithExisting(
+    List<AppNotificationItem> fetched,
+    List<AppNotificationItem> existing,
+  ) {
+    final mergedById = <String, AppNotificationItem>{};
+    for (final item in existing) {
+      if (item.id.isEmpty) continue;
+      mergedById[item.id] = item;
+    }
+    for (final item in fetched) {
+      if (item.id.isEmpty) continue;
+      mergedById[item.id] = item;
+    }
+    final merged = mergedById.values.toList(growable: false);
+    merged.sort((a, b) => _activityEpoch(b).compareTo(_activityEpoch(a)));
+    return merged;
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    final showLoading = !silent || _items.isEmpty;
     setState(() {
-      _loading = true;
+      _loading = showLoading;
       _error = null;
     });
 
     try {
-      final items = await NotificationService.fetchNotifications();
+      final fetched = await NotificationService.fetchNotifications();
       if (!mounted) return;
-      setState(() => _items = items);
+      setState(() {
+        _items = _mergeFetchedWithExisting(fetched, _items);
+      });
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
@@ -100,6 +164,99 @@ class _NotificationScreenState extends State<NotificationScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  String? _priorityCommentIdForItem(AppNotificationItem item) {
+    if (item.type == 'comment_like' || item.type == 'comment_reply') {
+      return item.commentId;
+    }
+    if (item.type == 'post_mention' && item.mentionSource == 'comment') {
+      return item.commentId;
+    }
+    return null;
+  }
+
+  Future<String?> _resolvePriorityCommentId(AppNotificationItem item) async {
+    final rawCommentId = _priorityCommentIdForItem(item);
+    final postId = item.postId;
+    if (rawCommentId == null || rawCommentId.isEmpty) return null;
+    if (postId == null || postId.isEmpty) return rawCommentId;
+
+    try {
+      final comment = await NotificationService.fetchCommentById(
+        postId: postId,
+        commentId: rawCommentId,
+      );
+      final root = comment['rootCommentId'] as String?;
+      final parent = comment['parentId'] as String?;
+      final id = comment['id'] as String?;
+      return (root?.isNotEmpty == true)
+          ? root
+          : (parent?.isNotEmpty == true)
+          ? parent
+          : (id?.isNotEmpty == true)
+          ? id
+          : rawCommentId;
+    } catch (_) {
+      return rawCommentId;
+    }
+  }
+
+  Future<void> _markReadOptimistic(AppNotificationItem item) async {
+    if (!item.isUnread) return;
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    setState(() {
+      _items = _items
+          .map(
+            (entry) =>
+                entry.id == item.id ? entry.copyWith(readAt: nowIso) : entry,
+          )
+          .toList(growable: false);
+    });
+    try {
+      await NotificationService.markRead(item.id);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _items = _items
+            .map(
+              (entry) => entry.id == item.id
+                  ? entry.copyWith(resetReadAt: true)
+                  : entry,
+            )
+            .toList(growable: false);
+      });
+    }
+  }
+
+  Future<void> _onItemTap(AppNotificationItem item) async {
+    if (item.type == 'system_notice' || item.type == 'report') {
+      return;
+    }
+
+    await _markReadOptimistic(item);
+    if (!mounted) return;
+
+    if (item.type == 'follow' && item.actor.id.isNotEmpty) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ProfileScreen(userId: item.actor.id),
+        ),
+      );
+      return;
+    }
+
+    if (item.postId == null || item.postId!.isEmpty) return;
+    final priorityCommentId = await _resolvePriorityCommentId(item);
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PostDetailScreen(
+          postId: item.postId!,
+          priorityCommentId: priorityCommentId,
+        ),
+      ),
+    );
   }
 
   List<AppNotificationItem> get _filtered {
@@ -999,6 +1156,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
                         return GestureDetector(
                           behavior: HitTestBehavior.opaque,
+                          onTap: () => _onItemTap(item),
                           onLongPressStart: (_) {
                             if (!mounted) return;
                             setState(() => _pressedItemId = item.id);

@@ -49,6 +49,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── Tab navigation ────────────────────────────────────────────────────────
   late TabController _tabController;
+  late final AnimationController _topNavAnimController;
+  late final Animation<double> _topNavVisibility;
+  static const double _kTopNavContentHeight = kToolbarHeight + 44;
+  static const double _kNavToggleTriggerDistance = 42;
+  static const double _kBackToTopTriggerDistance = 140;
+  double _scrollTriggerAccumulated = 0;
+  int _scrollTriggerDirection = 0;
+  DateTime? _lastBackPressedAt;
 
   // ── Nav badges ────────────────────────────────────────────────────────────
   int _notifUnread = 0;
@@ -65,6 +73,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   static const Duration _pollInterval = Duration(seconds: 5);
   StreamSubscription<NotificationRealtimeEvent>? _notificationRtSub;
   StreamSubscription<NotificationSeenEvent>? _notificationSeenSub;
+  StreamSubscription<NotificationStateEvent>? _notificationStateSub;
+  StreamSubscription<NotificationDeletedEvent>? _notificationDeletedSub;
   static const Set<String> _realtimeNotificationTypes = {
     'post_like',
     'post_comment',
@@ -85,6 +95,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+    _topNavAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 1,
+    );
+    _topNavVisibility = CurvedAnimation(
+      parent: _topNavAnimController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    _tabController.addListener(_onTabChanged);
     _loadFeed();
     _fetchProfile();
     _fetchUnreadCounts();
@@ -95,13 +116,138 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
+    _topNavAnimController.dispose();
     _pollTimer?.cancel();
     _notificationRtSub?.cancel();
     _notificationSeenSub?.cancel();
+    _notificationStateSub?.cancel();
+    _notificationDeletedSub?.cancel();
     NotificationRealtimeService.disconnect();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    _showTopNav();
+    _scrollTriggerAccumulated = 0;
+    _scrollTriggerDirection = 0;
+  }
+
+  void _showTopNav() {
+    if (_topNavAnimController.value >= 0.999) return;
+    _topNavAnimController.animateTo(1);
+  }
+
+  void _hideTopNav() {
+    if (_topNavAnimController.value <= 0.001) return;
+    _topNavAnimController.animateTo(0);
+  }
+
+  void _handleScrollToggleByThreshold({
+    required double delta,
+    required ScrollMetrics metrics,
+  }) {
+    if (metrics.pixels <= 0) {
+      _scrollTriggerAccumulated = 0;
+      _scrollTriggerDirection = 0;
+      _showTopNav();
+      return;
+    }
+
+    if (delta == 0) return;
+    final direction = delta > 0 ? 1 : -1;
+
+    if (_scrollTriggerDirection != direction) {
+      _scrollTriggerDirection = direction;
+      _scrollTriggerAccumulated = 0;
+    }
+
+    _scrollTriggerAccumulated += delta.abs();
+    if (_scrollTriggerAccumulated < _kNavToggleTriggerDistance) return;
+
+    if (direction > 0) {
+      _hideTopNav();
+    } else {
+      _showTopNav();
+    }
+
+    _scrollTriggerAccumulated = 0;
+  }
+
+  bool _onBodyScroll(ScrollNotification notification) {
+    if (!mounted) return false;
+    if (notification.metrics.axis != Axis.vertical) return false;
+
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta ?? 0;
+      _handleScrollToggleByThreshold(
+        delta: delta,
+        metrics: notification.metrics,
+      );
+      return false;
+    }
+
+    if (notification is OverscrollNotification && notification.overscroll < 0) {
+      _showTopNav();
+    }
+
+    return false;
+  }
+
+  Future<bool> _onWillPop() async {
+    final currentTab = _tabController.index;
+
+    // On any non-Home tab: back should return to Home tab first.
+    if (currentTab != 0) {
+      _tabController.animateTo(0);
+      _showTopNav();
+      _scrollTriggerAccumulated = 0;
+      _scrollTriggerDirection = 0;
+      return false;
+    }
+
+    // On Home: if user has scrolled down enough, back should scroll to top and refresh.
+    if (currentTab == 0 &&
+        _scrollController.hasClients &&
+        _scrollController.position.pixels > _kBackToTopTriggerDistance) {
+      _showTopNav();
+      _scrollTriggerAccumulated = 0;
+      _scrollTriggerDirection = 0;
+
+      await _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+
+      if (mounted) {
+        unawaited(_loadFeed(refresh: true));
+      }
+      return false;
+    }
+
+    // On Home root: require double back to exit to avoid accidental app close.
+    final now = DateTime.now();
+    final canExit =
+        _lastBackPressedAt != null &&
+        now.difference(_lastBackPressedAt!) <= const Duration(seconds: 2);
+    if (canExit) return true;
+
+    _lastBackPressedAt = now;
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Nhấn Back lần nữa để thoát ứng dụng'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+    }
+    return false;
   }
 
   Future<void> _startNotificationRealtime() async {
@@ -122,6 +268,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (!mounted) return;
       setState(() {
         _notificationSeenAt = event.lastSeenAt;
+        _notifUnread = event.unreadCount;
+      });
+    });
+
+    _notificationStateSub?.cancel();
+    _notificationStateSub = NotificationRealtimeService.stateEvents.listen((
+      event,
+    ) {
+      if (!mounted) return;
+      setState(() {
+        _notifUnread = event.unreadCount;
+      });
+    });
+
+    _notificationDeletedSub?.cancel();
+    _notificationDeletedSub = NotificationRealtimeService.deletedEvents.listen((
+      event,
+    ) {
+      if (!mounted) return;
+      setState(() {
         _notifUnread = event.unreadCount;
       });
     });
@@ -995,10 +1161,42 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0B1020),
-      appBar: _buildAppBar(),
-      body: _buildBody(),
+    return AnimatedBuilder(
+      animation: _topNavVisibility,
+      builder: (context, _) {
+        final topInset = MediaQuery.paddingOf(context).top;
+        final fullTopNavHeight = topInset + _kTopNavContentHeight;
+        final visibleTopNavHeight = fullTopNavHeight * _topNavVisibility.value;
+        final navFullyHidden = visibleTopNavHeight <= 0.1;
+
+        return WillPopScope(
+          onWillPop: _onWillPop,
+          child: Scaffold(
+            backgroundColor: const Color(0xFF0B1020),
+            appBar: navFullyHidden
+                ? null
+                : PreferredSize(
+                    preferredSize: Size.fromHeight(visibleTopNavHeight),
+                    child: ClipRect(
+                      child: SizedBox(
+                        height: fullTopNavHeight,
+                        child: Transform.translate(
+                          offset: Offset(
+                            0,
+                            -(1 - _topNavVisibility.value) * fullTopNavHeight,
+                          ),
+                          child: _buildAppBar(),
+                        ),
+                      ),
+                    ),
+                  ),
+            body: NotificationListener<ScrollNotification>(
+              onNotification: _onBodyScroll,
+              child: _buildBody(),
+            ),
+          ),
+        );
+      },
     );
   }
 

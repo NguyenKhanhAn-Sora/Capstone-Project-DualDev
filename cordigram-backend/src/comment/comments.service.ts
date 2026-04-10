@@ -149,9 +149,33 @@ export class CommentsService {
     await this.notifyMentionedUsers({
       actorId: userObjectId.toString(),
       postId: postObjectId.toString(),
+      commentId: created._id.toString(),
       postKind: post.kind ?? 'post',
       mentions,
     });
+
+    let postAuthorMentionedInComment = false;
+    if (post.authorId && mentions.length) {
+      postAuthorMentionedInComment = mentions.some(
+        (mention) =>
+          mention.userId != null && mention.userId.equals(post.authorId),
+      );
+
+      if (!postAuthorMentionedInComment) {
+        const postAuthorProfile = await this.profileModel
+          .findOne({ userId: post.authorId })
+          .select('username')
+          .lean<{ username?: string }>();
+        const postAuthorUsername = postAuthorProfile?.username
+          ?.toLowerCase()
+          .trim();
+        if (postAuthorUsername) {
+          postAuthorMentionedInComment = mentions.some(
+            (mention) => mention.username.toLowerCase() === postAuthorUsername,
+          );
+        }
+      }
+    }
 
     if (
       parentAuthorId &&
@@ -173,8 +197,9 @@ export class CommentsService {
         Boolean(parentAuthorId) &&
         post.authorId.toString() === parentAuthorId;
 
-      if (shouldSkipPostComment) {
+      if (shouldSkipPostComment || postAuthorMentionedInComment) {
         // Replying to post author's comment on their own post should only notify reply.
+        // Also skip the generic post-comment notification when post owner is directly @mentioned.
       } else {
         await this.notificationsService.createPostCommentNotification({
           actorId: userObjectId.toString(),
@@ -557,6 +582,82 @@ export class CommentsService {
         });
       }),
     };
+  }
+
+  async getById(userId: string, postId: string, commentId: string) {
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    const userObjectId = this.asObjectId(userId, 'userId');
+    const postObjectId = this.asObjectId(postId, 'postId');
+    const commentObjectId = this.asObjectId(commentId, 'commentId');
+
+    const post = await this.postModel
+      .findOne({
+        _id: postObjectId,
+        deletedAt: null,
+        moderationState: 'normal',
+      })
+      .select('authorId')
+      .lean();
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    await this.blocksService.assertNotBlocked(userObjectId, post.authorId);
+
+    const { blockedIds, blockedByIds } =
+      await this.blocksService.getBlockLists(userObjectId);
+    const excludedAuthorIds = new Set<string>([...blockedIds, ...blockedByIds]);
+
+    const comment = await this.commentModel
+      .findOne({
+        _id: commentObjectId,
+        postId: postObjectId,
+        deletedAt: null,
+        moderationState: { $in: ['normal', null] },
+      })
+      .lean();
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    const authorIdStr = comment.authorId?.toString?.();
+    if (authorIdStr && excludedAuthorIds.has(authorIdStr)) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    const [profile, repliesCount, likesCount, liked, creatorVerifiedMap] =
+      await Promise.all([
+        this.profileModel
+          .findOne({ userId: comment.authorId })
+          .select('userId displayName username avatarUrl')
+          .lean(),
+        this.commentModel.countDocuments({
+          parentId: commentObjectId,
+          deletedAt: null,
+          moderationState: { $in: ['normal', null] },
+        }),
+        this.commentLikeModel.countDocuments({ commentId: commentObjectId }),
+        this.commentLikeModel.exists({
+          commentId: commentObjectId,
+          userId: userObjectId,
+        }),
+        this.getCreatorVerifiedMap(
+          comment.authorId ? [comment.authorId] : ([] as Types.ObjectId[]),
+        ),
+      ]);
+
+    return this.toResponse(comment, profile || null, {
+      repliesCount,
+      likesCount,
+      liked: Boolean(liked),
+      authorIsCreatorVerified:
+        creatorVerifiedMap.get(comment.authorId?.toString?.() ?? '') ?? false,
+    });
   }
 
   async deleteComment(
@@ -1035,6 +1136,7 @@ export class CommentsService {
       await this.notifyMentionedUsers({
         actorId: userObjectId.toString(),
         postId: postObjectId.toString(),
+        commentId: commentObjectId.toString(),
         postKind: (post as { kind?: 'post' | 'reel' } | null)?.kind ?? 'post',
         mentions: mentions.filter((m) => addedMentions.includes(m.username)),
       });
@@ -1370,10 +1472,11 @@ export class CommentsService {
   private async notifyMentionedUsers(params: {
     actorId: string;
     postId: string;
+    commentId: string;
     postKind: 'post' | 'reel';
     mentions: Array<{ userId?: Types.ObjectId; username: string }>;
   }): Promise<void> {
-    const { actorId, postId, postKind, mentions } = params;
+    const { actorId, postId, commentId, postKind, mentions } = params;
     if (!mentions.length) return;
 
     const directIds = mentions
@@ -1407,6 +1510,7 @@ export class CommentsService {
           actorId,
           recipientId,
           postId,
+          commentId,
           postKind,
           source: 'comment',
         }),

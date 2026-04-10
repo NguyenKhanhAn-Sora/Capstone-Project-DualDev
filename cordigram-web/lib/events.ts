@@ -7,12 +7,25 @@ export const NOTIFICATION_RECEIVED_EVENT =
   "cordigram:notification-received" as const;
 
 export const NOTIFICATION_READ_EVENT = "cordigram:notification-read" as const;
+export const NOTIFICATION_STATE_CHANGED_EVENT =
+  "cordigram:notification-state-changed" as const;
+export const NOTIFICATION_DELETED_EVENT =
+  "cordigram:notification-deleted" as const;
 
 export type NotificationReceivedDetail = {
   notification: NotificationItem;
 };
 
 export type NotificationReadDetail = {
+  id: string;
+};
+
+export type NotificationStateChangedDetail = {
+  id: string;
+  readAt: string | null;
+};
+
+export type NotificationDeletedDetail = {
   id: string;
 };
 
@@ -33,4 +46,18 @@ export function emitNotificationReceived(
 export function emitNotificationRead(detail: NotificationReadDetail): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(NOTIFICATION_READ_EVENT, { detail }));
+}
+
+export function emitNotificationStateChanged(
+  detail: NotificationStateChangedDetail,
+): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(NOTIFICATION_STATE_CHANGED_EVENT, { detail }),
+  );
+}
+
+export function emitNotificationDeleted(detail: NotificationDeletedDetail): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(NOTIFICATION_DELETED_EVENT, { detail }));
 }

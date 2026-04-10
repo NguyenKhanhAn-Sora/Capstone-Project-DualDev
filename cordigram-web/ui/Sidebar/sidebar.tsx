@@ -21,7 +21,9 @@ import {
 } from "@/lib/api";
 import {
   CURRENT_PROFILE_UPDATED_EVENT,
+  emitNotificationDeleted,
   emitNotificationReceived,
+  emitNotificationStateChanged,
   NOTIFICATION_READ_EVENT,
   type NotificationReadDetail,
 } from "@/lib/events";
@@ -236,6 +238,31 @@ export default function Sidebar() {
           if (Number.isFinite(parsed)) {
             setLastSeenAt(parsed);
           }
+          setUnreadCount(
+            typeof payload?.unreadCount === "number" ? payload.unreadCount : 0,
+          );
+        },
+      );
+
+      socket.on(
+        "notification:state",
+        (payload: { id?: string; readAt?: string | null; unreadCount?: number }) => {
+          if (!payload?.id) return;
+          emitNotificationStateChanged({
+            id: payload.id,
+            readAt: payload.readAt ?? null,
+          });
+          setUnreadCount(
+            typeof payload?.unreadCount === "number" ? payload.unreadCount : 0,
+          );
+        },
+      );
+
+      socket.on(
+        "notification:deleted",
+        (payload: { id?: string; unreadCount?: number }) => {
+          if (!payload?.id) return;
+          emitNotificationDeleted({ id: payload.id });
           setUnreadCount(
             typeof payload?.unreadCount === "number" ? payload.unreadCount : 0,
           );

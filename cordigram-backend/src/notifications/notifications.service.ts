@@ -85,6 +85,17 @@ export type NotificationSeenPayload = {
   unreadCount: number;
 };
 
+export type NotificationStatePayload = {
+  id: string;
+  readAt: string | null;
+  unreadCount: number;
+};
+
+export type NotificationDeletedPayload = {
+  id: string;
+  unreadCount: number;
+};
+
 export type ForceLogoutPayload = {
   reason: 'suspended' | 'session_revoked';
   at: string;
@@ -287,7 +298,7 @@ export class NotificationsService {
     const recipientId = new Types.ObjectId(userId);
     const docs = await this.notificationModel
       .find({ recipientId })
-      .sort({ createdAt: -1 })
+      .sort({ updatedAt: -1, createdAt: -1 })
       .limit(limit)
       .lean();
 
@@ -389,13 +400,23 @@ export class NotificationsService {
       return { updated: false };
     }
 
+    const readAt = new Date();
     const result = await this.notificationModel.updateOne(
       {
         _id: new Types.ObjectId(notificationId),
         recipientId: new Types.ObjectId(userId),
       },
-      { $set: { readAt: new Date() } },
+      { $set: { readAt } },
     );
+
+    if (result.modifiedCount) {
+      const { unreadCount } = await this.getUnreadCount(userId);
+      this.gateway.emitToUser(userId, 'notification:state', {
+        id: notificationId,
+        readAt: readAt.toISOString(),
+        unreadCount,
+      } satisfies NotificationStatePayload);
+    }
 
     return { updated: Boolean(result.modifiedCount) };
   }
@@ -416,6 +437,15 @@ export class NotificationsService {
       { $set: { readAt: null } },
     );
 
+    if (result.modifiedCount) {
+      const { unreadCount } = await this.getUnreadCount(userId);
+      this.gateway.emitToUser(userId, 'notification:state', {
+        id: notificationId,
+        readAt: null,
+        unreadCount,
+      } satisfies NotificationStatePayload);
+    }
+
     return { updated: Boolean(result.modifiedCount) };
   }
 
@@ -431,6 +461,14 @@ export class NotificationsService {
       _id: new Types.ObjectId(notificationId),
       recipientId: new Types.ObjectId(userId),
     });
+
+    if (result.deletedCount) {
+      const { unreadCount } = await this.getUnreadCount(userId);
+      this.gateway.emitToUser(userId, 'notification:deleted', {
+        id: notificationId,
+        unreadCount,
+      } satisfies NotificationDeletedPayload);
+    }
 
     return { deleted: Boolean(result.deletedCount) };
   }
@@ -705,19 +743,28 @@ export class NotificationsService {
     postId: string;
     postKind: PostKind;
     source: 'post' | 'comment';
+    commentId?: string | null;
   }): Promise<NotificationItem | null> {
-    const { actorId, recipientId, postId, postKind, source } = params;
+    const { actorId, recipientId, postId, postKind, source, commentId } =
+      params;
 
     if (!(await this.canEmitCategoryNotification(recipientId, 'mentions'))) {
       return null;
     }
+
+    const mentionCommentId =
+      source === 'comment' && commentId && Types.ObjectId.isValid(commentId)
+        ? new Types.ObjectId(commentId)
+        : null;
 
     const doc = await this.notificationModel
       .findOneAndUpdate(
         {
           recipientId: new Types.ObjectId(recipientId),
           postId: new Types.ObjectId(postId),
+          commentId: mentionCommentId,
           type: 'post_mention',
+          mentionSource: source,
         },
         {
           $set: {
@@ -730,7 +777,9 @@ export class NotificationsService {
           $setOnInsert: {
             recipientId: new Types.ObjectId(recipientId),
             postId: new Types.ObjectId(postId),
+            commentId: mentionCommentId,
             type: 'post_mention',
+            mentionSource: source,
             postKind,
             mentionCount: 1,
           },
@@ -824,40 +873,42 @@ export class NotificationsService {
     if (!(await this.canEmitCategoryNotification(recipientId, 'follow'))) {
       return null;
     }
+    const actorObjectId = new Types.ObjectId(actorId);
+    const recipientObjectId = new Types.ObjectId(recipientId);
     const filter = {
-      recipientId: new Types.ObjectId(recipientId),
-      actorId: new Types.ObjectId(actorId),
+      recipientId: recipientObjectId,
+      actorId: actorObjectId,
       type: 'follow' as const,
       postId: null,
     };
 
-    const existing = await this.notificationModel.findOne(filter).lean();
-    if (existing) {
-      await this.notificationModel
-        .updateOne(filter, { $set: { updatedAt: new Date() } })
-        .exec();
-      const profile = await this.profileModel
-        .findOne({ userId: new Types.ObjectId(actorId) })
-        .select('userId displayName username avatarUrl')
-        .lean();
-      const response = this.toResponse(
-        existing as NotificationDoc,
-        profile ?? null,
-      );
-      return response;
-    }
+    const doc = await this.notificationModel
+      .findOneAndUpdate(
+        filter,
+        {
+          $set: {
+            actorId: actorObjectId,
+            readAt: null,
+            updatedAt: new Date(),
+          },
+          $setOnInsert: {
+            recipientId: recipientObjectId,
+            postId: null,
+            type: 'follow' as const,
+          },
+        },
+        { new: true, upsert: true },
+      )
+      .exec();
 
-    const created = await this.notificationModel.create({
-      ...filter,
-      readAt: null,
-    });
+    if (!doc) return null;
 
     const profile = await this.profileModel
-      .findOne({ userId: new Types.ObjectId(actorId) })
+      .findOne({ userId: actorObjectId })
       .select('userId displayName username avatarUrl')
       .lean();
 
-    const response = this.toResponse(created, profile ?? null, {
+    const response = this.toResponse(doc, profile ?? null, {
       recipientId,
     });
     const { unreadCount } = await this.getUnreadCount(recipientId);

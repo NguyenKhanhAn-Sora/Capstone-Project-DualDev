@@ -51,6 +51,20 @@ export class CommentsController {
     });
   }
 
+  @Get(':commentId')
+  async getById(
+    @Req() req: Request,
+    @Param('postId') postId: string,
+    @Param('commentId') commentId: string,
+  ) {
+    const user = req.user as AuthenticatedUser | undefined;
+    return this.commentsService.getById(
+      user?.userId ?? '',
+      postId,
+      commentId,
+    );
+  }
+
   @Post()
   async create(
     @Req() req: Request,

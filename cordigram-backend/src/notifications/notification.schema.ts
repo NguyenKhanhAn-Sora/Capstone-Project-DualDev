@@ -178,12 +178,26 @@ export class Notification extends Document {
 
 export const NotificationSchema = SchemaFactory.createForClass(Notification);
 NotificationSchema.index({ recipientId: 1, createdAt: -1 });
+NotificationSchema.index({ recipientId: 1, updatedAt: -1 });
 NotificationSchema.index({ recipientId: 1, readAt: 1 });
 NotificationSchema.index(
   { recipientId: 1, postId: 1, commentId: 1, type: 1 },
   {
     unique: true,
-    partialFilterExpression: { postId: { $ne: null } },
+    partialFilterExpression: {
+      postId: { $ne: null },
+      type: { $ne: 'post_mention' },
+    },
+  },
+);
+NotificationSchema.index(
+  { recipientId: 1, postId: 1, commentId: 1, type: 1, mentionSource: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      postId: { $ne: null },
+      type: 'post_mention',
+    },
   },
 );
 NotificationSchema.index(

@@ -53,6 +53,19 @@ class NotificationService {
     );
   }
 
+  static Future<Map<String, dynamic>> fetchCommentById({
+    required String postId,
+    required String commentId,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+
+    return ApiService.get(
+      '/posts/$postId/comments/$commentId',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
   static Future<Map<String, dynamic>> updatePostMute({
     required String postId,
     bool? enabled,
