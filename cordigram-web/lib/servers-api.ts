@@ -40,6 +40,10 @@ export interface Server {
   primaryLanguage?: "vi" | "en";
   avatarUrl?: string;
   bannerUrl?: string;
+  /** Ảnh biểu ngữ (URL); màu nền dùng bannerColor. */
+  bannerImageUrl?: string | null;
+  /** Gradient / màu nền biểu ngữ (preset). */
+  bannerColor?: string | null;
   profileTraits?: Array<{ emoji: string; text: string }>;
   template?: ServerTemplate;
   purpose?: ServerPurpose;
@@ -179,10 +183,60 @@ export interface Message {
   mentions?: string[];
   messageType?: string;
   giphyId?: string;
+  customStickerUrl?: string | null;
+  serverStickerId?: string | null;
   voiceUrl?: string;
   voiceDuration?: number;
   stickerReplyWelcomeEnabled?: boolean;
   contentModerationResult?: "none" | "blurred" | "rejected";
+}
+
+export interface StickerPickerSticker {
+  id: string;
+  imageUrl: string;
+  name: string;
+  addedBy: {
+    displayName: string;
+    username: string;
+    avatarUrl: string;
+  };
+}
+
+export interface StickerPickerGroup {
+  serverId: string;
+  serverName: string;
+  serverAvatarUrl: string | null;
+  locked: boolean;
+  stickers: StickerPickerSticker[];
+}
+
+export interface StickerPickerResponse {
+  contextServerId: string | null;
+  groups: StickerPickerGroup[];
+}
+
+export interface EmojiPickerEmoji {
+  id: string;
+  imageUrl: string;
+  name: string;
+  addedBy: {
+    displayName: string;
+    username: string;
+    avatarUrl: string;
+  };
+}
+
+export interface EmojiPickerGroup {
+  serverId: string;
+  serverName: string;
+  serverAvatarUrl: string | null;
+  locked: boolean;
+  emojis: EmojiPickerEmoji[];
+}
+
+export interface EmojiPickerResponse {
+  contextServerId: string | null;
+  groups: EmojiPickerGroup[];
 }
 
 export interface Friend {
@@ -226,6 +280,76 @@ export async function getMyServers(): Promise<Server[]> {
     throw new Error(errorData.message || "Không tải được danh sách máy chủ");
   }
 
+  return response.json();
+}
+
+export async function getStickerPickerData(
+  contextServerId?: string | null,
+): Promise<StickerPickerResponse> {
+  const params = new URLSearchParams();
+  if (contextServerId) params.set("contextServerId", contextServerId);
+  const qs = params.toString();
+  const response = await fetch(
+    `${API_BASE_URL}/servers/sticker-picker${qs ? `?${qs}` : ""}`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message || "Không tải được sticker máy chủ",
+    );
+  }
+  return response.json();
+}
+
+export async function getEmojiPickerData(
+  contextServerId?: string | null,
+): Promise<EmojiPickerResponse> {
+  const params = new URLSearchParams();
+  if (contextServerId) params.set("contextServerId", contextServerId);
+  const qs = params.toString();
+  const response = await fetch(
+    `${API_BASE_URL}/servers/emoji-picker${qs ? `?${qs}` : ""}`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message || "Không tải được emoji máy chủ",
+    );
+  }
+  return response.json();
+}
+
+export async function addServerEmoji(
+  serverId: string,
+  body: { imageUrl: string; name?: string },
+): Promise<{ emoji: { id: string; imageUrl: string; name: string } }> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/emojis`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { message?: string }).message || "Không thêm được emoji");
+  }
+  return response.json();
+}
+
+export async function addServerSticker(
+  serverId: string,
+  body: { imageUrl: string; name?: string },
+): Promise<{ sticker: { id: string; imageUrl: string; name: string } }> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/stickers`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { message?: string }).message || "Không thêm được sticker");
+  }
   return response.json();
 }
 
@@ -294,6 +418,8 @@ export async function updateServer(
   avatarUrl?: string | null,
   extra?: {
     bannerUrl?: string | null;
+    bannerImageUrl?: string | null;
+    bannerColor?: string | null;
     profileTraits?: Array<{ emoji: string; text: string }>;
   },
 ): Promise<Server> {
@@ -305,6 +431,8 @@ export async function updateServer(
       description,
       avatarUrl,
       bannerUrl: extra?.bannerUrl,
+      bannerImageUrl: extra?.bannerImageUrl,
+      bannerColor: extra?.bannerColor,
       profileTraits: extra?.profileTraits,
     }),
   });
@@ -1611,6 +1739,7 @@ export async function createMessage(
   giphyId?: string,
   voiceUrl?: string,
   voiceDuration?: number,
+  stickerExtras?: { customStickerUrl?: string; serverStickerId?: string },
 ): Promise<Message> {
   const body: Record<string, unknown> = {
     content,
@@ -1621,6 +1750,12 @@ export async function createMessage(
     ...(giphyId ? { giphyId } : {}),
     ...(voiceUrl ? { voiceUrl } : {}),
     ...(voiceDuration != null ? { voiceDuration } : {}),
+    ...(stickerExtras?.customStickerUrl
+      ? { customStickerUrl: stickerExtras.customStickerUrl }
+      : {}),
+    ...(stickerExtras?.serverStickerId
+      ? { serverStickerId: stickerExtras.serverStickerId }
+      : {}),
   };
   const response = await fetch(
     `${API_BASE_URL}/channels/${channelId}/messages`,
@@ -2324,6 +2459,8 @@ export type ExploreServer = {
   description: string | null;
   avatarUrl: string | null;
   bannerUrl: string | null;
+  bannerImageUrl: string | null;
+  bannerColor: string | null;
   memberCount: number;
   accessMode: "invite_only" | "apply" | "discoverable";
   isPublic: boolean;

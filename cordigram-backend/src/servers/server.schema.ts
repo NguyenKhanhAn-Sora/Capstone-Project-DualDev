@@ -131,6 +131,14 @@ export class Server extends Document {
   @Prop({ type: String, default: null })
   bannerUrl: string | null;
 
+  /** Ảnh biểu ngữ (URL); màu nền card dùng bannerColor. */
+  @Prop({ type: String, default: null })
+  bannerImageUrl: string | null;
+
+  /** Gradient / màu nền biểu ngữ (preset), luôn có kể cả khi có ảnh. */
+  @Prop({ type: String, default: null })
+  bannerColor: string | null;
+
   @Prop({
     type: [
       {
@@ -413,6 +421,46 @@ export class Server extends Document {
     default: 'pending',
   })
   communityDiscoveryStatus: CommunityDiscoveryStatus;
+
+  /** Sticker tùy chỉnh do máy chủ quản lý (hiển thị trong picker; chỉ dùng được trong kênh cùng server). */
+  @Prop({
+    type: [
+      {
+        imageUrl: { type: String, required: true, trim: true },
+        name: { type: String, default: '', trim: true, maxlength: 80 },
+        addedByUserId: { type: Types.ObjectId, ref: 'User', required: true },
+        addedAt: { type: Date, default: Date.now },
+      },
+    ],
+    default: [],
+  })
+  customStickers: Array<{
+    _id?: Types.ObjectId;
+    imageUrl: string;
+    name: string;
+    addedByUserId: Types.ObjectId;
+    addedAt: Date;
+  }>;
+
+  /** Emoji tùy chỉnh (ảnh + tên dạng :name:), cùng kiểu lưu trữ như sticker. */
+  @Prop({
+    type: [
+      {
+        imageUrl: { type: String, required: true, trim: true },
+        name: { type: String, default: '', trim: true, maxlength: 80 },
+        addedByUserId: { type: Types.ObjectId, ref: 'User', required: true },
+        addedAt: { type: Date, default: Date.now },
+      },
+    ],
+    default: [],
+  })
+  customEmojis: Array<{
+    _id?: Types.ObjectId;
+    imageUrl: string;
+    name: string;
+    addedByUserId: Types.ObjectId;
+    addedAt: Date;
+  }>;
 }
 
 export interface CommunitySettings {

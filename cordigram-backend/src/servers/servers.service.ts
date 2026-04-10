@@ -651,6 +651,16 @@ export class ServersService {
       server.avatarUrl = updateServerDto.avatarUrl;
     if (updateServerDto.bannerUrl !== undefined)
       (server as any).bannerUrl = updateServerDto.bannerUrl;
+    if (updateServerDto.bannerImageUrl !== undefined)
+      (server as any).bannerImageUrl = updateServerDto.bannerImageUrl;
+    if (updateServerDto.bannerColor !== undefined)
+      (server as any).bannerColor = updateServerDto.bannerColor;
+    // Đồng bộ trường legacy: bannerUrl = ảnh hoặc màu (cho client cũ)
+    const img = (server as any).bannerImageUrl;
+    const col = (server as any).bannerColor;
+    if (updateServerDto.bannerImageUrl !== undefined || updateServerDto.bannerColor !== undefined) {
+      (server as any).bannerUrl = img || col || (server as any).bannerUrl;
+    }
     if (updateServerDto.profileTraits !== undefined) {
       const traits = (updateServerDto.profileTraits || [])
         .slice(0, 5)
@@ -3046,7 +3056,7 @@ export class ServersService {
         isActive: true,
       })
       .select(
-        'name description avatarUrl bannerUrl memberCount accessMode isPublic',
+        'name description avatarUrl bannerUrl bannerImageUrl bannerColor memberCount accessMode isPublic',
       )
       .lean()
       .exec();
@@ -3057,6 +3067,8 @@ export class ServersService {
       description: s.description ?? null,
       avatarUrl: s.avatarUrl ?? null,
       bannerUrl: s.bannerUrl ?? null,
+      bannerImageUrl: s.bannerImageUrl ?? null,
+      bannerColor: s.bannerColor ?? null,
       memberCount: s.memberCount ?? 0,
       accessMode: s.accessMode ?? 'discoverable',
       isPublic: Boolean(s.isPublic),
@@ -3288,6 +3300,318 @@ export class ServersService {
       description: (server as any).description ?? null,
       primaryLanguage: (server as any).primaryLanguage ?? 'vi',
       rulesChannelId: (server as any).communitySettings?.rulesChannelId ?? null,
+    };
+  }
+
+  /**
+   * Dữ liệu sticker máy chủ cho picker: mọi server user tham gia có sticker;
+   * locked = true khi không phải server ngữ cảnh chat hiện tại.
+   */
+  async getStickerPickerData(
+    userId: string,
+    contextServerId?: string,
+  ): Promise<{
+    contextServerId: string | null;
+    groups: Array<{
+      serverId: string;
+      serverName: string;
+      serverAvatarUrl: string | null;
+      locked: boolean;
+      stickers: Array<{
+        id: string;
+        imageUrl: string;
+        name: string;
+        addedBy: {
+          displayName: string;
+          username: string;
+          avatarUrl: string;
+        };
+      }>;
+    }>;
+  }> {
+    const userObjectId = new Types.ObjectId(userId);
+    const servers = await this.serverModel
+      .find({ 'members.userId': userObjectId })
+      .select('_id name avatarUrl customStickers')
+      .lean()
+      .exec();
+
+    const userIdsNeedingProfile = new Set<string>();
+    for (const s of servers) {
+      for (const st of (s as any).customStickers || []) {
+        if (st.addedByUserId)
+          userIdsNeedingProfile.add(String(st.addedByUserId));
+      }
+    }
+    const profileList =
+      userIdsNeedingProfile.size === 0
+        ? []
+        : await this.profileModel
+            .find({
+              userId: {
+                $in: [...userIdsNeedingProfile].map(
+                  (id) => new Types.ObjectId(id),
+                ),
+              },
+            })
+            .select('userId displayName username avatarUrl')
+            .lean()
+            .exec();
+    const profileByUserId = new Map(
+      profileList.map((p: any) => [String(p.userId), p]),
+    );
+
+    const ctx = (contextServerId || '').trim();
+    const groups: Array<{
+      serverId: string;
+      serverName: string;
+      serverAvatarUrl: string | null;
+      locked: boolean;
+      stickers: Array<{
+        id: string;
+        imageUrl: string;
+        name: string;
+        addedBy: {
+          displayName: string;
+          username: string;
+          avatarUrl: string;
+        };
+      }>;
+    }> = [];
+
+    for (const s of servers) {
+      const stickersRaw = (s as any).customStickers || [];
+      if (!Array.isArray(stickersRaw) || stickersRaw.length === 0) continue;
+      const locked = ctx ? String(s._id) !== ctx : true;
+      const stickerOut = stickersRaw.map((st: any) => {
+        const prof = profileByUserId.get(String(st.addedByUserId));
+        return {
+          id: st._id?.toString(),
+          imageUrl: st.imageUrl,
+          name: (st.name || '').trim(),
+          addedBy: {
+            displayName: prof?.displayName || '',
+            username: prof?.username || '',
+            avatarUrl: prof?.avatarUrl || '',
+          },
+        };
+      });
+      groups.push({
+        serverId: String(s._id),
+        serverName: (s as any).name || '',
+        serverAvatarUrl: (s as any).avatarUrl ?? null,
+        locked,
+        stickers: stickerOut,
+      });
+    }
+
+    groups.sort((a, b) => {
+      if (a.locked !== b.locked) return a.locked ? 1 : -1;
+      return (a.serverName || '').localeCompare(b.serverName || '', 'vi');
+    });
+
+    return { contextServerId: ctx || null, groups };
+  }
+
+  async addServerSticker(
+    serverId: string,
+    userId: string,
+    dto: { imageUrl: string; name?: string },
+  ): Promise<{ sticker: { id: string; imageUrl: string; name: string } }> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    const isOwner = (server as any).ownerId?.toString() === userId;
+    const canManage =
+      isOwner ||
+      (await this.rolesService.hasPermission(serverId, userId, 'manageServer'));
+    if (!canManage) {
+      throw new ForbiddenException(
+        'Bạn không có quyền thêm sticker cho máy chủ này',
+      );
+    }
+
+    const url = dto.imageUrl?.trim();
+    if (!url || !/^https?:\/\//i.test(url)) {
+      throw new BadRequestException('imageUrl không hợp lệ');
+    }
+    const name = (dto.name || '').trim().slice(0, 80);
+
+    const stickerDoc = {
+      imageUrl: url,
+      name,
+      addedByUserId: new Types.ObjectId(userId),
+      addedAt: new Date(),
+    };
+    const list = (server as any).customStickers || [];
+    list.push(stickerDoc);
+    (server as any).customStickers = list;
+    await server.save();
+    const added = (server as any).customStickers[
+      (server as any).customStickers.length - 1
+    ];
+    return {
+      sticker: {
+        id: added._id.toString(),
+        imageUrl: added.imageUrl,
+        name: added.name || '',
+      },
+    };
+  }
+
+  async getEmojiPickerData(
+    userId: string,
+    contextServerId?: string,
+  ): Promise<{
+    contextServerId: string | null;
+    groups: Array<{
+      serverId: string;
+      serverName: string;
+      serverAvatarUrl: string | null;
+      locked: boolean;
+      emojis: Array<{
+        id: string;
+        imageUrl: string;
+        name: string;
+        addedBy: {
+          displayName: string;
+          username: string;
+          avatarUrl: string;
+        };
+      }>;
+    }>;
+  }> {
+    const userObjectId = new Types.ObjectId(userId);
+    const servers = await this.serverModel
+      .find({ 'members.userId': userObjectId })
+      .select('_id name avatarUrl customEmojis')
+      .lean()
+      .exec();
+
+    const userIdsNeedingProfile = new Set<string>();
+    for (const s of servers) {
+      for (const em of (s as any).customEmojis || []) {
+        if (em.addedByUserId)
+          userIdsNeedingProfile.add(String(em.addedByUserId));
+      }
+    }
+    const profileList =
+      userIdsNeedingProfile.size === 0
+        ? []
+        : await this.profileModel
+            .find({
+              userId: {
+                $in: [...userIdsNeedingProfile].map(
+                  (id) => new Types.ObjectId(id),
+                ),
+              },
+            })
+            .select('userId displayName username avatarUrl')
+            .lean()
+            .exec();
+    const profileByUserId = new Map(
+      profileList.map((p: any) => [String(p.userId), p]),
+    );
+
+    const ctx = (contextServerId || '').trim();
+    const groups: Array<{
+      serverId: string;
+      serverName: string;
+      serverAvatarUrl: string | null;
+      locked: boolean;
+      emojis: Array<{
+        id: string;
+        imageUrl: string;
+        name: string;
+        addedBy: {
+          displayName: string;
+          username: string;
+          avatarUrl: string;
+        };
+      }>;
+    }> = [];
+
+    for (const s of servers) {
+      const emojisRaw = (s as any).customEmojis || [];
+      if (!Array.isArray(emojisRaw) || emojisRaw.length === 0) continue;
+      const locked = ctx ? String(s._id) !== ctx : true;
+      const emojiOut = emojisRaw.map((em: any) => {
+        const prof = profileByUserId.get(String(em.addedByUserId));
+        return {
+          id: em._id?.toString(),
+          imageUrl: em.imageUrl,
+          name: (em.name || '').trim(),
+          addedBy: {
+            displayName: prof?.displayName || '',
+            username: prof?.username || '',
+            avatarUrl: prof?.avatarUrl || '',
+          },
+        };
+      });
+      groups.push({
+        serverId: String(s._id),
+        serverName: (s as any).name || '',
+        serverAvatarUrl: (s as any).avatarUrl ?? null,
+        locked,
+        emojis: emojiOut,
+      });
+    }
+
+    groups.sort((a, b) => {
+      if (a.locked !== b.locked) return a.locked ? 1 : -1;
+      return (a.serverName || '').localeCompare(b.serverName || '', 'vi');
+    });
+
+    return { contextServerId: ctx || null, groups };
+  }
+
+  async addServerEmoji(
+    serverId: string,
+    userId: string,
+    dto: { imageUrl: string; name?: string },
+  ): Promise<{ emoji: { id: string; imageUrl: string; name: string } }> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    const isOwner = (server as any).ownerId?.toString() === userId;
+    const canManage =
+      isOwner ||
+      (await this.rolesService.hasPermission(serverId, userId, 'manageServer'));
+    if (!canManage) {
+      throw new ForbiddenException(
+        'Bạn không có quyền thêm emoji cho máy chủ này',
+      );
+    }
+
+    const url = dto.imageUrl?.trim();
+    if (!url || !/^https?:\/\//i.test(url)) {
+      throw new BadRequestException('imageUrl không hợp lệ');
+    }
+    const name = (dto.name || '').trim().slice(0, 80);
+
+    const emojiDoc = {
+      imageUrl: url,
+      name,
+      addedByUserId: new Types.ObjectId(userId),
+      addedAt: new Date(),
+    };
+    const list = (server as any).customEmojis || [];
+    list.push(emojiDoc);
+    (server as any).customEmojis = list;
+    await server.save();
+    const added = (server as any).customEmojis[
+      (server as any).customEmojis.length - 1
+    ];
+    return {
+      emoji: {
+        id: added._id.toString(),
+        imageUrl: added.imageUrl,
+        name: added.name || '',
+      },
     };
   }
 }

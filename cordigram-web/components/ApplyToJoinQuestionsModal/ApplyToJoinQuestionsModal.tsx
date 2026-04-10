@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import ServerBannerStrip from "@/components/ServerBannerStrip/ServerBannerStrip";
+import type { ServerBannerFields } from "@/lib/server-banner";
 import styles from "./ApplyToJoinQuestionsModal.module.css";
 
 export type ApplyJoinQuestion = {
@@ -16,7 +18,7 @@ type ServerCard = {
   avatarUrl?: string | null;
   memberCount?: number;
   createdAt?: string;
-};
+} & ServerBannerFields;
 
 type Props = {
   open: boolean;
@@ -72,6 +74,8 @@ export default function ApplyToJoinQuestionsModal({
       }}
     >
       <div className={styles.card} onClick={(e) => e.stopPropagation()}>
+        <ServerBannerStrip server={server} height={72} className={styles.cardBanner} />
+        <div className={styles.cardMain}>
         <div className={styles.left}>
           <div
             className={styles.avatar}
@@ -192,6 +196,7 @@ export default function ApplyToJoinQuestionsModal({
               {submitting ? "Đang gửi…" : "Gửi"}
             </button>
           </div>
+        </div>
         </div>
       </div>
     </div>

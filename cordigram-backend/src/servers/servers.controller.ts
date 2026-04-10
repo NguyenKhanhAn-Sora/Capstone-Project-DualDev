@@ -15,6 +15,8 @@ import { ServersService } from './servers.service';
 import { ServerAccessService } from '../access/server-access.service';
 import { CreateServerDto } from './dto/create-server.dto';
 import { UpdateServerDto } from './dto/update-server.dto';
+import { AddServerStickerDto } from './dto/add-server-sticker.dto';
+import { AddServerEmojiDto } from './dto/add-server-emoji.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('servers')
@@ -47,6 +49,32 @@ export class ServersController {
   }
 
   /**
+   * Sticker máy chủ cho picker (theo mọi server user tham gia).
+   * Query contextServerId = server đang mở chat để đánh dấu khóa/mở.
+   */
+  @Get('sticker-picker')
+  async getStickerPicker(
+    @Query('contextServerId') contextServerId: string | undefined,
+    @Request() req: any,
+  ) {
+    return this.serversService.getStickerPickerData(
+      req.user.userId,
+      contextServerId,
+    );
+  }
+
+  @Get('emoji-picker')
+  async getEmojiPicker(
+    @Query('contextServerId') contextServerId: string | undefined,
+    @Request() req: any,
+  ) {
+    return this.serversService.getEmojiPickerData(
+      req.user.userId,
+      contextServerId,
+    );
+  }
+
+  /**
    * Lấy danh sách thành viên (chỉ owner - API cũ)
    */
   @Get(':id/mentions')
@@ -65,6 +93,24 @@ export class ServersController {
   @Get(':id/members')
   async getServerMembers(@Param('id') serverId: string, @Request() req: any) {
     return this.serversService.getServerMembers(serverId, req.user.userId);
+  }
+
+  @Post(':id/stickers')
+  async addServerSticker(
+    @Param('id') serverId: string,
+    @Body() body: AddServerStickerDto,
+    @Request() req: any,
+  ) {
+    return this.serversService.addServerSticker(serverId, req.user.userId, body);
+  }
+
+  @Post(':id/emojis')
+  async addServerEmoji(
+    @Param('id') serverId: string,
+    @Body() body: AddServerEmojiDto,
+    @Request() req: any,
+  ) {
+    return this.serversService.addServerEmoji(serverId, req.user.userId, body);
   }
 
   /**

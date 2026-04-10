@@ -30,6 +30,13 @@ export class Message extends Document {
   @Prop({ type: String, default: null })
   giphyId: string | null;
 
+  /** Sticker máy chủ (không phải Giphy): URL ảnh đã lưu trên server. */
+  @Prop({ type: String, default: null })
+  customStickerUrl: string | null;
+
+  @Prop({ type: Types.ObjectId, default: null })
+  serverStickerId: Types.ObjectId | null;
+
   @Prop({ type: String, default: null })
   voiceUrl: string | null;
 

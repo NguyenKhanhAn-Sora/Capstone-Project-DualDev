@@ -4,6 +4,11 @@ import React, { useMemo, useRef, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import * as serversApi from "@/lib/servers-api";
 import { uploadMedia } from "@/lib/api";
+import {
+  BANNER_PRESETS,
+  normalizeServerBanner,
+  optimizeBannerImageFile,
+} from "@/lib/server-banner";
 import styles from "./ServerProfileSection.module.css";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), {
@@ -13,18 +18,6 @@ const EmojiPicker = dynamic(() => import("emoji-picker-react"), {
 type Trait = { emoji: string; text: string };
 
 const RANDOM_EMOJIS = ["😀", "😎", "🔥", "🎮", "🎯", "🌟", "🚀", "✨", "🐱", "🫶", "👾", "🥳"];
-const BANNER_PRESETS = [
-  "linear-gradient(180deg, #1f2127 0%, #090b10 100%)",
-  "linear-gradient(180deg, #ff3ea5 0%, #eb188a 100%)",
-  "linear-gradient(180deg, #ff4b3e 0%, #ee1f22 100%)",
-  "linear-gradient(180deg, #ff9b3e 0%, #ea6a13 100%)",
-  "linear-gradient(180deg, #ffe66e 0%, #e4be24 100%)",
-  "linear-gradient(180deg, #b96cff 0%, #7f3ab1 100%)",
-  "linear-gradient(180deg, #49bfff 0%, #198fd4 100%)",
-  "linear-gradient(180deg, #74f0d4 0%, #4bc7b0 100%)",
-  "linear-gradient(180deg, #6da91f 0%, #3f7304 100%)",
-  "linear-gradient(180deg, #5e6168 0%, #2f3238 100%)",
-];
 
 interface ServerProfileSectionProps {
   serverId: string;
@@ -51,9 +44,11 @@ export default function ServerProfileSection({
   initialServer,
   onUpdated,
 }: ServerProfileSectionProps) {
+  const initialBanner = useMemo(() => normalizeServerBanner(initialServer), [initialServer]);
   const [name, setName] = useState(initialServer?.name ?? "");
   const [avatarUrl, setAvatarUrl] = useState(initialServer?.avatarUrl ?? "");
-  const [bannerUrl, setBannerUrl] = useState(initialServer?.bannerUrl || BANNER_PRESETS[0]);
+  const [bannerColor, setBannerColor] = useState(initialBanner.bannerColor);
+  const [bannerImageUrl, setBannerImageUrl] = useState<string | null>(initialBanner.bannerImageUrl);
   const [description, setDescription] = useState(initialServer?.description ?? "");
   const [traits, setTraits] = useState<Trait[]>(makeInitialTraits(initialServer));
   const [saving, setSaving] = useState(false);
@@ -64,9 +59,21 @@ export default function ServerProfileSection({
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [profileStats, setProfileStats] = useState<serversApi.ServerProfileStats | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   const traitsFilled = useMemo(() => traits.filter((t) => t.text.trim()).length, [traits]);
+
+  useEffect(() => {
+    const n = normalizeServerBanner(initialServer);
+    setBannerColor(n.bannerColor);
+    setBannerImageUrl(n.bannerImageUrl);
+  }, [
+    initialServer?._id,
+    initialServer?.bannerUrl,
+    initialServer?.bannerImageUrl,
+    initialServer?.bannerColor,
+  ]);
 
   const updateTrait = (idx: number, patch: Partial<Trait>) => {
     setTraits((prev) => prev.map((t, i) => (i === idx ? { ...t, ...patch } : t)));
@@ -121,6 +128,20 @@ export default function ServerProfileSection({
     }
   };
 
+  const handleUploadBanner = async (file: File | null) => {
+    if (!file || !token) return;
+    try {
+      setError(null);
+      const optimized = await optimizeBannerImageFile(file);
+      const up = await uploadMedia({ token, file: optimized });
+      const url = up.secureUrl || up.url;
+      if (!url) throw new Error("Không lấy được URL ảnh biểu ngữ");
+      setBannerImageUrl(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không tải ảnh biểu ngữ được");
+    }
+  };
+
   const handleSave = async () => {
     if (!canManageSettings) return;
     try {
@@ -131,12 +152,18 @@ export default function ServerProfileSection({
         .map((t) => ({ emoji: (t.emoji || "🙂").trim(), text: t.text.trim() }))
         .filter((t) => t.text.length > 0)
         .slice(0, 5);
+      const legacyBanner = bannerImageUrl || bannerColor;
       const updated = await serversApi.updateServer(
         serverId,
         name.trim(),
         description,
         avatarUrl || undefined,
-        { bannerUrl, profileTraits: payloadTraits },
+        {
+          bannerUrl: legacyBanner,
+          bannerImageUrl: bannerImageUrl || null,
+          bannerColor,
+          profileTraits: payloadTraits,
+        },
       );
       setSuccess("Đã lưu hồ sơ máy chủ.");
       onUpdated?.(updated);
@@ -146,10 +173,6 @@ export default function ServerProfileSection({
       setSaving(false);
     }
   };
-
-  const previewBannerStyle = bannerUrl.startsWith("http")
-    ? { backgroundImage: `url(${bannerUrl})` }
-    : { background: bannerUrl };
 
   return (
     <div className={styles.wrap}>
@@ -200,20 +223,48 @@ export default function ServerProfileSection({
 
         <div className={styles.card}>
           <div className={styles.label}>Biểu ngữ</div>
+          <div className={styles.hint}>
+            Chọn màu nền cho card (khám phá, lời mời, đơn đăng ký). Có thể thêm ảnh — ảnh được tối ưu trước khi tải lên.
+          </div>
+          <div className={styles.row} style={{ marginBottom: 10 }}>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnPrimary}`}
+              disabled={!canManageSettings}
+              onClick={() => bannerInputRef.current?.click()}
+            >
+              Tải ảnh biểu ngữ
+            </button>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnDanger}`}
+              disabled={!canManageSettings || !bannerImageUrl}
+              onClick={() => setBannerImageUrl(null)}
+            >
+              Xóa ảnh biểu ngữ
+            </button>
+            <input
+              ref={bannerInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              style={{ display: "none" }}
+              onChange={(e) => handleUploadBanner(e.target.files?.[0] ?? null)}
+            />
+          </div>
           <div className={styles.bannerPalette}>
             {BANNER_PRESETS.map((preset) => (
               <button
                 key={preset}
                 type="button"
-                className={`${styles.bannerSwatch} ${bannerUrl === preset ? styles.bannerSwatchActive : ""}`}
+                className={`${styles.bannerSwatch} ${bannerColor === preset ? styles.bannerSwatchActive : ""}`}
                 style={{ background: preset }}
                 disabled={!canManageSettings}
-                onClick={() => setBannerUrl(preset)}
-                aria-label="Chọn màu biểu ngữ"
+                onClick={() => setBannerColor(preset)}
+                aria-label="Chọn màu nền biểu ngữ"
               />
             ))}
           </div>
-          <div className={styles.hint}>Chỉ chọn màu biểu ngữ theo mẫu có sẵn.</div>
+          <div className={styles.hint}>Màu nền luôn áp dụng; nếu có ảnh, ảnh hiển thị phía trên màu nền.</div>
         </div>
 
         <div className={styles.card}>
@@ -280,7 +331,14 @@ export default function ServerProfileSection({
       </div>
 
       <div className={styles.preview}>
-        <div className={styles.previewBanner} style={previewBannerStyle} />
+        <div className={styles.previewBanner} style={{ background: bannerColor }}>
+          {bannerImageUrl ? (
+            <div
+              className={styles.previewBannerImage}
+              style={{ backgroundImage: `url(${bannerImageUrl})` }}
+            />
+          ) : null}
+        </div>
         <div className={styles.previewBody}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {avatarUrl ? (
@@ -328,4 +386,3 @@ export default function ServerProfileSection({
     </div>
   );
 }
-

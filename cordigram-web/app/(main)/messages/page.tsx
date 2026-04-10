@@ -39,7 +39,10 @@ import {
 import { getLiveKitToken, getDMRoomName, getVoiceChannelParticipants } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
 import OutgoingCallPopup from "@/components/OutgoingCallPopup";
-import GiphyPicker from "@/components/GiphyPicker";
+import GiphyPicker, {
+  type GiphyPickerSelection,
+  type MediaPickerTab,
+} from "@/components/GiphyPicker";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import VoiceMessage from "@/components/VoiceMessage";
 import ServerInviteCard from "@/components/ServerInviteCard/ServerInviteCard";
@@ -56,7 +59,6 @@ import CreateChannelModal, {
   type ChannelTypeForCreate,
 } from "@/components/CreateChannelModal/CreateChannelModal";
 import CreateCategoryModal from "@/components/CreateCategoryModal/CreateCategoryModal";
-import ChatEmojiPicker from "@/components/ChatEmojiPicker/ChatEmojiPicker";
 import EventsPopup from "@/components/ServerEvents/EventsPopup";
 import CreateEventWizard from "@/components/ServerEvents/CreateEventWizard";
 import EventImageEditor from "@/components/ServerEvents/EventImageEditor";
@@ -70,7 +72,9 @@ import ChannelContextMenu from "@/components/ChannelContextMenu/ChannelContextMe
 import CategoryContextMenu from "@/components/CategoryContextMenu/CategoryContextMenu";
 import * as sidebarPrefs from "@/lib/sidebar-prefs";
 import type { CategoryNotifyMode, ChannelNotifyMode } from "@/lib/sidebar-prefs";
-import ServerSettingsPanel from "@/components/ServerSettingsPanel/ServerSettingsPanel";
+import ServerSettingsPanel, {
+  type ServerSettingsSection,
+} from "@/components/ServerSettingsPanel/ServerSettingsPanel";
 import ServerMembersSection from "@/components/ServerMembersSection/ServerMembersSection";
 import RolesSection from "@/components/RolesSection/RolesSection";
 import ServerInteractionsSection from "@/components/ServerInteractionsSection/ServerInteractionsSection";
@@ -87,10 +91,15 @@ import ServerBansSection from "@/components/ServerBansSection/ServerBansSection"
 import MessageSearchPanel from "@/components/MessageSearchPanel/MessageSearchPanel";
 import MentionDropdown from "@/components/MentionDropdown/MentionDropdown";
 import { fetchInboxForYou } from "@/lib/inbox-api";
+import { normalizeServerBanner } from "@/lib/server-banner";
+import type { VoiceChannelCallProps } from "@/components/VoiceChannelCall";
 
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
 const CallRoom = dynamic(() => import("@/components/CallRoom"), { ssr: false });
-const VoiceChannelCall = dynamic(() => import("@/components/VoiceChannelCall"), { ssr: false });
+const VoiceChannelCall = dynamic<VoiceChannelCallProps>(
+  () => import("@/components/VoiceChannelCall"),
+  { ssr: false },
+);
 const UNCATEGORIZED_CATEGORY_ID = "__uncategorized__";
 
 interface BackendServer extends serversApi.Server {
@@ -121,6 +130,8 @@ interface UIMessage {
   isRead?: boolean; // Trạng thái đã đọc
   messageType?: "text" | "gif" | "sticker" | "voice" | "system" | "welcome";
   giphyId?: string;
+  customStickerUrl?: string;
+  serverStickerId?: string;
   voiceUrl?: string;
   voiceDuration?: number;
   reactions?: MessageReaction[];
@@ -449,6 +460,8 @@ function areMessagesEqual(
   if (prevProps.message.messageType !== nextProps.message.messageType)
     return false;
   if (prevProps.message.giphyId !== nextProps.message.giphyId) return false;
+  if (prevProps.message.customStickerUrl !== nextProps.message.customStickerUrl)
+    return false;
   if (prevProps.message.voiceUrl !== nextProps.message.voiceUrl) return false;
   if (prevProps.message.voiceDuration !== nextProps.message.voiceDuration)
     return false;
@@ -1023,6 +1036,7 @@ export default function MessagesPage() {
   const [serverSettingsTarget, setServerSettingsTarget] = useState<{
     serverId: string;
     serverName: string;
+    initialSection?: ServerSettingsSection;
   } | null>(null);
   const [communityEnabled, setCommunityEnabled] = useState(false);
   const [hideMutedChannels, setHideMutedChannels] = useState(false);
@@ -1130,14 +1144,11 @@ export default function MessagesPage() {
 
   // Media picker states
   const [showGiphyPicker, setShowGiphyPicker] = useState(false);
-  const [giphyPickerMode, setGiphyPickerMode] = useState<"gif" | "sticker">(
-    "gif",
-  );
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [mediaPickerTab, setMediaPickerTab] = useState<MediaPickerTab>("gif");
+  const [serverEmojiRenderMap, setServerEmojiRenderMap] = useState<
+    Record<string, string>
+  >({});
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const [gifSearchQuery, setGifSearchQuery] = useState("");
-  const [gifs, setGifs] = useState<any[]>([]);
 
   // Voice recording states
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
@@ -1146,6 +1157,12 @@ export default function MessagesPage() {
   /** Tắt/bật mic và loa trong thanh voice controls (dùng cả khi xem DM và khi ở server). */
   const [voiceMicMuted, setVoiceMicMuted] = useState(false);
   const [voiceSoundMuted, setVoiceSoundMuted] = useState(false);
+  /** Lưu trạng thái mute theo từng kênh thoại (serverId:channelId). */
+  const [voiceMuteByChannel, setVoiceMuteByChannel] = useState<
+    Record<string, { micMuted: boolean; soundMuted: boolean }>
+  >({});
+  /** Kênh thoại đang kết nối LiveKit (giữ khi user chuyển sang kênh chat). */
+  const [joinedVoiceChannelId, setJoinedVoiceChannelId] = useState<string | null>(null);
 
   // Poll states
   const [showCreatePollModal, setShowCreatePollModal] = useState(false);
@@ -1241,10 +1258,70 @@ export default function MessagesPage() {
     isConnected: isChannelSocketConnected,
     newMessageChannel,
     reactionUpdateChannel,
+    channelNotification,
     joinChannel,
     leaveChannel,
     clearNewMessageChannel,
+    clearChannelNotification,
   } = useChannelMessages({ token });
+
+  const inboxRefetchTimerRef = useRef<number | null>(null);
+  const scheduleInboxDotRefresh = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (inboxRefetchTimerRef.current != null) {
+      window.clearTimeout(inboxRefetchTimerRef.current);
+    }
+    inboxRefetchTimerRef.current = window.setTimeout(() => {
+      fetchInboxForYou()
+        .then((res) => {
+          const hasUnread = (res.items ?? []).some((i) => i.seen !== true);
+          setHasInboxNotification(hasUnread);
+        })
+        .catch(() => undefined);
+    }, 400);
+  }, []);
+
+  // Realtime: when a channel notification arrives, show inbox dot immediately (no reload).
+  useEffect(() => {
+    if (!channelNotification) return;
+    setHasInboxNotification(true);
+    scheduleInboxDotRefresh();
+    clearChannelNotification();
+  }, [channelNotification, clearChannelNotification, scheduleInboxDotRefresh]);
+
+  // Fallback: cover non-socket cases (server_invite / for-you items) without requiring reload.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!currentUserId) return;
+
+    let cancelled = false;
+    const refetch = async () => {
+      try {
+        const res = await fetchInboxForYou();
+        const hasUnread = (res.items ?? []).some((i) => i.seen !== true);
+        if (!cancelled) setHasInboxNotification(hasUnread);
+      } catch (_) {
+        // ignore
+      }
+    };
+
+    refetch();
+    const id = window.setInterval(refetch, 8000);
+
+    const onFocus = () => refetch();
+    const onVis = () => {
+      if (document.visibilityState === "visible") refetch();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [currentUserId]);
 
   // ✅ Sync reactions from WebSocket so both users see updates
   useEffect(() => {
@@ -1314,6 +1391,11 @@ export default function MessagesPage() {
       type: "server",
       messageType: msg.messageType || "text",
       giphyId: msg.giphyId || undefined,
+      customStickerUrl: (msg as serversApi.Message).customStickerUrl || undefined,
+      serverStickerId:
+        (msg as serversApi.Message).serverStickerId != null
+          ? String((msg as serversApi.Message).serverStickerId)
+          : undefined,
       voiceUrl: msg.voiceUrl ?? undefined,
       voiceDuration: msg.voiceDuration ?? undefined,
       stickerReplyWelcomeEnabled: msg.stickerReplyWelcomeEnabled,
@@ -2097,6 +2179,34 @@ export default function MessagesPage() {
     setEmailOtpCooldown(0);
   }, [selectedServer]);
 
+  useEffect(() => {
+    if (!selectedServer || !token) {
+      setServerEmojiRenderMap({});
+      return;
+    }
+    let cancelled = false;
+    serversApi
+      .getEmojiPickerData(selectedServer)
+      .then((data) => {
+        if (cancelled) return;
+        const m: Record<string, string> = {};
+        for (const g of data.groups || []) {
+          if (g.locked) continue;
+          for (const e of g.emojis || []) {
+            const k = (e.name || "").trim().toLowerCase();
+            if (k) m[k] = e.imageUrl;
+          }
+        }
+        setServerEmojiRenderMap(m);
+      })
+      .catch(() => {
+        if (!cancelled) setServerEmojiRenderMap({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedServer, token]);
+
   // Refetch active events mỗi 60s khi đang chọn server → sự kiện xuất hiện đúng lúc khi đến giờ
   useEffect(() => {
     if (!selectedServer) return;
@@ -2277,6 +2387,9 @@ export default function MessagesPage() {
         isRead: msg.isRead || false,
         messageType: msg.type || "text",
         giphyId: msg.giphyId || undefined,
+        customStickerUrl: msg.customStickerUrl || undefined,
+        serverStickerId:
+          msg.serverStickerId != null ? String(msg.serverStickerId) : undefined,
         voiceUrl: msg.voiceUrl ?? undefined,
         voiceDuration: msg.voiceDuration ?? undefined,
         reactions: normalizeReactions(msg.reactions),
@@ -2355,6 +2468,9 @@ export default function MessagesPage() {
         isRead: msg.isRead || false,
         messageType: msg.type || "text",
         giphyId: msg.giphyId || undefined,
+        customStickerUrl: msg.customStickerUrl || undefined,
+        serverStickerId:
+          msg.serverStickerId != null ? String(msg.serverStickerId) : undefined,
         voiceUrl: msg.voiceUrl ?? undefined,
         voiceDuration: msg.voiceDuration ?? undefined,
         reactions: normalizeReactions(msg.reactions),
@@ -2484,12 +2600,28 @@ export default function MessagesPage() {
   }, [messageDeleted]);
 
   // Load messages when any text chat channel is selected (includes category "info"; textChannels state excludes info only for sidebar grouping)
-  const selectedVoiceChannel = selectedChannel
-    ? voiceChannels.find((c) => c._id === selectedChannel)
+  /** Đang chọn kênh thoại trong sidebar (hiển thị UI kênh thoại đầy đủ). */
+  const viewingVoiceChannel = selectedChannel
+    ? voiceChannels.find((c) => c._id === selectedChannel) ?? null
+    : null;
+  /** Kênh thoại đang có phiên LiveKit (có thể đang xem kênh chat). */
+  const connectedVoiceChannel = joinedVoiceChannelId
+    ? voiceChannels.find((c) => c._id === joinedVoiceChannelId) ?? null
     : null;
   const selectedChatTextChannel = selectedChannel
     ? allChannels.find((c) => c._id === selectedChannel && c.type === "text")
     : null;
+
+  const voiceMuteKey =
+    selectedServer && joinedVoiceChannelId ? `${selectedServer}:${joinedVoiceChannelId}` : null;
+
+  // Khi đổi kênh thoại, phục hồi mute state theo kênh đó (không ảnh hưởng kênh khác)
+  useEffect(() => {
+    if (!voiceMuteKey) return;
+    const v = voiceMuteByChannel[voiceMuteKey];
+    setVoiceMicMuted(Boolean(v?.micMuted));
+    setVoiceSoundMuted(Boolean(v?.soundMuted));
+  }, [voiceMuteKey, voiceMuteByChannel]);
 
   useEffect(() => {
     if (selectedChannel && selectedChatTextChannel) {
@@ -2513,15 +2645,22 @@ export default function MessagesPage() {
     if (isChannelSocketConnected && selectedChannel) joinChannel(selectedChannel);
   }, [isChannelSocketConnected, selectedChannel, joinChannel]);
 
+  useEffect(() => {
+    setJoinedVoiceChannelId(null);
+    setVoiceChannelCallToken(null);
+    setVoiceChannelCallServerUrl("");
+    setVoiceChannelCallError(null);
+  }, [selectedServer]);
+
   // Voice channel: auto-join LiveKit room when user is in a voice channel (no separate call button)
   useEffect(() => {
-    if (!selectedVoiceChannel || !selectedServer || !token || !currentUserProfile) {
+    if (!connectedVoiceChannel || !selectedServer || !token || !currentUserProfile) {
       setVoiceChannelCallToken(null);
       setVoiceChannelCallServerUrl("");
       setVoiceChannelCallError(null);
       return;
     }
-    const roomName = `voice-${selectedServer}-${selectedVoiceChannel._id}`;
+    const roomName = `voice-${selectedServer}-${connectedVoiceChannel._id}`;
     const participantName =
       currentUserProfile.displayName || currentUserProfile.username || "Người dùng";
 
@@ -2546,7 +2685,7 @@ export default function MessagesPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedVoiceChannel?._id, selectedServer, token, currentUserProfile?.username]);
+  }, [connectedVoiceChannel?._id, selectedServer, token, currentUserProfile?.username]);
 
   // Auto scroll to latest message - optimized to prevent jitter
   useEffect(() => {
@@ -2735,6 +2874,11 @@ export default function MessagesPage() {
         type: "server",
         messageType: (msg as any).messageType || "text",
         giphyId: (msg as any).giphyId || undefined,
+        customStickerUrl: (msg as any).customStickerUrl || undefined,
+        serverStickerId:
+          (msg as any).serverStickerId != null
+            ? String((msg as any).serverStickerId)
+            : undefined,
         voiceUrl: (msg as any).voiceUrl ?? undefined,
         voiceDuration: (msg as any).voiceDuration ?? undefined,
         stickerReplyWelcomeEnabled: (msg as any).stickerReplyWelcomeEnabled,
@@ -2849,6 +2993,9 @@ export default function MessagesPage() {
         isRead: msg.isRead || false, // Load initial read status
         messageType: msg.type || "text", // Type of message content
         giphyId: msg.giphyId || undefined, // Giphy ID if it's a GIF/sticker
+        customStickerUrl: msg.customStickerUrl || undefined,
+        serverStickerId:
+          msg.serverStickerId != null ? String(msg.serverStickerId) : undefined,
         voiceUrl: msg.voiceUrl ?? undefined, // Voice message URL
         voiceDuration: msg.voiceDuration ?? undefined, // Voice message duration
         reactions: normalizeReactions(msg.reactions),
@@ -2918,6 +3065,10 @@ export default function MessagesPage() {
   };
 
   const handleSelectDirectMessageFriend = async (friend: serversApi.Friend) => {
+    setJoinedVoiceChannelId(null);
+    setVoiceChannelCallToken(null);
+    setVoiceChannelCallServerUrl("");
+    setShowExploreView(false);
     setSelectedDirectMessageFriend(friend);
     setMessageText("");
     setSelectedServer(null);
@@ -3138,8 +3289,7 @@ export default function MessagesPage() {
     if (!shouldBlockServerChatInput) return;
     setMentionOpen(false);
     setShowPlusMenu(false);
-    setShowEmojiPicker(false);
-    setShowGifPicker(false);
+    setShowGiphyPicker(false);
   }, [shouldBlockServerChatInput]);
 
   const handleSendMessage = async () => {
@@ -3202,6 +3352,11 @@ export default function MessagesPage() {
         type: "server",
         messageType: (newMessage as any).messageType || "text",
         giphyId: (newMessage as any).giphyId || undefined,
+        customStickerUrl: (newMessage as any).customStickerUrl || undefined,
+        serverStickerId:
+          (newMessage as any).serverStickerId != null
+            ? String((newMessage as any).serverStickerId)
+            : undefined,
         voiceUrl: (newMessage as any).voiceUrl ?? undefined,
         voiceDuration: (newMessage as any).voiceDuration ?? undefined,
         replyTo: replyingTo?.id ?? (newMessage.replyTo && typeof newMessage.replyTo === "object" ? (newMessage.replyTo as any)._id : typeof newMessage.replyTo === "string" ? newMessage.replyTo : undefined),
@@ -3465,6 +3620,11 @@ export default function MessagesPage() {
           isRead: created.isRead ?? false,
           messageType: created.type || "text",
           giphyId: created.giphyId ?? undefined,
+          customStickerUrl: (created as any).customStickerUrl ?? undefined,
+          serverStickerId:
+            (created as any).serverStickerId != null
+              ? String((created as any).serverStickerId)
+              : undefined,
           voiceUrl: created.voiceUrl ?? undefined,
           voiceDuration: created.voiceDuration ?? undefined,
           replyTo:
@@ -3513,8 +3673,6 @@ export default function MessagesPage() {
   };
 
   const handleSendGiphy = async (gif: GiphyGif, type: "gif" | "sticker") => {
-    setShowGiphyPicker(false);
-
     if (selectedChannel && !selectedDirectMessageFriend) {
       try {
         shouldAutoScrollRef.current = true;
@@ -3600,6 +3758,103 @@ export default function MessagesPage() {
     } catch (err) {
       console.error(`Failed to send ${type}:`, err);
       setError(`Không gửi được ${type}`);
+    }
+  };
+
+  const handleSendServerSticker = async (
+    sel: Extract<GiphyPickerSelection, { source: "server" }>,
+  ) => {
+    if (!selectedChannel || selectedDirectMessageFriend) {
+      setError("Sticker máy chủ chỉ dùng trong kênh máy chủ.");
+      return;
+    }
+    if (String(sel.serverId) !== String(selectedServer)) {
+      setError("Sticker này không dùng được ở máy chủ hiện tại.");
+      return;
+    }
+    try {
+      shouldAutoScrollRef.current = true;
+      const label = sel.name?.trim() ? `:${sel.name}:` : "Sticker máy chủ";
+      const newMsg = await serversApi.createMessage(
+        selectedChannel,
+        label,
+        undefined,
+        replyingTo?.id,
+        undefined,
+        "sticker",
+        undefined,
+        undefined,
+        undefined,
+        {
+          customStickerUrl: sel.imageUrl,
+          serverStickerId: sel.stickerId,
+        },
+      );
+      const rawStickerId = (newMsg as serversApi.Message).serverStickerId;
+      const serverStickerIdResolved: string =
+        rawStickerId != null && String(rawStickerId).length > 0
+          ? String(rawStickerId)
+          : sel.stickerId;
+      const uiMsg: UIMessage = {
+        id: newMsg._id,
+        text: newMsg.content,
+        senderId:
+          typeof newMsg.senderId === "string"
+            ? newMsg.senderId
+            : newMsg.senderId._id,
+        senderEmail: "",
+        senderName: currentUserProfile?.username || "",
+        senderDisplayName:
+          servers
+            .find((s) => s._id === selectedServer)
+            ?.members?.find((m) => String(m.userId) === String(currentUserId))
+            ?.nickname?.trim() ||
+          currentUserProfile?.displayName ||
+          undefined,
+        senderAvatar: currentUserProfile?.avatar,
+        timestamp: new Date(newMsg.createdAt),
+        isFromCurrentUser: true,
+        type: "server",
+        messageType: "sticker",
+        customStickerUrl: (() => {
+          const fromApi = (newMsg as serversApi.Message).customStickerUrl;
+          return typeof fromApi === "string" && fromApi.length > 0
+            ? fromApi
+            : sel.imageUrl;
+        })(),
+        serverStickerId: serverStickerIdResolved,
+        replyTo: replyingTo?.id ?? undefined,
+        reactions: [],
+      };
+      setMessages((prev) => appendServerMessage(prev, uiMsg));
+      setReplyingTo(null);
+    } catch (err) {
+      console.error("Failed to send server sticker:", err);
+      setError("Không gửi được sticker máy chủ");
+    }
+  };
+
+  const handleGiphyPickerSelect = (sel: GiphyPickerSelection) => {
+    setShowGiphyPicker(false);
+    if (sel.source === "giphy") {
+      void handleSendGiphy(sel.gif, sel.mediaType);
+      return;
+    }
+    if (sel.source === "server") {
+      void handleSendServerSticker(sel);
+      return;
+    }
+    if (sel.source === "unicode") {
+      setMessageText((p) => p + sel.emoji);
+      return;
+    }
+    if (sel.source === "kaomoji") {
+      setMessageText((p) => p + sel.text);
+      return;
+    }
+    if (sel.source === "serverEmoji") {
+      const safe = sel.name.replace(/[^a-zA-Z0-9_]/g, "") || "emoji";
+      setMessageText((p) => p + `:${safe}:`);
     }
   };
 
@@ -4401,7 +4656,14 @@ export default function MessagesPage() {
 
   const renderMessageContent = useCallback(
     (message: UIMessage) => {
-      const { text, messageType, giphyId, voiceUrl, voiceDuration } = message;
+      const {
+        text,
+        messageType,
+        giphyId,
+        customStickerUrl,
+        voiceUrl,
+        voiceDuration,
+      } = message;
 
       if (messageType === "system") {
         return (
@@ -4550,6 +4812,24 @@ export default function MessagesPage() {
         );
       }
 
+      if (messageType === "sticker" && customStickerUrl) {
+        return (
+          <div className={styles.mediaMessage}>
+            <img
+              src={customStickerUrl}
+              alt=""
+              style={{
+                maxWidth: "200px",
+                maxHeight: "200px",
+                borderRadius: "8px",
+                display: "block",
+              }}
+              loading="lazy"
+            />
+          </div>
+        );
+      }
+
       // Check if message is GIF or Sticker from Giphy
       if ((messageType === "gif" || messageType === "sticker") && giphyId) {
         return (
@@ -4559,7 +4839,7 @@ export default function MessagesPage() {
         );
       }
 
-      if (messageType === "sticker" && !giphyId) {
+      if (messageType === "sticker" && !giphyId && !customStickerUrl) {
         return (
           <div style={{ fontSize: 64, padding: "8px", lineHeight: 1 }}>
             👋
@@ -4713,45 +4993,51 @@ export default function MessagesPage() {
         );
       }
 
-      // Regular text message
-      return <span>{text}</span>;
-    },
-    [token, wavingIds, selectedChannel, handleWaveSticker],
-  );
-
-  // Handle emoji selection
-  const handleEmojiClick = (emojiData: any) => {
-    setMessageText((prev) => prev + emojiData.emoji);
-    setShowEmojiPicker(false);
-  };
-
-  // Search GIFs from Tenor API (free, no key needed)
-  const searchGifs = async (query: string) => {
-    if (!query.trim()) {
-      setGifs([]);
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&limit=20`,
+      // Regular text message (emoji máy chủ dạng :ten: trong kênh server)
+      const map = serverEmojiRenderMap;
+      if (!Object.keys(map).length) {
+        return <span>{text}</span>;
+      }
+      const re = /:([a-zA-Z0-9_]{2,32}):/g;
+      const nodes: React.ReactNode[] = [];
+      let last = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        if (m.index > last) {
+          nodes.push(<span key={`t-${last}`}>{text.slice(last, m.index)}</span>);
+        }
+        const url = map[m[1].toLowerCase()];
+        if (url) {
+          nodes.push(
+            <img
+              key={`e-${m.index}`}
+              src={url}
+              alt={m[0]}
+              style={{
+                width: 22,
+                height: 22,
+                verticalAlign: "middle",
+                objectFit: "contain",
+                display: "inline-block",
+              }}
+            />,
+          );
+        } else {
+          nodes.push(<span key={`l-${m.index}`}>{m[0]}</span>);
+        }
+        last = m.index + m[0].length;
+      }
+      if (last < text.length) {
+        nodes.push(<span key="tail">{text.slice(last)}</span>);
+      }
+      return (
+        <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+          {nodes}
+        </span>
       );
-      const data = await response.json();
-      setGifs(data.results || []);
-    } catch (error) {
-      console.error("Failed to search GIFs:", error);
-      setGifs([]);
-    }
-  };
-
-  // Handle GIF selection
-  const handleGifClick = (gif: any) => {
-    const gifUrl = gif.media_formats.gif.url;
-    setMessageText((prev) => prev + ` ${gifUrl} `);
-    setShowGifPicker(false);
-    setGifSearchQuery("");
-    setGifs([]);
-  };
+    },
+    [token, wavingIds, selectedChannel, handleWaveSticker, serverEmojiRenderMap],
+  );
 
   // Handle file upload
   const handleFileUpload = () => {
@@ -5131,6 +5417,47 @@ export default function MessagesPage() {
     return Boolean(currentServerPermissions?.canManageServer);
   }, [currentUserId, selectedServerEntity, currentServerPermissions]);
 
+  const ownedServersForPicker = useMemo(() => {
+    if (!currentUserId) return [];
+    return servers
+      .filter(
+        (s) =>
+          String((s as any).ownerId?._id ?? (s as any).ownerId) === currentUserId,
+      )
+      .map((s) => ({
+        id: s._id,
+        name: s.name || "Máy chủ",
+        avatarUrl: (s as any).avatarUrl ?? null,
+      }));
+  }, [servers, currentUserId]);
+
+  const openServerSettingsFromMediaPicker = useCallback(
+    async (serverId: string, section: ServerSettingsSection) => {
+      const s = servers.find((x) => x._id === serverId);
+      if (!s) return;
+      setShowGiphyPicker(false);
+      setServerSettingsTarget({
+        serverId,
+        serverName: s.name || "Máy chủ",
+        initialSection: section,
+      });
+      try {
+        const perms = await serversApi.getCurrentUserPermissions(serverId);
+        setServerSettingsPermissions(perms);
+      } catch {
+        setServerSettingsPermissions(null);
+      }
+      try {
+        const c = await serversApi.getCommunitySettings(serverId);
+        setCommunityEnabled(c.enabled);
+      } catch {
+        setCommunityEnabled(false);
+      }
+      setShowServerSettingsPanel(true);
+    },
+    [servers],
+  );
+
   useEffect(() => {
     setShowJoinApplicationsView(false);
   }, [selectedServer]);
@@ -5146,6 +5473,56 @@ export default function MessagesPage() {
       .catch(() => setJoinAppPendingCount(0));
   }, [selectedServer, canManageJoinApplications, joinApplicationsRefreshTick]);
 
+  // Realtime-ish refresh: avoid "must reload to see pending applications dot"
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!selectedServer || !canManageJoinApplications) return;
+
+    let cancelled = false;
+    const refetch = () => {
+      serversApi
+        .listJoinApplications(selectedServer, "pending")
+        .then((r) => {
+          if (!cancelled) setJoinAppPendingCount(r.pendingCount);
+        })
+        .catch(() => {
+          if (!cancelled) setJoinAppPendingCount(0);
+        });
+    };
+
+    // quick initial sync + polling
+    refetch();
+    const id = window.setInterval(refetch, 6000);
+
+    const onFocus = () => refetch();
+    const onVis = () => {
+      if (document.visibilityState === "visible") refetch();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [selectedServer, canManageJoinApplications]);
+
+  const leaveVoiceChannel = useCallback(() => {
+    const vid = joinedVoiceChannelId;
+    setJoinedVoiceChannelId(null);
+    setVoiceChannelCallToken(null);
+    setVoiceChannelCallServerUrl("");
+    setVoiceChannelCallError(null);
+    setVoiceMicMuted(false);
+    setVoiceSoundMuted(false);
+    if (vid && selectedChannel === vid) {
+      setSelectedChannel(null);
+    }
+    if (selectedServer) void loadActiveEvents(selectedServer);
+  }, [joinedVoiceChannelId, selectedChannel, selectedServer, loadActiveEvents]);
+
   const trySelectChannel = useCallback(
     (channelId: string) => {
       const channel = allChannels.find((c) => c._id === channelId);
@@ -5160,13 +5537,23 @@ export default function MessagesPage() {
           myServerAccessStatus?.status === "rejected")
       ) {
         setSelectedChannel(null);
+        setJoinedVoiceChannelId(null);
         return;
       }
       setError(null);
       setShowJoinApplicationsView(false);
+      setShowExploreView(false);
+      if (channel?.type === "voice") {
+        setJoinedVoiceChannelId(channelId);
+      }
       setSelectedChannel(channelId);
     },
-    [allChannels, canAccessPrivateChannel, myServerAccessStatus?.accessMode, myServerAccessStatus?.status],
+    [
+      allChannels,
+      canAccessPrivateChannel,
+      myServerAccessStatus?.accessMode,
+      myServerAccessStatus?.status,
+    ],
   );
 
   const getCategoryCollapseState = useCallback(
@@ -5247,6 +5634,9 @@ export default function MessagesPage() {
           alt="Cordigram"
           className={styles.logoImage}
           onClick={() => {
+            setJoinedVoiceChannelId(null);
+            setVoiceChannelCallToken(null);
+            setVoiceChannelCallServerUrl("");
             setSelectedServer(null);
             setSelectedChannel(null);
             setShowExploreView(false);
@@ -5274,13 +5664,16 @@ export default function MessagesPage() {
 
         <button
           className={`${styles.exploreBtn} ${showExploreView ? styles.exploreBtnActive : ""}`}
-          title="Khám phá"
+          title={showExploreView ? "Đóng Khám phá" : "Khám phá"}
           onClick={() => {
-            setShowExploreView(true);
-            setShowJoinApplicationsView(false);
-            setSelectedDirectMessageFriend(null);
-            setSelectedServer(null);
-            setSelectedChannel(null);
+            setShowExploreView((prev) => {
+              const next = !prev;
+              if (next) {
+                setShowJoinApplicationsView(false);
+                setSelectedDirectMessageFriend(null);
+              }
+              return next;
+            });
           }}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -5307,7 +5700,10 @@ export default function MessagesPage() {
               <button
                 key={server._id}
                 className={styles.navBtn}
-                onClick={() => setSelectedServer(server._id)}
+                onClick={() => {
+                  setShowExploreView(false);
+                  setSelectedServer(server._id);
+                }}
                 onContextMenu={async (e) => {
                   e.preventDefault();
                   if (isAdminViewedServer) {
@@ -5394,9 +5790,11 @@ export default function MessagesPage() {
           {/* Thanh thể hiện đang ở DM hay Server + nút Hộp thư */}
           <div className={styles.contextBar}>
             <span className={styles.contextBarLabel}>
-              {selectedServer
-                ? (currentServer?.name ?? "Máy chủ")
-                : "Tin nhắn trực tiếp"}
+              {showExploreView && !selectedDirectMessageFriend
+                ? "Khám phá"
+                : selectedServer
+                  ? (currentServer?.name ?? "Máy chủ")
+                  : "Tin nhắn trực tiếp"}
             </span>
             <div className={styles.contextBarActions}>
               <span className={styles.inboxBtnWrap}>
@@ -5603,7 +6001,19 @@ export default function MessagesPage() {
                       type="button"
                       className={`${styles.voiceButton} ${voiceMicMuted ? styles.voiceButtonMuted : ""}`}
                       title={voiceMicMuted ? "Bật mic" : "Tắt mic"}
-                      onClick={() => setVoiceMicMuted((m) => !m)}
+                      onClick={() => {
+                        const next = !voiceMicMuted;
+                        setVoiceMicMuted(next);
+                        if (voiceMuteKey) {
+                          setVoiceMuteByChannel((prev) => ({
+                            ...prev,
+                            [voiceMuteKey]: {
+                              micMuted: next,
+                              soundMuted: prev[voiceMuteKey]?.soundMuted ?? false,
+                            },
+                          }));
+                        }
+                      }}
                       aria-pressed={voiceMicMuted}
                     >
                       <svg
@@ -5624,7 +6034,19 @@ export default function MessagesPage() {
                       type="button"
                       className={`${styles.voiceButton} ${voiceSoundMuted ? styles.voiceButtonMuted : ""}`}
                       title={voiceSoundMuted ? "Bật âm thanh" : "Tắt âm thanh"}
-                      onClick={() => setVoiceSoundMuted((m) => !m)}
+                      onClick={() => {
+                        const next = !voiceSoundMuted;
+                        setVoiceSoundMuted(next);
+                        if (voiceMuteKey) {
+                          setVoiceMuteByChannel((prev) => ({
+                            ...prev,
+                            [voiceMuteKey]: {
+                              micMuted: prev[voiceMuteKey]?.micMuted ?? false,
+                              soundMuted: next,
+                            },
+                          }));
+                        }
+                      }}
                       aria-pressed={voiceSoundMuted}
                     >
                       <svg
@@ -5759,6 +6181,7 @@ export default function MessagesPage() {
                     type="button"
                     className={`${styles.serverMenuItem} ${showJoinApplicationsView ? styles.serverMenuItemActive : ""}`}
                     onClick={() => {
+                      setShowExploreView(false);
                       setShowJoinApplicationsView(true);
                       setSelectedChannel(null);
                     }}
@@ -5980,12 +6403,16 @@ export default function MessagesPage() {
                         >
                           {channelsInCat.map((channel) => {
                             const isVoice = channel.type === "voice";
-                            const isSelected = selectedChannel === channel._id;
+                            const isSelected =
+                              selectedChannel === channel._id || joinedVoiceChannelId === channel._id;
                             const isChDragging = dragType === "channel" && dragId === channel._id;
                             const isChDropTarget = dragType === "channel" && dragOverId === channel._id && dragId !== channel._id;
                             if (isVoice) {
                               const canInviteToVoice = currentServer && (currentServer.ownerId === currentUserId || currentServer.isPublic);
-                              const showInviteBar = isSelected && canInviteToVoice && !voiceInviteDismissed.has(channel._id);
+                              const showInviteBar =
+                                (selectedChannel === channel._id || joinedVoiceChannelId === channel._id) &&
+                                canInviteToVoice &&
+                                !voiceInviteDismissed.has(channel._id);
                               const participantsInChannel = voiceChannelParticipants[channel._id] ?? [];
                               return (
                                 <div
@@ -6217,7 +6644,7 @@ export default function MessagesPage() {
                       {voiceChannels.length > 0 ? voiceChannels.map((channel) => (
                         <div
                           key={channel._id}
-                          className={`${styles.conversationItem} ${selectedChannel === channel._id ? styles.active : ""}`}
+                          className={`${styles.conversationItem} ${selectedChannel === channel._id || joinedVoiceChannelId === channel._id ? styles.active : ""}`}
                           onClick={() => trySelectChannel(channel._id)}
                           onContextMenu={(e) => {
                             e.preventDefault();
@@ -6304,7 +6731,19 @@ export default function MessagesPage() {
                       type="button"
                       className={`${styles.voiceButton} ${voiceMicMuted ? styles.voiceButtonMuted : ""}`}
                       title={voiceMicMuted ? "Bật mic" : "Tắt mic"}
-                      onClick={() => setVoiceMicMuted((m) => !m)}
+                      onClick={() => {
+                        const next = !voiceMicMuted;
+                        setVoiceMicMuted(next);
+                        if (voiceMuteKey) {
+                          setVoiceMuteByChannel((prev) => ({
+                            ...prev,
+                            [voiceMuteKey]: {
+                              micMuted: next,
+                              soundMuted: prev[voiceMuteKey]?.soundMuted ?? false,
+                            },
+                          }));
+                        }
+                      }}
                       aria-pressed={voiceMicMuted}
                     >
                       <svg
@@ -6325,7 +6764,19 @@ export default function MessagesPage() {
                       type="button"
                       className={`${styles.voiceButton} ${voiceSoundMuted ? styles.voiceButtonMuted : ""}`}
                       title={voiceSoundMuted ? "Bật âm thanh" : "Tắt âm thanh"}
-                      onClick={() => setVoiceSoundMuted((m) => !m)}
+                      onClick={() => {
+                        const next = !voiceSoundMuted;
+                        setVoiceSoundMuted(next);
+                        if (voiceMuteKey) {
+                          setVoiceMuteByChannel((prev) => ({
+                            ...prev,
+                            [voiceMuteKey]: {
+                              micMuted: prev[voiceMuteKey]?.micMuted ?? false,
+                              soundMuted: next,
+                            },
+                          }));
+                        }
+                      }}
                       aria-pressed={voiceSoundMuted}
                     >
                       <svg
@@ -6404,6 +6855,7 @@ export default function MessagesPage() {
               </div>
             ) : showExploreView && !selectedDirectMessageFriend ? (
               <ExploreServersView
+                onClose={() => setShowExploreView(false)}
                 onJoin={async (serverId) => {
                   try {
                     const opened = await openApplyJoinModalIfNeeded(serverId);
@@ -6461,9 +6913,10 @@ export default function MessagesPage() {
               </div>
             ) : (selectedChannel && currentServer) ||
             selectedDirectMessageFriend ? (
-              selectedVoiceChannel ? (
-                <>
-                  {/* Voice channel = Call UI (no chat) */}
+              <>
+                {connectedVoiceChannel && (
+                  <>
+                    {viewingVoiceChannel && (
                   <div className={styles.chatHeader}>
                     <div className={styles.chatHeaderLeft}>
                       <span className={styles.voiceChannelIcon}>
@@ -6475,7 +6928,7 @@ export default function MessagesPage() {
                         </svg>
                       </span>
                       <h2 className={styles.chatHeaderTitle}>
-                        {selectedVoiceChannel.name}
+                        {connectedVoiceChannel.name}
                       </h2>
                     </div>
                     <div className={styles.chatHeaderActions}>
@@ -6491,7 +6944,12 @@ export default function MessagesPage() {
                       </button>
                     </div>
                   </div>
-                  <div className={styles.voiceCallView}>
+                    )}
+                  <div
+                    className={
+                      viewingVoiceChannel ? styles.voiceCallView : styles.voiceCallOffscreen
+                    }
+                  >
                     <div className={styles.voiceCallVideoArea}>
                       {voiceChannelCallError ? (
                         <div className={styles.voiceCallError}>
@@ -6499,7 +6957,7 @@ export default function MessagesPage() {
                           <button
                             type="button"
                             className={styles.voiceCallErrorBtn}
-                            onClick={() => setSelectedChannel(null)}
+                            onClick={leaveVoiceChannel}
                           >
                             Rời kênh
                           </button>
@@ -6508,17 +6966,14 @@ export default function MessagesPage() {
                         <VoiceChannelCall
                           token={voiceChannelCallToken}
                           serverUrl={voiceChannelCallServerUrl}
+                          micMuted={voiceMicMuted}
+                          soundMuted={voiceSoundMuted}
                           participantName={
                             currentUserProfile?.displayName ||
                             currentUserProfile?.username ||
                             "Người dùng"
                           }
-                          onDisconnect={() => {
-                            setVoiceChannelCallToken(null);
-                            setVoiceChannelCallServerUrl("");
-                            setSelectedChannel(null);
-                            if (selectedServer) loadActiveEvents(selectedServer);
-                          }}
+                          onDisconnect={leaveVoiceChannel}
                         />
                       ) : (
                         <div className={styles.voiceCallConnecting}>
@@ -6528,9 +6983,21 @@ export default function MessagesPage() {
                       )}
                     </div>
                   </div>
-                </>
-              ) : (
+                  </>
+                )}
+                {(selectedDirectMessageFriend ||
+                  (selectedChatTextChannel && !viewingVoiceChannel)) && (
               <>
+                {joinedVoiceChannelId && connectedVoiceChannel && !viewingVoiceChannel && (
+                  <div className={styles.voiceChatBanner}>
+                    <span className={styles.voiceChatBannerLabel}>
+                      Đang trong kênh thoại: {connectedVoiceChannel.name}
+                    </span>
+                    <button type="button" className={styles.voiceChatBannerLeave} onClick={leaveVoiceChannel}>
+                      Rời kênh
+                    </button>
+                  </div>
+                )}
                 {/* Chat Header (DM or text channel) */}
                 <div className={styles.chatHeader}>
                   <div className={styles.chatHeaderLeft}>
@@ -7375,9 +7842,8 @@ export default function MessagesPage() {
                           className={styles.mediaButton}
                           title="Send GIF"
                           onClick={() => {
-                            setGiphyPickerMode("gif");
+                            setMediaPickerTab("gif");
                             setShowGiphyPicker(true);
-                            setShowEmojiPicker(false);
                           }}
                         >
                           <span
@@ -7392,9 +7858,8 @@ export default function MessagesPage() {
                           className={styles.mediaButton}
                           title="Gửi nhãn dán"
                           onClick={() => {
-                            setGiphyPickerMode("sticker");
+                            setMediaPickerTab("sticker");
                             setShowGiphyPicker(true);
-                            setShowEmojiPicker(false);
                           }}
                         >
                           <svg
@@ -7436,42 +7901,28 @@ export default function MessagesPage() {
                         </button>
 
                         {/* Emoji Picker */}
-                        <div style={{ position: "relative" }}>
-                          <button
-                            className={styles.mediaButton}
-                            title="Gửi biểu tượng cảm xúc"
-                            onClick={() => {
-                              setShowEmojiPicker(!showEmojiPicker);
-                              setShowGifPicker(false);
-                            }}
+                        <button
+                          className={styles.mediaButton}
+                          title="Emoji & kaomoji"
+                          onClick={() => {
+                            setMediaPickerTab("emoji");
+                            setShowGiphyPicker(true);
+                          }}
+                        >
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
                           >
-                            <svg
-                              width="20"
-                              height="20"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                            >
-                              <circle cx="12" cy="12" r="10"></circle>
-                              <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-                              <line x1="9" y1="9" x2="9.01" y2="9"></line>
-                              <line x1="15" y1="9" x2="15.01" y2="9"></line>
-                            </svg>
-                          </button>
-
-                          {showEmojiPicker && (
-                            <div className={styles.emojiPickerWrapper}>
-                              <ChatEmojiPicker
-                                onSelect={(text) => {
-                                  setMessageText((prev) => prev + text);
-                                }}
-                                onClose={() => setShowEmojiPicker(false)}
-                                position="top"
-                              />
-                            </div>
-                          )}
-                        </div>
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                            <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                          </svg>
+                        </button>
                       </div>
 
                       <button
@@ -7500,7 +7951,8 @@ export default function MessagesPage() {
                 </div>
                 )}
               </>
-              )
+              )}
+            </>
             ) : (
               <div className={styles.emptyState}>
                 <div className={styles.emptyIcon}>💬</div>
@@ -8384,6 +8836,9 @@ export default function MessagesPage() {
         server={{
           name: applyJoinServerMeta?.name ?? "Máy chủ",
           avatarUrl: applyJoinServerMeta?.avatarUrl,
+          bannerUrl: applyJoinServerMeta?.bannerUrl,
+          bannerImageUrl: applyJoinServerMeta?.bannerImageUrl,
+          bannerColor: applyJoinServerMeta?.bannerColor,
           memberCount: applyJoinServerMeta?.memberCount,
           createdAt: applyJoinServerMeta?.createdAt,
         }}
@@ -8474,6 +8929,7 @@ export default function MessagesPage() {
         }}
         serverName={serverSettingsTarget?.serverName ?? ""}
         serverId={serverSettingsTarget?.serverId ?? ""}
+        initialSection={serverSettingsTarget?.initialSection}
         locale={
           ((serverSettingsTarget?.serverId
             ? (servers.find((s) => s._id === serverSettingsTarget.serverId) as any)?.primaryLanguage
@@ -9118,9 +9574,20 @@ export default function MessagesPage() {
       {/* Giphy Picker Modal */}
       {showGiphyPicker && (
         <GiphyPicker
-          onSelect={handleSendGiphy}
+          onSelect={handleGiphyPickerSelect}
           onClose={() => setShowGiphyPicker(false)}
-          initialTab={giphyPickerMode}
+          initialTab={mediaPickerTab}
+          contextServerId={selectedServer ?? null}
+          ownedServers={ownedServersForPicker}
+          onManageServerStickers={(sid) =>
+            void openServerSettingsFromMediaPicker(sid, "sticker")
+          }
+          onManageServerEmojis={(sid) =>
+            void openServerSettingsFromMediaPicker(sid, "emoji")
+          }
+          enableServerMedia={
+            !!(selectedChannel || selectedDirectMessageFriend)
+          }
         />
       )}
 
@@ -9171,8 +9638,10 @@ export default function MessagesPage() {
 }
 
 function ExploreServersView({
+  onClose,
   onJoin,
 }: {
+  onClose: () => void;
   onJoin: (serverId: string) => void | Promise<void>;
 }) {
   const [loading, setLoading] = useState(true);
@@ -9205,6 +9674,11 @@ function ExploreServersView({
   return (
     <div className={styles.explorePage}>
       <div className={styles.exploreHero}>
+        <div className={styles.exploreHeroTop}>
+          <button type="button" className={styles.exploreBackBtn} onClick={onClose}>
+            ← Quay lại chat
+          </button>
+        </div>
         <h2 className={styles.exploreHeroTitle}>Khám phá</h2>
         <p className={styles.exploreHeroSub}>
           Tìm những cộng đồng được duyệt để tham gia. Khi máy chủ có “Đăng ký tham gia”, bạn sẽ cần điền đơn trước khi vào.
@@ -9221,14 +9695,21 @@ function ExploreServersView({
         </div>
       ) : (
         <div className={styles.exploreGrid}>
-          {servers.map((s) => (
+          {servers.map((s) => {
+            const b = normalizeServerBanner(s);
+            return (
             <div key={s.id} className={styles.exploreCard}>
               <div
                 className={styles.exploreCardBanner}
-                style={{
-                  backgroundImage: s.bannerUrl ? `url(${s.bannerUrl})` : undefined,
-                }}
-              />
+                style={{ background: b.bannerColor }}
+              >
+                {b.bannerImageUrl ? (
+                  <div
+                    className={styles.exploreCardBannerImage}
+                    style={{ backgroundImage: `url(${b.bannerImageUrl})` }}
+                  />
+                ) : null}
+              </div>
               <div className={styles.exploreCardBody}>
                 <div className={styles.exploreCardHeader}>
                   <div
@@ -9261,7 +9742,8 @@ function ExploreServersView({
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Inject,
   forwardRef,
 } from '@nestjs/common';
@@ -617,6 +618,60 @@ export class MessagesService {
       }
     }
 
+    const messageTypeResolved = createMessageDto.messageType || 'text';
+    let resolvedCustomStickerUrl: string | null = null;
+    let resolvedServerStickerId: Types.ObjectId | null = null;
+
+    const hasCustomStickerFields = !!(
+      createMessageDto.customStickerUrl?.trim() ||
+      createMessageDto.serverStickerId?.trim()
+    );
+
+    if (hasCustomStickerFields) {
+      if (messageTypeResolved !== 'sticker') {
+        throw new BadRequestException(
+          'customStickerUrl/serverStickerId chỉ dùng với tin nhắn sticker',
+        );
+      }
+      if (
+        !createMessageDto.customStickerUrl?.trim() ||
+        !createMessageDto.serverStickerId?.trim()
+      ) {
+        throw new BadRequestException(
+          'Cần đủ customStickerUrl và serverStickerId cho sticker máy chủ',
+        );
+      }
+      if (createMessageDto.giphyId?.trim()) {
+        throw new BadRequestException(
+          'Không gửi đồng thời sticker Giphy và sticker máy chủ',
+        );
+      }
+      const srvStickers = await this.serverModel
+        .findById(channel.serverId)
+        .select('customStickers')
+        .lean()
+        .exec();
+      const sid = createMessageDto.serverStickerId.trim();
+      const sticker = ((srvStickers as any)?.customStickers || []).find(
+        (s: any) => s._id?.toString() === sid,
+      );
+      if (!sticker) {
+        throw new BadRequestException(
+          'Sticker không thuộc máy chủ của kênh này',
+        );
+      }
+      if (
+        String(sticker.imageUrl).trim() !==
+        createMessageDto.customStickerUrl.trim()
+      ) {
+        throw new BadRequestException(
+          'URL sticker không khớp với dữ liệu máy chủ',
+        );
+      }
+      resolvedCustomStickerUrl = sticker.imageUrl;
+      resolvedServerStickerId = new Types.ObjectId(sid);
+    }
+
     const message = new this.messageModel({
       channelId: new Types.ObjectId(channelId),
       senderId: userObjectId,
@@ -627,8 +682,10 @@ export class MessagesService {
         ? new Types.ObjectId(createMessageDto.replyTo)
         : null,
       mentions: mentionIds.map((id) => new Types.ObjectId(id)),
-      messageType: createMessageDto.messageType || 'text',
+      messageType: messageTypeResolved,
       giphyId: createMessageDto.giphyId || null,
+      customStickerUrl: resolvedCustomStickerUrl,
+      serverStickerId: resolvedServerStickerId,
       voiceUrl: createMessageDto.voiceUrl || null,
       voiceDuration: createMessageDto.voiceDuration ?? null,
     });

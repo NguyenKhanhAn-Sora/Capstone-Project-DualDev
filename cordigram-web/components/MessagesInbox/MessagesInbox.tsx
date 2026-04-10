@@ -15,8 +15,12 @@ import {
   type InboxMentionItem,
 } from "@/lib/inbox-api";
 import { getApiBaseUrl } from "@/lib/api";
-import { acceptServerInvite, declineServerInvite, getServerAccessSettings } from "@/lib/servers-api";
+import { markDmConversationRead } from "@/lib/api";
+import { acceptServerInvite, declineServerInvite, getServerAccessSettings, markChannelAsRead } from "@/lib/servers-api";
 type TabKey = "for-you" | "unread" | "mentions";
+
+type UiUnreadItem = InboxUnreadItem & { read?: boolean };
+type UiMentionItem = InboxMentionItem & { seen?: boolean };
 
 interface MessagesInboxProps {
   onClose: () => void;
@@ -58,9 +62,10 @@ export default function MessagesInbox({
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("for-you");
   const [forYouItems, setForYouItems] = useState<InboxForYouItem[]>([]);
-  const [unreadItems, setUnreadItems] = useState<InboxUnreadItem[]>([]);
-  const [mentionItems, setMentionItems] = useState<InboxMentionItem[]>([]);
+  const [unreadItems, setUnreadItems] = useState<UiUnreadItem[]>([]);
+  const [mentionItems, setMentionItems] = useState<UiMentionItem[]>([]);
   const [loading, setLoading] = useState({ "for-you": true, unread: true, mentions: true });
+  const [markAllLoading, setMarkAllLoading] = useState(false);
   const dmSocketRef = useRef<Socket | null>(null);
   const unreadRefreshTimerRef = useRef<number | null>(null);
 
@@ -79,9 +84,60 @@ export default function MessagesInbox({
     }
     unreadRefreshTimerRef.current = window.setTimeout(() => {
       fetchInboxUnread()
-        .then((res) => setUnreadItems(res.items ?? []))
+        .then((res) => {
+          // API returns only unread; merge in to keep already-read items visible in UI
+          setUnreadItems((prev) => {
+            const map = new Map<string, UiUnreadItem>();
+            prev.forEach((it) => {
+              const key = it.type === "dm" ? `dm:${it.userId}` : `ch:${it.serverId}:${it.channelId}`;
+              map.set(key, it);
+            });
+            (res.items ?? []).forEach((it) => {
+              const key = it.type === "dm" ? `dm:${it.userId}` : `ch:${it.serverId}:${it.channelId}`;
+              map.set(key, { ...(it as any), read: false });
+            });
+            return Array.from(map.values());
+          });
+        })
         .catch(() => undefined);
     }, 250);
+  };
+
+  const handleMarkAllRead = async () => {
+    if (markAllLoading) return;
+    setMarkAllLoading(true);
+    try {
+      const toMarkForYou = forYouItems.filter((i) => i.seen !== true);
+      const toMarkMentions = mentionItems;
+      const toMarkUnread = unreadItems;
+
+      await Promise.allSettled([
+        ...toMarkForYou.map((i) => markInboxSeen(i.type, i._id)),
+        ...toMarkMentions.map((m) => markInboxSeen("channel_mention", m.id)),
+        ...toMarkUnread.map((u) => {
+          if (u.type === "dm") {
+            if (!authToken) return Promise.resolve();
+            return markDmConversationRead({ token: authToken, userId: u.userId }).then(() => undefined);
+          }
+          // channel
+          return markChannelAsRead(u.channelId).then(() => undefined);
+        }),
+      ]);
+
+      // Clear dots for existing items immediately but keep the items visible.
+      setForYouItems((prev) => prev.map((i) => (i.seen !== true ? { ...i, seen: true } : i)));
+      setMentionItems((prev) => prev.map((m) => ({ ...m, seen: true })));
+      setUnreadItems((prev) =>
+        prev.map((u) =>
+          u.type === "dm"
+            ? ({ ...u, unreadCount: 0, read: true } as any)
+            : ({ ...u, unreadCount: 0, read: true } as any),
+        ),
+      );
+      onMarkSeen?.();
+    } finally {
+      setMarkAllLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -98,8 +154,8 @@ export default function MessagesInbox({
       const unreadRes = results[1].status === "fulfilled" ? results[1].value : null;
       const mentionsRes = results[2].status === "fulfilled" ? results[2].value : null;
       setForYouItems(forYouRes?.items ?? []);
-      setUnreadItems(unreadRes?.items ?? []);
-      setMentionItems(mentionsRes?.items ?? []);
+      setUnreadItems((unreadRes?.items ?? []).map((i) => ({ ...(i as any), read: false })));
+      setMentionItems((mentionsRes?.items ?? []).map((i) => ({ ...(i as any), seen: false })));
       setLoading({ "for-you": false, unread: false, mentions: false });
     })();
     return () => {
@@ -138,7 +194,14 @@ export default function MessagesInbox({
     chSocket.on("channel-notification", (data: any) => {
       if (data?.isMention) {
         fetchInboxMentions()
-          .then((res) => setMentionItems(res.items ?? []))
+          .then((res) =>
+            setMentionItems((prev) => {
+              const map = new Map<string, UiMentionItem>();
+              prev.forEach((m) => map.set(m.id, m));
+              (res.items ?? []).forEach((m) => map.set(m.id, { ...(m as any), seen: false }));
+              return Array.from(map.values());
+            }),
+          )
           .catch(() => undefined);
       }
       scheduleRefreshUnread();
@@ -160,7 +223,14 @@ export default function MessagesInbox({
     let cancelled = false;
     fetchInboxMentions()
       .then((res) => {
-        if (!cancelled) setMentionItems(res.items ?? []);
+        if (cancelled) return;
+        // Merge in new unseen mentions; keep existing (even if already marked seen locally)
+        setMentionItems((prev) => {
+          const map = new Map<string, UiMentionItem>();
+          prev.forEach((m) => map.set(m.id, m));
+          (res.items ?? []).forEach((m) => map.set(m.id, { ...(m as any), seen: false }));
+          return Array.from(map.values());
+        });
       })
       .catch(() => undefined);
     return () => {
@@ -304,6 +374,15 @@ export default function MessagesInbox({
             onClick={() => setTab("mentions")}
           >
             Đề cập
+          </button>
+          <button
+            type="button"
+            className={styles.markAllBtn}
+            onClick={handleMarkAllRead}
+            disabled={markAllLoading}
+            title="Đánh dấu đã đọc tất cả"
+          >
+            {markAllLoading ? "Đang đánh dấu..." : "Đánh dấu đã đọc"}
           </button>
         </div>
 
@@ -465,7 +544,9 @@ export default function MessagesInbox({
                             item.username?.charAt(0)?.toUpperCase() ??
                             "?"}
                         </div>
-                        <span className={styles.eventItemUnreadDot} aria-hidden />
+                        {(item.unreadCount ?? 0) > 0 ? (
+                          <span className={styles.eventItemUnreadDot} aria-hidden />
+                        ) : null}
                       </div>
                       <div className={styles.eventBody}>
                         <div className={styles.unreadTopRow}>
@@ -501,7 +582,9 @@ export default function MessagesInbox({
                         <div className={styles.eventAvatar}>
                           {item.serverName?.charAt(0)?.toUpperCase() ?? "#"}
                         </div>
-                        <span className={styles.eventItemUnreadDot} aria-hidden />
+                        {(item.unreadCount ?? 0) > 0 ? (
+                          <span className={styles.eventItemUnreadDot} aria-hidden />
+                        ) : null}
                       </div>
                       <div className={styles.eventBody}>
                         <div className={styles.unreadTopRow}>
@@ -554,6 +637,9 @@ export default function MessagesInbox({
                       <div className={styles.eventAvatar}>
                         {(item.serverName?.trim() || "#").charAt(0).toUpperCase()}
                       </div>
+                      {item.seen !== true ? (
+                        <span className={styles.eventItemUnreadDot} aria-hidden />
+                      ) : null}
                     </div>
                     <div className={styles.eventBody}>
                       <div className={styles.unreadTopRow}>

@@ -11,11 +11,23 @@
 
 .card {
   display: flex;
+  flex-direction: column;
   width: min(780px, 96vw);
   max-height: min(680px, 90vh);
   background: var(--color-panel-bg);
   border-radius: 12px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.cardBanner {
+  border-radius: 12px 12px 0 0;
+}
+
+.cardMain {
+  display: flex;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 

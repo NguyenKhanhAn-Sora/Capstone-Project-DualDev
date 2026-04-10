@@ -118,10 +118,18 @@
 }
 
 .previewBanner {
+  position: relative;
   height: 96px;
+  overflow: hidden;
   background: linear-gradient(135deg, #ff3ea5, #7a4dff);
+}
+
+.previewBannerImage {
+  position: absolute;
+  inset: 0;
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
 }
 
 .previewBody {

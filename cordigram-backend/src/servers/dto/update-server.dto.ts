@@ -41,6 +41,14 @@ export class UpdateServerDto {
   bannerUrl?: string | null;
 
   @IsOptional()
+  @IsString()
+  bannerImageUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  bannerColor?: string | null;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => UpdateServerTraitDto)

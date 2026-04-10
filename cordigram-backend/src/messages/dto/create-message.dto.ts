@@ -38,6 +38,14 @@ export class CreateMessageDto {
 
   @IsOptional()
   @IsString()
+  customStickerUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  serverStickerId?: string;
+
+  @IsOptional()
+  @IsString()
   voiceUrl?: string;
 
   @IsOptional()

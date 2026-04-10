@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getServer, getServerProfileStats } from "@/lib/servers-api";
+import ServerBannerStrip from "@/components/ServerBannerStrip/ServerBannerStrip";
 
 interface ServerInviteCardProps {
   serverId: string;
@@ -12,6 +13,9 @@ export default function ServerInviteCard({ serverId, inviteUrl }: ServerInviteCa
   const [server, setServer] = useState<{
     name: string;
     avatarUrl?: string;
+    bannerUrl?: string | null;
+    bannerImageUrl?: string | null;
+    bannerColor?: string | null;
     memberCount: number;
     createdAt: string;
   } | null>(null);
@@ -30,6 +34,9 @@ export default function ServerInviteCard({ serverId, inviteUrl }: ServerInviteCa
         setServer({
           name: srv.name,
           avatarUrl: srv.avatarUrl,
+          bannerUrl: srv.bannerUrl,
+          bannerImageUrl: srv.bannerImageUrl,
+          bannerColor: srv.bannerColor,
           memberCount: stats?.memberCount ?? srv.memberCount ?? srv.members?.length ?? 0,
           createdAt: srv.createdAt,
         });
@@ -64,11 +71,13 @@ export default function ServerInviteCard({ serverId, inviteUrl }: ServerInviteCa
     <div style={{
       background: "#2b2d31",
       borderRadius: 8,
-      padding: 16,
       maxWidth: 400,
       marginTop: 4,
       border: "1px solid #3f4147",
+      overflow: "hidden",
     }}>
+      <ServerBannerStrip server={server} height={72} />
+      <div style={{ padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
         {server.avatarUrl ? (
           <img
@@ -133,6 +142,7 @@ export default function ServerInviteCard({ serverId, inviteUrl }: ServerInviteCa
       >
         Đi tới Máy chủ
       </a>
+      </div>
     </div>
   );
 }

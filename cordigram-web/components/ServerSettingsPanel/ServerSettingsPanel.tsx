@@ -197,6 +197,8 @@ export interface ServerSettingsPanelProps {
   onClose: () => void;
   serverName: string;
   serverId: string;
+  /** Khi mở panel, nhảy thẳng tới mục này (ví dụ sticker / emoji). Không truyền thì mặc định Hồ sơ máy chủ. */
+  initialSection?: ServerSettingsSection;
   locale?: ServerLocale;
   /** Chỉ người tạo (chủ sở hữu) máy chủ mới xóa được. Khi false sẽ ẩn mục "Xóa máy chủ". */
   isOwner?: boolean;
@@ -213,6 +215,7 @@ export default function ServerSettingsPanel({
   onClose,
   serverName,
   serverId,
+  initialSection,
   locale = "vi",
   isOwner = true,
   communityEnabled = false,
@@ -224,6 +227,12 @@ export default function ServerSettingsPanel({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [localCommunityEnabled, setLocalCommunityEnabled] = useState(communityEnabled);
   useEffect(() => setLocalCommunityEnabled(communityEnabled), [communityEnabled]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (initialSection) setActiveSection(initialSection);
+    else setActiveSection("profile");
+  }, [isOpen, initialSection]);
 
   const handleSidebarClick = (section: ServerSettingsSection) => {
     if (section === "delete-server") {

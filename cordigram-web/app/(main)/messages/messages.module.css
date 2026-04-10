@@ -89,6 +89,31 @@
   background: linear-gradient(135deg, rgba(88,101,242,0.25), rgba(0,0,0,0));
 }
 
+.exploreHeroTop {
+  margin-bottom: 12px;
+}
+
+.exploreBackBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.exploreBackBtn:hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
 .exploreHeroTitle {
   margin: 0;
   font-size: 26px;
@@ -123,10 +148,18 @@
 }
 
 .exploreCardBanner {
+  position: relative;
   height: 88px;
   background: var(--color-surface-muted);
+  overflow: hidden;
+}
+
+.exploreCardBannerImage {
+  position: absolute;
+  inset: 0;
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
 }
 
 .exploreCardBody {
@@ -1716,6 +1749,53 @@
   flex-direction: column;
   min-height: 0;
   background: var(--color-bg);
+}
+
+/* Giữ LiveKit mounted khi user chuyển sang kênh chat (chỉ ẩn giao diện). */
+.voiceCallOffscreen {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.voiceChatBanner {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.voiceChatBannerLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  min-width: 0;
+}
+
+.voiceChatBannerLeave {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--color-panel-danger-hover);
+  color: #fff;
+}
+
+.voiceChatBannerLeave:hover {
+  filter: brightness(1.05);
 }
 
 .voiceCallVideoArea {

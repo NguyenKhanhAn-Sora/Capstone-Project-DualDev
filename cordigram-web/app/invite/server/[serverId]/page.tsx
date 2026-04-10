@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import * as serversApi from "@/lib/servers-api";
 import { fetchCurrentProfile } from "@/lib/api";
 import ApplyToJoinQuestionsModal from "@/components/ApplyToJoinQuestionsModal/ApplyToJoinQuestionsModal";
+import ServerBannerStrip from "@/components/ServerBannerStrip/ServerBannerStrip";
 
 function getToken(): string {
   if (typeof window === "undefined") return "";
@@ -221,6 +222,9 @@ export default function InviteServerPage() {
         server={{
           name: server.name,
           avatarUrl: server.avatarUrl,
+          bannerUrl: server.bannerUrl,
+          bannerImageUrl: server.bannerImageUrl,
+          bannerColor: server.bannerColor,
           memberCount: server.memberCount,
           createdAt: server.createdAt,
         }}
@@ -231,6 +235,7 @@ export default function InviteServerPage() {
       />
 
       <div className="w-full max-w-[420px] rounded-xl bg-[#2b2d31] shadow-xl overflow-hidden">
+        <ServerBannerStrip server={server} height={112} />
         <div className="pt-8 pb-4 px-6 text-center">
           <p className="text-[#f2f3f5] text-sm mb-2">Bạn được mời tham gia</p>
           <h1 className="text-[#f2f3f5] text-2xl font-bold mb-4">{server.name}</h1>
