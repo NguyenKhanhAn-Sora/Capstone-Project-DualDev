@@ -118,6 +118,21 @@ bool _hasStructuredAdMarkers(String value) {
   ).hasMatch(value);
 }
 
+int _itemDisplayTimeMs(Map<String, dynamic> item) {
+  int parse(dynamic raw) {
+    if (raw is! String || raw.isEmpty) return 0;
+    return DateTime.tryParse(raw)?.millisecondsSinceEpoch ?? 0;
+  }
+
+  final published = parse(item['publishedAt']);
+  if (published > 0) return published;
+
+  final scheduled = parse(item['scheduledAt']);
+  if (scheduled > 0) return scheduled;
+
+  return parse(item['createdAt']);
+}
+
 bool _isAdLikeProfileItem(Map<String, dynamic> item) {
   final kind = _asLower(item['kind']);
   final repostKind = _asLower(item['repostKind']);
@@ -543,8 +558,18 @@ class _ProfileScreenState extends State<ProfileScreen>
         items = raw
             .where((m) => m['repostOf'] == null || m['repostOf'] == '')
             .toList();
+        items.sort((a, b) {
+          final aT = _itemDisplayTimeMs(a);
+          final bT = _itemDisplayTimeMs(b);
+          return bT.compareTo(aT);
+        });
       } else if (key == 'reels') {
         items = await ProfileService.fetchUserReels(ownerId, limit: 30);
+        items.sort((a, b) {
+          final aT = _itemDisplayTimeMs(a);
+          final bT = _itemDisplayTimeMs(b);
+          return bT.compareTo(aT);
+        });
       } else if (key == 'repost') {
         // Combine posts + reels, keep only items with repostOf
         final results = await Future.wait([
@@ -562,32 +587,16 @@ class _ProfileScreenState extends State<ProfileScreen>
             .where((m) => m['repostOf'] != null && m['repostOf'] != '')
             .toList();
         items.sort((a, b) {
-          final aT =
-              DateTime.tryParse(
-                a['createdAt'] as String? ?? '',
-              )?.millisecondsSinceEpoch ??
-              0;
-          final bT =
-              DateTime.tryParse(
-                b['createdAt'] as String? ?? '',
-              )?.millisecondsSinceEpoch ??
-              0;
+          final aT = _itemDisplayTimeMs(a);
+          final bT = _itemDisplayTimeMs(b);
           return bT.compareTo(aT);
         });
       } else {
         // saved
         final raw = await ProfileService.fetchSavedItems(limit: 60);
         raw.sort((a, b) {
-          final aT =
-              DateTime.tryParse(
-                a['createdAt'] as String? ?? '',
-              )?.millisecondsSinceEpoch ??
-              0;
-          final bT =
-              DateTime.tryParse(
-                b['createdAt'] as String? ?? '',
-              )?.millisecondsSinceEpoch ??
-              0;
+          final aT = _itemDisplayTimeMs(a);
+          final bT = _itemDisplayTimeMs(b);
           return bT.compareTo(aT);
         });
         items = raw;

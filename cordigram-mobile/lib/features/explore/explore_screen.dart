@@ -139,6 +139,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
         'impressions': post.stats.impressions,
       },
       'createdAt': post.createdAt,
+      'scheduledAt': post.scheduledAt,
+      'publishedAt': post.publishedAt,
       'location': post.location,
       'authorId': post.authorId,
       'authorUsername': post.authorUsername,

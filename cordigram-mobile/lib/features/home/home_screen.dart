@@ -10,6 +10,7 @@ import '../auth/login_screen.dart';
 import '../explore/explore_screen.dart';
 import '../following/following_screen.dart';
 import '../hashtag/hashtag_screen.dart';
+import '../notifications/notification_screen.dart';
 import '../post/create_tab_screen.dart';
 import '../post/post_detail_screen.dart';
 import '../post/utils/post_edit_utils.dart';
@@ -112,7 +113,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         extraHeaders: {'Authorization': 'Bearer $token'},
       );
       if (!mounted) return;
-      setState(() => _notifUnread = (res['count'] as int?) ?? 0);
+      setState(() {
+        _notifUnread =
+            (res['unreadCount'] as int?) ?? (res['count'] as int?) ?? 0;
+      });
     } catch (_) {}
     try {
       final res = await ApiService.get(
@@ -958,11 +962,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           iconSize: 27,
           count: _notifUnread,
           tooltip: 'Notifications',
-          onTap: () {
-            setState(() => _notifUnread = 0);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Notifications coming soon')),
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NotificationScreen()),
             );
+            _fetchUnreadCounts();
           },
         ),
         // Direct messages with badge

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -17,6 +18,8 @@ const _kReelMaxBytes = 50 * 1024 * 1024; // 50 MB
 // ── Audience enum (reused from post) ─────────────────────────────────────────
 
 enum _Audience { public, followers, private }
+
+enum _PublishMode { now, schedule }
 
 extension _AudienceLabel on _Audience {
   String get label {
@@ -85,10 +88,12 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
 
   // form state
   _Audience _audience = _Audience.public;
+  _PublishMode _publishMode = _PublishMode.now;
   bool _allowComments = true;
   bool _allowDownload = false;
   bool _hideLikeCount = false;
   final List<String> _hashtags = [];
+  DateTime? _scheduledAtLocal;
 
   // submit
   bool _submitting = false;
@@ -399,6 +404,20 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       ).allMatches(_captionCtrl.text);
       final mentions = mentionMatches.map((m) => m.group(1)!).toSet().toList();
 
+      String? scheduledAtIso;
+      if (_publishMode == _PublishMode.schedule) {
+        final selected = _scheduledAtLocal;
+        if (selected == null) {
+          throw const ApiException(
+            'Please choose a date and time for scheduling.',
+          );
+        }
+        if (!selected.isAfter(DateTime.now())) {
+          throw const ApiException('Scheduled time must be later than now.');
+        }
+        scheduledAtIso = selected.toUtc().toIso8601String();
+      }
+
       final mediaPayload = <String, dynamic>{
         'type': 'video',
         'url': upload.url,
@@ -429,14 +448,17 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
         mentions: mentions,
         media: mediaPayload,
         durationSeconds: finalDuration,
+        scheduledAt: scheduledAtIso,
       );
 
       if (!mounted) return;
-      setState(() {
-        _submitSuccess = 'Reel created successfully!';
-        _submitting = false;
-      });
+      final wasScheduled = _publishMode == _PublishMode.schedule;
       _reset();
+      _showSnack(
+        wasScheduled
+            ? 'Reel scheduled successfully!'
+            : 'Reel created successfully!',
+      );
       widget.onReelCreated?.call();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -465,18 +487,163 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
       _previewCtrl = null;
       _hashtags.clear();
       _audience = _Audience.public;
+      _publishMode = _PublishMode.now;
       _allowComments = true;
       _allowDownload = false;
       _hideLikeCount = false;
+      _scheduledAtLocal = null;
       _locationSugs = [];
       _locationOpen = false;
+      _locationLoading = false;
       _mentionSugs = [];
       _mentionOpen = false;
+      _mentionLoading = false;
+      _submitting = false;
+      _submitError = null;
+      _submitSuccess = null;
     });
   }
 
   void _showSnack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  DateTime _nextValidScheduleTime() {
+    final now = DateTime.now();
+    return now.add(const Duration(minutes: 1));
+  }
+
+  String _formatScheduleDate(DateTime value) {
+    final y = value.year.toString();
+    final m = value.month.toString().padLeft(2, '0');
+    final d = value.day.toString().padLeft(2, '0');
+    return '$d/$m/$y';
+  }
+
+  String _formatScheduleTime(DateTime value) {
+    final h = value.hour.toString().padLeft(2, '0');
+    final m = value.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  Future<void> _pickScheduleDate() async {
+    final seed = _scheduledAtLocal ?? _nextValidScheduleTime();
+    final today = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: seed,
+      firstDate: DateTime(today.year, today.month, today.day),
+      lastDate: DateTime(today.year + 2, 12, 31),
+    );
+    if (picked == null || !mounted) return;
+
+    final base = _scheduledAtLocal ?? _nextValidScheduleTime();
+    var next = DateTime(
+      picked.year,
+      picked.month,
+      picked.day,
+      base.hour,
+      base.minute,
+    );
+    if (!next.isAfter(DateTime.now())) {
+      next = _nextValidScheduleTime();
+    }
+    setState(() => _scheduledAtLocal = next);
+  }
+
+  Future<void> _pickScheduleTime() async {
+    if (_scheduledAtLocal == null) {
+      setState(() => _scheduledAtLocal = _nextValidScheduleTime());
+    }
+    final seed = _scheduledAtLocal ?? _nextValidScheduleTime();
+    DateTime draft = seed;
+
+    final picked = await showModalBottomSheet<DateTime>(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 320,
+          child: Column(
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    const Spacer(),
+                    const Text(
+                      'Select time',
+                      style: TextStyle(
+                        color: Color(0xFFE8ECF8),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(draft),
+                      child: const Text('Done'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFF1E2D48)),
+              Expanded(
+                child: CupertinoTheme(
+                  data: const CupertinoThemeData(brightness: Brightness.dark),
+                  child: CupertinoDatePicker(
+                    mode: CupertinoDatePickerMode.time,
+                    use24hFormat: true,
+                    minuteInterval: 1,
+                    initialDateTime: seed,
+                    onDateTimeChanged: (value) {
+                      draft = DateTime(
+                        seed.year,
+                        seed.month,
+                        seed.day,
+                        value.hour,
+                        value.minute,
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+
+    final current = _scheduledAtLocal ?? _nextValidScheduleTime();
+    final next = DateTime(
+      current.year,
+      current.month,
+      current.day,
+      picked.hour,
+      picked.minute,
+    );
+    if (!next.isAfter(DateTime.now())) {
+      _showSnack('Please choose a future time.');
+      return;
+    }
+    setState(() => _scheduledAtLocal = next);
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -507,6 +674,8 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                 _buildHashtagSection(),
                 const SizedBox(height: 20),
                 _buildAudienceSelector(),
+                const SizedBox(height: 20),
+                _buildPublishTimeSection(),
                 const SizedBox(height: 20),
                 _buildToggles(),
                 const SizedBox(height: 24),
@@ -1113,6 +1282,83 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     );
   }
 
+  Widget _buildPublishTimeSection() {
+    final scheduled = _scheduledAtLocal;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel(text: 'Publish time'),
+        const SizedBox(height: 8),
+        _PublishModeOption(
+          title: 'Post now',
+          subtitle: 'Publish immediately after you tap finish.',
+          selected: _publishMode == _PublishMode.now,
+          onTap: () => setState(() => _publishMode = _PublishMode.now),
+        ),
+        const SizedBox(height: 8),
+        _PublishModeOption(
+          title: 'Schedule',
+          subtitle: 'Post automatically at your chosen time.',
+          selected: _publishMode == _PublishMode.schedule,
+          onTap: () {
+            setState(() {
+              _publishMode = _PublishMode.schedule;
+              _scheduledAtLocal ??= _nextValidScheduleTime();
+            });
+          },
+        ),
+        if (_publishMode == _PublishMode.schedule)
+          Container(
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111827),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF2A3A5C)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ScheduleFieldButton(
+                        label: 'Date',
+                        value: scheduled == null
+                            ? 'Select date'
+                            : _formatScheduleDate(scheduled),
+                        icon: Icons.calendar_today_outlined,
+                        onTap: _pickScheduleDate,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _ScheduleFieldButton(
+                        label: 'Time',
+                        value: scheduled == null
+                            ? 'Select time'
+                            : _formatScheduleTime(scheduled),
+                        icon: Icons.schedule_rounded,
+                        onTap: _pickScheduleTime,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Timezone: local device time',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.62),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   // ── Toggles ───────────────────────────────────────────────────────────────
 
   Widget _buildToggles() {
@@ -1227,9 +1473,14 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                   color: Colors.white,
                 ),
               )
-            : const Text(
-                'Publish reel',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            : Text(
+                _publishMode == _PublishMode.schedule
+                    ? 'Schedule reel'
+                    : 'Publish reel',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
       ),
     );
@@ -1416,6 +1667,137 @@ class _OutlineBtn extends StatelessWidget {
             Text(
               label,
               style: const TextStyle(color: Color(0xFF9BAECF), fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PublishModeOption extends StatelessWidget {
+  const _PublishModeOption({
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF1A3254) : const Color(0xFF111827),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? const Color(0xFF3470A2) : const Color(0xFF2A3A5C),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: selected
+                          ? const Color(0xFFE8ECF8)
+                          : const Color(0xFFD0D8EE),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFF7A8BB0),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color: selected
+                  ? const Color(0xFF4AA3E4)
+                  : const Color(0xFF6C7EA3),
+              size: 19,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScheduleFieldButton extends StatelessWidget {
+  const _ScheduleFieldButton({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFF2A3A5C)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF7A8BB0),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                Icon(icon, color: const Color(0xFF4AA3E4), size: 16),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      color: Color(0xFFE8ECF8),
+                      fontSize: 13,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

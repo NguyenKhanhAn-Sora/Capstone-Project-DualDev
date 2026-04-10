@@ -57,36 +57,73 @@ class UploadResult {
 
 class CreatePostService {
   static final _client = http.Client();
+  static const _uploadPaths = ['/posts/upload', '/posts/media/upload'];
 
   /// Upload a single media file to Cloudinary via the backend.
   static Future<UploadResult> uploadMedia(File file) async {
     final token = AuthStorage.accessToken;
     if (token == null) throw const ApiException('Not authenticated');
 
-    final uri = Uri.parse('${AppConfig.apiBaseUrl}/posts/media/upload');
-    final request = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer $token';
-
     final mimeType = _mimeFromPath(file.path);
-    request.files.add(
-      await http.MultipartFile.fromPath(
-        'file',
-        file.path,
-        contentType: MediaType.parse(mimeType),
-      ),
-    );
+    final attemptedPaths = <String>[];
 
-    final streamed = await _client
-        .send(request)
-        .timeout(const Duration(seconds: 120));
-    final response = await http.Response.fromStream(streamed);
+    for (final path in _uploadPaths) {
+      attemptedPaths.add(path);
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token';
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw ApiException('Upload failed (${response.statusCode})');
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          file.path,
+          contentType: MediaType.parse(mimeType),
+        ),
+      );
+
+      final streamed = await _client
+          .send(request)
+          .timeout(const Duration(seconds: 120));
+      final response = await http.Response.fromStream(streamed);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        return UploadResult.fromJson(json);
+      }
+
+      // Try legacy path only when current path is not found.
+      if (response.statusCode == 404 && path != _uploadPaths.last) {
+        continue;
+      }
+
+      final serverMessage = _extractServerError(response.body);
+      if (serverMessage != null && serverMessage.isNotEmpty) {
+        throw ApiException(serverMessage);
+      }
+
+      throw ApiException('Upload failed (${response.statusCode}) on $path');
     }
 
-    final json = jsonDecode(response.body) as Map<String, dynamic>;
-    return UploadResult.fromJson(json);
+    throw ApiException(
+      'Upload endpoint not found on ${AppConfig.apiBaseUrl}. Tried: ${attemptedPaths.join(', ')}',
+    );
+  }
+
+  static String? _extractServerError(String body) {
+    if (body.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        final message = decoded['message'];
+        if (message is String && message.isNotEmpty) return message;
+        if (message is List && message.isNotEmpty) {
+          return message.first.toString();
+        }
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
   }
 
   /// Create a reel with an already-uploaded video URL.

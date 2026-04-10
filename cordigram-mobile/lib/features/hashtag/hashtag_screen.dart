@@ -100,10 +100,8 @@ class _HashtagScreenState extends State<HashtagScreen> {
         ...bundle.reels.where((r) => !isAdLikeFeedPost(r)),
       ];
       merged.sort((a, b) {
-        final aTime =
-            DateTime.tryParse(a.createdAt)?.millisecondsSinceEpoch ?? 0;
-        final bTime =
-            DateTime.tryParse(b.createdAt)?.millisecondsSinceEpoch ?? 0;
+        final aTime = a.displayTimeMs;
+        final bTime = b.displayTimeMs;
         return bTime.compareTo(aTime);
       });
 
@@ -666,6 +664,8 @@ class _HashtagScreenState extends State<HashtagScreen> {
         'impressions': post.stats.impressions,
       },
       'createdAt': post.createdAt,
+      'scheduledAt': post.scheduledAt,
+      'publishedAt': post.publishedAt,
       'location': post.location,
       'authorId': post.authorId,
       'authorUsername': post.authorUsername,

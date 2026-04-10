@@ -2464,6 +2464,18 @@ export default function PostView({ postId, asModal }: PostViewProps) {
         sponsoredCreative.description ||
         sponsoredCreative.destinationUrl),
   );
+  const postDisplayAt = useMemo(() => {
+    if (post?.status === "scheduled" && post?.scheduledAt) {
+      return post.scheduledAt; 
+    }
+    return post?.publishedAt || post?.createdAt || "";
+  }, [post?.status, post?.scheduledAt, post?.publishedAt, post?.createdAt]);
+  const postDisplayTime = useMemo(() => {
+    if (!postDisplayAt) return "";
+    const parsed = new Date(postDisplayAt);
+    if (Number.isNaN(parsed.getTime())) return "";
+    return formatDistanceToNow(parsed, { addSuffix: true });
+  }, [postDisplayAt]);
 
   useEffect(() => {
     const el = captionRef.current;
@@ -5059,42 +5071,47 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             </span>
           )}
         </div>
-        <div className={`${styles.authorMeta} flex flex-row`}>
-          <span>
-            {post?.authorUsername ? (
-              authorProfileId ? (
-                <Link
-                  href={`/profile/${authorProfileId}`}
-                  className={`${styles.authorHandle} ${styles.authorHandleLink}`}
-                >
-                  <span className={styles.nameWithBadge}>
-                    @{post.authorUsername}
-                    {Boolean(
-                      (post as any).authorIsCreatorVerified ??
-                        post.author?.isCreatorVerified,
-                    ) ? (
-                      <VerifiedBadge />
-                    ) : null}
-                  </span>
-                </Link>
-              ) : (
-                <div className={styles.authorHandle}>
-                  <span className={styles.nameWithBadge}>
-                    @{post.authorUsername}
-                    {Boolean(
-                      (post as any).authorIsCreatorVerified ??
-                        post.author?.isCreatorVerified,
-                    ) ? (
-                      <VerifiedBadge />
-                    ) : null}
-                  </span>
-                </div>
-              )
+        <div className={styles.authorMeta}>
+          <div className={styles.authorIdentity}>
+            <span className={styles.authorPrimaryRow}>
+              {post?.authorUsername ? (
+                authorProfileId ? (
+                  <Link
+                    href={`/profile/${authorProfileId}`}
+                    className={`${styles.authorHandle} ${styles.authorHandleLink}`}
+                  >
+                    <span className={styles.nameWithBadge}>
+                      @{post.authorUsername}
+                      {Boolean(
+                        (post as any).authorIsCreatorVerified ??
+                          post.author?.isCreatorVerified,
+                      ) ? (
+                        <VerifiedBadge />
+                      ) : null}
+                    </span>
+                  </Link>
+                ) : (
+                  <div className={styles.authorHandle}>
+                    <span className={styles.nameWithBadge}>
+                      @{post.authorUsername}
+                      {Boolean(
+                        (post as any).authorIsCreatorVerified ??
+                          post.author?.isCreatorVerified,
+                      ) ? (
+                        <VerifiedBadge />
+                      ) : null}
+                    </span>
+                  </div>
+                )
+              ) : null}
+              {isSponsoredPostUi ? (
+                <span className={styles.sponsoredMarker}>Sponsored</span>
+              ) : null}
+            </span>
+            {postDisplayTime ? (
+              <span className={styles.authorTimestamp}>{postDisplayTime}</span>
             ) : null}
-            {isSponsoredPostUi ? (
-              <span className={styles.sponsoredMarker}>Sponsored</span>
-            ) : null}
-          </span>
+          </div>
           <span>
             {post?.authorId &&
             viewer?.id &&
@@ -6385,7 +6402,6 @@ export default function PostView({ postId, asModal }: PostViewProps) {
                       }}
                     >
                       <span
-                        className={styles.reportCategoryDot}
                         style={{ background: group.accent }}
                       />
                       <span className={styles.reportCategoryLabel}>

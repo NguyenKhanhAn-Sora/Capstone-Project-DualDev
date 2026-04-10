@@ -683,7 +683,7 @@ class _PostHeader extends StatelessWidget {
                   )
                 else
                   Text(
-                    _timeAgo(post.createdAt),
+                    _timeAgo(post.displayAt),
                     style: const TextStyle(
                       color: Color(0xFF7A8BB0),
                       fontSize: 12,

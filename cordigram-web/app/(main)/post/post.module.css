@@ -379,6 +379,26 @@
 .authorMeta {
   display: flex;
   align-items: center;
+  gap: 10px;
+}
+
+.authorIdentity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.authorPrimaryRow {
+  display: inline-flex;
+  align-items: center;
+}
+
+.authorTimestamp {
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .authorName {

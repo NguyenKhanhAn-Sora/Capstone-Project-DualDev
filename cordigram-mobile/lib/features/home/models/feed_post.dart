@@ -143,6 +143,8 @@ class FeedPost {
     required this.hashtags,
     required this.stats,
     required this.createdAt,
+    this.scheduledAt,
+    this.publishedAt,
     this.location,
     this.author,
     this.authorId,
@@ -176,6 +178,8 @@ class FeedPost {
   final List<String> hashtags;
   final FeedStats stats;
   final String createdAt;
+  final String? scheduledAt;
+  final String? publishedAt;
   final String? location;
   final FeedAuthor? author;
   final String? authorId;
@@ -209,6 +213,8 @@ class FeedPost {
     List<String>? hashtags,
     FeedStats? stats,
     String? createdAt,
+    String? scheduledAt,
+    String? publishedAt,
     String? location,
     FeedAuthor? author,
     String? authorId,
@@ -242,6 +248,8 @@ class FeedPost {
       hashtags: hashtags ?? this.hashtags,
       stats: stats ?? this.stats,
       createdAt: createdAt ?? this.createdAt,
+      scheduledAt: scheduledAt ?? this.scheduledAt,
+      publishedAt: publishedAt ?? this.publishedAt,
       location: location ?? this.location,
       author: author ?? this.author,
       authorId: authorId ?? this.authorId,
@@ -292,6 +300,23 @@ class FeedPost {
   String? get avatarUrl => author?.avatarUrl ?? authorAvatarUrl;
   bool get isVerified =>
       author?.isCreatorVerified ?? authorIsCreatorVerified ?? false;
+
+  String get displayAt {
+    final published = publishedAt?.trim();
+    if (published != null && published.isNotEmpty) return published;
+    final scheduled = scheduledAt?.trim();
+    if (scheduled != null && scheduled.isNotEmpty) return scheduled;
+    return createdAt;
+  }
+
+  int get displayTimeMs {
+    int? toMs(String? value) {
+      if (value == null || value.isEmpty) return null;
+      return DateTime.tryParse(value)?.millisecondsSinceEpoch;
+    }
+
+    return toMs(displayAt) ?? 0;
+  }
 
   /// Display name of the original author for reposts.
   String get repostAuthorName {
@@ -348,6 +373,13 @@ class FeedPost {
       saved = (flagsRaw['saved'] as bool?) ?? saved;
     }
 
+    final createdAtRaw =
+        (json['createdAt'] as String?) ?? (json['created_at'] as String?);
+    final publishedAtRaw =
+        (json['publishedAt'] as String?) ?? (json['published_at'] as String?);
+    final scheduledAtRaw =
+        (json['scheduledAt'] as String?) ?? (json['scheduled_at'] as String?);
+
     return FeedPost(
       id: (json['id'] as String?) ?? '',
       kind: (json['kind'] as String?) ?? 'post',
@@ -355,7 +387,9 @@ class FeedPost {
       media: mediaList,
       hashtags: hashtagsList,
       stats: stats,
-      createdAt: (json['createdAt'] as String?) ?? '',
+      createdAt: createdAtRaw ?? '',
+      scheduledAt: scheduledAtRaw,
+      publishedAt: publishedAtRaw,
       location: json['location'] as String?,
       author: author,
       authorId: json['authorId'] as String?,
