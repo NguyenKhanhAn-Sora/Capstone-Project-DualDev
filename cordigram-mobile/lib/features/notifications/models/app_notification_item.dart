@@ -35,6 +35,9 @@ class AppNotificationItem {
     required this.readAt,
     required this.createdAt,
     required this.activityAt,
+    this.isOwnPost,
+    this.postMutedUntil,
+    this.postMutedIndefinitely,
     this.postId,
     this.commentId,
     this.reportAudience,
@@ -55,6 +58,9 @@ class AppNotificationItem {
   final int commentCount;
   final int mentionCount;
   final String mentionSource;
+  final bool? isOwnPost;
+  final String? postMutedUntil;
+  final bool? postMutedIndefinitely;
   final String? reportAudience;
   final String? reportOutcome;
   final String? moderationDecision;
@@ -67,6 +73,39 @@ class AppNotificationItem {
 
   bool get isUnread => readAt == null;
 
+  AppNotificationItem copyWith({
+    String? readAt,
+    bool resetReadAt = false,
+    String? postMutedUntil,
+    bool? postMutedIndefinitely,
+  }) {
+    return AppNotificationItem(
+      id: id,
+      type: type,
+      actor: actor,
+      postKind: postKind,
+      likeCount: likeCount,
+      commentCount: commentCount,
+      mentionCount: mentionCount,
+      mentionSource: mentionSource,
+      isOwnPost: isOwnPost,
+      postMutedUntil: postMutedUntil ?? this.postMutedUntil,
+      postMutedIndefinitely:
+          postMutedIndefinitely ?? this.postMutedIndefinitely,
+      readAt: resetReadAt ? null : (readAt ?? this.readAt),
+      createdAt: createdAt,
+      activityAt: activityAt,
+      postId: postId,
+      commentId: commentId,
+      reportAudience: reportAudience,
+      reportOutcome: reportOutcome,
+      moderationDecision: moderationDecision,
+      systemNoticeTitle: systemNoticeTitle,
+      systemNoticeBody: systemNoticeBody,
+      systemNoticeLevel: systemNoticeLevel,
+    );
+  }
+
   factory AppNotificationItem.fromJson(Map<String, dynamic> json) {
     int asInt(dynamic value) => (value as num?)?.toInt() ?? 0;
 
@@ -74,13 +113,19 @@ class AppNotificationItem {
       id: (json['id'] as String?) ?? '',
       type: (json['type'] as String?) ?? 'system_notice',
       actor: NotificationActor.fromJson(json['actor'] as Map<String, dynamic>?),
-      postId: json['postId'] as String?,
-      commentId: json['commentId'] as String?,
-      postKind: (json['postKind'] as String?) ?? 'post',
+      postId: (json['postId'] ?? json['post_id']) as String?,
+      commentId: (json['commentId'] ?? json['comment_id']) as String?,
+      postKind: (json['postKind'] ?? json['post_kind']) as String? ?? 'post',
       likeCount: asInt(json['likeCount']),
       commentCount: asInt(json['commentCount']),
       mentionCount: asInt(json['mentionCount']),
       mentionSource: (json['mentionSource'] as String?) ?? 'post',
+      isOwnPost: (json['isOwnPost'] ?? json['is_own_post']) as bool?,
+      postMutedUntil:
+          (json['postMutedUntil'] ?? json['post_muted_until']) as String?,
+      postMutedIndefinitely:
+          (json['postMutedIndefinitely'] ?? json['post_muted_indefinitely'])
+              as bool?,
       reportAudience: json['reportAudience'] as String?,
       reportOutcome: json['reportOutcome'] as String?,
       moderationDecision: json['moderationDecision'] as String?,

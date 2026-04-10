@@ -80,6 +80,11 @@ export type NotificationRealtimePayload = {
   unreadCount: number;
 };
 
+export type NotificationSeenPayload = {
+  lastSeenAt: string;
+  unreadCount: number;
+};
+
 export type ForceLogoutPayload = {
   reason: 'suspended' | 'session_revoked';
   at: string;
@@ -349,6 +354,11 @@ export class NotificationsService {
         { $set: { 'settings.notifications.lastSeenAt': seenAt } },
       )
       .exec();
+
+    this.gateway.emitToUser(userId, 'notification:seen', {
+      lastSeenAt: seenAt.toISOString(),
+      unreadCount: 0,
+    } satisfies NotificationSeenPayload);
 
     return { lastSeenAt: seenAt.toISOString() };
   }

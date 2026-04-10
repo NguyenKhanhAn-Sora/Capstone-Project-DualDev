@@ -227,6 +227,21 @@ export default function Sidebar() {
         },
       );
 
+      socket.on(
+        "notification:seen",
+        (payload: { lastSeenAt?: string; unreadCount?: number }) => {
+          const parsed = payload?.lastSeenAt
+            ? new Date(payload.lastSeenAt).getTime()
+            : NaN;
+          if (Number.isFinite(parsed)) {
+            setLastSeenAt(parsed);
+          }
+          setUnreadCount(
+            typeof payload?.unreadCount === "number" ? payload.unreadCount : 0,
+          );
+        },
+      );
+
       socket.on("auth:force_logout", () => {
         socket.disconnect();
         socketRef.current = null;

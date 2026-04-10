@@ -22,4 +22,54 @@ class NotificationService {
         .map(AppNotificationItem.fromJson)
         .toList(growable: false);
   }
+
+  static Future<void> markRead(String notificationId) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+
+    await ApiService.patch(
+      '/notifications/$notificationId/read',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  static Future<void> markUnread(String notificationId) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+
+    await ApiService.patch(
+      '/notifications/$notificationId/unread',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  static Future<void> deleteNotification(String notificationId) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+
+    await ApiService.delete(
+      '/notifications/$notificationId',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  static Future<Map<String, dynamic>> updatePostMute({
+    required String postId,
+    bool? enabled,
+    String? mutedUntil,
+    bool? mutedIndefinitely,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+
+    return ApiService.patch(
+      '/posts/$postId/notifications/mute',
+      body: {
+        if (enabled != null) 'enabled': enabled,
+        if (mutedUntil != null) 'mutedUntil': mutedUntil,
+        if (mutedIndefinitely != null) 'mutedIndefinitely': mutedIndefinitely,
+      },
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
 }

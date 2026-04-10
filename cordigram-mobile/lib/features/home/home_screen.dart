@@ -10,6 +10,8 @@ import '../auth/login_screen.dart';
 import '../explore/explore_screen.dart';
 import '../following/following_screen.dart';
 import '../hashtag/hashtag_screen.dart';
+import '../notifications/models/app_notification_item.dart';
+import '../notifications/services/notification_realtime_service.dart';
 import '../notifications/notification_screen.dart';
 import '../post/create_tab_screen.dart';
 import '../post/post_detail_screen.dart';
@@ -51,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ── Nav badges ────────────────────────────────────────────────────────────
   int _notifUnread = 0;
   int _dmUnread = 0;
+  DateTime? _notificationSeenAt;
 
   // ── Profile ───────────────────────────────────────────────────────────────
   String? _avatarUrl;
@@ -60,6 +63,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ── Polling ────────────────────────────────────────────────────────────────
   Timer? _pollTimer;
   static const Duration _pollInterval = Duration(seconds: 5);
+  StreamSubscription<NotificationRealtimeEvent>? _notificationRtSub;
+  StreamSubscription<NotificationSeenEvent>? _notificationSeenSub;
+  static const Set<String> _realtimeNotificationTypes = {
+    'post_like',
+    'post_comment',
+    'comment_like',
+    'comment_reply',
+    'post_mention',
+    'follow',
+    'login_alert',
+    'post_moderation',
+    'report',
+    'system_notice',
+  };
   final Map<String, int> _viewCooldownMap = {};
   static const int _kViewCooldownMs = 300000;
   final Map<String, String> _campaignIdByPromotedPostId = {};
@@ -73,14 +90,62 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _fetchUnreadCounts();
     _scrollController.addListener(_onScroll);
     _startPolling();
+    _startNotificationRealtime();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _pollTimer?.cancel();
+    _notificationRtSub?.cancel();
+    _notificationSeenSub?.cancel();
+    NotificationRealtimeService.disconnect();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _startNotificationRealtime() async {
+    await NotificationRealtimeService.connect();
+    _notificationRtSub?.cancel();
+    _notificationRtSub = NotificationRealtimeService.events.listen((event) {
+      if (!mounted) return;
+      if (!_realtimeNotificationTypes.contains(event.notification.type)) {
+        return;
+      }
+      _applyRealtimeNotification(event);
+    });
+
+    _notificationSeenSub?.cancel();
+    _notificationSeenSub = NotificationRealtimeService.seenEvents.listen((
+      event,
+    ) {
+      if (!mounted) return;
+      setState(() {
+        _notificationSeenAt = event.lastSeenAt;
+        _notifUnread = event.unreadCount;
+      });
+    });
+  }
+
+  void _applyRealtimeNotification(NotificationRealtimeEvent event) {
+    final activityAt =
+        DateTime.tryParse(event.notification.activityAt)?.toUtc() ??
+        DateTime.tryParse(event.notification.createdAt)?.toUtc();
+    final seenAt = _notificationSeenAt;
+
+    setState(() {
+      if (seenAt == null) {
+        _notifUnread = event.unreadCount > 0
+            ? event.unreadCount
+            : _notifUnread + 1;
+        return;
+      }
+
+      final shouldCount = activityAt == null || activityAt.isAfter(seenAt);
+      if (shouldCount) {
+        _notifUnread += 1;
+      }
+    });
   }
 
   // ── Profile + viewerId fetch ──────────────────────────────────────────────
@@ -107,17 +172,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _fetchUnreadCounts() async {
     final token = AuthStorage.accessToken;
     if (token == null) return;
-    try {
-      final res = await ApiService.get(
-        '/notifications/unread-count',
-        extraHeaders: {'Authorization': 'Bearer $token'},
-      );
-      if (!mounted) return;
-      setState(() {
-        _notifUnread =
-            (res['unreadCount'] as int?) ?? (res['count'] as int?) ?? 0;
-      });
-    } catch (_) {}
+
+    await _refreshNotificationBadge(token);
+
     try {
       final res = await ApiService.get(
         '/direct-messages/unread/count',
@@ -130,11 +187,96 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } catch (_) {}
   }
 
+  Future<void> _refreshNotificationBadge(String token) async {
+    try {
+      final seenRes = await ApiService.get(
+        '/notifications/seen-at',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+
+      final rawSeenAt = seenRes['lastSeenAt'] as String?;
+      final seenAt = (rawSeenAt == null || rawSeenAt.isEmpty)
+          ? null
+          : DateTime.tryParse(rawSeenAt)?.toUtc();
+
+      if (seenAt == null) {
+        final unreadRes = await ApiService.get(
+          '/notifications/unread-count',
+          extraHeaders: {'Authorization': 'Bearer $token'},
+        );
+        if (!mounted) return;
+        setState(() {
+          _notificationSeenAt = null;
+          _notifUnread =
+              (unreadRes['unreadCount'] as int?) ??
+              (unreadRes['count'] as int?) ??
+              0;
+        });
+        return;
+      }
+
+      final res = await ApiService.get(
+        '/notifications?limit=50',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+
+      final items = res['items'];
+      var count = 0;
+      if (items is List) {
+        for (final raw in items) {
+          if (raw is! Map<String, dynamic>) continue;
+          final activityAt =
+              (raw['activityAt'] as String?) ?? (raw['createdAt'] as String?);
+          final activity = activityAt == null
+              ? null
+              : DateTime.tryParse(activityAt)?.toUtc();
+          if (activity != null && activity.isAfter(seenAt)) {
+            count += 1;
+          }
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _notificationSeenAt = seenAt;
+        _notifUnread = count;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _openNotifications() async {
+    final token = AuthStorage.accessToken;
+    if (mounted) {
+      setState(() {
+        _notifUnread = 0;
+        _notificationSeenAt = DateTime.now().toUtc();
+      });
+    }
+
+    if (token != null) {
+      try {
+        await ApiService.post(
+          '/notifications/seen-at',
+          extraHeaders: {'Authorization': 'Bearer $token'},
+        );
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const NotificationScreen()));
+    _fetchUnreadCounts();
+  }
+
   // ── Polling ────────────────────────────────────────────────────────
 
   void _startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(_pollInterval, (_) => _syncStats());
+    _pollTimer = Timer.periodic(_pollInterval, (_) {
+      _syncStats();
+      _fetchUnreadCounts();
+    });
   }
 
   /// Fetches a fresh batch from the server and merges updated stats into the
@@ -962,12 +1104,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           iconSize: 27,
           count: _notifUnread,
           tooltip: 'Notifications',
-          onTap: () async {
-            await Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const NotificationScreen()),
-            );
-            _fetchUnreadCounts();
-          },
+          onTap: _openNotifications,
         ),
         // Direct messages with badge
         _NavBadgeButton(
