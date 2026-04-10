@@ -22,6 +22,7 @@ import '../reels/reels_screen.dart';
 import '../search/search_screen.dart';
 import '../report/report_problem_screen.dart';
 import '../report/report_post_sheet.dart';
+import '../settings/settings_screen.dart';
 import 'models/feed_post.dart';
 import 'services/feed_service.dart';
 import 'services/post_interaction_service.dart';
@@ -1232,6 +1233,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             );
           }
         },
+        onSettings: () {
+          Navigator.pop(ctx);
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+        },
         onReportProblem: () {
           Navigator.pop(ctx);
           Navigator.of(context).push(
@@ -1553,6 +1560,7 @@ class _ProfileMenuSheet extends StatelessWidget {
     required this.onLogout,
     required this.onReportProblem,
     required this.onProfile,
+    required this.onSettings,
     required this.onAds,
     this.avatarUrl,
     this.displayName,
@@ -1565,6 +1573,7 @@ class _ProfileMenuSheet extends StatelessWidget {
   final VoidCallback onLogout;
   final VoidCallback onReportProblem;
   final VoidCallback onProfile;
+  final VoidCallback onSettings;
   final VoidCallback onAds;
 
   @override
@@ -1641,12 +1650,7 @@ class _ProfileMenuSheet extends StatelessWidget {
           _SheetItem(
             icon: Icons.settings_outlined,
             label: 'Settings',
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Settings coming soon')),
-              );
-            },
+            onTap: onSettings,
           ),
           _SheetItem(
             icon: Icons.bookmark_border_rounded,

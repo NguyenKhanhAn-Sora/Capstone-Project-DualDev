@@ -242,4 +242,79 @@ class ProfileService {
     );
     return data['available'] as bool? ?? false;
   }
+
+  /// Step 1: verify password and request OTP to current email.
+  static Future<Map<String, dynamic>> requestChangeEmailCurrentOtp({
+    required String password,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/email-change/request-current-otp',
+      body: {'password': password},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Step 2: verify OTP sent to current email.
+  static Future<Map<String, dynamic>> verifyChangeEmailCurrentOtp({
+    required String code,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/email-change/verify-current-otp',
+      body: {'code': code},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Step 3: request OTP to new email.
+  static Future<Map<String, dynamic>> requestChangeEmailNewOtp({
+    required String newEmail,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/email-change/request-new-otp',
+      body: {'newEmail': newEmail},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Step 4: verify OTP from new email and complete email change.
+  static Future<Map<String, dynamic>> verifyChangeEmailNewOtp({
+    required String code,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/email-change/verify-new-otp',
+      body: {'code': code},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Fetch creator verification eligibility/status for current user.
+  static Future<Map<String, dynamic>> fetchCreatorVerificationStatus() async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.get(
+      '/creator-verification/me',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Submit creator verification request.
+  static Future<Map<String, dynamic>> submitCreatorVerificationRequest({
+    String? note,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/creator-verification/request',
+      body: {'note': note},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
 }

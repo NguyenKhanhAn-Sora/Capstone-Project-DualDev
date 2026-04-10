@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/services/auth_storage.dart';
 import '../post/post_detail_screen.dart';
 import '../report/report_user_sheet.dart';
+import '../settings/settings_screen.dart';
 import 'follow_list_sheet.dart';
 import 'profile_item_viewer_screen.dart';
 import 'models/profile_detail.dart';
@@ -206,6 +207,8 @@ List<Map<String, dynamic>> _filterProfileInactiveAds(
       .toList(growable: false);
 }
 
+enum _BlockedViewKind { generic, blockedByYou, blockedByUser, unavailable }
+
 // ── Screen ───────────────────────────────────────────────────────────────────
 
 class ProfileScreen extends StatefulWidget {
@@ -223,6 +226,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _loading = true;
   String? _error;
   bool _blockedView = false;
+  _BlockedViewKind _blockedViewKind = _BlockedViewKind.generic;
   String _blockedMessage =
       'The link may be broken or the profile may have been removed.';
   bool _privateView = false;
@@ -329,6 +333,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       _loading = true;
       _error = null;
       _blockedView = false;
+      _blockedViewKind = _BlockedViewKind.generic;
+      _blockedMessage =
+          'The link may be broken or the profile may have been removed.';
       _privateView = false;
     });
     try {
@@ -359,20 +366,39 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
       final msg = e.toString().toLowerCase();
       final isPrivate = msg.contains('private') || msg.contains('403');
-      final isBlocked =
-          msg.contains('block') ||
-          msg.contains('423') ||
+      final isBlockedByYou =
+          msg.contains('you have blocked') ||
+          msg.contains('you blocked') ||
+          msg.contains('blocked this user') ||
+          msg.contains('cannot follow a blocked user');
+      final isBlockedByUser =
+          msg.contains('has blocked you') ||
+          msg.contains('blocked by this user') ||
+          msg.contains('you are blocked') ||
+          msg.contains('blocked by user');
+      final isUnavailable =
           msg.contains('unavailable') ||
           msg.contains('suspended') ||
           msg.contains('banned');
+      final isBlocked =
+          msg.contains('block') || msg.contains('423') || isUnavailable;
       if (isBlocked) {
         setState(() {
           _blockedView = true;
           _loading = false;
-          if (msg.contains('unavailable') ||
-              msg.contains('suspended') ||
-              msg.contains('banned')) {
+          if (isBlockedByYou) {
+            _blockedViewKind = _BlockedViewKind.blockedByYou;
+            _blockedMessage =
+                'You blocked this account. Unblock them from your settings if you want to view their profile again.';
+          } else if (isBlockedByUser) {
+            _blockedViewKind = _BlockedViewKind.blockedByUser;
+            _blockedMessage =
+                'This user has blocked you. Their profile and content are not available.';
+          } else if (isUnavailable) {
+            _blockedViewKind = _BlockedViewKind.unavailable;
             _blockedMessage = 'This account is currently unavailable.';
+          } else {
+            _blockedViewKind = _BlockedViewKind.generic;
           }
         });
       } else if (isPrivate) {
@@ -910,6 +936,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
       setState(() {
         _blockedView = true;
+        _blockedViewKind = _BlockedViewKind.blockedByYou;
+        _blockedMessage =
+            'You blocked this account. Unblock them from your settings if you want to view their profile again.';
         _profile = null;
       });
       _showToast('Blocked @${p.username}');
@@ -1788,7 +1817,14 @@ class _ProfileScreenState extends State<ProfileScreen>
         const SizedBox(width: 8),
         _IconActionButton(
           icon: Icons.settings_outlined,
-          onTap: () => _showToast('Settings coming soon'),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) =>
+                    const SettingsScreen(initialTab: SettingsTab.profile),
+              ),
+            );
+          },
         ),
         const SizedBox(width: 8),
         _IconActionButton(
@@ -2056,11 +2092,33 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ── Special views ─────────────────────────────────────────────────────────
 
   Widget _buildBlockedView() {
+    IconData icon = Icons.lock_outline_rounded;
+    Color iconColor = const Color(0xFF7A8BB0);
+    String title = 'Profile is not available';
+    String body = _blockedMessage;
+
+    if (_blockedViewKind == _BlockedViewKind.blockedByYou) {
+      icon = Icons.block_rounded;
+      iconColor = const Color(0xFFE53935);
+      title = 'You blocked this user';
+      body = _blockedMessage;
+    } else if (_blockedViewKind == _BlockedViewKind.blockedByUser) {
+      icon = Icons.gpp_bad_rounded;
+      iconColor = const Color(0xFFF59E0B);
+      title = 'You cannot view this profile';
+      body = _blockedMessage;
+    } else if (_blockedViewKind == _BlockedViewKind.unavailable) {
+      icon = Icons.person_off_rounded;
+      iconColor = const Color(0xFF7A8BB0);
+      title = 'Profile is not available';
+      body = _blockedMessage;
+    }
+
     return _SpecialStateView(
-      icon: Icons.lock_outline_rounded,
-      iconColor: const Color(0xFF7A8BB0),
-      title: 'Profile is not available',
-      body: _blockedMessage,
+      icon: icon,
+      iconColor: iconColor,
+      title: title,
+      body: body,
       buttonLabel: 'Go back',
       onButton: () => Navigator.of(context).pop(),
     );

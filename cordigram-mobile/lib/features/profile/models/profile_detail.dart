@@ -146,6 +146,7 @@ class ProfileDetail {
     String? location,
     ProfileWorkplace? workplace,
     String? birthdate,
+    ProfileVisibility? visibility,
   }) => ProfileDetail(
     id: id,
     userId: userId,
