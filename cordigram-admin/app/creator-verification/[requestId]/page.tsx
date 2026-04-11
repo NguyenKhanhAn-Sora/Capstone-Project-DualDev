@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getApiBaseUrl, getWebBaseUrl } from "@/lib/api";
+import { openAdminProfilePreview } from "@/lib/admin-profile-preview";
 import styles from "./detail.module.css";
 
 type AdminPayload = {
@@ -225,7 +226,6 @@ export default function CreatorVerificationDetailPage() {
     if (typeof window === "undefined") return "";
     return localStorage.getItem("adminAccessToken") || "";
   }, []);
-
   const webBaseUrl = getWebBaseUrl();
 
   useEffect(() => {
@@ -391,14 +391,19 @@ export default function CreatorVerificationDetailPage() {
               Back to queue
             </Link>
             {detail?.user.id ? (
-              <Link
-                href={`${webBaseUrl}/profile/${detail.user.id}`}
+              <button
+                type="button"
                 className={styles.primaryButton}
-                target="_blank"
-                rel="noreferrer"
+                onClick={async () => {
+                  try {
+                    await openAdminProfilePreview(detail.user.id);
+                  } catch {
+                    setError("Unable to open profile preview.");
+                  }
+                }}
               >
                 Open profile
-              </Link>
+              </button>
             ) : null}
           </div>
         </div>

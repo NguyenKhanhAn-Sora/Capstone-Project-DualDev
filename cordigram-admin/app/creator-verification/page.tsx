@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getApiBaseUrl, getWebBaseUrl } from "@/lib/api";
+import { getApiBaseUrl } from "@/lib/api";
+import { openAdminProfilePreview } from "@/lib/admin-profile-preview";
 import styles from "./creator-verification.module.css";
 
 type AdminPayload = {
@@ -273,7 +274,6 @@ export default function CreatorVerificationAdminPage() {
       : filter === "approved"
         ? styles.statusApproved
         : styles.statusRejected;
-  const webBaseUrl = getWebBaseUrl();
   const sortOptions = useMemo<SelectOption[]>(
     () => [
       { value: "desc", label: "Newest to oldest" },
@@ -419,14 +419,19 @@ export default function CreatorVerificationAdminPage() {
                       @{item.user.username || "unknown"} • {item.user.email || "no-email"}
                     </p>
                     {item.user.id ? (
-                      <Link
-                        href={`${webBaseUrl}/profile/${item.user.id}`}
+                      <button
+                        type="button"
                         className={styles.profileLink}
-                        target="_blank"
-                        rel="noreferrer"
+                        onClick={async () => {
+                          try {
+                            await openAdminProfilePreview(item.user.id);
+                          } catch {
+                            setError("Unable to open profile preview.");
+                          }
+                        }}
                       >
                         Open profile
-                      </Link>
+                      </button>
                     ) : null}
                   </div>
                   <div className={styles.cardStatusWrap}>

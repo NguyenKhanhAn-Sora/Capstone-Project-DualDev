@@ -27,6 +27,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../users/user.schema';
+import { JwtService } from '@nestjs/jwt';
 
 type MulterFile = {
   buffer: Buffer;
@@ -55,12 +56,60 @@ const BIO_CHAR_LIMIT = 300;
 
 @Controller('profiles')
 export class ProfilesController {
+  private readonly jwt = new JwtService();
+
   constructor(
     private readonly profilesService: ProfilesService,
     private readonly config: ConfigService,
     private readonly cloudinaryService: CloudinaryService,
     @InjectModel(User.name) private readonly userModel: Model<User>,
   ) {}
+
+  private resolveAdminPreviewViewerId(
+    req: Request & { user?: AuthenticatedUser },
+    usernameOrId: string,
+  ): string | null {
+    if (!/^[a-f\d]{24}$/i.test(usernameOrId)) {
+      return null;
+    }
+
+    const user = req.user;
+    if (!user) {
+      return null;
+    }
+
+    const headerToken = req.headers['x-admin-preview-token'];
+    const token =
+      typeof headerToken === 'string'
+        ? headerToken
+        : Array.isArray(headerToken)
+          ? headerToken[0]
+          : '';
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const payload = this.jwt.verify<{
+        type?: string;
+        adminId?: string;
+        targetUserId?: string;
+      }>(token, {
+        secret: this.config.jwtSecret,
+      });
+
+      if (payload?.type !== 'admin_profile_preview') {
+        return null;
+      }
+      if (payload.targetUserId !== usernameOrId) {
+        return null;
+      }
+
+      return payload.targetUserId;
+    } catch {
+      return null;
+    }
+  }
 
   @Get('check-username')
   async checkUsername(
@@ -233,9 +282,14 @@ export class ProfilesController {
       throw new UnauthorizedException('Unauthorized');
     }
 
+    const previewViewerId = this.resolveAdminPreviewViewerId(
+      req,
+      usernameOrId,
+    );
+
     return this.profilesService.getProfileDetails({
       usernameOrId,
-      viewerId: user.userId,
+      viewerId: previewViewerId ?? user.userId,
     });
   }
 

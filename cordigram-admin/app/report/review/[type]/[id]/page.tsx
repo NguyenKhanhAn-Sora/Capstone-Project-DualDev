@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import styles from "./review.module.css";
 import { getApiBaseUrl, getWebBaseUrl } from "@/lib/api";
+import { openAdminProfilePreview } from "@/lib/admin-profile-preview";
 import ImageViewerOverlay from "../../image-viewer-overlay";
 
 type ReportType = "post" | "comment" | "user";
@@ -360,8 +361,6 @@ export default function ReportReviewPage() {
   const webBaseUrl = getWebBaseUrl();
   const buildPostUrl = (postId?: string | null) =>
     postId ? `${webBaseUrl}/post/${postId}` : null;
-  const buildProfileUrl = (userId?: string | null) =>
-    userId ? `${webBaseUrl}/profile/${userId}` : null;
   const topCategoryBreakdown = detail?.categoryBreakdown?.[0] ?? null;
   const categorySignal = topCategoryBreakdown
     ? `${formatModerationKey(topCategoryBreakdown.category)} (${formatPercent(topCategoryBreakdown.percent)})`
@@ -1057,17 +1056,22 @@ export default function ReportReviewPage() {
                   <h2 className={styles.panelTitle}>User profile</h2>
                   <div className={styles.panelActions}>
                     <span className={styles.panelTag}>Account</span>
-                    {buildProfileUrl(detail?.targetId ?? targetId) ? (
-                      <a
+                    {detail?.targetId ?? targetId ? (
+                      <button
+                        type="button"
                         className={styles.linkButton}
-                        href={
-                          buildProfileUrl(detail?.targetId ?? targetId) ?? "#"
-                        }
-                        target="_blank"
-                        rel="noreferrer"
+                        onClick={async () => {
+                          try {
+                            await openAdminProfilePreview(
+                              detail?.targetId ?? targetId,
+                            );
+                          } catch {
+                            setResolveToast("Unable to open profile preview");
+                          }
+                        }}
                       >
                         Open profile
-                      </a>
+                      </button>
                     ) : null}
                   </div>
                 </div>

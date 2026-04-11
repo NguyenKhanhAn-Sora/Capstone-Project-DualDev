@@ -7,6 +7,7 @@ export type ModerationActionType =
   | 'strike_decay_auto'
   | 'rollback_moderation'
   | 'no_violation'
+  | 'admin_profile_preview'
   | 'remove_post'
   | 'restrict_post'
   | 'delete_comment'
@@ -37,6 +38,7 @@ export class ModerationAction extends Document {
       'strike_decay_auto',
       'rollback_moderation',
       'no_violation',
+      'admin_profile_preview',
       'remove_post',
       'restrict_post',
       'delete_comment',

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { JwtService } from '@nestjs/jwt';
 import { Connection, Model, Types } from 'mongoose';
 import { User } from '../users/user.schema';
 import { Post } from '../posts/post.schema';
@@ -30,9 +31,12 @@ import {
   ReportProblem,
   ReportProblemStatus,
 } from '../reportproblem/reportproblem.schema';
+import { ConfigService } from '../config/config.service';
 
 @Injectable()
 export class AdminService {
+  private readonly jwt = new JwtService();
+
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
@@ -63,6 +67,7 @@ export class AdminService {
     private readonly interactionMuteScheduler: InteractionMuteSchedulerService,
     private readonly cloudinary: CloudinaryService,
     private readonly livekit: LivekitService,
+    private readonly configService: ConfigService,
     @InjectConnection() private readonly connection: Connection,
   ) {}
 
@@ -295,6 +300,7 @@ export class AdminService {
   ): number {
     if (
       [
+        'admin_profile_preview',
         'warn',
         'mute_interaction',
         'no_violation',
@@ -1231,6 +1237,65 @@ export class AdminService {
         handledAt: updated.handledAt ?? null,
         updatedAt: updated.updatedAt,
       },
+    };
+  }
+
+  async createProfilePreviewToken(params: { adminId: string; userId: string }) {
+    if (
+      !Types.ObjectId.isValid(params.adminId) ||
+      !Types.ObjectId.isValid(params.userId)
+    ) {
+      throw new BadRequestException('Invalid admin/user id');
+    }
+
+    const adminObjectId = new Types.ObjectId(params.adminId);
+    const userObjectId = new Types.ObjectId(params.userId);
+
+    const [targetUser, targetProfile] = await Promise.all([
+      this.userModel.findById(userObjectId).select('_id status').lean(),
+      this.profileModel
+        .findOne({ userId: userObjectId })
+        .select('displayName username')
+        .lean(),
+    ]);
+
+    if (!targetUser || targetUser.status === 'banned') {
+      throw new NotFoundException('User not found');
+    }
+
+    const expiresInSeconds = 5 * 60;
+    const token = await this.jwt.signAsync(
+      {
+        type: 'admin_profile_preview',
+        adminId: adminObjectId.toString(),
+        targetUserId: userObjectId.toString(),
+      },
+      {
+        secret: this.configService.jwtSecret,
+        expiresIn: expiresInSeconds,
+      },
+    );
+
+    const targetLabel =
+      targetProfile?.username?.trim() ||
+      targetProfile?.displayName?.trim() ||
+      userObjectId.toString();
+
+    await this.moderationActionModel.create({
+      targetType: 'user',
+      targetId: userObjectId,
+      action: 'admin_profile_preview',
+      category: 'admin_tools',
+      reason: 'open_profile_preview',
+      severity: null,
+      note: `Admin opened profile preview for ${targetLabel}`,
+      moderatorId: adminObjectId,
+      expiresAt: null,
+    });
+
+    return {
+      token,
+      expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
     };
   }
 
@@ -4044,6 +4109,7 @@ export class AdminService {
           'auto_hidden_pending_review',
           'rollback_moderation',
           'no_violation',
+          'admin_profile_preview',
           'remove_post',
           'restrict_post',
           'delete_comment',
@@ -4306,6 +4372,7 @@ export class AdminService {
       const strikeDelta = [
         'no_violation',
         'rollback_moderation',
+        'admin_profile_preview',
         'creator_verification_approved',
         'creator_verification_rejected',
         'creator_verification_revoked',
@@ -4314,6 +4381,7 @@ export class AdminService {
         : this.getStrikeIncrement(row.action, row.severity ?? null);
 
       const actionLabelMap: Record<string, string> = {
+        admin_profile_preview: 'ADMIN PROFILE PREVIEW OPENED',
         creator_verification_approved: 'CREATOR VERIFICATION APPROVED',
         creator_verification_rejected: 'CREATOR VERIFICATION REJECTED',
         creator_verification_revoked: 'CREATOR VERIFICATION REVOKED',
@@ -5536,6 +5604,7 @@ export class AdminService {
       interactionMutedIndefinitely: boolean;
       accountLimitedUntil: Date | null;
       accountLimitedIndefinitely: boolean;
+      reachRestrictedUntil: Date | null;
       suspendedUntil: Date | null;
       suspendedIndefinitely: boolean;
       createdAt: Date | null;
@@ -5621,7 +5690,7 @@ export class AdminService {
       .skip(safeOffset)
       .limit(safeLimit + 1)
       .select(
-        '_id email status strikeCount interactionMutedUntil interactionMutedIndefinitely accountLimitedUntil accountLimitedIndefinitely suspendedUntil suspendedIndefinitely createdAt isCreatorVerified',
+        '_id email status strikeCount interactionMutedUntil interactionMutedIndefinitely accountLimitedUntil accountLimitedIndefinitely reachRestrictedUntil suspendedUntil suspendedIndefinitely createdAt isCreatorVerified',
       )
       .lean();
 
@@ -5654,6 +5723,7 @@ export class AdminService {
         interactionMutedIndefinitely: Boolean(doc.interactionMutedIndefinitely),
         accountLimitedUntil: doc.accountLimitedUntil ?? null,
         accountLimitedIndefinitely: Boolean(doc.accountLimitedIndefinitely),
+        reachRestrictedUntil: doc.reachRestrictedUntil ?? null,
         suspendedUntil: doc.suspendedUntil ?? null,
         suspendedIndefinitely: Boolean(doc.suspendedIndefinitely),
         createdAt: doc.createdAt ?? null,
@@ -5829,7 +5899,7 @@ export class AdminService {
     const user = await this.userModel
       .findById(objectId)
       .select(
-        'email status strikeCount interactionMutedUntil interactionMutedIndefinitely accountLimitedUntil accountLimitedIndefinitely suspendedUntil suspendedIndefinitely createdAt',
+        'email status strikeCount interactionMutedUntil interactionMutedIndefinitely accountLimitedUntil accountLimitedIndefinitely reachRestrictedUntil suspendedUntil suspendedIndefinitely createdAt updatedAt isVerified settings.notifications.lastSeenAt loginDevices.lastSeenAt loginDevices.firstSeenAt',
       )
       .lean();
     if (!user) {
@@ -5840,6 +5910,138 @@ export class AdminService {
       .findOne({ userId: user._id })
       .select('displayName username avatarUrl')
       .lean();
+
+    const now = new Date();
+    const since7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const [
+      reportsMadePostTotal,
+      reportsMadeCommentTotal,
+      reportsMadeUserTotal,
+      reportsMadePostLast7d,
+      reportsMadeCommentLast7d,
+      reportsMadeUserLast7d,
+      userReportsReceivedTotal,
+      userReportersReceived,
+      ownPostIds,
+      ownCommentIds,
+    ] = await Promise.all([
+      this.reportPostModel.countDocuments({ reporterId: objectId }).exec(),
+      this.reportCommentModel.countDocuments({ reporterId: objectId }).exec(),
+      this.reportUserModel.countDocuments({ reporterId: objectId }).exec(),
+      this.reportPostModel
+        .countDocuments({ reporterId: objectId, createdAt: { $gte: since7d } })
+        .exec(),
+      this.reportCommentModel
+        .countDocuments({ reporterId: objectId, createdAt: { $gte: since7d } })
+        .exec(),
+      this.reportUserModel
+        .countDocuments({ reporterId: objectId, createdAt: { $gte: since7d } })
+        .exec(),
+      this.reportUserModel
+        .countDocuments({ targetUserId: objectId, reporterId: { $ne: objectId } })
+        .exec(),
+      this.reportUserModel.distinct('reporterId', {
+        targetUserId: objectId,
+        reporterId: { $ne: objectId },
+      }),
+      this.postModel.find({ authorId: objectId }).distinct('_id').exec(),
+      this.commentModel.find({ authorId: objectId }).distinct('_id').exec(),
+    ]);
+
+    const postIdList = ownPostIds.filter((id: any) => Boolean(id));
+    const commentIdList = ownCommentIds.filter((id: any) => Boolean(id));
+
+    const [
+      postReportsReceivedTotal,
+      commentReportsReceivedTotal,
+      postReportersReceived,
+      commentReportersReceived,
+    ] = await Promise.all([
+      postIdList.length
+        ? this.reportPostModel
+            .countDocuments({
+              postId: { $in: postIdList },
+              reporterId: { $ne: objectId },
+            })
+            .exec()
+        : Promise.resolve(0),
+      commentIdList.length
+        ? this.reportCommentModel
+            .countDocuments({
+              commentId: { $in: commentIdList },
+              reporterId: { $ne: objectId },
+            })
+            .exec()
+        : Promise.resolve(0),
+      postIdList.length
+        ? this.reportPostModel.distinct('reporterId', {
+            postId: { $in: postIdList },
+            reporterId: { $ne: objectId },
+          })
+        : Promise.resolve([]),
+      commentIdList.length
+        ? this.reportCommentModel.distinct('reporterId', {
+            commentId: { $in: commentIdList },
+            reporterId: { $ne: objectId },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const reportsMadeTotal =
+      reportsMadePostTotal + reportsMadeCommentTotal + reportsMadeUserTotal;
+    const reportsMadeLast7d =
+      reportsMadePostLast7d + reportsMadeCommentLast7d + reportsMadeUserLast7d;
+
+    const reportsReceivedTotal =
+      userReportsReceivedTotal +
+      postReportsReceivedTotal +
+      commentReportsReceivedTotal;
+
+    const uniqueReporterSet = new Set<string>();
+    [...userReportersReceived, ...postReportersReceived, ...commentReportersReceived]
+      .map((id: any) => id?.toString?.() ?? '')
+      .filter((id: string) => Boolean(id))
+      .forEach((id: string) => uniqueReporterSet.add(id));
+
+    const userAny = user as any;
+    const lastSeenFromNotifications =
+      userAny?.settings?.notifications?.lastSeenAt ?? null;
+    const loginDevices = Array.isArray(userAny?.loginDevices)
+      ? userAny.loginDevices
+      : [];
+    const lastSeenFromDevices = loginDevices.reduce(
+      (latest: Date | null, device: any) => {
+        const candidateRaw = device?.lastSeenAt ?? device?.firstSeenAt ?? null;
+        if (!candidateRaw) return latest;
+        const candidate = new Date(candidateRaw);
+        if (Number.isNaN(candidate.getTime())) return latest;
+        if (!latest) return candidate;
+        return candidate.getTime() > latest.getTime() ? candidate : latest;
+      },
+      null,
+    );
+    const lastActiveCandidates = [
+      lastSeenFromNotifications,
+      lastSeenFromDevices,
+      userAny?.updatedAt ?? null,
+    ]
+      .map((value) => (value ? new Date(value) : null))
+      .filter((value): value is Date => Boolean(value))
+      .filter((value) => !Number.isNaN(value.getTime()));
+    const lastActiveAt =
+      lastActiveCandidates.length > 0
+        ? new Date(
+            Math.max(...lastActiveCandidates.map((value) => value.getTime())),
+          )
+        : null;
+
+    const reporterTrustWeight = this.computeReporterWeight({
+      createdAt: user.createdAt ?? null,
+      isVerified: Boolean((user as any).isVerified),
+      status: user.status ?? 'active',
+      reportsLast7d: reportsMadeLast7d,
+    });
 
     return {
       type: 'user',
@@ -5855,9 +6057,15 @@ export class AdminService {
         ),
         accountLimitedUntil: user.accountLimitedUntil ?? null,
         accountLimitedIndefinitely: Boolean(user.accountLimitedIndefinitely),
+        reachRestrictedUntil: (user as any).reachRestrictedUntil ?? null,
         suspendedUntil: user.suspendedUntil ?? null,
         suspendedIndefinitely: Boolean(user.suspendedIndefinitely),
         createdAt: user.createdAt ?? null,
+        lastActiveAt,
+        reporterTrustWeight,
+        reportsMadeTotal,
+        reportsReceivedTotal,
+        uniqueReportersReceived: uniqueReporterSet.size,
         displayName: profile?.displayName ?? null,
         username: profile?.username ?? null,
         avatarUrl: profile?.avatarUrl ?? null,

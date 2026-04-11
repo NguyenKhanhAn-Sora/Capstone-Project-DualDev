@@ -785,6 +785,39 @@
   padding: 10px;
 }
 
+.reviewOpenProfileButton {
+  margin-top: 8px;
+  border: 1px solid #b9cde7;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #edf4ff 0%, #e6f0ff 100%);
+  color: #1f4b7a;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.reviewOpenProfileButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #9ebcde;
+  box-shadow: 0 6px 14px rgba(48, 98, 160, 0.16);
+}
+
+.reviewOpenProfileButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.reviewOpenProfileIcon {
+  width: 14px;
+  height: 14px;
+}
+
 .reviewFooter {
   display: flex;
   justify-content: flex-end;

@@ -319,6 +319,20 @@ export class AdminController {
     });
   }
 
+  @Post('profile-preview/:userId/token')
+  async createProfilePreviewToken(
+    @Param('userId') userId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+
+    const adminId = req.user?.userId ?? '';
+    return this.adminService.createProfilePreviewToken({ adminId, userId });
+  }
+
   @Get('moderation/media')
   async getMediaModerationQueue(
     @Req() req: Request & { user?: AuthenticatedUser },

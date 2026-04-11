@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getApiBaseUrl } from "@/lib/api";
+import { openAdminProfilePreview } from "@/lib/admin-profile-preview";
 import styles from "./content-moderation.module.css";
 
 type AdminPayload = {
@@ -52,6 +53,7 @@ type UserItem = {
   interactionMutedIndefinitely: boolean;
   accountLimitedUntil: string | null;
   accountLimitedIndefinitely: boolean;
+  reachRestrictedUntil: string | null;
   suspendedUntil: string | null;
   suspendedIndefinitely: boolean;
   createdAt: string | null;
@@ -255,6 +257,46 @@ const formatDate = (value: string | null) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--";
   return date.toLocaleString();
+};
+
+const isFutureDate = (value: string | Date | null | undefined) => {
+  if (!value) return false;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  return date.getTime() > Date.now();
+};
+
+const getUserStatusLabel = (user: {
+  status?: string | null;
+  interactionMutedIndefinitely?: boolean;
+  interactionMutedUntil?: string | null;
+  accountLimitedIndefinitely?: boolean;
+  accountLimitedUntil?: string | null;
+  reachRestrictedUntil?: string | null;
+  suspendedIndefinitely?: boolean;
+  suspendedUntil?: string | null;
+}) => {
+  const baseStatus = (user.status || "active").trim().toLowerCase();
+  const activeFlags: string[] = [];
+
+  if (user.interactionMutedIndefinitely || isFutureDate(user.interactionMutedUntil)) {
+    activeFlags.push("muted");
+  }
+  if (user.accountLimitedIndefinitely || isFutureDate(user.accountLimitedUntil)) {
+    activeFlags.push("limited");
+  }
+  if (isFutureDate(user.reachRestrictedUntil)) {
+    activeFlags.push("restrict reach");
+  }
+  if (user.suspendedIndefinitely || isFutureDate(user.suspendedUntil)) {
+    activeFlags.push("suspended");
+  }
+
+  if (baseStatus === "active" && activeFlags.length) {
+    return `active (${activeFlags.join(", ")})`;
+  }
+
+  return baseStatus || "active";
 };
 
 const getStateToneClass = (state: string) => {
@@ -913,6 +955,18 @@ export default function ContentModerationPage() {
     openActionModal(reviewOverlay.type, reviewOverlay.targetId, targetLabel, "violation");
   }, [closeReviewOverlay, openActionModal, reviewOverlay.detail, reviewOverlay.targetId, reviewOverlay.type]);
 
+  const handleOpenProfileFromReview = useCallback(async () => {
+    if (reviewOverlay.type !== "user") return;
+    const userId = (reviewOverlay.detail as any)?.user?.userId as string | undefined;
+    if (!userId) return;
+
+    try {
+      await openAdminProfilePreview(userId);
+    } catch {
+      setActionError("Unable to open profile preview.");
+    }
+  }, [reviewOverlay.detail, reviewOverlay.type]);
+
   const closeMediaViewer = useCallback(() => {
     setMediaViewer({ open: false, postId: "", media: [], index: 0 });
   }, []);
@@ -1412,14 +1466,12 @@ export default function ContentModerationPage() {
                         <p className={styles.subText}>{item.email || "No email"}</p>
                       </td>
                       <td>
-                        <span className={`${styles.badge} ${getStateToneClass(item.status)}`}>{item.status}</span>
+                        <span className={`${styles.badge} ${getStateToneClass(getUserStatusLabel(item))}`}>
+                          {getUserStatusLabel(item)}
+                        </span>
                       </td>
                       <td className={styles.subText}>
                         strikes: {item.strikeCount}
-                        <br />
-                        muted: {item.interactionMutedIndefinitely || item.interactionMutedUntil ? "yes" : "no"}
-                        <br />
-                        limited: {item.accountLimitedIndefinitely || item.accountLimitedUntil ? "yes" : "no"}
                       </td>
                       <td className={`${styles.subText} ${styles.createdCell}`}>{formatDate(item.createdAt)}</td>
                       <td>
@@ -1878,27 +1930,65 @@ export default function ContentModerationPage() {
                     <div className={styles.reviewStatsGrid}>
                       <article>
                         <p className={styles.reviewInfoLabel}>Status</p>
-                        <p className={styles.reviewInfoValue}>{(reviewOverlay.detail as any)?.user?.status || "active"}</p>
+                        <p className={styles.reviewInfoValue}>
+                          {getUserStatusLabel((reviewOverlay.detail as any)?.user ?? {})}
+                        </p>
                       </article>
                       <article>
                         <p className={styles.reviewInfoLabel}>Strikes</p>
                         <p className={styles.reviewInfoValue}>{String((reviewOverlay.detail as any)?.user?.strikeCount ?? 0)}</p>
                       </article>
                       <article>
-                        <p className={styles.reviewInfoLabel}>Muted</p>
+                        <p className={styles.reviewInfoLabel}>Created at</p>
                         <p className={styles.reviewInfoValue}>
-                          {(reviewOverlay.detail as any)?.user?.interactionMutedIndefinitely || (reviewOverlay.detail as any)?.user?.interactionMutedUntil
-                            ? "Yes"
-                            : "No"}
+                          {formatDate((reviewOverlay.detail as any)?.user?.createdAt ?? null)}
                         </p>
                       </article>
                       <article>
-                        <p className={styles.reviewInfoLabel}>Limited</p>
+                        <p className={styles.reviewInfoLabel}>Last active</p>
                         <p className={styles.reviewInfoValue}>
-                          {(reviewOverlay.detail as any)?.user?.accountLimitedIndefinitely || (reviewOverlay.detail as any)?.user?.accountLimitedUntil
-                            ? "Yes"
-                            : "No"}
+                          {formatDate((reviewOverlay.detail as any)?.user?.lastActiveAt ?? null)}
                         </p>
+                      </article>
+                      <article>
+                        <p className={styles.reviewInfoLabel}>Trust score</p>
+                        <p className={styles.reviewInfoValue}>
+                          {Number((reviewOverlay.detail as any)?.user?.reporterTrustWeight ?? 0).toFixed(2)}
+                        </p>
+                      </article>
+                      <article>
+                        <p className={styles.reviewInfoLabel}>Reports made</p>
+                        <p className={styles.reviewInfoValue}>
+                          {String((reviewOverlay.detail as any)?.user?.reportsMadeTotal ?? 0)}
+                        </p>
+                      </article>
+                      <article>
+                        <p className={styles.reviewInfoLabel}>Reports received (unique)</p>
+                        <p className={styles.reviewInfoValue}>
+                          {String((reviewOverlay.detail as any)?.user?.reportsReceivedTotal ?? 0)}
+                          {` (${String((reviewOverlay.detail as any)?.user?.uniqueReportersReceived ?? 0)})`}
+                        </p>
+                      </article>
+                      <article>
+                        <p className={styles.reviewInfoLabel}>Profile</p>
+                        <button
+                          type="button"
+                          className={styles.reviewOpenProfileButton}
+                          onClick={() => void handleOpenProfileFromReview()}
+                          disabled={!((reviewOverlay.detail as any)?.user?.userId)}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true" className={styles.reviewOpenProfileIcon}>
+                            <path
+                              d="M14 5h5v5M10 14l9-9M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          Open profile
+                        </button>
                       </article>
                     </div>
                   </>

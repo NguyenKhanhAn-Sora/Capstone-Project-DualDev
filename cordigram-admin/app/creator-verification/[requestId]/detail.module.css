@@ -68,9 +68,12 @@
   text-decoration: none;
   font-size: 12px;
   font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
 }
 
 .primaryButton {
+  border: 0;
   color: #ffffff;
   background: linear-gradient(135deg, #7ec3e9, #5caedd);
   box-shadow: 0 8px 18px rgba(92, 174, 221, 0.24);

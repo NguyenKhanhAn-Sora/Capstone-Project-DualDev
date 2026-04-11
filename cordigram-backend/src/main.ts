@@ -32,6 +32,7 @@ async function bootstrap() {
       'x-device-info',
       'x-device-id',
       'x-login-method',
+      'x-admin-preview-token',
     ],
   });
 

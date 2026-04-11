@@ -37,12 +37,19 @@ export async function apiFetch<T = unknown>(options: FetchOptions): Promise<T> {
     typeof window !== "undefined"
       ? window.localStorage.getItem("cordigramDeviceId")
       : null;
+  const adminPreviewToken =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("admin_preview")
+      : null;
   const mergedHeaders: Record<string, string> = {
     "Content-Type": "application/json",
     ...(headers || {}),
   } as Record<string, string>;
   if (deviceId && !mergedHeaders["x-device-id"]) {
     mergedHeaders["x-device-id"] = deviceId;
+  }
+  if (adminPreviewToken && !mergedHeaders["x-admin-preview-token"]) {
+    mergedHeaders["x-admin-preview-token"] = adminPreviewToken;
   }
 
   const res = await fetch(url, {

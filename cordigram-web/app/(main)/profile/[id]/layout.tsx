@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import styles from "../profile.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import ImageViewerOverlay from "@/ui/image-viewer-overlay/image-viewer-overlay";
@@ -274,6 +274,7 @@ export default function ProfileLayout({
   const params = useParams<{ id?: string }>();
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const profileId = useMemo(() => {
     const raw = Array.isArray(params?.id) ? params.id[0] : params?.id;
     return raw ? decodeURIComponent(raw) : "";
@@ -336,31 +337,36 @@ export default function ProfileLayout({
     () => USER_REPORT_GROUPS.find((g) => g.key === reportCategory),
     [reportCategory],
   );
+  const isAdminPreviewMode = Boolean(searchParams.get("admin_preview"));
   const isOwner = profile && viewerId && profile.userId === viewerId;
   const isFollower = Boolean(profile?.isFollowing);
   const canViewProfile = profile
-    ? canViewByVisibility(
+    ? isAdminPreviewMode ||
+      canViewByVisibility(
         profile.visibility?.profile,
         Boolean(isOwner),
         isFollower,
       )
     : true;
   const canViewAbout = profile
-    ? canViewByVisibility(
+    ? isAdminPreviewMode ||
+      canViewByVisibility(
         profile.visibility?.about,
         Boolean(isOwner),
         isFollower,
       )
     : false;
   const canViewFollowers = profile
-    ? canViewByVisibility(
+    ? isAdminPreviewMode ||
+      canViewByVisibility(
         profile.visibility?.followers,
         Boolean(isOwner),
         isFollower,
       )
     : false;
   const canViewFollowing = profile
-    ? canViewByVisibility(
+    ? isAdminPreviewMode ||
+      canViewByVisibility(
         profile.visibility?.following,
         Boolean(isOwner),
         isFollower,
@@ -1226,25 +1232,32 @@ export default function ProfileLayout({
   const statsOriginalFallback =
     (profile?.stats?.posts ?? 0) + (profile?.stats?.reels ?? 0);
   const displayedPostsCount = authoredCount ?? statsOriginalFallback;
+  const appendPreviewQuery = (path: string) => {
+    if (!isAdminPreviewMode) return path;
+    const previewToken = searchParams.get("admin_preview");
+    if (!previewToken) return path;
+    const join = path.includes("?") ? "&" : "?";
+    return `${path}${join}admin_preview=${encodeURIComponent(previewToken)}`;
+  };
 
   const navItems = isOwner
     ? [
-        { key: "posts", label: "POSTS", href: `/profile/${profileId}` },
-        { key: "reels", label: "REELS", href: `/profile/${profileId}/reels` },
-        { key: "saved", label: "SAVED", href: `/profile/${profileId}/saved` },
+        { key: "posts", label: "POSTS", href: appendPreviewQuery(`/profile/${profileId}`) },
+        { key: "reels", label: "REELS", href: appendPreviewQuery(`/profile/${profileId}/reels`) },
+        { key: "saved", label: "SAVED", href: appendPreviewQuery(`/profile/${profileId}/saved`) },
         {
           key: "repost",
           label: "REPOST",
-          href: `/profile/${profileId}/repost`,
+          href: appendPreviewQuery(`/profile/${profileId}/repost`),
         },
       ]
     : [
-        { key: "posts", label: "POSTS", href: `/profile/${profileId}` },
-        { key: "reels", label: "REELS", href: `/profile/${profileId}/reels` },
+        { key: "posts", label: "POSTS", href: appendPreviewQuery(`/profile/${profileId}`) },
+        { key: "reels", label: "REELS", href: appendPreviewQuery(`/profile/${profileId}/reels`) },
         {
           key: "repost",
           label: "REPOST",
-          href: `/profile/${profileId}/repost`,
+          href: appendPreviewQuery(`/profile/${profileId}/repost`),
         },
       ];
 

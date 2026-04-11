@@ -14,11 +14,56 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/jwt.strategy';
 import { CreateReelDto } from './dto/create-reel.dto';
 import { PostsService } from './posts.service';
+import { ConfigService } from '../config/config.service';
+import { JwtService } from '@nestjs/jwt';
 
 @Controller('reels')
 @UseGuards(JwtAuthGuard)
 export class ReelsController {
-  constructor(private readonly postsService: PostsService) {}
+  private readonly jwt = new JwtService();
+
+  constructor(
+    private readonly postsService: PostsService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private resolveAdminPreviewViewerId(
+    req: Request,
+    user: AuthenticatedUser,
+    targetUserId: string,
+  ): string | null {
+    const headerToken = req.headers['x-admin-preview-token'];
+    const token =
+      typeof headerToken === 'string'
+        ? headerToken
+        : Array.isArray(headerToken)
+          ? headerToken[0]
+          : '';
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const payload = this.jwt.verify<{
+        type?: string;
+        adminId?: string;
+        targetUserId?: string;
+      }>(token, {
+        secret: this.config.jwtSecret,
+      });
+
+      if (payload?.type !== 'admin_profile_preview') {
+        return null;
+      }
+      if (payload.targetUserId !== targetUserId) {
+        return null;
+      }
+
+      return payload.targetUserId;
+    } catch {
+      return null;
+    }
+  }
 
   @Post()
   async create(@Req() req: Request, @Body() dto: CreateReelDto) {
@@ -77,8 +122,9 @@ export class ReelsController {
       throw new UnauthorizedException();
     }
     const parsedLimit = limit ? Number(limit) : undefined;
+    const previewViewerId = this.resolveAdminPreviewViewerId(req, user, id);
     return this.postsService.getUserReels({
-      viewerId: user.userId,
+      viewerId: previewViewerId ?? user.userId,
       targetUserId: id,
       limit: parsedLimit,
     });

@@ -32,11 +32,56 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { UpdateVisibilityDto } from './dto/update-visibility.dto';
 import { UpdatePostNotificationMuteDto } from './dto/update-post-notification-mute.dto';
 import { PostsService } from './posts.service';
+import { ConfigService } from '../config/config.service';
+import { JwtService } from '@nestjs/jwt';
 
 @Controller('posts')
 @UseGuards(JwtAuthGuard)
 export class PostsController {
-  constructor(private readonly postsService: PostsService) {}
+  private readonly jwt = new JwtService();
+
+  constructor(
+    private readonly postsService: PostsService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private resolveAdminPreviewViewerId(
+    req: Request,
+    user: AuthenticatedUser,
+    targetUserId: string,
+  ): string | null {
+    const headerToken = req.headers['x-admin-preview-token'];
+    const token =
+      typeof headerToken === 'string'
+        ? headerToken
+        : Array.isArray(headerToken)
+          ? headerToken[0]
+          : '';
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const payload = this.jwt.verify<{
+        type?: string;
+        adminId?: string;
+        targetUserId?: string;
+      }>(token, {
+        secret: this.config.jwtSecret,
+      });
+
+      if (payload?.type !== 'admin_profile_preview') {
+        return null;
+      }
+      if (payload.targetUserId !== targetUserId) {
+        return null;
+      }
+
+      return payload.targetUserId;
+    } catch {
+      return null;
+    }
+  }
 
   @Post()
   async create(@Req() req: Request, @Body() dto: CreatePostDto) {
@@ -182,8 +227,9 @@ export class PostsController {
       throw new UnauthorizedException();
     }
     const parsedLimit = limit ? Number(limit) : undefined;
+    const previewViewerId = this.resolveAdminPreviewViewerId(req, user, id);
     return this.postsService.getUserPosts({
-      viewerId: user.userId,
+      viewerId: previewViewerId ?? user.userId,
       targetUserId: id,
       limit: parsedLimit,
     });
