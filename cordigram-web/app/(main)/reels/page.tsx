@@ -6,6 +6,7 @@ import Link from "next/link";
 import EmojiPicker from "emoji-picker-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { formatDistanceToNow } from "date-fns";
 import {
   fetchReelsFeed,
   fetchReelDetail,
@@ -81,6 +82,13 @@ const formatCount = (value?: number) => {
     return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
   return `${n}`;
+};
+
+const formatTimeAgo = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return formatDistanceToNow(date, { addSuffix: true });
 };
 
 const REEL_STATS_POLL_INTERVAL = 5000;
@@ -282,6 +290,8 @@ type ReelVideoProps = {
   item: ReelItem;
   autoplay: boolean;
   onViewed?: (msWatched?: number) => void;
+  onFollow: (authorId: string, nextFollow: boolean) => void;
+  viewerId?: string;
   children?: React.ReactNode;
 };
 
@@ -408,7 +418,14 @@ const IconArrow = ({ up }: { up?: boolean }) => (
   </svg>
 );
 
-function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
+function ReelVideo({
+  item,
+  autoplay,
+  onViewed,
+  onFollow,
+  viewerId,
+  children,
+}: ReelVideoProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -418,6 +435,18 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
   const [expanded, setExpanded] = useState(false);
   const [canExpand, setCanExpand] = useState(false);
   const captionRef = useRef<HTMLDivElement | null>(null);
+  const authorOwnerId = item.authorId || item.author?.id;
+  const isSelf = Boolean(viewerId && authorOwnerId === viewerId);
+  const isFollowing = Boolean(
+    item.flags?.following ??
+      (item as unknown as { following?: boolean }).following,
+  );
+  const initialFollowingRef = useRef(isFollowing);
+  const followToggledRef = useRef(false);
+  const showInlineFollow =
+    !isSelf &&
+    Boolean(authorOwnerId) &&
+    (!initialFollowingRef.current || followToggledRef.current || !isFollowing);
   const viewSentRef = useRef(false);
 
   useEffect(() => {
@@ -713,34 +742,98 @@ function ReelVideo({ item, autoplay, onViewed, children }: ReelVideoProps) {
           ) : null}
 
           {item.authorUsername ? (
-            item.authorId ? (
-              <Link
-                href={`/profile/${item.authorId}`}
-                className={`${styles.captionHandle} ${styles.captionHandleLink}`}
-              >
-                <span className={styles.nameWithBadge}>
-                  @{item.authorUsername}
-                  <VerifiedBadge
-                    visible={Boolean(
-                      (item as any).authorIsCreatorVerified ??
-                        item.author?.isCreatorVerified,
+            <div className={styles.captionAuthorRow}>
+              <div className={styles.captionAuthorMain}>
+                {authorOwnerId ? (
+                  <Link
+                    href={`/profile/${authorOwnerId}`}
+                    className={styles.captionAuthorAvatarLink}
+                  >
+                    {item.authorAvatarUrl ? (
+                      <img
+                        src={item.authorAvatarUrl}
+                        alt={item.authorDisplayName || item.authorUsername || "avatar"}
+                        className={styles.captionAuthorAvatar}
+                      />
+                    ) : (
+                      <span className={styles.captionAuthorAvatarFallback}>
+                        {(item.authorDisplayName || item.authorUsername || "?")
+                          .slice(0, 1)
+                          .toUpperCase()}
+                      </span>
                     )}
+                  </Link>
+                ) : item.authorAvatarUrl ? (
+                  <img
+                    src={item.authorAvatarUrl}
+                    alt={item.authorDisplayName || item.authorUsername || "avatar"}
+                    className={styles.captionAuthorAvatar}
                   />
-                </span>
-              </Link>
-            ) : (
-              <div className={styles.captionHandle}>
-                <span className={styles.nameWithBadge}>
-                  @{item.authorUsername}
-                  <VerifiedBadge
-                    visible={Boolean(
-                      (item as any).authorIsCreatorVerified ??
-                        item.author?.isCreatorVerified,
+                ) : (
+                  <span className={styles.captionAuthorAvatarFallback}>
+                    {(item.authorDisplayName || item.authorUsername || "?")
+                      .slice(0, 1)
+                      .toUpperCase()}
+                  </span>
+                )}
+
+                <div className={styles.captionAuthorIdentity}>
+                  <div className={styles.captionAuthorTopRow}>
+                    {authorOwnerId ? (
+                      <Link
+                        href={`/profile/${authorOwnerId}`}
+                        className={`${styles.captionHandle} ${styles.captionHandleLink}`}
+                      >
+                        <span className={styles.nameWithBadge}>
+                          @{item.authorUsername}
+                          <VerifiedBadge
+                            visible={Boolean(
+                              (item as any).authorIsCreatorVerified ??
+                                item.author?.isCreatorVerified,
+                            )}
+                          />
+                        </span>
+                      </Link>
+                    ) : (
+                      <div className={styles.captionHandle}>
+                        <span className={styles.nameWithBadge}>
+                          @{item.authorUsername}
+                          <VerifiedBadge
+                            visible={Boolean(
+                              (item as any).authorIsCreatorVerified ??
+                                item.author?.isCreatorVerified,
+                            )}
+                          />
+                        </span>
+                      </div>
                     )}
-                  />
-                </span>
+
+                    {showInlineFollow ? (
+                      <button
+                        type="button"
+                        className={`${styles.captionFollowBtn} ${
+                          isFollowing ? styles.captionFollowBtnMuted : styles.captionFollowBtnPrimary
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          followToggledRef.current = true;
+                          onFollow(authorOwnerId as string, !isFollowing);
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {isFollowing ? "Following" : "Follow"}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {(item.createdAt || item.createdAtFormatted) ? (
+                    <span className={styles.captionTimeAgo}>
+                      {formatTimeAgo(item.createdAt || item.createdAtFormatted)}
+                    </span>
+                  ) : null}
+                </div>
               </div>
-            )
+            </div>
           ) : null}
         </div>
         <div
@@ -3085,6 +3178,8 @@ export default function ReelPage({
                               item={item}
                               autoplay={isActive}
                               onViewed={(ms) => handleViewed(item.id, ms)}
+                              onFollow={onFollow}
+                              viewerId={viewerId}
                             >
                               <div
                                 className={`${styles.moreMenuWrap} ${

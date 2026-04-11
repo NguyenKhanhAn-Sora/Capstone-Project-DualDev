@@ -819,6 +819,68 @@
   font-weight: 700;
 }
 
+.captionAuthorRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.captionAuthorMain {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.captionAuthorAvatarLink {
+  display: inline-flex;
+  border-radius: 999px;
+}
+
+.captionAuthorAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+}
+
+.captionAuthorAvatarFallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+  background: rgba(148, 163, 184, 0.36);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+}
+
+.captionAuthorIdentity {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.captionAuthorTopRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.captionUsernameLine {
+  color: rgba(226, 232, 240, 0.92);
+  font-size: 15px;
+  font-weight: 500;
+}
+
 .nameWithBadge {
   display: inline-flex;
   align-items: center;
@@ -836,6 +898,42 @@
 .captionHandle:hover {
   text-decoration: underline;
   cursor: pointer;
+}
+
+.captionFollowBtn {
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    filter 120ms ease;
+}
+
+.captionFollowBtn:hover {
+  transform: translateY(-1px);
+}
+
+.captionFollowBtnPrimary {
+  color: #ffffff;
+  background: rgba(15, 23, 42, 0.2);
+}
+
+.captionFollowBtnMuted {
+  color: #ffffff;
+  background: rgba(15, 23, 42, 0.2);
+  border-color: rgba(255, 255, 255, 0.78);
+  opacity: 0.88;
+}
+
+.captionTimeAgo {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.88);
+  line-height: 1.1;
 }
 
 .captionRepostBanner {

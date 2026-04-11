@@ -57,6 +57,23 @@ const EyeIcon = ({ open }: { open: boolean }) => (
   </svg>
 );
 
+const CloseIcon = () => (
+  <svg
+    aria-hidden
+    width={18}
+    height={18}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M6 6l12 12" />
+    <path d="M18 6l-12 12" />
+  </svg>
+);
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -919,7 +936,7 @@ export default function LoginPage() {
               }}
               aria-label="Close"
             >
-              ×
+              <CloseIcon />
             </button>
             <div className={styles["overlay-avatar-wrapper"]}>
               {selectedAccount.avatarUrl ? (
@@ -1074,7 +1091,7 @@ export default function LoginPage() {
               }}
               aria-label="Close"
             >
-              ×
+              <CloseIcon />
             </button>
             <p className={styles["overlay-name"]}>Two-factor verification</p>
             <p className={styles["overlay-subtitle"]}>

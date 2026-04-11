@@ -1465,6 +1465,10 @@
     border 120ms ease;
 }
 
+.closeBtn svg {
+    transform: translate(-1px,-1px)
+}
+
 .closeBtn:hover {
   color: var(--color-text);
   transform: translateY(-1px);
