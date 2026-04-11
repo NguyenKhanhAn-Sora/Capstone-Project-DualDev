@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import EmojiPicker from "emoji-picker-react";
 import styles from "./create.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import LivestreamCreatePanel from "@/components/livestream/LivestreamCreatePanel";
 import { DateSelect } from "@/ui/date-select/date-select";
 import { TimeSelect } from "@/ui/time-select/time-select";
 import {
@@ -155,7 +156,7 @@ const initialForm: FormState = {
 
 export default function CreatePostPage() {
   const canRender = useRequireAuth();
-  const [mode, setMode] = useState<"post" | "reel">("post");
+  const [mode, setMode] = useState<"post" | "reel" | "livestream">("post");
   const [step, setStep] = useState<Step>("select");
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [form, setForm] = useState<FormState>(initialForm);
@@ -1086,10 +1087,14 @@ export default function CreatePostPage() {
       <div className={styles.headerRow}>
         <div>
           <p className={styles.eyebrow}>
-            Create {mode === "reel" ? "reel" : "post"}
+            Create {mode === "reel" ? "reel" : mode === "livestream" ? "livestream" : "post"}
           </p>
           <h1 className={styles.title}>
-            {mode === "reel" ? "Share a short reel" : "Share genuine moments"}
+            {mode === "reel"
+              ? "Share a short reel"
+              : mode === "livestream"
+                ? "Go live from desktop"
+                : "Share genuine moments"}
           </h1>
           <div className={styles.modeSwitch}>
             <button
@@ -1118,43 +1123,62 @@ export default function CreatePostPage() {
             >
               Reel
             </button>
+            <button
+              type="button"
+              className={`${styles.modeButton} ${
+                mode === "livestream" ? styles.modeButtonActive : ""
+              }`}
+              onClick={() => {
+                setMode("livestream");
+                setError("");
+                resetSelection();
+              }}
+            >
+              Livestream
+            </button>
           </div>
         </div>
-        <div className={styles.stepper}>
-          <div
-            className={`${styles.step} ${
-              step === "select" ? styles.stepActive : ""
-            }`}
-          >
-            <span className={styles.stepNumber}>1</span>
-            <div>
-              <p className={styles.stepLabel}>Choose content</p>
+        {mode !== "livestream" ? (
+          <div className={styles.stepper}>
+            <div
+              className={`${styles.step} ${
+                step === "select" ? styles.stepActive : ""
+              }`}
+            >
+              <span className={styles.stepNumber}>1</span>
+              <div>
+                <p className={styles.stepLabel}>Choose content</p>
+              </div>
+            </div>
+            <div
+              className={`${styles.step} ${
+                step === "details" ? styles.stepActive : ""
+              }`}
+            >
+              <span className={styles.stepNumber}>2</span>
+              <div>
+                <p className={styles.stepLabel}>Add details</p>
+              </div>
             </div>
           </div>
-          <div
-            className={`${styles.step} ${
-              step === "details" ? styles.stepActive : ""
-            }`}
-          >
-            <span className={styles.stepNumber}>2</span>
-            <div>
-              <p className={styles.stepLabel}>Add details</p>
-            </div>
-          </div>
-        </div>
+        ) : null}
       </div>
 
-      <input
-        ref={fileInputRef}
-        id="fileInput"
-        type="file"
-        accept={mode === "reel" ? "video/*" : "image/*,video/*"}
-        multiple={mode === "post"}
-        className={styles.hiddenInput}
-        onChange={onInputChange}
-      />
+      {mode === "livestream" ? (
+        <LivestreamCreatePanel />
+      ) : (
+        <>
+          <input
+            ref={fileInputRef}
+            id="fileInput"
+            type="file"
+            accept={mode === "reel" ? "video/*" : "image/*,video/*"}
+            multiple={mode === "post"}
+            className={styles.hiddenInput}
+            onChange={onInputChange}
+          />
 
-      {step === "select" ? (
+          {step === "select" ? (
         <div className={styles.selectGrid}>
           <label
             className={`${styles.dropzone} ${
@@ -1220,7 +1244,7 @@ export default function CreatePostPage() {
             </div>
           </div>
         </div>
-      ) : (
+          ) : (
         <form className={styles.detailsGrid} onSubmit={handleSubmit}>
           <div className={styles.previewCard}>
             <div className={styles.cardHeader}>
@@ -1824,6 +1848,8 @@ export default function CreatePostPage() {
             )}
           </div>
         </form>
+          )}
+        </>
       )}
     </div>
   );

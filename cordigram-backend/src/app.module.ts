@@ -33,6 +33,7 @@ import { ServerInvitesModule } from './server-invites/server-invites.module';
 import { PaymentsModule } from './payments/payments.module';
 import { CreatorVerificationModule } from './creator-verification/creator-verification.module';
 import { RolesModule } from './roles/roles.module';
+import { LivestreamModule } from './livestream/livestream.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { RolesModule } from './roles/roles.module';
     PaymentsModule,
     CreatorVerificationModule,
     RolesModule,
+    LivestreamModule,
   ],
   controllers: [AppController],
   providers: [AppService],

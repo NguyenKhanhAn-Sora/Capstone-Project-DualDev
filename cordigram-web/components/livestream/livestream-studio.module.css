@@ -1,0 +1,503 @@
+.wrap {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.label {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-primary);
+}
+
+.title {
+  margin: 4px 0 0;
+  font-size: 34px;
+}
+
+.endButton {
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  color: #fff;
+  font-weight: 700;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.error {
+  margin: 0;
+  color: #fca5a5;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.mainPane,
+.settingsPane {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  padding: 14px;
+}
+
+.room {
+  display: grid;
+  gap: 10px;
+}
+
+.hostControls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lockNotice {
+  border: 1px solid rgba(14, 165, 233, 0.4);
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: rgba(14, 165, 233, 0.14);
+  color: #bae6fd;
+  font-size: 13px;
+}
+
+.controlPrimary,
+.controlGhost {
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.controlPrimary {
+  border: none;
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary), #22d3ee);
+}
+
+.controlGhost {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+}
+
+.inlineError {
+  width: 100%;
+  margin: 4px 0 0;
+  color: #fca5a5;
+  font-size: 12px;
+}
+
+.liveShell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 12px;
+}
+
+.stageWrap {
+  min-height: 430px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #020617;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.stageTile {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.stageVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.stageCaption {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.8);
+  padding: 5px 10px;
+  color: #fff;
+  font-size: 12px;
+}
+
+.stageEmpty {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.comments {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.commentsTitle {
+  margin: 0;
+}
+
+.pinnedBox {
+  border: 1px solid var(--color-primary);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(14, 165, 233, 0.12);
+}
+
+.pinnedRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pinnedIcon {
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pinnedText {
+  margin: 0;
+  font-size: 13px;
+}
+
+.commentList {
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+  flex-grow: 1;
+}
+
+.commentListEmpty {
+  align-content: center;
+}
+
+.commentItem {
+  margin: 0;
+  font-size: 13px;
+}
+
+.commentEmpty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 16px;
+  text-align: center;
+}
+
+.commentComposer {
+  display: flex;
+  gap: 8px;
+  max-height: 120px !important;
+  align-items: center;
+}
+
+.commentInputWrap {
+  position: relative;
+  flex-grow: 1;
+}
+
+.commentInput {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  width: 100%;
+  padding: 8px 42px 8px 12px;
+  min-height: 42px;
+  line-height: 1.35;
+}
+
+.commentEmojiWrap {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.commentEmojiButton {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.commentEmojiButton:hover {
+  color: var(--color-text);
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.commentEmojiButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.commentEmojiPicker {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 40;
+}
+
+.commentSend {
+  border: none;
+  border-radius: 15px;
+  /* background: linear-gradient(135deg, var(--color-primary), #22d3ee); */
+  color: #22d3ee;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.commentSend:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settingsTitle {
+  margin: 0 0 8px;
+}
+
+.settingsPane {
+  width: 100%;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  width: min(760px, 100%);
+}
+
+.titleLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.emojiWrap {
+  position: relative;
+}
+
+.emojiButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.emojiButton:hover {
+  border-color: var(--color-primary);
+}
+
+.emojiPickerPanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+}
+
+.titleTextarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  padding: 10px 12px;
+  min-height: 112px;
+  resize: vertical;
+}
+
+.titleCounter {
+  justify-self: end;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.fieldError {
+  color: #fca5a5;
+  font-size: 12px;
+}
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  padding: 9px 10px;
+}
+
+.textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.latencyGroup {
+  display: grid;
+  gap: 8px;
+}
+
+.latencyCard {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.latencyCard:hover {
+  border-color: rgba(34, 211, 238, 0.8);
+  transform: translateY(-1px);
+}
+
+.latencyCardActive {
+  border-color: rgba(34, 211, 238, 0.95);
+  background: rgba(14, 165, 233, 0.18);
+}
+
+.latencyTitle {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.latencyNote {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.saveButton {
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--color-primary), #22d3ee);
+  color: #fff;
+  font-weight: 700;
+  padding: 10px 14px;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.saveButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.navOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.62);
+  display: grid;
+  place-items: center;
+  z-index: 220;
+}
+
+.navDialog {
+  width: min(420px, calc(100vw - 24px));
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.navDialog h3,
+.navDialog p {
+  margin: 0;
+}
+
+.navActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.navStay,
+.navLeave {
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.navStay {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+}
+
+.navLeave {
+  border: none;
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  color: #fff;
+}
+
+@media (max-width: 1180px) {
+  .liveShell {
+    grid-template-columns: 1fr;
+  }
+
+  .field {
+    width: 100%;
+  }
+
+  .emojiPickerPanel {
+    right: auto;
+    left: 0;
+  }
+
+  .commentEmojiPicker {
+    right: auto;
+    left: -8px;
+  }
+}

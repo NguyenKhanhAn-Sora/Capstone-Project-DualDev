@@ -17,6 +17,10 @@ export class LivekitService {
     this.livekitUrl = this.configService.livekitUrl;
   }
 
+  getPublicUrl(): string {
+    return this.livekitUrl;
+  }
+
   private getRoomService(): RoomServiceClient {
     if (!this.roomService) {
       const url = this.livekitUrl
@@ -60,20 +64,69 @@ export class LivekitService {
   ): Promise<string> {
     await this.ensureVoiceChannelCapacity(roomName);
 
-    const at = new AccessToken(this.livekitApiKey, this.livekitApiSecret, {
-      identity: participantId,
-      name: participantName,
-    });
-
-    at.addGrant({
-      roomJoin: true,
-      room: roomName,
+    return this.generateTokenWithPermissions({
+      roomName,
+      participantName,
+      participantId,
       canPublish: true,
       canSubscribe: true,
       canPublishData: true,
     });
+  }
+
+  async generateTokenWithPermissions(params: {
+    roomName: string;
+    participantName: string;
+    participantId: string;
+    canPublish: boolean;
+    canSubscribe: boolean;
+    canPublishData: boolean;
+  }): Promise<string> {
+    if (params.roomName.startsWith('voice-')) {
+      await this.ensureVoiceChannelCapacity(params.roomName);
+    }
+
+    const at = new AccessToken(this.livekitApiKey, this.livekitApiSecret, {
+      identity: params.participantId,
+      name: params.participantName,
+    });
+
+    at.addGrant({
+      roomJoin: true,
+      room: params.roomName,
+      canPublish: params.canPublish,
+      canSubscribe: params.canSubscribe,
+      canPublishData: params.canPublishData,
+    });
 
     return await at.toJwt();
+  }
+
+  async getParticipantCount(roomName: string): Promise<number> {
+    try {
+      const participants = await this.getRoomService().listParticipants(roomName);
+      return participants.length;
+    } catch {
+      return 0;
+    }
+  }
+
+  async listRoomsByPrefix(prefix: string): Promise<Array<{ name: string; numParticipants: number }>> {
+    const rooms = await this.getRoomService().listRooms();
+    return rooms
+      .filter((room) => (room.name ?? '').startsWith(prefix))
+      .map((room) => ({
+        name: room.name ?? '',
+        numParticipants: room.numParticipants ?? 0,
+      }));
+  }
+
+  async deleteRoomSafe(roomName: string): Promise<void> {
+    try {
+      await this.getRoomService().deleteRoom(roomName);
+    } catch {
+      // Ignore not-found and transient errors during room cleanup.
+    }
   }
 
   /**

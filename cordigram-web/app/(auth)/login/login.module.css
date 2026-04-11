@@ -599,6 +599,7 @@
 .overlay-close svg {
   width: 16px;
   height: 16px;
+  stroke: #334155;
 }
 
 .overlay-close:hover {

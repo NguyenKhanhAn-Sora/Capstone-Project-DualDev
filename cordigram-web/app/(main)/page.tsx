@@ -58,6 +58,7 @@ import {
   INTERACTION_MUTED_FALLBACK_MESSAGE,
 } from "@/lib/interaction-mute";
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
+import LivestreamHub from "@/components/livestream/LivestreamHub";
 import styles from "./home-feed.module.css";
 
 type LocalFlags = {
@@ -1609,6 +1610,7 @@ export default function HomePage({
   return (
     <div className={embedded ? undefined : styles.page}>
       <div className={embedded ? styles.embedded : styles.centerColumn}>
+        <LivestreamHub viewerId={viewerId} />
         {headerSlot}
         {visibleItems.map(({ item, flags }) => (
           <FeedCard
