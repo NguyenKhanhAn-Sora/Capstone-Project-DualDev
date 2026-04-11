@@ -33,6 +33,10 @@ import {
   AdEngagementEvent,
   AdEngagementEventSchema,
 } from '../payments/ad-engagement-event.schema';
+import {
+  ReportProblem,
+  ReportProblemSchema,
+} from '../reportproblem/reportproblem.schema';
 
 @Module({
   imports: [
@@ -54,6 +58,9 @@ import {
     MongooseModule.forFeature([
       { name: PaymentTransaction.name, schema: PaymentTransactionSchema },
       { name: AdEngagementEvent.name, schema: AdEngagementEventSchema },
+    ]),
+    MongooseModule.forFeature([
+      { name: ReportProblem.name, schema: ReportProblemSchema },
     ]),
     LivekitModule,
     NotificationsModule,

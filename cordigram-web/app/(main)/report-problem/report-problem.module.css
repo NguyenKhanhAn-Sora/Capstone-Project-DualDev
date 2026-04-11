@@ -96,12 +96,23 @@
 }
 
 .fileInput {
-  width: 100%;
+  display: none;
+}
+
+.fileButton {
+  width: fit-content;
   border-radius: 10px;
   border: 1px dashed var(--color-border);
-  padding: 12px;
+  padding: 10px 14px;
   background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-weight: 700;
   cursor: pointer;
+}
+
+.fileButton:hover {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-surface-muted) 82%, #ffffff);
 }
 
 .hint {
@@ -109,32 +120,49 @@
   font-size: 13px;
 }
 
-.fileList {
+.previewGrid {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
 }
 
-.fileItem {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--color-surface-muted);
+.previewItem {
+  position: relative;
+  border-radius: 12px;
   border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  overflow: hidden;
 }
 
-.fileName {
-  font-weight: 600;
-  color: var(--color-text);
+.previewMedia {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  display: block;
+  background: rgba(15, 22, 41, 0.42);
 }
 
-.fileMeta {
-  color: var(--color-text-muted);
-  font-size: 13px;
+.removePreviewButton {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(8, 15, 32, 0.7);
+  color: #ffffff;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.removePreviewButton:hover {
+  background: rgba(185, 28, 28, 0.92);
+  border-color: rgba(255, 255, 255, 0.72);
 }
 
 .actions {

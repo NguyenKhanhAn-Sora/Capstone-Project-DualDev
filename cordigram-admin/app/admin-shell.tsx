@@ -9,7 +9,7 @@ import styles from "./admin-shell.module.css";
 type NavItem = {
   href: string;
   label: string;
-  icon: "dashboard" | "report" | "resolved" | "moderation" | "content" | "ads" | "audit" | "broadcast" | "verification";
+  icon: "dashboard" | "report" | "resolved" | "moderation" | "problem" | "content" | "ads" | "audit" | "broadcast" | "verification";
   matcher: (pathname: string) => boolean;
 };
 
@@ -37,6 +37,17 @@ function NavIcon({ icon }: { icon: NavItem["icon"] }) {
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" />
         <path d="M8 12.5l2.6 2.6L16 9.8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (icon === "problem") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6.5 4h8.8L20 8.7V18a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        <path d="M15.3 4v4.5H20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        <path d="M12.25 9.5c-1.45 0-2.25.82-2.25 1.95" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="12" cy="15.9" r="1" fill="currentColor" />
       </svg>
     );
   }
@@ -117,6 +128,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Auto Moderation",
     icon: "moderation",
     matcher: (pathname) => pathname === "/moderation" || pathname.startsWith("/moderation/"),
+  },
+  {
+    href: "/report-problem",
+    label: "Report Problem",
+    icon: "problem",
+    matcher: (pathname) => pathname === "/report-problem" || pathname.startsWith("/report-problem/"),
   },
   {
     href: "/content-moderation",

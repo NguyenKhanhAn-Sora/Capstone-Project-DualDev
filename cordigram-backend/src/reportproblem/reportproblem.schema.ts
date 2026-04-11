@@ -52,6 +52,15 @@ export class ReportProblem extends Document {
   })
   status: ReportProblemStatus;
 
+  @Prop({ type: String, trim: true, maxlength: 1200, default: null })
+  adminNote: string | null;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  handledBy: Types.ObjectId | null;
+
+  @Prop({ type: Date, default: null })
+  handledAt: Date | null;
+
   @Prop({ type: Date })
   createdAt: Date;
 

@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../config/app_config.dart';
+import 'auth_storage.dart';
 
 class ApiException implements Exception {
   const ApiException(this.message, {this.retryAfterSec});
@@ -23,6 +26,8 @@ class ApiAuthResult {
 
 class ApiService {
   static final _client = http.Client();
+  static final _deviceInfoPlugin = DeviceInfoPlugin();
+  static String? _cachedDeviceInfo;
 
   static Uri _uri(String path) => Uri.parse('${AppConfig.apiBaseUrl}$path');
 
@@ -31,16 +36,93 @@ class ApiService {
     'Accept': 'application/json',
   };
 
+  static String _platformLabel() {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return 'Android';
+      case TargetPlatform.iOS:
+        return 'iOS';
+      default:
+        return 'Mobile';
+    }
+  }
+
+  static Future<String> _deviceInfoLabel() async {
+    if (_cachedDeviceInfo != null && _cachedDeviceInfo!.isNotEmpty) {
+      return _cachedDeviceInfo!;
+    }
+
+    final platform = _platformLabel();
+    String label = 'Cordigram Mobile App ($platform)';
+
+    try {
+      if (kIsWeb) {
+        _cachedDeviceInfo = 'Cordigram Web App';
+        return _cachedDeviceInfo!;
+      }
+
+      switch (defaultTargetPlatform) {
+        case TargetPlatform.android:
+          final info = await _deviceInfoPlugin.androidInfo;
+          final brand = info.brand.trim();
+          final model = info.model.trim();
+          final parts = <String>[
+            if (brand.isNotEmpty) brand,
+            if (model.isNotEmpty) model,
+          ];
+          if (parts.isNotEmpty) {
+            label = parts.join(' ');
+          }
+          break;
+        case TargetPlatform.iOS:
+          final info = await _deviceInfoPlugin.iosInfo;
+          final model = info.model.trim();
+          final name = info.name.trim();
+          final parts = <String>[
+            if (name.isNotEmpty) name,
+            if (model.isNotEmpty && model.toLowerCase() != name.toLowerCase())
+              model,
+          ];
+          if (parts.isNotEmpty) {
+            label = parts.join(' ');
+          }
+          break;
+        default:
+          break;
+      }
+    } catch (_) {
+      // Fallback to generic app label when device info lookup fails.
+    }
+
+    _cachedDeviceInfo = label;
+    return label;
+  }
+
+  static Future<Map<String, String>> _deviceHeaders() async {
+    final platform = _platformLabel();
+    final deviceInfo = await _deviceInfoLabel();
+    final headers = <String, String>{
+      'User-Agent': 'CordigramApp/1.0 (mobile; $platform; Flutter)',
+      'x-device-info': deviceInfo,
+    };
+    final deviceId = AuthStorage.deviceId;
+    if (deviceId != null && deviceId.isNotEmpty) {
+      headers['x-device-id'] = deviceId;
+    }
+    return headers;
+  }
+
   // ── POST with JSON body, returns decoded Map ──
   static Future<Map<String, dynamic>> post(
     String path, {
     Map<String, dynamic>? body,
     Map<String, String>? extraHeaders,
   }) async {
+    final deviceHeaders = await _deviceHeaders();
     final response = await _client
         .post(
           _uri(path),
-          headers: {..._baseHeaders, ...?extraHeaders},
+          headers: {..._baseHeaders, ...deviceHeaders, ...?extraHeaders},
           body: body != null ? jsonEncode(body) : null,
         )
         .timeout(const Duration(seconds: 15));
@@ -55,10 +137,11 @@ class ApiService {
     Map<String, dynamic>? body,
     Map<String, String>? extraHeaders,
   }) async {
+    final deviceHeaders = await _deviceHeaders();
     final response = await _client
         .post(
           _uri(path),
-          headers: {..._baseHeaders, ...?extraHeaders},
+          headers: {..._baseHeaders, ...deviceHeaders, ...?extraHeaders},
           body: body != null ? jsonEncode(body) : null,
         )
         .timeout(const Duration(seconds: 15));
@@ -74,10 +157,11 @@ class ApiService {
     Map<String, dynamic>? body,
     Map<String, String>? extraHeaders,
   }) async {
+    final deviceHeaders = await _deviceHeaders();
     final response = await _client
         .patch(
           _uri(path),
-          headers: {..._baseHeaders, ...?extraHeaders},
+          headers: {..._baseHeaders, ...deviceHeaders, ...?extraHeaders},
           body: body != null ? jsonEncode(body) : null,
         )
         .timeout(const Duration(seconds: 15));
@@ -90,8 +174,12 @@ class ApiService {
     String path, {
     Map<String, String>? extraHeaders,
   }) async {
+    final deviceHeaders = await _deviceHeaders();
     final response = await _client
-        .delete(_uri(path), headers: {..._baseHeaders, ...?extraHeaders})
+        .delete(
+          _uri(path),
+          headers: {..._baseHeaders, ...deviceHeaders, ...?extraHeaders},
+        )
         .timeout(const Duration(seconds: 15));
 
     return _handleResponse(response);
@@ -105,8 +193,10 @@ class ApiService {
     required String contentType,
     Map<String, String>? extraHeaders,
   }) async {
+    final deviceHeaders = await _deviceHeaders();
     final uri = _uri(path);
     final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(deviceHeaders);
     if (extraHeaders != null) request.headers.addAll(extraHeaders);
     request.files.add(
       await http.MultipartFile.fromPath(
@@ -127,8 +217,12 @@ class ApiService {
     String path, {
     Map<String, String>? extraHeaders,
   }) async {
+    final deviceHeaders = await _deviceHeaders();
     final response = await _client
-        .get(_uri(path), headers: {..._baseHeaders, ...?extraHeaders})
+        .get(
+          _uri(path),
+          headers: {..._baseHeaders, ...deviceHeaders, ...?extraHeaders},
+        )
         .timeout(const Duration(seconds: 15));
 
     return _handleResponse(response);
@@ -139,8 +233,12 @@ class ApiService {
     String path, {
     Map<String, String>? extraHeaders,
   }) async {
+    final deviceHeaders = await _deviceHeaders();
     final response = await _client
-        .get(_uri(path), headers: {..._baseHeaders, ...?extraHeaders})
+        .get(
+          _uri(path),
+          headers: {..._baseHeaders, ...deviceHeaders, ...?extraHeaders},
+        )
         .timeout(const Duration(seconds: 15));
 
     if (response.statusCode >= 200 && response.statusCode < 300) {

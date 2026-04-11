@@ -9,7 +9,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Comment } from './comment.schema';
 import { CommentLike } from './comment-like.schema';
-import { Post } from 'src/posts/post.schema';
+import { Post } from '../posts/post.schema';
 import { Follow } from '../users/follow.schema';
 import { CreateCommentDto } from '../comment/dto/create-comment.dto';
 import { BlocksService } from '../users/blocks.service';

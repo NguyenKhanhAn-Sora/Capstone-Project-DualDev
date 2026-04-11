@@ -255,6 +255,70 @@ export class AdminController {
     return this.adminService.getResolvedReports({ type, limit });
   }
 
+  @Get('report-problems')
+  async getReportProblems(
+    @Query('status') status: string | undefined,
+    @Query('q') q: string | undefined,
+    @Query('limit') limitRaw: string | undefined,
+    @Query('offset') offsetRaw: string | undefined,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+
+    const parsedLimit = Number(limitRaw);
+    const parsedOffset = Number(offsetRaw);
+    const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
+    const offset = Number.isFinite(parsedOffset) ? parsedOffset : undefined;
+
+    const normalizedStatus =
+      status === 'open' || status === 'in_progress' || status === 'resolved'
+        ? status
+        : undefined;
+
+    return this.adminService.getReportProblems({
+      status: normalizedStatus,
+      q,
+      limit,
+      offset,
+    });
+  }
+
+  @Post('report-problems/:reportId/status')
+  async updateReportProblemStatus(
+    @Param('reportId') reportId: string,
+    @Body()
+    body: {
+      status?: 'open' | 'in_progress' | 'resolved';
+      adminNote?: string;
+    },
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+
+    if (!body?.status) {
+      throw new BadRequestException('Missing status');
+    }
+
+    if (!['open', 'in_progress', 'resolved'].includes(body.status)) {
+      throw new BadRequestException('Invalid status');
+    }
+
+    const adminId = req.user?.userId ?? '';
+
+    return this.adminService.updateReportProblemStatus({
+      reportId,
+      status: body.status,
+      adminNote: body.adminNote,
+      adminId,
+    });
+  }
+
   @Get('moderation/media')
   async getMediaModerationQueue(
     @Req() req: Request & { user?: AuthenticatedUser },

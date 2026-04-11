@@ -8,6 +8,10 @@ import '../../../core/services/auth_storage.dart';
 import '../models/profile_detail.dart';
 
 class ProfileService {
+  static bool _isDeviceSessionRevoked(ApiException e) {
+    return e.message.toLowerCase().contains('device session revoked');
+  }
+
   /// Fetch profile detail by userId (MongoDB ObjectId string).
   static Future<ProfileDetail> fetchProfile(String userId) async {
     final token = AuthStorage.accessToken;
@@ -316,5 +320,217 @@ class ProfileService {
       body: {'note': note},
       extraHeaders: {'Authorization': 'Bearer $token'},
     );
+  }
+
+  /// Request OTP for password change.
+  static Future<Map<String, dynamic>> requestPasswordChangeOtp() async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/password-change/request-otp',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Verify password-change OTP.
+  static Future<Map<String, dynamic>> verifyPasswordChangeOtp({
+    required String code,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/password-change/verify-otp',
+      body: {'code': code},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Confirm password change after OTP verification.
+  static Future<Map<String, dynamic>> confirmPasswordChange({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/password-change/confirm',
+      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Fetch last password change timestamp.
+  static Future<Map<String, dynamic>> fetchPasswordChangeStatus() async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.get(
+      '/users/password-change/status',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Fetch passkey status.
+  static Future<Map<String, dynamic>> fetchPasskeyStatus() async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.get(
+      '/users/passkey/status',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Request OTP for two-factor enable/disable.
+  static Future<Map<String, dynamic>> requestTwoFactorOtp({
+    required bool enable,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/two-factor/request-otp',
+      body: {'enable': enable},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Verify two-factor OTP and apply enable/disable.
+  static Future<Map<String, dynamic>> verifyTwoFactorOtp({
+    required String code,
+    required bool enable,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/two-factor/verify-otp',
+      body: {'code': code, 'enable': enable},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Fetch current two-factor status.
+  static Future<Map<String, dynamic>> fetchTwoFactorStatus() async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.get(
+      '/users/two-factor/status',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Request passkey OTP (password confirmation step).
+  static Future<Map<String, dynamic>> requestPasskeyOtp({
+    required String password,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/passkey/request-otp',
+      body: {'password': password},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Verify passkey OTP.
+  static Future<Map<String, dynamic>> verifyPasskeyOtp({
+    required String code,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/passkey/verify-otp',
+      body: {'code': code},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Confirm passkey set/change.
+  static Future<Map<String, dynamic>> confirmPasskey({
+    String? currentPasskey,
+    required String newPasskey,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/passkey/confirm',
+      body: {'currentPasskey': currentPasskey, 'newPasskey': newPasskey},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Enable/disable passkey verification.
+  static Future<Map<String, dynamic>> togglePasskey({
+    required bool enabled,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/passkey/toggle',
+      body: {'enabled': enabled},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Fetch login devices and current device hash.
+  static Future<Map<String, dynamic>> fetchLoginDevices({
+    String? deviceId,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    try {
+      return await ApiService.get(
+        '/users/login-devices',
+        extraHeaders: {
+          'Authorization': 'Bearer $token',
+          if (deviceId != null && deviceId.isNotEmpty) 'x-device-id': deviceId,
+        },
+      );
+    } on ApiException catch (e) {
+      if (!_isDeviceSessionRevoked(e) || deviceId == null || deviceId.isEmpty) {
+        rethrow;
+      }
+      // Fallback for stale device id: ask backend without x-device-id so
+      // user can still inspect and clean up active sessions.
+      return ApiService.get(
+        '/users/login-devices',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+    }
+  }
+
+  /// Logout one device by deviceIdHash.
+  static Future<Map<String, dynamic>> logoutLoginDevice({
+    required String deviceIdHash,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.post(
+      '/users/login-devices/logout',
+      body: {'deviceIdHash': deviceIdHash},
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Logout all devices except current one.
+  static Future<Map<String, dynamic>> logoutAllDevices({
+    String? deviceId,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    try {
+      return await ApiService.post(
+        '/users/login-devices/logout-all',
+        extraHeaders: {
+          'Authorization': 'Bearer $token',
+          if (deviceId != null && deviceId.isNotEmpty) 'x-device-id': deviceId,
+        },
+      );
+    } on ApiException catch (e) {
+      if (!_isDeviceSessionRevoked(e) || deviceId == null || deviceId.isEmpty) {
+        rethrow;
+      }
+      return ApiService.post(
+        '/users/login-devices/logout-all',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+    }
   }
 }

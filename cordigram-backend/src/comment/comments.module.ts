@@ -5,7 +5,7 @@ import { UsersModule } from '../users/users.module';
 import { ProfilesModule } from '../profiles/profiles.module';
 import { Comment, CommentSchema } from './comment.schema';
 import { CommentLike, CommentLikeSchema } from './comment-like.schema';
-import { Post, PostSchema } from 'src/posts/post.schema';
+import { Post, PostSchema } from '../posts/post.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { Follow, FollowSchema } from '../users/follow.schema';
 import { CommentsController } from './comments.controller';

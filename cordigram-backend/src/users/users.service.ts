@@ -170,7 +170,32 @@ export class UsersService {
     if (!user) return;
 
     const userAgent = params.userAgent ?? '';
-    const { deviceType, os, browser } = this.parseUserAgent(userAgent);
+    const parsed = this.parseUserAgent(userAgent);
+    let deviceType = parsed.deviceType;
+    let os = parsed.os;
+    let browser = parsed.browser;
+    let deviceInfo = (params.deviceInfo ?? '').trim();
+    const infoLower = deviceInfo.toLowerCase();
+
+    // Prefer explicit mobile-app metadata over browser UA inference.
+    if (infoLower.includes('cordigram') || infoLower.includes('flutter')) {
+      deviceType = 'mobile';
+      browser = 'Cordigram App';
+      if (infoLower.includes('android')) {
+        os = 'Android';
+      } else if (infoLower.includes('ios') || infoLower.includes('iphone')) {
+        os = 'iOS';
+      }
+    }
+
+    if (!deviceInfo) {
+      if (browser !== 'unknown' && os !== 'unknown') {
+        deviceInfo = `${browser} on ${os}`;
+      } else if (browser !== 'unknown') {
+        deviceInfo = browser;
+      }
+    }
+
     const baseId = params.deviceId?.trim()
       ? params.deviceId.trim()
       : `${userAgent}::${params.ip ?? ''}`;
@@ -181,7 +206,7 @@ export class UsersService {
     const nextItem = {
       deviceIdHash,
       userAgent,
-      deviceInfo: params.deviceInfo ?? '',
+      deviceInfo,
       ip: params.ip ?? '',
       location: params.location ?? '',
       deviceType,

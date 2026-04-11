@@ -176,10 +176,48 @@
   gap: 12px;
 }
 
+.queueListEmpty {
+  min-height: 160px;
+  align-content: center;
+}
+
 .emptyState {
   margin: 0;
   font-size: 13px;
   color: var(--color-text-muted);
+}
+
+.reportQueueEmpty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 18px 16px;
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--color-border) 75%, #ffffff);
+  background: color-mix(in srgb, var(--color-surface-muted) 72%, #ffffff);
+}
+
+.reportQueueEmptyIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #2f6898;
+  background: rgba(74, 163, 228, 0.14);
+}
+
+.reportQueueEmptyIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.reportQueueEmptyText {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 .queueItem {

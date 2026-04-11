@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./report-problem.module.css";
 import {
   createReportProblem,
@@ -12,7 +12,9 @@ import { useRequireAuth } from "@/hooks/use-require-auth";
 export default function ReportProblemPage() {
   const canRender = useRequireAuth();
   const [description, setDescription] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<
+    Array<{ id: string; file: File; previewUrl: string; isVideo: boolean }>
+  >([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<ReportProblemAttachment[] | null>(
@@ -20,6 +22,7 @@ export default function ReportProblemPage() {
   );
   const [cooldownMs, setCooldownMs] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (cooldownMs === null) return;
@@ -27,16 +30,58 @@ export default function ReportProblemPage() {
     return () => clearInterval(id);
   }, [cooldownMs]);
 
+  useEffect(() => {
+    return () => {
+      files.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
+    };
+  }, [files]);
+
   const remainingMs =
     cooldownMs !== null ? Math.max(0, cooldownMs - tick * 1000) : 0;
   const remainingSec = Math.ceil(remainingMs / 1000);
 
   if (!canRender) return null;
 
+  const clearSelectedFiles = () => {
+    files.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
+    setFiles([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleFiles = (list: FileList | null) => {
     if (!list) return;
-    const selected = Array.from(list).slice(0, 5);
-    setFiles(selected);
+    const selected = Array.from(list);
+    if (!selected.length) return;
+
+    setFiles((prev) => {
+      const availableSlots = Math.max(0, 5 - prev.length);
+      if (!availableSlots) return prev;
+
+      const nextEntries = selected.slice(0, availableSlots).map((file) => ({
+        id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        isVideo: file.type.startsWith("video/"),
+      }));
+
+      return [...prev, ...nextEntries];
+    });
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveFile = (id: string) => {
+    setFiles((prev) => {
+      const target = prev.find((entry) => entry.id === id);
+      if (target) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter((entry) => entry.id !== id);
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -65,11 +110,11 @@ export default function ReportProblemPage() {
       const res = await createReportProblem({
         token,
         description: trimmed,
-        files,
+        files: files.map((entry) => entry.file),
       });
       setSuccess(res.attachments ?? []);
       setDescription("");
-      setFiles([]);
+      clearSelectedFiles();
     } catch (err) {
       const apiErr = err as ApiError | undefined;
       const retryAfter = (apiErr?.data as { retryAfterMs?: number } | undefined)
@@ -115,24 +160,63 @@ export default function ReportProblemPage() {
             <label className={styles.label}>
               Attachments (optional)
               <input
+                ref={fileInputRef}
                 className={styles.fileInput}
                 type="file"
                 multiple
                 accept="image/*,video/*"
                 onChange={(e) => handleFiles(e.target.files)}
               />
+              <button
+                type="button"
+                className={styles.fileButton}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Select files
+              </button>
             </label>
-            <div className={styles.hint}>Up to 5 files · images or videos</div>
+            <div className={styles.hint}>
+              Up to 5 files · images or videos
+              {files.length ? ` · ${files.length}/5 selected` : ""}
+            </div>
           </div>
 
           {files.length ? (
-            <ul className={styles.fileList}>
-              {files.map((file) => (
-                <li key={file.name} className={styles.fileItem}>
-                  <span className={styles.fileName}>{file.name}</span>
-                  <span className={styles.fileMeta}>
-                    {(file.size / 1024 / 1024).toFixed(1)} MB
-                  </span>
+            <ul className={styles.previewGrid}>
+              {files.map((entry) => (
+                <li key={entry.id} className={styles.previewItem}>
+                  {entry.isVideo ? (
+                    <video
+                      src={entry.previewUrl}
+                      className={styles.previewMedia}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      preload="auto"
+                      onLoadedMetadata={(event) => {
+                        const video = event.currentTarget;
+                        if (video.duration > 0.2) {
+                          video.currentTime = 0.1;
+                        }
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={entry.previewUrl}
+                      alt="Selected attachment preview"
+                      className={styles.previewMedia}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    className={styles.removePreviewButton}
+                    onClick={() => handleRemoveFile(entry.id)}
+                    aria-label="Remove selected file"
+                    title="Remove"
+                  >
+                    ×
+                  </button>
                 </li>
               ))}
             </ul>
@@ -162,7 +246,7 @@ export default function ReportProblemPage() {
               className={styles.secondary}
               onClick={() => {
                 setDescription("");
-                setFiles([]);
+                clearSelectedFiles();
                 setError(null);
                 setSuccess(null);
               }}

@@ -450,6 +450,7 @@ export default function AdminDashboardPage() {
     stats.postsCreatedDeltaPct < 0;
   const isNewUsersDeltaNegative =
     typeof stats?.newUsersDeltaPct === "number" && stats.newUsersDeltaPct < 0;
+  const reportQueue = stats?.reportQueue ?? [];
 
   const adsGrossRevenue =
     typeof stats?.adsGrossRevenue30d === "number"
@@ -632,42 +633,78 @@ export default function AdminDashboardPage() {
                 View all
               </Link>
             </div>
-            <div className={styles.queueList}>
-              {(stats?.reportQueue ?? []).map((item) => (
-                <div
-                  className={styles.queueItem}
-                  key={`${item.type}:${item.targetId}`}
-                >
-                  <span className={styles.queueTitle}>{item.title}</span>
-                  <div className={styles.queueMeta}>
-                    <span className={styles.tag}>
-                      {item.type === "post"
-                        ? "Post"
-                        : item.type === "comment"
-                          ? "Comment"
-                          : "User"}
-                    </span>
-                    <span
-                      className={`${styles.status} ${
-                        getReportStatusClass(
+            <div
+              className={`${styles.queueList} ${
+                reportQueue.length === 0 ? styles.queueListEmpty : ""
+              }`}
+            >
+              {reportQueue.length === 0 ? (
+                <div className={styles.reportQueueEmpty}>
+                  <span className={styles.reportQueueEmptyIcon} aria-hidden="true">
+                    <svg
+                      viewBox="0 0 24 24"
+                      focusable="false"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M9.75 12.75l1.5 1.5 3-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M6 19h12a2 2 0 002-2V8.8a2 2 0 00-.66-1.48l-5-4.5A2 2 0 0013 3H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                  <p className={`${styles.emptyState} ${styles.reportQueueEmptyText}`}>
+                    Report queue is clear. No reports need review right now.
+                  </p>
+                </div>
+              ) : (
+                reportQueue.map((item) => (
+                  <div
+                    className={styles.queueItem}
+                    key={`${item.type}:${item.targetId}`}
+                  >
+                    <span className={styles.queueTitle}>{item.title}</span>
+                    <div className={styles.queueMeta}>
+                      <span className={styles.tag}>
+                        {item.type === "post"
+                          ? "Post"
+                          : item.type === "comment"
+                            ? "Comment"
+                            : "User"}
+                      </span>
+                      <span
+                        className={`${styles.status} ${
+                          getReportStatusClass(
+                            item.autoHideSuggested,
+                            item.severity,
+                          )
+                        }`}
+                      >
+                        {formatReportStatus(
                           item.autoHideSuggested,
                           item.severity,
-                        )
-                      }`}
-                    >
-                      {formatReportStatus(
-                        item.autoHideSuggested,
-                        item.severity,
-                      )}
-                    </span>
-                    <span>
-                      Score {item.score.toFixed(1)} · {item.uniqueReporters}{" "}
-                      reporters
-                    </span>
-                    <span>{formatRelativeTime(item.lastReportedAt)}</span>
+                        )}
+                      </span>
+                      <span>
+                        Score {item.score.toFixed(1)} · {item.uniqueReporters}{" "}
+                        reporters
+                      </span>
+                      <span>{formatRelativeTime(item.lastReportedAt)}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 

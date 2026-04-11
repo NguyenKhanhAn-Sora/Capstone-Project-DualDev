@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/api_service.dart';
@@ -7,9 +9,20 @@ import '../profile/models/profile_detail.dart';
 import '../profile/profile_edit_sheet.dart';
 import '../profile/services/profile_service.dart';
 
-enum SettingsTab { personalInfo, profile, creatorVerification }
+enum SettingsTab {
+  personalInfo,
+  profile,
+  creatorVerification,
+  passwordSecurity,
+}
 
 enum _EmailChangeStep { password, currentOtp, newEmail, newOtp, done }
+
+enum _PasswordChangeStep { otp, form, done }
+
+enum _PasskeyStep { password, otp, form, done }
+
+enum _TwoFactorStep { otp, done }
 
 class _CreatorCriteria {
   const _CreatorCriteria({
@@ -190,6 +203,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const Color _accent = Color(0xFF4AA3E4);
   static const Color _danger = Color(0xFFE53935);
   static final RegExp _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+  static final RegExp _passwordRegex = RegExp(
+    r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$',
+  );
+  static final RegExp _passkeyRegex = RegExp(r'^\d{6}$');
 
   static const List<String> _visibilityOptions = [
     'public',
@@ -224,6 +241,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _creatorError;
   String? _creatorSuccess;
   String _creatorNote = '';
+
+  bool _showChangePassword = false;
+  _PasswordChangeStep _passwordStep = _PasswordChangeStep.otp;
+  String _passwordOtp = '';
+  String _passwordCurrent = '';
+  String _passwordNew = '';
+  String _passwordConfirm = '';
+  bool _passwordSubmitting = false;
+  String? _passwordError;
+  String? _passwordSuccess;
+  int _passwordCooldown = 0;
+  int? _passwordExpiresSec;
+  String? _passwordChangedAt;
+  bool _passwordStatusLoading = false;
+  bool _passwordLogoutPrompt = false;
+  bool _passwordLogoutSubmitting = false;
+  String? _passwordLogoutError;
+
+  bool _twoFactorEnabled = false;
+  bool _twoFactorLoading = false;
+  bool _showTwoFactorFlow = false;
+  _TwoFactorStep _twoFactorStep = _TwoFactorStep.otp;
+  bool _twoFactorTarget = true;
+  String _twoFactorOtp = '';
+  bool _twoFactorSubmitting = false;
+  String? _twoFactorError;
+  String? _twoFactorSuccess;
+  int _twoFactorCooldown = 0;
+  int? _twoFactorExpiresSec;
+
+  bool _hasPasskey = false;
+  bool _passkeyEnabled = false;
+  bool _passkeyStatusLoading = false;
+  bool _showPasskeyFlow = false;
+  _PasskeyStep _passkeyStep = _PasskeyStep.password;
+  String _passkeyPassword = '';
+  String _passkeyOtp = '';
+  String _passkeyCurrent = '';
+  String _passkeyNew = '';
+  String _passkeyConfirm = '';
+  bool _showCurrentPasskey = false;
+  bool _passkeySubmitting = false;
+  String? _passkeyError;
+  String? _passkeySuccess;
+  int _passkeyCooldown = 0;
+  int? _passkeyExpiresSec;
+  bool _passkeyToggleSubmitting = false;
+  String? _passkeyToggleError;
+
+  bool _showLoginDevices = false;
+  bool _loginDevicesLoading = false;
+  String? _loginDevicesError;
+  final List<Map<String, dynamic>> _loginDevices = [];
+  String? _loginDevicesCurrent;
+  String? _localDeviceName;
+  final Set<String> _logoutDeviceSubmitting = {};
+  bool _logoutAllSubmitting = false;
+  String? _logoutAllError;
   final Map<String, bool> _visibilitySaving = {
     'gender': false,
     'birthdate': false,
@@ -243,13 +318,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _currentEmail = _decodeEmailFromToken(AuthStorage.accessToken);
     _cooldownTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      if (_currentCooldown <= 0 && _newCooldown <= 0) return;
+      if (_currentCooldown <= 0 &&
+          _newCooldown <= 0 &&
+          _passwordCooldown <= 0 &&
+          _passkeyCooldown <= 0 &&
+          _twoFactorCooldown <= 0) {
+        return;
+      }
       setState(() {
         if (_currentCooldown > 0) _currentCooldown -= 1;
         if (_newCooldown > 0) _newCooldown -= 1;
+        if (_passwordCooldown > 0) _passwordCooldown -= 1;
+        if (_passkeyCooldown > 0) _passkeyCooldown -= 1;
+        if (_twoFactorCooldown > 0) _twoFactorCooldown -= 1;
       });
     });
+    _loadLocalDeviceName();
     _loadProfile();
+  }
+
+  Future<void> _loadLocalDeviceName() async {
+    try {
+      final plugin = DeviceInfoPlugin();
+      String? label;
+      switch (defaultTargetPlatform) {
+        case TargetPlatform.android:
+          final info = await plugin.androidInfo;
+          final brand = info.brand.trim();
+          final model = info.model.trim();
+          final parts = <String>[
+            if (brand.isNotEmpty) brand,
+            if (model.isNotEmpty) model,
+          ];
+          if (parts.isNotEmpty) label = parts.join(' ');
+          break;
+        case TargetPlatform.iOS:
+          final info = await plugin.iosInfo;
+          final name = info.name.trim();
+          final model = info.model.trim();
+          final parts = <String>[
+            if (name.isNotEmpty) name,
+            if (model.isNotEmpty && model.toLowerCase() != name.toLowerCase())
+              model,
+          ];
+          if (parts.isNotEmpty) label = parts.join(' ');
+          break;
+        default:
+          break;
+      }
+
+      if (!mounted || label == null || label.isEmpty) return;
+      setState(() => _localDeviceName = label);
+    } catch (_) {
+      // Keep backend-provided label if local device info cannot be resolved.
+    }
   }
 
   @override
@@ -599,6 +721,715 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _loadPasswordSecurityStatus() async {
+    setState(() {
+      _passwordStatusLoading = true;
+      _twoFactorLoading = true;
+      _passkeyStatusLoading = true;
+    });
+    try {
+      final results = await Future.wait([
+        ProfileService.fetchPasswordChangeStatus(),
+        ProfileService.fetchTwoFactorStatus(),
+        ProfileService.fetchPasskeyStatus(),
+      ]);
+      if (!mounted) return;
+      final password = results[0];
+      final twoFactor = results[1];
+      final passkey = results[2];
+      setState(() {
+        _passwordChangedAt = password['lastChangedAt'] as String?;
+        _twoFactorEnabled = twoFactor['enabled'] as bool? ?? false;
+        _hasPasskey = passkey['hasPasskey'] as bool? ?? false;
+        _passkeyEnabled = _hasPasskey
+            ? (passkey['enabled'] as bool? ?? false)
+            : false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _passwordChangedAt = null;
+        _twoFactorEnabled = false;
+        _hasPasskey = false;
+        _passkeyEnabled = false;
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _passwordStatusLoading = false;
+        _twoFactorLoading = false;
+        _passkeyStatusLoading = false;
+      });
+    }
+  }
+
+  void _resetPasswordFlow() {
+    _passwordStep = _PasswordChangeStep.otp;
+    _passwordOtp = '';
+    _passwordCurrent = '';
+    _passwordNew = '';
+    _passwordConfirm = '';
+    _passwordSubmitting = false;
+    _passwordError = null;
+    _passwordSuccess = null;
+    _passwordCooldown = 0;
+    _passwordExpiresSec = null;
+    _passwordLogoutPrompt = false;
+    _passwordLogoutSubmitting = false;
+    _passwordLogoutError = null;
+  }
+
+  Future<void> _openChangePassword() async {
+    setState(() {
+      _resetPasswordFlow();
+      _showChangePassword = true;
+    });
+    await _requestPasswordOtp(silent: true);
+  }
+
+  void _handlePasswordBack() {
+    setState(() {
+      if (_passwordStep == _PasswordChangeStep.otp) {
+        _showChangePassword = false;
+        _resetPasswordFlow();
+        return;
+      }
+      if (_passwordStep == _PasswordChangeStep.form) {
+        _passwordStep = _PasswordChangeStep.otp;
+        return;
+      }
+      _showChangePassword = false;
+      _resetPasswordFlow();
+    });
+  }
+
+  Future<void> _requestPasswordOtp({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _passwordError = null;
+        _passwordSuccess = null;
+      });
+    }
+    setState(() => _passwordSubmitting = true);
+    try {
+      final res = await ProfileService.requestPasswordChangeOtp();
+      if (!mounted) return;
+      setState(() {
+        _passwordExpiresSec = (res['expiresSec'] as num?)?.toInt();
+        _passwordCooldown = 60;
+        _passwordStep = _PasswordChangeStep.otp;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (e.retryAfterSec != null && e.retryAfterSec! > 0) {
+          _passwordCooldown = e.retryAfterSec!;
+          _passwordError = 'OTP was just sent. Please wait before retrying.';
+        } else {
+          _passwordError = e.message;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _passwordError = 'Unable to send OTP.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _passwordSubmitting = false);
+    }
+  }
+
+  Future<void> _verifyPasswordOtp() async {
+    final code = _passwordOtp.trim();
+    if (code.isEmpty) {
+      setState(() => _passwordError = 'Please enter the OTP.');
+      return;
+    }
+    setState(() {
+      _passwordSubmitting = true;
+      _passwordError = null;
+      _passwordSuccess = null;
+    });
+    try {
+      await ProfileService.verifyPasswordChangeOtp(code: code);
+      if (!mounted) return;
+      setState(() => _passwordStep = _PasswordChangeStep.form);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _passwordError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _passwordError = 'Invalid or expired OTP.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _passwordSubmitting = false);
+    }
+  }
+
+  Future<void> _confirmPasswordChange() async {
+    final current = _passwordCurrent.trim();
+    final next = _passwordNew.trim();
+    final confirm = _passwordConfirm.trim();
+
+    if (current.isEmpty) {
+      setState(() => _passwordError = 'Please enter your current password.');
+      return;
+    }
+    if (next.isEmpty) {
+      setState(() => _passwordError = 'Please enter a new password.');
+      return;
+    }
+    if (next == current) {
+      setState(() {
+        _passwordError =
+            'New password must be different from your current password.';
+      });
+      return;
+    }
+    if (!_passwordRegex.hasMatch(next)) {
+      setState(() {
+        _passwordError =
+            'Password must be at least 8 characters and include uppercase, lowercase, and a number.';
+      });
+      return;
+    }
+    if (next != confirm) {
+      setState(() => _passwordError = 'New passwords do not match.');
+      return;
+    }
+
+    setState(() {
+      _passwordSubmitting = true;
+      _passwordError = null;
+      _passwordSuccess = null;
+    });
+    try {
+      await ProfileService.confirmPasswordChange(
+        currentPassword: current,
+        newPassword: next,
+      );
+      if (!mounted) return;
+      setState(() {
+        _passwordChangedAt = DateTime.now().toIso8601String();
+        _passwordStep = _PasswordChangeStep.done;
+        _passwordSuccess = 'Password updated successfully.';
+        _passwordLogoutPrompt = true;
+        _passwordCurrent = '';
+        _passwordNew = '';
+        _passwordConfirm = '';
+        _passwordOtp = '';
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _passwordError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _passwordError = 'Unable to change password.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _passwordSubmitting = false);
+    }
+  }
+
+  Future<void> _logoutOtherDevicesAfterPassword() async {
+    setState(() {
+      _passwordLogoutSubmitting = true;
+      _passwordLogoutError = null;
+    });
+    try {
+      await ProfileService.logoutAllDevices(deviceId: AuthStorage.deviceId);
+      if (!mounted) return;
+      setState(() {
+        _passwordLogoutPrompt = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _passwordLogoutError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _passwordLogoutError = 'Unable to log out other devices.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _passwordLogoutSubmitting = false);
+    }
+  }
+
+  void _resetTwoFactorFlow() {
+    _twoFactorStep = _TwoFactorStep.otp;
+    _twoFactorOtp = '';
+    _twoFactorError = null;
+    _twoFactorSuccess = null;
+    _twoFactorSubmitting = false;
+    _twoFactorCooldown = 0;
+    _twoFactorExpiresSec = null;
+  }
+
+  Future<void> _openTwoFactorFlow(bool enable) async {
+    setState(() {
+      _resetTwoFactorFlow();
+      _twoFactorTarget = enable;
+      _showTwoFactorFlow = true;
+    });
+    await _requestTwoFactorOtp(enable, silent: true);
+  }
+
+  Future<void> _requestTwoFactorOtp(bool enable, {bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _twoFactorError = null;
+        _twoFactorSuccess = null;
+      });
+    }
+    setState(() => _twoFactorSubmitting = true);
+    try {
+      final res = await ProfileService.requestTwoFactorOtp(enable: enable);
+      if (!mounted) return;
+      setState(() {
+        _twoFactorExpiresSec = (res['expiresSec'] as num?)?.toInt();
+        _twoFactorCooldown = 60;
+        _twoFactorStep = _TwoFactorStep.otp;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (e.retryAfterSec != null && e.retryAfterSec! > 0) {
+          _twoFactorCooldown = e.retryAfterSec!;
+          _twoFactorError = 'OTP was just sent. Please wait before retrying.';
+        } else {
+          _twoFactorError = e.message;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _twoFactorError = 'Unable to send OTP.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _twoFactorSubmitting = false);
+    }
+  }
+
+  Future<void> _verifyTwoFactorOtp() async {
+    final code = _twoFactorOtp.trim();
+    if (code.isEmpty) {
+      setState(() => _twoFactorError = 'Please enter the OTP.');
+      return;
+    }
+    setState(() {
+      _twoFactorSubmitting = true;
+      _twoFactorError = null;
+      _twoFactorSuccess = null;
+    });
+    try {
+      final res = await ProfileService.verifyTwoFactorOtp(
+        code: code,
+        enable: _twoFactorTarget,
+      );
+      if (!mounted) return;
+      final enabled = res['enabled'] as bool? ?? _twoFactorTarget;
+      setState(() {
+        _twoFactorEnabled = enabled;
+        _twoFactorStep = _TwoFactorStep.done;
+        _twoFactorSuccess = enabled
+            ? 'Two-factor authentication enabled.'
+            : 'Two-factor authentication disabled.';
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _twoFactorError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _twoFactorError = 'Invalid or expired OTP.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _twoFactorSubmitting = false);
+    }
+  }
+
+  void _handleTwoFactorBack() {
+    setState(() {
+      _showTwoFactorFlow = false;
+      _resetTwoFactorFlow();
+    });
+  }
+
+  void _resetPasskeyFlow() {
+    _passkeyStep = _PasskeyStep.password;
+    _passkeyPassword = '';
+    _passkeyOtp = '';
+    _passkeyCurrent = '';
+    _passkeyNew = '';
+    _passkeyConfirm = '';
+    _showCurrentPasskey = false;
+    _passkeySubmitting = false;
+    _passkeyError = null;
+    _passkeySuccess = null;
+    _passkeyCooldown = 0;
+    _passkeyExpiresSec = null;
+  }
+
+  void _resetPasswordSecurityViewState({bool keepStatus = false}) {
+    _showChangePassword = false;
+    _resetPasswordFlow();
+
+    _showTwoFactorFlow = false;
+    _resetTwoFactorFlow();
+
+    _showPasskeyFlow = false;
+    _resetPasskeyFlow();
+    _passkeyToggleSubmitting = false;
+    _passkeyToggleError = null;
+
+    _showLoginDevices = false;
+    _loginDevicesLoading = false;
+    _loginDevicesError = null;
+    _loginDevices..clear();
+    _loginDevicesCurrent = null;
+    _logoutDeviceSubmitting.clear();
+    _logoutAllSubmitting = false;
+    _logoutAllError = null;
+
+    if (!keepStatus) {
+      _passwordStatusLoading = false;
+      _twoFactorLoading = false;
+      _passkeyStatusLoading = false;
+      _passwordChangedAt = null;
+      _twoFactorEnabled = false;
+      _hasPasskey = false;
+      _passkeyEnabled = false;
+    }
+  }
+
+  void _openPasskeyFlow() {
+    setState(() {
+      _resetPasskeyFlow();
+      _showPasskeyFlow = true;
+    });
+  }
+
+  void _handlePasskeyBack() {
+    setState(() {
+      if (_passkeyStep == _PasskeyStep.password) {
+        _showPasskeyFlow = false;
+        _resetPasskeyFlow();
+        return;
+      }
+      if (_passkeyStep == _PasskeyStep.otp) {
+        _passkeyStep = _PasskeyStep.password;
+        return;
+      }
+      if (_passkeyStep == _PasskeyStep.form) {
+        _passkeyStep = _PasskeyStep.otp;
+        return;
+      }
+      _showPasskeyFlow = false;
+      _resetPasskeyFlow();
+    });
+  }
+
+  Future<void> _requestPasskeyOtp() async {
+    final password = _passkeyPassword.trim();
+    if (password.isEmpty) {
+      setState(() => _passkeyError = 'Please enter your current password.');
+      return;
+    }
+
+    setState(() {
+      _passkeySubmitting = true;
+      _passkeyError = null;
+      _passkeySuccess = null;
+    });
+    try {
+      final res = await ProfileService.requestPasskeyOtp(password: password);
+      if (!mounted) return;
+      setState(() {
+        _passkeyExpiresSec = (res['expiresSec'] as num?)?.toInt();
+        _passkeyCooldown = 60;
+        _passkeyStep = _PasskeyStep.otp;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (e.retryAfterSec != null && e.retryAfterSec! > 0) {
+          _passkeyCooldown = e.retryAfterSec!;
+          _passkeyError = 'OTP was just sent. Please wait before retrying.';
+        } else {
+          _passkeyError = e.message;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _passkeyError = 'Unable to send OTP.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _passkeySubmitting = false);
+    }
+  }
+
+  Future<void> _verifyPasskeyOtp() async {
+    final code = _passkeyOtp.trim();
+    if (code.isEmpty) {
+      setState(() => _passkeyError = 'Please enter the OTP.');
+      return;
+    }
+
+    setState(() {
+      _passkeySubmitting = true;
+      _passkeyError = null;
+      _passkeySuccess = null;
+    });
+    try {
+      final res = await ProfileService.verifyPasskeyOtp(code: code);
+      if (!mounted) return;
+      setState(() {
+        _hasPasskey = res['hasPasskey'] as bool? ?? false;
+        _passkeyCurrent = (res['currentPasskey'] as String?) ?? '';
+        _passkeyStep = _PasskeyStep.form;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _passkeyError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _passkeyError = 'Invalid or expired OTP.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _passkeySubmitting = false);
+    }
+  }
+
+  Future<void> _confirmPasskey() async {
+    final next = _passkeyNew.trim();
+    final confirm = _passkeyConfirm.trim();
+    if (_hasPasskey && _passkeyCurrent.trim().isEmpty) {
+      setState(() => _passkeyError = 'Current passkey is required.');
+      return;
+    }
+    if (next.isEmpty) {
+      setState(() => _passkeyError = 'Please enter a new passkey.');
+      return;
+    }
+    if (!_passkeyRegex.hasMatch(next)) {
+      setState(() => _passkeyError = 'Passkey must be exactly 6 digits.');
+      return;
+    }
+    if (next != confirm) {
+      setState(() => _passkeyError = 'Passkeys do not match.');
+      return;
+    }
+    if (_hasPasskey && next == _passkeyCurrent) {
+      setState(() {
+        _passkeyError = 'New passkey must be different from current passkey.';
+      });
+      return;
+    }
+
+    setState(() {
+      _passkeySubmitting = true;
+      _passkeyError = null;
+      _passkeySuccess = null;
+    });
+    try {
+      await ProfileService.confirmPasskey(
+        currentPasskey: _hasPasskey ? _passkeyCurrent : null,
+        newPasskey: next,
+      );
+      if (!mounted) return;
+      setState(() {
+        _hasPasskey = true;
+        _passkeyEnabled = true;
+        _passkeyCurrent = next;
+        _passkeyStep = _PasskeyStep.done;
+        _passkeySuccess = 'Passkey updated successfully.';
+        _passkeyOtp = '';
+        _passkeyNew = '';
+        _passkeyConfirm = '';
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _passkeyError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _passkeyError = 'Unable to update passkey.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _passkeySubmitting = false);
+    }
+  }
+
+  Future<void> _togglePasskey() async {
+    setState(() {
+      _passkeyToggleSubmitting = true;
+      _passkeyToggleError = null;
+    });
+    try {
+      final res = await ProfileService.togglePasskey(enabled: !_passkeyEnabled);
+      if (!mounted) return;
+      setState(() {
+        _passkeyEnabled = res['enabled'] as bool? ?? !_passkeyEnabled;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _passkeyToggleError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _passkeyToggleError = 'Unable to update passkey.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _passkeyToggleSubmitting = false);
+    }
+  }
+
+  String _resolveDeviceName(Map<String, dynamic> device) {
+    final userAgent = (device['userAgent'] as String?)?.trim() ?? '';
+    final loginMethod =
+        ((device['loginMethod'] as String?)?.trim().toLowerCase() ?? '');
+    final uaLower = userAgent.toLowerCase();
+    final info = (device['deviceInfo'] as String?)?.trim() ?? '';
+    final infoLower = info.toLowerCase();
+    final browser = (device['browser'] as String?)?.trim() ?? '';
+    final os = (device['os'] as String?)?.trim() ?? '';
+    final browserLower = browser.toLowerCase();
+    final type = (device['deviceType'] as String?)?.trim().toLowerCase() ?? '';
+
+    final looksLikeMobileApp =
+        infoLower.contains('cordigram') ||
+        infoLower.contains('flutter') ||
+        uaLower.contains('cordigramapp') ||
+        uaLower.contains('dart/') ||
+        (type == 'mobile' &&
+            loginMethod == 'password' &&
+            (browserLower == 'chrome' || browserLower == 'unknown'));
+
+    if (looksLikeMobileApp) {
+      final hasSpecificModel =
+          info.isNotEmpty &&
+          !infoLower.contains('cordigram mobile app') &&
+          !infoLower.contains('cordigram app');
+      if (hasSpecificModel) return info;
+      final osLabel = (os.isNotEmpty && os.toLowerCase() != 'unknown')
+          ? os
+          : 'Mobile';
+      return 'Cordigram App on $osLabel';
+    }
+
+    if (info.isNotEmpty) return info;
+    final parts = <String>[
+      if (browser.isNotEmpty) browser,
+      if (os.isNotEmpty) os,
+    ];
+    if (parts.isNotEmpty) return parts.join(' on ');
+    return type.isEmpty ? 'Unknown device' : '$type device';
+  }
+
+  String _resolveDeviceTime(Map<String, dynamic> device) {
+    final raw =
+        (device['lastSeenAt'] as String?) ?? (device['firstSeenAt'] as String?);
+    final text = _formatRelativeTime(raw);
+    if (text.isEmpty) return '';
+    return 'Last active $text.';
+  }
+
+  bool get _hasOtherLoginDevices {
+    if (_loginDevicesCurrent == null || _loginDevices.isEmpty) return false;
+    return _loginDevices.any(
+      (d) => (d['deviceIdHash'] as String?) != _loginDevicesCurrent,
+    );
+  }
+
+  Future<void> _openLoginDevices() async {
+    setState(() {
+      _showLoginDevices = true;
+      _loginDevicesError = null;
+      _logoutAllError = null;
+    });
+    await _loadLoginDevices();
+  }
+
+  Future<void> _loadLoginDevices() async {
+    setState(() => _loginDevicesLoading = true);
+    try {
+      final res = await ProfileService.fetchLoginDevices(
+        deviceId: AuthStorage.deviceId,
+      );
+      final devices = (res['devices'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _loginDevices
+          ..clear()
+          ..addAll(devices);
+        _loginDevicesCurrent = res['currentDeviceIdHash'] as String?;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _loginDevicesError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loginDevicesError = 'Unable to load login devices.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _loginDevicesLoading = false);
+    }
+  }
+
+  Future<void> _logoutDevice(String deviceIdHash) async {
+    setState(() {
+      _logoutDeviceSubmitting.add(deviceIdHash);
+    });
+    try {
+      await ProfileService.logoutLoginDevice(deviceIdHash: deviceIdHash);
+      if (!mounted) return;
+      setState(() {
+        _loginDevices.removeWhere((d) => d['deviceIdHash'] == deviceIdHash);
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _loginDevicesError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loginDevicesError = 'Unable to log out this device.');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _logoutDeviceSubmitting.remove(deviceIdHash);
+      });
+    }
+  }
+
+  Future<void> _logoutAllDevices() async {
+    if (_loginDevicesCurrent == null || _loginDevicesCurrent!.isEmpty) {
+      setState(() => _logoutAllError = 'Unable to detect this device.');
+      return;
+    }
+    setState(() {
+      _logoutAllSubmitting = true;
+      _logoutAllError = null;
+    });
+    try {
+      final res = await ProfileService.logoutAllDevices(
+        deviceId: AuthStorage.deviceId,
+      );
+      if (!mounted) return;
+      final currentHash =
+          (res['currentDeviceIdHash'] as String?) ?? _loginDevicesCurrent;
+      setState(() {
+        _loginDevicesCurrent = currentHash;
+        _loginDevices.removeWhere(
+          (d) => (d['deviceIdHash'] as String?) != currentHash,
+        );
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _logoutAllError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _logoutAllError = 'Unable to log out devices.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _logoutAllSubmitting = false);
+    }
+  }
+
   String _formatRelativeTime(String? value) {
     if (value == null || value.isEmpty) return '';
     final dt = DateTime.tryParse(value);
@@ -648,6 +1479,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'Profile';
       case SettingsTab.creatorVerification:
         return 'Creator verification';
+      case SettingsTab.passwordSecurity:
+        return 'Password & Security';
     }
   }
 
@@ -659,6 +1492,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return Icons.account_circle_outlined;
       case SettingsTab.creatorVerification:
         return Icons.verified_outlined;
+      case SettingsTab.passwordSecurity:
+        return Icons.lock_outline_rounded;
     }
   }
 
@@ -670,17 +1505,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'Control who can view profile sections and follower lists.';
       case SettingsTab.creatorVerification:
         return 'Check eligibility and request creator badge verification.';
+      case SettingsTab.passwordSecurity:
+        return 'Manage password, two-factor, passkey, and login devices.';
     }
   }
 
   void _openSection(SettingsTab tab) {
+    final previous = _selectedTab;
     setState(() {
+      if (tab == SettingsTab.passwordSecurity) {
+        _resetPasswordSecurityViewState();
+      }
+      if (previous == SettingsTab.passwordSecurity &&
+          tab != SettingsTab.passwordSecurity) {
+        _resetPasswordSecurityViewState();
+      }
       _selectedTab = tab;
     });
     if (tab == SettingsTab.creatorVerification &&
         _creatorStatus == null &&
         !_creatorLoading) {
       _loadCreatorVerificationStatus();
+    }
+    if (tab == SettingsTab.passwordSecurity &&
+        !_passwordStatusLoading &&
+        !_twoFactorLoading &&
+        !_passkeyStatusLoading) {
+      _loadPasswordSecurityStatus();
     }
   }
 
@@ -964,6 +1815,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final tab = _selectedTab ?? SettingsTab.personalInfo;
     if (tab == SettingsTab.personalInfo) return _buildPersonalInfoTab();
     if (tab == SettingsTab.profile) return _buildProfileTab();
+    if (tab == SettingsTab.passwordSecurity) return _buildPasswordSecurityTab();
     return _buildCreatorVerificationTab();
   }
 
@@ -1986,6 +2838,953 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  String _passwordStepLabel() {
+    if (_passwordStep == _PasswordChangeStep.otp) return 'Step 1 · Email OTP';
+    if (_passwordStep == _PasswordChangeStep.form) {
+      return 'Step 2 · Update password';
+    }
+    return 'Completed';
+  }
+
+  String _passkeyStepLabel() {
+    if (_passkeyStep == _PasskeyStep.password)
+      return 'Step 1 · Verify password';
+    if (_passkeyStep == _PasskeyStep.otp) return 'Step 2 · Email OTP';
+    if (_passkeyStep == _PasskeyStep.form) {
+      return _hasPasskey ? 'Step 3 · Change passkey' : 'Step 3 · Set passkey';
+    }
+    return 'Completed';
+  }
+
+  Widget _buildActionHeader({
+    required VoidCallback? onBack,
+    required String stepLabel,
+  }) {
+    return Row(
+      children: [
+        TextButton.icon(
+          onPressed: onBack,
+          icon: const Icon(Icons.arrow_back_rounded, size: 16),
+          label: const Text('Back'),
+          style: TextButton.styleFrom(foregroundColor: _textPrimary),
+        ),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            stepLabel,
+            style: const TextStyle(
+              color: _textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPasswordSecurityTab() {
+    String sixDigits(String value) {
+      final digits = value.replaceAll(RegExp(r'\D'), '');
+      return digits.length > 6 ? digits.substring(0, 6) : digits;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Password & Security',
+          style: TextStyle(
+            color: _textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Manage your login protection and password updates.',
+          style: TextStyle(color: _textSecondary, fontSize: 13),
+        ),
+        const SizedBox(height: 14),
+
+        _buildCard(
+          children: [
+            if (!_showChangePassword)
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Change password',
+                      style: TextStyle(
+                        color: _textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _passwordStatusLoading
+                          ? 'Loading last password change...'
+                          : (_passwordChangedAt != null
+                                ? 'Last changed ${_formatRelativeTime(_passwordChangedAt)}'
+                                : 'Password has not been changed yet.'),
+                      style: const TextStyle(
+                        color: _textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _openChangePassword,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _accent,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Change password'),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildActionHeader(
+                      onBack: _passwordSubmitting ? null : _handlePasswordBack,
+                      stepLabel: _passwordStepLabel(),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_passwordStep == _PasswordChangeStep.otp) ...[
+                      const Text(
+                        'OTP for password change',
+                        style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const ValueKey('password-change-otp-input'),
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        onChanged: (v) =>
+                            _passwordOtp = v.replaceAll(RegExp(r'\D'), ''),
+                        style: const TextStyle(color: _textPrimary),
+                        decoration: _emailInputDecoration(
+                          '------',
+                        ).copyWith(counterText: ''),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _passwordExpiresSec != null
+                            ? 'OTP expires in ${_passwordExpiresSec}s.'
+                            : 'OTP expires in 5 minutes.',
+                        style: const TextStyle(
+                          color: _textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStepActions(
+                        secondaryLabel: _passwordCooldown > 0
+                            ? 'Resend (${_passwordCooldown}s)'
+                            : 'Resend OTP',
+                        onSecondary: () => _requestPasswordOtp(),
+                        secondaryDisabled:
+                            _passwordSubmitting || _passwordCooldown > 0,
+                        primaryLabel: _passwordSubmitting
+                            ? 'Verifying...'
+                            : 'Verify',
+                        onPrimary: _passwordSubmitting
+                            ? null
+                            : _verifyPasswordOtp,
+                      ),
+                    ],
+                    if (_passwordStep == _PasswordChangeStep.form) ...[
+                      const Text(
+                        'Current password',
+                        style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const ValueKey('password-change-current-input'),
+                        obscureText: true,
+                        enableSuggestions: false,
+                        autocorrect: false,
+                        onChanged: (v) => _passwordCurrent = v,
+                        style: const TextStyle(color: _textPrimary),
+                        decoration: _emailInputDecoration(
+                          'Enter current password',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'New password',
+                        style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const ValueKey('password-change-new-input'),
+                        obscureText: true,
+                        enableSuggestions: false,
+                        autocorrect: false,
+                        onChanged: (v) => _passwordNew = v,
+                        style: const TextStyle(color: _textPrimary),
+                        decoration: _emailInputDecoration(
+                          'Create a new password',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Confirm new password',
+                        style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const ValueKey('password-change-confirm-input'),
+                        obscureText: true,
+                        enableSuggestions: false,
+                        autocorrect: false,
+                        onChanged: (v) => _passwordConfirm = v,
+                        style: const TextStyle(color: _textPrimary),
+                        decoration: _emailInputDecoration(
+                          'Re-enter new password',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Password must be at least 8 characters and include uppercase, lowercase, and a number.',
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStepActions(
+                        primaryLabel: _passwordSubmitting
+                            ? 'Updating...'
+                            : 'Change password',
+                        onPrimary: _passwordSubmitting
+                            ? null
+                            : _confirmPasswordChange,
+                      ),
+                    ],
+                    if (_passwordStep == _PasswordChangeStep.done) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A2B4A),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _accent.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Text(
+                          _passwordSuccess ?? 'Password updated successfully.',
+                          style: const TextStyle(color: _textPrimary),
+                        ),
+                      ),
+                      if (_passwordLogoutPrompt) ...[
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Do you want to log out of all other devices?',
+                          style: TextStyle(color: _textSecondary, fontSize: 12),
+                        ),
+                        if (_passwordLogoutError != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _passwordLogoutError!,
+                            style: const TextStyle(
+                              color: _danger,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        _buildStepActions(
+                          secondaryLabel: 'No, keep signed in',
+                          onSecondary: () {
+                            setState(() {
+                              _passwordLogoutPrompt = false;
+                            });
+                          },
+                          secondaryDisabled: _passwordLogoutSubmitting,
+                          primaryLabel: _passwordLogoutSubmitting
+                              ? 'Logging out...'
+                              : 'Yes, log out others',
+                          onPrimary: _passwordLogoutSubmitting
+                              ? null
+                              : _logoutOtherDevicesAfterPassword,
+                        ),
+                      ],
+                    ],
+                    if (_passwordError != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        _passwordError!,
+                        style: const TextStyle(color: _danger, fontSize: 12),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+        _buildCard(
+          children: [
+            if (!_showTwoFactorFlow)
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Two-factor authentication',
+                      style: TextStyle(
+                        color: _textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Require an email OTP each time you sign in.',
+                      style: TextStyle(color: _textSecondary, fontSize: 12),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _twoFactorLoading
+                            ? null
+                            : () => _openTwoFactorFlow(!_twoFactorEnabled),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _accent,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text(
+                          _twoFactorLoading
+                              ? 'Loading...'
+                              : (_twoFactorEnabled ? 'Disable' : 'Enable'),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildActionHeader(
+                      onBack: _twoFactorSubmitting
+                          ? null
+                          : _handleTwoFactorBack,
+                      stepLabel: _twoFactorStep == _TwoFactorStep.otp
+                          ? 'Step 1 - Email OTP'
+                          : 'Completed',
+                    ),
+                    const SizedBox(height: 8),
+                    if (_twoFactorStep == _TwoFactorStep.otp) ...[
+                      Text(
+                        _twoFactorTarget
+                            ? 'OTP to enable two-factor'
+                            : 'OTP to disable two-factor',
+                        style: const TextStyle(
+                          color: _textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const ValueKey('two-factor-otp-input'),
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        onChanged: (v) =>
+                            _twoFactorOtp = v.replaceAll(RegExp(r'\D'), ''),
+                        style: const TextStyle(color: _textPrimary),
+                        decoration: _emailInputDecoration(
+                          '------',
+                        ).copyWith(counterText: ''),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _twoFactorExpiresSec != null
+                            ? 'OTP expires in ${_twoFactorExpiresSec}s.'
+                            : 'OTP expires in 5 minutes.',
+                        style: const TextStyle(
+                          color: _textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStepActions(
+                        secondaryLabel: _twoFactorCooldown > 0
+                            ? 'Resend (${_twoFactorCooldown}s)'
+                            : 'Resend OTP',
+                        onSecondary: () =>
+                            _requestTwoFactorOtp(_twoFactorTarget),
+                        secondaryDisabled:
+                            _twoFactorSubmitting || _twoFactorCooldown > 0,
+                        primaryLabel: _twoFactorSubmitting
+                            ? 'Verifying...'
+                            : (_twoFactorTarget ? 'Enable' : 'Disable'),
+                        onPrimary: _twoFactorSubmitting
+                            ? null
+                            : _verifyTwoFactorOtp,
+                      ),
+                    ],
+                    if (_twoFactorStep == _TwoFactorStep.done)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A2B4A),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _accent.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Text(
+                          _twoFactorSuccess ?? 'Two-factor updated.',
+                          style: const TextStyle(color: _textPrimary),
+                        ),
+                      ),
+                    if (_twoFactorError != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        _twoFactorError!,
+                        style: const TextStyle(color: _danger, fontSize: 12),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+        _buildCard(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Passkeys',
+                    style: TextStyle(
+                      color: _textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Use a 6-digit passkey for quick verification.',
+                    style: TextStyle(color: _textSecondary, fontSize: 12),
+                  ),
+                  if (_hasPasskey) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      _passkeyEnabled ? 'Status: Enabled' : 'Status: Disabled',
+                      style: const TextStyle(
+                        color: _textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                  if (!_showPasskeyFlow) ...[
+                    const SizedBox(height: 12),
+                    if (_hasPasskey) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed:
+                              (_passkeyStatusLoading ||
+                                  _passkeyToggleSubmitting)
+                              ? null
+                              : _togglePasskey,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _textPrimary,
+                            side: BorderSide(color: _border),
+                          ),
+                          child: Text(
+                            _passkeyToggleSubmitting
+                                ? 'Updating...'
+                                : (_passkeyEnabled ? 'Disable' : 'Enable'),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _passkeyStatusLoading
+                            ? null
+                            : _openPasskeyFlow,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _accent,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text(
+                          _passkeyStatusLoading
+                              ? 'Loading...'
+                              : (_hasPasskey
+                                    ? 'Change passkey'
+                                    : 'Set passkey'),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (_passkeyToggleError != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                child: Text(
+                  _passkeyToggleError!,
+                  style: const TextStyle(color: _danger, fontSize: 12),
+                ),
+              ),
+            if (_showPasskeyFlow)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildActionHeader(
+                      onBack: _passkeySubmitting ? null : _handlePasskeyBack,
+                      stepLabel: _passkeyStepLabel(),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_passkeyStep == _PasskeyStep.password) ...[
+                      const Text(
+                        'Current password',
+                        style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const ValueKey('passkey-password-input'),
+                        obscureText: true,
+                        onChanged: (v) => _passkeyPassword = v,
+                        style: const TextStyle(color: _textPrimary),
+                        decoration: _emailInputDecoration(
+                          'Enter your password',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'We\'ll send a 6-digit OTP to confirm your passkey change.',
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStepActions(
+                        primaryLabel: _passkeySubmitting
+                            ? 'Sending...'
+                            : 'Send OTP',
+                        onPrimary: _passkeySubmitting
+                            ? null
+                            : _requestPasskeyOtp,
+                      ),
+                    ],
+                    if (_passkeyStep == _PasskeyStep.otp) ...[
+                      const Text(
+                        'OTP for passkey setup',
+                        style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const ValueKey('passkey-otp-input'),
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        onChanged: (v) =>
+                            _passkeyOtp = v.replaceAll(RegExp(r'\D'), ''),
+                        style: const TextStyle(color: _textPrimary),
+                        decoration: _emailInputDecoration(
+                          '------',
+                        ).copyWith(counterText: ''),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _passkeyExpiresSec != null
+                            ? 'OTP expires in ${_passkeyExpiresSec}s.'
+                            : 'OTP expires in 5 minutes.',
+                        style: const TextStyle(
+                          color: _textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStepActions(
+                        secondaryLabel: _passkeyCooldown > 0
+                            ? 'Resend (${_passkeyCooldown}s)'
+                            : 'Resend OTP',
+                        onSecondary: _requestPasskeyOtp,
+                        secondaryDisabled:
+                            _passkeySubmitting || _passkeyCooldown > 0,
+                        primaryLabel: _passkeySubmitting
+                            ? 'Verifying...'
+                            : 'Verify',
+                        onPrimary: _passkeySubmitting
+                            ? null
+                            : _verifyPasskeyOtp,
+                      ),
+                    ],
+                    if (_passkeyStep == _PasskeyStep.form) ...[
+                      if (_hasPasskey) ...[
+                        const Text(
+                          'Current passkey',
+                          style: TextStyle(
+                            color: _textPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F1A2F),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _border.withValues(alpha: 0.9),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _showCurrentPasskey
+                                      ? _passkeyCurrent
+                                      : ('*' * _passkeyCurrent.length),
+                                  style: const TextStyle(color: _textPrimary),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _showCurrentPasskey = !_showCurrentPasskey;
+                                  });
+                                },
+                                icon: Icon(
+                                  _showCurrentPasskey
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  color: _textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      const Text(
+                        'New passkey',
+                        style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const ValueKey('passkey-new-input'),
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        obscureText: true,
+                        onChanged: (v) => _passkeyNew = sixDigits(v),
+                        style: const TextStyle(color: _textPrimary),
+                        decoration: _emailInputDecoration(
+                          'Enter 6-digit passkey',
+                        ).copyWith(counterText: ''),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Confirm passkey',
+                        style: TextStyle(
+                          color: _textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const ValueKey('passkey-confirm-input'),
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        obscureText: true,
+                        onChanged: (v) => _passkeyConfirm = sixDigits(v),
+                        style: const TextStyle(color: _textPrimary),
+                        decoration: _emailInputDecoration(
+                          'Re-enter passkey',
+                        ).copyWith(counterText: ''),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Passkey must be exactly 6 digits.',
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStepActions(
+                        primaryLabel: _passkeySubmitting ? 'Saving...' : 'Save',
+                        onPrimary: _passkeySubmitting ? null : _confirmPasskey,
+                      ),
+                    ],
+                    if (_passkeyStep == _PasskeyStep.done)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A2B4A),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _accent.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Text(
+                          _passkeySuccess ?? 'Passkey updated successfully.',
+                          style: const TextStyle(color: _textPrimary),
+                        ),
+                      ),
+                    if (_passkeyError != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        _passkeyError!,
+                        style: const TextStyle(color: _danger, fontSize: 12),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+        _buildCard(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Where you\'re logged in',
+                    style: TextStyle(
+                      color: _textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Review devices that have accessed your account.',
+                    style: TextStyle(color: _textSecondary, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _openLoginDevices,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _accent,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('View devices'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_showLoginDevices)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_loginDevicesLoading)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'Loading devices...',
+                          style: TextStyle(color: _textSecondary, fontSize: 12),
+                        ),
+                      ),
+                    if (_loginDevicesError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          _loginDevicesError!,
+                          style: const TextStyle(color: _danger, fontSize: 12),
+                        ),
+                      ),
+                    if (!_loginDevicesLoading && _loginDevices.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'No login devices found.',
+                          style: TextStyle(color: _textSecondary, fontSize: 12),
+                        ),
+                      ),
+                    ..._loginDevices.map((device) {
+                      final hash = (device['deviceIdHash'] as String?) ?? '';
+                      final isCurrent =
+                          hash.isNotEmpty && hash == _loginDevicesCurrent;
+                      final isSubmitting = _logoutDeviceSubmitting.contains(
+                        hash,
+                      );
+                      final resolvedName =
+                          (isCurrent &&
+                              _localDeviceName != null &&
+                              _localDeviceName!.isNotEmpty)
+                          ? _localDeviceName!
+                          : _resolveDeviceName(device);
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF101D35),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: _border),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    resolvedName,
+                                    style: const TextStyle(
+                                      color: _textPrimary,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _resolveDeviceTime(device),
+                                    style: const TextStyle(
+                                      color: _textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  if (isCurrent)
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        'Current device',
+                                        style: TextStyle(
+                                          color: _accent,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (!isCurrent && hash.isNotEmpty)
+                              TextButton(
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () => _logoutDevice(hash),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: _danger,
+                                ),
+                                child: Text(
+                                  isSubmitting ? 'Logging out...' : 'Log out',
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    }),
+                    if (_hasOtherLoginDevices) ...[
+                      if (_logoutAllError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            _logoutAllError!,
+                            style: const TextStyle(
+                              color: _danger,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: _logoutAllSubmitting
+                              ? null
+                              : _logoutAllDevices,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _textPrimary,
+                            side: BorderSide(color: _border),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: Text(
+                            _logoutAllSubmitting
+                                ? 'Logging out...'
+                                : 'Log out all other devices',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildContent() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator(color: _accent));
@@ -2024,6 +3823,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           await _loadCreatorVerificationStatus();
           return;
         }
+        if (_selectedTab == SettingsTab.passwordSecurity) {
+          await _loadPasswordSecurityStatus();
+          if (_showLoginDevices) {
+            await _loadLoginDevices();
+          }
+          return;
+        }
         await _loadProfile();
       },
       color: _accent,
@@ -2041,10 +3847,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       onWillPop: () async {
         if (_selectedTab != null) {
           setState(() {
+            if (_selectedTab == SettingsTab.passwordSecurity) {
+              _resetPasswordSecurityViewState();
+            }
             _selectedTab = null;
           });
           return false;
         }
+        _resetPasswordSecurityViewState();
         return true;
       },
       child: Scaffold(
@@ -2066,6 +3876,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: const Icon(Icons.arrow_back_rounded),
                   onPressed: () {
                     setState(() {
+                      if (_selectedTab == SettingsTab.passwordSecurity) {
+                        _resetPasswordSecurityViewState();
+                      }
                       _selectedTab = null;
                     });
                   },

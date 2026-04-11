@@ -26,6 +26,10 @@ import {
   AdEngagementEvent,
   AdEngagementEventType,
 } from '../payments/ad-engagement-event.schema';
+import {
+  ReportProblem,
+  ReportProblemStatus,
+} from '../reportproblem/reportproblem.schema';
 
 @Injectable()
 export class AdminService {
@@ -50,6 +54,8 @@ export class AdminService {
     private readonly paymentTransactionModel: Model<PaymentTransaction>,
     @InjectModel(AdEngagementEvent.name)
     private readonly adEngagementEventModel: Model<AdEngagementEvent>,
+    @InjectModel(ReportProblem.name)
+    private readonly reportProblemModel: Model<ReportProblem>,
     private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
     private readonly mailService: MailService,
@@ -970,6 +976,262 @@ export class AdminService {
     });
 
     return { items };
+  }
+
+  async getReportProblems(params?: {
+    status?: ReportProblemStatus;
+    q?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    items: Array<{
+      id: string;
+      reporterId: string;
+      reporterDisplayName: string | null;
+      reporterUsername: string | null;
+      reporterEmail: string | null;
+      description: string;
+      attachments: Array<{
+        url: string;
+        secureUrl: string;
+        resourceType: string;
+        bytes: number;
+        width?: number;
+        height?: number;
+        duration?: number;
+        format?: string;
+      }>;
+      status: ReportProblemStatus;
+      adminNote: string | null;
+      handledBy: string | null;
+      handledByDisplayName: string | null;
+      handledByUsername: string | null;
+      handledByEmail: string | null;
+      handledAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+    pagination: {
+      total: number;
+      limit: number;
+      offset: number;
+      hasMore: boolean;
+    };
+  }> {
+    const safeLimit = Math.min(Math.max(params?.limit ?? 40, 1), 100);
+    const safeOffset = Math.max(params?.offset ?? 0, 0);
+    const q = params?.q?.trim();
+
+    const query: Record<string, unknown> = {};
+    if (params?.status) {
+      query.status = params.status;
+    }
+    if (q) {
+      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'i');
+      const matchers: Array<Record<string, unknown>> = [
+        { description: { $regex: regex } },
+      ];
+
+      if (Types.ObjectId.isValid(q)) {
+        matchers.push({ _id: new Types.ObjectId(q) });
+      }
+
+      const [profileMatches, userMatches] = await Promise.all([
+        this.profileModel
+          .find({
+            $or: [{ username: { $regex: regex } }, { displayName: { $regex: regex } }],
+          })
+          .select('userId')
+          .lean(),
+        this.userModel
+          .find({ email: { $regex: regex } })
+          .select('_id')
+          .lean(),
+      ]);
+
+      const reporterIdSet = new Set<string>();
+      profileMatches.forEach((profile) => {
+        const id = profile.userId?.toString?.();
+        if (id) reporterIdSet.add(id);
+      });
+      userMatches.forEach((user) => {
+        const id = user._id?.toString?.();
+        if (id) reporterIdSet.add(id);
+      });
+
+      const reporterIds = Array.from(reporterIdSet)
+        .filter((id) => Types.ObjectId.isValid(id))
+        .map((id) => new Types.ObjectId(id));
+
+      if (reporterIds.length) {
+        matchers.push({
+          $or: [{ reporterId: { $in: reporterIds } }, { userId: { $in: reporterIds } }],
+        });
+      }
+
+      query.$or = matchers;
+    }
+
+    const [docs, total] = await Promise.all([
+      this.reportProblemModel
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(safeOffset)
+        .limit(safeLimit)
+        .select(
+          '_id reporterId userId description attachments status adminNote handledBy handledAt createdAt updatedAt',
+        )
+        .lean(),
+      this.reportProblemModel.countDocuments(query).exec(),
+    ]);
+
+    const reporterIds = Array.from(
+      new Set(
+        docs
+          .map((doc) => doc.reporterId?.toString?.() ?? doc.userId?.toString?.())
+          .filter(Boolean),
+      ),
+    )
+      .filter((id): id is string => Boolean(id))
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const handlerIds = Array.from(
+      new Set(docs.map((doc) => doc.handledBy?.toString?.()).filter(Boolean)),
+    )
+      .filter((id): id is string => Boolean(id))
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    const allUserIds = Array.from(
+      new Set([...reporterIds, ...handlerIds].map((id) => id.toString())),
+    ).map((id) => new Types.ObjectId(id));
+
+    const [profiles, users] = allUserIds.length
+      ? await Promise.all([
+          this.profileModel
+            .find({ userId: { $in: allUserIds } })
+            .select('userId displayName username')
+            .lean(),
+          this.userModel.find({ _id: { $in: allUserIds } }).select('_id email').lean(),
+        ])
+      : [[], []];
+
+    const profileMap = new Map(
+      profiles.map((profile) => [profile.userId.toString(), profile]),
+    );
+    const userMap = new Map(users.map((user) => [user._id.toString(), user]));
+
+    const items = docs.map((doc) => {
+      const reporterId =
+        doc.reporterId?.toString?.() ?? doc.userId?.toString?.() ?? '';
+      const handlerId = doc.handledBy?.toString?.() ?? null;
+
+      const reporterProfile = reporterId ? profileMap.get(reporterId) : null;
+      const reporterUser = reporterId ? userMap.get(reporterId) : null;
+      const handlerProfile = handlerId ? profileMap.get(handlerId) : null;
+      const handlerUser = handlerId ? userMap.get(handlerId) : null;
+
+      return {
+        id: doc._id.toString(),
+        reporterId,
+        reporterDisplayName: reporterProfile?.displayName ?? null,
+        reporterUsername: reporterProfile?.username ?? null,
+        reporterEmail: reporterUser?.email ?? null,
+        description: doc.description,
+        attachments: (doc.attachments ?? []).map((attachment) => ({
+          url: attachment.url,
+          secureUrl: attachment.secureUrl,
+          resourceType: attachment.resourceType,
+          bytes: attachment.bytes,
+          width: attachment.width,
+          height: attachment.height,
+          duration: attachment.duration,
+          format: attachment.format,
+        })),
+        status: doc.status,
+        adminNote: doc.adminNote ?? null,
+        handledBy: handlerId,
+        handledByDisplayName: handlerProfile?.displayName ?? null,
+        handledByUsername: handlerProfile?.username ?? null,
+        handledByEmail: handlerUser?.email ?? null,
+        handledAt: doc.handledAt ?? null,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+      };
+    });
+
+    return {
+      items,
+      pagination: {
+        total,
+        limit: safeLimit,
+        offset: safeOffset,
+        hasMore: safeOffset + items.length < total,
+      },
+    };
+  }
+
+  async updateReportProblemStatus(params: {
+    reportId: string;
+    status: ReportProblemStatus;
+    adminNote?: string;
+    adminId: string;
+  }): Promise<{
+    status: 'ok';
+    item: {
+      id: string;
+      status: ReportProblemStatus;
+      adminNote: string | null;
+      handledBy: string | null;
+      handledAt: Date | null;
+      updatedAt: Date;
+    };
+  }> {
+    if (!Types.ObjectId.isValid(params.reportId)) {
+      throw new BadRequestException('Invalid report id');
+    }
+
+    if (!Types.ObjectId.isValid(params.adminId)) {
+      throw new BadRequestException('Invalid admin id');
+    }
+
+    const reportId = new Types.ObjectId(params.reportId);
+    const adminId = new Types.ObjectId(params.adminId);
+    const now = new Date();
+    const trimmedNote = params.adminNote?.trim();
+
+    const updatePayload: Record<string, unknown> = {
+      status: params.status,
+      handledBy: adminId,
+      handledAt: now,
+    };
+
+    if (typeof params.adminNote === 'string') {
+      updatePayload.adminNote = trimmedNote ? trimmedNote.slice(0, 1200) : null;
+    }
+
+    const updated = await this.reportProblemModel
+      .findOneAndUpdate({ _id: reportId }, { $set: updatePayload }, { new: true })
+      .select('_id status adminNote handledBy handledAt updatedAt')
+      .lean();
+
+    if (!updated) {
+      throw new NotFoundException('Report problem not found');
+    }
+
+    return {
+      status: 'ok',
+      item: {
+        id: updated._id.toString(),
+        status: updated.status,
+        adminNote: updated.adminNote ?? null,
+        handledBy: updated.handledBy?.toString?.() ?? null,
+        handledAt: updated.handledAt ?? null,
+        updatedAt: updated.updatedAt,
+      },
+    };
   }
 
   async reopenResolvedCase(params: {
