@@ -195,6 +195,8 @@ export interface StickerPickerSticker {
   id: string;
   imageUrl: string;
   name: string;
+  /** GIF động (URL Cloudinary). */
+  animated?: boolean;
   addedBy: {
     displayName: string;
     username: string;
@@ -219,6 +221,21 @@ export interface EmojiPickerEmoji {
   id: string;
   imageUrl: string;
   name: string;
+  /** GIF động trong picker */
+  animated?: boolean;
+  addedBy: {
+    displayName: string;
+    username: string;
+    avatarUrl: string;
+  };
+}
+
+/** Một hàng trong màn quản lý emoji máy chủ */
+export interface ServerEmojiManageRow {
+  id: string;
+  imageUrl: string;
+  name: string;
+  animated: boolean;
   addedBy: {
     displayName: string;
     username: string;
@@ -321,10 +338,108 @@ export async function getEmojiPickerData(
   return response.json();
 }
 
+/** Máy chủ có quyền tải emoji + slot còn lại (modal Thêm emoji). */
+export interface EmojiUploadTarget {
+  serverId: string;
+  name: string;
+  avatarUrl: string | null;
+  count: number;
+  max: number;
+  remaining: number;
+}
+
+export async function getEmojiUploadTargets(): Promise<{
+  targets: EmojiUploadTarget[];
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/emoji-upload-targets`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message ||
+        "Không tải được danh sách máy chủ",
+    );
+  }
+  return response.json();
+}
+
+/** Cùng dạng slot với emoji; max sticker hiện 5. */
+export type StickerUploadTarget = EmojiUploadTarget;
+
+export async function getStickerUploadTargets(): Promise<{
+  targets: StickerUploadTarget[];
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/sticker-upload-targets`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message ||
+        "Không tải được danh sách máy chủ",
+    );
+  }
+  return response.json();
+}
+
+export async function getServerEmojisManage(serverId: string): Promise<{
+  max: number;
+  count: number;
+  emojis: ServerEmojiManageRow[];
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/emojis/manage`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message || "Không tải được danh sách emoji",
+    );
+  }
+  return response.json();
+}
+
+/** Một sticker trên màn quản lý máy chủ */
+export interface ServerStickerManageRow {
+  id: string;
+  imageUrl: string;
+  name: string;
+  animated?: boolean;
+  addedBy: {
+    displayName: string;
+    username: string;
+    avatarUrl: string;
+  };
+}
+
+export async function getServerStickersManage(serverId: string): Promise<{
+  max: number;
+  count: number;
+  stickers: ServerStickerManageRow[];
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/stickers/manage`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message || "Không tải được danh sách sticker",
+    );
+  }
+  return response.json();
+}
+
 export async function addServerEmoji(
   serverId: string,
-  body: { imageUrl: string; name?: string },
-): Promise<{ emoji: { id: string; imageUrl: string; name: string } }> {
+  body: { imageUrl: string; name?: string; animated?: boolean },
+): Promise<{
+  emoji: { id: string; imageUrl: string; name: string; animated: boolean };
+}> {
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}/emojis`, {
     method: "POST",
     headers: getHeaders(),
@@ -339,8 +454,10 @@ export async function addServerEmoji(
 
 export async function addServerSticker(
   serverId: string,
-  body: { imageUrl: string; name?: string },
-): Promise<{ sticker: { id: string; imageUrl: string; name: string } }> {
+  body: { imageUrl: string; name?: string; animated?: boolean },
+): Promise<{
+  sticker: { id: string; imageUrl: string; name: string; animated: boolean };
+}> {
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}/stickers`, {
     method: "POST",
     headers: getHeaders(),
@@ -2410,6 +2527,30 @@ export async function adminGetServerView(
     { headers: adminHeaders(adminToken) },
   );
   if (!res.ok) throw new Error("Không tải được thông tin server");
+  return res.json();
+}
+
+export async function adminGetEmojiPickerData(
+  serverId: string,
+  adminToken: string,
+): Promise<EmojiPickerResponse> {
+  const res = await fetch(
+    `${API_BASE_URL}/admin/community-discovery/${serverId}/emoji-picker`,
+    { headers: adminHeaders(adminToken) },
+  );
+  if (!res.ok) throw new Error("Không tải được emoji máy chủ (admin)");
+  return res.json();
+}
+
+export async function adminGetStickerPickerData(
+  serverId: string,
+  adminToken: string,
+): Promise<StickerPickerResponse> {
+  const res = await fetch(
+    `${API_BASE_URL}/admin/community-discovery/${serverId}/sticker-picker`,
+    { headers: adminHeaders(adminToken) },
+  );
+  if (!res.ok) throw new Error("Không tải được sticker máy chủ (admin)");
   return res.json();
 }
 

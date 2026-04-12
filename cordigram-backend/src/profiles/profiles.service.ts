@@ -10,6 +10,8 @@ import { Profile } from './profile.schema';
 import { Follow } from '../users/follow.schema';
 import { Post } from '../posts/post.schema';
 import { User } from '../users/user.schema';
+import { Block } from '../users/block.schema';
+import { Server } from '../servers/server.schema';
 import { CompaniesService } from '../companies/companies.service';
 import type {
   ProfileFieldVisibility,
@@ -23,6 +25,8 @@ export class ProfilesService {
     @InjectModel(Follow.name) private readonly followModel: Model<Follow>,
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(Server.name) private readonly serverModel: Model<Server>,
+    @InjectModel(Block.name) private readonly blockModel: Model<Block>,
     private readonly companiesService: CompaniesService,
   ) {}
 
@@ -58,6 +62,177 @@ export class ProfilesService {
     if (input instanceof Types.ObjectId) return input;
     if (!Types.ObjectId.isValid(input)) return null;
     return new Types.ObjectId(input);
+  }
+
+  /** Danh sách máy chủ mà cả viewer và otherUser đều là thành viên. */
+  private async listMutualServers(
+    viewerId: Types.ObjectId,
+    otherUserId: Types.ObjectId,
+  ): Promise<
+    Array<{ serverId: string; name: string; avatarUrl: string | null }>
+  > {
+    const servers = await this.serverModel
+      .find({ 'members.userId': viewerId })
+      .select({ members: 1, name: 1, avatarUrl: 1 })
+      .lean()
+      .exec();
+    const other = otherUserId.toString();
+    const out: Array<{ serverId: string; name: string; avatarUrl: string | null }> =
+      [];
+    for (const s of servers) {
+      const sid = (s as { _id?: Types.ObjectId })._id;
+      if (!sid) continue;
+      const members = (s as { members?: { userId?: Types.ObjectId | string }[] })
+        .members;
+      if (!Array.isArray(members)) continue;
+      const both = members.some((m) => {
+        const id = m?.userId;
+        if (!id) return false;
+        return id instanceof Types.ObjectId
+          ? id.equals(otherUserId)
+          : String(id) === other;
+      });
+      if (!both) continue;
+      const name = (s as { name?: string }).name?.trim() || 'Máy chủ';
+      const avatarUrl =
+        (s as { avatarUrl?: string | null }).avatarUrl ?? null;
+      out.push({ serverId: sid.toString(), name, avatarUrl });
+    }
+    out.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+    return out;
+  }
+
+  /** Người bị chặn / chặn viewer — loại khỏi danh sách follow chung (cùng rules followers). */
+  private async getViewerBlockExcludedIds(
+    viewerId: Types.ObjectId,
+  ): Promise<Types.ObjectId[]> {
+    const [blocked, blockedBy] = await Promise.all([
+      this.blockModel
+        .find({ blockerId: viewerId })
+        .select('blockedId')
+        .lean()
+        .exec(),
+      this.blockModel
+        .find({ blockedId: viewerId })
+        .select('blockerId')
+        .lean()
+        .exec(),
+    ]);
+    const out = new Set<string>();
+    for (const d of blocked as Array<{ blockedId?: Types.ObjectId }>) {
+      const id = d.blockedId?.toString?.();
+      if (id) out.add(id);
+    }
+    for (const d of blockedBy as Array<{ blockerId?: Types.ObjectId }>) {
+      const id = d.blockerId?.toString?.();
+      if (id) out.add(id);
+    }
+    return [...out]
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+  }
+
+  /**
+   * Follow chung (social): người vừa follow owner vừa follow viewer (giao tập followers).
+   */
+  private async getMutualFollowersPreview(
+    viewerId: Types.ObjectId,
+    ownerId: Types.ObjectId,
+  ): Promise<{
+    count: number;
+    users: Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+    }>;
+  }> {
+    const coll = this.followModel.collection.name;
+    const excluded = await this.getViewerBlockExcludedIds(viewerId);
+    const matchFollowersOfOwner: Record<string, unknown> = {
+      followeeId: ownerId,
+    };
+    if (excluded.length) {
+      matchFollowersOfOwner.followerId = { $nin: excluded };
+    }
+    const facet = await this.followModel
+      .aggregate<{
+        total: Array<{ cnt: number }>;
+        sample: Array<{ followerId: Types.ObjectId }>;
+      }>([
+        { $match: matchFollowersOfOwner },
+        {
+          $lookup: {
+            from: coll,
+            let: { uid: '$followerId' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$followeeId', viewerId] },
+                      { $eq: ['$followerId', '$$uid'] },
+                    ],
+                  },
+                },
+              },
+              { $limit: 1 },
+            ],
+            as: 'm',
+          },
+        },
+        { $match: { m: { $ne: [] } } },
+        {
+          $facet: {
+            total: [{ $count: 'cnt' }],
+            sample: [{ $limit: 30 }, { $project: { _id: 0, followerId: 1 } }],
+          },
+        },
+      ])
+      .exec();
+    const row = facet[0];
+    const count = row?.total?.[0]?.cnt ?? 0;
+    const ids =
+      row?.sample
+        ?.map((s) => s.followerId?.toString())
+        .filter((id): id is string => Boolean(id)) ?? [];
+    if (!ids.length) {
+      return { count, users: [] };
+    }
+    const profiles = await this.profileModel
+      .find({ userId: { $in: ids.map((id) => new Types.ObjectId(id)) } })
+      .select('userId username displayName avatarUrl')
+      .lean()
+      .exec();
+    const profileByUserId = new Map<string, (typeof profiles)[0]>();
+    for (const p of profiles) {
+      const id = (p as { userId?: Types.ObjectId }).userId?.toString?.();
+      if (id) profileByUserId.set(id, p);
+    }
+    const users = ids
+      .map((id) => {
+        const p = profileByUserId.get(id) as
+          | {
+              username?: string;
+              displayName?: string;
+              avatarUrl?: string;
+            }
+          | undefined;
+        if (!p) return null;
+        return {
+          userId: id,
+          username: p.username ?? '',
+          displayName: p.displayName ?? p.username ?? '',
+          avatarUrl: p.avatarUrl || this.DEFAULT_AVATAR_URL,
+        };
+      })
+      .filter(Boolean) as Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+    }>;
+    return { count, users };
   }
 
   async createOrUpdate(data: {
@@ -496,6 +671,24 @@ export class ProfilesService {
     };
     isCreatorVerified?: boolean;
     isFollowing?: boolean;
+    /** Ngày tài khoản Cordigram được tạo (cho card hồ sơ). */
+    cordigramMemberSince?: string;
+    /** Số máy chủ chung với người đang xem (0 nếu không đăng nhập / xem chính mình). */
+    mutualServerCount?: number;
+    /** Danh sách máy chủ chung (khi có viewer và không xem chính mình). */
+    mutualServers?: Array<{
+      serverId: string;
+      name: string;
+      avatarUrl: string | null;
+    }>;
+    /** Số người theo dõi cả viewer và chủ hồ sơ (giao followers). */
+    mutualFollowCount?: number;
+    mutualFollowUsers?: Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+    }>;
   }> {
     const raw = params.usernameOrId?.toString().trim();
     if (!raw) {
@@ -527,7 +720,7 @@ export class ProfilesService {
 
     const ownerUser = await this.userModel
       .findById(ownerId)
-      .select('status isCreatorVerified')
+      .select('status isCreatorVerified createdAt')
       .lean();
 
     if (!ownerUser || ownerUser.status === 'banned') {
@@ -584,6 +777,44 @@ export class ProfilesService {
       throw new ForbiddenException('Profile is private');
     }
 
+    let mutualServerCount: number | undefined;
+    let mutualServers:
+      | Array<{ serverId: string; name: string; avatarUrl: string | null }>
+      | undefined;
+    let mutualFollowCount: number | undefined;
+    let mutualFollowUsers:
+      | {
+          userId: string;
+          username: string;
+          displayName: string;
+          avatarUrl: string;
+        }[]
+      | undefined;
+    if (viewerId && !isOwner) {
+      const vid = viewerId;
+      const oid = ownerId;
+      const [serverList, mutualFollow] = await Promise.all([
+        this.listMutualServers(vid, oid),
+        this.getMutualFollowersPreview(vid, oid),
+      ]);
+      mutualServers = serverList.length ? serverList : [];
+      mutualServerCount = serverList.length;
+      mutualFollowCount = mutualFollow.count;
+      mutualFollowUsers = mutualFollow.users;
+    }
+
+    const cordigramMemberSince =
+      ownerUser && (ownerUser as { createdAt?: Date }).createdAt
+        ? new Date((ownerUser as { createdAt: Date }).createdAt).toLocaleDateString(
+            'vi-VN',
+            {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            },
+          )
+        : undefined;
+
     return {
       id: profile._id?.toString?.() ?? maybeObjectId?.toString?.() ?? '',
       userId: ownerId.toString(),
@@ -618,6 +849,11 @@ export class ProfilesService {
       },
       isCreatorVerified: Boolean(ownerUser?.isCreatorVerified),
       isFollowing: Boolean(viewerFollow),
+      cordigramMemberSince,
+      mutualServerCount,
+      mutualServers,
+      mutualFollowCount,
+      mutualFollowUsers,
     };
   }
 }

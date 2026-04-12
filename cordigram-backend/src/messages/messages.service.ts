@@ -15,6 +15,7 @@ import { Server } from '../servers/server.schema';
 import { ChannelReadState } from './channel-read-state.schema';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { IgnoredService } from '../users/ignored.service';
+import { MentionMuteService } from '../users/mention-mute.service';
 import { RolesService } from '../roles/roles.service';
 import { InboxSeen } from '../inbox/inbox-seen.schema';
 import { UserServer } from '../access/user-server.schema';
@@ -41,6 +42,7 @@ export class MessagesService {
     @InjectModel(InboxSeen.name) private inboxSeenModel: Model<InboxSeen>,
     @InjectModel(User.name) private userModel: Model<User>,
     private readonly ignoredService: IgnoredService,
+    private readonly mentionMuteService: MentionMuteService,
     @Inject(forwardRef(() => RolesService))
     private readonly rolesService: RolesService,
     private readonly mediaModerationService: MediaModerationService,
@@ -949,12 +951,24 @@ export class MessagesService {
       servers.map((s: any) => [String(s._id), s.name]),
     );
 
-    const senderIds = [
+    const allSenderIds = [
       ...new Set(messages.map((m: any) => m.senderId.toString())),
+    ];
+    const mutedSenders = await this.mentionMuteService.listMutedSendersForOwner(
+      userId,
+      allSenderIds,
+    );
+    const visibleMessages = messages.filter(
+      (m: any) => !mutedSenders.has(m.senderId.toString()),
+    );
+    if (visibleMessages.length === 0) return [];
+
+    const visibleSenderIds = [
+      ...new Set(visibleMessages.map((m: any) => m.senderId.toString())),
     ];
     const profiles = await this.profileModel
       .find({
-        userId: { $in: senderIds.map((id) => new Types.ObjectId(id)) },
+        userId: { $in: visibleSenderIds.map((id) => new Types.ObjectId(id)) },
       })
       .select('userId displayName username')
       .lean()
@@ -966,7 +980,7 @@ export class MessagesService {
       ]),
     );
 
-    return messages.map((msg: any) => {
+    return visibleMessages.map((msg: any) => {
       const ch = msg.channelId;
       const rawSid = ch?.serverId;
       const serverId = rawSid != null ? String(rawSid) : '';

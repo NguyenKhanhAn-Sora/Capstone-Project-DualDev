@@ -177,6 +177,9 @@ export default function AdminShell({
 
   const isLoginRoute = pathname === "/login" || pathname.startsWith("/login/");
   const isRootRoute = pathname === "/";
+  /** Xem máy chủ chỉ đọc: fullscreen, không sidebar điều hướng admin. */
+  const isServerReadOnlyPreview =
+    pathname.startsWith("/community-discovery/server-view/");
 
   useEffect(() => {
     if (!signOutConfirmOpen || typeof window === "undefined") return;
@@ -210,7 +213,7 @@ export default function AdminShell({
     router.replace("/login");
   };
 
-  if (isLoginRoute || isRootRoute) {
+  if (isLoginRoute || isRootRoute || isServerReadOnlyPreview) {
     return <>{children}</>;
   }
 

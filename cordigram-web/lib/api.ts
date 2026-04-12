@@ -2228,7 +2228,63 @@ export type ProfileDetailResponse = {
   };
   isCreatorVerified?: boolean;
   isFollowing?: boolean;
+  /** Ngày tham gia Cordigram (tài khoản), định dạng theo locale khi trả về từ API */
+  cordigramMemberSince?: string;
+  /** Số máy chủ chung với người đang xem hồ sơ */
+  mutualServerCount?: number;
+  /** Danh sách máy chủ chung (tên + icon) */
+  mutualServers?: Array<{
+    serverId: string;
+    name: string;
+    avatarUrl: string | null;
+  }>;
+  /**
+   * Số người theo dõi cả bạn và chủ hồ sơ (giao followers — social).
+   */
+  mutualFollowCount?: number;
+  /** Tối đa 30 người (preview). */
+  mutualFollowUsers?: Array<{
+    userId: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string;
+  }>;
 };
+
+export type MentionMuteDuration =
+  | "15m"
+  | "1h"
+  | "3h"
+  | "8h"
+  | "24h"
+  | "forever";
+
+export async function upsertMentionMute(opts: {
+  token: string;
+  mutedUserId: string;
+  duration: MentionMuteDuration;
+}): Promise<{ until: string }> {
+  return apiFetch<{ until: string }>({
+    path: "/users/mention-mutes",
+    method: "POST",
+    headers: { Authorization: `Bearer ${opts.token}` },
+    body: JSON.stringify({
+      mutedUserId: opts.mutedUserId,
+      duration: opts.duration,
+    }),
+  });
+}
+
+export async function deleteMentionMute(opts: {
+  token: string;
+  mutedUserId: string;
+}): Promise<void> {
+  await apiFetch<{ ok: boolean }>({
+    path: `/users/mention-mutes/${encodeURIComponent(opts.mutedUserId)}`,
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
 
 export async function searchProfiles(opts: {
   token: string;

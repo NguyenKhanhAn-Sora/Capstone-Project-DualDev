@@ -1,4 +1,10 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class AddServerEmojiDto {
   @IsString()
@@ -10,4 +16,9 @@ export class AddServerEmojiDto {
   @IsString()
   @MaxLength(80)
   name?: string;
+
+  /** true nếu file là GIF động (emoji hoạt hình). */
+  @IsOptional()
+  @IsBoolean()
+  animated?: boolean;
 }

@@ -23,6 +23,12 @@ import { ChannelMessagesGateway } from '../messages/channel-messages.gateway';
 import { ServerAccessService } from '../access/server-access.service';
 import { RolePermissions } from '../roles/role.schema';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { AddServerEmojiDto } from './dto/add-server-emoji.dto';
+
+/** Tổng số emoji tùy chỉnh (tĩnh + GIF) tối đa mỗi máy chủ. */
+const MAX_CUSTOM_EMOJIS_PER_SERVER = 30;
+/** Sticker máy chủ — tầng nâng cấp (boost) sẽ mở rộng sau; hiện chỉ dùng tầng miễn phí. */
+const MAX_CUSTOM_STICKERS_PER_SERVER = 5;
 
 @Injectable()
 export class ServersService {
@@ -2040,7 +2046,10 @@ export class ServersService {
     const channelIds = ((server as any).channels ?? []) as Types.ObjectId[];
     const tenMinAgo = new Date(now - 10 * 60 * 1000);
     const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
-    const fiveMinAgo = new Date(now - 5 * 60 * 1000);
+    /** Hoạt động thiết bị: 30 phút — tránh offline nhầm khi app không gửi lastSeen thường xuyên. */
+    const devicePresenceAgo = new Date(now - 30 * 60 * 1000);
+    /** Tin nhắn gần nhất trên server (trong 30 ngày agg) — nếu trong 15 phút thì coi như đang dùng kênh. */
+    const recentMessageAgo = new Date(now - 15 * 60 * 1000);
 
     const msgStats = new Map<
       string,
@@ -2140,7 +2149,14 @@ export class ServersService {
           }
         }
       }
-      const isOnline = lastDevice > 0 && lastDevice >= fiveMinAgo.getTime();
+      const deviceOnline =
+        lastDevice > 0 && lastDevice >= devicePresenceAgo.getTime();
+      /** Có tin trên server trong 10 phút → coi như đang hoạt động trên máy chủ. */
+      const activeInServer = (stats?.count10 ?? 0) > 0;
+      const lastMsgMs = stats?.lastAt ? new Date(stats.lastAt).getTime() : 0;
+      const recentlyMessaged =
+        lastMsgMs > 0 && lastMsgMs >= recentMessageAgo.getTime();
+      const isOnline = deviceOnline || activeInServer || recentlyMessaged;
 
       let joinMethod: 'owner' | 'invited' | 'link' = 'link';
       let invitedBy: { id: string; username: string } | undefined;
@@ -3321,6 +3337,7 @@ export class ServersService {
         id: string;
         imageUrl: string;
         name: string;
+        animated: boolean;
         addedBy: {
           displayName: string;
           username: string;
@@ -3371,6 +3388,7 @@ export class ServersService {
         id: string;
         imageUrl: string;
         name: string;
+        animated: boolean;
         addedBy: {
           displayName: string;
           username: string;
@@ -3389,6 +3407,7 @@ export class ServersService {
           id: st._id?.toString(),
           imageUrl: st.imageUrl,
           name: (st.name || '').trim(),
+          animated: !!st.animated,
           addedBy: {
             displayName: prof?.displayName || '',
             username: prof?.username || '',
@@ -3416,8 +3435,10 @@ export class ServersService {
   async addServerSticker(
     serverId: string,
     userId: string,
-    dto: { imageUrl: string; name?: string },
-  ): Promise<{ sticker: { id: string; imageUrl: string; name: string } }> {
+    dto: { imageUrl: string; name?: string; animated?: boolean },
+  ): Promise<{
+    sticker: { id: string; imageUrl: string; name: string; animated: boolean };
+  }> {
     const server = await this.serverModel.findById(serverId).exec();
     if (!server) {
       throw new NotFoundException(`Server with id ${serverId} not found`);
@@ -3439,13 +3460,20 @@ export class ServersService {
     }
     const name = (dto.name || '').trim().slice(0, 80);
 
+    const list = (server as any).customStickers || [];
+    if (list.length >= MAX_CUSTOM_STICKERS_PER_SERVER) {
+      throw new BadRequestException(
+        `Máy chủ đã đạt giới hạn ${MAX_CUSTOM_STICKERS_PER_SERVER} sticker tùy chỉnh. Nâng cấp máy chủ sẽ mở thêm ô (sắp có).`,
+      );
+    }
+
     const stickerDoc = {
       imageUrl: url,
       name,
+      animated: dto.animated === true,
       addedByUserId: new Types.ObjectId(userId),
       addedAt: new Date(),
     };
-    const list = (server as any).customStickers || [];
     list.push(stickerDoc);
     (server as any).customStickers = list;
     await server.save();
@@ -3457,6 +3485,7 @@ export class ServersService {
         id: added._id.toString(),
         imageUrl: added.imageUrl,
         name: added.name || '',
+        animated: !!added.animated,
       },
     };
   }
@@ -3475,6 +3504,7 @@ export class ServersService {
         id: string;
         imageUrl: string;
         name: string;
+        animated: boolean;
         addedBy: {
           displayName: string;
           username: string;
@@ -3525,6 +3555,7 @@ export class ServersService {
         id: string;
         imageUrl: string;
         name: string;
+        animated: boolean;
         addedBy: {
           displayName: string;
           username: string;
@@ -3543,6 +3574,7 @@ export class ServersService {
           id: em._id?.toString(),
           imageUrl: em.imageUrl,
           name: (em.name || '').trim(),
+          animated: !!em.animated,
           addedBy: {
             displayName: prof?.displayName || '',
             username: prof?.username || '',
@@ -3567,11 +3599,287 @@ export class ServersService {
     return { contextServerId: ctx || null, groups };
   }
 
+  /** Máy chủ mà user có quyền quản lý emoji + số slot còn lại (modal tải lên). */
+  async getEmojiUploadTargets(userId: string): Promise<{
+    targets: Array<{
+      serverId: string;
+      name: string;
+      avatarUrl: string | null;
+      count: number;
+      max: number;
+      remaining: number;
+    }>;
+  }> {
+    const userObjectId = new Types.ObjectId(userId);
+    const servers = await this.serverModel
+      .find({ 'members.userId': userObjectId })
+      .select('_id name avatarUrl customEmojis ownerId')
+      .lean()
+      .exec();
+
+    const targets: Array<{
+      serverId: string;
+      name: string;
+      avatarUrl: string | null;
+      count: number;
+      max: number;
+      remaining: number;
+    }> = [];
+
+    for (const s of servers) {
+      const sid = String(s._id);
+      const isOwner = String((s as any).ownerId) === userId;
+      const canManage =
+        isOwner ||
+        (await this.rolesService.hasPermission(sid, userId, 'manageServer'));
+      if (!canManage) continue;
+
+      const list = ((s as any).customEmojis || []) as any[];
+      const count = list.length;
+      targets.push({
+        serverId: sid,
+        name: (s as any).name || '',
+        avatarUrl: (s as any).avatarUrl ?? null,
+        count,
+        max: MAX_CUSTOM_EMOJIS_PER_SERVER,
+        remaining: Math.max(0, MAX_CUSTOM_EMOJIS_PER_SERVER - count),
+      });
+    }
+
+    targets.sort((a, b) =>
+      (a.name || '').localeCompare(b.name || '', 'vi'),
+    );
+
+    return { targets };
+  }
+
+  /** Máy chủ mà user có quyền quản lý sticker + slot còn lại (tối đa 5, chưa tính boost). */
+  async getStickerUploadTargets(userId: string): Promise<{
+    targets: Array<{
+      serverId: string;
+      name: string;
+      avatarUrl: string | null;
+      count: number;
+      max: number;
+      remaining: number;
+    }>;
+  }> {
+    const userObjectId = new Types.ObjectId(userId);
+    const servers = await this.serverModel
+      .find({ 'members.userId': userObjectId })
+      .select('_id name avatarUrl customStickers ownerId')
+      .lean()
+      .exec();
+
+    const targets: Array<{
+      serverId: string;
+      name: string;
+      avatarUrl: string | null;
+      count: number;
+      max: number;
+      remaining: number;
+    }> = [];
+
+    for (const s of servers) {
+      const sid = String(s._id);
+      const isOwner = String((s as any).ownerId) === userId;
+      const canManage =
+        isOwner ||
+        (await this.rolesService.hasPermission(sid, userId, 'manageServer'));
+      if (!canManage) continue;
+
+      const list = ((s as any).customStickers || []) as any[];
+      const count = list.length;
+      targets.push({
+        serverId: sid,
+        name: (s as any).name || '',
+        avatarUrl: (s as any).avatarUrl ?? null,
+        count,
+        max: MAX_CUSTOM_STICKERS_PER_SERVER,
+        remaining: Math.max(0, MAX_CUSTOM_STICKERS_PER_SERVER - count),
+      });
+    }
+
+    targets.sort((a, b) =>
+      (a.name || '').localeCompare(b.name || '', 'vi'),
+    );
+
+    return { targets };
+  }
+
+  async getServerEmojisManage(
+    serverId: string,
+    userId: string,
+  ): Promise<{
+    max: number;
+    count: number;
+    emojis: Array<{
+      id: string;
+      imageUrl: string;
+      name: string;
+      animated: boolean;
+      addedBy: {
+        displayName: string;
+        username: string;
+        avatarUrl: string;
+      };
+    }>;
+  }> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    const isOwner = (server as any).ownerId?.toString() === userId;
+    const canManage =
+      isOwner ||
+      (await this.rolesService.hasPermission(serverId, userId, 'manageServer'));
+    if (!canManage) {
+      throw new ForbiddenException(
+        'Bạn không có quyền xem hoặc quản lý emoji máy chủ này',
+      );
+    }
+
+    const list = ((server as any).customEmojis || []) as any[];
+    const userIdsNeedingProfile = new Set(
+      list.map((em) => String(em.addedByUserId)).filter(Boolean),
+    );
+    const profileList =
+      userIdsNeedingProfile.size === 0
+        ? []
+        : await this.profileModel
+            .find({
+              userId: {
+                $in: [...userIdsNeedingProfile].map(
+                  (id) => new Types.ObjectId(id),
+                ),
+              },
+            })
+            .select('userId displayName username avatarUrl')
+            .lean()
+            .exec();
+    const profileByUserId = new Map(
+      profileList.map((p: any) => [String(p.userId), p]),
+    );
+
+    const sorted = [...list].sort((a, b) => {
+      const ta = new Date(a.addedAt || 0).getTime();
+      const tb = new Date(b.addedAt || 0).getTime();
+      return tb - ta;
+    });
+
+    const emojis = sorted.map((em: any) => {
+      const prof = profileByUserId.get(String(em.addedByUserId));
+      return {
+        id: em._id?.toString(),
+        imageUrl: em.imageUrl,
+        name: (em.name || '').trim(),
+        animated: !!em.animated,
+        addedBy: {
+          displayName: prof?.displayName || '',
+          username: prof?.username || '',
+          avatarUrl: prof?.avatarUrl || '',
+        },
+      };
+    });
+
+    return {
+      max: MAX_CUSTOM_EMOJIS_PER_SERVER,
+      count: list.length,
+      emojis,
+    };
+  }
+
+  async getServerStickersManage(
+    serverId: string,
+    userId: string,
+  ): Promise<{
+    max: number;
+    count: number;
+    stickers: Array<{
+      id: string;
+      imageUrl: string;
+      name: string;
+      animated: boolean;
+      addedBy: {
+        displayName: string;
+        username: string;
+        avatarUrl: string;
+      };
+    }>;
+  }> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+
+    const isOwner = (server as any).ownerId?.toString() === userId;
+    const canManage =
+      isOwner ||
+      (await this.rolesService.hasPermission(serverId, userId, 'manageServer'));
+    if (!canManage) {
+      throw new ForbiddenException(
+        'Bạn không có quyền xem hoặc quản lý sticker máy chủ này',
+      );
+    }
+
+    const list = ((server as any).customStickers || []) as any[];
+    const userIdsNeedingProfile = new Set(
+      list.map((st) => String(st.addedByUserId)).filter(Boolean),
+    );
+    const profileList =
+      userIdsNeedingProfile.size === 0
+        ? []
+        : await this.profileModel
+            .find({
+              userId: {
+                $in: [...userIdsNeedingProfile].map(
+                  (id) => new Types.ObjectId(id),
+                ),
+              },
+            })
+            .select('userId displayName username avatarUrl')
+            .lean()
+            .exec();
+    const profileByUserId = new Map(
+      profileList.map((p: any) => [String(p.userId), p]),
+    );
+
+    const sorted = [...list].sort((a, b) => {
+      const ta = new Date(a.addedAt || 0).getTime();
+      const tb = new Date(b.addedAt || 0).getTime();
+      return tb - ta;
+    });
+
+    const stickers = sorted.map((st: any) => {
+      const prof = profileByUserId.get(String(st.addedByUserId));
+      return {
+        id: st._id?.toString(),
+        imageUrl: st.imageUrl,
+        name: (st.name || '').trim(),
+        animated: !!st.animated,
+        addedBy: {
+          displayName: prof?.displayName || '',
+          username: prof?.username || '',
+          avatarUrl: prof?.avatarUrl || '',
+        },
+      };
+    });
+
+    return {
+      max: MAX_CUSTOM_STICKERS_PER_SERVER,
+      count: list.length,
+      stickers,
+    };
+  }
+
   async addServerEmoji(
     serverId: string,
     userId: string,
-    dto: { imageUrl: string; name?: string },
-  ): Promise<{ emoji: { id: string; imageUrl: string; name: string } }> {
+    dto: AddServerEmojiDto,
+  ): Promise<{
+    emoji: { id: string; imageUrl: string; name: string; animated: boolean };
+  }> {
     const server = await this.serverModel.findById(serverId).exec();
     if (!server) {
       throw new NotFoundException(`Server with id ${serverId} not found`);
@@ -3593,13 +3901,20 @@ export class ServersService {
     }
     const name = (dto.name || '').trim().slice(0, 80);
 
+    const list = (server as any).customEmojis || [];
+    if (list.length >= MAX_CUSTOM_EMOJIS_PER_SERVER) {
+      throw new BadRequestException(
+        `Máy chủ đã đạt giới hạn ${MAX_CUSTOM_EMOJIS_PER_SERVER} emoji tùy chỉnh (tĩnh và GIF cộng dồn).`,
+      );
+    }
+
     const emojiDoc = {
       imageUrl: url,
       name,
+      animated: dto.animated === true,
       addedByUserId: new Types.ObjectId(userId),
       addedAt: new Date(),
     };
-    const list = (server as any).customEmojis || [];
     list.push(emojiDoc);
     (server as any).customEmojis = list;
     await server.save();
@@ -3611,6 +3926,7 @@ export class ServersService {
         id: added._id.toString(),
         imageUrl: added.imageUrl,
         name: added.name || '',
+        animated: !!added.animated,
       },
     };
   }

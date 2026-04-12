@@ -14,6 +14,8 @@ import {
 import {
   getStickerPickerData,
   getEmojiPickerData,
+  adminGetStickerPickerData,
+  adminGetEmojiPickerData,
   type StickerPickerGroup,
   type StickerPickerSticker,
   type EmojiPickerGroup,
@@ -43,6 +45,8 @@ export type GiphyPickerSelection =
       stickerId: string;
       imageUrl: string;
       name: string;
+      /** GIF sticker từ máy chủ */
+      animated?: boolean;
       addedBy: {
         displayName: string;
         username: string;
@@ -81,6 +85,7 @@ type FreqStored = {
   addedByDisplayName?: string;
   addedByUsername?: string;
   addedByAvatarUrl?: string;
+  animated?: boolean;
 };
 
 type EmojiFreqStored = {
@@ -246,6 +251,11 @@ interface GiphyPickerProps {
   /** @deprecated dùng enableServerMedia */
   enableServerStickers?: boolean;
   enableServerMedia?: boolean;
+  /**
+   * Chế độ admin xem server: tải emoji/sticker qua endpoint admin (JWT admin),
+   * không dùng danh sách server theo membership.
+   */
+  adminMediaPicker?: boolean;
 }
 
 export default function GiphyPicker({
@@ -258,6 +268,7 @@ export default function GiphyPicker({
   onManageServerEmojis,
   enableServerStickers,
   enableServerMedia,
+  adminMediaPicker = false,
 }: GiphyPickerProps) {
   const serverMediaOn =
     enableServerMedia ?? enableServerStickers ?? true;
@@ -389,7 +400,16 @@ export default function GiphyPicker({
     let c = false;
     setStickerPickerLoading(true);
     setStickerPickerError(null);
-    getStickerPickerData(contextServerId || undefined)
+    const sid = contextServerId || "";
+    const adminTok =
+      typeof window !== "undefined"
+        ? localStorage.getItem("accessToken") || localStorage.getItem("token") || ""
+        : "";
+    const req =
+      adminMediaPicker && sid && adminTok
+        ? adminGetStickerPickerData(sid, adminTok)
+        : getStickerPickerData(contextServerId || undefined);
+    req
       .then((d) => {
         if (!c) setStickerGroups(d.groups || []);
       })
@@ -403,7 +423,7 @@ export default function GiphyPicker({
     return () => {
       c = true;
     };
-  }, [activeTab, serverMediaOn, contextServerId]);
+  }, [activeTab, serverMediaOn, contextServerId, adminMediaPicker]);
 
   useEffect(() => {
     if (activeTab !== "emoji" || !serverMediaOn) {
@@ -414,7 +434,16 @@ export default function GiphyPicker({
     let c = false;
     setEmojiPickerLoading(true);
     setEmojiPickerError(null);
-    getEmojiPickerData(contextServerId || undefined)
+    const sid = contextServerId || "";
+    const adminTok =
+      typeof window !== "undefined"
+        ? localStorage.getItem("accessToken") || localStorage.getItem("token") || ""
+        : "";
+    const req =
+      adminMediaPicker && sid && adminTok
+        ? adminGetEmojiPickerData(sid, adminTok)
+        : getEmojiPickerData(contextServerId || undefined);
+    req
       .then((d) => {
         if (!c) setEmojiGroups(d.groups || []);
       })
@@ -428,7 +457,7 @@ export default function GiphyPicker({
     return () => {
       c = true;
     };
-  }, [activeTab, serverMediaOn, contextServerId]);
+  }, [activeTab, serverMediaOn, contextServerId, adminMediaPicker]);
 
   useEffect(() => {
     if (activeTab !== "gif") return;
@@ -569,6 +598,7 @@ export default function GiphyPicker({
       addedByDisplayName: st.addedBy.displayName,
       addedByUsername: st.addedBy.username,
       addedByAvatarUrl: st.addedBy.avatarUrl,
+      animated: st.animated === true,
     });
     setFreqTick((x) => x + 1);
     onSelect({
@@ -579,6 +609,7 @@ export default function GiphyPicker({
       stickerId: st.id,
       imageUrl: st.imageUrl,
       name: st.name || "",
+      animated: st.animated === true,
       addedBy: st.addedBy,
     });
     onClose();
@@ -678,6 +709,7 @@ export default function GiphyPicker({
         id: e.stickerId,
         imageUrl: e.imageUrl,
         name: e.name || "",
+        animated: e.animated === true,
         addedBy: {
           displayName: e.addedByDisplayName || "",
           username: e.addedByUsername || "",
@@ -1518,26 +1550,36 @@ export default function GiphyPicker({
 
               {activeTab === "emoji" && !searching && (
                 <section className={styles.emojiDefaultSection} id="emoji-section-default">
-                  <h3 className={styles.sectionTitleGiphy}>Emoji mặc định</h3>
-                  <div className={styles.emojiMartHost} ref={emojiMartHostRef}>
-                    <EmojiPicker
-                      onEmojiClick={(d: { emoji?: string }) => {
-                        const ch = d?.emoji ?? "";
-                        if (!ch) return;
-                        bumpEmojiFreq({ n: 0, type: "unicode", char: ch });
-                        setFreqTick((x) => x + 1);
-                        onSelect({ source: "unicode", emoji: ch });
-                        onClose();
-                      }}
-                      theme={Theme.DARK}
-                      autoFocusSearch={false}
-                      lazyLoadEmojis
-                      searchDisabled={false}
-                      skinTonesDisabled
-                      previewConfig={{ showPreview: false }}
-                      height={340}
-                      width="100%"
-                    />
+                  <div className={styles.emoji} ref={emojiMartHostRef}>
+                    <h3 className={styles.emojiDefaultHeading}>Emoji mặc định</h3>
+                    <div className={styles.emojiPickerSlot}>
+                      <EmojiPicker
+                        className="cordigram-default-emoji-epr"
+                        style={{
+                          width: "100%",
+                          border: "none",
+                          borderRadius: 0,
+                          background: "transparent",
+                          boxShadow: "none",
+                        }}
+                        onEmojiClick={(d: { emoji?: string }) => {
+                          const ch = d?.emoji ?? "";
+                          if (!ch) return;
+                          bumpEmojiFreq({ n: 0, type: "unicode", char: ch });
+                          setFreqTick((x) => x + 1);
+                          onSelect({ source: "unicode", emoji: ch });
+                          onClose();
+                        }}
+                        theme={Theme.DARK}
+                        autoFocusSearch={false}
+                        lazyLoadEmojis
+                        searchDisabled
+                        skinTonesDisabled
+                        previewConfig={{ showPreview: false }}
+                        height={340}
+                        width="100%"
+                      />
+                    </div>
                   </div>
                 </section>
               )}

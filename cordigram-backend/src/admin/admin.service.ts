@@ -7502,6 +7502,182 @@ export class AdminService {
     return { server, channels, categories };
   }
 
+  /** Emoji máy chủ cho chế độ admin xem server (không cần là thành viên). Cùng dạng với GET /servers/emoji-picker. */
+  async adminGetEmojiPickerData(serverId: string): Promise<{
+    contextServerId: string | null;
+    groups: Array<{
+      serverId: string;
+      serverName: string;
+      serverAvatarUrl: string | null;
+      locked: boolean;
+      emojis: Array<{
+        id: string;
+        imageUrl: string;
+        name: string;
+        animated: boolean;
+        addedBy: {
+          displayName: string;
+          username: string;
+          avatarUrl: string;
+        };
+      }>;
+    }>;
+  }> {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('_id name avatarUrl customEmojis')
+      .lean()
+      .exec();
+    if (!server) throw new NotFoundException('Server not found');
+
+    const emojisRaw = (server as any).customEmojis || [];
+    const userIdsNeedingProfile = new Set<string>();
+    if (Array.isArray(emojisRaw)) {
+      for (const em of emojisRaw) {
+        if (em?.addedByUserId)
+          userIdsNeedingProfile.add(String(em.addedByUserId));
+      }
+    }
+    const profileList =
+      userIdsNeedingProfile.size === 0
+        ? []
+        : await this.profileModel
+            .find({
+              userId: {
+                $in: [...userIdsNeedingProfile].map(
+                  (id) => new Types.ObjectId(id),
+                ),
+              },
+            })
+            .select('userId displayName username avatarUrl')
+            .lean()
+            .exec();
+    const profileByUserId = new Map(
+      profileList.map((p: any) => [String(p.userId), p]),
+    );
+
+    const emojiOut = Array.isArray(emojisRaw)
+      ? emojisRaw.map((em: any) => {
+          const prof = profileByUserId.get(String(em.addedByUserId));
+          return {
+            id: em._id?.toString(),
+            imageUrl: em.imageUrl,
+            name: (em.name || '').trim(),
+            animated: !!em.animated,
+            addedBy: {
+              displayName: prof?.displayName || '',
+              username: prof?.username || '',
+              avatarUrl: prof?.avatarUrl || '',
+            },
+          };
+        })
+      : [];
+
+    const sid = String(server._id);
+    const groups =
+      emojiOut.length > 0
+        ? [
+            {
+              serverId: sid,
+              serverName: (server as any).name || '',
+              serverAvatarUrl: (server as any).avatarUrl ?? null,
+              locked: false,
+              emojis: emojiOut,
+            },
+          ]
+        : [];
+
+    return { contextServerId: sid, groups };
+  }
+
+  /** Sticker máy chủ cho chế độ admin xem server. Cùng dạng với GET /servers/sticker-picker. */
+  async adminGetStickerPickerData(serverId: string): Promise<{
+    contextServerId: string | null;
+    groups: Array<{
+      serverId: string;
+      serverName: string;
+      serverAvatarUrl: string | null;
+      locked: boolean;
+      stickers: Array<{
+        id: string;
+        imageUrl: string;
+        name: string;
+        animated: boolean;
+        addedBy: {
+          displayName: string;
+          username: string;
+          avatarUrl: string;
+        };
+      }>;
+    }>;
+  }> {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('_id name avatarUrl customStickers')
+      .lean()
+      .exec();
+    if (!server) throw new NotFoundException('Server not found');
+
+    const stickersRaw = (server as any).customStickers || [];
+    const userIdsNeedingProfile = new Set<string>();
+    if (Array.isArray(stickersRaw)) {
+      for (const st of stickersRaw) {
+        if (st?.addedByUserId)
+          userIdsNeedingProfile.add(String(st.addedByUserId));
+      }
+    }
+    const profileList =
+      userIdsNeedingProfile.size === 0
+        ? []
+        : await this.profileModel
+            .find({
+              userId: {
+                $in: [...userIdsNeedingProfile].map(
+                  (id) => new Types.ObjectId(id),
+                ),
+              },
+            })
+            .select('userId displayName username avatarUrl')
+            .lean()
+            .exec();
+    const profileByUserId = new Map(
+      profileList.map((p: any) => [String(p.userId), p]),
+    );
+
+    const stickerOut = Array.isArray(stickersRaw)
+      ? stickersRaw.map((st: any) => {
+          const prof = profileByUserId.get(String(st.addedByUserId));
+          return {
+            id: st._id?.toString(),
+            imageUrl: st.imageUrl,
+            name: (st.name || '').trim(),
+            animated: !!st.animated,
+            addedBy: {
+              displayName: prof?.displayName || '',
+              username: prof?.username || '',
+              avatarUrl: prof?.avatarUrl || '',
+            },
+          };
+        })
+      : [];
+
+    const sid = String(server._id);
+    const groups =
+      stickerOut.length > 0
+        ? [
+            {
+              serverId: sid,
+              serverName: (server as any).name || '',
+              serverAvatarUrl: (server as any).avatarUrl ?? null,
+              locked: false,
+              stickers: stickerOut,
+            },
+          ]
+        : [];
+
+    return { contextServerId: sid, groups };
+  }
+
   async adminLeaveServer(serverId: string, adminUserId?: string) {
     if (!adminUserId) return { ok: true };
 

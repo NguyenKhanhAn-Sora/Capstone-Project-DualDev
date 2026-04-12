@@ -718,6 +718,30 @@ export class AdminController {
     return this.adminService.adminGetServerView(serverId, adminUserId);
   }
 
+  @Get('community-discovery/:serverId/emoji-picker')
+  async adminGetEmojiPicker(
+    @Param('serverId') serverId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    return this.adminService.adminGetEmojiPickerData(serverId);
+  }
+
+  @Get('community-discovery/:serverId/sticker-picker')
+  async adminGetStickerPicker(
+    @Param('serverId') serverId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    return this.adminService.adminGetStickerPickerData(serverId);
+  }
+
   @Post('community-discovery/:serverId/leave')
   async adminLeaveServer(
     @Param('serverId') serverId: string,

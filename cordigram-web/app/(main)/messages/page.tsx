@@ -88,11 +88,16 @@ import AutoModSection from "@/components/AutoModSection/AutoModSection";
 import ServerSafetySection from "@/components/ServerSafetySection/ServerSafetySection";
 import { mapSectionToSafetyTab } from "@/components/ServerSafetySection/safety-tab-map";
 import ServerBansSection from "@/components/ServerBansSection/ServerBansSection";
+import ServerEmojiSection from "@/components/ServerEmojiSection/ServerEmojiSection";
+import ServerStickerSection from "@/components/ServerStickerSection/ServerStickerSection";
 import MessageSearchPanel from "@/components/MessageSearchPanel/MessageSearchPanel";
 import MentionDropdown from "@/components/MentionDropdown/MentionDropdown";
 import { fetchInboxForYou } from "@/lib/inbox-api";
 import { normalizeServerBanner } from "@/lib/server-banner";
 import type { VoiceChannelCallProps } from "@/components/VoiceChannelCall";
+import ChannelUserProfileRoot, {
+  type ChannelProfileAnchorContext,
+} from "@/components/ChannelUserProfile/ChannelUserProfileRoot";
 
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
 const CallRoom = dynamic(() => import("@/components/CallRoom"), { ssr: false });
@@ -147,6 +152,8 @@ interface UIMessage {
     messageType?: "text" | "gif" | "sticker" | "voice" | "system" | "welcome";
     text: string;
   } | null;
+  /** Biệt danh trong máy chủ (nếu có) — mở card hồ sơ từ kênh. */
+  serverNickname?: string;
 }
 
 // GiphyMessage component for rendering GIF/Sticker
@@ -431,15 +438,25 @@ function areMessagesEqual(
     renderMessageContent: (message: UIMessage) => React.ReactNode;
     onVisible?: (messageId: string, isVisible: boolean) => void;
     senderColor?: string;
+    onChannelUserProfileOpen?: (
+      message: UIMessage,
+      anchorRect: DOMRect,
+    ) => void;
   },
   nextProps: {
     message: UIMessage;
     renderMessageContent: (message: UIMessage) => React.ReactNode;
     onVisible?: (messageId: string, isVisible: boolean) => void;
     senderColor?: string;
+    onChannelUserProfileOpen?: (
+      message: UIMessage,
+      anchorRect: DOMRect,
+    ) => void;
   },
 ) {
   if (prevProps.senderColor !== nextProps.senderColor) return false;
+  if (prevProps.onChannelUserProfileOpen !== nextProps.onChannelUserProfileOpen)
+    return false;
   if (prevProps.message.id !== nextProps.message.id) return false;
 
   // Re-render if read status changed (THIS IS KEY!)
@@ -472,6 +489,10 @@ function areMessagesEqual(
   if (prevProps.message.replyToMessage !== nextProps.message.replyToMessage)
     return false;
 
+  // Emoji map / jumbo sizing đi qua renderMessageContent — phải re-render khi callback đổi
+  if (prevProps.renderMessageContent !== nextProps.renderMessageContent)
+    return false;
+
   // Don't re-render if only timestamp changed
   return true;
 }
@@ -491,6 +512,7 @@ const MessageItem = memo(
     scrollContainerRef,
     dmPartnerDisplayName,
     senderColor,
+    onChannelUserProfileOpen,
   }: {
     message: UIMessage;
     renderMessageContent: (message: UIMessage) => React.ReactNode;
@@ -504,6 +526,10 @@ const MessageItem = memo(
     scrollContainerRef?: React.RefObject<HTMLElement | null>;
     dmPartnerDisplayName?: string;
     senderColor?: string; // Màu hiển thị từ role cao nhất
+    onChannelUserProfileOpen?: (
+      message: UIMessage,
+      anchorRect: DOMRect,
+    ) => void;
   }) => {
     const messageRef = useRef<HTMLDivElement>(null);
     const [isHovered, setIsHovered] = useState(false);
@@ -600,21 +626,49 @@ const MessageItem = memo(
         }}
         style={{ position: "relative" }}
       >
-        {/* Avatar */}
-        <div className={styles.messageAvatar}>
-          {isValidAvatarUrl(message.senderAvatar) ? (
-            <img
-              src={message.senderAvatar}
-              alt={message.senderName || "Người dùng"}
-            />
-          ) : (
-            <div className={styles.avatarPlaceholder}>
-              {(message.senderName || message.senderEmail || "?")
-                .charAt(0)
-                .toUpperCase()}
-            </div>
-          )}
-        </div>
+        {/* Avatar — kênh server: bấm mở card hồ sơ (không phải tin của mình). */}
+        {onChannelUserProfileOpen &&
+        !message.isFromCurrentUser &&
+        message.type === "server" ? (
+          <button
+            type="button"
+            className={`${styles.messageAvatar} ${styles.messageAvatarButton}`}
+            aria-label="Xem hồ sơ người gửi"
+            onClick={(e) => {
+              e.stopPropagation();
+              const r = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+              onChannelUserProfileOpen(message, r);
+            }}
+          >
+            {isValidAvatarUrl(message.senderAvatar) ? (
+              <img
+                src={message.senderAvatar}
+                alt={message.senderName || "Người dùng"}
+              />
+            ) : (
+              <div className={styles.avatarPlaceholder}>
+                {(message.senderName || message.senderEmail || "?")
+                  .charAt(0)
+                  .toUpperCase()}
+              </div>
+            )}
+          </button>
+        ) : (
+          <div className={styles.messageAvatar}>
+            {isValidAvatarUrl(message.senderAvatar) ? (
+              <img
+                src={message.senderAvatar}
+                alt={message.senderName || "Người dùng"}
+              />
+            ) : (
+              <div className={styles.avatarPlaceholder}>
+                {(message.senderName || message.senderEmail || "?")
+                  .charAt(0)
+                  .toUpperCase()}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className={styles.messageContent}>
           {/* Name and timestamp */}
@@ -889,6 +943,38 @@ function formatMessageTime(date: Date) {
   if (diffDays < 7) return `${diffDays}d ago`;
 
   return date.toLocaleDateString();
+}
+
+/** Kích thước emoji :name: trong dòng chữ (kênh + DM). */
+const CUSTOM_EMOJI_INLINE_PX = 22;
+/** Emoji “jumbo” khi tin chỉ có emoji máy chủ (giống Discord). */
+const CUSTOM_EMOJI_JUMBO_PX = 48;
+const CUSTOM_EMOJI_JUMBO_MAX_COUNT = 3;
+
+/**
+ * Nếu toàn bộ tin (bỏ khoảng trắng) chỉ gồm 1–3 token :ten: và mỗi token đều có trong map → trả về kích thước jumbo.
+ */
+function getServerCustomEmojiRenderSizePx(
+  text: string,
+  map: Record<string, string>,
+): number {
+  const trimmed = text.trim();
+  if (!trimmed) return CUSTOM_EMOJI_INLINE_PX;
+  const stripped = trimmed.replace(/\s+/g, "");
+  if (!stripped.length) return CUSTOM_EMOJI_INLINE_PX;
+  if (!/^(:[a-zA-Z0-9_]{1,80}:)+$/.test(stripped)) return CUSTOM_EMOJI_INLINE_PX;
+  const tokens = stripped.match(/:[a-zA-Z0-9_]{1,80}:/g) ?? [];
+  if (
+    tokens.length === 0 ||
+    tokens.length > CUSTOM_EMOJI_JUMBO_MAX_COUNT
+  ) {
+    return CUSTOM_EMOJI_INLINE_PX;
+  }
+  const allResolved = tokens.every((t) => {
+    const name = t.slice(1, -1).toLowerCase();
+    return Boolean(map[name]);
+  });
+  return allResolved ? CUSTOM_EMOJI_JUMBO_PX : CUSTOM_EMOJI_INLINE_PX;
 }
 
 /** API getMessages sort createdAt:-1; UI chat cần cũ → mới (trên xuống dưới) để khớp append/socket. */
@@ -1187,6 +1273,8 @@ export default function MessagesPage() {
   const [replyingTo, setReplyingTo] = useState<UIMessage | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [channelProfileContext, setChannelProfileContext] =
+    useState<ChannelProfileAnchorContext | null>(null);
 
   // Call states
   const [isInCall, setIsInCall] = useState(false);
@@ -1849,6 +1937,13 @@ export default function MessagesPage() {
     }
   }, [adminTokenFromUrl]);
 
+  // Admin chỉ xem server: không mở Khám phá / tránh lệch giao diện (sidebar server + nội dung Explore).
+  useEffect(() => {
+    if (!isAdminView) return;
+    setShowExploreView(false);
+    setShowJoinApplicationsView(false);
+  }, [isAdminView]);
+
   // Load servers on mount
   useEffect(() => {
     const authToken =
@@ -2179,33 +2274,42 @@ export default function MessagesPage() {
     setEmailOtpCooldown(0);
   }, [selectedServer]);
 
-  useEffect(() => {
-    if (!selectedServer || !token) {
+  const refreshServerEmojiMap = useCallback(async () => {
+    if (!selectedServer) {
       setServerEmojiRenderMap({});
       return;
     }
-    let cancelled = false;
-    serversApi
-      .getEmojiPickerData(selectedServer)
-      .then((data) => {
-        if (cancelled) return;
-        const m: Record<string, string> = {};
-        for (const g of data.groups || []) {
-          if (g.locked) continue;
-          for (const e of g.emojis || []) {
-            const k = (e.name || "").trim().toLowerCase();
-            if (k) m[k] = e.imageUrl;
-          }
+    const authToken =
+      localStorage.getItem("accessToken") || localStorage.getItem("token") || "";
+    if (!authToken) {
+      setServerEmojiRenderMap({});
+      return;
+    }
+    const adminViewingServer =
+      isAdminView &&
+      adminViewServerId &&
+      String(selectedServer) === String(adminViewServerId);
+    try {
+      const data = adminViewingServer
+        ? await serversApi.adminGetEmojiPickerData(selectedServer, authToken)
+        : await serversApi.getEmojiPickerData(selectedServer);
+      const m: Record<string, string> = {};
+      for (const g of data.groups || []) {
+        if (String(g.serverId) !== String(selectedServer)) continue;
+        for (const e of g.emojis || []) {
+          const k = (e.name || "").trim().toLowerCase();
+          if (k) m[k] = e.imageUrl;
         }
-        setServerEmojiRenderMap(m);
-      })
-      .catch(() => {
-        if (!cancelled) setServerEmojiRenderMap({});
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedServer, token]);
+      }
+      setServerEmojiRenderMap(m);
+    } catch {
+      setServerEmojiRenderMap({});
+    }
+  }, [selectedServer, token, isAdminView, adminViewServerId]);
+
+  useEffect(() => {
+    void refreshServerEmojiMap();
+  }, [refreshServerEmojiMap]);
 
   // Refetch active events mỗi 60s khi đang chọn server → sự kiện xuất hiện đúng lúc khi đến giờ
   useEffect(() => {
@@ -2862,6 +2966,10 @@ export default function MessagesPage() {
           typeof msg.senderId === "string"
             ? undefined
             : nickByUserId.get(String((msg.senderId as any)._id)) || (msg.senderId as any).displayName || undefined,
+        serverNickname:
+          typeof msg.senderId === "string"
+            ? undefined
+            : nickByUserId.get(String((msg.senderId as any)._id)) || undefined,
         senderAvatar:
           typeof msg.senderId === "string"
             ? undefined
@@ -3088,6 +3196,56 @@ export default function MessagesPage() {
     }
     await loadDirectMessages(friend._id);
   };
+
+  const handleOpenChannelUserProfile = useCallback(
+    (message: UIMessage, anchorRect: DOMRect) => {
+      if (!selectedServer) return;
+      const srv = servers.find((s) => s._id === selectedServer);
+      if (!srv) return;
+      setChannelProfileContext({
+        anchorRect,
+        serverId: selectedServer,
+        serverName: srv.name || "Máy chủ",
+        serverAvatarUrl: srv.avatarUrl ?? null,
+        targetUserId: message.senderId,
+        nicknameInChannel: message.serverNickname ?? null,
+        fallbackDisplayName:
+          message.senderDisplayName ||
+          message.senderName ||
+          message.senderEmail ||
+          "Người dùng",
+        fallbackUsername: message.senderName || message.senderEmail || "",
+        fallbackAvatarUrl: message.senderAvatar,
+      });
+    },
+    [selectedServer, servers],
+  );
+
+  const handleOpenDmFromChannelProfile = useCallback(
+    (friend: serversApi.Friend, opts?: { openGifPicker?: boolean }) => {
+      setChannelProfileContext(null);
+      setSelectedServer(null);
+      setSelectedChannel(null);
+      setSelectedDirectMessageFriend(friend);
+      void loadDirectMessages(friend._id);
+      if (opts?.openGifPicker) {
+        setMediaPickerTab("gif");
+        setShowGiphyPicker(true);
+      }
+    },
+    [loadDirectMessages],
+  );
+
+  const channelProfileInviteServers = useMemo(() => {
+    const sid = channelProfileContext?.serverId;
+    return servers
+      .filter((s) => (sid ? s._id !== sid : true))
+      .map((s) => ({
+        _id: s._id,
+        name: s.name || "Máy chủ",
+        avatarUrl: s.avatarUrl ?? null,
+      }));
+  }, [servers, channelProfileContext?.serverId]);
 
   // Handler for adding/removing reactions (DM and channel)
   const applyReactionUpdate = (
@@ -3854,7 +4012,12 @@ export default function MessagesPage() {
     }
     if (sel.source === "serverEmoji") {
       const safe = sel.name.replace(/[^a-zA-Z0-9_]/g, "") || "emoji";
+      const key = safe.toLowerCase();
       setMessageText((p) => p + `:${safe}:`);
+      setServerEmojiRenderMap((prev) => ({
+        ...prev,
+        [key]: sel.imageUrl,
+      }));
     }
   };
 
@@ -4993,12 +5156,11 @@ export default function MessagesPage() {
         );
       }
 
-      // Regular text message (emoji máy chủ dạng :ten: trong kênh server)
+      // Regular text message (emoji máy chủ dạng :ten: — kênh chat & DM dùng chung)
       const map = serverEmojiRenderMap;
-      if (!Object.keys(map).length) {
-        return <span>{text}</span>;
-      }
-      const re = /:([a-zA-Z0-9_]{2,32}):/g;
+      const emojiPx = getServerCustomEmojiRenderSizePx(text, map);
+      const isJumboEmojiRow = emojiPx >= CUSTOM_EMOJI_JUMBO_PX;
+      const re = /:([a-zA-Z0-9_]{1,80}):/g;
       const nodes: React.ReactNode[] = [];
       let last = 0;
       let m: RegExpExecArray | null;
@@ -5014,11 +5176,12 @@ export default function MessagesPage() {
               src={url}
               alt={m[0]}
               style={{
-                width: 22,
-                height: 22,
+                width: emojiPx,
+                height: emojiPx,
                 verticalAlign: "middle",
                 objectFit: "contain",
                 display: "inline-block",
+                margin: isJumboEmojiRow ? "2px 4px 2px 0" : undefined,
               }}
             />,
           );
@@ -5031,7 +5194,20 @@ export default function MessagesPage() {
         nodes.push(<span key="tail">{text.slice(last)}</span>);
       }
       return (
-        <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+        <span
+          style={{
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            ...(isJumboEmojiRow
+              ? {
+                  display: "inline-flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: 6,
+                }
+              : {}),
+          }}
+        >
           {nodes}
         </span>
       );
@@ -5645,42 +5821,48 @@ export default function MessagesPage() {
           style={{ cursor: "pointer" }}
         />
 
-        <button
-          className={styles.createBtn}
-          title="Tạo máy chủ"
-          onClick={() => setShowCreateServerModal(true)}
-        >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+        {!isAdminView ? (
+          <button
+            className={styles.createBtn}
+            title="Tạo máy chủ"
+            onClick={() => setShowCreateServerModal(true)}
           >
-            <path d="M12 5v14M5 12h14"></path>
-          </svg>
-        </button>
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
+          </button>
+        ) : null}
 
-        <button
-          className={`${styles.exploreBtn} ${showExploreView ? styles.exploreBtnActive : ""}`}
-          title={showExploreView ? "Đóng Khám phá" : "Khám phá"}
-          onClick={() => {
-            setShowExploreView((prev) => {
-              const next = !prev;
-              if (next) {
-                setShowJoinApplicationsView(false);
-                setSelectedDirectMessageFriend(null);
-              }
-              return next;
-            });
-          }}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M14.5 9.5l-2.2 6.4-1.1-2.5-2.5-1.1 6.4-2.2z" />
-          </svg>
-        </button>
+        {!isAdminView ? (
+          <button
+            className={`${styles.exploreBtn} ${showExploreView ? styles.exploreBtnActive : ""}`}
+            title={showExploreView ? "Đóng Khám phá" : "Khám phá"}
+            onClick={() => {
+              setShowExploreView((prev) => {
+                const next = !prev;
+                if (next) {
+                  setShowJoinApplicationsView(false);
+                  setSelectedDirectMessageFriend(null);
+                  setSelectedServer(null);
+                  setSelectedChannel(null);
+                }
+                return next;
+              });
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M14.5 9.5l-2.2 6.4-1.1-2.5-2.5-1.1 6.4-2.2z" />
+            </svg>
+          </button>
+        ) : null}
 
         {/* Servers List */}
         <div
@@ -7432,6 +7614,7 @@ export default function MessagesPage() {
                             onDelete={(msgId) => setShowDeleteDialog(msgId)}
                             scrollContainerRef={messagesContainerRef}
                             senderColor={memberRoleColors[message.senderId]}
+                            onChannelUserProfileOpen={handleOpenChannelUserProfile}
                           />
                         </div>
                       );
@@ -9143,6 +9326,35 @@ export default function MessagesPage() {
               </div>
             );
           }
+          if (section === "emoji" && serverSettingsTarget?.serverId && token) {
+            const canManageEmoji =
+              Boolean(serverSettingsPermissions?.isOwner) ||
+              Boolean(serverSettingsPermissions?.canManageServer);
+            return (
+              <ServerEmojiSection
+                serverId={serverSettingsTarget.serverId}
+                token={token}
+                canManage={canManageEmoji}
+                onEmojisChanged={() => {
+                  if (serverSettingsTarget.serverId === selectedServer) {
+                    void refreshServerEmojiMap();
+                  }
+                }}
+              />
+            );
+          }
+          if (section === "sticker" && serverSettingsTarget?.serverId && token) {
+            const canManageSticker =
+              Boolean(serverSettingsPermissions?.isOwner) ||
+              Boolean(serverSettingsPermissions?.canManageServer);
+            return (
+              <ServerStickerSection
+                serverId={serverSettingsTarget.serverId}
+                token={token}
+                canManage={canManageSticker}
+              />
+            );
+          }
           return undefined;
         }}
       />
@@ -9571,6 +9783,18 @@ export default function MessagesPage() {
         />
       )}
 
+      {channelProfileContext && token ? (
+        <ChannelUserProfileRoot
+          open
+          context={channelProfileContext}
+          token={token}
+          inviteableServers={channelProfileInviteServers}
+          onClose={() => setChannelProfileContext(null)}
+          onOpenDirectMessage={handleOpenDmFromChannelProfile}
+          onToast={(m) => setToastMessage(m)}
+        />
+      ) : null}
+
       {/* Giphy Picker Modal */}
       {showGiphyPicker && (
         <GiphyPicker
@@ -9588,6 +9812,12 @@ export default function MessagesPage() {
           enableServerMedia={
             !!(selectedChannel || selectedDirectMessageFriend)
           }
+          adminMediaPicker={Boolean(
+            isAdminView &&
+              adminViewServerId &&
+              selectedServer &&
+              String(selectedServer) === String(adminViewServerId),
+          )}
         />
       )}
 

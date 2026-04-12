@@ -1277,6 +1277,19 @@
   object-fit: cover;
 }
 
+.messageAvatarButton {
+  cursor: pointer;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+}
+
+.messageAvatarButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .avatarPlaceholder {
   width: 100%;
   height: 100%;

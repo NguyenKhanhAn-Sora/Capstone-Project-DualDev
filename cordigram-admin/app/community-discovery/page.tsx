@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./community-discovery.module.css";
 import { getApiBaseUrl } from "@/lib/api";
-import { getWebBaseUrl } from "@/lib/urls";
 
 type AdminPayload = {
   roles?: string[];
@@ -180,10 +179,7 @@ export default function CommunityDiscoveryPage() {
 
   const handleJoinConfirm = () => {
     if (!joinConfirm) return;
-    const token = localStorage.getItem("adminAccessToken") || "";
-    const adminReturnUrl = `${window.location.origin}/community-discovery`;
-    const webUrl = `${getWebBaseUrl()}/messages?server=${joinConfirm.id}&from=admin&adminToken=${encodeURIComponent(token)}&returnUrl=${encodeURIComponent(adminReturnUrl)}`;
-    window.open(webUrl, "_blank");
+    router.push(`/community-discovery/server-view/${joinConfirm.id}`);
     setJoinConfirm(null);
   };
 
@@ -839,9 +835,10 @@ export default function CommunityDiscoveryPage() {
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Xem máy chủ</h2>
             <p className={styles.modalDesc}>
-              Bạn sẽ mở máy chủ &ldquo;{joinConfirm.name}&rdquo; ở chế độ
-              <strong> chỉ đọc</strong> để kiểm tra nội dung. Không ảnh hưởng
-              gì đến máy chủ.
+              Bạn sẽ vào màn hình xem nội bộ &ldquo;{joinConfirm.name}&rdquo; (cùng
+              cổng admin, đã đăng nhập) ở chế độ <strong>chỉ đọc</strong>: danh
+              sách kênh và tin nhắn, không chat hay reaction. Không mở tab ứng
+              dụng web người dùng.
             </p>
             <div className={styles.modalActions}>
               <button

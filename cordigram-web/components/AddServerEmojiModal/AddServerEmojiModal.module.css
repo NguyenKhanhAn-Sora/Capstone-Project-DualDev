@@ -1,0 +1,389 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal {
+  width: min(960px, 100%);
+  max-height: min(92vh, 720px);
+  background: #313338;
+  border-radius: 8px;
+  border: 1px solid #1e1f22;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #1e1f22;
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #f2f3f5;
+  text-align: center;
+}
+
+.iconBtn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #b5bac1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.iconBtn:hover {
+  background: #3f4147;
+  color: #fff;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  min-height: 0;
+  flex: 1;
+}
+
+@media (max-width: 800px) {
+  .body {
+    grid-template-columns: 1fr;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid #1e1f22;
+}
+
+.cropWrap {
+  position: relative;
+  flex: 1;
+  min-height: 320px;
+  background: repeating-conic-gradient(#2b2d31 0% 25%, #232428 0% 50%) 50% /
+    16px 16px;
+}
+
+.gifPreview {
+  flex: 1;
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: repeating-conic-gradient(#2b2d31 0% 25%, #232428 0% 50%) 50% /
+    16px 16px;
+  padding: 24px;
+}
+
+.gifPreview img {
+  max-width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+}
+
+.hint {
+  text-align: center;
+  font-size: 12px;
+  color: #949ba4;
+  margin: 0;
+  padding: 8px 12px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #2b2d31;
+  border-top: 1px solid #1e1f22;
+  flex-wrap: wrap;
+}
+
+.toolBtn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: #1e1f22;
+  color: #dbdee1;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolBtn:hover:not(:disabled) {
+  background: #3f4147;
+}
+
+.toolBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.zoomWrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 140px;
+}
+
+.zoomLabel {
+  font-size: 12px;
+  color: #949ba4;
+}
+
+.zoomSlider {
+  flex: 1;
+  accent-color: #5865f2;
+}
+
+.side {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  background: #2b2d31;
+}
+
+.sideTitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #949ba4;
+}
+
+.previewRow {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.previewBox {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  background: #1e1f22;
+  border: 1px solid #3f4147;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.previewBoxSm {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.previewBox img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.previewCtx {
+  font-size: 13px;
+  color: #b5bac1;
+  padding-bottom: 4px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: #dbdee1;
+  margin-bottom: 6px;
+}
+
+.required {
+  color: #ed4245;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #1e1f22;
+  border: 1px solid #3f4147;
+  border-radius: 6px;
+  padding: 0 10px;
+}
+
+.nameInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: #f2f3f5;
+  font-size: 14px;
+  padding: 10px 0;
+  outline: none;
+}
+
+.nameClear {
+  border: none;
+  background: none;
+  color: #949ba4;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+}
+
+.nameClear:hover {
+  color: #fff;
+}
+
+.selectWrap {
+  position: relative;
+}
+
+.selectBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #3f4147;
+  background: #1e1f22;
+  color: #f2f3f5;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+}
+
+.selectBtn:hover {
+  border-color: #5865f2;
+}
+
+.selectMeta {
+  margin-left: auto;
+  font-size: 12px;
+  color: #949ba4;
+}
+
+.selectChev {
+  color: #949ba4;
+  font-size: 10px;
+}
+
+.dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 220px;
+  overflow-y: auto;
+  background: #111214;
+  border: 1px solid #3f4147;
+  border-radius: 8px;
+  z-index: 2;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.dropdownItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: #f2f3f5;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+}
+
+.dropdownItem:hover {
+  background: #5865f2;
+}
+
+.dropdownItemActive {
+  background: rgba(88, 101, 242, 0.25);
+}
+
+.srvIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.srvPh {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #5865f2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.err {
+  font-size: 13px;
+  color: #ed4245;
+  margin: 0;
+}
+
+.footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: stretch;
+  padding-top: 8px;
+}
+
+.doneBtn {
+  width: 100%;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  background: #5865f2;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.doneBtn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.doneBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

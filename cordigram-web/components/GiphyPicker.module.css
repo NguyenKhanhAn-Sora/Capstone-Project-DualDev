@@ -306,22 +306,72 @@
   margin-top: 8px;
 }
 
-.emojiMartHost {
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--color-panel-deep);
-}
-
-/* Danh mục emoji mặc định dùng rail trái — ẩn thanh category dưới của emoji-picker-react */
-.emojiMartHost :global(#epr-category-nav-id) {
+/* Unicode picker: không thanh tìm kiếm, không scrollbar (cuộn vẫn hoạt động) */
+.emojiDefaultSection :global(.epr-header) {
   display: none !important;
 }
 
-.emojiMartHost em-emoji-picker,
-.emojiMartHost > div {
+.emojiDefaultSection :global(.epr-body) {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.emojiDefaultSection :global(.epr-body)::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Một vỏ duy nhất: tiêu đề + unicode picker (không lồng khung “epr-main” như panel riêng) */
+.emoji {
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--color-panel-deep);
+  border: 1px solid var(--color-panel-border, #3f4147);
+}
+
+.emojiDefaultHeading {
+  margin: 0;
+  padding: 10px 12px 6px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-panel-text-muted, #949ba4);
+  border-bottom: 1px solid var(--color-panel-border, #3f4147);
+}
+
+.emojiPickerSlot {
+  width: 100%;
+  min-height: 0;
+}
+
+/*
+  Root của emoji-picker-react vẫn là aside.epr-main (không thể gỡ class từ lib).
+  Làm trong suốt / không viền để nền + viền chỉ đến từ .emoji.
+*/
+.emoji :global(aside.cordigram-default-emoji-epr.epr-main),
+.emoji :global(aside.epr-main.EmojiPickerReact),
+.emoji :global(aside.epr-main) {
   width: 100% !important;
   max-width: 100% !important;
   border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+  margin: 0 !important;
+}
+
+.emoji :global(.epr-body),
+.emoji :global(.epr-header),
+.emoji :global(.epr-emoji-category-label) {
+  background: transparent !important;
+}
+
+.emojiPickerSlot > :global(*) {
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 .emojiPickerLoading {

@@ -428,6 +428,7 @@ export class Server extends Document {
       {
         imageUrl: { type: String, required: true, trim: true },
         name: { type: String, default: '', trim: true, maxlength: 80 },
+        animated: { type: Boolean, default: false },
         addedByUserId: { type: Types.ObjectId, ref: 'User', required: true },
         addedAt: { type: Date, default: Date.now },
       },
@@ -438,16 +439,18 @@ export class Server extends Document {
     _id?: Types.ObjectId;
     imageUrl: string;
     name: string;
+    animated?: boolean;
     addedByUserId: Types.ObjectId;
     addedAt: Date;
   }>;
 
-  /** Emoji tùy chỉnh (ảnh + tên dạng :name:), cùng kiểu lưu trữ như sticker. */
+  /** Emoji tùy chỉnh (ảnh / GIF + tên dạng :name:), cùng kiểu lưu trữ như sticker. */
   @Prop({
     type: [
       {
         imageUrl: { type: String, required: true, trim: true },
         name: { type: String, default: '', trim: true, maxlength: 80 },
+        animated: { type: Boolean, default: false },
         addedByUserId: { type: Types.ObjectId, ref: 'User', required: true },
         addedAt: { type: Date, default: Date.now },
       },
@@ -458,6 +461,7 @@ export class Server extends Document {
     _id?: Types.ObjectId;
     imageUrl: string;
     name: string;
+    animated?: boolean;
     addedByUserId: Types.ObjectId;
     addedAt: Date;
   }>;

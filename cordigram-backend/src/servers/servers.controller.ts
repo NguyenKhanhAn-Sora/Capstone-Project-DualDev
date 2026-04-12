@@ -74,6 +74,16 @@ export class ServersController {
     );
   }
 
+  @Get('emoji-upload-targets')
+  async getEmojiUploadTargets(@Request() req: any) {
+    return this.serversService.getEmojiUploadTargets(req.user.userId);
+  }
+
+  @Get('sticker-upload-targets')
+  async getStickerUploadTargets(@Request() req: any) {
+    return this.serversService.getStickerUploadTargets(req.user.userId);
+  }
+
   /**
    * Lấy danh sách thành viên (chỉ owner - API cũ)
    */
@@ -104,6 +114,18 @@ export class ServersController {
     return this.serversService.addServerSticker(serverId, req.user.userId, body);
   }
 
+  /** Danh sách sticker tùy chỉnh (cài đặt máy chủ) — chỉ người có quyền quản lý. */
+  @Get(':id/stickers/manage')
+  async getServerStickersManage(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getServerStickersManage(
+      serverId,
+      req.user.userId,
+    );
+  }
+
   @Post(':id/emojis')
   async addServerEmoji(
     @Param('id') serverId: string,
@@ -111,6 +133,18 @@ export class ServersController {
     @Request() req: any,
   ) {
     return this.serversService.addServerEmoji(serverId, req.user.userId, body);
+  }
+
+  /** Danh sách emoji tùy chỉnh (màn cài đặt máy chủ) — chỉ người có quyền quản lý. */
+  @Get(':id/emojis/manage')
+  async getServerEmojisManage(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getServerEmojisManage(
+      serverId,
+      req.user.userId,
+    );
   }
 
   /**

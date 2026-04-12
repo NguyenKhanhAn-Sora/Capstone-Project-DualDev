@@ -13,6 +13,7 @@
     "@livekit/components-react": "^2.9.19",
     "classnames": "^2.5.1",
     "date-fns": "^4.1.0",
+    "discord-card-react": "^2.2.2",
     "emoji-picker-react": "^4.16.1",
     "howler": "^2.2.4",
     "livekit-client": "^2.17.0",
@@ -24,11 +25,11 @@
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@playwright/test": "^1.54.2",
     "eslint": "^9",
     "eslint-config-next": "16.0.6",
     "tailwindcss": "^4",

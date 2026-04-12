@@ -4,6 +4,7 @@ import { User, UserSchema } from './user.schema';
 import { Follow, FollowSchema } from './follow.schema';
 import { Block, BlockSchema } from './block.schema';
 import { Ignored, IgnoredSchema } from './ignored.schema';
+import { MentionMute, MentionMuteSchema } from './mention-mute.schema';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import {
   UserTasteProfile,
@@ -13,6 +14,7 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { BlocksService } from './blocks.service';
 import { IgnoredService } from './ignored.service';
+import { MentionMuteService } from './mention-mute.service';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OtpModule } from '../otp/otp.module';
@@ -40,6 +42,7 @@ import { StrikeDecaySchedulerService } from './strike-decay-scheduler.service';
       { name: Follow.name, schema: FollowSchema },
       { name: Block.name, schema: BlockSchema },
       { name: Ignored.name, schema: IgnoredSchema },
+      { name: MentionMute.name, schema: MentionMuteSchema },
       { name: Profile.name, schema: ProfileSchema },
       { name: UserTasteProfile.name, schema: UserTasteProfileSchema },
       { name: Session.name, schema: SessionSchema },
@@ -61,8 +64,9 @@ import { StrikeDecaySchedulerService } from './strike-decay-scheduler.service';
     UsersService,
     BlocksService,
     IgnoredService,
+    MentionMuteService,
     StrikeDecaySchedulerService,
   ],
-  exports: [UsersService, BlocksService, IgnoredService],
+  exports: [UsersService, BlocksService, IgnoredService, MentionMuteService],
 })
 export class UsersModule {}

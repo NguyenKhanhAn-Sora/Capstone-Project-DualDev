@@ -23,6 +23,7 @@ import { RolesModule } from '../roles/roles.module';
 import { MessagesModule } from '../messages/messages.module';
 import { ServerAccessModule } from '../access/access.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AuditLogModule } from '../audit-log/audit-log.module';
     forwardRef(() => ServerAccessModule),
     AuditLogModule,
     MessagesModule,
+    CloudinaryModule,
   ],
   providers: [ServersService],
   controllers: [ServersController],
