@@ -6,6 +6,7 @@ import { LivestreamController } from './livestream.controller';
 import { LivekitModule } from '../livekit/livekit.module';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { IvsService } from './ivs.service';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       },
     ]),
   ],
-  providers: [LivestreamService],
+  providers: [LivestreamService, IvsService],
   controllers: [LivestreamController],
 })
 export class LivestreamModule {}

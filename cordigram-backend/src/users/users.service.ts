@@ -31,7 +31,12 @@ import { ReportComment } from '../reportcomment/reportcomment.schema';
 import { ReportUser } from '../reportuser/reportuser.schema';
 import { type SupportedLanguage } from './language.constants';
 
-type NotificationCategoryKey = 'follow' | 'comment' | 'like' | 'mentions';
+type NotificationCategoryKey =
+  | 'follow'
+  | 'comment'
+  | 'like'
+  | 'mentions'
+  | 'system';
 
 type NotificationCategorySettings = {
   enabled: boolean;
@@ -51,6 +56,7 @@ const NOTIFICATION_CATEGORY_KEYS: NotificationCategoryKey[] = [
   'comment',
   'like',
   'mentions',
+  'system',
 ];
 
 const STRIKE_THRESHOLD_REACH_RESTRICT = 10;

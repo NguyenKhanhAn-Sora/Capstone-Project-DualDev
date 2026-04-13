@@ -20,4 +20,9 @@ export class UpdateLivestreamDto {
   @IsString()
   @IsIn(['adaptive', 'balanced', 'low'])
   latencyMode?: 'adaptive' | 'balanced' | 'low';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  location?: string;
 }

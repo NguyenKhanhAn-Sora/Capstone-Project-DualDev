@@ -14,6 +14,7 @@ enum SettingsTab {
   profile,
   creatorVerification,
   passwordSecurity,
+  notifications,
 }
 
 enum _EmailChangeStep { password, currentOtp, newEmail, newOtp, done }
@@ -185,6 +186,57 @@ class _CreatorStatusResponse {
       );
 }
 
+class _NotificationCategorySettingsState {
+  const _NotificationCategorySettingsState({
+    required this.enabled,
+    required this.mutedUntil,
+    required this.mutedIndefinitely,
+  });
+
+  final bool enabled;
+  final String? mutedUntil;
+  final bool mutedIndefinitely;
+
+  factory _NotificationCategorySettingsState.fromJson(Map<String, dynamic> j) {
+    return _NotificationCategorySettingsState(
+      enabled: j['enabled'] as bool? ?? true,
+      mutedUntil: j['mutedUntil'] as String?,
+      mutedIndefinitely: j['mutedIndefinitely'] as bool? ?? false,
+    );
+  }
+}
+
+class _NotificationSettingsState {
+  const _NotificationSettingsState({
+    required this.enabled,
+    required this.mutedUntil,
+    required this.mutedIndefinitely,
+    required this.categories,
+  });
+
+  final bool enabled;
+  final String? mutedUntil;
+  final bool mutedIndefinitely;
+  final Map<String, _NotificationCategorySettingsState> categories;
+
+  factory _NotificationSettingsState.fromJson(Map<String, dynamic> j) {
+    final rawCategories = j['categories'] as Map<String, dynamic>? ?? {};
+    final categories = <String, _NotificationCategorySettingsState>{};
+    rawCategories.forEach((key, value) {
+      if (value is Map<String, dynamic>) {
+        categories[key] = _NotificationCategorySettingsState.fromJson(value);
+      }
+    });
+
+    return _NotificationSettingsState(
+      enabled: j['enabled'] as bool? ?? true,
+      mutedUntil: j['mutedUntil'] as String?,
+      mutedIndefinitely: j['mutedIndefinitely'] as bool? ?? false,
+      categories: categories,
+    );
+  }
+}
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.initialTab = SettingsTab.personalInfo});
 
@@ -214,6 +266,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'private',
   ];
 
+  static const List<Map<String, String>> _notificationCategories = [
+    {
+      'key': 'follow',
+      'label': 'Follows',
+      'description': 'When someone follows you.',
+    },
+    {
+      'key': 'comment',
+      'label': 'Comments',
+      'description': 'When someone comments on your posts or reels.',
+    },
+    {
+      'key': 'like',
+      'label': 'Likes',
+      'description': 'When someone likes your posts, reels, or comments.',
+    },
+    {
+      'key': 'mentions',
+      'label': 'Mentions & tags',
+      'description': 'When someone mentions or tags you.',
+    },
+    {
+      'key': 'system',
+      'label': 'System notifications',
+      'description': 'Important announcements and system updates.',
+    },
+  ];
+
+  static const List<Map<String, dynamic>> _notificationMuteOptions = [
+    {'key': '5m', 'label': '5 minutes', 'ms': 5 * 60 * 1000},
+    {'key': '10m', 'label': '10 minutes', 'ms': 10 * 60 * 1000},
+    {'key': '15m', 'label': '15 minutes', 'ms': 15 * 60 * 1000},
+    {'key': '30m', 'label': '30 minutes', 'ms': 30 * 60 * 1000},
+    {'key': '1h', 'label': '1 hour', 'ms': 60 * 60 * 1000},
+    {'key': '1d', 'label': '1 day', 'ms': 24 * 60 * 60 * 1000},
+    {'key': 'until', 'label': 'Until I turn it back on', 'ms': null},
+    {'key': 'custom', 'label': 'Choose date & time', 'ms': null},
+  ];
+
   Timer? _cooldownTicker;
   SettingsTab? _selectedTab;
 
@@ -241,6 +332,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _creatorError;
   String? _creatorSuccess;
   String _creatorNote = '';
+
+  _NotificationSettingsState? _notificationSettings;
+  bool _notificationLoading = false;
+  bool _notificationSaving = false;
+  String? _notificationError;
 
   bool _showChangePassword = false;
   _PasswordChangeStep _passwordStep = _PasswordChangeStep.otp;
@@ -719,6 +815,470 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _creatorSubmitting = false;
       });
     }
+  }
+
+  Future<void> _loadNotificationSettings() async {
+    setState(() {
+      _notificationLoading = true;
+      _notificationError = null;
+    });
+    try {
+      final res = await ProfileService.fetchNotificationSettings();
+      if (!mounted) return;
+      setState(() {
+        _notificationSettings = _NotificationSettingsState.fromJson(res);
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _notificationError = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _notificationError = 'Unable to load notification settings.';
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _notificationLoading = false;
+      });
+    }
+  }
+
+  String _notificationStatusLabel({
+    required bool enabled,
+    required String? mutedUntil,
+    required bool mutedIndefinitely,
+  }) {
+    if (enabled) return 'Enabled';
+    if (mutedIndefinitely) return 'Muted until you turn it back on';
+    if (mutedUntil != null && mutedUntil.isNotEmpty) {
+      final dt = DateTime.tryParse(mutedUntil)?.toUtc();
+      if (dt != null) {
+        final now = DateTime.now().toUtc();
+        if (dt.isAfter(now)) {
+          final diff = dt.difference(now);
+          if (diff.inMinutes < 1) return 'Muted for less than a minute';
+          if (diff.inHours < 1) return 'Muted for ${diff.inMinutes} minutes';
+          if (diff.inDays < 1) return 'Muted for ${diff.inHours} hours';
+          return 'Muted for ${diff.inDays} days';
+        }
+      }
+    }
+    return 'Muted';
+  }
+
+  String? _buildLocalDateTimeIso(String date, String time) {
+    if (date.isEmpty || time.isEmpty) return null;
+    final dt = DateTime.tryParse('${date}T$time:00');
+    if (dt == null) return null;
+    return dt.toUtc().toIso8601String();
+  }
+
+  Future<String?> _pickNotificationDate(String current) async {
+    final now = DateTime.now();
+    final seed = DateTime.tryParse(current) ?? now;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: seed,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 2, 12, 31),
+    );
+    if (picked == null) return null;
+    final y = picked.year.toString().padLeft(4, '0');
+    final m = picked.month.toString().padLeft(2, '0');
+    final d = picked.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  Future<String?> _pickNotificationTime(String current) async {
+    final now = DateTime.now();
+    final pieces = current.split(':');
+    final initial = TimeOfDay(
+      hour: pieces.isNotEmpty ? int.tryParse(pieces[0]) ?? now.hour : now.hour,
+      minute: pieces.length > 1
+          ? int.tryParse(pieces[1]) ?? now.minute
+          : now.minute,
+    );
+
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+      builder: (ctx, child) {
+        return Theme(
+          data: Theme.of(ctx).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: _accent,
+              surface: Color(0xFF0F172A),
+            ),
+            dialogTheme: const DialogThemeData(
+              backgroundColor: Color(0xFF0F172A),
+            ),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+    );
+
+    if (picked == null) return null;
+    final h = picked.hour.toString().padLeft(2, '0');
+    final m = picked.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  Future<void> _updateNotificationSettings({
+    String? category,
+    bool? enabled,
+    String? mutedUntil,
+    bool? mutedIndefinitely,
+  }) async {
+    final res = await ProfileService.updateNotificationSettings(
+      category: category,
+      enabled: enabled,
+      mutedUntil: mutedUntil,
+      mutedIndefinitely: mutedIndefinitely,
+    );
+    if (!mounted) return;
+    setState(() {
+      _notificationSettings = _NotificationSettingsState.fromJson(res);
+    });
+  }
+
+  Future<void> _openNotificationMuteOverlay({
+    required String title,
+    required String subtitle,
+    required String? mutedUntil,
+    required bool mutedIndefinitely,
+    required Future<void> Function(String? until, bool indefinitely) onSave,
+  }) async {
+    String selected = '5m';
+    String customDate = '';
+    String customTime = '';
+    String? error;
+    bool saving = false;
+
+    if (mutedIndefinitely) {
+      selected = 'until';
+    } else if (mutedUntil != null && mutedUntil.isNotEmpty) {
+      final dt = DateTime.tryParse(mutedUntil)?.toLocal();
+      if (dt != null) {
+        selected = 'custom';
+        final y = dt.year.toString().padLeft(4, '0');
+        final m = dt.month.toString().padLeft(2, '0');
+        final d = dt.day.toString().padLeft(2, '0');
+        final hh = dt.hour.toString().padLeft(2, '0');
+        final mm = dt.minute.toString().padLeft(2, '0');
+        customDate = '$y-$m-$d';
+        customTime = '$hh:$mm';
+      }
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final quickOptions = _notificationMuteOptions
+                .where((opt) {
+                  final key = opt['key'] as String;
+                  return key != 'until' && key != 'custom';
+                })
+                .toList(growable: false);
+            final endingOptions = _notificationMuteOptions
+                .where((opt) {
+                  final key = opt['key'] as String;
+                  return key == 'until' || key == 'custom';
+                })
+                .toList(growable: false);
+
+            Widget buildOptionTile(Map<String, dynamic> opt, {double? width}) {
+              final key = opt['key'] as String;
+              final active = selected == key;
+              return GestureDetector(
+                onTap: saving
+                    ? null
+                    : () => setModalState(() {
+                        selected = key;
+                        error = null;
+                      }),
+                child: Container(
+                  width: width,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: active
+                          ? const Color(0xFF5E86C2)
+                          : const Color(0xFF233B63),
+                    ),
+                    color: active
+                        ? const Color(0xFF1B3558)
+                        : Colors.transparent,
+                  ),
+                  child: Text(
+                    opt['label'] as String,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: active
+                          ? const Color(0xFFE8ECF8)
+                          : const Color(0xFF9BAECF),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return Dialog(
+              backgroundColor: const Color(0xFF0E1730),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  color: Color(0xFFE8ECF8),
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                subtitle,
+                                style: const TextStyle(
+                                  color: Color(0xFF9BAECF),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: saving
+                              ? null
+                              : () => Navigator.of(dialogCtx).pop(),
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Color(0xFFD0D8EE),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    LayoutBuilder(
+                      builder: (_, constraints) {
+                        final itemWidth = (constraints.maxWidth - 8) / 2;
+                        return Column(
+                          children: [
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: quickOptions
+                                  .map(
+                                    (opt) =>
+                                        buildOptionTile(opt, width: itemWidth),
+                                  )
+                                  .toList(growable: false),
+                            ),
+                            if (endingOptions.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Column(
+                                children: [
+                                  for (
+                                    var i = 0;
+                                    i < endingOptions.length;
+                                    i++
+                                  ) ...[
+                                    if (i > 0) const SizedBox(height: 8),
+                                    buildOptionTile(
+                                      endingOptions[i],
+                                      width: constraints.maxWidth,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ],
+                        );
+                      },
+                    ),
+                    if (selected == 'custom') ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: saving
+                                  ? null
+                                  : () async {
+                                      final next = await _pickNotificationDate(
+                                        customDate,
+                                      );
+                                      if (next == null) return;
+                                      setModalState(() {
+                                        customDate = next;
+                                        error = null;
+                                      });
+                                    },
+                              icon: const Icon(
+                                Icons.calendar_today_outlined,
+                                size: 16,
+                              ),
+                              label: Text(
+                                customDate.isEmpty ? 'Select date' : customDate,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: saving
+                                  ? null
+                                  : () async {
+                                      final next = await _pickNotificationTime(
+                                        customTime,
+                                      );
+                                      if (next == null) return;
+                                      setModalState(() {
+                                        customTime = next;
+                                        error = null;
+                                      });
+                                    },
+                              icon: const Icon(
+                                Icons.schedule_rounded,
+                                size: 16,
+                              ),
+                              label: Text(
+                                customTime.isEmpty ? 'Select time' : customTime,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (error != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        error!,
+                        style: const TextStyle(
+                          color: Color(0xFFF87171),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: saving
+                              ? null
+                              : () => Navigator.of(dialogCtx).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: saving
+                              ? null
+                              : () async {
+                                  setModalState(() {
+                                    saving = true;
+                                    error = null;
+                                  });
+
+                                  try {
+                                    String? nextMutedUntil;
+                                    bool nextMutedIndefinitely = false;
+                                    final selectedOpt = _notificationMuteOptions
+                                        .firstWhere(
+                                          (o) => o['key'] == selected,
+                                        );
+
+                                    if (selected == 'until') {
+                                      nextMutedIndefinitely = true;
+                                    } else if (selected == 'custom') {
+                                      final iso = _buildLocalDateTimeIso(
+                                        customDate,
+                                        customTime,
+                                      );
+                                      if (iso == null) {
+                                        setModalState(() {
+                                          saving = false;
+                                          error =
+                                              'Please select a valid date and time.';
+                                        });
+                                        return;
+                                      }
+                                      final dt = DateTime.parse(iso);
+                                      if (!dt.isAfter(DateTime.now().toUtc())) {
+                                        setModalState(() {
+                                          saving = false;
+                                          error =
+                                              'Please choose a future time.';
+                                        });
+                                        return;
+                                      }
+                                      nextMutedUntil = iso;
+                                    } else {
+                                      final ms = selectedOpt['ms'] as int?;
+                                      if (ms != null) {
+                                        nextMutedUntil = DateTime.now()
+                                            .toUtc()
+                                            .add(Duration(milliseconds: ms))
+                                            .toIso8601String();
+                                      } else {
+                                        nextMutedIndefinitely = true;
+                                      }
+                                    }
+
+                                    await onSave(
+                                      nextMutedUntil,
+                                      nextMutedIndefinitely,
+                                    );
+
+                                    if (ctx.mounted) {
+                                      Navigator.of(dialogCtx).pop();
+                                    }
+                                  } catch (e) {
+                                    setModalState(() {
+                                      saving = false;
+                                      error = e is ApiException
+                                          ? e.message
+                                          : 'Failed to update notifications';
+                                    });
+                                  }
+                                },
+                          child: Text(saving ? 'Saving...' : 'Save'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _loadPasswordSecurityStatus() async {
@@ -1481,6 +2041,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'Creator verification';
       case SettingsTab.passwordSecurity:
         return 'Password & Security';
+      case SettingsTab.notifications:
+        return 'Notifications';
     }
   }
 
@@ -1494,6 +2056,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return Icons.verified_outlined;
       case SettingsTab.passwordSecurity:
         return Icons.lock_outline_rounded;
+      case SettingsTab.notifications:
+        return Icons.notifications_none_rounded;
     }
   }
 
@@ -1507,6 +2071,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'Check eligibility and request creator badge verification.';
       case SettingsTab.passwordSecurity:
         return 'Manage password, two-factor, passkey, and login devices.';
+      case SettingsTab.notifications:
+        return 'Control when notification alerts are delivered.';
     }
   }
 
@@ -1532,6 +2098,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         !_twoFactorLoading &&
         !_passkeyStatusLoading) {
       _loadPasswordSecurityStatus();
+    }
+    if (tab == SettingsTab.notifications &&
+        _notificationSettings == null &&
+        !_notificationLoading) {
+      _loadNotificationSettings();
     }
   }
 
@@ -1816,6 +2387,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (tab == SettingsTab.personalInfo) return _buildPersonalInfoTab();
     if (tab == SettingsTab.profile) return _buildProfileTab();
     if (tab == SettingsTab.passwordSecurity) return _buildPasswordSecurityTab();
+    if (tab == SettingsTab.notifications) return _buildNotificationsTab();
     return _buildCreatorVerificationTab();
   }
 
@@ -3785,6 +4357,275 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildNotificationsTab() {
+    final settings = _notificationSettings;
+
+    Widget buildRow({
+      required String title,
+      required String status,
+      required String hint,
+      required bool enabled,
+      required VoidCallback? onMute,
+      required VoidCallback? onEnable,
+    }) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: _textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              status,
+              style: const TextStyle(color: _textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              hint,
+              style: const TextStyle(color: _textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton(
+                    onPressed: (_notificationLoading || _notificationSaving)
+                        ? null
+                        : onMute,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _textPrimary,
+                      side: BorderSide(color: _border),
+                    ),
+                    child: Text(enabled ? 'Mute' : 'Edit'),
+                  ),
+                  if (!enabled)
+                    ElevatedButton(
+                      onPressed: (_notificationLoading || _notificationSaving)
+                          ? null
+                          : onEnable,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _accent,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Enable'),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Notifications',
+          style: TextStyle(
+            color: _textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Control when you receive notification alerts.',
+          style: TextStyle(color: _textSecondary, fontSize: 13),
+        ),
+        const SizedBox(height: 14),
+
+        _buildCard(
+          children: [
+            buildRow(
+              title: 'Push notifications',
+              status: _notificationLoading
+                  ? 'Loading...'
+                  : _notificationStatusLabel(
+                      enabled: settings?.enabled ?? true,
+                      mutedUntil: settings?.mutedUntil,
+                      mutedIndefinitely: settings?.mutedIndefinitely ?? false,
+                    ),
+              hint:
+                  'When muted, new notifications are still saved but won\'t alert you in real time.',
+              enabled: settings?.enabled ?? true,
+              onMute: settings == null
+                  ? null
+                  : () => _openNotificationMuteOverlay(
+                      title: 'Mute notifications',
+                      subtitle:
+                          'Choose how long to pause alerts for your account.',
+                      mutedUntil: settings.mutedUntil,
+                      mutedIndefinitely: settings.mutedIndefinitely,
+                      onSave: (until, indefinitely) async {
+                        setState(() {
+                          _notificationSaving = true;
+                          _notificationError = null;
+                        });
+                        try {
+                          await _updateNotificationSettings(
+                            mutedUntil: until,
+                            mutedIndefinitely: indefinitely,
+                          );
+                        } finally {
+                          if (mounted) {
+                            setState(() {
+                              _notificationSaving = false;
+                            });
+                          }
+                        }
+                      },
+                    ),
+              onEnable: settings == null
+                  ? null
+                  : () async {
+                      setState(() {
+                        _notificationSaving = true;
+                        _notificationError = null;
+                      });
+                      try {
+                        await _updateNotificationSettings(enabled: true);
+                      } on ApiException catch (e) {
+                        if (!mounted) return;
+                        setState(() {
+                          _notificationError = e.message;
+                        });
+                      } catch (_) {
+                        if (!mounted) return;
+                        setState(() {
+                          _notificationError =
+                              'Unable to update notifications.';
+                        });
+                      } finally {
+                        if (mounted) {
+                          setState(() {
+                            _notificationSaving = false;
+                          });
+                        }
+                      }
+                    },
+            ),
+            if (_notificationError != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                child: Text(
+                  _notificationError!,
+                  style: const TextStyle(color: _danger, fontSize: 12),
+                ),
+              ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildCard(
+          children: [
+            for (var i = 0; i < _notificationCategories.length; i++)
+              Builder(
+                builder: (_) {
+                  final category = _notificationCategories[i];
+                  final key = category['key']!;
+                  final label = category['label']!;
+                  final description = category['description']!;
+                  final categorySettings = settings?.categories[key];
+                  final enabled = categorySettings?.enabled ?? true;
+
+                  return buildRow(
+                    title: label,
+                    status: _notificationLoading
+                        ? 'Loading...'
+                        : _notificationStatusLabel(
+                            enabled: categorySettings?.enabled ?? true,
+                            mutedUntil: categorySettings?.mutedUntil,
+                            mutedIndefinitely:
+                                categorySettings?.mutedIndefinitely ?? false,
+                          ),
+                    hint: description,
+                    enabled: enabled,
+                    onMute: categorySettings == null
+                        ? null
+                        : () => _openNotificationMuteOverlay(
+                            title: 'Mute notifications',
+                            subtitle:
+                                'Choose how long to pause alerts for $label.',
+                            mutedUntil: categorySettings.mutedUntil,
+                            mutedIndefinitely:
+                                categorySettings.mutedIndefinitely,
+                            onSave: (until, indefinitely) async {
+                              setState(() {
+                                _notificationSaving = true;
+                                _notificationError = null;
+                              });
+                              try {
+                                await _updateNotificationSettings(
+                                  category: key,
+                                  mutedUntil: until,
+                                  mutedIndefinitely: indefinitely,
+                                );
+                              } finally {
+                                if (mounted) {
+                                  setState(() {
+                                    _notificationSaving = false;
+                                  });
+                                }
+                              }
+                            },
+                          ),
+                    onEnable: categorySettings == null
+                        ? null
+                        : () async {
+                            setState(() {
+                              _notificationSaving = true;
+                              _notificationError = null;
+                            });
+                            try {
+                              await _updateNotificationSettings(
+                                category: key,
+                                enabled: true,
+                              );
+                            } on ApiException catch (e) {
+                              if (!mounted) return;
+                              setState(() {
+                                _notificationError = e.message;
+                              });
+                            } catch (_) {
+                              if (!mounted) return;
+                              setState(() {
+                                _notificationError =
+                                    'Unable to update notifications.';
+                              });
+                            } finally {
+                              if (mounted) {
+                                setState(() {
+                                  _notificationSaving = false;
+                                });
+                              }
+                            }
+                          },
+                  );
+                },
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildContent() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator(color: _accent));
@@ -3828,6 +4669,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (_showLoginDevices) {
             await _loadLoginDevices();
           }
+          return;
+        }
+        if (_selectedTab == SettingsTab.notifications) {
+          await _loadNotificationSettings();
           return;
         }
         await _loadProfile();

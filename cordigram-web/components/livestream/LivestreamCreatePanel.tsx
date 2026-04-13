@@ -48,6 +48,50 @@ const latencyOptions: Array<{
 const MIC_LEVEL_MULTIPLIER = 1.5;
 const MIC_MONITOR_DELAY_SECONDS = 0.2;
 
+function getHighQualityScreenCaptureConstraints(mode: LivestreamLatencyMode) {
+  if (mode === "low") {
+    return {
+      width: { ideal: 1280, max: 1920 },
+      height: { ideal: 720, max: 1080 },
+      frameRate: { ideal: 24, max: 30 },
+      cursor: "always",
+    } as MediaTrackConstraints;
+  }
+
+  if (mode === "balanced") {
+    return {
+      width: { ideal: 1920, max: 2560 },
+      height: { ideal: 1080, max: 1440 },
+      frameRate: { ideal: 30, max: 30 },
+      cursor: "always",
+    } as MediaTrackConstraints;
+  }
+
+  return {
+    width: { ideal: 2560, max: 3840 },
+    height: { ideal: 1440, max: 2160 },
+    frameRate: { ideal: 30, max: 60 },
+    cursor: "always",
+  } as MediaTrackConstraints;
+}
+
+async function optimizeScreenVideoTrack(
+  track: MediaStreamTrack,
+  mode: LivestreamLatencyMode,
+) {
+  try {
+    (track as MediaStreamTrack & { contentHint?: string }).contentHint = "detail";
+  } catch {
+    // Ignore unsupported contentHint assignment.
+  }
+
+  try {
+    await track.applyConstraints(getHighQualityScreenCaptureConstraints(mode));
+  } catch {
+    // Some browsers reject strict constraints after picker selection; keep original track.
+  }
+}
+
 export default function LivestreamCreatePanel() {
   const router = useRouter();
   type PermissionState = "unknown" | "granted" | "denied" | "unsupported";
@@ -412,12 +456,17 @@ export default function LivestreamCreatePanel() {
       setLastPreviewAttempt("screen");
       setPermissionError("");
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
+        video: getHighQualityScreenCaptureConstraints(latencyMode),
         audio: true,
-      });
+      } as DisplayMediaStreamOptions);
+
+      const [videoTrack] = stream.getVideoTracks();
+      if (videoTrack) {
+        await optimizeScreenVideoTrack(videoTrack, latencyMode);
+      }
+
       setScreenPermission("granted");
       attachPreviewStream(stream, "screen");
-      const [videoTrack] = stream.getVideoTracks();
       if (videoTrack) {
         videoTrack.onended = () => {
           stopPreview();
@@ -613,6 +662,16 @@ export default function LivestreamCreatePanel() {
       return;
     }
 
+    const hasScreenPreview =
+      previewMode === "screen" &&
+      Boolean(previewStreamRef.current?.getVideoTracks()?.[0]) &&
+      previewStreamRef.current?.getVideoTracks()?.[0]?.readyState !== "ended";
+
+    if (!hasScreenPreview) {
+      setError("Please choose a screen share source before creating livestream.");
+      return;
+    }
+
     try {
       setLoading(true);
       const data = await createLivestream({
@@ -624,11 +683,9 @@ export default function LivestreamCreatePanel() {
         location: location.trim(),
         mentions: extractMentionsFromTitle(trimmedTitle),
       });
-      if (previewMode === "screen" && previewStreamRef.current) {
-        keepScreenPreviewOnUnmountRef.current = true;
-        setPendingScreenShareStream(previewStreamRef.current);
-      }
-      router.push(`/livestream/${encodeURIComponent(data.stream.id)}`);
+      keepScreenPreviewOnUnmountRef.current = true;
+      setPendingScreenShareStream(previewStreamRef.current);
+      router.push(`/livestream/${encodeURIComponent(data.stream.id)}?host=1`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create livestream.");
     } finally {
@@ -947,7 +1004,16 @@ export default function LivestreamCreatePanel() {
 
         {error ? <p className={panelStyles.error}>{error}</p> : null}
 
-        <button type="submit" className={panelStyles.button} disabled={loading}>
+        <button
+          type="submit"
+          className={panelStyles.button}
+          disabled={
+            loading ||
+            previewMode !== "screen" ||
+            !previewStreamRef.current?.getVideoTracks()?.[0] ||
+            previewStreamRef.current?.getVideoTracks()?.[0]?.readyState === "ended"
+          }
+        >
           {loading ? "Creating..." : "Create livestream"}
         </button>
       </form>

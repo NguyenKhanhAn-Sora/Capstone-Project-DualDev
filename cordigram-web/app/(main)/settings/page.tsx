@@ -1133,6 +1133,11 @@ export default function SettingsPage() {
         label: "Mentions & tags",
         description: "When someone mentions or tags you.",
       },
+      {
+        key: "system" as const,
+        label: "System notifications",
+        description: "Important announcements and system updates.",
+      },
     ],
     [],
   );
@@ -4555,7 +4560,11 @@ export default function SettingsPage() {
                 <p className={styles.kicker}>Notifications</p>
                 <h2 className={styles.overlayTitle}>
                   Mute{" "}
-                  {categoryKey === "mentions" ? "mentions & tags" : categoryKey}
+                  {categoryKey === "mentions"
+                    ? "mentions & tags"
+                    : categoryKey === "system"
+                      ? "system notifications"
+                      : categoryKey}
                 </h2>
               </div>
               <div className={styles.overlayActions}>

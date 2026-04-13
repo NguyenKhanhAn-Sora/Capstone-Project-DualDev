@@ -144,7 +144,12 @@ type NotificationDoc = {
   updatedAt?: Date;
 };
 
-type NotificationCategoryKey = 'follow' | 'comment' | 'like' | 'mentions';
+type NotificationCategoryKey =
+  | 'follow'
+  | 'comment'
+  | 'like'
+  | 'mentions'
+  | 'system';
 
 @Injectable()
 export class NotificationsService {
@@ -855,7 +860,10 @@ export class NotificationsService {
       recipientId: params.recipientId,
     });
     const { unreadCount } = await this.getUnreadCount(params.recipientId);
-    if (await this.canEmitNotification(params.recipientId)) {
+    if (
+      (await this.canEmitNotification(params.recipientId)) &&
+      (await this.canEmitCategoryNotification(params.recipientId, 'system'))
+    ) {
       this.gateway.emitToUser(params.recipientId, 'notification:new', {
         notification: response,
         unreadCount,
@@ -1165,16 +1173,25 @@ export class NotificationsService {
       .lean();
 
     let realtimeDeliveredCount = 0;
-    inserted.forEach((doc) => {
+    for (const doc of inserted) {
       const recipientId = doc.recipientId?.toString?.() ?? null;
-      if (!recipientId) return;
+      if (!recipientId) continue;
+
+      const [canEmitGlobal, canEmitSystem] = await Promise.all([
+        this.canEmitNotification(recipientId),
+        this.canEmitCategoryNotification(recipientId, 'system'),
+      ]);
+      if (!canEmitGlobal || !canEmitSystem) {
+        continue;
+      }
+
       const response = this.toResponse(doc, profile ?? null, { recipientId });
       this.gateway.emitToUser(recipientId, 'notification:new', {
         notification: response,
         unreadCount: 0,
       } satisfies NotificationRealtimePayload);
       realtimeDeliveredCount += 1;
-    });
+    }
 
     const broadcast = await this.broadcastNoticeModel.create({
       adminId: adminObjectId,

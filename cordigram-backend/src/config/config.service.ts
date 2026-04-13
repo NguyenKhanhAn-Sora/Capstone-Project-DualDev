@@ -196,6 +196,25 @@ export class ConfigService {
     return this.require('NEXT_PUBLIC_LIVEKIT_URL');
   }
 
+  get livestreamHqProvider(): 'livekit' | 'ivs' {
+    const value = (process.env.LIVESTREAM_HQ_PROVIDER ?? 'livekit')
+      .trim()
+      .toLowerCase();
+    return value === 'ivs' ? 'ivs' : 'livekit';
+  }
+
+  get ivsRegion(): string {
+    return process.env.AWS_IVS_REGION?.trim() || this.awsRegion;
+  }
+
+  get ivsAccessKeyId(): string {
+    return process.env.AWS_IVS_ACCESS_KEY_ID?.trim() ?? '';
+  }
+
+  get ivsSecretAccessKey(): string {
+    return process.env.AWS_IVS_SECRET_ACCESS_KEY?.trim() ?? '';
+  }
+
   get adminEmail(): string | null {
     return process.env.ADMIN_EMAIL?.toLowerCase().trim() ?? null;
   }

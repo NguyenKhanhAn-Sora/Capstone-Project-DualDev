@@ -86,6 +86,13 @@
   transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.modeButtonInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1;
+}
+
 .modeButtonActive {
   background: linear-gradient(135deg, var(--color-primary), #22d3ee);
   color: #ffffff;

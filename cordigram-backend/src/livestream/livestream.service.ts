@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -13,18 +14,22 @@ import { UpdateLivestreamDto } from './dto/update-livestream.dto';
 import { Profile } from '../profiles/profile.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ConfigService } from '../config/config.service';
+import { IvsService } from './ivs.service';
 
 const MAX_CONCURRENT_LIVESTREAMS = 5;
 const MAX_VIEWERS_PER_ROOM = 30;
 
 @Injectable()
 export class LivestreamService {
+  private readonly logger = new Logger(LivestreamService.name);
+
   constructor(
     @InjectModel(Livestream.name)
     private readonly livestreamModel: Model<Livestream>,
     @InjectModel(Profile.name)
     private readonly profileModel: Model<Profile>,
     private readonly livekitService: LivekitService,
+    private readonly ivsService: IvsService,
     private readonly notificationsService: NotificationsService,
     private readonly configService: ConfigService,
   ) {}
@@ -44,6 +49,8 @@ export class LivestreamService {
     hostName: string;
     hostUserId: string;
     roomName: string;
+    provider: 'livekit' | 'ivs';
+    ivsPlaybackUrl?: string;
     status: 'live' | 'ended';
     startedAt: Date;
     endedAt: Date | null;
@@ -62,6 +69,8 @@ export class LivestreamService {
       hostName: stream.hostName,
       hostUserId: stream.hostUserId.toString(),
       roomName: stream.roomName,
+      provider: stream.provider ?? 'livekit',
+      ivsPlaybackUrl: stream.ivsPlaybackUrl || '',
       status: stream.status,
       startedAt: stream.startedAt,
       endedAt: stream.endedAt,
@@ -211,6 +220,32 @@ export class LivestreamService {
 
     const mentionUsernames = this.normalizeMentions(dto.mentions, dto.title);
 
+    let provider: 'livekit' | 'ivs' = 'livekit';
+    let ivsChannelArn = '';
+    let ivsPlaybackUrl = '';
+    let ivsIngestEndpoint = '';
+    let ivsStreamKey = '';
+
+    if (this.ivsService.enabled) {
+      try {
+        const ivs = await this.ivsService.createChannelForStream({
+          streamId: `${userId}-${Date.now().toString(36)}`,
+          latencyMode: dto.latencyMode ?? 'adaptive',
+        });
+        provider = 'ivs';
+        ivsChannelArn = ivs.channelArn;
+        ivsPlaybackUrl = ivs.playbackUrl;
+        ivsIngestEndpoint = ivs.ingestEndpoint;
+        ivsStreamKey = ivs.streamKey;
+      } catch (err) {
+        this.logger.warn(
+          `IVS provisioning failed, fallback to livekit. reason=${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
     const stream = await this.livestreamModel.create({
       hostUserId: new Types.ObjectId(userId),
       hostName,
@@ -222,6 +257,11 @@ export class LivestreamService {
       visibility: dto.visibility ?? 'public',
       latencyMode: dto.latencyMode ?? 'adaptive',
       roomName,
+      provider,
+      ivsChannelArn,
+      ivsPlaybackUrl,
+      ivsIngestEndpoint,
+      ivsStreamKey,
       maxViewers: MAX_VIEWERS_PER_ROOM,
       status: 'live',
       startedAt: new Date(),
@@ -274,10 +314,19 @@ export class LivestreamService {
       roomName: stream.roomName,
       participantName,
       participantId: identity,
-      canPublish: asHost,
+      // canPublish must be true for all participants so the LiveKit client
+      // establishes a publisher PeerConnection (required for publishData /
+      // data-channel comments). The actual media publishing is prevented on
+      // the frontend by the LiveKitRoom audio={false} video={false} props and
+      // the absence of any publishTrack() call in the viewer UI.
+      canPublish: true,
       canSubscribe: true,
       canPublishData: true,
     });
+
+    this.logger.log(
+      `joinToken issued stream=${streamId} role=${role} user=${user.userId} identity=${identity} canPublish=true canSubscribe=true canPublishData=true participants=${participants}`,
+    );
 
     return {
       token,
@@ -294,6 +343,24 @@ export class LivestreamService {
         ? await this.livekitService.getParticipantCount(stream.roomName)
         : 0;
     return { stream: this.toResponse(stream, participants) };
+  }
+
+  async getIvsIngest(streamId: string, userId: string) {
+    const stream = await this.getLiveStreamOrThrow(streamId);
+    if (stream.hostUserId.toString() !== userId) {
+      throw new ForbiddenException('Only the host can access IVS ingest credentials');
+    }
+
+    if ((stream.provider ?? 'livekit') !== 'ivs') {
+      throw new BadRequestException('This livestream is not using AWS IVS');
+    }
+
+    return {
+      provider: 'ivs',
+      ingestEndpoint: stream.ivsIngestEndpoint || '',
+      streamKey: stream.ivsStreamKey || '',
+      playbackUrl: stream.ivsPlaybackUrl || '',
+    };
   }
 
   async updateLiveSettings(
@@ -316,6 +383,7 @@ export class LivestreamService {
         throw new BadRequestException('Livestream title supports up to 300 words');
       }
       stream.title = title;
+      stream.mentionUsernames = this.normalizeMentions(undefined, title);
     }
 
     if (typeof dto.description === 'string') {
@@ -324,6 +392,10 @@ export class LivestreamService {
 
     if (typeof dto.pinnedComment === 'string') {
       stream.pinnedComment = dto.pinnedComment.trim();
+    }
+
+    if (typeof dto.location === 'string') {
+      stream.location = dto.location.trim();
     }
 
     if (typeof dto.latencyMode === 'string') {
@@ -345,6 +417,10 @@ export class LivestreamService {
     stream.status = 'ended';
     stream.endedAt = new Date();
     await stream.save();
+
+    if ((stream.provider ?? 'livekit') === 'ivs') {
+      await this.ivsService.deleteChannelSafe(stream.ivsChannelArn);
+    }
 
     await this.livekitService.deleteRoomSafe(stream.roomName);
 

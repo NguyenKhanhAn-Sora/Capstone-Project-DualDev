@@ -5,6 +5,7 @@ const NOTIFICATION_CATEGORY_KEYS = [
   'comment',
   'like',
   'mentions',
+  'system',
 ] as const;
 
 export class UpdateNotificationSettingsDto {

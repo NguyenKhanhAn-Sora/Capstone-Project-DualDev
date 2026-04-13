@@ -416,6 +416,37 @@ class ProfileService {
     );
   }
 
+  /// Fetch notification settings for the current user.
+  static Future<Map<String, dynamic>> fetchNotificationSettings() async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.get(
+      '/users/notifications/settings',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Update notification settings for global or category level.
+  static Future<Map<String, dynamic>> updateNotificationSettings({
+    String? category,
+    bool? enabled,
+    String? mutedUntil,
+    bool? mutedIndefinitely,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.patch(
+      '/users/notifications/settings',
+      body: {
+        if (category != null && category.isNotEmpty) 'category': category,
+        if (enabled != null) 'enabled': enabled,
+        if (mutedUntil != null) 'mutedUntil': mutedUntil,
+        if (mutedIndefinitely != null) 'mutedIndefinitely': mutedIndefinitely,
+      },
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
   /// Request passkey OTP (password confirmation step).
   static Future<Map<String, dynamic>> requestPasskeyOtp({
     required String password,

@@ -14,11 +14,20 @@ export type LivestreamItem = {
   hostName: string;
   hostUserId: string;
   roomName: string;
+  provider: "livekit" | "ivs";
+  ivsPlaybackUrl?: string;
   status: "live" | "ended";
   startedAt: string;
   endedAt: string | null;
   maxViewers: number;
   viewerCount: number;
+};
+
+export type IvsIngestResponse = {
+  provider: "ivs";
+  ingestEndpoint: string;
+  streamKey: string;
+  playbackUrl: string;
 };
 
 export type LivestreamListResponse = {
@@ -123,6 +132,7 @@ export async function updateLivestream(streamId: string, payload: {
   title?: string;
   description?: string;
   pinnedComment?: string;
+  location?: string;
   latencyMode?: LivestreamLatencyMode;
 }): Promise<{ stream: LivestreamItem }> {
   const token = getToken();
@@ -149,4 +159,17 @@ export async function endLivestream(streamId: string): Promise<{ ok: boolean }> 
     credentials: "include",
   });
   return handleResponse<{ ok: boolean }>(response, "Failed to end livestream.");
+}
+
+export async function getIvsIngest(streamId: string): Promise<IvsIngestResponse> {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/livestreams/${streamId}/ivs-ingest`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+  });
+  return handleResponse<IvsIngestResponse>(response, "Failed to load AWS IVS ingest info.");
 }

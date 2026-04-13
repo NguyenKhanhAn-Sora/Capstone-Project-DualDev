@@ -44,6 +44,21 @@ export class Livestream extends Document {
   @Prop({ type: String, required: true, unique: true, index: true })
   roomName: string;
 
+  @Prop({ type: String, enum: ['livekit', 'ivs'], default: 'livekit', index: true })
+  provider: 'livekit' | 'ivs';
+
+  @Prop({ type: String, default: '', trim: true })
+  ivsChannelArn: string;
+
+  @Prop({ type: String, default: '', trim: true })
+  ivsPlaybackUrl: string;
+
+  @Prop({ type: String, default: '', trim: true })
+  ivsIngestEndpoint: string;
+
+  @Prop({ type: String, default: '', trim: true })
+  ivsStreamKey: string;
+
   @Prop({ type: Number, default: 30 })
   maxViewers: number;
 

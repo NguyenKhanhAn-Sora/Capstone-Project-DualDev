@@ -36,6 +36,94 @@ function LocationIcon() {
   );
 }
 
+function TabPostIcon() {
+  return (
+    <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <rect
+        x="3"
+        y="3"
+        width="7"
+        height="7"
+        rx="1.6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <rect
+        x="14"
+        y="3"
+        width="7"
+        height="7"
+        rx="1.6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <rect
+        x="3"
+        y="14"
+        width="7"
+        height="7"
+        rx="1.6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <rect
+        x="14"
+        y="14"
+        width="7"
+        height="7"
+        rx="1.6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+    </svg>
+  );
+}
+
+function TabReelIcon() {
+  return (
+    <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M8.5 6.7c0-.8.9-1.3 1.6-.8l6 4.3c.6.4.6 1.3 0 1.7l-6 4.3c-.7.5-1.6 0-1.6-.8V6.7Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect
+        x="3.5"
+        y="3.5"
+        width="17"
+        height="17"
+        rx="3"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+    </svg>
+  );
+}
+
+function TabLivestreamIcon() {
+  return (
+    <svg
+      aria-hidden
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M8.8 9.2a4.4 4.4 0 0 0 0 5.6" />
+      <path d="M15.2 9.2a4.4 4.4 0 0 1 0 5.6" />
+      <path d="M6.1 6.6a8 8 0 0 0 0 10.8" />
+      <path d="M17.9 6.6a8 8 0 0 1 0 10.8" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 const audienceOptions = [
   { value: "public", label: "Public" },
   { value: "followers", label: "Friends / Following" },
@@ -1108,7 +1196,10 @@ export default function CreatePostPage() {
                 resetSelection();
               }}
             >
-              Post
+              <span className={styles.modeButtonInner}>
+                <TabPostIcon />
+                <span>Post</span>
+              </span>
             </button>
             <button
               type="button"
@@ -1121,7 +1212,10 @@ export default function CreatePostPage() {
                 resetSelection();
               }}
             >
-              Reel
+              <span className={styles.modeButtonInner}>
+                <TabReelIcon />
+                <span>Reel</span>
+              </span>
             </button>
             <button
               type="button"
@@ -1134,7 +1228,10 @@ export default function CreatePostPage() {
                 resetSelection();
               }}
             >
-              Livestream
+              <span className={styles.modeButtonInner}>
+                <TabLivestreamIcon />
+                <span>Livestream</span>
+              </span>
             </button>
           </div>
         </div>

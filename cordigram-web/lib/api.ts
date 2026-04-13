@@ -1446,7 +1446,8 @@ export type NotificationCategoryKey =
   | "follow"
   | "comment"
   | "like"
-  | "mentions";
+  | "mentions"
+  | "system";
 
 export type NotificationCategorySettings = {
   enabled: boolean;

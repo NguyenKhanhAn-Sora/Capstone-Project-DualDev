@@ -41,6 +41,14 @@ export class LivestreamController {
     return this.livestreamService.getById(streamId);
   }
 
+  @Get(':id/ivs-ingest')
+  async getIvsIngest(
+    @Param('id') streamId: string,
+    @CurrentUser() user: { userId: string },
+  ) {
+    return this.livestreamService.getIvsIngest(streamId, user.userId);
+  }
+
   @Patch(':id')
   async update(
     @Param('id') streamId: string,
