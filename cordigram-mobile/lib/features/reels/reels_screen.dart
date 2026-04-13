@@ -22,6 +22,7 @@ import '../home/widgets/post_card.dart' show PostMenuAction;
 import '../profile/profile_screen.dart';
 import '../post/post_detail_screen.dart' show CommentItem, CommentLinkPreview;
 import '../post/utils/post_edit_utils.dart';
+import '../post/utils/likes_list_sheet.dart';
 import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../report/report_comment_sheet.dart';
@@ -1637,6 +1638,11 @@ class _ReelPageState extends State<_ReelPage> {
                       ? ''
                       : _formatCount(widget.state.stats.hearts),
                   onTap: widget.onLike,
+                  onLongPress: () => showPostLikesSheet(
+                    context,
+                    postId: widget.state.post.id,
+                    viewerId: widget.viewerId,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 // Comment
@@ -1824,17 +1830,20 @@ class _ActionButton extends StatelessWidget {
     required this.color,
     required this.label,
     required this.onTap,
+    this.onLongPress,
   });
 
   final IconData icon;
   final Color color;
   final String label;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -3015,11 +3024,18 @@ class _RCommentTileState extends State<_RCommentTile> {
                               children: [
                                 GestureDetector(
                                   onTap: _onLikeComment,
+                                  behavior: HitTestBehavior.opaque,
+                                  onLongPress: () => showCommentLikesSheet(
+                                    context,
+                                    postId: widget.postId,
+                                    commentId: widget.comment.id,
+                                    viewerId: widget.viewerId,
+                                  ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       _RIconLike(
-                                        size: 16,
+                                        size: 18,
                                         filled: _liked,
                                         color: _liked
                                             ? const Color(0xFF2b74b0)
@@ -3695,10 +3711,20 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                           width: 28,
                           height: 28,
                           child: IconButton(
-                            icon: const Icon(
-                              Icons.emoji_emotions_outlined,
-                              color: Color(0xFF7A8BB0),
-                              size: 17,
+                            icon: SvgPicture.string(
+                              '''
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" stroke-width="1.6" fill="none"/>
+  <circle cx="10" cy="11" r="1" fill="currentColor"/>
+  <circle cx="14" cy="11" r="1" fill="currentColor"/>
+  <path d="M9 15c1.2 1 4.8 1 6 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+</svg>''',
+                              width: 17,
+                              height: 17,
+                              colorFilter: const ColorFilter.mode(
+                                Color(0xFF7A8BB0),
+                                BlendMode.srcIn,
+                              ),
                             ),
                             onPressed: _sending
                                 ? null

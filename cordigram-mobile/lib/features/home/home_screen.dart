@@ -16,6 +16,7 @@ import '../notifications/notification_screen.dart';
 import '../post/create_tab_screen.dart';
 import '../post/post_detail_screen.dart';
 import '../post/utils/post_edit_utils.dart';
+import '../post/utils/likes_list_sheet.dart';
 import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../profile/profile_screen.dart';
@@ -1451,6 +1452,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 viewerId: _viewerId,
                 useAdsMenuMode: true,
                 onLike: () => _onLike(itemState.post.id),
+                onLikeLongPress: () => showPostLikesSheet(
+                  context,
+                  postId: itemState.post.id,
+                  viewerId: _viewerId,
+                ),
                 onSave: () => _onSave(itemState.post.id),
                 onRepost: () => _onRepost(itemState),
                 onHide: () => _onHide(itemState.post.id),

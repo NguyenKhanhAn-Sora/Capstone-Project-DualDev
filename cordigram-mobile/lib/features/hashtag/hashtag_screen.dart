@@ -7,6 +7,7 @@ import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostCard, PostMenuAction;
 import '../post/post_detail_screen.dart';
 import '../post/utils/post_edit_utils.dart';
+import '../post/utils/likes_list_sheet.dart';
 import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../profile/profile_item_viewer_screen.dart';
@@ -826,6 +827,11 @@ class _HashtagScreenState extends State<HashtagScreen> {
             state: state,
             viewerId: _viewerId,
             onLike: () => _onLike(state),
+            onLikeLongPress: () => showPostLikesSheet(
+              context,
+              postId: state.post.id,
+              viewerId: _viewerId,
+            ),
             onSave: () => _onSave(state),
             onRepost: () => _onRepost(state),
             onHide: () => _onHide(state),

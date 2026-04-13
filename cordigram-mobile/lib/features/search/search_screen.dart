@@ -11,6 +11,7 @@ import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostCard, PostMenuAction;
 import '../post/post_detail_screen.dart';
 import '../post/utils/post_edit_utils.dart';
+import '../post/utils/likes_list_sheet.dart';
 import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../profile/profile_screen.dart';
@@ -1248,6 +1249,8 @@ class _SearchScreenState extends State<SearchScreen> {
           (state) => PostCard(
             state: state,
             onLike: () => _onLike(state),
+            onLikeLongPress: () =>
+                showPostLikesSheet(context, postId: state.post.id),
             onSave: () => _onSave(state),
             onRepost: () => _onRepost(state),
             onHide: () => _onHide(state),

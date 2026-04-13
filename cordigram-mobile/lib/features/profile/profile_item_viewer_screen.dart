@@ -15,6 +15,7 @@ import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostMenuAction;
 import '../post/post_detail_screen.dart';
 import '../post/utils/post_edit_utils.dart';
+import '../post/utils/likes_list_sheet.dart';
 import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../profile/profile_screen.dart';
@@ -2320,6 +2321,15 @@ class _ItemPageState extends State<_ItemPage> {
                   color: Colors.white,
                   label: hideLikesForViewer ? '' : _fmtCountInt(hearts),
                   onTap: _onLikeTap,
+                  onLongPress: () {
+                    final postId = (normalized['id'] as String?) ?? '';
+                    if (postId.isEmpty) return;
+                    showPostLikesSheet(
+                      context,
+                      postId: postId,
+                      viewerId: widget.viewerId,
+                    );
+                  },
                 ),
                 const SizedBox(height: 20),
                 _ActionButton(
@@ -2826,17 +2836,20 @@ class _ActionButton extends StatelessWidget {
     required this.color,
     required this.label,
     required this.onTap,
+    this.onLongPress,
   });
 
   final IconData icon;
   final Color color;
   final String label;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

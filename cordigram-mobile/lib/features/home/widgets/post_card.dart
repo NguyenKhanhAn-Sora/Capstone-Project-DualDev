@@ -156,6 +156,7 @@ class PostCard extends StatefulWidget {
     super.key,
     required this.state,
     required this.onLike,
+    this.onLikeLongPress,
     required this.onSave,
     required this.onHide,
     required this.onView,
@@ -173,6 +174,7 @@ class PostCard extends StatefulWidget {
 
   final FeedPostState state;
   final VoidCallback onLike;
+  final VoidCallback? onLikeLongPress;
   final VoidCallback onSave;
   final VoidCallback onHide;
   final VoidCallback? onRepost;
@@ -547,6 +549,9 @@ class _PostCardState extends State<PostCard> {
                 viewerId: widget.viewerId,
                 hideReposts: widget.detailMode,
                 onLike: widget.detailMode ? widget.onLike : null,
+                onLikeLongPress: widget.detailMode
+                    ? widget.onLikeLongPress
+                    : null,
               ),
               if (!widget.detailMode) ...[
                 const SizedBox(height: 2),
@@ -554,6 +559,7 @@ class _PostCardState extends State<PostCard> {
                 _ActionBar(
                   state: state,
                   onLike: widget.onLike,
+                  onLikeLongPress: widget.onLikeLongPress,
                   onSave: widget.onSave,
                   onRepost: widget.onRepost,
                   onComment: widget.onComment,
@@ -1257,11 +1263,13 @@ class _StatsRow extends StatelessWidget {
     this.viewerId,
     this.hideReposts = false,
     this.onLike,
+    this.onLikeLongPress,
   });
   final FeedPostState state;
   final String? viewerId;
   final bool hideReposts;
   final VoidCallback? onLike;
+  final VoidCallback? onLikeLongPress;
 
   static String _fmt(int n) {
     if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
@@ -1293,6 +1301,7 @@ class _StatsRow extends StatelessWidget {
                 if (!hideLikes) ...[
                   GestureDetector(
                     onTap: onLike,
+                    onLongPress: onLikeLongPress,
                     behavior: HitTestBehavior.opaque,
                     child: _StatChip(
                       iconWidget: _PostIconLike(
@@ -1395,12 +1404,14 @@ class _ActionBar extends StatelessWidget {
   const _ActionBar({
     required this.state,
     required this.onLike,
+    this.onLikeLongPress,
     required this.onSave,
     this.onRepost,
     this.onComment,
   });
   final FeedPostState state;
   final VoidCallback onLike;
+  final VoidCallback? onLikeLongPress;
   final VoidCallback onSave;
   final VoidCallback? onRepost;
   final VoidCallback? onComment;
@@ -1427,6 +1438,7 @@ class _ActionBar extends StatelessWidget {
                   ? const Color(0xFF2b74b0)
                   : const Color(0xFF7A8BB0),
               onTap: onLike,
+              onLongPress: onLikeLongPress,
             ),
           ),
           Expanded(
@@ -1481,6 +1493,7 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.color,
     required this.onTap,
+    this.onLongPress,
   });
 
   final IconData? icon;
@@ -1488,11 +1501,13 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(10),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),

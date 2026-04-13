@@ -91,6 +91,43 @@ class PostInteractionService {
     await ApiService.delete('/posts/$postId/like', extraHeaders: _authHeader);
   }
 
+  /// GET /posts/:id/likes
+  static Future<Map<String, dynamic>> listPostLikes(
+    String postId, {
+    int limit = 20,
+    String? cursor,
+  }) async {
+    final safeLimit = limit.clamp(1, 50);
+    final qp = <String, String>{'limit': '$safeLimit'};
+    if (cursor != null && cursor.trim().isNotEmpty) {
+      qp['cursor'] = cursor.trim();
+    }
+    final query = Uri(queryParameters: qp).query;
+    return ApiService.get(
+      '/posts/$postId/likes?$query',
+      extraHeaders: _authHeader,
+    );
+  }
+
+  /// GET /posts/:postId/comments/:commentId/likes
+  static Future<Map<String, dynamic>> listCommentLikes({
+    required String postId,
+    required String commentId,
+    int limit = 20,
+    String? cursor,
+  }) async {
+    final safeLimit = limit.clamp(1, 50);
+    final qp = <String, String>{'limit': '$safeLimit'};
+    if (cursor != null && cursor.trim().isNotEmpty) {
+      qp['cursor'] = cursor.trim();
+    }
+    final query = Uri(queryParameters: qp).query;
+    return ApiService.get(
+      '/posts/$postId/comments/$commentId/likes?$query',
+      extraHeaders: _authHeader,
+    );
+  }
+
   // ── Save / Unsave ────────────────────────────────────────────────────────
 
   /// POST /posts/:id/save

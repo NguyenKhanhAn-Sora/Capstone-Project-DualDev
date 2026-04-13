@@ -21,6 +21,7 @@ import '../home/widgets/media_carousel.dart';
 import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostCard, PostMenuAction;
 import 'utils/post_edit_utils.dart';
+import 'utils/likes_list_sheet.dart';
 import 'utils/post_mute_overlay.dart';
 
 // ── Comment media data (mirrors web's CommentMedia + local XFile) ─────────────
@@ -1034,6 +1035,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 fullWidth: true,
                 detailMode: true,
                 onLike: _onLike,
+                onLikeLongPress: () => showPostLikesSheet(
+                  context,
+                  postId: _postState!.post.id,
+                  viewerId: _viewerId,
+                ),
                 onSave: _onSave,
                 onFollow: _onFollow,
                 onAuthorTap: _openUserProfile,
@@ -1841,11 +1847,18 @@ class _CommentTileState extends State<_CommentTile> {
                               children: [
                                 GestureDetector(
                                   onTap: _onLikeComment,
+                                  behavior: HitTestBehavior.opaque,
+                                  onLongPress: () => showCommentLikesSheet(
+                                    context,
+                                    postId: widget.postId,
+                                    commentId: widget.comment.id,
+                                    viewerId: widget.viewerId,
+                                  ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       _IconLike(
-                                        size: 13,
+                                        size: 15,
                                         filled: _liked,
                                         color: _liked
                                             ? const Color(0xFF2b74b0)
@@ -3110,10 +3123,20 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                           width: 28,
                           height: 28,
                           child: IconButton(
-                            icon: const Icon(
-                              Icons.emoji_emotions_outlined,
-                              color: Color(0xFF7A8BB0),
-                              size: 17,
+                            icon: SvgPicture.string(
+                              '''
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" stroke-width="1.6" fill="none"/>
+  <circle cx="10" cy="11" r="1" fill="currentColor"/>
+  <circle cx="14" cy="11" r="1" fill="currentColor"/>
+  <path d="M9 15c1.2 1 4.8 1 6 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+</svg>''',
+                              width: 17,
+                              height: 17,
+                              colorFilter: const ColorFilter.mode(
+                                Color(0xFF7A8BB0),
+                                BlendMode.srcIn,
+                              ),
                             ),
                             onPressed: _sending
                                 ? null
