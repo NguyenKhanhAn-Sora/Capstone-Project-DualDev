@@ -35,6 +35,7 @@ import { RequestTwoFactorOtpDto } from './dto/request-two-factor-otp.dto';
 import { VerifyTwoFactorOtpDto } from './dto/verify-two-factor-otp.dto';
 import { ActivityType } from '../activity/activity.schema';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
+import { UpdatePushTokenDto } from './dto/update-push-token.dto';
 import { type SupportedLanguage } from './language.constants';
 
 @Controller('users')
@@ -294,6 +295,23 @@ export class UsersController {
       enabled: dto.enabled,
       mutedIndefinitely: dto.mutedIndefinitely,
       mutedUntil: dto.mutedUntil ?? null,
+    });
+  }
+
+  @Patch('push-token')
+  async updatePushToken(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Body() dto: UpdatePushTokenDto,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    return this.usersService.updateCurrentDevicePushToken({
+      userId,
+      deviceId: req.headers['x-device-id'] as string | undefined,
+      token: dto.token ?? null,
     });
   }
 

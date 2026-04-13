@@ -7,6 +7,8 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import type { Server, Socket } from 'socket.io';
 import { ConfigService } from '../config/config.service';
+import { FcmPushService } from './fcm-push.service';
+import type { NotificationRealtimePayload } from './notifications.service';
 
 interface AccessTokenPayload {
   sub: string;
@@ -32,6 +34,7 @@ export class NotificationsGateway
   constructor(
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly fcmPushService: FcmPushService,
   ) {}
 
   handleConnection(client: Socket) {
@@ -68,10 +71,16 @@ export class NotificationsGateway
 
   emitToUser<T>(userId: string, event: string, payload: T): void {
     const sockets = this.connections.get(userId);
-    if (!sockets?.size) return;
-    sockets.forEach((socketId) => {
-      this.server.to(socketId).emit(event, payload);
-    });
+    if (sockets?.size) {
+      sockets.forEach((socketId) => {
+        this.server.to(socketId).emit(event, payload);
+      });
+    }
+
+    if (event === 'notification:new') {
+      const typed = payload as unknown as NotificationRealtimePayload;
+      void this.fcmPushService.pushNotificationToUser(userId, typed.notification);
+    }
   }
 
   emitToAll<T>(event: string, payload: T): void {

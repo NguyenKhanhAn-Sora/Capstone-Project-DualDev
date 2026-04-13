@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "255526004854",
+    "project_id": "cordigram-89002",
+    "storage_bucket": "cordigram-89002.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:255526004854:android:a55704a4d8cb2b1b2e5757",
+        "android_client_info": {
+          "package_name": "com.example.cordigram_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBari7jRqPW1mkBMScHJSGX0kz68BzZbzQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:255526004854:android:9e10ef649ca0ac0e2e5757",
+        "android_client_info": {
+          "package_name": "cordigram.android.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBari7jRqPW1mkBMScHJSGX0kz68BzZbzQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

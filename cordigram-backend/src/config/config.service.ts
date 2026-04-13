@@ -234,4 +234,14 @@ export class ConfigService {
   get stripeWebhookSecret(): string {
     return this.require('STRIPE_WEBHOOK_SECRET');
   }
+
+  get fcmServiceAccountPath(): string | null {
+    const value = process.env.FCM_SERVICE_ACCOUNT_PATH?.trim() ?? '';
+    return value || null;
+  }
+
+  get fcmServiceAccountJson(): string | null {
+    const value = process.env.FCM_SERVICE_ACCOUNT_JSON?.trim() ?? '';
+    return value || null;
+  }
 }

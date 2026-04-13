@@ -6,6 +6,7 @@ import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/push_notification_service.dart';
 import '../home/home_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
@@ -68,6 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
         accessToken: accessToken,
         refreshToken: result.refreshToken,
       );
+      await PushNotificationService.syncCurrentToken();
       if (!mounted) return;
       Navigator.of(
         context,
@@ -113,6 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
           accessToken: accessToken,
           refreshToken: refreshToken,
         );
+        await PushNotificationService.syncCurrentToken();
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),

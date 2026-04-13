@@ -7,6 +7,7 @@ import { AuthModule } from '../auth/auth.module';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsGateway } from './notifications.gateway';
 import { NotificationsService } from './notifications.service';
+import { FcmPushService } from './fcm-push.service';
 import { Notification, NotificationSchema } from './notification.schema';
 import {
   BroadcastNotice,
@@ -35,7 +36,7 @@ import { Post, PostSchema } from '../posts/post.schema';
     ]),
   ],
   controllers: [NotificationsController],
-  providers: [NotificationsService, NotificationsGateway],
+  providers: [NotificationsService, NotificationsGateway, FcmPushService],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}

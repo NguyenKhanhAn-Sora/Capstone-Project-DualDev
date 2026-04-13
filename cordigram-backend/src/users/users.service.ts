@@ -234,6 +234,46 @@ export class UsersService {
     await user.save();
   }
 
+  async updateCurrentDevicePushToken(params: {
+    userId: string;
+    deviceId?: string;
+    token?: string | null;
+  }): Promise<{ ok: true }> {
+    const user = await this.userModel
+      .findById(params.userId)
+      .select('loginDevices')
+      .exec();
+    if (!user) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    const deviceId = params.deviceId?.trim();
+    if (!deviceId) {
+      throw new BadRequestException('Missing device id');
+    }
+
+    const deviceIdHash = this.hashDeviceId(deviceId);
+    const token = params.token?.trim() ?? '';
+    const nextToken = token.length ? token : null;
+
+    const current = user.loginDevices ?? [];
+    const idx = current.findIndex((d) => d.deviceIdHash === deviceIdHash);
+    if (idx < 0) {
+      throw new NotFoundException('Device session not found');
+    }
+
+    const next = [...current];
+    next[idx] = {
+      ...next[idx],
+      fcmToken: nextToken,
+      lastSeenAt: new Date(),
+    } as any;
+
+    user.loginDevices = next;
+    await user.save();
+    return { ok: true };
+  }
+
   private isPasswordChangeFresh(requestedAt?: Date | null): boolean {
     if (!requestedAt) return true;
     const now = Date.now();

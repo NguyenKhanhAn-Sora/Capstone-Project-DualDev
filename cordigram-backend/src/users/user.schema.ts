@@ -77,6 +77,7 @@ export type LoginDevice = {
   deviceIdHash: string;
   userAgent?: string;
   deviceInfo?: string;
+  fcmToken?: string;
   ip?: string;
   location?: string;
   deviceType?: string;
@@ -270,6 +271,7 @@ export class User extends Document {
         deviceIdHash: { type: String },
         userAgent: { type: String },
         deviceInfo: { type: String },
+        fcmToken: { type: String },
         ip: { type: String },
         location: { type: String },
         deviceType: { type: String },
