@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import styles from "./ShareEventPopup.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 interface ShareEventPopupProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ export default function ShareEventPopup({
   onClose,
   shareLink,
 }: ShareEventPopupProps) {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -31,7 +33,7 @@ export default function ShareEventPopup({
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Đóng">
+        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label={t("chat.popups.closeAria")}>
           ×
         </button>
         <div className={styles.iconWrap}>
@@ -42,10 +44,9 @@ export default function ShareEventPopup({
             <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
         </div>
-        <h2 className={styles.title}>Sẵn sàng. Giờ thì hãy chia sẻ sự kiện!</h2>
+        <h2 className={styles.title}>{t("chat.popups.shareEvent.title")}</h2>
         <p className={styles.desc}>
-          Sao chép liên kết sự kiện bên dưới để mời mọi người tham gia sự kiện của bạn. Liên kết
-          này cũng sẽ là liên kết mời vào máy chủ.
+          {t("chat.popups.shareEvent.desc")}
         </p>
         <div className={styles.linkWrap}>
           <input
@@ -59,10 +60,10 @@ export default function ShareEventPopup({
             className={`${styles.copyBtn} ${copied ? styles.copied : ""}`}
             onClick={handleCopy}
           >
-            {copied ? "Đã sao chép" : "Sao chép"}
+            {copied ? t("chat.common.copied") : t("chat.common.copy")}
           </button>
         </div>
-        <p className={styles.expireNote}>Link mời của bạn sẽ hết hạn sau 7 ngày.</p>
+        <p className={styles.expireNote}>{t("chat.popups.shareEvent.expireNote")}</p>
       </div>
     </div>
   );

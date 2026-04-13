@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import styles from "./CreateChannelModal.module.css";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker/ChatEmojiPicker";
+import { useLanguage } from "@/component/language-provider";
 
 export type ChannelTypeForCreate = "text" | "voice";
 
@@ -19,6 +20,7 @@ export default function CreateChannelModal({
   defaultType = "text",
   onCreateChannel,
 }: CreateChannelModalProps) {
+  const { t } = useLanguage();
   const [channelType, setChannelType] = useState<ChannelTypeForCreate>(defaultType);
   const [channelName, setChannelName] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
@@ -51,7 +53,7 @@ export default function CreateChannelModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const name = channelName.trim().replace(/^#\s*/, "") || "kênh-mới";
+    const name = channelName.trim().replace(/^#\s*/, "") || t("chat.popups.createChannel.defaultName");
     if (!name) return;
     setIsSubmitting(true);
     try {
@@ -69,14 +71,14 @@ export default function CreateChannelModal({
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Đóng">
+        <button type="button" className={styles.closeButton} onClick={onClose} aria-label={t("chat.popups.closeAria")}>
           &times;
         </button>
         <form onSubmit={handleSubmit}>
-          <h2 className={styles.title}>Tạo kênh</h2>
+          <h2 className={styles.title}>{t("chat.popups.createChannel.title")}</h2>
 
           <div className={styles.section}>
-            <label className={styles.sectionLabel}>Loại Kênh</label>
+            <label className={styles.sectionLabel}>{t("chat.popups.createChannel.channelType")}</label>
             <div className={styles.typeOptions}>
               <label className={styles.typeOption}>
                 <input
@@ -88,8 +90,8 @@ export default function CreateChannelModal({
                 />
                 <span className={styles.typeIcon}>#</span>
                 <div>
-                  <span className={styles.typeName}>Văn bản</span>
-                  <p className={styles.typeDesc}>Gửi tin nhắn, hình ảnh, ảnh GIF, emoji, ý kiến, và chơi chữ</p>
+                  <span className={styles.typeName}>{t("chat.popups.createChannel.textName")}</span>
+                  <p className={styles.typeDesc}>{t("chat.popups.createChannel.textDesc")}</p>
                 </div>
               </label>
               <label className={styles.typeOption}>
@@ -109,15 +111,15 @@ export default function CreateChannelModal({
                   </svg>
                 </span>
                 <div>
-                  <span className={styles.typeName}>Giọ ng nói</span>
-                  <p className={styles.typeDesc}>Cùng gặp mặt bằng gọi thoại, video, và chia sẻ màn hình</p>
+                  <span className={styles.typeName}>{t("chat.popups.createChannel.voiceName")}</span>
+                  <p className={styles.typeDesc}>{t("chat.popups.createChannel.voiceDesc")}</p>
                 </div>
               </label>
             </div>
           </div>
 
           <div className={styles.section}>
-            <label className={styles.sectionLabel}>Tên kênh</label>
+            <label className={styles.sectionLabel}>{t("chat.popups.createChannel.channelName")}</label>
             <div className={styles.nameInputWrap}>
               <span className={styles.namePrefix}>#</span>
               <input
@@ -126,7 +128,7 @@ export default function CreateChannelModal({
                 className={styles.nameInput}
                 value={channelName}
                 onChange={(e) => setChannelName(e.target.value)}
-                placeholder="kênh-mới"
+                placeholder={t("chat.popups.createChannel.defaultName")}
                 maxLength={100}
               />
               <div className={styles.emojiWrapper}>
@@ -134,7 +136,7 @@ export default function CreateChannelModal({
                   type="button"
                   className={styles.emojiBtn}
                   onClick={() => setShowEmojiPicker((p) => !p)}
-                  title="Thêm emoji / kaomoji"
+                  title={t("chat.popups.createChannel.emojiTitle")}
                 >
                   &#128522;
                 </button>
@@ -152,8 +154,8 @@ export default function CreateChannelModal({
           <div className={styles.section}>
             <div className={styles.privateRow}>
               <div>
-                <span className={styles.privateLabel}>Kênh Riêng</span>
-                <p className={styles.privateDesc}>Chỉ có thành viên và vai trò được chọn mới có thể nhìn thấy kênh này.</p>
+                <span className={styles.privateLabel}>{t("chat.popups.createChannel.privateLabel")}</span>
+                <p className={styles.privateDesc}>{t("chat.popups.createChannel.privateDesc")}</p>
               </div>
               <button
                 type="button"
@@ -168,9 +170,9 @@ export default function CreateChannelModal({
           </div>
 
           <div className={styles.footer}>
-            <button type="button" className={styles.cancelBtn} onClick={onClose}>Hủy bỏ</button>
+            <button type="button" className={styles.cancelBtn} onClick={onClose}>{t("chat.common.cancel")}</button>
             <button type="submit" className={styles.submitBtn} disabled={isSubmitting}>
-              {isSubmitting ? "Đang tạo..." : "Tạo kênh"}
+              {isSubmitting ? t("chat.popups.createChannel.creating") : t("chat.popups.createChannel.createBtn")}
             </button>
           </div>
         </form>

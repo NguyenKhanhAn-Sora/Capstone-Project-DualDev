@@ -1520,17 +1520,32 @@ export class UsersService {
 
   async getSettings(userId: string): Promise<{
     theme: 'light' | 'dark';
-    language: 'en' | 'vi';
+    language: 'vi' | 'en' | 'ja' | 'zh';
+    dmListFrom: 'everyone' | 'followers_only';
+    dmCallFrom: 'everyone' | 'followers_only';
+    showCordigramMemberSince: boolean;
+    sharePresence: boolean;
+    chatSoundEnabled: boolean;
   }> {
     const user = await this.userModel
       .findById(userId)
       .select('settings')
       .lean()
       .exec();
+    const s = user?.settings as Record<string, unknown> | undefined;
 
     return {
-      theme: user?.settings?.theme ?? 'light',
-      language: user?.settings?.language ?? 'en',
+      theme: (s?.theme as 'light' | 'dark') ?? 'light',
+      language: (s?.language as 'vi' | 'en' | 'ja' | 'zh') ?? 'vi',
+      dmListFrom:
+        (s?.dmListFrom as 'everyone' | 'followers_only') ?? 'everyone',
+      dmCallFrom:
+        (s?.dmCallFrom as 'everyone' | 'followers_only') ?? 'everyone',
+      showCordigramMemberSince:
+        (s?.showCordigramMemberSince as boolean | undefined) !== false,
+      sharePresence: (s?.sharePresence as boolean | undefined) !== false,
+      chatSoundEnabled:
+        (s?.chatSoundEnabled as boolean | undefined) !== false,
     };
   }
 
@@ -2090,8 +2105,21 @@ export class UsersService {
   async updateSettings(params: {
     userId: string;
     theme?: 'light' | 'dark';
-    language?: 'en' | 'vi';
-  }): Promise<{ theme: 'light' | 'dark'; language: 'en' | 'vi' }> {
+    language?: 'vi' | 'en' | 'ja' | 'zh';
+    dmListFrom?: 'everyone' | 'followers_only';
+    dmCallFrom?: 'everyone' | 'followers_only';
+    showCordigramMemberSince?: boolean;
+    sharePresence?: boolean;
+    chatSoundEnabled?: boolean;
+  }): Promise<{
+    theme: 'light' | 'dark';
+    language: 'vi' | 'en' | 'ja' | 'zh';
+    dmListFrom: 'everyone' | 'followers_only';
+    dmCallFrom: 'everyone' | 'followers_only';
+    showCordigramMemberSince: boolean;
+    sharePresence: boolean;
+    chatSoundEnabled: boolean;
+  }> {
     const update: Record<string, unknown> = {};
     if (params.theme) {
       update['settings.theme'] = params.theme;
@@ -2099,18 +2127,32 @@ export class UsersService {
     if (params.language) {
       update['settings.language'] = params.language;
     }
+    if (params.dmListFrom) {
+      update['settings.dmListFrom'] = params.dmListFrom;
+    }
+    if (params.dmCallFrom) {
+      update['settings.dmCallFrom'] = params.dmCallFrom;
+    }
+    if (params.showCordigramMemberSince !== undefined) {
+      update['settings.showCordigramMemberSince'] =
+        params.showCordigramMemberSince;
+    }
+    if (params.sharePresence !== undefined) {
+      update['settings.sharePresence'] = params.sharePresence;
+    }
+    if (params.chatSoundEnabled !== undefined) {
+      update['settings.chatSoundEnabled'] = params.chatSoundEnabled;
+    }
 
     if (!Object.keys(update).length) {
-      const current = await this.getSettings(params.userId);
-      return current;
+      return this.getSettings(params.userId);
     }
 
     await this.userModel
       .updateOne({ _id: params.userId }, { $set: update })
       .exec();
 
-    const next = await this.getSettings(params.userId);
-    return next;
+    return this.getSettings(params.userId);
   }
 
   async createWithGoogle(params: {

@@ -36,4 +36,9 @@ export class CreateServerDto {
   @IsOptional()
   @IsEnum(['club-community', 'me-and-friends'])
   purpose?: string;
+
+  /** UI language when creating the server — used to localise default channel/category names. */
+  @IsOptional()
+  @IsEnum(['vi', 'en', 'ja', 'zh'])
+  language?: 'vi' | 'en' | 'ja' | 'zh';
 }

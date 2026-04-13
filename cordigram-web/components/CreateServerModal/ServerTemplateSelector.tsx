@@ -3,80 +3,51 @@
 import React from "react";
 import styles from "./ServerTemplateSelector.module.css";
 import { type ServerTemplate } from "@/lib/servers-api";
+import { useLanguage } from "@/component/language-provider";
 
 interface ServerTemplateSelectorProps {
   onSelectTemplate: (template: ServerTemplate) => void;
 }
 
-const templates = [
-  {
-    id: "custom" as ServerTemplate,
-    name: "Tạo Mẫu Riêng",
-    icon: "🎨",
-    description: "Tạo máy chủ từ đầu với cài đặt tùy chỉnh",
-  },
-  {
-    id: "gaming" as ServerTemplate,
-    name: "Gaming",
-    icon: "🎮",
-    description: "Chơi game cùng bạn bè",
-  },
-  {
-    id: "friends" as ServerTemplate,
-    name: "Bạn bè",
-    icon: "💕",
-    description: "Trò chuyện với bạn bè thân thiết",
-  },
-  {
-    id: "study-group" as ServerTemplate,
-    name: "Nhóm Học Tập",
-    icon: "🍎",
-    description: "Học tập và hợp tác",
-  },
-  {
-    id: "school-club" as ServerTemplate,
-    name: "Câu Lạc Bộ Trường Học",
-    icon: "📚",
-    description: "Kết nối với câu lạc bộ của bạn",
-  },
-  {
-    id: "local-community" as ServerTemplate,
-    name: "Cộng Đồng Địa Phương",
-    icon: "🌿",
-    description: "Kết nối với cộng đồng địa phương",
-  },
-  {
-    id: "artists-creators" as ServerTemplate,
-    name: "Nghệ Sĩ và Người Sáng Tạo",
-    icon: "🎨",
-    description: "Chia sẻ và thảo luận nghệ thuật",
-  },
+const templates: Array<{ id: ServerTemplate; icon: string }> = [
+  { id: "custom", icon: "🎨" },
+  { id: "gaming", icon: "🎮" },
+  { id: "friends", icon: "💕" },
+  { id: "study-group", icon: "🍎" },
+  { id: "school-club", icon: "📚" },
+  { id: "local-community", icon: "🌿" },
+  { id: "artists-creators", icon: "🎨" },
 ];
 
 export default function ServerTemplateSelector({
   onSelectTemplate,
 }: ServerTemplateSelectorProps) {
+  const { t } = useLanguage();
   return (
     <div className={styles.container}>
-      <h2 className={styles.title}>Tạo Máy Chủ Của Bạn</h2>
+      <h2 className={styles.title}>{t("chat.createServer.template.title")}</h2>
       <p className={styles.subtitle}>
-        Máy chủ của bạn là nơi bạn giao lưu với bạn bè của mình.
+        {t("chat.createServer.template.subtitleLine1")}
         <br />
-        Hãy tạo máy chủ của riêng bạn và bắt đầu trò chuyện.
+        {t("chat.createServer.template.subtitleLine2")}
       </p>
 
       <div className={styles.templateList}>
         {templates.map((template, index) => (
           <React.Fragment key={template.id}>
             {index === 1 && (
-              <div className={styles.sectionLabel}>BẮT ĐẦU TỪ MẪU</div>
+              <div className={styles.sectionLabel}>
+                {t("chat.createServer.template.startFromTemplate")}
+              </div>
             )}
             <button
               className={styles.templateButton}
               onClick={() => onSelectTemplate(template.id)}
             >
               <span className={styles.templateIcon}>{template.icon}</span>
-              <span className={styles.templateName}>{template.name}</span>
+              <span className={styles.templateName}>
+                {t(`chat.createServer.template.items.${template.id}.name`)}
+              </span>
               <span className={styles.arrow}>›</span>
             </button>
           </React.Fragment>
@@ -84,8 +55,12 @@ export default function ServerTemplateSelector({
       </div>
 
       <div className={styles.footer}>
-        <p className={styles.footerQuestion}>Bạn đã nhận được lời mời rồi?</p>
-        <button className={styles.joinButton}>Tham gia máy chủ</button>
+        <p className={styles.footerQuestion}>
+          {t("chat.createServer.template.haveInvite")}
+        </p>
+        <button className={styles.joinButton}>
+          {t("chat.createServer.template.joinServer")}
+        </button>
       </div>
     </div>
   );

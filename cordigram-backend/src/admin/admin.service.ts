@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
@@ -39,7 +41,8 @@ import {
 } from './community-discovery-history.schema';
 
 @Injectable()
-export class AdminService {
+export class AdminService implements OnModuleInit {
+  private readonly logger = new Logger(AdminService.name);
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
@@ -84,6 +87,17 @@ export class AdminService {
     @InjectModel(CommunityDiscoveryHistory.name)
     private readonly communityDiscoveryHistoryModel: Model<CommunityDiscoveryHistory>,
   ) {}
+
+  async onModuleInit() {
+    try {
+      const result = await this.migrateNotificationI18nKeys();
+      if (result.updated > 0) {
+        this.logger.log(`Migrated ${result.updated} notification records to i18n keys`);
+      }
+    } catch (err) {
+      this.logger.warn(`Notification i18n migration skipped: ${err?.message ?? err}`);
+    }
+  }
 
   private async getAdsRevenueStats(params: {
     since: Date;
@@ -7750,11 +7764,61 @@ export class AdminService {
     await this.serverNotificationModel.create({
       serverId: new Types.ObjectId(serverId),
       createdBy,
-      title: 'Quản trị viên hệ thống đang xem máy chủ',
-      content: `Quản trị viên hệ thống đang kiểm tra máy chủ "${server.name}" của bạn. Đây là hoạt động kiểm duyệt định kỳ.`,
+      title: '__SYS:adminView',
+      content: `__SYS:adminViewContent:${server.name}`,
       targetType: 'role',
       recipientUserIds,
     });
+  }
+
+  /**
+   * One-time migration: convert old hardcoded Vietnamese notification texts
+   * to language-neutral __SYS:* key markers so the frontend can translate them.
+   */
+  async migrateNotificationI18nKeys(): Promise<{ updated: number }> {
+    const docs = await this.serverNotificationModel
+      .find({
+        $or: [
+          { title: 'Quản trị viên hệ thống đang xem máy chủ' },
+          { title: '⚠️ Cảnh báo spam đề cập' },
+        ],
+      })
+      .exec();
+
+    let updated = 0;
+    for (const doc of docs) {
+      const updates: Record<string, string> = {};
+
+      if (doc.title === 'Quản trị viên hệ thống đang xem máy chủ') {
+        updates['title'] = '__SYS:adminView';
+        const match = typeof doc.content === 'string'
+          ? doc.content.match(/máy chủ "(.+)" của bạn/)
+          : null;
+        if (match) {
+          updates['content'] = `__SYS:adminViewContent:${match[1]}`;
+        }
+      }
+
+      if (doc.title === '⚠️ Cảnh báo spam đề cập') {
+        updates['title'] = '__SYS:mentionSpamTitle';
+        const match = typeof doc.content === 'string'
+          ? doc.content.match(/máy chủ "(.+)"\./)
+          : null;
+        if (match) {
+          updates['content'] = `__SYS:mentionSpamWarning:${match[1]}`;
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await this.serverNotificationModel.updateOne(
+          { _id: doc._id },
+          { $set: updates },
+        );
+        updated++;
+      }
+    }
+
+    return { updated };
   }
 
   async adminGetChannelMessages(

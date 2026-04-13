@@ -1,0 +1,1223 @@
+{
+  "chat": {
+    "common": {
+      "back": "Trở lại",
+      "create": "Tạo",
+      "creating": "Đang tạo...",
+      "uploading": "Đang tải lên...",
+      "saving": "Đang lưu...",
+      "saveChanges": "Lưu thay đổi",
+      "cancel": "Hủy",
+      "remove": "Gỡ",
+      "copy": "Sao chép",
+      "copied": "Đã sao chép",
+      "sending": "Đang gửi…",
+      "user": "Người dùng",
+      "server": "Máy chủ"
+    },
+    "loading": {
+      "gif": "Đang tải GIF...",
+      "sticker": "Đang tải sticker...",
+      "generic": "Đang tải..."
+    },
+    "createServer": {
+      "errors": {
+        "nameRequired": "Vui lòng nhập tên máy chủ",
+        "createFailed": "Không thể tạo máy chủ. Vui lòng thử lại."
+      },
+      "template": {
+        "title": "Tạo Máy Chủ Của Bạn",
+        "subtitleLine1": "Máy chủ của bạn là nơi bạn giao lưu với bạn bè của mình.",
+        "subtitleLine2": "Hãy tạo máy chủ của riêng bạn và bắt đầu trò chuyện.",
+        "startFromTemplate": "BẮT ĐẦU TỪ MẪU",
+        "haveInvite": "Bạn đã nhận được lời mời rồi?",
+        "joinServer": "Tham gia máy chủ",
+        "items": {
+          "custom": {
+            "name": "Tạo Mẫu Riêng"
+          },
+          "gaming": {
+            "name": "Gaming"
+          },
+          "friends": {
+            "name": "Bạn bè"
+          },
+          "study-group": {
+            "name": "Nhóm Học Tập"
+          },
+          "school-club": {
+            "name": "Câu Lạc Bộ Trường Học"
+          },
+          "local-community": {
+            "name": "Cộng Đồng Địa Phương"
+          },
+          "artists-creators": {
+            "name": "Nghệ Sĩ và Người Sáng Tạo"
+          }
+        }
+      },
+      "purpose": {
+        "title": "Cho chúng tôi biết thêm về máy chủ của bạn",
+        "subtitle": "Để giúp bạn thiết lập, máy chủ mới của bạn chỉ dành cho một vài người bạn hay cho một cộng đồng lớn hơn?",
+        "items": {
+          "club-community": "Dành cho một câu lạc bộ hoặc cộng đồng",
+          "me-and-friends": "Dành cho tôi và bạn bè tôi"
+        },
+        "notSure": "Bạn không chắc? Bạn có thể tạm thời",
+        "skip": "bỏ qua câu hỏi này"
+      },
+      "customize": {
+        "title": "Tùy chỉnh máy chủ của bạn",
+        "subtitle": "Hãy cá nhân hóa máy chủ bằng cách đặt tên và thêm biểu tượng đại diện. Bạn có thể đổi bất cứ lúc nào.",
+        "serverNameLabel": "Tên máy chủ",
+        "serverNamePlaceholder": "Nhập tên máy chủ",
+        "communityGuidelinesPrefix": "Khi tạo máy chủ, nghĩa là bạn đã đồng ý với",
+        "communityGuidelinesLink": "Nguyên Tắc Cộng Đồng",
+        "communityGuidelinesSuffix": "của Discord.",
+        "errors": {
+          "imageOnly": "Vui lòng chọn file ảnh",
+          "maxSize5mb": "Kích thước file không được vượt quá 5MB",
+          "loginRequired": "Bạn cần đăng nhập để upload ảnh",
+          "uploadFailed": "Không thể tải lên ảnh. Vui lòng thử lại."
+        }
+      }
+    },
+    "serverSettings": {
+      "ariaLabel": "Cài đặt máy chủ",
+      "sidebarTitlePrefix": "MÁY CHỦ CỦA",
+      "groups": {
+        "expressions": "BIỂU CẢM",
+        "people": "MỌI NGƯỜI",
+        "moderation": "ĐIỀU CHỈNH"
+      },
+      "sections": {
+        "profile": "Hồ sơ máy chủ",
+        "interactions": "Tương Tác",
+        "privileges": "Đặc Quyền Nâng Cấp",
+        "emoji": "Emoji",
+        "sticker": "Sticker",
+        "members": "Thành viên",
+        "roles": "Vai trò",
+        "invites": "Lời mời",
+        "access": "Truy cập",
+        "safety": "Thiết lập An toàn",
+        "bans": "Chặn",
+        "automod": "AutoMod",
+        "community": "Cài Đặt Cộng Đồng",
+        "community-overview": "Tổng Quan Cộng Đồng",
+        "community-onboarding": "Hướng Dẫn Làm Quen",
+        "delete-server": "Xóa máy chủ"
+      },
+      "profileDesc": "Tùy chỉnh cách máy chủ của bạn xuất hiện trong liên kết mời và, nếu được bật, trong Khám Phá Máy Chủ và tin nhắn Kênh Thông Báo",
+      "placeholder": {
+        "profile": "Trang chỉnh sửa Hồ Sơ Máy Chủ sẽ được minh họa từng mục sau.",
+        "section": "Nội dung cho mục \"{label}\" sẽ được bổ sung sau."
+      }
+    },
+    "deleteMessage": {
+      "title": "Bạn muốn thu hồi tin nhắn này ở phía ai?",
+      "forEveryone": {
+        "title": "Thu hồi với mọi người",
+        "desc": "Tin nhắn này sẽ bị thu hồi với mọi người trong đoạn chat. Những người khác có thể đã xem hoặc chuyển tiếp tin nhắn đó. Tin nhắn đã thu hồi vẫn có thể bị báo cáo."
+      },
+      "forMe": {
+        "title": "Thu hồi với bạn",
+        "desc": "Tin nhắn này sẽ bị gỡ khỏi thiết bị của bạn, nhưng vẫn hiển thị với các thành viên khác trong đoạn chat."
+      }
+    },
+    "reportMessage": {
+      "title": "Báo cáo tin nhắn",
+      "reasonLabel": "Lý do báo cáo *",
+      "descriptionLabel": "Mô tả chi tiết (tùy chọn)",
+      "descriptionPlaceholder": "Mô tả vấn đề bạn gặp phải...",
+      "submit": "Gửi báo cáo",
+      "reasons": {
+        "spam": "Spam",
+        "harassment": "Quấy rối",
+        "inappropriate": "Nội dung không phù hợp",
+        "misinfo": "Thông tin sai lệch",
+        "scam": "Lừa đảo",
+        "other": "Khác"
+      }
+    },
+    "invite": {
+      "searchPlaceholder": "Tìm kiếm bạn bè",
+      "sectionLabel": "Mời Vào Máy Chủ",
+      "invite": "Mời",
+      "invited": "Đã mời",
+      "orSendLink": "Hoặc, gửi link mời cho họ",
+      "empty": {
+        "noFriends": "Chưa có bạn bè để mời.",
+        "notFound": "Không tìm thấy bạn bè nào."
+      },
+      "errors": {
+        "cannotSendInvite": "Không gửi được lời mời"
+      }
+    },
+    "inviteServer": {
+      "title": "Mời bạn bè vào Máy chủ của {serverName}",
+      "sub": "Người nhận sẽ đến # chung",
+      "expireNote": "Link mời của bạn sẽ hết hạn sau 7 ngày. Chỉnh sửa link mời."
+    },
+    "inviteVoice": {
+      "title": "Mời bạn bè vào {serverName}",
+      "sub": "Người nhận sẽ đến {channelName}",
+      "expireNote": "Link mời dẫn thẳng vào kênh thoại này. Người chưa vào máy chủ sẽ thấy trang mời tham gia trước."
+    },
+    "serverProfile": {
+      "saved": "Đã lưu hồ sơ máy chủ.",
+      "errors": {
+        "fileUrlMissing": "Không lấy được URL tệp",
+        "bannerUrlMissing": "Không lấy được URL ảnh biểu ngữ",
+        "uploadAvatarFailed": "Không tải ảnh lên được",
+        "uploadBannerFailed": "Không tải ảnh biểu ngữ được",
+        "saveFailed": "Không lưu được hồ sơ máy chủ"
+      },
+      "info": {
+        "title": "Thông tin máy chủ",
+        "online": "Trực tuyến: {count}",
+        "members": "Thành viên: {count}",
+        "createdAt": "Ngày thành lập: {date}"
+      },
+      "name": {
+        "label": "Tên",
+        "placeholder": "Tên máy chủ"
+      },
+      "avatar": {
+        "label": "Biểu tượng",
+        "change": "Thay đổi biểu tượng máy chủ",
+        "remove": "Xóa biểu tượng",
+        "urlPlaceholder": "Hoặc dán URL biểu tượng"
+      },
+      "banner": {
+        "label": "Biểu ngữ",
+        "hint": "Chọn màu nền cho card (khám phá, lời mời, đơn đăng ký). Có thể thêm ảnh — ảnh được tối ưu trước khi tải lên.",
+        "upload": "Tải ảnh biểu ngữ",
+        "remove": "Xóa ảnh biểu ngữ",
+        "pickColorAria": "Chọn màu nền biểu ngữ",
+        "note": "Màu nền luôn áp dụng; nếu có ảnh, ảnh hiển thị phía trên màu nền."
+      },
+      "traits": {
+        "label": "Đặc điểm",
+        "hint": "Thêm tối đa 5 đặc điểm để thể hiện sở thích và tính cách của máy chủ.",
+        "pickEmoji": "Chọn emoji",
+        "placeholder": "Đặc điểm...",
+        "filledCount": "{count}/5 đặc điểm đã điền"
+      },
+      "description": {
+        "label": "Mô tả",
+        "hint": "Mô tả cho server.",
+        "placeholder": "Hãy giới thiệu một chút về máy chủ này với thế giới."
+      },
+      "preview": {
+        "noDescription": "Chưa có mô tả."
+      }
+    },
+    "popups": {
+      "closeAria": "Đóng",
+      "loading": "Đang tải...",
+      "applyToJoin": {
+        "ariaLabel": "Đơn đăng ký tham gia máy chủ",
+        "serverFallback": "Máy chủ",
+        "members": "{count} thành viên",
+        "establishedPrefix": "Thành lập từ",
+        "titleBeforeChat": "Trước khi bạn bắt đầu trò chuyện ở đây...",
+        "subtitleSteps": "Bạn sẽ phải hoàn thành các bước dưới đây.",
+        "sectionLabel": "Đơn đăng ký tham gia",
+        "emptyHint": "Chủ máy chủ chưa thêm câu hỏi. Nhấn Gửi để nộp đơn đăng ký tham gia.",
+        "answerPlaceholder": "Nhập câu trả lời...",
+        "submit": "Gửi",
+        "submitting": "Đang gửi…"
+      },
+      "createChannel": {
+        "title": "Tạo kênh",
+        "channelType": "Loại kênh",
+        "textName": "Văn bản",
+        "textDesc": "Gửi tin nhắn, hình ảnh, ảnh GIF, emoji, ý kiến, và chơi chữ",
+        "voiceName": "Giọng nói",
+        "voiceDesc": "Cùng gặp mặt bằng gọi thoại, video, và chia sẻ màn hình",
+        "channelName": "Tên kênh",
+        "defaultName": "kênh-mới",
+        "emojiTitle": "Thêm emoji / kaomoji",
+        "privateLabel": "Kênh riêng",
+        "privateDesc": "Chỉ có thành viên và vai trò được chọn mới có thể nhìn thấy kênh này.",
+        "creating": "Đang tạo...",
+        "createBtn": "Tạo kênh"
+      },
+      "createCategory": {
+        "title": "Tạo danh mục",
+        "nameLabel": "Tên danh mục",
+        "placeholder": "Danh mục mới",
+        "defaultName": "Danh mục mới",
+        "privateLabel": "Danh mục riêng",
+        "privateDesc": "Chỉ có thành viên và vai trò được chọn mới có thể xem danh mục này.",
+        "creating": "Đang tạo...",
+        "createBtn": "Tạo danh mục"
+      },
+      "deleteServer": {
+        "title": "Xóa \"{serverName}\"",
+        "message": "Bạn có chắc muốn xóa {serverName}? Hành động này không thể hoàn tác.",
+        "confirmLabel": "Nhập tên máy chủ",
+        "deleting": "Đang xóa…",
+        "deleteBtn": "Xóa máy chủ",
+        "error": "Không xóa được máy chủ"
+      },
+      "events": {
+        "title": "Sự kiện",
+        "create": "Tạo sự kiện",
+        "emptyTitle": "Không có sự kiện nào sắp diễn ra.",
+        "emptyDesc": "Lên lịch sự kiện cho bất kỳ kế hoạch hoạt động nào trong máy chủ của bạn.",
+        "emptyHint": "Bạn có thể trao quyền cho người khác tạo sự kiện trong Cài đặt máy chủ › Vai trò."
+      },
+      "shareEvent": {
+        "title": "Sẵn sàng. Giờ thì hãy chia sẻ sự kiện!",
+        "desc": "Sao chép liên kết sự kiện bên dưới để mời mọi người. Liên kết này cũng là liên kết mời vào máy chủ.",
+        "expireNote": "Link mời của bạn sẽ hết hạn sau 7 ngày."
+      },
+      "eventDetail": {
+        "headerCount": "1 sự kiện",
+        "createAnother": "Tạo sự kiện",
+        "location": "Máy chủ của {serverName}{channel}",
+        "locationChannel": " > #{name}",
+        "copyLink": "Sao chép link",
+        "interested": "Quan tâm",
+        "start": "Bắt đầu",
+        "starting": "Đang bắt đầu...",
+        "countdown": {
+          "started": "Đã bắt đầu",
+          "seconds": "Bắt đầu trong vài giây",
+          "minutes": "Bắt đầu sau {m} phút nữa",
+          "hours": "Bắt đầu sau {h} giờ nữa",
+          "hoursMinutes": "Bắt đầu sau {h} giờ {m} phút nữa"
+        }
+      },
+      "incomingCall": {
+        "canceled": "Cuộc gọi đã bị hủy",
+        "incoming": "Cuộc gọi đến...",
+        "videoCall": "Cuộc gọi video",
+        "voiceCall": "Cuộc gọi thoại",
+        "close": "Đóng",
+        "decline": "Từ chối",
+        "accept": "Nghe máy",
+        "declineAria": "Từ chối cuộc gọi",
+        "acceptAria": "Nghe cuộc gọi",
+        "closeAria": "Đóng"
+      },
+      "outgoingCall": {
+        "calling": "Đang gọi...",
+        "rejected": "Người nhận không khả dụng",
+        "noAnswer": "Không có người nghe máy",
+        "videoCall": "Cuộc gọi video",
+        "voiceCall": "Cuộc gọi thoại",
+        "cancelCall": "Hủy cuộc gọi",
+        "close": "Đóng",
+        "cancelAria": "Hủy cuộc gọi",
+        "closeAria": "Đóng"
+      },
+      "ignoreUser": {
+        "ariaIgnore": "Bỏ qua người dùng",
+        "ariaIgnored": "Đã bỏ qua người dùng",
+        "titleIgnored": "Bạn đã bỏ qua {name}",
+        "subtitleIgnored": "Tin nhắn và thông báo từ họ đang bị ẩn. Khôi phục để nhắn tin và nhận thông báo vào hộp thư như bình thường (DM và kênh chat server).",
+        "restore": "Khôi phục",
+        "restoring": "Đang xử lý...",
+        "title": "Bỏ qua {name}?",
+        "subtitle": "Dừng tương tác mà không để họ biết",
+        "hideProfile": "Ẩn hồ sơ và tin nhắn của họ",
+        "hideProfileDesc": "Bạn có thể hủy việc ẩn họ bất cứ lúc nào",
+        "muteNotif": "Tắt tiếng thông báo và hoạt động của họ",
+        "muteNotifDesc": "Bạn sẽ ít thấy họ trên ứng dụng hơn (DM, kênh chat, kênh thoại)",
+        "info": "Họ vẫn có thể nhắn tin cho bạn và xem hoạt động của bạn. Họ sẽ không biết bạn đã bỏ qua họ.",
+        "blockTitle": "Vẫn không đủ sao?",
+        "blockText": "Thay vào đó, hãy chặn",
+        "blockDesc": "Ngừng liên hệ trực tiếp và hạn chế những gì họ thấy. Không nhận tin nhắn hay cuộc gọi từ người đã chặn (DM và kênh trong server).",
+        "block": "Chặn",
+        "ignore": "Bỏ qua"
+      },
+      "memberProfile": {
+        "aria": "Hồ sơ thành viên",
+        "follow": "Follow",
+        "following": "Đã follow",
+        "message": "Nhắn tin",
+        "messageAria": "Nhắn tin",
+        "optionsAria": "Tùy chọn",
+        "joinFrom": "Gia nhập từ",
+        "roles": "Vai trò",
+        "owner": "Chủ",
+        "moderator": "Mod",
+        "member": "Thành viên",
+        "ownerBadge": "Chủ sở hữu",
+        "notes": "Ghi chú (chỉ hiển thị cho bạn)",
+        "notesHint": "Nhấp để thêm ghi chú",
+        "tabActivity": "Hoạt động",
+        "tabFollowers": "Follower chung",
+        "activityEmpty": "{name} không có hoạt động nào để chia sẻ ở đây.",
+        "activityHint": "Vẫn đang chờ xem họ sẽ chia sẻ nội dung gì tiếp theo — sao không phá vỡ bầu không khí ngại ngùng này nhỉ?",
+        "followersEmpty": "Follower chung sẽ hiển thị tại đây."
+      },
+      "messageSearch": {
+        "title": "Tìm kiếm tin nhắn",
+        "placeholderDm": "Tìm trong cuộc trò chuyện với {name}",
+        "placeholderServer": "Tìm nội dung tin nhắn...",
+        "allChannels": "Tất cả kênh",
+        "allUsers": "Tất cả người dùng",
+        "hasFile": "Có file",
+        "time": "Thời gian",
+        "fromDate": "Từ ngày",
+        "toDate": "Đến ngày",
+        "found": "Tìm thấy {count} kết quả",
+        "none": "Không tìm thấy kết quả",
+        "clearFilters": "Xóa bộ lọc",
+        "searching": "Đang tìm kiếm...",
+        "empty": "Không tìm thấy kết quả",
+        "emptyHint": "Thử từ khóa khác hoặc thay đổi bộ lọc",
+        "attachments": "{count} file đính kèm",
+        "loadMore": "Xem thêm ({count} kết quả)",
+        "loadingMore": "Đang tải...",
+        "todayAt": "Hôm nay lúc {time}",
+        "yesterday": "Hôm qua",
+        "daysAgo": "{n} ngày trước"
+      },
+      "inbox": {
+        "title": "Hộp thư đến",
+        "tabForYou": "Dành cho bạn",
+        "tabUnread": "Chưa đọc",
+        "tabMentions": "Đề cập",
+        "markAllTitle": "Đánh dấu đã đọc tất cả",
+        "markAllDoing": "Đang đánh dấu...",
+        "markAll": "Đánh dấu đã đọc",
+        "loading": "Đang tải...",
+        "emptyForYou": "Không có sự kiện, lời mời hoặc thông báo vai trò nào từ các máy chủ của bạn.",
+        "emptyUnread": "Không có tin nhắn hoặc thông báo chưa đọc từ các kênh.",
+        "emptyMentions": "Chưa có ai đề cập bạn trong kênh.",
+        "eventLive": "• Đang diễn ra",
+        "eventStarted": "đã bắt đầu trong máy chủ {serverName}.",
+        "inviteTitle": "Lời mời vào máy chủ",
+        "inviteMeta": "{inviter} mời bạn tham gia {serverName}.",
+        "accept": "Chấp nhận",
+        "acceptInviteAria": "Chấp nhận lời mời",
+        "decline": "Từ chối",
+        "declineInviteAria": "Từ chối lời mời",
+        "dmFallback": "Tin nhắn",
+        "newMessageFallback": "Bạn có tin nhắn mới",
+        "serverFallback": "Máy chủ",
+        "mentionYou": "đã đề cập bạn",
+        "timeMinutes": "{n} phút",
+        "timeHours": "{n} giờ",
+        "timeDays": "{n} ngày",
+        "adminViewTitle": "Quản trị viên hệ thống đang xem máy chủ",
+        "adminViewContent": "Quản trị viên hệ thống đang kiểm tra máy chủ \"{server}\" của bạn. Đây là hoạt động kiểm duyệt định kỳ.",
+        "mentionSpamWarning": "Bạn đã bị cảnh báo vì spam đề cập trong kênh của máy chủ \"{server}\". Vui lòng giảm số lần đề cập trong tin nhắn.",
+        "mentionSpamTitle": "⚠️ Cảnh báo spam đề cập"
+      }
+    },
+    "explore": {
+      "backToChat": "← Quay lại chat",
+      "title": "Khám phá",
+      "subtitle": "Tìm cộng đồng đã được duyệt để tham gia. Nếu máy chủ dùng Đăng ký tham gia, bạn phải nộp đơn trước.",
+      "loading": "Đang tải…",
+      "loadError": "Không tải được",
+      "empty": "Chưa có máy chủ được duyệt để hiển thị.",
+      "members": "{count} thành viên",
+      "badgeApply": " • Đăng ký tham gia",
+      "badgeInviteOnly": " • Chỉ mời",
+      "join": "Tham gia",
+      "inviteOnly": "Chỉ mời",
+      "inviteOnlyTitle": "Máy chủ này chỉ dành cho lời mời"
+    },
+    "sidebar": {
+      "contextExplore": "Khám phá",
+      "contextServer": "Máy chủ",
+      "contextDm": "Tin nhắn trực tiếp",
+      "inboxAria": "Hộp thư đến",
+      "createServerTitle": "Tạo máy chủ",
+      "settingsAria": "Cài đặt",
+      "exploreOpen": "Khám phá",
+      "exploreClose": "Đóng Khám phá",
+      "liveEvent": "Đang Diễn Ra",
+      "eventDetail": "Chi Tiết Sự Kiện",
+      "events": "Sự Kiện",
+      "eventsCount": "{count} Sự kiện",
+      "boostServer": "Nâng Cấp Máy Chủ",
+      "members": "Thành viên",
+      "noChannels": "Chưa có kênh",
+      "noChatChannels": "Chưa có kênh chat",
+      "noVoiceChannels": "Chưa có kênh đàm thoại",
+      "closeAria": "Đóng",
+      "eventDetailLive": "Đang Diễn Ra – Kết thúc {time}",
+      "eventDetailHostedBy": "Máy chủ của {name}",
+      "eventDetailCopyLink": "Sao Chép Link",
+      "eventDetailInterested": "Quan tâm",
+      "eventDetailStart": "Bắt đầu",
+      "eventDetailEnd": "Kết Thúc Sự Kiện"
+    },
+    "toasts": {
+      "messageRemovedAll": "Đã xóa tin nhắn cho mọi người",
+      "messageDeletedSelf": "Bạn đã xóa một tin nhắn"
+    },
+    "channelUi": {
+      "sectionChat": "Kênh tin nhắn",
+      "sectionVoice": "Kênh thoại",
+      "defaultCategoryLabel": "Kênh"
+    },
+    "roleEditor": {
+      "back": "TRỞ LẠI",
+      "editTitle": "SỬA ĐỔI VAI TRÒ - ",
+      "tabDisplay": "Hiển thị",
+      "tabPermissions": "Quyền hạn",
+      "tabMembers": "Quản Lý thành viên ({count})",
+      "esc": "ESC",
+      "deleteRoleTitle": "Xóa vai trò",
+      "confirmDeleteRole": "Bạn có chắc muốn xóa vai trò \"{name}\"?",
+      "errorDeleteRole": "Không xóa được vai trò",
+      "newRoleName": "vai trò mới",
+      "errorCreateRole": "Không tạo được vai trò",
+      "viewServerByRole": "Xem Máy Chủ Theo Vai Trò",
+      "delete": "Xóa",
+      "deleteRoleAria": "Xóa vai trò"
+    },
+    "roleDisplay": {
+      "roleNameLabel": "Tên vai trò",
+      "required": "*",
+      "roleNamePlaceholder": "Nhập tên vai trò",
+      "styleTitle": "Phong cách Vai trò",
+      "previewName": "Wumpus",
+      "previewRole": "Ủng bộ nhạc",
+      "previewBadge": "Ổn định",
+      "colorLabel": "Màu vai trò",
+      "colorHint": "Các thành viên sử dụng màu của vai trò cao nhất mà họ có trong danh sách vai trò.",
+      "displaySeparateToggle": "Hiển thị vai trò thành viên riêng biệt với các thành viên trực tuyến",
+      "mentionableToggle": "Cho phép mọi người @mention vai trò này",
+      "mentionableHint": "Ghi chú: Thành viên có quyền sử dụng \"Đề cập @everyone, @here và Tất Cả Vai Trò\" sẽ luôn có thể đề cập người có vai trò này.",
+      "viewAsRoleTitle": "Xem Máy Chủ Theo Vai Trò",
+      "viewAsRoleDesc": "Tính năng này cho phép bạn kiểm tra xem vai trò này có thể thực hiện những tác vụ nào và truy cập những kênh nào. Chỉ dành cho Chủ Sở Hữu Máy Chủ và Quản Trị Viên.",
+      "viewAsRoleBtn": "Xem Máy Chủ Theo Vai Trò",
+      "saveFailed": "Không lưu được thay đổi",
+      "unsavedBar": "Cẩn thận - bạn có thay đổi chưa lưu!",
+      "reset": "Đặt lại",
+      "saving": "Đang lưu...",
+      "saveChanges": "Lưu thay đổi"
+    },
+    "roleMembers": {
+      "loading": "Đang tải danh sách thành viên...",
+      "noAccessTitle": "Không có quyền truy cập",
+      "noAccessDesc": "Chỉ chủ máy chủ hoặc thành viên có vai trò Quản lý máy chủ mới có thể xem và quản lý danh sách thành viên.",
+      "everyoneTitle": "@everyone",
+      "everyoneDesc": "Vai trò @everyone được áp dụng tự động cho tất cả thành viên trong máy chủ. Bạn không thể thêm hoặc xóa thành viên khỏi vai trò này.",
+      "memberCount": "{count} thành viên",
+      "searchPlaceholder": "Tìm kiếm thành viên",
+      "addMember": "Thêm Thành Viên",
+      "emptySearch": "Không tìm thấy thành viên nào phù hợp với \"{query}\"",
+      "emptyRole": "Chưa có thành viên nào trong vai trò này",
+      "removeFromRoleTitle": "Xóa khỏi vai trò",
+      "confirmRemove": "Bạn có chắc muốn xóa thành viên khỏi vai trò này?",
+      "errorAdd": "Không thêm được thành viên",
+      "errorRemove": "Không xóa được thành viên",
+      "allHaveRole": "Tất cả thành viên đã có vai trò này"
+    },
+    "rolePermissions": {
+      "sections": {
+        "serverManagement": "QUYỀN QUẢN LÝ MÁY CHỦ",
+        "member": "QUYỀN THÀNH VIÊN",
+        "textChannel": "QUYỀN KÊNH TIN NHẮN",
+        "voiceChannel": "QUYỀN KÊNH THOẠI"
+      },
+      "searchPlaceholder": "Quyền tìm kiếm",
+      "noResults": "Không có quyền nào khớp \"{query}\"",
+      "unsavedBar": "Cẩn thận - bạn có thay đổi chưa lưu!",
+      "reset": "Đặt lại",
+      "saving": "Đang lưu...",
+      "saveChanges": "Lưu thay đổi",
+      "saveFailed": "Không lưu được thay đổi",
+      "items": {
+        "manageServer": {
+          "label": "Quản Lý Máy Chủ",
+          "description": "Cho phép thành viên chỉnh sửa tên, hình ảnh và các cài đặt cơ bản của máy chủ.",
+          "warning": "Đây là quyền quản trị viên mạnh mẽ. Hãy cân nhắc kỹ trước khi cấp."
+        },
+        "manageChannels": {
+          "label": "Quản Lý Kênh",
+          "description": "Cho phép thành viên tạo, chỉnh sửa và xóa kênh trong máy chủ.",
+          "warning": "Đây là quyền quản trị viên mạnh mẽ. Hãy cân nhắc kỹ trước khi cấp."
+        },
+        "manageEvents": {
+          "label": "Quản Lý Sự Kiện",
+          "description": "Cho phép thành viên tạo, chỉnh sửa và xóa sự kiện của máy chủ."
+        },
+        "createInvite": {
+          "label": "Tạo Lời Mời",
+          "description": "Cho phép thành viên mời người mới vào máy chủ này."
+        },
+        "changeNickname": {
+          "label": "Đổi Biệt Danh",
+          "description": "Cho phép thành viên tùy ý thay đổi biệt danh trong máy chủ này."
+        },
+        "manageNicknames": {
+          "label": "Quản Lý Biệt Danh",
+          "description": "Cho phép thành viên thay đổi biệt danh của thành viên khác."
+        },
+        "kickMembers": {
+          "label": "Đuổi, Chấp thuận và Từ chối Thành viên",
+          "description": "Tính năng Đuổi sẽ xóa các thành viên khác khỏi máy chủ này. Thành viên bị đuổi có thể tham gia lại nếu nhận được lời mời khác. Nếu máy chủ kích hoạt Yêu Cầu Đối Với Thành Viên, quyền này cho phép chấp thuận hoặc từ chối các thành viên yêu cầu tham gia vào máy chủ."
+        },
+        "banMembers": {
+          "label": "Cấm Thành Viên",
+          "description": "Cho phép thành viên cấm vĩnh viễn và xóa lịch sử tin nhắn của các thành viên khác từ máy chủ này."
+        },
+        "timeoutMembers": {
+          "label": "Hạn chế thành viên",
+          "description": "Khi bạn đặt một người dùng về trạng thái chờ (timeout) thì họ sẽ không thể gửi tin nhắn trò chuyện, trả lời chủ đề thảo luận, tương tác với tin nhắn, hoặc nói trong kênh thoại hoặc kênh Sân Khấu."
+        },
+        "mentionEveryone": {
+          "label": "Đề cập @everyone, @here và Tất Cả Vai Trò",
+          "description": "Cho phép thành viên dùng @everyone và @here để thông báo tới mọi người trong kênh, và đề cập các vai trò được bật \"cho phép đề cập\".",
+          "warning": "Chỉ nên cấp cho người đáng tin cậy."
+        },
+        "sendMessages": {
+          "label": "Gửi tin nhắn và tạo bài đăng",
+          "description": "Cho phép thành viên gửi tin nhắn trong các kênh văn bản và tạo bài đăng trong các kênh diễn đàn."
+        },
+        "sendMessagesInThreads": {
+          "label": "Gửi tin nhắn trong chủ đề và bài đăng",
+          "description": "Cho phép các thành viên gửi tin nhắn trong chủ đề và trong bài đăng trên các kênh diễn đàn."
+        },
+        "createPublicThreads": {
+          "label": "Tạo Chủ Đề Công Khai",
+          "description": "Cho phép thành viên được tạo chủ đề mà mọi người trong kênh đều có thể xem."
+        },
+        "createPrivateThreads": {
+          "label": "Tạo Các Chủ Đề Riêng Tư",
+          "description": "Cho phép thành viên được tạo chủ đề theo chỉ được mời."
+        },
+        "embedLinks": {
+          "label": "Nhúng liên kết",
+          "description": "Cho phép hiển thị nội dung nhúng của liên kết do thành viên chia sẻ trong các kênh chat."
+        },
+        "attachFiles": {
+          "label": "Đính kèm tập tin",
+          "description": "Cho phép thành viên tải lên tệp hoặc tệp media trong kênh chat."
+        },
+        "addReactions": {
+          "label": "Thêm Biểu Cảm",
+          "description": "Cho phép thành viên thêm hiệu ứng tương tác emoji mới vào tin nhắn. Nếu không cấp quyền này, thành viên vẫn có thể sử dụng các tương tác có sẵn trong tin nhắn."
+        },
+        "manageMessages": {
+          "label": "Quản lý tin nhắn",
+          "description": "Cho phép thành viên xóa hoặc gỡ bỏ các nội dung nhúng khối tin nhắn của thành viên khác."
+        },
+        "pinMessages": {
+          "label": "Ghim Tin Nhắn",
+          "description": "Cho phép thành viên ghim hoặc bỏ ghim tin nhắn bất kỳ."
+        },
+        "viewMessageHistory": {
+          "label": "Đọc lịch sử tin nhắn",
+          "description": "Cho phép đọc tin nhắn trước đó. Nếu không có quyền này, có thể chỉ thấy tin nhắn khi đang trực tuyến."
+        },
+        "sendVoiceMessages": {
+          "label": "Gửi tin nhắn thoại",
+          "description": "Cho phép gửi tin nhắn thoại."
+        },
+        "createPolls": {
+          "label": "Tạo bình chọn",
+          "description": "Cho phép tạo bình chọn."
+        },
+        "connect": {
+          "label": "Kết nối",
+          "description": "Cho phép tham gia kênh thoại và nghe người khác."
+        },
+        "speak": {
+          "label": "Nói",
+          "description": "Cho phép nói trong kênh thoại. Nếu không có quyền, người dùng bị tắt tiếng cho đến khi được bật lại."
+        },
+        "video": {
+          "label": "Video",
+          "description": "Cho phép video, chia sẻ màn hình hoặc phát trực tiếp trên máy chủ này."
+        },
+        "muteMembers": {
+          "label": "Tắt tiếng thành viên",
+          "description": "Cho phép tắt tiếng thành viên khác trong kênh thoại."
+        },
+        "deafenMembers": {
+          "label": "Tắt nghe thành viên",
+          "description": "Cho phép tắt nghe người khác để họ không nghe và không nói được."
+        },
+        "moveMembers": {
+          "label": "Di chuyển thành viên",
+          "description": "Cho phép ngắt kết nối hoặc chuyển thành viên giữa các kênh thoại mà bạn có thể truy cập."
+        },
+        "setVoiceChannelStatus": {
+          "label": "Đặt trạng thái kênh thoại",
+          "description": "Cho phép tạo và chỉnh sửa trạng thái kênh thoại."
+        }
+      }
+    },
+    "serverContextMenu": {
+      "aria": "Menu máy chủ",
+      "markAsRead": "Đánh Dấu Đã Đọc",
+      "inviteToServer": "Mời Vào Máy Chủ",
+      "muteServer": "Tắt âm Máy chủ",
+      "unmuteServer": "Bỏ tắt âm máy chủ",
+      "notificationSettings": "Cài đặt thông báo",
+      "hideVoiceChannels": "Ẩn Các Kênh Bị Tắt Âm",
+      "showAllChannels": "Hiện tất cả kênh",
+      "serverSettings": "Cài đặt máy chủ",
+      "createChannel": "Tạo kênh",
+      "createCategory": "Tạo Danh Mục",
+      "createEvent": "Tạo Sự kiện",
+      "leaveServer": "Rời khỏi phòng",
+      "notifAll": "Tất cả các tin nhắn",
+      "notifMentions": "Chỉ @mentions",
+      "notifNone": "Không có",
+      "muteFor15m": "Trong vòng 15 Phút",
+      "muteFor1h": "Trong vòng 1 Giờ",
+      "muteFor3h": "Trong vòng 3 Giờ",
+      "muteFor8h": "Trong vòng 8 Giờ",
+      "muteFor24h": "Trong vòng 24 Giờ",
+      "muteUntilReenable": "Cho đến khi bật lại",
+      "suppressEveryone": "Cấm @everyone và @here",
+      "suppressRoles": "Bỏ Tất Cả Vai Trò @mentions",
+      "hideHighlights": "Ẩn các tin tức nổi bật",
+      "muteNewEvents": "Tắt âm báo sự kiện mới",
+      "mobileNotif": "Thông báo nhắc nhở trên di động"
+    },
+    "profileEditor": {
+      "loading": "Đang tải…",
+      "serverLabel": "Máy chủ",
+      "selectServer": "— Chọn máy chủ —",
+      "serverHint": "Biểu ngữ và ảnh đại diện dùng chung với hồ sơ chính; xem trước hiển thị biệt danh trên máy chủ này.",
+      "serverNickLabel": "Biệt danh máy chủ",
+      "serverNickPlaceholder": "Tên hiển thị trong máy chủ",
+      "displayNameLabel": "Tên hiển thị",
+      "usernameLabel": "Username",
+      "pronounsLabel": "Đại từ nhân xưng",
+      "pronounsPlaceholder": "ví dụ: they/them",
+      "avatarLabel": "Ảnh Đại Diện",
+      "changeAvatar": "Đổi Ảnh Đại Diện",
+      "removeAvatar": "Xóa Ảnh Đại Diện",
+      "avatarDecoLabel": "Trang Trí Ảnh Đại Diện",
+      "changeAvatarDeco": "Thay Đổi Trang Trí",
+      "nameplateLabel": "Bảng Tên",
+      "changeNameplate": "Thay Đổi Bảng Tên",
+      "profileEffectLabel": "Hiệu Ứng Hồ Sơ",
+      "changeProfileEffect": "Thay đổi hiệu ứng",
+      "bannerColorLabel": "Màu Biểu Ngữ",
+      "changeBannerColorAria": "Chọn màu biểu ngữ",
+      "uploadBanner": "Tải ảnh biểu ngữ",
+      "removeBanner": "Xóa ảnh biểu ngữ",
+      "bioLabel": "Tiểu sử",
+      "bioHint": "Bạn có thể sử dụng các mã đánh dấu và đường liên kết nếu muốn.",
+      "insertEmojiAria": "Chèn emoji",
+      "previewTitle": "Xem trước",
+      "statusPlaceholder": "+ Thêm trạng thái",
+      "exampleBtn": "Nút Ví dụ",
+      "saveMain": "Lưu hồ sơ chính",
+      "saveServerNick": "Lưu biệt danh máy chủ",
+      "errorLoadProfile": "Không tải được hồ sơ.",
+      "savedProfile": "Đã lưu hồ sơ.",
+      "errorSaveProfile": "Không lưu được hồ sơ.",
+      "savedNick": "Đã lưu biệt danh máy chủ.",
+      "errorSaveNick": "Không lưu được.",
+      "updatedAvatar": "Đã cập nhật ảnh đại diện.",
+      "removeAvatarDone": "Đã xóa ảnh đại diện.",
+      "errorRemoveAvatar": "Không xóa được ảnh đại diện.",
+      "errorLoadBanner": "Không tải biểu ngữ lên được.",
+      "errorOpenRecent": "Không mở được ảnh gần đây (CORS hoặc mạng).",
+      "errorGetUrl": "Không lấy được URL",
+      "comingSoon": "Chức năng sẽ do bạn bổ sung sau."
+    },
+    "profileAvatarCrop": {
+      "title": "Cắt ảnh đại diện",
+      "subtitle": "Kéo và zoom để chọn vùng hiển thị tốt nhất.",
+      "closeAria": "Đóng",
+      "zoomLabel": "Thu phóng",
+      "cancel": "Hủy",
+      "saving": "Đang lưu…",
+      "save": "Lưu",
+      "errorNoCrop": "Chưa chọn vùng ảnh.",
+      "errorUpload": "Không tải lên được."
+    },
+    "profileImagePicker": {
+      "titleAvatar": "Chọn một Hình ảnh",
+      "titleBanner": "Chọn ảnh biểu ngữ",
+      "closeAria": "Đóng",
+      "uploadImage": "Tải Lên Hình Ảnh",
+      "pickGif": "Chọn Ảnh GIF",
+      "recentTitle": "Ảnh Đại Diện Gần Đây",
+      "recentHint": "Truy cập 6 ảnh đại diện tải lên gần đây nhất của bạn.",
+      "selectRecentAria": "Chọn ảnh gần đây",
+      "emptySlotAria": "Trống"
+    },
+    "profileBannerPicker": {
+      "hexLabel": "Mã hex",
+      "eyedropperTitle": "Lấy màu màn hình"
+    },
+    "communityOverview": {
+      "title": "Tổng quan cộng đồng",
+      "subtitle": "Thiết lập kênh quy tắc/hướng dẫn, ngôn ngữ chính của máy chủ và mô tả máy chủ.",
+      "loading": "Đang tải…",
+      "rulesChannelLabel": "Kênh quy tắc hoặc hướng dẫn",
+      "rulesChannelHint": "Chọn kênh sẽ hiển thị quy tắc/hướng dẫn cho thành viên (ví dụ: #chào-mừng-và-nội-quy).",
+      "noChannel": "— Không chọn —",
+      "langLabel": "Ngôn ngữ chính của máy chủ",
+      "langHint": "Chỉ hỗ trợ Tiếng Việt và English.",
+      "langVi": "Tiếng Việt",
+      "langEn": "English",
+      "descLabel": "Mô tả máy chủ",
+      "descHint": "Mô tả này sẽ hiển thị bên dưới link mời trong thẻ invite.",
+      "descPlaceholder": "Hãy giới thiệu một chút về máy chủ này với thế giới.",
+      "saving": "Đang lưu…",
+      "save": "Lưu thay đổi",
+      "errorSave": "Không lưu được"
+    },
+    "messagesPage": {
+      "contextExplore": "Khám phá",
+      "contextServer": "Máy chủ",
+      "contextDm": "Tin nhắn trực tiếp",
+      "inboxTitle": "Hộp thư đến",
+      "inboxAria": "Hộp thư đến",
+      "searchPlaceholder": "Tìm hoặc bắt đầu cuộc trò chuyện",
+      "directMessages": "TIN NHẮN TRỰC TIẾP",
+      "userFallback": "Người dùng",
+      "micOn": "Bật mic",
+      "micOff": "Tắt mic",
+      "soundOn": "Bật âm thanh",
+      "soundOff": "Tắt âm thanh",
+      "createServerTitle": "Tạo máy chủ",
+      "exploreTitle": "Khám phá",
+      "exploreClose": "Đóng Khám phá",
+      "settingsTitle": "Cài đặt",
+      "sectionChat": "Kênh Chat",
+      "sectionVoice": "Kênh Thoại",
+      "createChannelSectionLabelDefault": "Kênh Chat",
+      "reportDone": "Tin nhắn đã được báo cáo. Cảm ơn bạn!",
+      "voiceMessageLabel": "Tin nhắn thoại"
+    },
+    "channels": {
+      "catInfo": "Thông Tin",
+      "catText": "Kênh Chat",
+      "catVoice": "Kênh Thoại",
+      "general": "chung",
+      "highlights": "khoảnh-khắc-đỉnh-cao",
+      "lobby": "Sảnh",
+      "gaming": "trò-chơi",
+      "music": "âm-nhạc",
+      "waitingRoom": "Phòng Chờ",
+      "streamingRoom": "Phòng Stream",
+      "welcomeAndRules": "chào-mừng-và-nội-quy",
+      "notesResources": "ghi-chú-tài-nguyên",
+      "homeworkHelp": "trợ-giúp-làm-bài-tập-về-nhà",
+      "sessionPlanning": "lên-kế-hoạch-phiên",
+      "offTopic": "lạc-đề",
+      "studyRoom1": "Phòng Học 1",
+      "studyRoom2": "Phòng Học 2",
+      "announcements": "thông-báo",
+      "resources": "tài-nguyên",
+      "meetingPlan": "kế-hoạch-buổi-họp",
+      "meetingRoom1": "Phòng Họp 1",
+      "meetingRoom2": "Phòng Họp 2",
+      "events": "sự-kiện",
+      "feedback": "ý-kiến-và-phản-hồi",
+      "communityHub": "Nơi Tập Trung Cộng Đồng"
+    },
+    "serverInteractions": {
+      "title": "Tương Tác",
+      "desc": "Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới có thể thay đổi các cài đặt này.",
+      "systemMessages": "Tin Nhắn Hệ Thống",
+      "enableSystem": "Bật tin nhắn hệ thống",
+      "sendWelcome": "Gửi tin nhắn chào mừng thành viên mới",
+      "stickerReply": "Giúp thành viên trả lời thông báo chào mừng bằng sticker",
+      "systemChannel": "Kênh tin nhắn hệ thống",
+      "noChannel": "Không chọn",
+      "defaultNotif": "Cài đặt thông báo mặc định",
+      "notifAll": "Tất cả các tin nhắn",
+      "notifMentions": "Chỉ @mentions",
+      "roleNotif": "Thông Báo Vai Trò (Dành cho bạn)",
+      "roleNotifDesc": "Gửi thông báo theo vai trò, thành viên nhận được sẽ thấy trong tab Dành cho bạn.",
+      "notifTitlePlaceholder": "Tiêu đề thông báo",
+      "notifContentPlaceholder": "Nội dung thông báo",
+      "targetEveryone": "@everyone",
+      "targetRole": "Theo vai trò",
+      "sendBtn": "Gửi thông báo",
+      "sendingBtn": "Đang gửi...",
+      "loading": "Đang tải cài đặt tương tác...",
+      "loadError": "Không tải được dữ liệu",
+      "loadFail": "Không tải được cài đặt tương tác",
+      "saveError": "Không lưu được cài đặt",
+      "sendError": "Không gửi được thông báo",
+      "errTitle": "Vui lòng nhập tiêu đề và nội dung thông báo",
+      "errRole": "Vui lòng chọn vai trò",
+      "sentAlert": "Đã gửi thông báo cho {n} thành viên."
+    },
+    "serverSafety": {
+      "loadError": "Không tải được thiết lập an toàn.",
+      "verifyTitle": "Mức xác minh",
+      "verifyDesc": "Thành viên của máy chủ phải đáp ứng được các tiêu chí sau để gửi tin nhắn trong kênh văn bản hoặc bắt đầu cuộc trò chuyện bằng tin nhắn trực tiếp. Nếu thành viên đã được chỉ định vai trò và hướng dẫn làm quen trên máy chủ không bật thì không cần sử dụng các tiêu chí này nữa.",
+      "verifyRecommend": "Chúng tôi khuyến nghị bạn nên cài đặt mức xác minh cho Máy Chủ Cộng Đồng.",
+      "changeBtn": "Thay đổi",
+      "verifyAriaLabel": "Mức xác minh",
+      "contentFilterTitle": "Bộ lọc nội dung nhạy cảm",
+      "contentFilterDesc": "Chọn nếu thành viên máy chủ có thể chia sẻ nội dung đa phương tiện có hình ảnh được bộ lọc nội dung nhạy cảm phát hiện. Cài đặt này sẽ áp dụng cho các kênh không giới hạn độ tuổi.",
+      "learnMore": "Tìm hiểu thêm",
+      "contentFilterAriaLabel": "Bộ lọc nội dung nhạy cảm",
+      "verifyNoneTitle": "Không",
+      "verifyNoneDesc": "Không giới hạn",
+      "verifyLowTitle": "Thấp",
+      "verifyLowDesc": "Bạn cần xác nhận email đăng kí Cordigram.",
+      "verifyMediumTitle": "Trung bình",
+      "verifyMediumDesc": "Phải đăng kí Cordigram lâu hơn 5 phút.",
+      "verifyHighTitle": "Cao",
+      "verifyHighDesc": "Phải là thành viên trong máy chủ này lâu hơn 10 phút.",
+      "filterAllTitle": "Lọc tin nhắn từ tất cả thành viên",
+      "filterAllDesc": "Tất cả tin nhắn sẽ được lọc để phát hiện nội dung đa phương tiện có hình ảnh nội dung nhạy cảm.",
+      "filterNoRoleTitle": "Lọc tin nhắn từ các thành viên máy chủ không giữ vai trò",
+      "filterNoRoleDesc": "Các tin nhắn từ những thành viên máy chủ không giữ vai trò sẽ bị lọc để phát hiện nội dung đa phương tiện có hình ảnh nhạy cảm.",
+      "filterNoneTitle": "Không lọc",
+      "filterNoneDesc": "Các tin nhắn sẽ không bị lọc đối với nội dung đa phương tiện có hình ảnh nhạy cảm."
+    },
+    "serverEmoji": {
+      "denied": "Chỉ chủ máy chủ hoặc thành viên có quyền quản lý máy chủ mới chỉnh sửa được emoji.",
+      "loading": "Đang tải emoji…",
+      "loadError": "Lỗi tải emoji",
+      "fileTooLarge": "File không được vượt quá 2 MB.",
+      "fileInvalid": "Chỉ hỗ trợ PNG, JPG, GIF hoặc WebP.",
+      "title": "Emoji",
+      "desc": "Thành viên có thể dùng tối đa {max} emoji tùy chỉnh trên máy chủ này. Bạn có thể tải ảnh tĩnh (PNG, JPG, WebP) hoặc GIF động. Tên emoji mặc định lấy từ tên file (chỉ chữ, số và dấu gạch dưới).",
+      "uploadBtn": "Tải lên emoji",
+      "slotsLeft": "Còn {n}/{max} chỗ",
+      "dropHint": "Kéo thả file vào đây để tải lên nhanh (PNG, JPG, GIF, WebP — tối đa 2 MB).",
+      "sectionTitle": "Emoji",
+      "sectionSub": "{n} chỗ trống sẵn có (tối đa {max} emoji tùy chỉnh, tĩnh + GIF)",
+      "animSection": "Emoji hoạt hình",
+      "animSub": "{n} GIF · còn {r} chỗ trong tổng {max}",
+      "colImage": "Hình ảnh",
+      "colName": "Tên",
+      "colUploader": "Tải lên bởi",
+      "emptyStatic": "Chưa có emoji tĩnh",
+      "emptyAnimated": "KHÔNG"
+    },
+    "serverSticker": {
+      "denied": "Chỉ chủ máy chủ hoặc thành viên có quyền quản lý máy chủ mới chỉnh sửa được sticker.",
+      "loading": "Đang tải sticker…",
+      "loadError": "Lỗi tải sticker",
+      "fileTooLarge": "File không được vượt quá 2 MB.",
+      "fileInvalid": "Chỉ hỗ trợ PNG, JPG hoặc WebP.",
+      "bannerAriaLabel": "Nâng cấp máy chủ",
+      "bannerTitle": "Nhận Nâng Cấp",
+      "bannerDesc": "Nâng cấp máy chủ lên Cấp 1 trở lên sẽ mở thêm ô sticker và các đặc quyền khác. Hiện tại máy chủ chỉ dùng {n} ô sticker miễn phí — phần nâng cấp sẽ được bổ sung sau.",
+      "btnUpgrade": "Nâng Cấp Máy Chủ",
+      "btnLearnMore": "Tìm hiểu thêm",
+      "freeTitle": "Ô miễn phí",
+      "freeSub": "{n} trong số {total} ô sẵn có",
+      "uploadBtn": "Tải Lên Sticker",
+      "notice": "Ảnh tĩnh (PNG/JPG/WebP): cắt vuông, nén ~500 KB rồi tải lên Cloudinary (URL lưu DB). Sticker GIF: tải nguyên file tối đa 2 MB lên Cloudinary. Giới hạn hiện tại: {max} sticker trên máy chủ.",
+      "tierTitle": "Cấp {n}",
+      "tierNote": "Cần nâng cấp máy chủ (sắp có)",
+      "tierBonus10": "+10 Ô Sticker",
+      "tierBonus15": "+15 Ô Sticker (tổng cộng là 30)",
+      "tierBonus30": "+30 Ô Sticker (tổng cộng là 60)",
+      "boosts": "{n} Nâng Cấp",
+      "buyBtn": "Mua Cấp Độ"
+    },
+    "serverMembers": {
+      "showInChannelLabel": "Hiện thành viên trong danh sách kênh",
+      "showInChannelDesc": "Khi bật, chỉ hiển thị tối đa 50 thành viên: đang trực tuyến, tài khoản mới (< 7 ngày), gia nhập gần đây hoặc có hoạt động tin nhắn trong 7 ngày — phù hợp hiển thị trong danh sách kênh.",
+      "searchResults": "Kết quả tìm kiếm",
+      "searchPlaceholder": "Tìm theo username hoặc user ID (lọc ngay)",
+      "sortBtn": "Sắp xếp",
+      "sortNewest": "Gia nhập từ (mới nhất trước)",
+      "sortOldest": "Gia nhập từ (lâu nhất trước)",
+      "sortUsername": "Username (A → Z)",
+      "sortActivity": "Hoạt động (nhiều → ít)",
+      "filterLabel": "Lọc",
+      "filterNewAccount": "Tài khoản mới (< 7 ngày)",
+      "filterSpam": "Spam (> 50 tin / 10 phút)",
+      "roleLabel": "Vai trò",
+      "roleAll": "Mọi vai trò",
+      "roleOwner": "Chủ",
+      "roleModerator": "Điều hành",
+      "roleMember": "Thành viên",
+      "pruneBtn": "Lược bỏ",
+      "loading": "Đang tải...",
+      "loadFail": "Không tải được danh sách",
+      "colCheck": "Chọn tất cả",
+      "colName": "TÊN",
+      "memberOptions": "Tùy chọn",
+      "resultCount": "Đang hiển thị {n} thành viên",
+      "resultCountCapped": " (tối đa 50 khi bật hiển thị trong kênh)",
+      "ownerBadge": "Chủ",
+      "modBadge": "Mod",
+      "memberBadge": "Thành viên",
+      "menuProfile": "Hồ sơ",
+      "menuMessage": "Nhắn tin",
+      "menuTimeout": "Hạn chế {name}",
+      "menuKick": "Đuổi {name}",
+      "menuBan": "Cấm {name}",
+      "filterTitle": "Lọc thành viên — Máy chủ",
+      "filterClose": "Đóng",
+      "filterLastSeen": "Lần cuối nhìn thấy",
+      "filterDays7": "hơn 7 ngày trước",
+      "filterDays30": "hơn 30 ngày trước",
+      "filterIncludeRole": "Đồng thời bao gồm thành viên giữ vai trò",
+      "filterRoleAll": "Tất cả vai trò",
+      "filterRoleNone": "Không có vai trò (thành viên)",
+      "filterRoleMember": "Thành viên",
+      "filterRoleMod": "Mod (quản lý server)",
+      "filterHint": "Việc thanh lọc sẽ loại bỏ thành viên ít hoạt động trong khoảng thời gian đã chọn. Họ có thể vào lại máy chủ nếu được mời lại.",
+      "filterSelectHint": "Chọn điều kiện để xem trước số lượng thành viên sẽ bị lược bỏ.",
+      "filterPreview": "Sẽ lược bỏ {n} thành viên.",
+      "filterCancel": "Hủy bỏ",
+      "filterApply": "Lược bỏ",
+      "filterApplying": "Đang lược bỏ...",
+      "filterConfirm": "Bạn chắc chắn muốn lược bỏ {n} thành viên không hoạt động hơn {days} ngày?",
+      "filterDone": "Đã lược bỏ {n} thành viên.",
+      "filterError": "Không lược bỏ được",
+      "moderateKickTitle": "Đuổi {name}",
+      "moderateBanTitle": "Cấm {name}",
+      "moderateTimeoutTitle": "Tạm khóa {name}",
+      "kickDesc": "Người này sẽ bị loại khỏi server nhưng có thể tham gia lại nếu được mời.",
+      "banDesc": "Người này sẽ bị cấm vĩnh viễn và không thể tham gia lại server.",
+      "timeoutDesc": "Người này sẽ bị tạm khóa và không thể gửi tin nhắn trong khoảng thời gian đã chọn.",
+      "timeoutDuration": "Thời gian tạm khóa",
+      "reason": "Lý do (không bắt buộc)",
+      "reasonPlaceholder": "Nhập lý do...",
+      "moderateCancel": "Hủy",
+      "moderateApplying": "Đang xử lý...",
+      "kick": "Đuổi",
+      "ban": "Cấm",
+      "timeout": "Tạm khóa",
+      "moderateFail": "Không thực hiện được hành động",
+      "transferTitle": "Chuyển quyền sở hữu",
+      "transferDesc": "Chuyển quyền sở hữu máy chủ cho {name}? Người này sẽ trở thành chủ máy chủ, bạn sẽ trở thành thành viên.",
+      "transferCancel": "Hủy bỏ",
+      "transferApplying": "Đang xử lý...",
+      "transferBtn": "Chuyển quyền",
+      "transferFail": "Không chuyển được quyền sở hữu",
+      "joinOwner": "Chủ máy chủ",
+      "joinInvited": "Mời bởi {name}",
+      "joinUrl": "Tham gia bằng URL",
+      "timeout60s": "60 giây",
+      "timeout5m": "5 phút",
+      "timeout10m": "10 phút",
+      "timeout1h": "1 giờ",
+      "timeout1d": "1 ngày",
+      "timeout1w": "1 tuần"
+    },
+    "serverAccess": {
+      "loading": "Đang tải cài đặt truy cập...",
+      "loadError": "Không tải được cài đặt truy cập",
+      "saveError": "Không lưu được cài đặt truy cập",
+      "title": "Truy cập",
+      "desc": "Chọn cách thành viên tham gia và (nếu bật) yêu cầu chấp nhận quy định trước khi chat.",
+      "inviteOnlyTitle": "Chỉ Dành Cho Lời Mời",
+      "inviteOnlyHint": "Mọi người có thể tham gia máy chủ của bạn trực tiếp bằng một lời mời",
+      "applyTitle": "Đăng ký tham gia",
+      "applyHint": "Phải nộp đơn đăng ký và được chấp thuận mới có thể tham gia",
+      "discoverTitle": "Có Thể Khám Phá",
+      "discoverHint": "Bất kỳ ai cũng có thể trực tiếp tham gia máy chủ của bạn thông qua Khám Phá Máy Chủ",
+      "discoveryMet": "Máy chủ của bạn đã đáp ứng đủ các yêu cầu để được hiển thị trong mục Khám Phá Máy Chủ",
+      "discoveryNotMet": "Máy chủ của bạn hiện không đáp ứng đủ các yêu cầu để được hiển thị trong mục Khám Phá Máy Chủ",
+      "checkingDiscovery": "Đang kiểm tra...",
+      "ageTitle": "Age Restricted",
+      "ageDesc": "Bật để chặn người dưới 18 tuổi.",
+      "rulesToggleTitle": "Server Rules",
+      "rulesToggleDesc": "Bật để yêu cầu người dùng chấp nhận quy định.",
+      "rulesSection": "Quy định",
+      "rulesEnabledDesc": "Thêm và quản lý quy định áp dụng cho máy chủ.",
+      "rulesDisabledDesc": "Bật Server Rules để thêm quy định.",
+      "rulesPlaceholder": "Nhập nội dung quy định",
+      "addRuleBtn": "Thêm quy định",
+      "addRuleChipTitle": "Thêm quy định mẫu",
+      "noRules": "Chưa có quy định.",
+      "addRuleError": "Không thêm được quy định",
+      "joinFormTitle": "Đơn đăng ký tham gia",
+      "joinFormDesc": "Thêm câu hỏi vào đơn đăng ký của bạn. Mọi người không thể tham gia máy chủ cho đến khi được bạn phê duyệt đơn đăng ký.",
+      "joinFormToggleTitle": "Bật/tắt đơn đăng ký tham gia",
+      "agreeRulesQuestion": "Đọc và đồng ý với các Quy Định Máy Chủ",
+      "agreeRulesBadge": "Quy Định Máy Chủ",
+      "editQuestion": "Sửa",
+      "deleteQuestion": "Xóa",
+      "addQuestionBtn": "+ Thêm câu hỏi",
+      "addQuestionChipTitle": "Thêm câu hỏi mẫu",
+      "maxQuestions": "Tối đa {max} câu hỏi. Còn lại: {n}.",
+      "joinFormSaveError": "Không lưu được đơn đăng ký tham gia",
+      "pickTypeTitle": "Chọn loại câu hỏi",
+      "typeShort": "Câu Trả Lời Ngắn",
+      "typeParagraph": "Đoạn",
+      "typeMultiple": "Nhiều Lựa Chọn",
+      "questionPlaceholder": "Nhập câu hỏi của bạn",
+      "optionPlaceholder": "Tùy chọn {n}",
+      "addOption": "+ Thêm 1 tùy chọn",
+      "removeOptionTitle": "Xóa tùy chọn",
+      "modalCancel": "Hủy bỏ",
+      "modalSave": "Lưu"
+    },
+    "serverBans": {
+      "desc": "Cấm mặc định theo tài khoản và IP. Một người dùng có thể qua mặt lệnh cấm IP bằng cách sử dụng proxy. Việc qua mặt lệnh cấm sẽ rất khó thực hiện khi mở xác minh số điện thoại trong",
+      "moderation": "Kiểm duyệt",
+      "searchPlaceholder": "Tìm kiếm lệnh cấm theo ID người dùng hoặc Tên người dùng",
+      "searchBtn": "Tìm kiếm",
+      "loading": "Đang tải danh sách...",
+      "noBansTitle": "KHÔNG CẤM",
+      "noBansDesc": "Bạn chưa cấm một ai cả... nhưng nếu và khi bắt buộc phải làm như vậy, đừng do dự!",
+      "noBansSearch": "Không tìm thấy người dùng bị cấm phù hợp với tìm kiếm của bạn.",
+      "reason": "Lý do: {reason}",
+      "unbanBtn": "Gỡ lệnh cấm",
+      "resultCount": "Hiển thị {n} trên tổng số {total} người dùng bị cấm",
+      "restrictedTitle": "Thành viên bị hạn chế (Spam đề cập)",
+      "restrictedEmpty": "Không có thành viên nào bị hạn chế.",
+      "restricted": "Bị hạn chế gửi tin nhắn",
+      "mentionBlocked": "Chặn đề cập đến {date}",
+      "unrestrictBtn": "Mở hạn chế",
+      "confirmTitle": "Gỡ lệnh cấm",
+      "confirmDesc": "Bạn có chắc chắn muốn gỡ lệnh cấm cho {name} (@{username})? Người dùng này sẽ có thể tham gia lại máy chủ bằng lời mời mới.",
+      "confirmCancel": "Hủy",
+      "confirmSubmit": "Gỡ lệnh cấm",
+      "confirming": "Đang gỡ...",
+      "loadFail": "Không tải được danh sách chặn",
+      "unbanFail": "Gỡ lệnh cấm thất bại"
+    },
+    "autoMod": {
+      "loadError": "Không tải được cài đặt AutoMod.",
+      "spamTitle": "Chặn spam đề cập",
+      "spamDesc": "Chặn các tin nhắn vượt quá số lượt đề cập đến vai trò và người dùng",
+      "settingsBtn": "Cài đặt",
+      "ruleNameLabel": "Tên quy tắc",
+      "ruleNameValue": "Chặn spam đề cập",
+      "toggleAriaLabel": "Bật/Tắt",
+      "section1Title": "Số lượt giới hạn cấu hình",
+      "mentionLimitTitle": "Số lượt đề cập đặc biệt (vai trò + người dùng) mỗi tin nhắn",
+      "mentionLimitDesc": "Giới hạn số lần đề cập đặc biệt trong mỗi tin nhắn",
+      "section2Title": "Chọn một phản hồi",
+      "blockTitle": "Chặn tin nhắn",
+      "blockDesc": "Chặn các tin nhắn vượt quá số lượt đề cập duy nhất.",
+      "blockDesc2": "Một thông báo tùy biến báo lỗi có thể được hiển thị cho các thành viên.",
+      "editNotifLink": "Chỉnh Sửa Thông Báo Tùy Biến",
+      "warnTitle": "Gửi cảnh báo",
+      "warnDesc": "Gửi một cảnh báo có chứa tin nhắn được gần cở đến một kênh đã chọn.",
+      "restrictTitle": "Thành viên bị hạn chế",
+      "restrictDesc": "Tạm thời vô hiệu hóa khả năng gửi tin nhắn hoặc tham gia các kênh thoại của thành viên.",
+      "section3Title": "Cho phép các vai trò hoặc kênh nhất định (không bắt buộc)",
+      "searchPlaceholder": "Tìm kiếm kênh hoặc vai trò",
+      "groupChannels": "KÊNH",
+      "groupRoles": "VAI TRÒ",
+      "noResults": "Không tìm thấy kết quả",
+      "exemptNote": "Suyt - các thành viên có quyền Quản trị viên và Quản lý máy chủ luôn không nằm trong các quy tắc lọc.",
+      "cancelBtn": "Hủy bỏ",
+      "saveBtn": "Lưu thay đổi",
+      "savingBtn": "Đang lưu...",
+      "tagBlock": "chặn tin nhắn",
+      "tagWarn": "gửi cảnh báo",
+      "tagRestrict": "thành viên bị hạn chế",
+      "notifModalTitle": "Chỉnh Sửa Thông Báo Tùy Biến",
+      "notifModalDesc": "Thông báo tùy biến của bạn sẽ được hiển thị khi AutoMod chặn tin nhắn của thành viên. Đây là cơ hội để giúp các thành viên hiểu được quy tắc máy chủ!",
+      "notifPlaceholder": "Nhập thông báo tùy biến của bạn",
+      "notifCancel": "Hủy bỏ",
+      "notifSave": "Chỉnh sửa"
+    },
+    "noMessages": "Chưa có tin nhắn. Hãy bắt đầu trò chuyện!",
+    "loadingMessages": "Đang tải tin nhắn...",
+    "welcome": {
+      "title": "Chào mừng đến với",
+      "serverOf": "Máy chủ của {name}",
+      "channelBegin": "Đây là khởi đầu của kênh",
+      "startTalking": ". Hãy bắt đầu cuộc trò chuyện!",
+      "greeting": "Rất vui được gặp bạn, {name}!",
+      "unknownUser": "Ai đó",
+      "waving": "Đang gửi...",
+      "waveBtn": "Vẫy tay chào {name}!"
+    },
+    "dmList": {
+      "sent": "Đã gửi",
+      "seen": "Đã xem"
+    },
+    "mention": {
+      "tooltip": "Đề cập (@mention)"
+    },
+    "applyPending": {
+      "title": "Đơn đăng ký tham gia {server} của bạn đang được xem xét!",
+      "desc": "Bạn sẽ nhận được thông báo khi có bản cập nhật.",
+      "withdraw": "Thu hồi",
+      "withdrawError": "Không thu hồi được",
+      "joinError": "Không tham gia được máy chủ"
+    }
+  },
+  "settings": {
+    "title": "Cài đặt",
+    "close": "Đóng",
+    "saved": "Đã lưu.",
+    "failedToLoad": "Không tải được cài đặt.",
+    "sections": {
+      "general": "Cài đặt chung",
+      "privacy": "Quyền riêng tư",
+      "messages": "Tin nhắn & cuộc gọi",
+      "appearance": "Giao diện",
+      "notifications": "Thông báo",
+      "profile": "Hồ sơ"
+    },
+    "general": {
+      "dmDirectoryTitle": "Danh bạ (DM)",
+      "dmDirectoryHint": "Chỉ áp dụng khi bạn đang ở Tin nhắn trực tiếp.",
+      "dmDirectoryAllFriends": "Hiển thị tất cả bạn bè",
+      "dmDirectoryOnlineFriends": "Chỉ bạn bè đang online",
+      "languageTitle": "Ngôn ngữ",
+      "languageHint": "Áp dụng cho Chat (trang này) và Social (cookie NEXT_LOCALE).",
+      "languageLabel": "Ngôn ngữ hiển thị",
+      "languageNames": {
+        "vi": "Tiếng Việt",
+        "en": "English",
+        "ja": "日本語",
+        "zh": "中文"
+      }
+    },
+    "privacy": {
+      "title": "Quyền riêng tư",
+      "hint": "Ẩn ngày tham gia Cordigram trên hồ sơ công khai. Tắt chia sẻ trạng thái online/idle/offline với người khác (danh sách thành viên máy chủ).",
+      "showMemberSince": "Hiển thị ngày tham gia Cordigram",
+      "sharePresence": "Chia sẻ trạng thái (online / chờ / offline)"
+    },
+    "messages": {
+      "title": "Tin nhắn & cuộc gọi",
+      "allowMessageLabel": "Cho phép nhắn tin",
+      "allowCallLabel": "Cho phép gọi điện",
+      "everyone": "Tất cả mọi người",
+      "followersOnly": "Chỉ những người bạn đang follow",
+      "blockTitle": "Chặn tin nhắn",
+      "blockedList": "Danh sách chặn ›",
+      "ignoredList": "Danh sách bỏ qua ›",
+      "blockedHeading": "Đã chặn",
+      "ignoredHeading": "Đang bỏ qua",
+      "empty": "Trống",
+      "unblock": "Bỏ chặn",
+      "unignored": "Gỡ bỏ qua"
+    },
+    "appearance": {
+      "title": "Giao diện",
+      "hint": "Chế độ sáng / tối (đồng bộ tài khoản).",
+      "light": "Sáng",
+      "dark": "Tối"
+    },
+    "notifications": {
+      "title": "Thông báo",
+      "masterLabel": "Thông báo",
+      "masterHint": "Bật: thông báo bình thường. Tắt: tắt mọi thông báo (social + DM/server qua cài đặt tài khoản).",
+      "enabledToast": "Đã bật thông báo.",
+      "disabledToast": "Đã tắt thông báo.",
+      "soundLabel": "Âm thanh thông báo (tin & thông báo mới)"
+    },
+    "profile": {
+      "title": "Hồ sơ",
+      "main": "Hồ sơ chính",
+      "server": "Hồ sơ máy chủ"
+    },
+    "errorLoadBlocked": "Không tải danh sách chặn.",
+    "errorLoadIgnored": "Không tải danh sách bỏ qua.",
+    "errorUpdate": "Không cập nhật được.",
+    "errorSave": "Không lưu được.",
+    "unblockedToast": "Đã bỏ chặn.",
+    "errorUnblock": "Không bỏ chặn được.",
+    "unignoredToast": "Đã gỡ bỏ qua.",
+    "errorUnignore": "Không gỡ được.",
+    "ariaShowMemberSince": "Bật tắt ngày tham gia",
+    "ariaSharePresence": "Bật tắt trạng thái"
+  }
+}

@@ -682,6 +682,20 @@ export class ServersController {
     return { message: 'Left server successfully' };
   }
 
+  @Patch(':id/me/nickname')
+  async updateMyServerNickname(
+    @Param('id') serverId: string,
+    @Body() body: { nickname?: string },
+    @Request() req: any,
+  ) {
+    await this.serversService.updateMyServerNickname(
+      serverId,
+      req.user.userId,
+      body?.nickname ?? '',
+    );
+    return { ok: true };
+  }
+
   @Post(':id/members/:memberId')
   async addMember(
     @Param('id') serverId: string,

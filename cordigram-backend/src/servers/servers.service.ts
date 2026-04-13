@@ -226,72 +226,110 @@ export class ServersService {
 
     // Template channel definitions
     const template = createServerDto.template || 'custom';
+    const lang = createServerDto.language || 'vi';
+
     interface ChannelDef {
       name: string;
       type: 'text' | 'voice';
       category?: string | null;
       isDefault?: boolean;
     }
+
+    // Localised names for system categories and channel slots
+    const CATEGORY_NAMES: Record<string, Record<string, string>> = {
+      info:  { vi: 'Thông Tin',  en: 'Information',       ja: '情報',              zh: '信息'       },
+      text:  { vi: 'Kênh Chat',  en: 'Text Channels',     ja: 'テキストチャンネル', zh: '文字频道'   },
+      voice: { vi: 'Kênh Thoại', en: 'Voice Channels',    ja: 'ボイスチャンネル',  zh: '语音频道'   },
+    };
+
+    const CH: Record<string, Record<string, string>> = {
+      general:          { vi: 'chung',                          en: 'general',           ja: '一般',             zh: '综合'       },
+      generalVoice:     { vi: 'general',                        en: 'general',           ja: '一般',             zh: '综合'       },
+      highlights:       { vi: 'khoảnh-khắc-đỉnh-cao',          en: 'highlights',        ja: 'ハイライト',       zh: '精彩时刻'   },
+      lobby:            { vi: 'Sảnh',                           en: 'Lobby',             ja: 'ロビー',           zh: '大厅'       },
+      gaming:           { vi: 'trò-chơi',                       en: 'gaming',            ja: 'ゲーム',           zh: '游戏'       },
+      music:            { vi: 'âm-nhạc',                        en: 'music',             ja: '音楽',             zh: '音乐'       },
+      waitingRoom:      { vi: 'Phòng Chờ',                      en: 'Waiting Room',      ja: '待機室',           zh: '等待室'     },
+      streamingRoom:    { vi: 'Phòng Stream',                   en: 'Streaming',         ja: '配信',             zh: '直播'       },
+      welcomeAndRules:  { vi: 'chào-mừng-và-nội-quy',          en: 'welcome-and-rules', ja: 'ようこそ-ルール',   zh: '欢迎-规则'  },
+      notesResources:   { vi: 'ghi-chú-tài-nguyên',            en: 'notes-resources',   ja: 'ノート-リソース',   zh: '笔记-资源'  },
+      homeworkHelp:     { vi: 'trợ-giúp-làm-bài-tập-về-nhà',  en: 'homework-help',     ja: '宿題サポート',     zh: '作业帮助'   },
+      sessionPlanning:  { vi: 'lên-kế-hoạch-phiên',            en: 'session-planning',  ja: 'セッション計画',   zh: '学习计划'   },
+      offTopic:         { vi: 'lạc-đề',                         en: 'off-topic',         ja: '雑談',             zh: '闲聊'       },
+      studyRoom1:       { vi: 'Phòng Học 1',                    en: 'Study Room 1',      ja: '学習室-1',         zh: '学习室-1'   },
+      studyRoom2:       { vi: 'Phòng Học 2',                    en: 'Study Room 2',      ja: '学習室-2',         zh: '学习室-2'   },
+      announcements:    { vi: 'thông-báo',                      en: 'announcements',     ja: 'お知らせ',         zh: '公告'       },
+      resources:        { vi: 'tài-nguyên',                     en: 'resources',         ja: 'リソース',         zh: '资源'       },
+      meetingPlan:      { vi: 'kế-hoạch-buổi-họp',             en: 'meeting-plan',      ja: '会議計画',         zh: '会议计划'   },
+      meetingRoom1:     { vi: 'Phòng Họp 1',                    en: 'Meeting Room 1',    ja: '会議室-1',         zh: '会议室-1'   },
+      meetingRoom2:     { vi: 'Phòng Họp 2',                    en: 'Meeting Room 2',    ja: '会議室-2',         zh: '会议室-2'   },
+      events:           { vi: 'sự-kiện',                        en: 'events',            ja: 'イベント',         zh: '活动'       },
+      feedback:         { vi: 'ý-kiến-và-phản-hồi',            en: 'feedback',          ja: 'フィードバック',   zh: '反馈'       },
+      communityHub:     { vi: 'Nơi Tập Trung Cộng Đồng',       en: 'Community Hub',     ja: 'コミュニティハブ', zh: '社区中心'   },
+    };
+
+    const c = (key: string): string => CH[key]?.[lang] ?? CH[key]?.['vi'] ?? key;
+
     const templateChannels: Record<string, ChannelDef[]> = {
       custom: [
-        { name: 'chung', type: 'text', isDefault: true },
-        { name: 'general', type: 'voice', isDefault: true },
+        { name: c('general'),         type: 'text',  isDefault: true },
+        { name: c('generalVoice'),    type: 'voice', isDefault: true },
       ],
       gaming: [
-        { name: 'chung', type: 'text', isDefault: true },
-        { name: 'khoảnh-khắc-đỉnh-cao', type: 'text' },
-        { name: 'Sảnh', type: 'voice', isDefault: true },
-        { name: 'Gaming', type: 'voice' },
+        { name: c('general'),    type: 'text',  isDefault: true },
+        { name: c('highlights'), type: 'text' },
+        { name: c('lobby'),      type: 'voice', isDefault: true },
+        { name: 'Gaming',        type: 'voice' },
       ],
       friends: [
-        { name: 'chung', type: 'text', isDefault: true },
-        { name: 'trò-chơi', type: 'text' },
-        { name: 'âm-nhạc', type: 'text' },
-        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
-        { name: 'Phòng Stream', type: 'voice' },
+        { name: c('general'),       type: 'text',  isDefault: true },
+        { name: c('gaming'),        type: 'text' },
+        { name: c('music'),         type: 'text' },
+        { name: c('waitingRoom'),   type: 'voice', isDefault: true },
+        { name: c('streamingRoom'), type: 'voice' },
       ],
       'study-group': [
-        { name: 'chào-mừng-và-nội-quy', type: 'text', category: 'info' },
-        { name: 'ghi-chú-tài-nguyên', type: 'text', category: 'info' },
-        { name: 'chung', type: 'text', isDefault: true },
-        { name: 'trợ-giúp-làm-bài-tập-về-nhà', type: 'text' },
-        { name: 'lên-kế-hoạch-phiên', type: 'text' },
-        { name: 'lạc-đề', type: 'text' },
-        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
-        { name: 'Phòng Học 1', type: 'voice' },
-        { name: 'Phòng Học 2', type: 'voice' },
+        { name: c('welcomeAndRules'),  type: 'text', category: 'info' },
+        { name: c('notesResources'),   type: 'text', category: 'info' },
+        { name: c('general'),          type: 'text', isDefault: true },
+        { name: c('homeworkHelp'),     type: 'text' },
+        { name: c('sessionPlanning'), type: 'text' },
+        { name: c('offTopic'),         type: 'text' },
+        { name: c('waitingRoom'),      type: 'voice', isDefault: true },
+        { name: c('studyRoom1'),       type: 'voice' },
+        { name: c('studyRoom2'),       type: 'voice' },
       ],
       'school-club': [
-        { name: 'chào-mừng-và-nội-quy', type: 'text', category: 'info' },
-        { name: 'thông-báo', type: 'text', category: 'info' },
-        { name: 'tài-nguyên', type: 'text', category: 'info' },
-        { name: 'chung', type: 'text', isDefault: true },
-        { name: 'kế-hoạch-buổi-họp', type: 'text' },
-        { name: 'lạc-đề', type: 'text' },
-        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
-        { name: 'Phòng Họp 1', type: 'voice' },
-        { name: 'Phòng Họp 2', type: 'voice' },
+        { name: c('welcomeAndRules'), type: 'text', category: 'info' },
+        { name: c('announcements'),   type: 'text', category: 'info' },
+        { name: c('resources'),       type: 'text', category: 'info' },
+        { name: c('general'),         type: 'text', isDefault: true },
+        { name: c('meetingPlan'),     type: 'text' },
+        { name: c('offTopic'),        type: 'text' },
+        { name: c('waitingRoom'),     type: 'voice', isDefault: true },
+        { name: c('meetingRoom1'),    type: 'voice' },
+        { name: c('meetingRoom2'),    type: 'voice' },
       ],
       'local-community': [
-        { name: 'chào-mừng-và-nội-quy', type: 'text', category: 'info' },
-        { name: 'thông-báo', type: 'text', category: 'info' },
-        { name: 'tài-nguyên', type: 'text', category: 'info' },
-        { name: 'chung', type: 'text', isDefault: true },
-        { name: 'kế-hoạch-buổi-họp', type: 'text' },
-        { name: 'lạc-đề', type: 'text' },
-        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
-        { name: 'Phòng Họp 1', type: 'voice' },
-        { name: 'Phòng Họp 2', type: 'voice' },
+        { name: c('welcomeAndRules'), type: 'text', category: 'info' },
+        { name: c('announcements'),   type: 'text', category: 'info' },
+        { name: c('resources'),       type: 'text', category: 'info' },
+        { name: c('general'),         type: 'text', isDefault: true },
+        { name: c('meetingPlan'),     type: 'text' },
+        { name: c('offTopic'),        type: 'text' },
+        { name: c('waitingRoom'),     type: 'voice', isDefault: true },
+        { name: c('meetingRoom1'),    type: 'voice' },
+        { name: c('meetingRoom2'),    type: 'voice' },
       ],
       'artists-creators': [
-        { name: 'chào-mừng-và-nội-quy', type: 'text', category: 'info' },
-        { name: 'thông-báo', type: 'text', category: 'info' },
-        { name: 'chung', type: 'text', isDefault: true },
-        { name: 'sự-kiện', type: 'text' },
-        { name: 'ý-kiến-và-phản-hồi', type: 'text' },
-        { name: 'Phòng Chờ', type: 'voice', isDefault: true },
-        { name: 'Nơi Tập Trung Cộng Đồng', type: 'voice' },
-        { name: 'Phòng Stream', type: 'voice' },
+        { name: c('welcomeAndRules'), type: 'text', category: 'info' },
+        { name: c('announcements'),   type: 'text', category: 'info' },
+        { name: c('general'),         type: 'text', isDefault: true },
+        { name: c('events'),          type: 'text' },
+        { name: c('feedback'),        type: 'text' },
+        { name: c('waitingRoom'),     type: 'voice', isDefault: true },
+        { name: c('communityHub'),    type: 'voice' },
+        { name: c('streamingRoom'),   type: 'voice' },
       ],
     };
 
@@ -312,7 +350,7 @@ export class ServersService {
 
     if (hasInfoChannels) {
       const infoCat = new this.channelCategoryModel({
-        name: 'Thông Tin',
+        name: CATEGORY_NAMES['info'][lang] ?? CATEGORY_NAMES['info']['vi'],
         serverId: savedServer._id,
         position: catPosition++,
         type: 'text',
@@ -322,7 +360,7 @@ export class ServersService {
     }
     if (hasTextChannels) {
       const textCat = new this.channelCategoryModel({
-        name: 'Kênh Chat',
+        name: CATEGORY_NAMES['text'][lang] ?? CATEGORY_NAMES['text']['vi'],
         serverId: savedServer._id,
         position: catPosition++,
         type: 'text',
@@ -332,7 +370,7 @@ export class ServersService {
     }
     if (hasVoiceChannels) {
       const voiceCat = new this.channelCategoryModel({
-        name: 'Kênh Thoại',
+        name: CATEGORY_NAMES['voice'][lang] ?? CATEGORY_NAMES['voice']['vi'],
         serverId: savedServer._id,
         position: catPosition++,
         type: 'voice',
@@ -1032,12 +1070,32 @@ export class ServersService {
     userId: string,
     nickname: string,
   ): Promise<void> {
+    const trimmed = nickname.trim();
     await this.serverModel
       .updateOne(
         { _id: new Types.ObjectId(serverId), 'members.userId': new Types.ObjectId(userId) },
-        { $set: { 'members.$.nickname': nickname.trim() } },
+        { $set: { 'members.$.nickname': trimmed === '' ? null : trimmed } },
       )
       .exec();
+  }
+
+  /** Thành viên tự đổi biệt danh trên máy chủ (chỉ chính họ). */
+  async updateMyServerNickname(
+    serverId: string,
+    userId: string,
+    nickname: string,
+  ): Promise<void> {
+    const server = await this.serverModel.findById(serverId).select('members').exec();
+    if (!server) {
+      throw new NotFoundException('Server not found');
+    }
+    if (!this.isMember(server, userId)) {
+      throw new ForbiddenException('Not a member of this server');
+    }
+    if (nickname.trim().length > 64) {
+      throw new BadRequestException('nickname too long');
+    }
+    await this.setMemberNickname(serverId, userId, nickname);
   }
 
   isMember(server: Server, userId: string): boolean {
@@ -1168,6 +1226,7 @@ export class ServersService {
       userId: string;
       displayName: string;
       username: string;
+      nickname: string | null;
       avatarUrl: string;
       joinedAt: Date;
       joinedCordigramAt: Date;
@@ -1271,6 +1330,7 @@ export class ServersService {
       userId: string;
       displayName: string;
       username: string;
+      nickname: string | null;
       avatarUrl: string;
       joinedAt: Date;
       joinedCordigramAt: Date;
@@ -1305,10 +1365,17 @@ export class ServersService {
         };
       }
 
+      const rawNick = m.nickname;
+      const nickname =
+        typeof rawNick === 'string' && rawNick.trim() !== ''
+          ? rawNick.trim()
+          : null;
+
       result.push({
         userId: uid,
         displayName: profile?.displayName ?? 'Người dùng',
         username: profile?.username ?? uid,
+        nickname,
         avatarUrl: profile?.avatarUrl ?? '',
         joinedAt,
         joinedCordigramAt,
@@ -2033,13 +2100,17 @@ export class ServersService {
 
     const users = await this.userModel
       .find({ _id: { $in: userObjectIds } })
-      .select('createdAt loginDevices')
+      .select('createdAt loginDevices settings')
       .lean()
       .exec();
     const userById = new Map(
       users.map((u: any) => [
         u._id.toString(),
-        u as { createdAt?: Date; loginDevices?: Array<{ lastSeenAt?: Date }> },
+        u as {
+          createdAt?: Date;
+          loginDevices?: Array<{ lastSeenAt?: Date }>;
+          settings?: { sharePresence?: boolean };
+        },
       ]),
     );
 
@@ -2156,7 +2227,10 @@ export class ServersService {
       const lastMsgMs = stats?.lastAt ? new Date(stats.lastAt).getTime() : 0;
       const recentlyMessaged =
         lastMsgMs > 0 && lastMsgMs >= recentMessageAgo.getTime();
-      const isOnline = deviceOnline || activeInServer || recentlyMessaged;
+      const sharePresence = u?.settings?.sharePresence !== false;
+      const isOnline =
+        sharePresence &&
+        (deviceOnline || activeInServer || recentlyMessaged);
 
       let joinMethod: 'owner' | 'invited' | 'link' = 'link';
       let invitedBy: { id: string; username: string } | undefined;

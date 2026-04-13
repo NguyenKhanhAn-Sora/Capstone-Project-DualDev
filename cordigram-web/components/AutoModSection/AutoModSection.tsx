@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
 import styles from "./AutoModSection.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 interface Props {
   serverId: string;
@@ -20,6 +21,7 @@ const DEFAULT_MSF: serversApi.MentionSpamFilter = {
 };
 
 export default function AutoModSection({ serverId, canManageSettings }: Props) {
+  const { t } = useLanguage();
   const [settings, setSettings] = useState<serversApi.ServerSafetySettings | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
@@ -30,7 +32,6 @@ export default function AutoModSection({ serverId, canManageSettings }: Props) {
   const [roles, setRoles] = useState<serversApi.Role[]>([]);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-
   const [draft, setDraft] = useState<serversApi.MentionSpamFilter>(DEFAULT_MSF);
 
   useEffect(() => {
@@ -49,51 +50,36 @@ export default function AutoModSection({ serverId, canManageSettings }: Props) {
   }, [settings]);
 
   const updateDraft = useCallback((patch: Partial<serversApi.MentionSpamFilter>) => {
-    setDraft((prev) => ({ ...prev, ...patch }));
-    setDirty(true);
+    setDraft((prev) => ({ ...prev, ...patch })); setDirty(true);
   }, []);
 
-  const updateDraftResponses = useCallback(
-    (patch: Partial<serversApi.MentionSpamFilter["responses"]>) => {
-      setDraft((prev) => ({ ...prev, responses: { ...prev.responses, ...patch } }));
-      setDirty(true);
-    },
-    [],
-  );
+  const updateDraftResponses = useCallback((patch: Partial<serversApi.MentionSpamFilter["responses"]>) => {
+    setDraft((prev) => ({ ...prev, responses: { ...prev.responses, ...patch } })); setDirty(true);
+  }, []);
 
   const handleSave = async () => {
     if (!settings || !canManageSettings) return;
     setSaving(true);
     try {
-      const next: serversApi.ServerSafetySettings = {
-        ...settings,
-        automod: { ...(settings.automod || {}), mentionSpamFilter: draft },
-      };
+      const next: serversApi.ServerSafetySettings = { ...settings, automod: { ...(settings.automod || {}), mentionSpamFilter: draft } };
       const saved = await serversApi.updateServerSafetySettings(serverId, next);
       setSettings(saved);
       const loaded = saved?.automod?.mentionSpamFilter;
       if (loaded) setDraft({ ...DEFAULT_MSF, ...loaded });
       setDirty(false);
-    } catch {
-      /* keep dirty so user can retry */
-    } finally {
-      setSaving(false);
-    }
+    } catch { /* keep dirty */ } finally { setSaving(false); }
   };
 
-  const handleCancel = () => {
-    setDraft(savedMsf);
-    setDirty(false);
-  };
+  const handleCancel = () => { setDraft(savedMsf); setDirty(false); };
 
   const activeResponseTags = useMemo(() => {
     const src = dirty ? draft : savedMsf;
     const tags: Array<{ icon: string; label: string }> = [];
-    if (src.responses.blockMessage) tags.push({ icon: "✕", label: "chặn tin nhắn" });
-    if (src.responses.sendWarning) tags.push({ icon: "#", label: "gửi cảnh báo" });
-    if (src.responses.restrictMember) tags.push({ icon: "👤", label: "thành viên bị hạn chế" });
+    if (src.responses.blockMessage) tags.push({ icon: "✕", label: t("chat.autoMod.tagBlock") });
+    if (src.responses.sendWarning) tags.push({ icon: "#", label: t("chat.autoMod.tagWarn") });
+    if (src.responses.restrictMember) tags.push({ icon: "👤", label: t("chat.autoMod.tagRestrict") });
     return tags;
-  }, [draft, savedMsf, dirty]);
+  }, [draft, savedMsf, dirty, t]);
 
   const filteredChannels = useMemo(() => {
     if (!searchQuery.trim()) return channels;
@@ -117,137 +103,78 @@ export default function AutoModSection({ serverId, canManageSettings }: Props) {
     return draft.exemptRoleIds.map((id) => ({ id, name: map.get(id) || id }));
   }, [roles, draft.exemptRoleIds]);
 
-  const addExemptChannel = (id: string) => {
-    if (draft.exemptChannelIds.includes(id)) return;
-    updateDraft({ exemptChannelIds: [...draft.exemptChannelIds, id] });
-  };
+  const addExemptChannel = (id: string) => { if (!draft.exemptChannelIds.includes(id)) updateDraft({ exemptChannelIds: [...draft.exemptChannelIds, id] }); };
+  const removeExemptChannel = (id: string) => updateDraft({ exemptChannelIds: draft.exemptChannelIds.filter((x) => x !== id) });
+  const addExemptRole = (id: string) => { if (!draft.exemptRoleIds.includes(id)) updateDraft({ exemptRoleIds: [...draft.exemptRoleIds, id] }); };
+  const removeExemptRole = (id: string) => updateDraft({ exemptRoleIds: draft.exemptRoleIds.filter((x) => x !== id) });
 
-  const removeExemptChannel = (id: string) => {
-    updateDraft({ exemptChannelIds: draft.exemptChannelIds.filter((x) => x !== id) });
-  };
-
-  const addExemptRole = (id: string) => {
-    if (draft.exemptRoleIds.includes(id)) return;
-    updateDraft({ exemptRoleIds: [...draft.exemptRoleIds, id] });
-  };
-
-  const removeExemptRole = (id: string) => {
-    updateDraft({ exemptRoleIds: draft.exemptRoleIds.filter((x) => x !== id) });
-  };
-
-  if (!settings) return <div>Không tải được cài đặt AutoMod.</div>;
+  if (!settings) return <div>{t("chat.autoMod.loadError")}</div>;
 
   const displayMsf = dirty ? draft : savedMsf;
 
   return (
     <div className={styles.container}>
-      {/* ── Collapsed summary card ── */}
       <div className={styles.summaryCard}>
         <div className={styles.summaryIcon}>@</div>
         <div className={styles.summaryBody}>
-          <p className={styles.summaryTitle}>Chặn spam đề cập</p>
-          <p className={styles.summaryDesc}>
-            Chặn các tin nhắn vượt quá số lượt đề cập đến vai trò và người dùng
-          </p>
+          <p className={styles.summaryTitle}>{t("chat.autoMod.spamTitle")}</p>
+          <p className={styles.summaryDesc}>{t("chat.autoMod.spamDesc")}</p>
           {savedMsf.enabled && activeResponseTags.length > 0 && (
             <div className={styles.summaryTags}>
-              {activeResponseTags.map((t) => (
-                <span key={t.label} className={styles.tag}>
-                  <span className={styles.tagIcon}>{t.icon}</span>
-                  {t.label}
-                </span>
+              {activeResponseTags.map((tag) => (
+                <span key={tag.label} className={styles.tag}><span className={styles.tagIcon}>{tag.icon}</span>{tag.label}</span>
               ))}
             </div>
           )}
         </div>
-        <button
-          type="button"
-          className={styles.settingsBtn}
-          disabled={!canManageSettings}
-          onClick={() => setExpanded((v) => !v)}
-        >
-          Cài đặt
+        <button type="button" className={styles.settingsBtn} disabled={!canManageSettings} onClick={() => setExpanded((v) => !v)}>
+          {t("chat.autoMod.settingsBtn")}
         </button>
       </div>
 
-      {/* ── Settings panel (expanded) ── */}
       {expanded && (
         <div className={styles.settingsPanel}>
-          {/* Header */}
-          <p className={styles.headerLabel}>Tên quy tắc</p>
+          <p className={styles.headerLabel}>{t("chat.autoMod.ruleNameLabel")}</p>
           <div className={styles.settingsHeader}>
-            <input
-              type="text"
-              className={styles.ruleNameInput}
-              value="Chặn spam đề cập"
-              readOnly
-            />
+            <input type="text" className={styles.ruleNameInput} value={t("chat.autoMod.ruleNameValue")} readOnly />
             <div className={styles.toggleWrapper}>
-              <button
-                type="button"
-                className={`${styles.toggleSwitch} ${draft.enabled ? styles.active : ""}`}
-                disabled={!canManageSettings}
-                onClick={() => updateDraft({ enabled: !draft.enabled })}
-                aria-label="Bật/Tắt"
-              >
+              <button type="button" className={`${styles.toggleSwitch} ${draft.enabled ? styles.active : ""}`} disabled={!canManageSettings} onClick={() => updateDraft({ enabled: !draft.enabled })} aria-label={t("chat.autoMod.toggleAriaLabel")}>
                 <span className={styles.toggleKnob} />
               </button>
             </div>
           </div>
 
-          {/* Section 1: Mention limit */}
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <span className={styles.sectionNumber}>1</span>
-              <h3 className={styles.sectionTitle}>Số lượt giới hạn cấu hình</h3>
+              <h3 className={styles.sectionTitle}>{t("chat.autoMod.section1Title")}</h3>
             </div>
             <div className={styles.mentionLimitCard}>
               <div className={styles.mentionIcon}>@</div>
               <div className={styles.mentionBody}>
-                <p className={styles.mentionTitle}>
-                  Số lượt đề cập đặc biệt (vai trò + người dùng) mỗi tin nhắn
-                </p>
-                <p className={styles.mentionDesc}>
-                  Giới hạn số lần đề cập đặc biệt trong mỗi tin nhắn
-                </p>
+                <p className={styles.mentionTitle}>{t("chat.autoMod.mentionLimitTitle")}</p>
+                <p className={styles.mentionDesc}>{t("chat.autoMod.mentionLimitDesc")}</p>
               </div>
               <div className={styles.counterGroup}>
-                <button
-                  type="button"
-                  className={styles.counterBtn}
-                  disabled={!canManageSettings || draft.mentionLimit <= 1}
-                  onClick={() => updateDraft({ mentionLimit: Math.max(1, draft.mentionLimit - 1) })}
-                >
-                  −
-                </button>
+                <button type="button" className={styles.counterBtn} disabled={!canManageSettings || draft.mentionLimit <= 1} onClick={() => updateDraft({ mentionLimit: Math.max(1, draft.mentionLimit - 1) })}>−</button>
                 <span className={styles.counterValue}>{draft.mentionLimit}</span>
-                <button
-                  type="button"
-                  className={styles.counterBtn}
-                  disabled={!canManageSettings || draft.mentionLimit >= 100}
-                  onClick={() => updateDraft({ mentionLimit: Math.min(100, draft.mentionLimit + 1) })}
-                >
-                  +
-                </button>
+                <button type="button" className={styles.counterBtn} disabled={!canManageSettings || draft.mentionLimit >= 100} onClick={() => updateDraft({ mentionLimit: Math.min(100, draft.mentionLimit + 1) })}>+</button>
               </div>
             </div>
           </div>
 
-          {/* Arrow */}
           <div className={styles.arrowDown}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 5v14M5 12l7 7 7-7" />
             </svg>
           </div>
 
-          {/* Section 2: Responses */}
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <span className={styles.sectionNumber}>2</span>
-              <h3 className={styles.sectionTitle}>Chọn một phản hồi</h3>
+              <h3 className={styles.sectionTitle}>{t("chat.autoMod.section2Title")}</h3>
             </div>
             <div className={styles.responseList}>
-              {/* Block message */}
               <label className={styles.responseItem}>
                 <div className={`${styles.responseIcon} ${styles.responseIconBlock}`}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -255,246 +182,106 @@ export default function AutoModSection({ serverId, canManageSettings }: Props) {
                   </svg>
                 </div>
                 <div className={styles.responseBody}>
-                  <p className={styles.responseTitle}>Chặn tin nhắn</p>
+                  <p className={styles.responseTitle}>{t("chat.autoMod.blockTitle")}</p>
                   <p className={styles.responseDesc}>
-                    Chặn các tin nhắn vượt quá số lượt đề cập duy nhất.
-                    <br />
-                    Một thông báo tùy biến báo lỗi có thể được hiển thị cho các thành viên.{" "}
-                    <button
-                      type="button"
-                      className={styles.editNotifLink}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setNotifDraft(draft.customNotification);
-                        setShowNotifModal(true);
-                      }}
-                    >
-                      Chỉnh Sửa Thông Báo Tùy Biến
+                    {t("chat.autoMod.blockDesc")}<br />
+                    {t("chat.autoMod.blockDesc2")}{" "}
+                    <button type="button" className={styles.editNotifLink} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setNotifDraft(draft.customNotification); setShowNotifModal(true); }}>
+                      {t("chat.autoMod.editNotifLink")}
                     </button>
                   </p>
                 </div>
-                <input
-                  type="checkbox"
-                  className={styles.responseCheckbox}
-                  checked={draft.responses.blockMessage}
-                  disabled={!canManageSettings}
-                  onChange={() => updateDraftResponses({ blockMessage: !draft.responses.blockMessage })}
-                />
+                <input type="checkbox" className={styles.responseCheckbox} checked={draft.responses.blockMessage} disabled={!canManageSettings} onChange={() => updateDraftResponses({ blockMessage: !draft.responses.blockMessage })} />
               </label>
-              {/* Send warning */}
               <label className={styles.responseItem}>
-                <div className={`${styles.responseIcon} ${styles.responseIconWarn}`}>
-                  <span style={{ fontWeight: 700, fontSize: 16 }}>#</span>
-                </div>
+                <div className={`${styles.responseIcon} ${styles.responseIconWarn}`}><span style={{ fontWeight: 700, fontSize: 16 }}>#</span></div>
                 <div className={styles.responseBody}>
-                  <p className={styles.responseTitle}>Gửi cảnh báo</p>
-                  <p className={styles.responseDesc}>
-                    Gửi một cảnh báo có chứa tin nhắn được gần cở đến một kênh đã chọn.
-                  </p>
+                  <p className={styles.responseTitle}>{t("chat.autoMod.warnTitle")}</p>
+                  <p className={styles.responseDesc}>{t("chat.autoMod.warnDesc")}</p>
                 </div>
-                <input
-                  type="checkbox"
-                  className={styles.responseCheckbox}
-                  checked={draft.responses.sendWarning}
-                  disabled={!canManageSettings}
-                  onChange={() => updateDraftResponses({ sendWarning: !draft.responses.sendWarning })}
-                />
+                <input type="checkbox" className={styles.responseCheckbox} checked={draft.responses.sendWarning} disabled={!canManageSettings} onChange={() => updateDraftResponses({ sendWarning: !draft.responses.sendWarning })} />
               </label>
-              {/* Restrict member */}
               <label className={styles.responseItem}>
                 <div className={`${styles.responseIcon} ${styles.responseIconRestrict}`}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v2h20v-2c0-3.3-6.7-5-10-5z" />
-                  </svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v2h20v-2c0-3.3-6.7-5-10-5z" /></svg>
                 </div>
                 <div className={styles.responseBody}>
-                  <p className={styles.responseTitle}>Thành viên bị hạn chế</p>
-                  <p className={styles.responseDesc}>
-                    Tạm thời vô hiệu hóa khả năng gửi tin nhắn hoặc tham gia các kênh thoại của thành viên.
-                  </p>
+                  <p className={styles.responseTitle}>{t("chat.autoMod.restrictTitle")}</p>
+                  <p className={styles.responseDesc}>{t("chat.autoMod.restrictDesc")}</p>
                 </div>
-                <input
-                  type="checkbox"
-                  className={styles.responseCheckbox}
-                  checked={draft.responses.restrictMember}
-                  disabled={!canManageSettings}
-                  onChange={() => updateDraftResponses({ restrictMember: !draft.responses.restrictMember })}
-                />
+                <input type="checkbox" className={styles.responseCheckbox} checked={draft.responses.restrictMember} disabled={!canManageSettings} onChange={() => updateDraftResponses({ restrictMember: !draft.responses.restrictMember })} />
               </label>
             </div>
           </div>
 
-          {/* Section 3: Exempt channels / roles */}
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <span className={styles.sectionNumber}>3</span>
-              <h3 className={styles.sectionTitle}>
-                Cho phép các vai trò hoặc kênh nhất định (không bắt buộc)
-              </h3>
+              <h3 className={styles.sectionTitle}>{t("chat.autoMod.section3Title")}</h3>
             </div>
             <div className={styles.searchWrapper}>
-              <input
-                type="text"
-                className={styles.searchInput}
-                placeholder="Tìm kiếm kênh hoặc vai trò"
-                value={searchQuery}
-                disabled={!canManageSettings}
-                onFocus={() => setSearchOpen(true)}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setSearchOpen(true);
-                }}
-                onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
-              />
+              <input type="text" className={styles.searchInput} placeholder={t("chat.autoMod.searchPlaceholder")} value={searchQuery} disabled={!canManageSettings}
+                onFocus={() => setSearchOpen(true)} onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+                onBlur={() => setTimeout(() => setSearchOpen(false), 200)} />
               {searchOpen && (
                 <div className={styles.searchDropdown}>
                   {filteredChannels.length > 0 && (
                     <>
-                      <div className={styles.dropdownGroupTitle}>KÊNH</div>
+                      <div className={styles.dropdownGroupTitle}>{t("chat.autoMod.groupChannels")}</div>
                       {filteredChannels.map((ch) => (
-                        <div
-                          key={ch._id}
-                          className={styles.dropdownItem}
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            addExemptChannel(ch._id);
-                            setSearchQuery("");
-                            setSearchOpen(false);
-                          }}
-                        >
-                          <span className={styles.dropdownItemIcon}>
-                            {ch.type === "voice" ? "🔊" : "#"}
-                          </span>
-                          {ch.name}
+                        <div key={ch._id} className={styles.dropdownItem} onMouseDown={(e) => e.preventDefault()} onClick={() => { addExemptChannel(ch._id); setSearchQuery(""); setSearchOpen(false); }}>
+                          <span className={styles.dropdownItemIcon}>{ch.type === "voice" ? "🔊" : "#"}</span>{ch.name}
                         </div>
                       ))}
                     </>
                   )}
                   {filteredRoles.length > 0 && (
                     <>
-                      <div className={styles.dropdownGroupTitle}>VAI TRÒ</div>
+                      <div className={styles.dropdownGroupTitle}>{t("chat.autoMod.groupRoles")}</div>
                       {filteredRoles.map((r) => (
-                        <div
-                          key={r._id}
-                          className={styles.dropdownItem}
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            addExemptRole(r._id);
-                            setSearchQuery("");
-                            setSearchOpen(false);
-                          }}
-                        >
-                          <span
-                            className={styles.dropdownItemIcon}
-                            style={{ color: r.color || undefined }}
-                          >
-                            @
-                          </span>
-                          {r.name}
+                        <div key={r._id} className={styles.dropdownItem} onMouseDown={(e) => e.preventDefault()} onClick={() => { addExemptRole(r._id); setSearchQuery(""); setSearchOpen(false); }}>
+                          <span className={styles.dropdownItemIcon} style={{ color: r.color || undefined }}>@</span>{r.name}
                         </div>
                       ))}
                     </>
                   )}
                   {filteredChannels.length === 0 && filteredRoles.length === 0 && (
-                    <div className={styles.dropdownItem} style={{ opacity: 0.5, cursor: "default" }}>
-                      Không tìm thấy kết quả
-                    </div>
+                    <div className={styles.dropdownItem} style={{ opacity: 0.5, cursor: "default" }}>{t("chat.autoMod.noResults")}</div>
                   )}
                 </div>
               )}
             </div>
-            <p className={styles.exemptNote}>
-              Suyt - các thành viên có quyền Quản trị viên và Quản lý máy chủ luôn không nằm trong các quy tắc lọc.
-            </p>
+            <p className={styles.exemptNote}>{t("chat.autoMod.exemptNote")}</p>
             {(exemptChannelNames.length > 0 || exemptRoleNames.length > 0) && (
               <div className={styles.exemptTags}>
                 {exemptChannelNames.map((c) => (
-                  <span key={c.id} className={styles.exemptTag}>
-                    # {c.name}
-                    <button
-                      type="button"
-                      className={styles.exemptTagRemove}
-                      onClick={() => removeExemptChannel(c.id)}
-                    >
-                      ×
-                    </button>
-                  </span>
+                  <span key={c.id} className={styles.exemptTag}># {c.name}<button type="button" className={styles.exemptTagRemove} onClick={() => removeExemptChannel(c.id)}>×</button></span>
                 ))}
                 {exemptRoleNames.map((r) => (
-                  <span key={r.id} className={styles.exemptTag}>
-                    @ {r.name}
-                    <button
-                      type="button"
-                      className={styles.exemptTagRemove}
-                      onClick={() => removeExemptRole(r.id)}
-                    >
-                      ×
-                    </button>
-                  </span>
+                  <span key={r.id} className={styles.exemptTag}>@ {r.name}<button type="button" className={styles.exemptTagRemove} onClick={() => removeExemptRole(r.id)}>×</button></span>
                 ))}
               </div>
             )}
           </div>
 
-          {/* ── Save / Cancel buttons ── */}
           <div className={styles.actionBar}>
-            <button
-              type="button"
-              className={styles.cancelBtn}
-              disabled={!dirty || saving}
-              onClick={handleCancel}
-            >
-              Hủy bỏ
-            </button>
-            <button
-              type="button"
-              className={styles.saveBtn}
-              disabled={!dirty || saving || !canManageSettings}
-              onClick={handleSave}
-            >
-              {saving ? "Đang lưu..." : "Lưu thay đổi"}
+            <button type="button" className={styles.cancelBtn} disabled={!dirty || saving} onClick={handleCancel}>{t("chat.autoMod.cancelBtn")}</button>
+            <button type="button" className={styles.saveBtn} disabled={!dirty || saving || !canManageSettings} onClick={handleSave}>
+              {saving ? t("chat.autoMod.savingBtn") : t("chat.autoMod.saveBtn")}
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Custom notification modal ── */}
       {showNotifModal && (
-        <div
-          className={styles.modalOverlay}
-          onClick={() => setShowNotifModal(false)}
-        >
+        <div className={styles.modalOverlay} onClick={() => setShowNotifModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h3 className={styles.modalTitle}>Chỉnh Sửa Thông Báo Tùy Biến</h3>
-            <p className={styles.modalDesc}>
-              Thông báo tùy biến của bạn sẽ được hiển thị khi AutoMod chặn tin nhắn của thành viên. Đây là cơ hội để
-              giúp các thành viên hiểu được quy tắc máy chủ!
-            </p>
-            <textarea
-              className={styles.modalTextarea}
-              placeholder="Nhập thông báo tùy biến của bạn"
-              value={notifDraft}
-              onChange={(e) => setNotifDraft(e.target.value)}
-            />
+            <h3 className={styles.modalTitle}>{t("chat.autoMod.notifModalTitle")}</h3>
+            <p className={styles.modalDesc}>{t("chat.autoMod.notifModalDesc")}</p>
+            <textarea className={styles.modalTextarea} placeholder={t("chat.autoMod.notifPlaceholder")} value={notifDraft} onChange={(e) => setNotifDraft(e.target.value)} />
             <div className={styles.modalActions}>
-              <button
-                type="button"
-                className={styles.modalCancelBtn}
-                onClick={() => setShowNotifModal(false)}
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                className={styles.modalSaveBtn}
-                onClick={() => {
-                  updateDraft({ customNotification: notifDraft });
-                  setShowNotifModal(false);
-                }}
-              >
-                Chỉnh sửa
-              </button>
+              <button type="button" className={styles.modalCancelBtn} onClick={() => setShowNotifModal(false)}>{t("chat.autoMod.notifCancel")}</button>
+              <button type="button" className={styles.modalSaveBtn} onClick={() => { updateDraft({ customNotification: notifDraft }); setShowNotifModal(false); }}>{t("chat.autoMod.notifSave")}</button>
             </div>
           </div>
         </div>

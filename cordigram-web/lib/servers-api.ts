@@ -263,6 +263,8 @@ export interface Friend {
   avatarUrl: string;
   email: string;
   bio?: string;
+  /** Trạng thái hoạt động (DM) — từ API available-users. */
+  isOnline?: boolean;
 }
 
 // Servers
@@ -272,11 +274,12 @@ export async function createServer(
   avatarUrl?: string,
   template?: ServerTemplate,
   purpose?: ServerPurpose,
+  language?: "vi" | "en" | "ja" | "zh",
 ): Promise<Server> {
   const response = await fetch(`${API_BASE_URL}/servers`, {
     method: "POST",
     headers: getHeaders(),
-    body: JSON.stringify({ name, description, avatarUrl, template, purpose }),
+    body: JSON.stringify({ name, description, avatarUrl, template, purpose, language }),
   });
 
   if (!response.ok) {
@@ -576,6 +579,8 @@ export type ServerMemberRow = {
   userId: string;
   displayName: string;
   username: string;
+  /** Biệt danh trong máy chủ (nếu có), từ server.members[].nickname */
+  nickname?: string | null;
   avatarUrl: string;
   joinedAt: string;
   joinedCordigramAt: string;
@@ -1802,6 +1807,27 @@ export async function leaveServer(serverId: string): Promise<void> {
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || "Không thể rời máy chủ");
+  }
+}
+
+export async function updateMyServerNickname(
+  serverId: string,
+  nickname: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/me/nickname`,
+    {
+      method: "PATCH",
+      headers: {
+        ...getHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ nickname }),
+    },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không lưu biệt danh");
   }
 }
 

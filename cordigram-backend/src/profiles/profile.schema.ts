@@ -46,6 +46,10 @@ export class Profile extends Document {
   @Prop({ default: '' })
   bio: string;
 
+  /** Đại từ nhân xưng (hiển thị trên card hồ sơ). */
+  @Prop({ default: '' })
+  pronouns: string;
+
   @Prop({ default: '' })
   location: string;
 

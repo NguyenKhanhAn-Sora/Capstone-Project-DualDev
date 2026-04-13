@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import styles from "./IgnoreUserPopup.module.css";
 import { checkIgnoreStatus, unignoreUser } from "@/lib/api";
+import { useLanguage } from "@/component/language-provider";
 
 export interface IgnoreUserPopupProps {
   displayName: string;
@@ -25,6 +26,7 @@ export default function IgnoreUserPopup({
   onBlock,
   onRestore,
 }: IgnoreUserPopupProps) {
+  const { t } = useLanguage();
   const [hideProfile, setHideProfile] = useState(true);
   const [muteNotifications, setMuteNotifications] = useState(true);
   const [alreadyIgnored, setAlreadyIgnored] = useState<boolean | null>(null);
@@ -58,9 +60,9 @@ export default function IgnoreUserPopup({
 
   if (alreadyIgnored === null && userId && token) {
     return (
-      <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal aria-label="Bỏ qua người dùng">
+      <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal aria-label={t("chat.popups.ignoreUser.ariaIgnore")}>
         <div className={styles.popup} onClick={(e) => e.stopPropagation()}>
-          <div className={styles.loading}>Đang tải...</div>
+          <div className={styles.loading}>{t("chat.popups.loading")}</div>
         </div>
       </div>
     );
@@ -68,7 +70,7 @@ export default function IgnoreUserPopup({
 
   if (alreadyIgnored === true) {
     return (
-      <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal aria-label="Đã bỏ qua người dùng">
+      <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal aria-label={t("chat.popups.ignoreUser.ariaIgnored")}>
         <div className={styles.popup} onClick={(e) => e.stopPropagation()}>
           <div className={styles.iconWrap}>
             <svg className={styles.icon} width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -76,13 +78,13 @@ export default function IgnoreUserPopup({
               <path d="M4.93 4.93l14.14 14.14" />
             </svg>
           </div>
-          <h2 className={styles.title}>Bạn đã bỏ qua {displayName}</h2>
+          <h2 className={styles.title}>{t("chat.popups.ignoreUser.titleIgnored", { name: displayName })}</h2>
           <p className={styles.subtitle}>
-            Tin nhắn và thông báo từ họ đang bị ẩn. Khôi phục để nhắn tin và nhận thông báo vào hộp thư như bình thường (DM và kênh chat server).
+            {t("chat.popups.ignoreUser.subtitleIgnored")}
           </p>
           <div className={styles.footer}>
             <button type="button" className={styles.btnCancel} onClick={onClose}>
-              Hủy bỏ
+              {t("chat.common.cancel")}
             </button>
             <button
               type="button"
@@ -90,7 +92,7 @@ export default function IgnoreUserPopup({
               onClick={handleRestore}
               disabled={restoring}
             >
-              {restoring ? "Đang xử lý..." : "Khôi phục"}
+              {restoring ? t("chat.popups.ignoreUser.restoring") : t("chat.popups.ignoreUser.restore")}
             </button>
           </div>
         </div>
@@ -99,7 +101,7 @@ export default function IgnoreUserPopup({
   }
 
   return (
-    <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal aria-label="Bỏ qua người dùng">
+    <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal aria-label={t("chat.popups.ignoreUser.ariaIgnore")}>
       <div className={styles.popup} onClick={(e) => e.stopPropagation()}>
         <div className={styles.iconWrap}>
           <svg className={styles.icon} width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -107,8 +109,8 @@ export default function IgnoreUserPopup({
             <path d="M4.93 4.93l14.14 14.14" />
           </svg>
         </div>
-        <h2 className={styles.title}>Bỏ qua {displayName}?</h2>
-        <p className={styles.subtitle}>Dừng tương tác mà không để họ biết</p>
+        <h2 className={styles.title}>{t("chat.popups.ignoreUser.title", { name: displayName })}</h2>
+        <p className={styles.subtitle}>{t("chat.popups.ignoreUser.subtitle")}</p>
 
         <label className={styles.checkRow}>
           <input
@@ -116,9 +118,9 @@ export default function IgnoreUserPopup({
             checked={hideProfile}
             onChange={(e) => setHideProfile(e.target.checked)}
           />
-          <span className={styles.checkLabel}>Ẩn hồ sơ và tin nhắn của họ</span>
+          <span className={styles.checkLabel}>{t("chat.popups.ignoreUser.hideProfile")}</span>
         </label>
-        <p className={styles.checkDesc}>Bạn có thể hủy việc ẩn họ bất cứ lúc nào</p>
+        <p className={styles.checkDesc}>{t("chat.popups.ignoreUser.hideProfileDesc")}</p>
 
         <label className={styles.checkRow}>
           <input
@@ -126,36 +128,36 @@ export default function IgnoreUserPopup({
             checked={muteNotifications}
             onChange={(e) => setMuteNotifications(e.target.checked)}
           />
-          <span className={styles.checkLabel}>Tắt tiếng thông báo và hoạt động của họ</span>
+          <span className={styles.checkLabel}>{t("chat.popups.ignoreUser.muteNotif")}</span>
         </label>
-        <p className={styles.checkDesc}>Bạn sẽ ít thấy họ trên ứng dụng hơn (DM, kênh chat, kênh thoại)</p>
+        <p className={styles.checkDesc}>{t("chat.popups.ignoreUser.muteNotifDesc")}</p>
 
         <p className={styles.info}>
           <span className={styles.infoIcon} aria-hidden>ℹ</span>
-          Họ vẫn có thể nhắn tin cho bạn và xem hoạt động của bạn. Họ sẽ không biết bạn đã bỏ qua họ.
+          {t("chat.popups.ignoreUser.info")}
         </p>
 
         <div className={styles.blockSection}>
-          <p className={styles.blockTitle}>Vẫn không đủ sao?</p>
+          <p className={styles.blockTitle}>{t("chat.popups.ignoreUser.blockTitle")}</p>
           <div className={styles.blockBox}>
-            <p className={styles.blockText}>Thay vào đó, hãy chặn</p>
-            <p className={styles.blockDesc}>Ngừng liên hệ trực tiếp và hạn chế những gì họ thấy. Không nhận tin nhắn hay cuộc gọi từ người đã chặn (DM và kênh trong server).</p>
+            <p className={styles.blockText}>{t("chat.popups.ignoreUser.blockText")}</p>
+            <p className={styles.blockDesc}>{t("chat.popups.ignoreUser.blockDesc")}</p>
             <button type="button" className={styles.blockBtn} onClick={onBlock}>
-              Chặn
+              {t("chat.popups.ignoreUser.block")}
             </button>
           </div>
         </div>
 
         <div className={styles.footer}>
           <button type="button" className={styles.btnCancel} onClick={onClose}>
-            Hủy bỏ
+            {t("chat.common.cancel")}
           </button>
           <button
             type="button"
             className={styles.btnIgnore}
             onClick={() => onConfirm({ hideProfile, muteNotifications })}
           >
-            Bỏ qua
+            {t("chat.popups.ignoreUser.ignore")}
           </button>
         </div>
       </div>

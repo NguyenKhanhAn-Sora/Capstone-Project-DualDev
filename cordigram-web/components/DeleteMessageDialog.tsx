@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import styles from "./DeleteMessageDialog.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 interface DeleteMessageDialogProps {
   onConfirm: (deleteType: "for-everyone" | "for-me") => void;
@@ -12,6 +13,7 @@ export default function DeleteMessageDialog({
   onConfirm,
   onClose,
 }: DeleteMessageDialogProps) {
+  const { t } = useLanguage();
   const [deleteType, setDeleteType] = useState<"for-everyone" | "for-me">(
     "for-everyone"
   );
@@ -25,7 +27,7 @@ export default function DeleteMessageDialog({
       <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <h2 className={styles.title}>
-            Bạn muốn thu hồi tin nhắn này ở phía ai?
+            {t("chat.deleteMessage.title")}
           </h2>
           <button className={styles.closeButton} onClick={onClose}>
             ✕
@@ -43,11 +45,11 @@ export default function DeleteMessageDialog({
               className={styles.radio}
             />
             <div className={styles.optionContent}>
-              <div className={styles.optionTitle}>Thu hồi với mọi người</div>
+              <div className={styles.optionTitle}>
+                {t("chat.deleteMessage.forEveryone.title")}
+              </div>
               <div className={styles.optionDescription}>
-                Tin nhắn này sẽ bị thu hồi với mọi người trong đoạn chat. Những
-                người khác có thể đã xem hoặc chuyển tiếp tin nhắn đó. Tin nhắn
-                đã thu hồi vẫn có thể bị báo cáo.
+                {t("chat.deleteMessage.forEveryone.desc")}
               </div>
             </div>
           </label>
@@ -62,10 +64,11 @@ export default function DeleteMessageDialog({
               className={styles.radio}
             />
             <div className={styles.optionContent}>
-              <div className={styles.optionTitle}>Thu hồi với bạn</div>
+              <div className={styles.optionTitle}>
+                {t("chat.deleteMessage.forMe.title")}
+              </div>
               <div className={styles.optionDescription}>
-                Tin nhắn này sẽ bị gỡ khỏi thiết bị của bạn, nhưng vẫn hiển thị
-                với các thành viên khác trong đoạn chat.
+                {t("chat.deleteMessage.forMe.desc")}
               </div>
             </div>
           </label>
@@ -73,10 +76,10 @@ export default function DeleteMessageDialog({
 
         <div className={styles.footer}>
           <button className={styles.cancelButton} onClick={onClose}>
-            Hủy
+            {t("chat.common.cancel")}
           </button>
           <button className={styles.confirmButton} onClick={handleConfirm}>
-            Gỡ
+            {t("chat.common.remove")}
           </button>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import React from "react";
 import { useCallSound } from "@/hooks/use-call-sound";
 import styles from "./IncomingCallPopup.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 interface IncomingCallPopupProps {
   callerName: string;
@@ -21,7 +22,7 @@ export default function IncomingCallPopup({
   onReject,
   status = "incoming",
 }: IncomingCallPopupProps) {
-  const callTypeText = callType === "video" ? "Video" : "Voice";
+  const { t } = useLanguage();
   const isCancelled = status === "cancelled";
 
   // ✅ Play incoming call ringtone (only when status is 'incoming')
@@ -59,12 +60,16 @@ export default function IncomingCallPopup({
         <h2 className={styles.callerName}>{callerName}</h2>
         {isCancelled ? (
           <p className={styles.callType} style={{ color: "#ed4245" }}>
-            Call was canceled
+            {t("chat.popups.incomingCall.canceled")}
           </p>
         ) : (
           <>
-            <p className={styles.callType}>Incoming call...</p>
-            <p className={styles.callTypeDetail}>{callTypeText} call</p>
+            <p className={styles.callType}>{t("chat.popups.incomingCall.incoming")}</p>
+            <p className={styles.callTypeDetail}>
+              {callType === "video"
+                ? t("chat.popups.incomingCall.videoCall")
+                : t("chat.popups.incomingCall.voiceCall")}
+            </p>
           </>
         )}
 
@@ -74,17 +79,17 @@ export default function IncomingCallPopup({
             <button
               onClick={onReject}
               className={`${styles.button} ${styles.rejectButton}`}
-              aria-label="Close"
+              aria-label={t("chat.popups.incomingCall.closeAria")}
               style={{ width: "100%" }}
             >
-              <span>Close</span>
+              <span>{t("chat.popups.incomingCall.close")}</span>
             </button>
           ) : (
             <>
               <button
                 onClick={onReject}
                 className={`${styles.button} ${styles.rejectButton}`}
-                aria-label="Decline call"
+                aria-label={t("chat.popups.incomingCall.declineAria")}
               >
                 <svg
                   width="28"
@@ -96,13 +101,13 @@ export default function IncomingCallPopup({
                 >
                   <path d="M23 1L1 23M1 1l22 22" />
                 </svg>
-                <span>Decline</span>
+                <span>{t("chat.popups.incomingCall.decline")}</span>
               </button>
 
               <button
                 onClick={onAccept}
                 className={`${styles.button} ${styles.acceptButton}`}
-                aria-label="Accept call"
+                aria-label={t("chat.popups.incomingCall.acceptAria")}
               >
                 <svg
                   width="28"
@@ -114,7 +119,7 @@ export default function IncomingCallPopup({
                 >
                   <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />
                 </svg>
-                <span>Accept call</span>
+                <span>{t("chat.popups.incomingCall.accept")}</span>
               </button>
             </>
           )}

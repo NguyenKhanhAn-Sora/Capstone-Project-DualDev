@@ -364,6 +364,8 @@ export class ProfilesService {
       displayName?: string;
       username?: string;
       bio?: string;
+      pronouns?: string;
+      coverUrl?: string;
       location?: string;
       gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
       birthdate?: string;
@@ -408,6 +410,15 @@ export class ProfilesService {
     if (data.bio !== undefined) {
       // Preserve user-entered formatting (newlines/spaces). Normalize line endings.
       profile.bio = data.bio.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    }
+
+    if (data.pronouns !== undefined) {
+      profile.pronouns = data.pronouns.trim().slice(0, 80);
+    }
+
+    if (data.coverUrl !== undefined) {
+      const trimmed = data.coverUrl.trim();
+      profile.coverUrl = trimmed;
     }
 
     if (data.location !== undefined) {
@@ -657,6 +668,7 @@ export class ProfilesService {
     avatarOriginalUrl: string;
     coverUrl?: string;
     bio?: string;
+    pronouns?: string;
     gender?: string;
     location?: string;
     workplace?: { companyId: string; companyName: string };
@@ -720,7 +732,7 @@ export class ProfilesService {
 
     const ownerUser = await this.userModel
       .findById(ownerId)
-      .select('status isCreatorVerified createdAt')
+      .select('status isCreatorVerified createdAt settings')
       .lean();
 
     if (!ownerUser || ownerUser.status === 'banned') {
@@ -803,8 +815,15 @@ export class ProfilesService {
       mutualFollowUsers = mutualFollow.users;
     }
 
+    const ownerSettings = (ownerUser as { settings?: Record<string, unknown> })
+      ?.settings;
+    const showMemberSince =
+      (ownerSettings?.showCordigramMemberSince as boolean | undefined) !==
+      false;
     const cordigramMemberSince =
-      ownerUser && (ownerUser as { createdAt?: Date }).createdAt
+      showMemberSince &&
+      ownerUser &&
+      (ownerUser as { createdAt?: Date }).createdAt
         ? new Date((ownerUser as { createdAt: Date }).createdAt).toLocaleDateString(
             'vi-VN',
             {
@@ -824,6 +843,9 @@ export class ProfilesService {
       avatarOriginalUrl: profile.avatarOriginalUrl || this.DEFAULT_AVATAR_URL,
       coverUrl: profile.coverUrl || '',
       bio: canViewBio ? profile.bio || '' : '',
+      pronouns: canViewProfile
+        ? (profile as { pronouns?: string }).pronouns?.trim() || ''
+        : '',
       gender: canViewGender ? profile.gender || '' : '',
       location: canViewLocation ? profile.location || '' : '',
       workplace: canViewWorkplace

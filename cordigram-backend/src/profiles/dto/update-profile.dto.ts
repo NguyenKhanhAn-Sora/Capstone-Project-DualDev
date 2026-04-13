@@ -26,6 +26,17 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(80)
+  pronouns?: string;
+
+  /** URL ảnh biểu ngữ (Cloudinary / CDN). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(4096)
+  coverUrl?: string;
+
+  @IsOptional()
+  @IsString()
   location?: string;
 
   @IsOptional()

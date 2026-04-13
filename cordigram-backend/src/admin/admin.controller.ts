@@ -774,4 +774,15 @@ export class AdminController {
       +skip || 0,
     );
   }
+
+  @Post('migrate/notification-i18n-keys')
+  async migrateNotificationI18nKeys(
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    return this.adminService.migrateNotificationI18nKeys();
+  }
 }

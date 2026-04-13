@@ -93,14 +93,14 @@ export class MessagesService {
           .lean()
           .exec();
         const serverName = (serverDoc as any)?.name || 'Máy chủ';
-        const notifContent = `Bạn đã bị cảnh báo vì spam đề cập trong kênh của máy chủ "${serverName}". Vui lòng giảm số lần đề cập trong tin nhắn.`;
+        const notifContent = `__SYS:mentionSpamWarning:${serverName}`;
         const notifModel = this.serverModel.db.model('ServerNotification');
         await notifModel.create({
           serverId: new Types.ObjectId(serverId),
           createdBy: new Types.ObjectId(
             (server as any).ownerId?.toString() ?? serverId,
           ),
-          title: '⚠️ Cảnh báo spam đề cập',
+          title: '__SYS:mentionSpamTitle',
           content: notifContent,
           targetType: 'role',
           targetRoleName: null,

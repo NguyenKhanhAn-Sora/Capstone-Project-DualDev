@@ -276,6 +276,14 @@
   color: var(--color-text);
 }
 
+.settingsBtnImg {
+  display: block;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
 .passkeyOverlay {
   position: fixed;
   inset: 0;

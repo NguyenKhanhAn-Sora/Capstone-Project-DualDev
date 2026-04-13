@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
 import styles from "./ServerSafetySection.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 interface Props {
   serverId: string;
@@ -10,80 +11,8 @@ interface Props {
   initialTab?: "spam" | "automod" | "privileges";
 }
 
-interface VerificationOption {
-  value: serversApi.ServerVerificationLevel;
-  accent: string;
-  title: string;
-  desc: string;
-}
-
-interface ContentFilterOption {
-  value: serversApi.ContentFilterLevel;
-  accent: string;
-  title: string;
-  desc: string;
-}
-
-const CONTENT_FILTER_OPTIONS: ContentFilterOption[] = [
-  {
-    value: "all_members",
-    accent: styles.accentHigh,
-    title: "Lọc tin nhắn từ tất cả thành viên",
-    desc: "Tất cả tin nhắn sẽ được lọc để phát hiện nội dung đa phương tiện có hình ảnh nội dung nhạy cảm.",
-  },
-  {
-    value: "no_role_members",
-    accent: styles.accentMedium,
-    title: "Lọc tin nhắn từ các thành viên máy chủ không giữ vai trò",
-    desc: "Các tin nhắn từ những thành viên máy chủ không giữ vai trò sẽ bị lọc để phát hiện nội dung đa phương tiện có hình ảnh nhạy cảm.",
-  },
-  {
-    value: "none",
-    accent: styles.accentNone,
-    title: "Không lọc",
-    desc: "Các tin nhắn sẽ không bị lọc đối với nội dung đa phương tiện có hình ảnh nhạy cảm.",
-  },
-];
-
-function findContentFilterOption(level: serversApi.ContentFilterLevel): ContentFilterOption {
-  return CONTENT_FILTER_OPTIONS.find((o) => o.value === level) ?? CONTENT_FILTER_OPTIONS[2];
-}
-
-const VERIFICATION_OPTIONS: VerificationOption[] = [
-  {
-    value: "none",
-    accent: styles.accentNone,
-    title: "Không",
-    desc: "Không giới hạn",
-  },
-  {
-    value: "low",
-    accent: styles.accentLow,
-    title: "Thấp",
-    desc: "Bạn cần xác nhận email đăng kí Cordigram.",
-  },
-  {
-    value: "medium",
-    accent: styles.accentMedium,
-    title: "Trung bình",
-    desc: "Phải đăng kí Cordigram lâu hơn 5 phút.",
-  },
-  {
-    value: "high",
-    accent: styles.accentHigh,
-    title: "Cao",
-    desc: "Phải là thành viên trong máy chủ này lâu hơn 10 phút.",
-  },
-];
-
-function findOption(level: serversApi.ServerVerificationLevel): VerificationOption {
-  return VERIFICATION_OPTIONS.find((o) => o.value === level) ?? VERIFICATION_OPTIONS[0];
-}
-
-export default function ServerSafetySection({
-  serverId,
-  canManageSettings,
-}: Props) {
+export default function ServerSafetySection({ serverId, canManageSettings }: Props) {
+  const { t } = useLanguage();
   const [settings, setSettings] = useState<serversApi.ServerSafetySettings | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [contentFilterExpanded, setContentFilterExpanded] = useState(false);
@@ -100,36 +29,41 @@ export default function ServerSafetySection({
 
   const setVerificationLevel = (value: serversApi.ServerVerificationLevel) => {
     if (!settings) return;
-    save({
-      ...settings,
-      spamProtection: { ...settings.spamProtection, verificationLevel: value },
-    });
+    save({ ...settings, spamProtection: { ...settings.spamProtection, verificationLevel: value } });
   };
 
   const setContentFilterLevel = (value: serversApi.ContentFilterLevel) => {
     if (!settings) return;
-    save({
-      ...settings,
-      contentFilter: { ...(settings.contentFilter || {}), level: value },
-    });
+    save({ ...settings, contentFilter: { ...(settings.contentFilter || {}), level: value } });
   };
 
-  if (!settings) return <div>Không tải được thiết lập an toàn.</div>;
+  if (!settings) return <div>{t("chat.serverSafety.loadError")}</div>;
+
+  const VERIFICATION_OPTIONS = [
+    { value: "none"   as const, accent: styles.accentNone,   title: t("chat.serverSafety.verifyNoneTitle"),   desc: t("chat.serverSafety.verifyNoneDesc")   },
+    { value: "low"    as const, accent: styles.accentLow,    title: t("chat.serverSafety.verifyLowTitle"),    desc: t("chat.serverSafety.verifyLowDesc")    },
+    { value: "medium" as const, accent: styles.accentMedium, title: t("chat.serverSafety.verifyMediumTitle"), desc: t("chat.serverSafety.verifyMediumDesc") },
+    { value: "high"   as const, accent: styles.accentHigh,   title: t("chat.serverSafety.verifyHighTitle"),   desc: t("chat.serverSafety.verifyHighDesc")   },
+  ];
+
+  const CONTENT_FILTER_OPTIONS = [
+    { value: "all_members"    as const, accent: styles.accentHigh,   title: t("chat.serverSafety.filterAllTitle"),    desc: t("chat.serverSafety.filterAllDesc")    },
+    { value: "no_role_members"as const, accent: styles.accentMedium, title: t("chat.serverSafety.filterNoRoleTitle"), desc: t("chat.serverSafety.filterNoRoleDesc") },
+    { value: "none"           as const, accent: styles.accentNone,   title: t("chat.serverSafety.filterNoneTitle"),   desc: t("chat.serverSafety.filterNoneDesc")   },
+  ];
 
   const currentLevel = settings.spamProtection.verificationLevel ?? "none";
-  const current = findOption(currentLevel);
+  const current = VERIFICATION_OPTIONS.find((o) => o.value === currentLevel) ?? VERIFICATION_OPTIONS[0];
 
   const currentFilterLevel = settings.contentFilter?.level ?? "none";
-  const currentFilter = findContentFilterOption(currentFilterLevel);
+  const currentFilter = CONTENT_FILTER_OPTIONS.find((o) => o.value === currentFilterLevel) ?? CONTENT_FILTER_OPTIONS[2];
 
   return (
     <div className={styles.container}>
-      <h3 className={styles.sectionTitle}>Mức xác minh</h3>
+      <h3 className={styles.sectionTitle}>{t("chat.serverSafety.verifyTitle")}</h3>
       <p className={styles.sectionDesc}>
-        Thành viên của máy chủ phải đáp ứng được các tiêu chí sau để gửi tin nhắn trong kênh văn bản hoặc bắt đầu
-        cuộc trò chuyện bằng tin nhắn trực tiếp. Nếu thành viên đã được chỉ định vai trò và hướng dẫn làm quen trên
-        máy chủ không bật thì không cần sử dụng các tiêu chí này nữa.{" "}
-        <strong>Chúng tôi khuyến nghị bạn nên cài đặt mức xác minh cho Máy Chủ Cộng Đồng.</strong>
+        {t("chat.serverSafety.verifyDesc")}{" "}
+        <strong>{t("chat.serverSafety.verifyRecommend")}</strong>
       </p>
 
       <div className={styles.summary}>
@@ -144,45 +78,38 @@ export default function ServerSafetySection({
           disabled={!canManageSettings}
           onClick={() => setExpanded((v) => !v)}
         >
-          Thay đổi
+          {t("chat.serverSafety.changeBtn")}
         </button>
       </div>
 
       {expanded && (
-        <div className={styles.radioList} role="radiogroup" aria-label="Mức xác minh">
-          {VERIFICATION_OPTIONS.map((opt) => {
-            const selected = currentLevel === opt.value;
-            return (
-              <label key={opt.value} className={styles.radioItem}>
-                <span className={`${styles.accent} ${opt.accent}`} />
-                <div className={styles.radioBody}>
-                  <p className={styles.radioTitle}>{opt.title}</p>
-                  <p className={styles.radioDesc}>{opt.desc}</p>
-                </div>
-                <input
-                  type="radio"
-                  name={`verification-${serverId}`}
-                  className={styles.radioInput}
-                  checked={selected}
-                  disabled={!canManageSettings}
-                  onChange={() => {
-                    setVerificationLevel(opt.value);
-                    setExpanded(false);
-                  }}
-                />
-              </label>
-            );
-          })}
+        <div className={styles.radioList} role="radiogroup" aria-label={t("chat.serverSafety.verifyAriaLabel")}>
+          {VERIFICATION_OPTIONS.map((opt) => (
+            <label key={opt.value} className={styles.radioItem}>
+              <span className={`${styles.accent} ${opt.accent}`} />
+              <div className={styles.radioBody}>
+                <p className={styles.radioTitle}>{opt.title}</p>
+                <p className={styles.radioDesc}>{opt.desc}</p>
+              </div>
+              <input
+                type="radio"
+                name={`verification-${serverId}`}
+                className={styles.radioInput}
+                checked={currentLevel === opt.value}
+                disabled={!canManageSettings}
+                onChange={() => { setVerificationLevel(opt.value); setExpanded(false); }}
+              />
+            </label>
+          ))}
         </div>
       )}
 
       <div className={styles.divider} />
 
-      <h3 className={styles.sectionTitle}>Bộ lọc nội dung nhạy cảm</h3>
+      <h3 className={styles.sectionTitle}>{t("chat.serverSafety.contentFilterTitle")}</h3>
       <p className={styles.sectionDesc}>
-        Chọn nếu thành viên máy chủ có thể chia sẻ nội dung đa phương tiện có hình ảnh được bộ lọc nội dung nhạy cảm
-        phát hiện. Cài đặt này sẽ áp dụng cho các kênh không giới hạn độ tuổi.{" "}
-        <a href="#" style={{ color: "#00a8fc", textDecoration: "none" }}>Tìm hiểu thêm</a>
+        {t("chat.serverSafety.contentFilterDesc")}{" "}
+        <a href="#" style={{ color: "#00a8fc", textDecoration: "none" }}>{t("chat.serverSafety.learnMore")}</a>
       </p>
 
       <div className={styles.summary}>
@@ -197,35 +124,29 @@ export default function ServerSafetySection({
           disabled={!canManageSettings}
           onClick={() => setContentFilterExpanded((v) => !v)}
         >
-          Thay đổi
+          {t("chat.serverSafety.changeBtn")}
         </button>
       </div>
 
       {contentFilterExpanded && (
-        <div className={styles.radioList} role="radiogroup" aria-label="Bộ lọc nội dung nhạy cảm">
-          {CONTENT_FILTER_OPTIONS.map((opt) => {
-            const selected = currentFilterLevel === opt.value;
-            return (
-              <label key={opt.value} className={styles.radioItem}>
-                <span className={`${styles.accent} ${opt.accent}`} />
-                <div className={styles.radioBody}>
-                  <p className={styles.radioTitle}>{opt.title}</p>
-                  <p className={styles.radioDesc}>{opt.desc}</p>
-                </div>
-                <input
-                  type="radio"
-                  name={`content-filter-${serverId}`}
-                  className={styles.radioInput}
-                  checked={selected}
-                  disabled={!canManageSettings}
-                  onChange={() => {
-                    setContentFilterLevel(opt.value);
-                    setContentFilterExpanded(false);
-                  }}
-                />
-              </label>
-            );
-          })}
+        <div className={styles.radioList} role="radiogroup" aria-label={t("chat.serverSafety.contentFilterAriaLabel")}>
+          {CONTENT_FILTER_OPTIONS.map((opt) => (
+            <label key={opt.value} className={styles.radioItem}>
+              <span className={`${styles.accent} ${opt.accent}`} />
+              <div className={styles.radioBody}>
+                <p className={styles.radioTitle}>{opt.title}</p>
+                <p className={styles.radioDesc}>{opt.desc}</p>
+              </div>
+              <input
+                type="radio"
+                name={`content-filter-${serverId}`}
+                className={styles.radioInput}
+                checked={currentFilterLevel === opt.value}
+                disabled={!canManageSettings}
+                onChange={() => { setContentFilterLevel(opt.value); setContentFilterExpanded(false); }}
+              />
+            </label>
+          ))}
         </div>
       )}
     </div>

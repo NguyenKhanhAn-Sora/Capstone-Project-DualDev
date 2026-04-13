@@ -3,32 +3,12 @@
 import React, { useState, useEffect } from "react";
 import styles from "./EventCreatedDetailPopup.module.css";
 import type { ServerEvent } from "@/lib/servers-api";
+import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 
 function getMinsUntilStart(startAt: string): number {
   const start = new Date(startAt).getTime();
   const now = Date.now();
   return (start - now) / 60000;
-}
-
-function formatCountdown(mins: number): string {
-  if (mins < 0) return "Đã bắt đầu";
-  if (mins < 1) return "Bắt đầu trong vài giây";
-  const m = Math.floor(mins);
-  if (m < 60) return `Bắt đầu sau ${m} phút nữa`;
-  const h = Math.floor(m / 60);
-  const left = m % 60;
-  if (left === 0) return `Bắt đầu sau ${h} giờ nữa`;
-  return `Bắt đầu sau ${h} giờ ${left} phút nữa`;
-}
-
-function formatStartDate(startAt: string): string {
-  return new Date(startAt).toLocaleDateString("vi-VN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 interface EventCreatedDetailPopupProps {
@@ -47,15 +27,35 @@ export default function EventCreatedDetailPopup({
   onClose,
   event,
   serverName,
-  serverId,
   shareLink,
   onCopyLink,
   onStart,
 }: EventCreatedDetailPopupProps) {
+  const { t, language } = useLanguage();
   const [minsLeft, setMinsLeft] = useState(() => getMinsUntilStart(event.startAt));
   const [interested, setInterested] = useState(false);
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
+
+  const formatCountdown = (mins: number) => {
+    if (mins < 0) return t("chat.popups.eventDetail.countdown.started");
+    if (mins < 1) return t("chat.popups.eventDetail.countdown.seconds");
+    const m = Math.floor(mins);
+    if (m < 60) return t("chat.popups.eventDetail.countdown.minutes", { m });
+    const h = Math.floor(m / 60);
+    const left = m % 60;
+    if (left === 0) return t("chat.popups.eventDetail.countdown.hours", { h });
+    return t("chat.popups.eventDetail.countdown.hoursMinutes", { h, m: left });
+  };
+
+  const formatStartDate = (startAt: string) =>
+    new Date(startAt).toLocaleDateString(localeTagForLanguage(language), {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -88,7 +88,7 @@ export default function EventCreatedDetailPopup({
           type="button"
           className={styles.closeBtn}
           onClick={onClose}
-          aria-label="Đóng"
+          aria-label={t("chat.popups.closeAria")}
         >
           ×
         </button>
@@ -102,9 +102,9 @@ export default function EventCreatedDetailPopup({
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
           </span>
-          <h2 className={styles.headerTitle}>1 Sự kiện</h2>
+          <h2 className={styles.headerTitle}>{t("chat.popups.eventDetail.headerCount")}</h2>
           <button type="button" className={styles.createBtn} onClick={onClose}>
-            Tạo Sự kiện
+            {t("chat.popups.eventDetail.createAnother")}
           </button>
         </div>
 
@@ -131,8 +131,15 @@ export default function EventCreatedDetailPopup({
             <circle cx="12" cy="10" r="3" />
           </svg>
           <span>
-            Máy chủ của {serverName}
-            {event.channelId ? ` > # ${event.channelId.name}` : ""}
+            {t("chat.popups.eventDetail.location", {
+              serverName,
+              channel:
+                event.channelId && typeof event.channelId === "object" && "name" in event.channelId
+                  ? t("chat.popups.eventDetail.locationChannel", {
+                      name: String((event.channelId as { name: string }).name),
+                    })
+                  : "",
+            })}
           </span>
         </div>
 
@@ -146,7 +153,7 @@ export default function EventCreatedDetailPopup({
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
             </svg>
-            {copied ? "Đã sao chép" : "Sao Chép Link"}
+            {copied ? t("chat.common.copied") : t("chat.popups.eventDetail.copyLink")}
           </button>
           <button
             type="button"
@@ -156,7 +163,7 @@ export default function EventCreatedDetailPopup({
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            Quan tâm
+            {t("chat.popups.eventDetail.interested")}
           </button>
           {showStartButton && (
             <button
@@ -172,7 +179,7 @@ export default function EventCreatedDetailPopup({
                 }
               }}
             >
-              {starting ? "Đang bắt đầu..." : "Bắt đầu"}
+              {starting ? t("chat.popups.eventDetail.starting") : t("chat.popups.eventDetail.start")}
             </button>
           )}
         </div>

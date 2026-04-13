@@ -1221,6 +1221,19 @@ export async function fetchBlockedUsers(opts: {
   });
 }
 
+export async function fetchIgnoredUserIds(opts: {
+  token: string;
+}): Promise<{ ignoredUserIds: string[] }> {
+  const { token } = opts;
+  return apiFetch<{ ignoredUserIds: string[] }>({
+    path: "/users/ignored-ids",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function fetchActivityLog(opts: {
   token: string;
   limit?: number;
@@ -1430,7 +1443,12 @@ export type UpdateAvatarResponse = {
 
 export type UserSettingsResponse = {
   theme: "light" | "dark";
-  language?: "en" | "vi";
+  language?: "vi" | "en" | "ja" | "zh";
+  dmListFrom?: "everyone" | "followers_only";
+  dmCallFrom?: "everyone" | "followers_only";
+  showCordigramMemberSince?: boolean;
+  sharePresence?: boolean;
+  chatSoundEnabled?: boolean;
 };
 
 export type NotificationCategoryKey =
@@ -1698,16 +1716,38 @@ export async function fetchUserSettings(opts: {
 export async function updateUserSettings(opts: {
   token: string;
   theme?: "light" | "dark";
-  language?: "en" | "vi";
+  language?: "vi" | "en" | "ja" | "zh";
+  dmListFrom?: "everyone" | "followers_only";
+  dmCallFrom?: "everyone" | "followers_only";
+  showCordigramMemberSince?: boolean;
+  sharePresence?: boolean;
+  chatSoundEnabled?: boolean;
 }): Promise<UserSettingsResponse> {
-  const { token, theme, language } = opts;
+  const {
+    token,
+    theme,
+    language,
+    dmListFrom,
+    dmCallFrom,
+    showCordigramMemberSince,
+    sharePresence,
+    chatSoundEnabled,
+  } = opts;
   return apiFetch<UserSettingsResponse>({
     path: "/users/settings",
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ theme, language }),
+    body: JSON.stringify({
+      theme,
+      language,
+      dmListFrom,
+      dmCallFrom,
+      showCordigramMemberSince,
+      sharePresence,
+      chatSoundEnabled,
+    }),
   });
 }
 
@@ -2211,6 +2251,7 @@ export type ProfileDetailResponse = {
   avatarOriginalUrl?: string;
   coverUrl?: string;
   bio?: string;
+  pronouns?: string;
   gender?: string;
   location?: string;
   workplace?: {
@@ -2323,6 +2364,8 @@ export type UpdateMyProfilePayload = {
   displayName?: string;
   username?: string;
   bio?: string;
+  pronouns?: string;
+  coverUrl?: string;
   location?: string;
   gender?: "male" | "female" | "other" | "prefer_not_to_say";
   birthdate?: string;

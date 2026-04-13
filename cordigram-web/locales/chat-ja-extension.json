@@ -1,0 +1,226 @@
+{
+  "explore": {
+    "backToChat": "← チャットに戻る",
+    "title": "見つける",
+    "subtitle": "参加できる審査済みコミュニティを探します。「参加申請」が有効なサーバーでは、先に申請を送信する必要があります。",
+    "loading": "読み込み中…",
+    "loadError": "読み込めませんでした",
+    "empty": "表示できる承認済みサーバーはまだありません。",
+    "members": "メンバー {count} 人",
+    "badgeApply": " • 参加申請",
+    "badgeInviteOnly": " • 招待のみ",
+    "join": "参加",
+    "inviteOnly": "招待のみ",
+    "inviteOnlyTitle": "このサーバーは招待制です"
+  },
+  "sidebar": {
+    "contextExplore": "見つける",
+    "contextServer": "サーバー",
+    "contextDm": "ダイレクトメッセージ",
+    "inboxAria": "受信トレイ",
+    "createServerTitle": "サーバーを作成",
+    "settingsAria": "設定",
+    "exploreOpen": "見つける",
+    "exploreClose": "見つけるを閉じる"
+  },
+  "toasts": {
+    "messageRemovedAll": "メッセージを全員から削除しました",
+    "messageDeletedSelf": "メッセージを削除しました"
+  },
+  "channelUi": {
+    "sectionChat": "テキストチャンネル",
+    "sectionVoice": "ボイスチャンネル",
+    "defaultCategoryLabel": "チャンネル"
+  },
+  "roleEditor": {
+    "back": "戻る",
+    "editTitle": "ロールを編集 - ",
+    "tabDisplay": "表示",
+    "tabPermissions": "権限",
+    "tabMembers": "メンバー管理 ({count})",
+    "esc": "ESC",
+    "deleteRoleTitle": "ロールを削除",
+    "confirmDeleteRole": "ロール「{name}」を削除しますか？",
+    "errorDeleteRole": "ロールを削除できませんでした",
+    "newRoleName": "新しいロール",
+    "errorCreateRole": "ロールを作成できませんでした",
+    "viewServerByRole": "ロールでサーバーを表示",
+    "delete": "削除",
+    "deleteRoleAria": "ロールを削除"
+  },
+  "roleDisplay": {
+    "roleNameLabel": "ロール名",
+    "required": "*",
+    "roleNamePlaceholder": "ロール名を入力",
+    "styleTitle": "ロールのスタイル",
+    "previewName": "Wumpus",
+    "previewRole": "音楽サポーター",
+    "previewBadge": "安定",
+    "colorLabel": "ロールの色",
+    "colorHint": "メンバーはロール一覧で最も高いロールの色が適用されます。",
+    "displaySeparateToggle": "このロールのメンバーをオンライン表示から分けて表示する",
+    "mentionableToggle": "全員がこのロールを @メンション できるようにする",
+    "mentionableHint": "注：「@everyone、@here、すべてのロールをメンション」権限を持つメンバーは、常にこのロールのメンバーをメンションできます。",
+    "viewAsRoleTitle": "ロールとしてサーバーを表示",
+    "viewAsRoleDesc": "このロールができることとアクセスできるチャンネルを確認します。サーバー所有者と管理者のみ。",
+    "viewAsRoleBtn": "ロールとしてサーバーを表示",
+    "saveFailed": "変更を保存できませんでした",
+    "unsavedBar": "注意 — 未保存の変更があります！",
+    "reset": "リセット",
+    "saving": "保存中...",
+    "saveChanges": "変更を保存"
+  },
+  "roleMembers": {
+    "loading": "メンバー一覧を読み込み中…",
+    "noAccessTitle": "アクセスできません",
+    "noAccessDesc": "サーバー所有者、または「サーバーの管理」権限を持つメンバーのみ、メンバー一覧を表示・管理できます。",
+    "everyoneTitle": "@everyone",
+    "everyoneDesc": "@everyone ロールは全メンバーに自動で適用されます。このロールからメンバーを追加・削除することはできません。",
+    "memberCount": "メンバー {count} 人",
+    "searchPlaceholder": "メンバーを検索",
+    "addMember": "メンバーを追加",
+    "emptySearch": "「{query}」に一致するメンバーはいません",
+    "emptyRole": "このロールにメンバーはまだいません",
+    "removeFromRoleTitle": "ロールから削除",
+    "confirmRemove": "このメンバーをロールから削除しますか？",
+    "errorAdd": "メンバーを追加できませんでした",
+    "errorRemove": "メンバーを削除できませんでした",
+    "allHaveRole": "全員がすでにこのロールを持っています"
+  },
+  "rolePermissions": {
+    "sections": {
+      "serverManagement": "サーバー管理の権限",
+      "member": "メンバーの権限",
+      "textChannel": "テキストチャンネルの権限",
+      "voiceChannel": "ボイスチャンネルの権限"
+    },
+    "searchPlaceholder": "権限を検索",
+    "noResults": "「{query}」に一致する権限はありません",
+    "unsavedBar": "注意 — 未保存の変更があります！",
+    "reset": "リセット",
+    "saving": "保存中...",
+    "saveChanges": "変更を保存",
+    "saveFailed": "変更を保存できませんでした",
+    "items": {
+      "manageServer": {
+        "label": "サーバーの管理",
+        "description": "サーバー名・画像・基本設定の編集を許可します。",
+        "warning": "強力な管理者権限です。付与は慎重に。"
+      },
+      "manageChannels": {
+        "label": "チャンネルの管理",
+        "description": "チャンネルの作成・編集・削除を許可します。",
+        "warning": "強力な管理者権限です。付与は慎重に。"
+      },
+      "manageEvents": {
+        "label": "イベントの管理",
+        "description": "サーバーイベントの作成・編集・削除を許可します。"
+      },
+      "createInvite": {
+        "label": "招待を作成",
+        "description": "新しい人をこのサーバーに招待することを許可します。"
+      },
+      "changeNickname": {
+        "label": "ニックネームを変更",
+        "description": "このサーバーで自分のニックネームを変更することを許可します。"
+      },
+      "manageNicknames": {
+        "label": "ニックネームの管理",
+        "description": "他のメンバーのニックネームを変更することを許可します。"
+      },
+      "kickMembers": {
+        "label": "キック・承認・拒否",
+        "description": "キックでメンバーをサーバーから外します。新しい招待があれば再参加できます。参加申請が有効な場合、この権限で申請を承認・拒否できます。"
+      },
+      "banMembers": {
+        "label": "メンバーをBAN",
+        "description": "他のメンバーを永久BANし、メッセージ履歴を削除することを許可します。"
+      },
+      "timeoutMembers": {
+        "label": "タイムアウト",
+        "description": "タイムアウト中はチャット送信、スレ返信、リアクション、ボイス／ステージでの発言ができません。"
+      },
+      "mentionEveryone": {
+        "label": "@everyone、@here、全ロールをメンション",
+        "description": "@everyone / @here の使用と、メンション可能なロールへのメンションを許可します。",
+        "warning": "信頼できる人にのみ付与してください。"
+      },
+      "sendMessages": {
+        "label": "メッセージ送信と投稿作成",
+        "description": "テキストチャンネルでの送信とフォーラムチャンネルでの投稿を許可します。"
+      },
+      "sendMessagesInThreads": {
+        "label": "スレッドと投稿でメッセージ送信",
+        "description": "スレッドとフォーラム投稿内でのメッセージ送信を許可します。"
+      },
+      "createPublicThreads": {
+        "label": "公開スレッドを作成",
+        "description": "チャンネル内の全員が見られるスレッドを作成することを許可します。"
+      },
+      "createPrivateThreads": {
+        "label": "プライベートスレッドを作成",
+        "description": "招待制のスレッドを作成することを許可します。"
+      },
+      "embedLinks": {
+        "label": "リンクを埋め込む",
+        "description": "共有されたリンクのリッチ埋め込みを表示することを許可します。"
+      },
+      "attachFiles": {
+        "label": "ファイルを添付",
+        "description": "チャットでファイルやメディアをアップロードすることを許可します。"
+      },
+      "addReactions": {
+        "label": "リアクションを追加",
+        "description": "メッセージに新しい絵文字リアクションを追加することを許可します。"
+      },
+      "manageMessages": {
+        "label": "メッセージの管理",
+        "description": "他のメンバーのメッセージの削除や埋め込みの解除を許可します。"
+      },
+      "pinMessages": {
+        "label": "メッセージをピン留め",
+        "description": "任意のメッセージのピン留め／解除を許可します。"
+      },
+      "viewMessageHistory": {
+        "label": "メッセージ履歴を読む",
+        "description": "過去のメッセージを読むことを許可します。ない場合、オンライン中のメッセージのみ表示されることがあります。"
+      },
+      "sendVoiceMessages": {
+        "label": "ボイスメッセージを送信",
+        "description": "ボイスメッセージの送信を許可します。"
+      },
+      "createPolls": {
+        "label": "投票を作成",
+        "description": "投票の作成を許可します。"
+      },
+      "connect": {
+        "label": "接続",
+        "description": "ボイスに参加し、他の人の声を聞くことを許可します。"
+      },
+      "speak": {
+        "label": "発言",
+        "description": "ボイスで発言することを許可します。ない場合はミュートされ、誰かが解除するまで発言できません。"
+      },
+      "video": {
+        "label": "ビデオ",
+        "description": "このサーバーでビデオ・画面共有・配信を許可します。"
+      },
+      "muteMembers": {
+        "label": "メンバーをミュート",
+        "description": "ボイスチャンネルで他のメンバーをミュートすることを許可します。"
+      },
+      "deafenMembers": {
+        "label": "メンバーをスピーカーオフ",
+        "description": "他のメンバーを聞けず話せない状態にすることを許可します。"
+      },
+      "moveMembers": {
+        "label": "メンバーを移動",
+        "description": "アクセスできるボイスチャンネル間でメンバーの切断・移動を許可します。"
+      },
+      "setVoiceChannelStatus": {
+        "label": "ボイスチャンネルステータスを設定",
+        "description": "ボイスチャンネルステータスの作成・編集を許可します。"
+      }
+    }
+  }
+}

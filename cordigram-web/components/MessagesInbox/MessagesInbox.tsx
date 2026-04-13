@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { io, type Socket } from "socket.io-client";
 import styles from "./MessagesInbox.module.css";
@@ -17,6 +17,7 @@ import {
 import { getApiBaseUrl } from "@/lib/api";
 import { markDmConversationRead } from "@/lib/api";
 import { acceptServerInvite, declineServerInvite, getServerAccessSettings, markChannelAsRead } from "@/lib/servers-api";
+import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 type TabKey = "for-you" | "unread" | "mentions";
 
 type UiUnreadItem = InboxUnreadItem & { read?: boolean };
@@ -38,19 +39,6 @@ interface MessagesInboxProps {
   onApplyToJoinBeforeAccept?: (serverId: string, inviteId: string) => Promise<boolean>;
 }
 
-function formatTimeAgo(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffM = Math.floor(diffMs / 60000);
-  const diffH = Math.floor(diffMs / 3600000);
-  const diffD = Math.floor(diffMs / 86400000);
-  if (diffM < 60) return `${diffM} phút`;
-  if (diffH < 24) return `${diffH} giờ`;
-  if (diffD < 28) return `${diffD} ngày`;
-  return d.toLocaleDateString("vi-VN");
-}
-
 export default function MessagesInbox({
   onClose,
   onNavigateToChannel,
@@ -59,6 +47,7 @@ export default function MessagesInbox({
   onAcceptInvite,
   onApplyToJoinBeforeAccept,
 }: MessagesInboxProps) {
+  const { t, language } = useLanguage();
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("for-you");
   const [forYouItems, setForYouItems] = useState<InboxForYouItem[]>([]);
@@ -68,6 +57,59 @@ export default function MessagesInbox({
   const [markAllLoading, setMarkAllLoading] = useState(false);
   const dmSocketRef = useRef<Socket | null>(null);
   const unreadRefreshTimerRef = useRef<number | null>(null);
+
+  const resolveNotifText = useCallback(
+    (raw: string | undefined): string => {
+      if (!raw) return "";
+
+      // Current __SYS: markers (new notifications)
+      if (raw === "__SYS:adminView") return t("chat.popups.inbox.adminViewTitle");
+      if (raw.startsWith("__SYS:adminViewContent:")) {
+        const server = raw.slice("__SYS:adminViewContent:".length);
+        return t("chat.popups.inbox.adminViewContent").replace("{server}", server);
+      }
+      if (raw === "__SYS:mentionSpamTitle") return t("chat.popups.inbox.mentionSpamTitle");
+      if (raw.startsWith("__SYS:mentionSpamWarning:")) {
+        const server = raw.slice("__SYS:mentionSpamWarning:".length);
+        return t("chat.popups.inbox.mentionSpamWarning").replace("{server}", server);
+      }
+
+      // Legacy Vietnamese strings stored in DB before migration
+      if (raw === "Quản trị viên hệ thống đang xem máy chủ") {
+        return t("chat.popups.inbox.adminViewTitle");
+      }
+      const adminContentVi = raw.match(/^Quản trị viên hệ thống đang kiểm tra máy chủ "(.+)" của bạn\./);
+      if (adminContentVi) {
+        return t("chat.popups.inbox.adminViewContent").replace("{server}", adminContentVi[1]);
+      }
+      if (raw === "⚠️ Cảnh báo spam đề cập") {
+        return t("chat.popups.inbox.mentionSpamTitle");
+      }
+      const spamVi = raw.match(/^Bạn đã bị cảnh báo vì spam đề cập trong kênh của máy chủ "(.+)"\./);
+      if (spamVi) {
+        return t("chat.popups.inbox.mentionSpamWarning").replace("{server}", spamVi[1]);
+      }
+
+      return raw;
+    },
+    [t],
+  );
+
+  const formatTimeAgo = useCallback(
+    (iso: string) => {
+      const d = new Date(iso);
+      const now = new Date();
+      const diffMs = now.getTime() - d.getTime();
+      const diffM = Math.floor(diffMs / 60000);
+      const diffH = Math.floor(diffMs / 3600000);
+      const diffD = Math.floor(diffMs / 86400000);
+      if (diffM < 60) return t("chat.popups.inbox.timeMinutes", { n: Math.max(0, diffM) });
+      if (diffH < 24) return t("chat.popups.inbox.timeHours", { n: diffH });
+      if (diffD < 28) return t("chat.popups.inbox.timeDays", { n: diffD });
+      return d.toLocaleDateString(localeTagForLanguage(language));
+    },
+    [t, language],
+  );
 
   const authToken = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -344,9 +386,9 @@ export default function MessagesInbox({
                 <polyline points="22,6 12,13 2,6" />
               </svg>
             </span>
-            Hộp thư đến
+            {t("chat.popups.inbox.title")}
           </h2>
-          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Đóng">
+          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label={t("chat.popups.closeAria")}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
@@ -359,30 +401,30 @@ export default function MessagesInbox({
             className={`${styles.tab} ${tab === "for-you" ? styles.tabActive : ""}`}
             onClick={() => setTab("for-you")}
           >
-            Dành cho Bạn
+            {t("chat.popups.inbox.tabForYou")}
           </button>
           <button
             type="button"
             className={`${styles.tab} ${tab === "unread" ? styles.tabActive : ""}`}
             onClick={() => setTab("unread")}
           >
-            Chưa đọc
+            {t("chat.popups.inbox.tabUnread")}
           </button>
           <button
             type="button"
             className={`${styles.tab} ${tab === "mentions" ? styles.tabActive : ""}`}
             onClick={() => setTab("mentions")}
           >
-            Đề cập
+            {t("chat.popups.inbox.tabMentions")}
           </button>
           <button
             type="button"
             className={styles.markAllBtn}
             onClick={handleMarkAllRead}
             disabled={markAllLoading}
-            title="Đánh dấu đã đọc tất cả"
+            title={t("chat.popups.inbox.markAllTitle")}
           >
-            {markAllLoading ? "Đang đánh dấu..." : "Đánh dấu đã đọc"}
+            {markAllLoading ? t("chat.popups.inbox.markAllDoing") : t("chat.popups.inbox.markAll")}
           </button>
         </div>
 
@@ -390,10 +432,10 @@ export default function MessagesInbox({
           {tab === "for-you" && (
             <>
               {loading["for-you"] ? (
-                <div className={styles.loading}>Đang tải...</div>
+                <div className={styles.loading}>{t("chat.popups.inbox.loading")}</div>
               ) : forYouItems.length === 0 ? (
                 <div className={styles.empty}>
-                  Không có sự kiện, lời mời hoặc thông báo vai trò nào từ các máy chủ của bạn.
+                  {t("chat.popups.inbox.emptyForYou")}
                 </div>
               ) : (
                 forYouItems.map((item) =>
@@ -421,11 +463,11 @@ export default function MessagesInbox({
                         <p className={styles.eventTitle}>
                           {item.topic}
                           {item.status === "live" && (
-                            <span style={{ color: "var(--color-primary)", marginLeft: 6 }}>• Đang diễn ra</span>
+                            <span style={{ color: "var(--color-primary)", marginLeft: 6 }}>{t("chat.popups.inbox.eventLive")}</span>
                           )}
                         </p>
                         <p className={styles.eventMeta}>
-                          đã bắt đầu trong Máy chủ của {item.serverName}.
+                          {t("chat.popups.inbox.eventStarted", { serverName: item.serverName })}
                         </p>
                         <p className={styles.eventTime}>{formatTimeAgo(item.startAt)}</p>
                       </div>
@@ -451,13 +493,13 @@ export default function MessagesInbox({
                         {item.seen !== true && <span className={styles.eventItemUnreadDot} aria-hidden />}
                       </div>
                       <div className={styles.eventBody}>
-                        <p className={styles.eventTitle}>{item.title}</p>
+                        <p className={styles.eventTitle}>{resolveNotifText(item.title)}</p>
                         <p className={styles.eventMeta}>
                           {item.serverName}
                           {item.targetRoleName ? ` • ${item.targetRoleName}` : ""}
                         </p>
                         <p className={styles.unreadPreview}>
-                          {item.content}
+                          {resolveNotifText(item.content)}
                         </p>
                         <p className={styles.eventTime}>{formatTimeAgo(item.createdAt)}</p>
                       </div>
@@ -482,10 +524,13 @@ export default function MessagesInbox({
                       </div>
                       <div className={styles.eventBody}>
                         <p className={styles.eventTitle}>
-                          Lời mời vào máy chủ
+                          {t("chat.popups.inbox.inviteTitle")}
                         </p>
                         <p className={styles.eventMeta}>
-                          {item.inviterDisplay} mời bạn tham gia {item.serverName}.
+                          {t("chat.popups.inbox.inviteMeta", {
+                            inviter: item.inviterDisplay,
+                            serverName: item.serverName,
+                          })}
                         </p>
                         <p className={styles.eventTime}>{formatTimeAgo(item.createdAt)}</p>
                       </div>
@@ -493,9 +538,9 @@ export default function MessagesInbox({
                         <button
                           type="button"
                           className={styles.inviteActionBtn}
-                          title="Chấp nhận"
+                          title={t("chat.popups.inbox.accept")}
                           onClick={() => handleAcceptInvite(item)}
-                          aria-label="Chấp nhận lời mời"
+                          aria-label={t("chat.popups.inbox.acceptInviteAria")}
                         >
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <polyline points="20 6 9 17 4 12" />
@@ -504,9 +549,9 @@ export default function MessagesInbox({
                         <button
                           type="button"
                           className={`${styles.inviteActionBtn} ${styles.inviteActionBtnDecline}`}
-                          title="Từ chối"
+                          title={t("chat.popups.inbox.decline")}
                           onClick={() => handleDeclineInvite(item)}
-                          aria-label="Từ chối lời mời"
+                          aria-label={t("chat.popups.inbox.declineInviteAria")}
                         >
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <line x1="18" y1="6" x2="6" y2="18" />
@@ -524,10 +569,10 @@ export default function MessagesInbox({
           {tab === "unread" && (
             <>
               {loading.unread ? (
-                <div className={styles.loading}>Đang tải...</div>
+                <div className={styles.loading}>{t("chat.popups.inbox.loading")}</div>
               ) : unreadItems.length === 0 ? (
                 <div className={styles.empty}>
-                  Không có tin nhắn hoặc thông báo chưa đọc từ các kênh.
+                  {t("chat.popups.inbox.emptyUnread")}
                 </div>
               ) : (
                 unreadItems.map((item) =>
@@ -551,7 +596,7 @@ export default function MessagesInbox({
                       <div className={styles.eventBody}>
                         <div className={styles.unreadTopRow}>
                           <p className={styles.unreadTitle}>
-                            {item.displayName || item.username || "Tin nhắn"}
+                            {item.displayName || item.username || t("chat.popups.inbox.dmFallback")}
                           </p>
                           <div className={styles.unreadRight}>
                             <span className={styles.unreadTime}>
@@ -567,7 +612,7 @@ export default function MessagesInbox({
                         <p className={styles.unreadPreview}>
                           {item.lastMessage?.trim()
                             ? item.lastMessage
-                            : "Bạn có tin nhắn mới"}
+                            : t("chat.popups.inbox.newMessageFallback")}
                         </p>
                       </div>
                     </button>
@@ -607,7 +652,7 @@ export default function MessagesInbox({
                         <p className={styles.unreadPreview}>
                           {item.lastMessage?.trim()
                             ? item.lastMessage
-                            : "Bạn có tin nhắn mới"}
+                            : t("chat.popups.inbox.newMessageFallback")}
                         </p>
                       </div>
                     </button>
@@ -620,10 +665,10 @@ export default function MessagesInbox({
           {tab === "mentions" && (
             <>
               {loading.mentions ? (
-                <div className={styles.loading}>Đang tải...</div>
+                <div className={styles.loading}>{t("chat.popups.inbox.loading")}</div>
               ) : mentionItems.length === 0 ? (
                 <div className={styles.empty}>
-                  Chưa có ai đề cập bạn trong kênh.
+                  {t("chat.popups.inbox.emptyMentions")}
                 </div>
               ) : (
                 mentionItems.map((item) => (
@@ -644,14 +689,14 @@ export default function MessagesInbox({
                     <div className={styles.eventBody}>
                       <div className={styles.unreadTopRow}>
                         <p className={styles.unreadTitle}>
-                          {item.serverName?.trim() || "Máy chủ"}, #{item.channelName}
+                          {item.serverName?.trim() || t("chat.popups.inbox.serverFallback")}, #{item.channelName}
                         </p>
                         <span className={styles.unreadTime}>
                           {formatTimeAgo(item.createdAt)}
                         </span>
                       </div>
                       <p className={styles.unreadPreview}>
-                        <strong>{item.actorName}</strong> đã đề cập bạn
+                        <strong>{item.actorName}</strong> {t("chat.popups.inbox.mentionYou")}
                         {item.excerpt?.trim()
                           ? ` — ${item.excerpt.trim().slice(0, 140)}`
                           : ""}

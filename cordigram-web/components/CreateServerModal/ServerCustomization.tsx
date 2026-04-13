@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import styles from "./ServerCustomization.module.css";
 import { uploadMedia } from "@/lib/api";
+import { useLanguage } from "@/component/language-provider";
 
 interface ServerCustomizationProps {
   onCreateServer: (name: string, avatarUrl?: string) => void;
@@ -15,6 +16,7 @@ export default function ServerCustomization({
   onBack,
   isCreating,
 }: ServerCustomizationProps) {
+  const { t } = useLanguage();
   const [serverName, setServerName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -32,18 +34,18 @@ export default function ServerCustomization({
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("Vui lòng chọn file ảnh");
+      alert(t("chat.createServer.customize.errors.imageOnly"));
       return;
     }
 
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-      alert("Kích thước file không được vượt quá 5MB");
+      alert(t("chat.createServer.customize.errors.maxSize5mb"));
       return;
     }
 
     if (!token) {
-      alert("Bạn cần đăng nhập để upload ảnh");
+      alert(t("chat.createServer.customize.errors.loginRequired"));
       return;
     }
 
@@ -54,7 +56,7 @@ export default function ServerCustomization({
       setAvatarUrl(result.url);
     } catch (error) {
       console.error("Failed to upload image:", error);
-      alert("Không thể tải lên ảnh. Vui lòng thử lại.");
+      alert(t("chat.createServer.customize.errors.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -62,7 +64,7 @@ export default function ServerCustomization({
 
   const handleSubmit = () => {
     if (!serverName.trim()) {
-      alert("Vui lòng nhập tên máy chủ");
+      alert(t("chat.createServer.errors.nameRequired"));
       return;
     }
     onCreateServer(serverName, avatarUrl || undefined);
@@ -70,10 +72,9 @@ export default function ServerCustomization({
 
   return (
     <div className={styles.container}>
-      <h2 className={styles.title}>Tùy chỉnh máy chủ của bạn</h2>
+      <h2 className={styles.title}>{t("chat.createServer.customize.title")}</h2>
       <p className={styles.subtitle}>
-        Hãy cá nhân hóa máy chủ bằng cách đặt tên và thêm biểu tượng đại diện.
-        Bạn có thể đổi bất cứ lúc nào.
+        {t("chat.createServer.customize.subtitle")}
       </p>
 
       <div className={styles.uploadSection}>
@@ -101,37 +102,43 @@ export default function ServerCustomization({
             </div>
           )}
         </button>
-        {uploading && <p className={styles.uploadingText}>Đang tải lên...</p>}
+        {uploading && (
+          <p className={styles.uploadingText}>{t("chat.common.uploading")}</p>
+        )}
       </div>
 
       <div className={styles.inputSection}>
         <label className={styles.label}>
-          Tên máy chủ <span className={styles.required}>*</span>
+          {t("chat.createServer.customize.serverNameLabel")}{" "}
+          <span className={styles.required}>*</span>
         </label>
         <input
           type="text"
           className={styles.input}
           value={serverName}
           onChange={(e) => setServerName(e.target.value)}
-          placeholder="Nhập tên máy chủ"
+          placeholder={t("chat.createServer.customize.serverNamePlaceholder")}
           maxLength={100}
         />
         <p className={styles.hint}>
-          Khi tạo máy chủ, nghĩa là bạn đã đồng ý với{" "}
-          <span className={styles.link}>Nguyên Tắc Cộng Đồng</span> của Discord.
+          {t("chat.createServer.customize.communityGuidelinesPrefix")}{" "}
+          <span className={styles.link}>
+            {t("chat.createServer.customize.communityGuidelinesLink")}
+          </span>{" "}
+          {t("chat.createServer.customize.communityGuidelinesSuffix")}
         </p>
       </div>
 
       <div className={styles.footer}>
         <button className={styles.backButton} onClick={onBack} disabled={isCreating}>
-          Trở lại
+          {t("chat.common.back")}
         </button>
         <button
           className={styles.createButton}
           onClick={handleSubmit}
           disabled={isCreating || !serverName.trim()}
         >
-          {isCreating ? "Đang tạo..." : "Tạo"}
+          {isCreating ? t("chat.common.creating") : t("chat.common.create")}
         </button>
       </div>
     </div>

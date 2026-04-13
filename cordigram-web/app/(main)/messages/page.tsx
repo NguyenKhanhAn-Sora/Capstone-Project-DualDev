@@ -7,12 +7,14 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import styles from "./messages.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { useLanguage } from "@/component/language-provider";
 import {
   useDirectMessages,
   type DirectMessage,
 } from "@/hooks/use-direct-messages";
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
+import { translateCategoryName, translateChannelName } from "@/lib/system-names";
 import {
   sendDirectMessage,
   getDirectMessages,
@@ -35,6 +37,8 @@ import {
   reportDirectMessage,
   deleteDirectMessage,
   markDmConversationRead,
+  fetchUserSettings,
+  type UserSettingsResponse,
 } from "@/lib/api";
 import { getLiveKitToken, getDMRoomName, getVoiceChannelParticipants } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
@@ -98,6 +102,8 @@ import type { VoiceChannelCallProps } from "@/components/VoiceChannelCall";
 import ChannelUserProfileRoot, {
   type ChannelProfileAnchorContext,
 } from "@/components/ChannelUserProfile/ChannelUserProfileRoot";
+import MessagesUserSettingsModal from "@/components/MessagesUserSettings/MessagesUserSettingsModal";
+import { getDmSidebarPeersMode } from "@/lib/messages-dm-sidebar-prefs";
 
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
 const CallRoom = dynamic(() => import("@/components/CallRoom"), { ssr: false });
@@ -167,6 +173,7 @@ const GiphyMessage = memo(
   }) => {
     const [gifData, setGifData] = useState<GiphyGif | null>(null);
     const [loading, setLoading] = useState(true);
+    const { t } = useLanguage();
 
     useEffect(() => {
       getGifById(giphyId)
@@ -183,7 +190,11 @@ const GiphyMessage = memo(
     if (loading) {
       return (
         <div style={{ padding: "12px", color: "#b5bac1", fontSize: "14px" }}>
-          Đang tải {messageType}...
+          {messageType === "gif"
+            ? t("chat.loading.gif")
+            : messageType === "sticker"
+              ? t("chat.loading.sticker")
+              : t("chat.loading.generic")}
         </div>
       );
     }
@@ -531,6 +542,7 @@ const MessageItem = memo(
       anchorRect: DOMRect,
     ) => void;
   }) => {
+    const { t } = useLanguage();
     const messageRef = useRef<HTMLDivElement>(null);
     const [isHovered, setIsHovered] = useState(false);
     const [showQuickReactions, setShowQuickReactions] = useState(false);
@@ -787,7 +799,7 @@ const MessageItem = memo(
                       opacity="0.6"
                     />
                   </svg>
-                  <span className={styles.readText}>Seen</span>
+                  <span className={styles.readText}>{t("chat.dmList.seen")}</span>
                 </div>
               ) : (
                 <div className={styles.readStatus}>
@@ -808,7 +820,7 @@ const MessageItem = memo(
                       opacity="0.5"
                     />
                   </svg>
-                  <span className={styles.unreadText}>Sent</span>
+                  <span className={styles.unreadText}>{t("chat.dmList.sent")}</span>
                 </div>
               )}
             </div>
@@ -1047,6 +1059,7 @@ function mapReplyToMessage(raw: any): UIMessage["replyToMessage"] {
 
 export default function MessagesPage() {
   const searchParams = useSearchParams();
+  const { t, language } = useLanguage();
 
   const isAdminView = searchParams.get("from") === "admin";
   const adminReturnUrl = searchParams.get("returnUrl");
@@ -1220,6 +1233,16 @@ export default function MessagesPage() {
   const [dmUnreadCounts, setDmUnreadCounts] = useState<Record<string, number>>({});
   const [loadingDirectMessages, setLoadingDirectMessages] = useState(false);
   const [token, setToken] = useState<string>("");
+  const [showMessagesUserSettings, setShowMessagesUserSettings] =
+    useState(false);
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [chatUserSettings, setChatUserSettings] =
+    useState<UserSettingsResponse | null>(null);
+  const [dmSidebarPeersModeState, setDmSidebarPeersModeState] = useState<
+    "all" | "online"
+  >(() =>
+    typeof window !== "undefined" ? getDmSidebarPeersMode() : "all",
+  );
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const [passkeyRequired, setPasskeyRequired] = useState(false);
   const [passkeyChecking, setPasskeyChecking] = useState(false);
@@ -2057,6 +2080,53 @@ export default function MessagesPage() {
       // Fallback to loading following if available users endpoint is not ready
       loadFollowing();
     }
+  }, [token]);
+
+  const friendsForDmSidebar = useMemo(() => {
+    let list = friends;
+    if (dmSidebarPeersModeState === "online") {
+      list = list.filter((f) => f.isOnline === true);
+    }
+    if (chatUserSettings?.dmListFrom === "followers_only") {
+      list = list.filter((f) => followingIds.has(f._id));
+    }
+    return list;
+  }, [
+    friends,
+    dmSidebarPeersModeState,
+    chatUserSettings?.dmListFrom,
+    followingIds,
+  ]);
+
+  useEffect(() => {
+    const onDm = () => setDmSidebarPeersModeState(getDmSidebarPeersMode());
+    const onChat = () => {
+      const auth =
+        typeof window !== "undefined"
+          ? localStorage.getItem("accessToken")
+          : null;
+      if (!auth) return;
+      void fetchUserSettings({ token: auth })
+        .then(setChatUserSettings)
+        .catch(() => {});
+    };
+    window.addEventListener("cordigram-dm-sidebar-prefs", onDm);
+    window.addEventListener("cordigram-chat-settings", onChat);
+    return () => {
+      window.removeEventListener("cordigram-dm-sidebar-prefs", onDm);
+      window.removeEventListener("cordigram-chat-settings", onChat);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    void fetchUserSettings({ token })
+      .then(setChatUserSettings)
+      .catch(() => {});
+    void serversApi
+      .getFollowing()
+      .then((list) => setFollowingIds(new Set(list.map((f) => f._id))))
+      .catch(() => setFollowingIds(new Set()));
   }, [token]);
 
   // Debug: Log current user profile when it changes
@@ -3379,7 +3449,7 @@ export default function MessagesPage() {
   ) => {
     try {
       await reportDirectMessage(messageId, reason, description, { token });
-      alert("Tin nhắn đã được báo cáo. Cảm ơn bạn!");
+      alert(t("chat.messagesPage.reportDone"));
       setShowReportDialog(null);
 
       // Socket will be notified via backend gateway
@@ -4256,7 +4326,7 @@ export default function MessagesPage() {
     if (!serverName.trim()) return;
 
     try {
-      const newServer = await serversApi.createServer(serverName);
+      const newServer = await serversApi.createServer(serverName, undefined, undefined, undefined, undefined, language as "vi" | "en" | "ja" | "zh");
 
       const allCh = newServer.channels as serversApi.Channel[];
       const serverWithChannels: BackendServer = {
@@ -4872,7 +4942,7 @@ export default function MessagesPage() {
         const isWaving = wavingIds.has(message.id);
         const showWaveButton = message.stickerReplyWelcomeEnabled !== false;
         const displayName =
-          message.senderDisplayName || message.senderName || "Ai đó";
+          message.senderDisplayName || message.senderName || t("chat.welcome.unknownUser");
         return (
           <div style={{
             display: "flex",
@@ -4899,7 +4969,7 @@ export default function MessagesPage() {
                 minWidth: 0,
               }}>
                 <div>
-                  <span style={{ color: "var(--color-text)", fontSize: 14 }}>{text}</span>
+                  <span style={{ color: "var(--color-text)", fontSize: 14 }}>{t("chat.welcome.greeting").replace("{name}", displayName)}</span>
                   <span style={{
                     color: "var(--color-text-muted)",
                     fontSize: 12,
@@ -4949,12 +5019,12 @@ export default function MessagesPage() {
                             animation: "spin 0.6s linear infinite",
                           }}
                         />
-                        Đang gửi...
+                        {t("chat.welcome.waving")}
                       </>
                     ) : (
                       <>
                         <span style={{ fontSize: 15 }}>👋</span>
-                        Vẫy tay chào {displayName}!
+                        {t("chat.welcome.waveBtn").replace("{name}", displayName)}
                       </>
                     )}
                   </button>
@@ -5824,7 +5894,7 @@ export default function MessagesPage() {
         {!isAdminView ? (
           <button
             className={styles.createBtn}
-            title="Tạo máy chủ"
+            title={t("chat.messagesPage.createServerTitle")}
             onClick={() => setShowCreateServerModal(true)}
           >
             <svg
@@ -5843,7 +5913,7 @@ export default function MessagesPage() {
         {!isAdminView ? (
           <button
             className={`${styles.exploreBtn} ${showExploreView ? styles.exploreBtnActive : ""}`}
-            title={showExploreView ? "Đóng Khám phá" : "Khám phá"}
+            title={showExploreView ? t("chat.messagesPage.exploreClose") : t("chat.messagesPage.exploreTitle")}
             onClick={() => {
               setShowExploreView((prev) => {
                 const next = !prev;
@@ -5949,18 +6019,20 @@ export default function MessagesPage() {
         </div>
 
         <div className={styles.sidebarFooter}>
-          <button className={styles.settingsBtn} title="Settings">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6m-16.78 7.78l4.24-4.24m3.08-3.08l4.24-4.24"></path>
-            </svg>
+          <button
+            type="button"
+            className={styles.settingsBtn}
+            title={t("chat.messagesPage.settingsTitle")}
+            aria-label={t("chat.messagesPage.settingsTitle")}
+            onClick={() => setShowMessagesUserSettings(true)}
+          >
+            <img
+              src="/Windows_Settings_app_icon.png"
+              alt=""
+              width={28}
+              height={28}
+              className={styles.settingsBtnImg}
+            />
           </button>
         </div>
       </div>
@@ -5973,10 +6045,10 @@ export default function MessagesPage() {
           <div className={styles.contextBar}>
             <span className={styles.contextBarLabel}>
               {showExploreView && !selectedDirectMessageFriend
-                ? "Khám phá"
+                ? t("chat.messagesPage.contextExplore")
                 : selectedServer
-                  ? (currentServer?.name ?? "Máy chủ")
-                  : "Tin nhắn trực tiếp"}
+                  ? (currentServer?.name ?? t("chat.messagesPage.contextServer"))
+                  : t("chat.messagesPage.contextDm")}
             </span>
             <div className={styles.contextBarActions}>
               <span className={styles.inboxBtnWrap}>
@@ -5987,8 +6059,8 @@ export default function MessagesPage() {
                     setShowMessagesInbox(true);
                     setHasInboxNotification(false);
                   }}
-                  title="Hộp thư đến"
-                  aria-label="Hộp thư đến"
+                  title={t("chat.messagesPage.inboxTitle")}
+                  aria-label={t("chat.messagesPage.inboxAria")}
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
@@ -6009,7 +6081,7 @@ export default function MessagesPage() {
                   <input
                     type="text"
                     className={styles.searchInput}
-                    placeholder="Tìm hoặc bắt đầu cuộc trò chuyện"
+                    placeholder={t("chat.messagesPage.searchPlaceholder")}
                   />
                 </div>
 
@@ -6065,14 +6137,14 @@ export default function MessagesPage() {
                 <div className={styles.directMessagesSection}>
                   <div className={styles.directMessagesTitleRow}>
                     <h3 className={styles.directMessagesTitle}>
-                      DIRECT MESSAGES
+                      {t("chat.messagesPage.directMessages")}
                     </h3>
                   </div>
 
                   {/* Friends List */}
                   <div className={styles.friendsList}>
-                    {friends && friends.length > 0 ? (
-                      friends.map((friend) => {
+                    {friendsForDmSidebar && friendsForDmSidebar.length > 0 ? (
+                      friendsForDmSidebar.map((friend) => {
                         const initial =
                           friend.displayName?.charAt(0)?.toUpperCase() ||
                           friend.username?.charAt(0)?.toUpperCase() ||
@@ -6169,7 +6241,7 @@ export default function MessagesPage() {
                       <div className={styles.userDisplayName}>
                         {currentUserProfile?.displayName ||
                           currentUserProfile?.username ||
-                          "Người dùng"}
+                          t("chat.messagesPage.userFallback")}
                       </div>
                       <div className={styles.userUsername}>
                         {currentUserProfile?.username || ""}
@@ -6182,7 +6254,7 @@ export default function MessagesPage() {
                     <button
                       type="button"
                       className={`${styles.voiceButton} ${voiceMicMuted ? styles.voiceButtonMuted : ""}`}
-                      title={voiceMicMuted ? "Bật mic" : "Tắt mic"}
+                      title={voiceMicMuted ? t("chat.messagesPage.micOn") : t("chat.messagesPage.micOff")}
                       onClick={() => {
                         const next = !voiceMicMuted;
                         setVoiceMicMuted(next);
@@ -6215,7 +6287,7 @@ export default function MessagesPage() {
                     <button
                       type="button"
                       className={`${styles.voiceButton} ${voiceSoundMuted ? styles.voiceButtonMuted : ""}`}
-                      title={voiceSoundMuted ? "Bật âm thanh" : "Tắt âm thanh"}
+                      title={voiceSoundMuted ? t("chat.messagesPage.soundOn") : t("chat.messagesPage.soundOff")}
                       onClick={() => {
                         const next = !voiceSoundMuted;
                         setVoiceSoundMuted(next);
@@ -6294,7 +6366,7 @@ export default function MessagesPage() {
                         <div className={styles.activeEventHeader}>
                           <span className={styles.activeEventLive}>
                             <span className={styles.activeEventDot} />
-                            Đang Diễn Ra
+                            {t("chat.sidebar.liveEvent")}
                           </span>
                           <button
                             type="button"
@@ -6303,8 +6375,7 @@ export default function MessagesPage() {
                               e.stopPropagation();
                               setActiveServerEvents((prev) => prev.filter((x) => x._id !== ev._id));
                             }}
-                            aria-label="Đóng"
-                          >
+                            aria-label={t("chat.sidebar.closeAria")}>
                             ×
                           </button>
                         </div>
@@ -6324,7 +6395,7 @@ export default function MessagesPage() {
                           className={styles.activeEventDetailBtn}
                           onClick={() => setSelectedEventDetail(ev)}
                         >
-                          Chi Tiết Sự Kiện
+                          {t("chat.sidebar.eventDetail")}
                         </button>
                       </div>
                     ))}
@@ -6345,9 +6416,9 @@ export default function MessagesPage() {
                     <line x1="8" y1="2" x2="8" y2="6" />
                     <line x1="3" y1="10" x2="21" y2="10" />
                   </svg>
-                  <span>Sự Kiện</span>
+                  <span>{t("chat.sidebar.events")}</span>
                   {serverEventsTotalCount > 0 && (
-                    <span className={styles.eventCountBadge}>{serverEventsTotalCount} Sự kiện</span>
+                    <span className={styles.eventCountBadge}>{serverEventsTotalCount} {t("chat.sidebar.events")}</span>
                   )}
                 </button>
                 {/* Nâng Cấp Máy Chủ */}
@@ -6356,7 +6427,7 @@ export default function MessagesPage() {
                     <path d="M12 2L2 7l10 5 10-5-10-5z" />
                     <path d="M2 17l10 5 10-5" />
                   </svg>
-                  <span>Nâng Cấp Máy Chủ</span>
+                  <span>{t("chat.sidebar.boostServer")}</span>
                 </button>
                 {canManageJoinApplications && selectedServer && (
                   <button
@@ -6374,7 +6445,7 @@ export default function MessagesPage() {
                       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
-                    <span>Thành viên</span>
+                    <span>{t("chat.sidebar.members")}</span>
                     {joinAppPendingCount > 0 && (
                       <span
                         style={{
@@ -6468,7 +6539,7 @@ export default function MessagesPage() {
                           ) : (
                             <span style={{ fontSize: "18px" }}>#</span>
                           )}
-                          <span style={{ fontSize: "18px" }}>{channel.name}</span>
+                          <span style={{ fontSize: "18px" }}>{translateChannelName(channel.name, language)}</span>
                         </div>
                       </div>
                     ))}
@@ -6560,7 +6631,7 @@ export default function MessagesPage() {
                               onBlur={() => { if (renameCancelledRef.current) { renameCancelledRef.current = false; return; } handleRenameCategory(cat._id, renamingCategoryName); }}
                             />
                           ) : (
-                            <h3 className={styles.sectionTitle} style={{ flex: 1, margin: 0 }}>{cat.name}</h3>
+                            <h3 className={styles.sectionTitle} style={{ flex: 1, margin: 0 }}>{translateCategoryName(cat.name, language)}</h3>
                           )}
                           <button
                             type="button"
@@ -6625,7 +6696,7 @@ export default function MessagesPage() {
                                           <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" />
                                         </svg>
                                       </span>
-                                      <span>{channel.name}</span>
+                                      <span>{translateChannelName(channel.name, language)}</span>
                                     </div>
                                     {isSelected && (
                                       <div className={styles.voiceChannelActions}>
@@ -6702,7 +6773,7 @@ export default function MessagesPage() {
                                     ) : (
                                       <span style={{ fontSize: "18px" }}>#</span>
                                     )}
-                                    <span style={{ fontSize: "18px" }}>{channel.name}</span>
+                                    <span style={{ fontSize: "18px" }}>{translateChannelName(channel.name, language)}</span>
                                   </div>
                                 </div>
                                 {isChDropTarget && dragPosition === "after" && <div className={styles.dropIndicator} style={{ bottom: 0 }} />}
@@ -6712,7 +6783,7 @@ export default function MessagesPage() {
                         </div>
                         {channelsInCat.length === 0 && (
                           <div style={{ padding: "12px 16px", fontSize: "12px", color: "var(--color-text-muted)" }}>
-                            Chưa có kênh
+                            {t("chat.sidebar.noChannels")}
                           </div>
                         )}
                         {isCatDropTarget && dragPosition === "after" && (
@@ -6781,7 +6852,7 @@ export default function MessagesPage() {
                               ) : (
                                 <span style={{ fontSize: "18px" }}>#</span>
                               )}
-                              <span style={{ fontSize: channel.type === "voice" ? "14px" : "18px" }}>{channel.name}</span>
+                              <span style={{ fontSize: channel.type === "voice" ? "14px" : "18px" }}>{translateChannelName(channel.name, language)}</span>
                             </div>
                           </div>
                         </div>
@@ -6793,7 +6864,7 @@ export default function MessagesPage() {
                   <>
                     <div className={styles.section}>
                       <div className={styles.sectionHeader}>
-                        <h3 className={styles.sectionTitle}>Kênh Chat</h3>
+                        <h3 className={styles.sectionTitle}>{t("chat.messagesPage.sectionChat")}</h3>
                         <button type="button" className={styles.addChannelBtn} title="Tạo kênh chat" onClick={() => openCreateChannelModal("text")}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
                         </button>
@@ -6809,16 +6880,16 @@ export default function MessagesPage() {
                           }}
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
-                            <span style={{ fontSize: "18px" }}>#{channel.name}</span>
+                            <span style={{ fontSize: "18px" }}>#{translateChannelName(channel.name, language)}</span>
                           </div>
                         </div>
                       )) : (
-                        <div style={{ padding: "12px 16px", fontSize: "12px", color: "var(--color-text-muted)" }}>Chưa có kênh chat</div>
+                        <div style={{ padding: "12px 16px", fontSize: "12px", color: "var(--color-text-muted)" }}>{t("chat.sidebar.noChatChannels")}</div>
                       )}
                     </div>
                     <div className={styles.section}>
                       <div className={styles.sectionHeader}>
-                        <h3 className={styles.sectionTitle}>Kênh Thoại</h3>
+                        <h3 className={styles.sectionTitle}>{t("chat.messagesPage.sectionVoice")}</h3>
                         <button type="button" className={styles.addChannelBtn} title="Tạo kênh thoại" onClick={() => openCreateChannelModal("voice")}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
                         </button>
@@ -6835,11 +6906,11 @@ export default function MessagesPage() {
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, opacity: 0.7 }}><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
-                            <span style={{ fontSize: "14px" }}>{channel.name}</span>
+                            <span style={{ fontSize: "14px" }}>{translateChannelName(channel.name, language)}</span>
                           </div>
                         </div>
                       )) : (
-                        <div style={{ padding: "12px 16px", fontSize: "12px", color: "var(--color-text-muted)" }}>Chưa có kênh đàm thoại</div>
+                        <div style={{ padding: "12px 16px", fontSize: "12px", color: "var(--color-text-muted)" }}>{t("chat.sidebar.noVoiceChannels")}</div>
                       )}
                     </div>
                   </>
@@ -6912,7 +6983,7 @@ export default function MessagesPage() {
                     <button
                       type="button"
                       className={`${styles.voiceButton} ${voiceMicMuted ? styles.voiceButtonMuted : ""}`}
-                      title={voiceMicMuted ? "Bật mic" : "Tắt mic"}
+                      title={voiceMicMuted ? t("chat.messagesPage.micOn") : t("chat.messagesPage.micOff")}
                       onClick={() => {
                         const next = !voiceMicMuted;
                         setVoiceMicMuted(next);
@@ -6945,7 +7016,7 @@ export default function MessagesPage() {
                     <button
                       type="button"
                       className={`${styles.voiceButton} ${voiceSoundMuted ? styles.voiceButtonMuted : ""}`}
-                      title={voiceSoundMuted ? "Bật âm thanh" : "Tắt âm thanh"}
+                      title={voiceSoundMuted ? t("chat.messagesPage.soundOn") : t("chat.messagesPage.soundOff")}
                       onClick={() => {
                         const next = !voiceSoundMuted;
                         setVoiceSoundMuted(next);
@@ -7003,10 +7074,10 @@ export default function MessagesPage() {
                 >
                   <div style={{ fontSize: 28, marginBottom: 10 }}>⏳</div>
                   <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 8, color: "#f2f3f5" }}>
-                    Đơn đăng ký tham gia {currentServer.name || "máy chủ"} của bạn đang được xem xét!
+                    {t("chat.applyPending.title").replace("{server}", currentServer.name || t("chat.popups.inbox.serverFallback"))}
                   </div>
                   <div style={{ fontSize: 13, color: "#b5bac1", marginBottom: 18 }}>
-                    Bạn sẽ nhận được thông báo khi có bản cập nhật.
+                    {t("chat.applyPending.desc")}
                   </div>
                   <button
                     type="button"
@@ -7017,7 +7088,7 @@ export default function MessagesPage() {
                         setSelectedServer(null);
                         setSelectedChannel(null);
                       } catch (e) {
-                        alert(e instanceof Error ? e.message : "Không thu hồi được");
+                        alert(e instanceof Error ? e.message : t("chat.applyPending.withdrawError"));
                       }
                     }}
                     style={{
@@ -7031,7 +7102,7 @@ export default function MessagesPage() {
                       cursor: "pointer",
                     }}
                   >
-                    Thu hồi
+                    {t("chat.applyPending.withdraw")}
                   </button>
                 </div>
               </div>
@@ -7047,7 +7118,7 @@ export default function MessagesPage() {
                     setShowExploreView(false);
                     setSelectedServer(serverId);
                   } catch (e) {
-                    alert(e instanceof Error ? e.message : "Không tham gia được máy chủ");
+                    alert(e instanceof Error ? e.message : t("chat.applyPending.joinError"));
                   }
                 }}
               />
@@ -7110,7 +7181,7 @@ export default function MessagesPage() {
                         </svg>
                       </span>
                       <h2 className={styles.chatHeaderTitle}>
-                        {connectedVoiceChannel.name}
+                        {translateChannelName(connectedVoiceChannel.name, language)}
                       </h2>
                     </div>
                     <div className={styles.chatHeaderActions}>
@@ -7173,7 +7244,7 @@ export default function MessagesPage() {
                 {joinedVoiceChannelId && connectedVoiceChannel && !viewingVoiceChannel && (
                   <div className={styles.voiceChatBanner}>
                     <span className={styles.voiceChatBannerLabel}>
-                      Đang trong kênh thoại: {connectedVoiceChannel.name}
+                      Đang trong kênh thoại: {translateChannelName(connectedVoiceChannel.name, language)}
                     </span>
                     <button type="button" className={styles.voiceChatBannerLeave} onClick={leaveVoiceChannel}>
                       Rời kênh
@@ -7454,7 +7525,7 @@ export default function MessagesPage() {
                           color: "var(--color-text-muted)",
                         }}
                       >
-                        <p>Đang tải tin nhắn...</p>
+                        <p>{t("chat.loadingMessages")}</p>
                       </div>
                     ) : (
                         conversations.get(selectedDirectMessageFriend._id) || []
@@ -7468,7 +7539,7 @@ export default function MessagesPage() {
                           color: "var(--color-text-muted)",
                         }}
                       >
-                        <p>Chưa có tin nhắn. Hãy bắt đầu trò chuyện!</p>
+                        <p>{t("chat.noMessages")}</p>
                       </div>
                     ) : (
                       (
@@ -7505,7 +7576,7 @@ export default function MessagesPage() {
                         color: "var(--color-text-muted)",
                       }}
                     >
-                      <p>Đang tải tin nhắn...</p>
+                      <p>{t("chat.loadingMessages")}</p>
                     </div>
                   ) : (
                     <>
@@ -7531,9 +7602,9 @@ export default function MessagesPage() {
                             margin: 0,
                             textAlign: "left",
                           }}>
-                            Chào mừng đến với
+                            {t("chat.welcome.title")}
                             <br />
-                            Máy chủ của {currentServer.name}
+                            {t("chat.welcome.serverOf").replace("{name}", currentServer.name)}
                           </h1>
                           <p style={{
                             fontSize: 14,
@@ -7542,11 +7613,11 @@ export default function MessagesPage() {
                             maxWidth: 560,
                             textAlign: "left",
                           }}>
-                            Đây là khởi đầu của kênh{" "}
+                            {t("chat.welcome.channelBegin")}{" "}
                             <strong style={{ color: "var(--color-text)" }}>
                               #{allChannels.find((c) => c._id === selectedChannel)?.name || "chung"}
                             </strong>
-                            . Hãy bắt đầu cuộc trò chuyện!
+                            {t("chat.welcome.startTalking")}
                           </p>
                           {/* Welcome messages: nằm dưới phần chào mừng, không bị trôi theo chat */}
                           <div style={{
@@ -7583,7 +7654,7 @@ export default function MessagesPage() {
                             color: "var(--color-text-muted)",
                           }}
                         >
-                          <p>Chưa có tin nhắn. Hãy bắt đầu trò chuyện!</p>
+                          <p>{t("chat.noMessages")}</p>
                         </div>
                       ) : (
                     messages
@@ -7838,7 +7909,7 @@ export default function MessagesPage() {
                     !shouldBlockServerChatInput && (
                     <button
                       className={styles.plusButton}
-                      title="Đề cập (@mention)"
+                      title={t("chat.mention.tooltip")}
                       type="button"
                       onClick={() => {
                         const start = messageText.length;
@@ -9499,7 +9570,7 @@ export default function MessagesPage() {
                 <div className={styles.eventDetailMeta}>
                   <span className={styles.eventDetailLive}>
                     <span className={styles.activeEventDot} />
-                    Đang Diễn Ra – Kết thúc {endTimeStr}
+                    {t("chat.sidebar.eventDetailLive", { time: endTimeStr })}
                   </span>
                 </div>
               )}
@@ -9507,7 +9578,7 @@ export default function MessagesPage() {
               <div className={styles.eventDetailRow}>
                 <span className={styles.eventDetailIcon}>📍</span>
                 <span>
-                  Máy chủ của {currentServer?.name}
+                  {t("chat.sidebar.eventDetailHostedBy", { name: currentServer?.name ?? "" })}
                   {selectedEventDetail.channelId
                     ? ` > # ${selectedEventDetail.channelId.name}`
                     : ""}
@@ -9532,14 +9603,14 @@ export default function MessagesPage() {
                     }
                   }}
                 >
-                  Sao Chép Link
+                  {t("chat.sidebar.eventDetailCopyLink")}
                 </button>
                 <button
                   type="button"
                   className={`${styles.eventDetailJoinBtn} ${eventDetailInterested ? styles.eventDetailInterestedActive : ""}`}
                   onClick={() => setEventDetailInterested((v) => !v)}
                 >
-                  Quan tâm
+                  {t("chat.sidebar.eventDetailInterested")}
                 </button>
                 {isScheduled && isOwnerOrMod && (
                   <button
@@ -9556,7 +9627,7 @@ export default function MessagesPage() {
                       }
                     }}
                   >
-                    Bắt đầu
+                    {t("chat.sidebar.eventDetailStart")}
                   </button>
                 )}
                 {isLive && isOwnerOrMod && (
@@ -9574,7 +9645,7 @@ export default function MessagesPage() {
                       }
                     }}
                   >
-                    Kết Thúc Sự Kiện
+                    {t("chat.sidebar.eventDetailEnd")}
                   </button>
                 )}
               </div>
@@ -9795,6 +9866,20 @@ export default function MessagesPage() {
         />
       ) : null}
 
+      {showMessagesUserSettings && token && !isAdminView ? (
+        <MessagesUserSettingsModal
+          open
+          onClose={() => setShowMessagesUserSettings(false)}
+          token={token}
+          currentUserId={currentUserId}
+          servers={servers.map((s) => ({ _id: s._id, name: s.name }))}
+          onToast={(m) => {
+            setToastMessage(m);
+            setTimeout(() => setToastMessage(null), 3000);
+          }}
+        />
+      ) : null}
+
       {/* Giphy Picker Modal */}
       {showGiphyPicker && (
         <GiphyPicker
@@ -9874,6 +9959,7 @@ function ExploreServersView({
   onClose: () => void;
   onJoin: (serverId: string) => void | Promise<void>;
 }) {
+  const { t, language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [servers, setServers] = useState<ExploreServer[]>([]);
@@ -9890,7 +9976,7 @@ function ExploreServersView({
       })
       .catch((e) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Không tải được");
+        setError(e instanceof Error ? e.message : t("chat.explore.loadError"));
         setServers([]);
       })
       .finally(() => {
@@ -9906,23 +9992,19 @@ function ExploreServersView({
       <div className={styles.exploreHero}>
         <div className={styles.exploreHeroTop}>
           <button type="button" className={styles.exploreBackBtn} onClick={onClose}>
-            ← Quay lại chat
+            {t("chat.explore.backToChat")}
           </button>
         </div>
-        <h2 className={styles.exploreHeroTitle}>Khám phá</h2>
-        <p className={styles.exploreHeroSub}>
-          Tìm những cộng đồng được duyệt để tham gia. Khi máy chủ có “Đăng ký tham gia”, bạn sẽ cần điền đơn trước khi vào.
-        </p>
+        <h2 className={styles.exploreHeroTitle}>{t("chat.explore.title")}</h2>
+        <p className={styles.exploreHeroSub}>{t("chat.explore.subtitle")}</p>
       </div>
 
       {loading ? (
-        <div style={{ padding: 28, color: "var(--color-text-muted)" }}>Đang tải…</div>
+        <div style={{ padding: 28, color: "var(--color-text-muted)" }}>{t("chat.explore.loading")}</div>
       ) : error ? (
         <div style={{ padding: 28, color: "var(--color-danger)" }}>{error}</div>
       ) : servers.length === 0 ? (
-        <div style={{ padding: 28, color: "var(--color-text-muted)" }}>
-          Chưa có máy chủ nào được duyệt để hiển thị.
-        </div>
+        <div style={{ padding: 28, color: "var(--color-text-muted)" }}>{t("chat.explore.empty")}</div>
       ) : (
         <div className={styles.exploreGrid}>
           {servers.map((s) => {
@@ -9952,8 +10034,8 @@ function ExploreServersView({
                   <div style={{ minWidth: 0 }}>
                     <div className={styles.exploreCardName}>{s.name}</div>
                     <div className={styles.exploreCardMeta}>
-                      {Number(s.memberCount || 0).toLocaleString("vi-VN")} thành viên
-                      {s.accessMode === "apply" ? " • Đăng ký tham gia" : s.accessMode === "invite_only" ? " • Chỉ mời" : ""}
+                      {t("chat.explore.members", { count: String(Number(s.memberCount || 0).toLocaleString(language === "vi" ? "vi-VN" : language === "ja" ? "ja-JP" : language === "zh" ? "zh-CN" : "en-US")) })}
+                      {s.accessMode === "apply" ? " • " + t("chat.explore.badgeApply") : s.accessMode === "invite_only" ? " • " + t("chat.explore.badgeInviteOnly") : ""}
                     </div>
                   </div>
                 </div>
@@ -9965,10 +10047,10 @@ function ExploreServersView({
                   className={styles.exploreJoinBtn}
                   onClick={() => onJoin(s.id)}
                   disabled={s.accessMode === "invite_only"}
-                  title={s.accessMode === "invite_only" ? "Máy chủ này chỉ tham gia bằng lời mời" : "Tham gia"}
+                  title={s.accessMode === "invite_only" ? t("chat.explore.inviteOnlyTitle") : t("chat.explore.join")}
                   style={s.accessMode === "invite_only" ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
                 >
-                  {s.accessMode === "invite_only" ? "Chỉ mời" : "Tham gia"}
+                  {s.accessMode === "invite_only" ? t("chat.explore.inviteOnly") : t("chat.explore.join")}
                 </button>
               </div>
             </div>
@@ -9991,6 +10073,7 @@ function CommunityOverviewSection({
   initialServer: (serversApi.Server & { primaryLanguage?: "vi" | "en" }) | null;
   onUpdated?: (patch: Partial<serversApi.Server>) => void;
 }) {
+  const { t } = useLanguage();
   const [channels, setChannels] = useState<serversApi.Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -10031,15 +10114,15 @@ function CommunityOverviewSection({
     <div style={{ padding: 24 }}>
       <div style={{ marginBottom: 14 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: "var(--color-text)" }}>
-          Tổng quan cộng đồng
+          {t("chat.communityOverview.title")}
         </h2>
         <p style={{ margin: "6px 0 0", color: "var(--color-text-muted)", fontSize: 13, lineHeight: 1.5 }}>
-          Thiết lập kênh quy tắc/hướng dẫn, ngôn ngữ chính của máy chủ và mô tả máy chủ.
+          {t("chat.communityOverview.subtitle")}
         </p>
       </div>
 
       {loading ? (
-        <div style={{ color: "var(--color-text-muted)" }}>Đang tải…</div>
+        <div style={{ color: "var(--color-text-muted)" }}>{t("chat.communityOverview.loading")}</div>
       ) : (
         <>
           {error && (
@@ -10049,10 +10132,10 @@ function CommunityOverviewSection({
           <div style={{ display: "grid", gap: 18, maxWidth: 760 }}>
             <div>
               <div style={{ fontWeight: 800, color: "var(--color-text)", marginBottom: 6 }}>
-                Kênh quy tắc hoặc hướng dẫn
+                {t("chat.communityOverview.rulesChannelLabel")}
               </div>
               <div style={{ color: "var(--color-text-muted)", fontSize: 13, marginBottom: 10, lineHeight: 1.5 }}>
-                Chọn kênh sẽ hiển thị quy tắc/hướng dẫn cho thành viên (ví dụ: <code>#chào-mừng-và-nội-quy</code>).
+                {t("chat.communityOverview.rulesChannelHint")}<code>#chào-mừng-và-nội-quy</code>).
               </div>
               <select
                 value={rulesChannelId ?? ""}
@@ -10067,7 +10150,7 @@ function CommunityOverviewSection({
                   color: "var(--color-text)",
                 }}
               >
-                <option value="">— Không chọn —</option>
+                <option value="">{t("chat.communityOverview.noChannel")}</option>
                 {textChannels.map((ch) => (
                   <option key={ch._id} value={ch._id}>
                     #{ch.name}
@@ -10078,10 +10161,10 @@ function CommunityOverviewSection({
 
             <div>
               <div style={{ fontWeight: 800, color: "var(--color-text)", marginBottom: 6 }}>
-                Ngôn ngữ chính của máy chủ
+                {t("chat.communityOverview.langLabel")}
               </div>
               <div style={{ color: "var(--color-text-muted)", fontSize: 13, marginBottom: 10, lineHeight: 1.5 }}>
-                Chỉ hỗ trợ <b>Tiếng Việt</b> và <b>English</b>.
+                {t("chat.communityOverview.langHint")}
               </div>
               <select
                 value={primaryLanguage}
@@ -10096,24 +10179,24 @@ function CommunityOverviewSection({
                   color: "var(--color-text)",
                 }}
               >
-                <option value="vi">Tiếng Việt</option>
-                <option value="en">English</option>
+                <option value="vi">{t("chat.communityOverview.langVi")}</option>
+                <option value="en">{t("chat.communityOverview.langEn")}</option>
               </select>
             </div>
 
             <div>
               <div style={{ fontWeight: 800, color: "var(--color-text)", marginBottom: 6 }}>
-                Mô tả máy chủ
+                {t("chat.communityOverview.descLabel")}
               </div>
               <div style={{ color: "var(--color-text-muted)", fontSize: 13, marginBottom: 10, lineHeight: 1.5 }}>
-                Mô tả này sẽ hiển thị bên dưới link mời trong thẻ invite.
+                {t("chat.communityOverview.descHint")}
               </div>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={!canManageSettings}
                 rows={4}
-                placeholder="Hãy giới thiệu một chút về máy chủ này với thế giới."
+                placeholder={t("chat.communityOverview.descPlaceholder")}
                 style={{
                   width: "100%",
                   border: "1px solid var(--color-border)",
@@ -10144,7 +10227,7 @@ function CommunityOverviewSection({
                       primaryLanguage: res.primaryLanguage,
                     } as any);
                   } catch (e) {
-                    setError(e instanceof Error ? e.message : "Không lưu được");
+                    setError(e instanceof Error ? e.message : t("chat.communityOverview.errorSave"));
                   } finally {
                     setSaving(false);
                   }
@@ -10160,7 +10243,7 @@ function CommunityOverviewSection({
                   opacity: !canManageSettings || saving ? 0.6 : 1,
                 }}
               >
-                {saving ? "Đang lưu…" : "Lưu thay đổi"}
+                {saving ? t("chat.communityOverview.saving") : t("chat.communityOverview.save")}
               </button>
             </div>
           </div>

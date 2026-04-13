@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import ServerBannerStrip from "@/components/ServerBannerStrip/ServerBannerStrip";
 import type { ServerBannerFields } from "@/lib/server-banner";
 import styles from "./ApplyToJoinQuestionsModal.module.css";
+import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 
 export type ApplyJoinQuestion = {
   id: string;
@@ -39,6 +40,7 @@ export default function ApplyToJoinQuestionsModal({
   error,
   onSubmit,
 }: Props) {
+  const { t, language } = useLanguage();
   const [answers, setAnswers] = useState<Record<string, { text?: string; selectedOption?: string }>>({});
 
   useEffect(() => {
@@ -55,7 +57,10 @@ export default function ApplyToJoinQuestionsModal({
 
   const established =
     server.createdAt != null && server.createdAt !== ""
-      ? new Date(server.createdAt).toLocaleDateString("vi-VN", { month: "numeric", year: "numeric" })
+      ? new Date(server.createdAt).toLocaleDateString(localeTagForLanguage(language), {
+          month: "numeric",
+          year: "numeric",
+        })
       : "";
 
   const handleSubmit = () => {
@@ -66,7 +71,7 @@ export default function ApplyToJoinQuestionsModal({
     <div
       role="dialog"
       aria-modal
-      aria-label="Đơn đăng ký tham gia máy chủ"
+      aria-label={t("chat.popups.applyToJoin.ariaLabel")}
       className={styles.overlay}
       onClick={() => {
         if (submitting) return;
@@ -87,28 +92,30 @@ export default function ApplyToJoinQuestionsModal({
           >
             {!hasAvatar && (server.name?.charAt(0)?.toUpperCase() ?? "S")}
           </div>
-          <p className={styles.serverName}>{server.name || "Máy chủ"}</p>
+          <p className={styles.serverName}>{server.name || t("chat.popups.applyToJoin.serverFallback")}</p>
           <div className={styles.memberRow}>
             <span className={styles.onlineDot} />
             <span className={styles.muted}>
-              {server.memberCount ?? 0} thành viên
+              {t("chat.popups.applyToJoin.members", { count: server.memberCount ?? 0 })}
             </span>
           </div>
           {established && (
-            <p className={styles.established}>Thành lập từ tháng {established}</p>
+            <p className={styles.established}>
+              {t("chat.popups.applyToJoin.establishedPrefix")} {established}
+            </p>
           )}
         </div>
 
         <div className={styles.right}>
           <div className={styles.rightHeader}>
             <div>
-              <h2 className={styles.title}>Trước khi bạn bắt đầu trò chuyện ở đây...</h2>
-              <p className={styles.subtitle}>Bạn sẽ phải hoàn thành các bước dưới đây.</p>
+              <h2 className={styles.title}>{t("chat.popups.applyToJoin.titleBeforeChat")}</h2>
+              <p className={styles.subtitle}>{t("chat.popups.applyToJoin.subtitleSteps")}</p>
             </div>
             <button
               type="button"
               className={styles.closeBtn}
-              aria-label="Đóng"
+              aria-label={t("chat.popups.closeAria")}
               disabled={submitting}
               onClick={onClose}
             >
@@ -116,12 +123,10 @@ export default function ApplyToJoinQuestionsModal({
             </button>
           </div>
 
-          <p className={styles.sectionLabel}>Đơn đăng ký tham gia</p>
+          <p className={styles.sectionLabel}>{t("chat.popups.applyToJoin.sectionLabel")}</p>
 
           {questions.length === 0 && (
-            <p className={styles.emptyHint}>
-              Chủ máy chủ chưa thêm câu hỏi. Nhấn <strong>Gửi</strong> để nộp đơn đăng ký tham gia.
-            </p>
+            <p className={styles.emptyHint}>{t("chat.popups.applyToJoin.emptyHint")}</p>
           )}
 
           <div className={styles.questions}>
@@ -163,7 +168,7 @@ export default function ApplyToJoinQuestionsModal({
                         }))
                       }
                       rows={4}
-                      placeholder="Nhập câu trả lời..."
+                      placeholder={t("chat.popups.applyToJoin.answerPlaceholder")}
                     />
                   ) : (
                     <input
@@ -176,7 +181,7 @@ export default function ApplyToJoinQuestionsModal({
                           [q.id]: { ...prev[q.id], text: e.target.value },
                         }))
                       }
-                      placeholder="Nhập câu trả lời..."
+                      placeholder={t("chat.popups.applyToJoin.answerPlaceholder")}
                     />
                   )}
                 </div>
@@ -193,7 +198,7 @@ export default function ApplyToJoinQuestionsModal({
               disabled={submitting}
               onClick={handleSubmit}
             >
-              {submitting ? "Đang gửi…" : "Gửi"}
+              {submitting ? t("chat.popups.applyToJoin.submitting") : t("chat.popups.applyToJoin.submit")}
             </button>
           </div>
         </div>

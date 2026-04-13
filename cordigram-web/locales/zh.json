@@ -1,0 +1,1223 @@
+{
+  "chat": {
+    "common": {
+      "back": "返回",
+      "create": "创建",
+      "creating": "创建中…",
+      "uploading": "上传中…",
+      "saving": "保存中…",
+      "saveChanges": "保存更改",
+      "cancel": "取消",
+      "remove": "移除",
+      "copy": "复制",
+      "copied": "已复制",
+      "sending": "发送中…",
+      "user": "用户",
+      "server": "服务器"
+    },
+    "loading": {
+      "gif": "正在加载 GIF…",
+      "sticker": "正在加载贴纸…",
+      "generic": "正在加载…"
+    },
+    "createServer": {
+      "errors": {
+        "nameRequired": "请输入服务器名称",
+        "createFailed": "无法创建服务器，请重试。"
+      },
+      "template": {
+        "title": "创建你的服务器",
+        "subtitleLine1": "服务器是你和朋友一起交流的地方。",
+        "subtitleLine2": "创建一个属于自己的服务器并开始聊天。",
+        "startFromTemplate": "从模板开始",
+        "haveInvite": "已经有邀请了吗？",
+        "joinServer": "加入服务器",
+        "items": {
+          "custom": {
+            "name": "自定义创建"
+          },
+          "gaming": {
+            "name": "游戏"
+          },
+          "friends": {
+            "name": "朋友"
+          },
+          "study-group": {
+            "name": "学习小组"
+          },
+          "school-club": {
+            "name": "学校社团"
+          },
+          "local-community": {
+            "name": "本地社区"
+          },
+          "artists-creators": {
+            "name": "艺术家与创作者"
+          }
+        }
+      },
+      "purpose": {
+        "title": "告诉我们更多关于你的服务器",
+        "subtitle": "为了帮助你设置，你的服务器是给少数朋友用还是更大的社区？",
+        "items": {
+          "club-community": "俱乐部或社区",
+          "me-and-friends": "我和我的朋友"
+        },
+        "notSure": "不确定？你可以",
+        "skip": "跳过此问题"
+      },
+      "customize": {
+        "title": "自定义你的服务器",
+        "subtitle": "为服务器设置名称并添加图标。你之后随时可以更改。",
+        "serverNameLabel": "服务器名称",
+        "serverNamePlaceholder": "输入服务器名称",
+        "communityGuidelinesPrefix": "创建服务器即表示你同意 Discord 的",
+        "communityGuidelinesLink": "社区准则",
+        "communityGuidelinesSuffix": "。",
+        "errors": {
+          "imageOnly": "请选择图片文件",
+          "maxSize5mb": "文件大小不能超过 5MB",
+          "loginRequired": "你需要登录才能上传图片",
+          "uploadFailed": "无法上传图片，请重试。"
+        }
+      }
+    },
+    "serverSettings": {
+      "ariaLabel": "服务器设置",
+      "sidebarTitlePrefix": "服务器：",
+      "groups": {
+        "expressions": "表情",
+        "people": "成员",
+        "moderation": "管理"
+      },
+      "sections": {
+        "profile": "服务器资料",
+        "interactions": "互动",
+        "privileges": "特权",
+        "emoji": "Emoji",
+        "sticker": "贴纸",
+        "members": "成员",
+        "roles": "角色",
+        "invites": "邀请",
+        "access": "访问",
+        "safety": "安全设置",
+        "bans": "屏蔽",
+        "automod": "AutoMod",
+        "community": "社区设置",
+        "community-overview": "社区概览",
+        "community-onboarding": "新手引导",
+        "delete-server": "删除服务器"
+      },
+      "profileDesc": "自定义服务器在邀请链接中的展示方式，并在启用时用于服务器发现与通知频道消息。",
+      "placeholder": {
+        "profile": "服务器资料编辑器会在这里添加。",
+        "section": "“{label}”的内容将稍后补充。"
+      }
+    },
+    "deleteMessage": {
+      "title": "你希望从谁那里移除这条消息？",
+      "forEveryone": {
+        "title": "对所有人移除",
+        "desc": "这条消息将从聊天中的所有人那里移除。其他人可能已经看过或转发。被移除的消息仍可被举报。"
+      },
+      "forMe": {
+        "title": "仅对你移除",
+        "desc": "这条消息会从你的设备中移除，但仍会对其他成员显示。"
+      }
+    },
+    "reportMessage": {
+      "title": "举报消息",
+      "reasonLabel": "举报原因 *",
+      "descriptionLabel": "详细描述（可选）",
+      "descriptionPlaceholder": "描述你遇到的问题…",
+      "submit": "提交举报",
+      "reasons": {
+        "spam": "垃圾信息",
+        "harassment": "骚扰",
+        "inappropriate": "不当内容",
+        "misinfo": "虚假信息",
+        "scam": "诈骗",
+        "other": "其他"
+      }
+    },
+    "invite": {
+      "searchPlaceholder": "搜索好友",
+      "sectionLabel": "邀请加入服务器",
+      "invite": "邀请",
+      "invited": "已邀请",
+      "orSendLink": "或者发送邀请链接",
+      "empty": {
+        "noFriends": "暂无可邀请的好友。",
+        "notFound": "未找到好友。"
+      },
+      "errors": {
+        "cannotSendInvite": "无法发送邀请"
+      }
+    },
+    "inviteServer": {
+      "title": "邀请好友加入 {serverName}",
+      "sub": "对方将进入 #general",
+      "expireNote": "你的邀请链接将在 7 天后过期。编辑邀请链接。"
+    },
+    "inviteVoice": {
+      "title": "邀请好友加入 {serverName}",
+      "sub": "对方将进入 {channelName}",
+      "expireNote": "此链接会直接进入该语音频道。若对方尚未加入服务器，会先看到加入页面。"
+    },
+    "serverProfile": {
+      "saved": "服务器资料已保存。",
+      "errors": {
+        "fileUrlMissing": "无法获取文件 URL",
+        "bannerUrlMissing": "无法获取横幅图片 URL",
+        "uploadAvatarFailed": "无法上传图标",
+        "uploadBannerFailed": "无法上传横幅",
+        "saveFailed": "无法保存服务器资料"
+      },
+      "info": {
+        "title": "服务器信息",
+        "online": "在线：{count}",
+        "members": "成员：{count}",
+        "createdAt": "创建日期：{date}"
+      },
+      "name": {
+        "label": "名称",
+        "placeholder": "服务器名称"
+      },
+      "avatar": {
+        "label": "图标",
+        "change": "更改服务器图标",
+        "remove": "移除图标",
+        "urlPlaceholder": "或粘贴图标 URL"
+      },
+      "banner": {
+        "label": "横幅",
+        "hint": "选择卡片背景色（发现、邀请、申请）。也可上传图片——上传前会进行优化。",
+        "upload": "上传横幅图片",
+        "remove": "移除横幅图片",
+        "pickColorAria": "选择横幅背景色",
+        "note": "背景色始终生效；若有图片，图片会显示在背景色之上。"
+      },
+      "traits": {
+        "label": "特征",
+        "hint": "最多添加 5 个特征来展示服务器的喜好与风格。",
+        "pickEmoji": "选择表情",
+        "placeholder": "特征…",
+        "filledCount": "已填写 {count}/5"
+      },
+      "description": {
+        "label": "描述",
+        "hint": "服务器描述。",
+        "placeholder": "向大家介绍一下这个服务器。"
+      },
+      "preview": {
+        "noDescription": "暂无描述。"
+      }
+    },
+    "popups": {
+      "closeAria": "关闭",
+      "loading": "加载中...",
+      "applyToJoin": {
+        "ariaLabel": "服务器加入申请",
+        "serverFallback": "服务器",
+        "members": "{count} 位成员",
+        "establishedPrefix": "成立于",
+        "titleBeforeChat": "开始在此聊天之前...",
+        "subtitleSteps": "您需要完成以下步骤。",
+        "sectionLabel": "加入申请",
+        "emptyHint": "服务器所有者尚未添加问题。点击提交以发送加入申请。",
+        "answerPlaceholder": "输入回答...",
+        "submit": "提交",
+        "submitting": "发送中…"
+      },
+      "createChannel": {
+        "title": "创建频道",
+        "channelType": "频道类型",
+        "textName": "文字",
+        "textDesc": "发送消息、图片、GIF、表情、观点与文字游戏",
+        "voiceName": "语音",
+        "voiceDesc": "语音、视频通话与屏幕共享",
+        "channelName": "频道名称",
+        "defaultName": "新频道",
+        "emojiTitle": "添加表情 / 颜文字",
+        "privateLabel": "私密频道",
+        "privateDesc": "仅被选中的成员与角色可见此频道。",
+        "creating": "创建中...",
+        "createBtn": "创建频道"
+      },
+      "createCategory": {
+        "title": "创建类别",
+        "nameLabel": "类别名称",
+        "placeholder": "新类别",
+        "defaultName": "新类别",
+        "privateLabel": "私密类别",
+        "privateDesc": "仅被选中的成员与角色可见此类别。",
+        "creating": "创建中...",
+        "createBtn": "创建类别"
+      },
+      "deleteServer": {
+        "title": "删除「{serverName}」",
+        "message": "确定要删除 {serverName} 吗？此操作无法撤销。",
+        "confirmLabel": "输入服务器名称",
+        "deleting": "删除中…",
+        "deleteBtn": "删除服务器",
+        "error": "无法删除服务器"
+      },
+      "events": {
+        "title": "活动",
+        "create": "创建活动",
+        "emptyTitle": "暂无即将开始的活动。",
+        "emptyDesc": "为服务器中的任何活动安排日程。",
+        "emptyHint": "您可以在服务器设置 › 角色中允许他人创建活动。"
+      },
+      "shareEvent": {
+        "title": "准备好了，现在分享活动吧！",
+        "desc": "复制下方活动链接邀请大家。该链接也可作为服务器邀请。",
+        "expireNote": "邀请链接将在 7 天后过期。"
+      },
+      "eventDetail": {
+        "headerCount": "1 个活动",
+        "createAnother": "创建活动",
+        "location": "{serverName} 的服务器{channel}",
+        "locationChannel": " > #{name}",
+        "copyLink": "复制链接",
+        "interested": "感兴趣",
+        "start": "开始",
+        "starting": "开始中...",
+        "countdown": {
+          "started": "已开始",
+          "seconds": "几秒内开始",
+          "minutes": "{m} 分钟后开始",
+          "hours": "{h} 小时后开始",
+          "hoursMinutes": "{h} 小时 {m} 分钟后开始"
+        }
+      },
+      "incomingCall": {
+        "canceled": "通话已取消",
+        "incoming": "来电...",
+        "videoCall": "视频通话",
+        "voiceCall": "语音通话",
+        "close": "关闭",
+        "decline": "拒绝",
+        "accept": "接听",
+        "declineAria": "拒绝通话",
+        "acceptAria": "接听通话",
+        "closeAria": "关闭"
+      },
+      "outgoingCall": {
+        "calling": "正在呼叫...",
+        "rejected": "对方不可用",
+        "noAnswer": "无人接听",
+        "videoCall": "视频通话",
+        "voiceCall": "语音通话",
+        "cancelCall": "取消通话",
+        "close": "关闭",
+        "cancelAria": "取消通话",
+        "closeAria": "关闭"
+      },
+      "ignoreUser": {
+        "ariaIgnore": "忽略用户",
+        "ariaIgnored": "已忽略用户",
+        "titleIgnored": "您已忽略 {name}",
+        "subtitleIgnored": "对方的消息和通知已隐藏。恢复后可在私信与服务器频道中正常收发。",
+        "restore": "恢复",
+        "restoring": "处理中...",
+        "title": "忽略 {name}？",
+        "subtitle": "停止互动且不让对方知道",
+        "hideProfile": "隐藏对方的资料与消息",
+        "hideProfileDesc": "您可以随时取消隐藏",
+        "muteNotif": "静音对方的通知与动态",
+        "muteNotifDesc": "您将在应用中更少看到对方（私信、文字频道、语音）",
+        "info": "对方仍可给您发消息并查看您的动态。对方不会知道您忽略了他们。",
+        "blockTitle": "还不够？",
+        "blockText": "改为屏蔽",
+        "blockDesc": "停止直接联系并限制对方可见内容。无法收到被屏蔽用户的消息或通话。",
+        "block": "屏蔽",
+        "ignore": "忽略"
+      },
+      "memberProfile": {
+        "aria": "成员资料",
+        "follow": "关注",
+        "following": "已关注",
+        "message": "发消息",
+        "messageAria": "发消息",
+        "optionsAria": "更多选项",
+        "joinFrom": "加入时间",
+        "roles": "身份组",
+        "owner": "所有者",
+        "moderator": "管理员",
+        "member": "成员",
+        "ownerBadge": "所有者",
+        "notes": "备注（仅自己可见）",
+        "notesHint": "点击添加备注",
+        "tabActivity": "动态",
+        "tabFollowers": "共同关注",
+        "activityEmpty": "{name} 还没有可在此分享的动态。",
+        "activityHint": "看看对方接下来会分享什么——不如先打个招呼？",
+        "followersEmpty": "共同关注将显示在这里。"
+      },
+      "messageSearch": {
+        "title": "搜索消息",
+        "placeholderDm": "在与 {name} 的对话中搜索",
+        "placeholderServer": "搜索消息内容...",
+        "allChannels": "所有频道",
+        "allUsers": "所有用户",
+        "hasFile": "含文件",
+        "time": "时间",
+        "fromDate": "开始日期",
+        "toDate": "结束日期",
+        "found": "找到 {count} 条结果",
+        "none": "无结果",
+        "clearFilters": "清除筛选",
+        "searching": "搜索中...",
+        "empty": "无结果",
+        "emptyHint": "尝试其他关键词或更改筛选条件",
+        "attachments": "{count} 个附件",
+        "loadMore": "加载更多（剩余 {count} 条）",
+        "loadingMore": "加载中...",
+        "todayAt": "今天 {time}",
+        "yesterday": "昨天",
+        "daysAgo": "{n} 天前"
+      },
+      "inbox": {
+        "title": "收件箱",
+        "tabForYou": "为你推荐",
+        "tabUnread": "未读",
+        "tabMentions": "提及",
+        "markAllTitle": "全部标为已读",
+        "markAllDoing": "正在标记...",
+        "markAll": "标为已读",
+        "loading": "加载中...",
+        "emptyForYou": "你的服务器暂无活动、邀请或身份组通知。",
+        "emptyUnread": "频道暂无未读消息或通知。",
+        "emptyMentions": "还没有人在频道中提及你。",
+        "eventLive": "• 进行中",
+        "eventStarted": "已在 {serverName} 的服务器中开始。",
+        "inviteTitle": "服务器邀请",
+        "inviteMeta": "{inviter} 邀请你加入 {serverName}。",
+        "accept": "接受",
+        "acceptInviteAria": "接受邀请",
+        "decline": "拒绝",
+        "declineInviteAria": "拒绝邀请",
+        "dmFallback": "消息",
+        "newMessageFallback": "你有新消息",
+        "serverFallback": "服务器",
+        "mentionYou": "提及了你",
+        "timeMinutes": "{n} 分钟",
+        "timeHours": "{n} 小时",
+        "timeDays": "{n} 天",
+        "adminViewTitle": "系统管理员正在查看服务器",
+        "adminViewContent": "系统管理员正在审核您的服务器「{server}」。这是定期审核活动。",
+        "mentionSpamWarning": "您因在服务器「{server}」的频道中滥发提及而受到警告。请减少消息中的提及次数。",
+        "mentionSpamTitle": "⚠️ 提及刺刷警告"
+      }
+    },
+    "explore": {
+      "backToChat": "← 返回聊天",
+      "title": "发现",
+      "subtitle": "查找可加入的已审核社区。若服务器开启“申请加入”，需先提交申请。",
+      "loading": "加载中…",
+      "loadError": "无法加载",
+      "empty": "暂无可显示的服务器。",
+      "members": "{count} 位成员",
+      "badgeApply": " • 申请加入",
+      "badgeInviteOnly": " • 仅邀请",
+      "join": "加入",
+      "inviteOnly": "仅邀请",
+      "inviteOnlyTitle": "此服务器仅限邀请"
+    },
+    "sidebar": {
+      "contextExplore": "发现",
+      "contextServer": "服务器",
+      "contextDm": "私信",
+      "inboxAria": "收件箱",
+      "createServerTitle": "创建服务器",
+      "settingsAria": "设置",
+      "exploreOpen": "发现",
+      "exploreClose": "关闭发现",
+      "liveEvent": "进行中",
+      "eventDetail": "活动详情",
+      "events": "活动",
+      "eventsCount": "{count} 活动",
+      "boostServer": "助力服务器",
+      "members": "成员",
+      "noChannels": "暂无频道",
+      "noChatChannels": "暂无文字频道",
+      "noVoiceChannels": "暂无语音频道",
+      "closeAria": "关闭",
+      "eventDetailLive": "进行中 – 结束于 {time}",
+      "eventDetailHostedBy": "{name} 的服务器",
+      "eventDetailCopyLink": "复制链接",
+      "eventDetailInterested": "感兴趣",
+      "eventDetailStart": "开始",
+      "eventDetailEnd": "结束活动"
+    },
+    "toasts": {
+      "messageRemovedAll": "已为所有人删除消息",
+      "messageDeletedSelf": "你已删除一条消息"
+    },
+    "channelUi": {
+      "sectionChat": "文字频道",
+      "sectionVoice": "语音频道",
+      "defaultCategoryLabel": "频道"
+    },
+    "roleEditor": {
+      "back": "返回",
+      "editTitle": "编辑身份组 - ",
+      "tabDisplay": "显示",
+      "tabPermissions": "权限",
+      "tabMembers": "成员管理 ({count})",
+      "esc": "ESC",
+      "deleteRoleTitle": "删除身份组",
+      "confirmDeleteRole": "确定要删除身份组「{name}」吗？",
+      "errorDeleteRole": "无法删除身份组",
+      "newRoleName": "新身份组",
+      "errorCreateRole": "无法创建身份组",
+      "viewServerByRole": "按身份组查看服务器",
+      "delete": "删除",
+      "deleteRoleAria": "删除身份组"
+    },
+    "roleDisplay": {
+      "roleNameLabel": "身份组名称",
+      "required": "*",
+      "roleNamePlaceholder": "输入身份组名称",
+      "styleTitle": "身份组样式",
+      "previewName": "Wumpus",
+      "previewRole": "音乐支持者",
+      "previewBadge": "稳定",
+      "colorLabel": "身份组颜色",
+      "colorHint": "成员将使用其在列表中最高身份组的颜色。",
+      "displaySeparateToggle": "将此身份组成员与在线成员分开显示",
+      "mentionableToggle": "允许所有人 @提及 此身份组",
+      "mentionableHint": "说明：拥有「提及 @everyone、@here 和所有身份组」权限的成员始终可以提及拥有此身份组的成员。",
+      "viewAsRoleTitle": "以身份组身份查看服务器",
+      "viewAsRoleDesc": "预览此身份组可执行的操作与可访问的频道。仅限服务器所有者与管理员。",
+      "viewAsRoleBtn": "以身份组身份查看服务器",
+      "saveFailed": "无法保存更改",
+      "unsavedBar": "注意 — 你有未保存的更改！",
+      "reset": "重置",
+      "saving": "保存中...",
+      "saveChanges": "保存更改"
+    },
+    "roleMembers": {
+      "loading": "正在加载成员列表…",
+      "noAccessTitle": "无访问权限",
+      "noAccessDesc": "仅服务器所有者或拥有「管理服务器」权限的成员可查看并管理成员列表。",
+      "everyoneTitle": "@everyone",
+      "everyoneDesc": "@everyone 身份组会自动应用于所有成员。你无法向此身份组添加或移除成员。",
+      "memberCount": "{count} 位成员",
+      "searchPlaceholder": "搜索成员",
+      "addMember": "添加成员",
+      "emptySearch": "没有与「{query}」匹配的成员",
+      "emptyRole": "此身份组尚无成员",
+      "removeFromRoleTitle": "从身份组移除",
+      "confirmRemove": "确定要将该成员从此身份组移除吗？",
+      "errorAdd": "无法添加成员",
+      "errorRemove": "无法移除成员",
+      "allHaveRole": "所有成员已拥有此身份组"
+    },
+    "rolePermissions": {
+      "sections": {
+        "serverManagement": "服务器管理权限",
+        "member": "成员权限",
+        "textChannel": "文字频道权限",
+        "voiceChannel": "语音频道权限"
+      },
+      "searchPlaceholder": "搜索权限",
+      "noResults": "没有与「{query}」匹配的权限",
+      "unsavedBar": "注意 — 你有未保存的更改！",
+      "reset": "重置",
+      "saving": "保存中...",
+      "saveChanges": "保存更改",
+      "saveFailed": "无法保存更改",
+      "items": {
+        "manageServer": {
+          "label": "管理服务器",
+          "description": "允许成员编辑服务器名称、头像和基本设置。",
+          "warning": "这是强大的管理员权限，请谨慎授予。"
+        },
+        "manageChannels": {
+          "label": "管理频道",
+          "description": "允许成员创建、编辑和删除频道。",
+          "warning": "这是强大的管理员权限，请谨慎授予。"
+        },
+        "manageEvents": {
+          "label": "管理活动",
+          "description": "允许成员创建、编辑和删除服务器活动。"
+        },
+        "createInvite": {
+          "label": "创建邀请",
+          "description": "允许成员邀请新用户加入此服务器。"
+        },
+        "changeNickname": {
+          "label": "更改昵称",
+          "description": "允许成员在此服务器更改自己的昵称。"
+        },
+        "manageNicknames": {
+          "label": "管理昵称",
+          "description": "允许成员更改其他成员的昵称。"
+        },
+        "kickMembers": {
+          "label": "踢出、批准与拒绝成员",
+          "description": "踢出会将成员移出服务器；若有新邀请可再次加入。若服务器启用加入申请，此权限可批准或拒绝申请。"
+        },
+        "banMembers": {
+          "label": "封禁成员",
+          "description": "允许永久封禁其他成员并清除其在此服务器的消息记录。"
+        },
+        "timeoutMembers": {
+          "label": "限制成员（超时）",
+          "description": "被超时后，用户无法发送聊天消息、回复主题、互动消息，也无法在语音或舞台频道发言。"
+        },
+        "mentionEveryone": {
+          "label": "提及 @everyone、@here 和所有身份组",
+          "description": "允许使用 @everyone / @here，以及提及可提及的身份组。",
+          "warning": "仅应授予可信任的人。"
+        },
+        "sendMessages": {
+          "label": "发送消息与创建帖子",
+          "description": "允许在文字频道发送消息，在论坛频道创建帖子。"
+        },
+        "sendMessagesInThreads": {
+          "label": "在线程与帖子中发送消息",
+          "description": "允许在线程和论坛帖子中发送消息。"
+        },
+        "createPublicThreads": {
+          "label": "创建公开线程",
+          "description": "允许创建频道内所有人可见的线程。"
+        },
+        "createPrivateThreads": {
+          "label": "创建私密线程",
+          "description": "允许创建仅限邀请的线程。"
+        },
+        "embedLinks": {
+          "label": "嵌入链接",
+          "description": "允许显示成员分享链接的富媒体嵌入。"
+        },
+        "attachFiles": {
+          "label": "附加文件",
+          "description": "允许在聊天中上传文件或媒体。"
+        },
+        "addReactions": {
+          "label": "添加反应",
+          "description": "允许为消息添加新的表情反应。"
+        },
+        "manageMessages": {
+          "label": "管理消息",
+          "description": "允许删除或移除其他成员消息的嵌入内容。"
+        },
+        "pinMessages": {
+          "label": "置顶消息",
+          "description": "允许置顶或取消置顶任意消息。"
+        },
+        "viewMessageHistory": {
+          "label": "阅读消息历史",
+          "description": "允许阅读更早的消息。若无此权限，可能仅显示在线时的消息。"
+        },
+        "sendVoiceMessages": {
+          "label": "发送语音消息",
+          "description": "允许发送语音消息。"
+        },
+        "createPolls": {
+          "label": "创建投票",
+          "description": "允许创建投票。"
+        },
+        "connect": {
+          "label": "连接",
+          "description": "允许加入语音并听到他人。"
+        },
+        "speak": {
+          "label": "发言",
+          "description": "允许在语音中发言。若无此权限，将被静音直到有人取消静音。"
+        },
+        "video": {
+          "label": "视频",
+          "description": "允许在此服务器进行视频、屏幕共享或直播。"
+        },
+        "muteMembers": {
+          "label": "静音成员",
+          "description": "允许在语音频道将其他成员静音。"
+        },
+        "deafenMembers": {
+          "label": "拒听成员",
+          "description": "允许使他人无法听与说。"
+        },
+        "moveMembers": {
+          "label": "移动成员",
+          "description": "允许在你可访问的语音频道之间断开或移动成员。"
+        },
+        "setVoiceChannelStatus": {
+          "label": "设置语音频道状态",
+          "description": "允许创建和编辑语音频道状态。"
+        }
+      }
+    },
+    "serverContextMenu": {
+      "aria": "服务器菜单",
+      "markAsRead": "标为已读",
+      "inviteToServer": "邀请进入服务器",
+      "muteServer": "屏蔽服务器",
+      "unmuteServer": "取消屏蔽",
+      "notificationSettings": "通知设置",
+      "hideVoiceChannels": "隐藏已屏蔽频道",
+      "showAllChannels": "显示所有频道",
+      "serverSettings": "服务器设置",
+      "createChannel": "创建频道",
+      "createCategory": "创建分类",
+      "createEvent": "创建活动",
+      "leaveServer": "离开服务器",
+      "notifAll": "所有消息",
+      "notifMentions": "仅 @提及",
+      "notifNone": "无",
+      "muteFor15m": "15分钟",
+      "muteFor1h": "1小时",
+      "muteFor3h": "3小时",
+      "muteFor8h": "8小时",
+      "muteFor24h": "24小时",
+      "muteUntilReenable": "直到重新开启",
+      "suppressEveryone": "屏蔽 @everyone 和 @here",
+      "suppressRoles": "屏蔽所有身份组 @提及",
+      "hideHighlights": "隐藏新活动亮点",
+      "muteNewEvents": "静音新活动提醒",
+      "mobileNotif": "移动端推送通知"
+    },
+    "profileEditor": {
+      "loading": "加载中…",
+      "serverLabel": "服务器",
+      "selectServer": "— 选择服务器 —",
+      "serverHint": "横幅和头像与主个人资料共享；预览显示你在此服务器的昵称。",
+      "serverNickLabel": "服务器昵称",
+      "serverNickPlaceholder": "在此服务器的显示名称",
+      "displayNameLabel": "显示名称",
+      "usernameLabel": "用户名",
+      "pronounsLabel": "代词",
+      "pronounsPlaceholder": "例如: they/them",
+      "avatarLabel": "头像",
+      "changeAvatar": "更换头像",
+      "removeAvatar": "删除头像",
+      "avatarDecoLabel": "头像装饰",
+      "changeAvatarDeco": "更换装饰",
+      "nameplateLabel": "铭牌",
+      "changeNameplate": "更换铭牌",
+      "profileEffectLabel": "个人资料特效",
+      "changeProfileEffect": "更换特效",
+      "bannerColorLabel": "横幅颜色",
+      "changeBannerColorAria": "选择横幅颜色",
+      "uploadBanner": "上传横幅图片",
+      "removeBanner": "删除横幅图片",
+      "bioLabel": "个人简介",
+      "bioHint": "你可以使用 Markdown 和链接。",
+      "insertEmojiAria": "插入表情",
+      "previewTitle": "预览",
+      "statusPlaceholder": "+ 添加状态",
+      "exampleBtn": "示例按钮",
+      "saveMain": "保存个人资料",
+      "saveServerNick": "保存服务器昵称",
+      "errorLoadProfile": "无法加载个人资料。",
+      "savedProfile": "个人资料已保存。",
+      "errorSaveProfile": "无法保存个人资料。",
+      "savedNick": "服务器昵称已保存。",
+      "errorSaveNick": "无法保存。",
+      "updatedAvatar": "头像已更新。",
+      "removeAvatarDone": "头像已删除。",
+      "errorRemoveAvatar": "无法删除头像。",
+      "errorLoadBanner": "无法上传横幅。",
+      "errorOpenRecent": "无法打开最近图片（CORS 或网络问题）。",
+      "errorGetUrl": "无法获取 URL",
+      "comingSoon": "此功能即将推出。"
+    },
+    "profileAvatarCrop": {
+      "title": "裁剪头像",
+      "subtitle": "拖动或缩放以选择最佳显示区域。",
+      "closeAria": "关闭",
+      "zoomLabel": "缩放",
+      "cancel": "取消",
+      "saving": "保存中…",
+      "save": "保存",
+      "errorNoCrop": "未选择裁剪区域。",
+      "errorUpload": "无法上传。"
+    },
+    "profileImagePicker": {
+      "titleAvatar": "选择图片",
+      "titleBanner": "选择横幅图片",
+      "closeAria": "关闭",
+      "uploadImage": "上传图片",
+      "pickGif": "选择 GIF",
+      "recentTitle": "最近的头像",
+      "recentHint": "访问你最近上传的 6 张头像。",
+      "selectRecentAria": "选择最近的图片",
+      "emptySlotAria": "空"
+    },
+    "profileBannerPicker": {
+      "hexLabel": "十六进制",
+      "eyedropperTitle": "从屏幕取色"
+    },
+    "communityOverview": {
+      "title": "社区概览",
+      "subtitle": "设置规则/指南频道、服务器主要语言和服务器描述。",
+      "loading": "加载中…",
+      "rulesChannelLabel": "规则或指南频道",
+      "rulesChannelHint": "选择向成员显示规则/指南的频道（例如 #欢迎-和-规则）。",
+      "noChannel": "— 无 —",
+      "langLabel": "服务器主要语言",
+      "langHint": "仅支持越南语和英语。",
+      "langVi": "越南语",
+      "langEn": "英语",
+      "descLabel": "服务器描述",
+      "descHint": "此描述会显示在邀请卡的邀请链接下方。",
+      "descPlaceholder": "向世界介绍这个服务器吧。",
+      "saving": "保存中…",
+      "save": "保存更改",
+      "errorSave": "无法保存"
+    },
+    "messagesPage": {
+      "contextExplore": "发现",
+      "contextServer": "服务器",
+      "contextDm": "私信",
+      "inboxTitle": "收件箱",
+      "inboxAria": "收件箱",
+      "searchPlaceholder": "搜索或开始对话",
+      "directMessages": "私信",
+      "userFallback": "用户",
+      "micOn": "取消静音",
+      "micOff": "静音",
+      "soundOn": "取消音频静音",
+      "soundOff": "音频静音",
+      "createServerTitle": "创建服务器",
+      "exploreTitle": "发现",
+      "exploreClose": "关闭发现",
+      "settingsTitle": "设置",
+      "sectionChat": "文字频道",
+      "sectionVoice": "语音频道",
+      "createChannelSectionLabelDefault": "文字频道",
+      "reportDone": "消息已举报，谢谢！",
+      "voiceMessageLabel": "语音消息"
+    },
+    "channels": {
+      "catInfo": "信息",
+      "catText": "文字频道",
+      "catVoice": "语音频道",
+      "general": "综合",
+      "highlights": "精彩时刻",
+      "lobby": "大厅",
+      "gaming": "游戏",
+      "music": "音乐",
+      "waitingRoom": "等待室",
+      "streamingRoom": "直播",
+      "welcomeAndRules": "欢迎-规则",
+      "notesResources": "笔记-资源",
+      "homeworkHelp": "作业帮助",
+      "sessionPlanning": "学习计划",
+      "offTopic": "闲聊",
+      "studyRoom1": "学习室-1",
+      "studyRoom2": "学习室-2",
+      "announcements": "公告",
+      "resources": "资源",
+      "meetingPlan": "会议计划",
+      "meetingRoom1": "会议室-1",
+      "meetingRoom2": "会议室-2",
+      "events": "活动",
+      "feedback": "反馈",
+      "communityHub": "社区中心"
+    },
+    "serverInteractions": {
+      "title": "互动",
+      "desc": "只有服务器所有者或拥有管理服务器权限的成员才能更改这些设置。",
+      "systemMessages": "系统消息",
+      "enableSystem": "启用系统消息",
+      "sendWelcome": "向新成员发送欢迎消息",
+      "stickerReply": "帮助成员用贴纸回复欢迎通知",
+      "systemChannel": "系统消息频道",
+      "noChannel": "无",
+      "defaultNotif": "默认通知级别",
+      "notifAll": "所有消息",
+      "notifMentions": "仅@提及",
+      "roleNotif": "身份组通知 (为你)",
+      "roleNotifDesc": "按身份组发送通知，收件人将在「为你」选项卡中看到。",
+      "notifTitlePlaceholder": "通知标题",
+      "notifContentPlaceholder": "通知内容",
+      "targetEveryone": "@everyone",
+      "targetRole": "按身份组",
+      "sendBtn": "发送通知",
+      "sendingBtn": "发送中...",
+      "loading": "正在加载互动设置...",
+      "loadError": "加载数据失败",
+      "loadFail": "加载互动设置失败",
+      "saveError": "保存设置失败",
+      "sendError": "发送通知失败",
+      "errTitle": "请输入通知标题和内容",
+      "errRole": "请选择身份组",
+      "sentAlert": "已向{n}名成员发送通知。"
+    },
+    "serverSafety": {
+      "loadError": "加载安全设置失败。",
+      "verifyTitle": "验证级别",
+      "verifyDesc": "服务器成员必须满足以下条件才能在文字频道发送消息或开始私信对话。",
+      "verifyRecommend": "我们建议为社区服务器设置验证级别。",
+      "changeBtn": "更改",
+      "verifyAriaLabel": "验证级别",
+      "contentFilterTitle": "显式媒体内容过滤器",
+      "contentFilterDesc": "选择服务器成员是否可以分享含有显式内容的媒体。此设置适用于未限制年龄的频道。",
+      "learnMore": "了解更多",
+      "contentFilterAriaLabel": "显式媒体内容过滤器",
+      "verifyNoneTitle": "无",
+      "verifyNoneDesc": "不限制",
+      "verifyLowTitle": "低",
+      "verifyLowDesc": "需要验证Cordigram账号邮箱。",
+      "verifyMediumTitle": "中",
+      "verifyMediumDesc": "需要注册Cordigram超过5分钟。",
+      "verifyHighTitle": "高",
+      "verifyHighDesc": "需要成为此服务器成员超过10分钟。",
+      "filterAllTitle": "过滤所有成员的消息",
+      "filterAllDesc": "所有消息将被扫描以检测显式媒体内容。",
+      "filterNoRoleTitle": "过滤没有身份组的服务器成员的消息",
+      "filterNoRoleDesc": "没有身份组的服务器成员的消息将被扫描以检测显式内容。",
+      "filterNoneTitle": "不过滤",
+      "filterNoneDesc": "消息不会被扫描以检测显式媒体内容。"
+    },
+    "serverEmoji": {
+      "denied": "只有服务器所有者或拥有管理服务器权限的成员才能编辑表情符号。",
+      "loading": "正在加载表情符号…",
+      "loadError": "加载表情符号出错",
+      "fileTooLarge": "文件不得超过2 MB。",
+      "fileInvalid": "仅支持PNG、JPG、GIF或WebP。",
+      "title": "表情符号",
+      "desc": "成员可以在此服务器上最多使用{max}个自定义表情符号。可以上传静态图片(PNG、JPG、WebP)或动态GIF。",
+      "uploadBtn": "上传表情符号",
+      "slotsLeft": "剩余{n}/{max}个位置",
+      "dropHint": "将文件拖放到此处快速上传 (PNG、JPG、GIF、WebP — 最大2 MB)。",
+      "sectionTitle": "表情符号",
+      "sectionSub": "{n}个位置可用 (最多{max}个自定义表情符号，静态+GIF)",
+      "animSection": "动态表情符号",
+      "animSub": "{n}个GIF · {max}个位置中剩余{r}个",
+      "colImage": "图片",
+      "colName": "名称",
+      "colUploader": "上传者",
+      "emptyStatic": "暂无静态表情符号",
+      "emptyAnimated": "无"
+    },
+    "serverSticker": {
+      "denied": "只有服务器所有者或拥有管理服务器权限的成员才能编辑贴纸。",
+      "loading": "正在加载贴纸…",
+      "loadError": "加载贴纸出错",
+      "fileTooLarge": "文件不得超过2 MB。",
+      "fileInvalid": "仅支持PNG、JPG或WebP。",
+      "bannerAriaLabel": "服务器加速",
+      "bannerTitle": "获取加速",
+      "bannerDesc": "将服务器加速到1级或更高可解锁更多贴纸位置和其他特权。目前服务器只有{n}个免费贴纸位置。",
+      "btnUpgrade": "加速服务器",
+      "btnLearnMore": "了解更多",
+      "freeTitle": "免费位置",
+      "freeSub": "{total}个位置中{n}个可用",
+      "uploadBtn": "上传贴纸",
+      "notice": "静态图片(PNG/JPG/WebP): 正方形裁剪，~500 KB压缩后上传到Cloudinary。贴纸GIF: 最大2 MB的原始文件上传到Cloudinary。当前限制: 每个服务器{max}个贴纸。",
+      "tierTitle": "等级{n}",
+      "tierNote": "需要服务器加速 (即将推出)",
+      "tierBonus10": "+10个贴纸位置",
+      "tierBonus15": "+15个贴纸位置 (共30个)",
+      "tierBonus30": "+30个贴纸位置 (共60个)",
+      "boosts": "{n}次加速",
+      "buyBtn": "购买等级"
+    },
+    "serverMembers": {
+      "showInChannelLabel": "在频道列表中显示成员",
+      "showInChannelDesc": "启用后，最多显示50名成员：在线、新账号(< 7天)、最近加入或7天内有消息活动。",
+      "searchResults": "搜索结果",
+      "searchPlaceholder": "按用户名或用户ID搜索",
+      "sortBtn": "排序",
+      "sortNewest": "加入日期 (最新优先)",
+      "sortOldest": "加入日期 (最早优先)",
+      "sortUsername": "用户名 (A → Z)",
+      "sortActivity": "活跃度 (多 → 少)",
+      "filterLabel": "筛选",
+      "filterNewAccount": "新账号 (< 7天)",
+      "filterSpam": "垃圾信息 (10分钟内>50条)",
+      "roleLabel": "身份组",
+      "roleAll": "所有身份组",
+      "roleOwner": "所有者",
+      "roleModerator": "管理员",
+      "roleMember": "成员",
+      "pruneBtn": "清理",
+      "loading": "加载中...",
+      "loadFail": "加载成员列表失败",
+      "colCheck": "全选",
+      "colName": "名称",
+      "memberOptions": "选项",
+      "resultCount": "显示{n}名成员",
+      "resultCountCapped": " (频道列表启用时最多50人)",
+      "ownerBadge": "所有者",
+      "modBadge": "Mod",
+      "memberBadge": "成员",
+      "menuProfile": "资料",
+      "menuMessage": "发消息",
+      "menuTimeout": "禁言 {name}",
+      "menuKick": "踢出 {name}",
+      "menuBan": "封禁 {name}",
+      "filterTitle": "清理成员 — 服务器",
+      "filterClose": "关闭",
+      "filterLastSeen": "最后出现",
+      "filterDays7": "超过7天前",
+      "filterDays30": "超过30天前",
+      "filterIncludeRole": "同时包含持有身份组的成员",
+      "filterRoleAll": "所有身份组",
+      "filterRoleNone": "无身份组 (成员)",
+      "filterRoleMember": "成员",
+      "filterRoleMod": "Mod (服务器管理员)",
+      "filterHint": "清理将删除在所选时间段内不活跃的成员。他们可以被重新邀请加入。",
+      "filterSelectHint": "选择条件以预览将被清理的成员数量。",
+      "filterPreview": "将清理{n}名成员。",
+      "filterCancel": "取消",
+      "filterApply": "清理",
+      "filterApplying": "清理中...",
+      "filterConfirm": "确定要清理{n}名超过{days}天不活跃的成员吗？",
+      "filterDone": "已清理{n}名成员。",
+      "filterError": "清理失败",
+      "moderateKickTitle": "踢出 {name}",
+      "moderateBanTitle": "封禁 {name}",
+      "moderateTimeoutTitle": "禁言 {name}",
+      "kickDesc": "此人将被从服务器中移除，但可以通过邀请重新加入。",
+      "banDesc": "此人将被永久封禁，无法重新加入服务器。",
+      "timeoutDesc": "此人将被禁言，在所选时间内无法发送消息。",
+      "timeoutDuration": "禁言时长",
+      "reason": "原因 (可选)",
+      "reasonPlaceholder": "输入原因...",
+      "moderateCancel": "取消",
+      "moderateApplying": "处理中...",
+      "kick": "踢出",
+      "ban": "封禁",
+      "timeout": "禁言",
+      "moderateFail": "执行操作失败",
+      "transferTitle": "转让所有权",
+      "transferDesc": "将服务器所有权转让给{name}？他们将成为服务器所有者，您将成为成员。",
+      "transferCancel": "取消",
+      "transferApplying": "处理中...",
+      "transferBtn": "转让",
+      "transferFail": "转让所有权失败",
+      "joinOwner": "服务器所有者",
+      "joinInvited": "由{name}邀请",
+      "joinUrl": "通过链接加入",
+      "timeout60s": "60秒",
+      "timeout5m": "5分钟",
+      "timeout10m": "10分钟",
+      "timeout1h": "1小时",
+      "timeout1d": "1天",
+      "timeout1w": "1周"
+    },
+    "serverAccess": {
+      "loading": "正在加载访问设置...",
+      "loadError": "加载访问设置失败",
+      "saveError": "保存访问设置失败",
+      "title": "访问",
+      "desc": "选择成员加入方式，以及(如果启用)要求在聊天前接受规则。",
+      "inviteOnlyTitle": "仅限邀请",
+      "inviteOnlyHint": "人们可以通过邀请链接直接加入您的服务器",
+      "applyTitle": "需要申请",
+      "applyHint": "必须提交申请并获得批准才能加入",
+      "discoverTitle": "可发现",
+      "discoverHint": "任何人都可以通过服务器发现直接加入您的服务器",
+      "discoveryMet": "您的服务器已满足在服务器发现中显示的所有要求",
+      "discoveryNotMet": "您的服务器目前不满足在服务器发现中显示的所有要求",
+      "checkingDiscovery": "检查中...",
+      "ageTitle": "年龄限制",
+      "ageDesc": "启用以阻止18岁以下用户。",
+      "rulesToggleTitle": "服务器规则",
+      "rulesToggleDesc": "启用以要求用户接受规则。",
+      "rulesSection": "规则",
+      "rulesEnabledDesc": "添加和管理适用于服务器的规则。",
+      "rulesDisabledDesc": "启用服务器规则以添加规则。",
+      "rulesPlaceholder": "输入规则内容",
+      "addRuleBtn": "添加规则",
+      "addRuleChipTitle": "添加模板规则",
+      "noRules": "暂无规则。",
+      "addRuleError": "添加规则失败",
+      "joinFormTitle": "加入申请",
+      "joinFormDesc": "向申请表添加问题。在您批准申请之前，人们无法加入服务器。",
+      "joinFormToggleTitle": "切换加入申请表",
+      "agreeRulesQuestion": "阅读并同意服务器规则",
+      "agreeRulesBadge": "服务器规则",
+      "editQuestion": "编辑",
+      "deleteQuestion": "删除",
+      "addQuestionBtn": "+ 添加问题",
+      "addQuestionChipTitle": "添加模板问题",
+      "maxQuestions": "最多{max}个问题。剩余: {n}个。",
+      "joinFormSaveError": "保存加入申请表失败",
+      "pickTypeTitle": "选择问题类型",
+      "typeShort": "简短回答",
+      "typeParagraph": "段落",
+      "typeMultiple": "多项选择",
+      "questionPlaceholder": "输入您的问题",
+      "optionPlaceholder": "选项{n}",
+      "addOption": "+ 添加选项",
+      "removeOptionTitle": "删除选项",
+      "modalCancel": "取消",
+      "modalSave": "保存"
+    },
+    "serverBans": {
+      "desc": "封禁按账号和IP执行。用户可以通过代理绕过IP封禁。",
+      "moderation": "管理",
+      "searchPlaceholder": "按用户ID或用户名搜索封禁",
+      "searchBtn": "搜索",
+      "loading": "正在加载列表...",
+      "noBansTitle": "无封禁",
+      "noBansDesc": "您还没有封禁任何人...但如果需要，请不要犹豫！",
+      "noBansSearch": "没有与您的搜索匹配的被封禁用户。",
+      "reason": "原因: {reason}",
+      "unbanBtn": "解除封禁",
+      "resultCount": "显示{total}名被封禁用户中的{n}名",
+      "restrictedTitle": "受限成员 (提及垃圾信息)",
+      "restrictedEmpty": "没有受限成员。",
+      "restricted": "已限制发送消息",
+      "mentionBlocked": "提及封锁至{date}",
+      "unrestrictBtn": "解除限制",
+      "confirmTitle": "解除封禁",
+      "confirmDesc": "确定要解除对{name} (@{username})的封禁吗？此用户将可以通过新邀请重新加入服务器。",
+      "confirmCancel": "取消",
+      "confirmSubmit": "解除封禁",
+      "confirming": "解除中...",
+      "loadFail": "加载封禁列表失败",
+      "unbanFail": "解除封禁失败"
+    },
+    "autoMod": {
+      "loadError": "加载AutoMod设置失败。",
+      "spamTitle": "屏蔽提及垃圾信息",
+      "spamDesc": "屏蔽超过身份组和用户提及限制的消息",
+      "settingsBtn": "设置",
+      "ruleNameLabel": "规则名称",
+      "ruleNameValue": "屏蔽提及垃圾信息",
+      "toggleAriaLabel": "启用/禁用",
+      "section1Title": "配置提及限制",
+      "mentionLimitTitle": "每条消息的唯一提及 (身份组 + 用户)",
+      "mentionLimitDesc": "限制每条消息的唯一提及数量",
+      "section2Title": "选择响应",
+      "blockTitle": "屏蔽消息",
+      "blockDesc": "屏蔽超过唯一提及限制的消息。",
+      "blockDesc2": "可以向成员显示自定义错误通知。",
+      "editNotifLink": "编辑自定义通知",
+      "warnTitle": "发送警告",
+      "warnDesc": "将包含被标记消息的警告发送到所选频道。",
+      "restrictTitle": "限制成员",
+      "restrictDesc": "临时禁用成员发送消息或加入语音频道的能力。",
+      "section3Title": "允许特定身份组或频道 (可选)",
+      "searchPlaceholder": "搜索频道或身份组",
+      "groupChannels": "频道",
+      "groupRoles": "身份组",
+      "noResults": "未找到结果",
+      "exemptNote": "注意 — 拥有管理员和管理服务器权限的成员始终不受过滤规则约束。",
+      "cancelBtn": "取消",
+      "saveBtn": "保存更改",
+      "savingBtn": "保存中...",
+      "tagBlock": "屏蔽消息",
+      "tagWarn": "发送警告",
+      "tagRestrict": "限制成员",
+      "notifModalTitle": "编辑自定义通知",
+      "notifModalDesc": "当AutoMod屏蔽成员的消息时将显示您的自定义通知。",
+      "notifPlaceholder": "输入您的自定义通知",
+      "notifCancel": "取消",
+      "notifSave": "保存"
+    },
+    "noMessages": "暂无消息。开始聊天吧！",
+    "loadingMessages": "正在加载消息...",
+    "welcome": {
+      "title": "欢迎来到",
+      "serverOf": "{name}的服务器",
+      "channelBegin": "这是",
+      "startTalking": "频道的开始。开始聊天吧！",
+      "greeting": "很高兴认识你，{name}！",
+      "unknownUser": "某人",
+      "waving": "发送中...",
+      "waveBtn": "向{name}挥手！"
+    },
+    "dmList": {
+      "sent": "已发送",
+      "seen": "已读"
+    },
+    "mention": {
+      "tooltip": "提及 (@mention)"
+    },
+    "applyPending": {
+      "title": "您加入 {server} 的申请正在审核中！",
+      "desc": "有更新时您将收到通知。",
+      "withdraw": "撤回",
+      "withdrawError": "无法撤回申请",
+      "joinError": "无法加入服务器"
+    }
+  },
+  "settings": {
+    "title": "设置",
+    "close": "关闭",
+    "saved": "已保存。",
+    "failedToLoad": "加载设置失败。",
+    "sections": {
+      "general": "常规",
+      "privacy": "隐私",
+      "messages": "消息与通话",
+      "appearance": "外观",
+      "notifications": "通知",
+      "profile": "个人资料"
+    },
+    "general": {
+      "dmDirectoryTitle": "私信通讯录",
+      "dmDirectoryHint": "仅在私信中生效。",
+      "dmDirectoryAllFriends": "显示全部好友",
+      "dmDirectoryOnlineFriends": "仅显示在线好友",
+      "languageTitle": "语言",
+      "languageHint": "适用于聊天（本页面）与社交（NEXT_LOCALE Cookie）。",
+      "languageLabel": "显示语言",
+      "languageNames": {
+        "vi": "越南语",
+        "en": "英语",
+        "ja": "日语",
+        "zh": "中文"
+      }
+    },
+    "privacy": {
+      "title": "隐私",
+      "hint": "在公开个人资料中隐藏加入 Cordigram 的日期。关闭与他人共享在线/离开/离线状态。",
+      "showMemberSince": "显示加入 Cordigram 日期",
+      "sharePresence": "共享状态（在线 / 离开 / 离线）"
+    },
+    "messages": {
+      "title": "消息与通话",
+      "allowMessageLabel": "允许发送消息",
+      "allowCallLabel": "允许通话",
+      "everyone": "所有人",
+      "followersOnly": "仅限你关注的人",
+      "blockTitle": "消息屏蔽",
+      "blockedList": "已屏蔽列表 ›",
+      "ignoredList": "已忽略列表 ›",
+      "blockedHeading": "已屏蔽",
+      "ignoredHeading": "已忽略",
+      "empty": "空",
+      "unblock": "取消屏蔽",
+      "unignored": "取消忽略"
+    },
+    "appearance": {
+      "title": "外观",
+      "hint": "浅色/深色（与账号同步）。",
+      "light": "浅色",
+      "dark": "深色"
+    },
+    "notifications": {
+      "title": "通知",
+      "masterLabel": "通知",
+      "masterHint": "开启：正常通知。关闭：关闭所有通知（社交 + 私信/服务器）。",
+      "enabledToast": "已开启通知。",
+      "disabledToast": "已关闭通知。",
+      "soundLabel": "通知声音（消息与新通知）"
+    },
+    "profile": {
+      "title": "个人资料",
+      "main": "主资料",
+      "server": "服务器资料"
+    },
+    "errorLoadBlocked": "无法加载黑名单。",
+    "errorLoadIgnored": "无法加载屏蔽列表。",
+    "errorUpdate": "无法更新。",
+    "errorSave": "无法保存。",
+    "unblockedToast": "已取消拉黑。",
+    "errorUnblock": "无法取消拉黑。",
+    "unignoredToast": "已取消屏蔽。",
+    "errorUnignore": "无法取消屏蔽。",
+    "ariaShowMemberSince": "切换加入日期显示",
+    "ariaSharePresence": "切换在线状态共享"
+  }
+}

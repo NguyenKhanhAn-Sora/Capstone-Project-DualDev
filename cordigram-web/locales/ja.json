@@ -1,0 +1,1223 @@
+{
+  "chat": {
+    "common": {
+      "back": "戻る",
+      "create": "作成",
+      "creating": "作成中...",
+      "uploading": "アップロード中...",
+      "saving": "保存中...",
+      "saveChanges": "変更を保存",
+      "cancel": "キャンセル",
+      "remove": "削除",
+      "copy": "コピー",
+      "copied": "コピーしました",
+      "sending": "送信中…",
+      "user": "ユーザー",
+      "server": "サーバー"
+    },
+    "loading": {
+      "gif": "GIF を読み込み中...",
+      "sticker": "スタンプを読み込み中...",
+      "generic": "読み込み中..."
+    },
+    "createServer": {
+      "errors": {
+        "nameRequired": "サーバー名を入力してください",
+        "createFailed": "サーバーを作成できませんでした。もう一度お試しください。"
+      },
+      "template": {
+        "title": "サーバーを作成",
+        "subtitleLine1": "サーバーは友だちと過ごす場所です。",
+        "subtitleLine2": "自分のサーバーを作成してチャットを始めましょう。",
+        "startFromTemplate": "テンプレートから開始",
+        "haveInvite": "招待リンクをお持ちですか？",
+        "joinServer": "サーバーに参加",
+        "items": {
+          "custom": {
+            "name": "自分で作成"
+          },
+          "gaming": {
+            "name": "ゲーム"
+          },
+          "friends": {
+            "name": "友だち"
+          },
+          "study-group": {
+            "name": "勉強グループ"
+          },
+          "school-club": {
+            "name": "学校クラブ"
+          },
+          "local-community": {
+            "name": "地域コミュニティ"
+          },
+          "artists-creators": {
+            "name": "アーティスト＆クリエイター"
+          }
+        }
+      },
+      "purpose": {
+        "title": "サーバーについて教えてください",
+        "subtitle": "設定を手伝うため、あなたのサーバーは少人数向けですか？それとも大きなコミュニティ向けですか？",
+        "items": {
+          "club-community": "クラブまたはコミュニティ",
+          "me-and-friends": "私と友だち"
+        },
+        "notSure": "迷っていますか？",
+        "skip": "この質問をスキップ"
+      },
+      "customize": {
+        "title": "サーバーをカスタマイズ",
+        "subtitle": "サーバー名とアイコンで個性を出しましょう。あとでいつでも変更できます。",
+        "serverNameLabel": "サーバー名",
+        "serverNamePlaceholder": "サーバー名を入力",
+        "communityGuidelinesPrefix": "サーバーを作成することで、Discord の",
+        "communityGuidelinesLink": "コミュニティガイドライン",
+        "communityGuidelinesSuffix": "に同意したものとみなされます。",
+        "errors": {
+          "imageOnly": "画像ファイルを選択してください",
+          "maxSize5mb": "ファイルサイズは 5MB 以下にしてください",
+          "loginRequired": "画像をアップロードするにはログインが必要です",
+          "uploadFailed": "画像をアップロードできませんでした。もう一度お試しください。"
+        }
+      }
+    },
+    "serverSettings": {
+      "ariaLabel": "サーバー設定",
+      "sidebarTitlePrefix": "サーバー：",
+      "groups": {
+        "expressions": "表現",
+        "people": "メンバー",
+        "moderation": "管理"
+      },
+      "sections": {
+        "profile": "サーバープロフィール",
+        "interactions": "インタラクション",
+        "privileges": "特典",
+        "emoji": "絵文字",
+        "sticker": "スタンプ",
+        "members": "メンバー",
+        "roles": "ロール",
+        "invites": "招待",
+        "access": "アクセス",
+        "safety": "安全設定",
+        "bans": "ブロック",
+        "automod": "AutoMod",
+        "community": "コミュニティ設定",
+        "community-overview": "コミュニティ概要",
+        "community-onboarding": "オンボーディング",
+        "delete-server": "サーバーを削除"
+      },
+      "profileDesc": "招待リンクでの表示や（有効な場合）サーバー発見・通知チャンネルでの表示をカスタマイズします。",
+      "placeholder": {
+        "profile": "サーバープロフィール編集はここに追加されます。",
+        "section": "「{label}」の内容は後で追加されます。"
+      }
+    },
+    "deleteMessage": {
+      "title": "このメッセージを誰から削除しますか？",
+      "forEveryone": {
+        "title": "全員から削除",
+        "desc": "このメッセージはチャットの全員から削除されます。すでに見られたり転送された可能性があります。削除済みメッセージでも報告できます。"
+      },
+      "forMe": {
+        "title": "自分だけ削除",
+        "desc": "このメッセージはあなたの端末から削除されますが、他のメンバーには表示されたままです。"
+      }
+    },
+    "reportMessage": {
+      "title": "メッセージを報告",
+      "reasonLabel": "報告理由 *",
+      "descriptionLabel": "詳細（任意）",
+      "descriptionPlaceholder": "状況を説明してください...",
+      "submit": "報告を送信",
+      "reasons": {
+        "spam": "スパム",
+        "harassment": "嫌がらせ",
+        "inappropriate": "不適切な内容",
+        "misinfo": "誤情報",
+        "scam": "詐欺",
+        "other": "その他"
+      }
+    },
+    "invite": {
+      "searchPlaceholder": "友だちを検索",
+      "sectionLabel": "サーバーに招待",
+      "invite": "招待",
+      "invited": "招待済み",
+      "orSendLink": "または招待リンクを送信",
+      "empty": {
+        "noFriends": "招待できる友だちがいません。",
+        "notFound": "友だちが見つかりません。"
+      },
+      "errors": {
+        "cannotSendInvite": "招待を送信できませんでした"
+      }
+    },
+    "inviteServer": {
+      "title": "{serverName} に友だちを招待",
+      "sub": "受信者は #general に移動します",
+      "expireNote": "招待リンクは 7 日後に期限切れになります。招待リンクを編集してください。"
+    },
+    "inviteVoice": {
+      "title": "{serverName} に友だちを招待",
+      "sub": "受信者は {channelName} に移動します",
+      "expireNote": "このリンクはこのボイスチャンネルに直接移動します。未参加の場合は先に参加ページが表示されます。"
+    },
+    "serverProfile": {
+      "saved": "サーバープロフィールを保存しました。",
+      "errors": {
+        "fileUrlMissing": "ファイル URL を取得できません",
+        "bannerUrlMissing": "バナー画像 URL を取得できません",
+        "uploadAvatarFailed": "アイコンをアップロードできませんでした",
+        "uploadBannerFailed": "バナーをアップロードできませんでした",
+        "saveFailed": "サーバープロフィールを保存できませんでした"
+      },
+      "info": {
+        "title": "サーバー情報",
+        "online": "オンライン: {count}",
+        "members": "メンバー: {count}",
+        "createdAt": "作成日: {date}"
+      },
+      "name": {
+        "label": "名前",
+        "placeholder": "サーバー名"
+      },
+      "avatar": {
+        "label": "アイコン",
+        "change": "サーバーアイコンを変更",
+        "remove": "アイコンを削除",
+        "urlPlaceholder": "またはアイコンURLを貼り付け"
+      },
+      "banner": {
+        "label": "バナー",
+        "hint": "カードの背景色（発見、招待、申請）を選択できます。画像も追加でき、アップロード前に最適化されます。",
+        "upload": "バナー画像をアップロード",
+        "remove": "バナー画像を削除",
+        "pickColorAria": "バナー背景色を選択",
+        "note": "背景色は常に適用され、画像がある場合は上に表示されます。"
+      },
+      "traits": {
+        "label": "特徴",
+        "hint": "サーバーの雰囲気を伝える特徴を最大5つ追加できます。",
+        "pickEmoji": "絵文字を選択",
+        "placeholder": "特徴...",
+        "filledCount": "{count}/5 入力済み"
+      },
+      "description": {
+        "label": "説明",
+        "hint": "サーバーの説明です。",
+        "placeholder": "このサーバーについて紹介してください。"
+      },
+      "preview": {
+        "noDescription": "説明はまだありません。"
+      }
+    },
+    "popups": {
+      "closeAria": "閉じる",
+      "loading": "読み込み中...",
+      "applyToJoin": {
+        "ariaLabel": "サーバー参加申請",
+        "serverFallback": "サーバー",
+        "members": "メンバー {count} 人",
+        "establishedPrefix": "開設",
+        "titleBeforeChat": "ここでチャットを始める前に...",
+        "subtitleSteps": "次の手順を完了してください。",
+        "sectionLabel": "参加申請",
+        "emptyHint": "オーナーが質問を追加していません。「送信」で参加申請を送れます。",
+        "answerPlaceholder": "回答を入力...",
+        "submit": "送信",
+        "submitting": "送信中…"
+      },
+      "createChannel": {
+        "title": "チャンネルを作成",
+        "channelType": "チャンネルタイプ",
+        "textName": "テキスト",
+        "textDesc": "メッセージ、画像、GIF、絵文字、意見、言葉遊びを送る",
+        "voiceName": "ボイス",
+        "voiceDesc": "音声・ビデオ通話と画面共有で交流",
+        "channelName": "チャンネル名",
+        "defaultName": "new-channel",
+        "emojiTitle": "絵文字 / 顔文字を追加",
+        "privateLabel": "プライベートチャンネル",
+        "privateDesc": "選択したメンバーとロールだけがこのチャンネルを見られます。",
+        "creating": "作成中...",
+        "createBtn": "チャンネルを作成"
+      },
+      "createCategory": {
+        "title": "カテゴリを作成",
+        "nameLabel": "カテゴリ名",
+        "placeholder": "新しいカテゴリ",
+        "defaultName": "新しいカテゴリ",
+        "privateLabel": "プライベートカテゴリ",
+        "privateDesc": "選択したメンバーとロールだけがこのカテゴリを見られます。",
+        "creating": "作成中...",
+        "createBtn": "カテゴリを作成"
+      },
+      "deleteServer": {
+        "title": "「{serverName}」を削除",
+        "message": "{serverName} を削除しますか？この操作は取り消せません。",
+        "confirmLabel": "サーバー名を入力",
+        "deleting": "削除中…",
+        "deleteBtn": "サーバーを削除",
+        "error": "サーバーを削除できませんでした"
+      },
+      "events": {
+        "title": "イベント",
+        "create": "イベントを作成",
+        "emptyTitle": "予定されているイベントはありません。",
+        "emptyDesc": "サーバー内の活動のためにイベントを予定しましょう。",
+        "emptyHint": "サーバー設定 › ロールで他の人にイベント作成を許可できます。"
+      },
+      "shareEvent": {
+        "title": "準備完了。イベントを共有しましょう！",
+        "desc": "下のイベントリンクをコピーして招待してください。このリンクはサーバー招待としても使えます。",
+        "expireNote": "招待リンクは7日後に期限切れになります。"
+      },
+      "eventDetail": {
+        "headerCount": "イベント 1 件",
+        "createAnother": "イベントを作成",
+        "location": "{serverName} のサーバー{channel}",
+        "locationChannel": " > #{name}",
+        "copyLink": "リンクをコピー",
+        "interested": "興味あり",
+        "start": "開始",
+        "starting": "開始中...",
+        "countdown": {
+          "started": "開始済み",
+          "seconds": "数秒後に開始",
+          "minutes": "{m} 分後に開始",
+          "hours": "{h} 時間後に開始",
+          "hoursMinutes": "{h} 時間 {m} 分後に開始"
+        }
+      },
+      "incomingCall": {
+        "canceled": "通話はキャンセルされました",
+        "incoming": "着信...",
+        "videoCall": "ビデオ通話",
+        "voiceCall": "音声通話",
+        "close": "閉じる",
+        "decline": "拒否",
+        "accept": "応答",
+        "declineAria": "通話を拒否",
+        "acceptAria": "通話に応答",
+        "closeAria": "閉じる"
+      },
+      "outgoingCall": {
+        "calling": "呼び出し中...",
+        "rejected": "相手が利用できません",
+        "noAnswer": "応答なし",
+        "videoCall": "ビデオ通話",
+        "voiceCall": "音声通話",
+        "cancelCall": "通話をキャンセル",
+        "close": "閉じる",
+        "cancelAria": "通話をキャンセル",
+        "closeAria": "閉じる"
+      },
+      "ignoreUser": {
+        "ariaIgnore": "ユーザーを無視",
+        "ariaIgnored": "ユーザーを無視中",
+        "titleIgnored": "{name} を無視しています",
+        "subtitleIgnored": "相手のメッセージと通知は非表示です。復元するとDMやサーバーチャットで通常どおりやり取りできます。",
+        "restore": "復元",
+        "restoring": "処理中...",
+        "title": "{name} を無視しますか？",
+        "subtitle": "相手に知られずにやり取りを止めます",
+        "hideProfile": "プロフィールとメッセージを非表示",
+        "hideProfileDesc": "いつでも解除できます",
+        "muteNotif": "通知とアクティビティをミュート",
+        "muteNotifDesc": "アプリ上で相手をあまり見なくなります（DM、テキスト、ボイス）",
+        "info": "相手はあなたにメッセージでき、あなたの活動も見られます。無視されたことは分かりません。",
+        "blockTitle": "それでも足りない？",
+        "blockText": "代わりにブロック",
+        "blockDesc": "直接の連絡を止め、見える範囲を制限します。ブロックした相手からのメッセージや通話は受け取れません。",
+        "block": "ブロック",
+        "ignore": "無視"
+      },
+      "memberProfile": {
+        "aria": "メンバープロフィール",
+        "follow": "フォロー",
+        "following": "フォロー中",
+        "message": "メッセージ",
+        "messageAria": "メッセージ",
+        "optionsAria": "その他",
+        "joinFrom": "参加日",
+        "roles": "ロール",
+        "owner": "オーナー",
+        "moderator": "モデレーター",
+        "member": "メンバー",
+        "ownerBadge": "オーナー",
+        "notes": "メモ（自分だけに表示）",
+        "notesHint": "クリックしてメモを追加",
+        "tabActivity": "アクティビティ",
+        "tabFollowers": "共通のフォロワー",
+        "activityEmpty": "{name} はまだここに共有するアクティビティがありません。",
+        "activityHint": "次に何を共有するか待ちましょう。会話のきっかけを作りませんか？",
+        "followersEmpty": "共通のフォロワーがここに表示されます。"
+      },
+      "messageSearch": {
+        "title": "メッセージを検索",
+        "placeholderDm": "{name} との会話を検索",
+        "placeholderServer": "メッセージ内容を検索...",
+        "allChannels": "すべてのチャンネル",
+        "allUsers": "すべてのユーザー",
+        "hasFile": "ファイルあり",
+        "time": "日時",
+        "fromDate": "開始日",
+        "toDate": "終了日",
+        "found": "{count} 件見つかりました",
+        "none": "結果がありません",
+        "clearFilters": "フィルターをクリア",
+        "searching": "検索中...",
+        "empty": "結果がありません",
+        "emptyHint": "別のキーワードかフィルターを試してください",
+        "attachments": "添付 {count} 件",
+        "loadMore": "さらに読み込む（残り {count} 件）",
+        "loadingMore": "読み込み中...",
+        "todayAt": "今日 {time}",
+        "yesterday": "昨日",
+        "daysAgo": "{n} 日前"
+      },
+      "inbox": {
+        "title": "受信トレイ",
+        "tabForYou": "あなた宛て",
+        "tabUnread": "未読",
+        "tabMentions": "メンション",
+        "markAllTitle": "すべて既読にする",
+        "markAllDoing": "処理中...",
+        "markAll": "既読にする",
+        "loading": "読み込み中...",
+        "emptyForYou": "サーバーからのイベント、招待、ロール通知はありません。",
+        "emptyUnread": "チャンネルからの未読メッセージや通知はありません。",
+        "emptyMentions": "チャンネルでメンションはまだありません。",
+        "eventLive": "• ライブ",
+        "eventStarted": "{serverName} のサーバーで開始されました。",
+        "inviteTitle": "サーバーへの招待",
+        "inviteMeta": "{inviter} が {serverName} への参加を招待しました。",
+        "accept": "承認",
+        "acceptInviteAria": "招待を承認",
+        "decline": "拒否",
+        "declineInviteAria": "招待を拒否",
+        "dmFallback": "メッセージ",
+        "newMessageFallback": "新しいメッセージがあります",
+        "serverFallback": "サーバー",
+        "mentionYou": "があなたにメンションしました",
+        "timeMinutes": "{n} 分",
+        "timeHours": "{n} 時間",
+        "timeDays": "{n} 日",
+        "adminViewTitle": "システム管理者がサーバーを閲覧中",
+        "adminViewContent": "システム管理者があなたのサーバー「{server}」を確認しています。これは定期的なモデレーション活動です。",
+        "mentionSpamWarning": "サーバー「{server}」のチャンネルでメンションスパムをしたとして警告されました。メッセージ内のメンション数を減らしてください。",
+        "mentionSpamTitle": "⚠️ メンションスパム警告"
+      }
+    },
+    "explore": {
+      "backToChat": "← チャットに戻る",
+      "title": "見つける",
+      "subtitle": "参加できる審査済みコミュニティを探します。「参加申請」が有効なサーバーでは、先に申請を送信する必要があります。",
+      "loading": "読み込み中…",
+      "loadError": "読み込めませんでした",
+      "empty": "表示できる承認済みサーバーはまだありません。",
+      "members": "メンバー {count} 人",
+      "badgeApply": " • 参加申請",
+      "badgeInviteOnly": " • 招待のみ",
+      "join": "参加",
+      "inviteOnly": "招待のみ",
+      "inviteOnlyTitle": "このサーバーは招待制です"
+    },
+    "sidebar": {
+      "contextExplore": "見つける",
+      "contextServer": "サーバー",
+      "contextDm": "ダイレクトメッセージ",
+      "inboxAria": "受信トレイ",
+      "createServerTitle": "サーバーを作成",
+      "settingsAria": "設定",
+      "exploreOpen": "見つける",
+      "exploreClose": "見つけるを閉じる",
+      "liveEvent": "開催中",
+      "eventDetail": "イベント詳細",
+      "events": "イベント",
+      "eventsCount": "{count} イベント",
+      "boostServer": "サーバーをブースト",
+      "members": "メンバー",
+      "noChannels": "チャンネルがありません",
+      "noChatChannels": "テキストチャンネルがありません",
+      "noVoiceChannels": "ボイスチャンネルがありません",
+      "closeAria": "閉じる",
+      "eventDetailLive": "開催中 – 終了: {time}",
+      "eventDetailHostedBy": "{name} のサーバー",
+      "eventDetailCopyLink": "リンクをコピー",
+      "eventDetailInterested": "興味あり",
+      "eventDetailStart": "開始",
+      "eventDetailEnd": "イベントを終了"
+    },
+    "toasts": {
+      "messageRemovedAll": "メッセージを全員から削除しました",
+      "messageDeletedSelf": "メッセージを削除しました"
+    },
+    "channelUi": {
+      "sectionChat": "テキストチャンネル",
+      "sectionVoice": "ボイスチャンネル",
+      "defaultCategoryLabel": "チャンネル"
+    },
+    "roleEditor": {
+      "back": "戻る",
+      "editTitle": "ロールを編集 - ",
+      "tabDisplay": "表示",
+      "tabPermissions": "権限",
+      "tabMembers": "メンバー管理 ({count})",
+      "esc": "ESC",
+      "deleteRoleTitle": "ロールを削除",
+      "confirmDeleteRole": "ロール「{name}」を削除しますか？",
+      "errorDeleteRole": "ロールを削除できませんでした",
+      "newRoleName": "新しいロール",
+      "errorCreateRole": "ロールを作成できませんでした",
+      "viewServerByRole": "ロールでサーバーを表示",
+      "delete": "削除",
+      "deleteRoleAria": "ロールを削除"
+    },
+    "roleDisplay": {
+      "roleNameLabel": "ロール名",
+      "required": "*",
+      "roleNamePlaceholder": "ロール名を入力",
+      "styleTitle": "ロールのスタイル",
+      "previewName": "Wumpus",
+      "previewRole": "音楽サポーター",
+      "previewBadge": "安定",
+      "colorLabel": "ロールの色",
+      "colorHint": "メンバーはロール一覧で最も高いロールの色が適用されます。",
+      "displaySeparateToggle": "このロールのメンバーをオンライン表示から分けて表示する",
+      "mentionableToggle": "全員がこのロールを @メンション できるようにする",
+      "mentionableHint": "注：「@everyone、@here、すべてのロールをメンション」権限を持つメンバーは、常にこのロールのメンバーをメンションできます。",
+      "viewAsRoleTitle": "ロールとしてサーバーを表示",
+      "viewAsRoleDesc": "このロールができることとアクセスできるチャンネルを確認します。サーバー所有者と管理者のみ。",
+      "viewAsRoleBtn": "ロールとしてサーバーを表示",
+      "saveFailed": "変更を保存できませんでした",
+      "unsavedBar": "注意 — 未保存の変更があります！",
+      "reset": "リセット",
+      "saving": "保存中...",
+      "saveChanges": "変更を保存"
+    },
+    "roleMembers": {
+      "loading": "メンバー一覧を読み込み中…",
+      "noAccessTitle": "アクセスできません",
+      "noAccessDesc": "サーバー所有者、または「サーバーの管理」権限を持つメンバーのみ、メンバー一覧を表示・管理できます。",
+      "everyoneTitle": "@everyone",
+      "everyoneDesc": "@everyone ロールは全メンバーに自動で適用されます。このロールからメンバーを追加・削除することはできません。",
+      "memberCount": "メンバー {count} 人",
+      "searchPlaceholder": "メンバーを検索",
+      "addMember": "メンバーを追加",
+      "emptySearch": "「{query}」に一致するメンバーはいません",
+      "emptyRole": "このロールにメンバーはまだいません",
+      "removeFromRoleTitle": "ロールから削除",
+      "confirmRemove": "このメンバーをロールから削除しますか？",
+      "errorAdd": "メンバーを追加できませんでした",
+      "errorRemove": "メンバーを削除できませんでした",
+      "allHaveRole": "全員がすでにこのロールを持っています"
+    },
+    "rolePermissions": {
+      "sections": {
+        "serverManagement": "サーバー管理の権限",
+        "member": "メンバーの権限",
+        "textChannel": "テキストチャンネルの権限",
+        "voiceChannel": "ボイスチャンネルの権限"
+      },
+      "searchPlaceholder": "権限を検索",
+      "noResults": "「{query}」に一致する権限はありません",
+      "unsavedBar": "注意 — 未保存の変更があります！",
+      "reset": "リセット",
+      "saving": "保存中...",
+      "saveChanges": "変更を保存",
+      "saveFailed": "変更を保存できませんでした",
+      "items": {
+        "manageServer": {
+          "label": "サーバーの管理",
+          "description": "サーバー名・画像・基本設定の編集を許可します。",
+          "warning": "強力な管理者権限です。付与は慎重に。"
+        },
+        "manageChannels": {
+          "label": "チャンネルの管理",
+          "description": "チャンネルの作成・編集・削除を許可します。",
+          "warning": "強力な管理者権限です。付与は慎重に。"
+        },
+        "manageEvents": {
+          "label": "イベントの管理",
+          "description": "サーバーイベントの作成・編集・削除を許可します。"
+        },
+        "createInvite": {
+          "label": "招待を作成",
+          "description": "新しい人をこのサーバーに招待することを許可します。"
+        },
+        "changeNickname": {
+          "label": "ニックネームを変更",
+          "description": "このサーバーで自分のニックネームを変更することを許可します。"
+        },
+        "manageNicknames": {
+          "label": "ニックネームの管理",
+          "description": "他のメンバーのニックネームを変更することを許可します。"
+        },
+        "kickMembers": {
+          "label": "キック・承認・拒否",
+          "description": "キックでメンバーをサーバーから外します。新しい招待があれば再参加できます。参加申請が有効な場合、この権限で申請を承認・拒否できます。"
+        },
+        "banMembers": {
+          "label": "メンバーをBAN",
+          "description": "他のメンバーを永久BANし、メッセージ履歴を削除することを許可します。"
+        },
+        "timeoutMembers": {
+          "label": "タイムアウト",
+          "description": "タイムアウト中はチャット送信、スレ返信、リアクション、ボイス／ステージでの発言ができません。"
+        },
+        "mentionEveryone": {
+          "label": "@everyone、@here、全ロールをメンション",
+          "description": "@everyone / @here の使用と、メンション可能なロールへのメンションを許可します。",
+          "warning": "信頼できる人にのみ付与してください。"
+        },
+        "sendMessages": {
+          "label": "メッセージ送信と投稿作成",
+          "description": "テキストチャンネルでの送信とフォーラムチャンネルでの投稿を許可します。"
+        },
+        "sendMessagesInThreads": {
+          "label": "スレッドと投稿でメッセージ送信",
+          "description": "スレッドとフォーラム投稿内でのメッセージ送信を許可します。"
+        },
+        "createPublicThreads": {
+          "label": "公開スレッドを作成",
+          "description": "チャンネル内の全員が見られるスレッドを作成することを許可します。"
+        },
+        "createPrivateThreads": {
+          "label": "プライベートスレッドを作成",
+          "description": "招待制のスレッドを作成することを許可します。"
+        },
+        "embedLinks": {
+          "label": "リンクを埋め込む",
+          "description": "共有されたリンクのリッチ埋め込みを表示することを許可します。"
+        },
+        "attachFiles": {
+          "label": "ファイルを添付",
+          "description": "チャットでファイルやメディアをアップロードすることを許可します。"
+        },
+        "addReactions": {
+          "label": "リアクションを追加",
+          "description": "メッセージに新しい絵文字リアクションを追加することを許可します。"
+        },
+        "manageMessages": {
+          "label": "メッセージの管理",
+          "description": "他のメンバーのメッセージの削除や埋め込みの解除を許可します。"
+        },
+        "pinMessages": {
+          "label": "メッセージをピン留め",
+          "description": "任意のメッセージのピン留め／解除を許可します。"
+        },
+        "viewMessageHistory": {
+          "label": "メッセージ履歴を読む",
+          "description": "過去のメッセージを読むことを許可します。ない場合、オンライン中のメッセージのみ表示されることがあります。"
+        },
+        "sendVoiceMessages": {
+          "label": "ボイスメッセージを送信",
+          "description": "ボイスメッセージの送信を許可します。"
+        },
+        "createPolls": {
+          "label": "投票を作成",
+          "description": "投票の作成を許可します。"
+        },
+        "connect": {
+          "label": "接続",
+          "description": "ボイスに参加し、他の人の声を聞くことを許可します。"
+        },
+        "speak": {
+          "label": "発言",
+          "description": "ボイスで発言することを許可します。ない場合はミュートされ、誰かが解除するまで発言できません。"
+        },
+        "video": {
+          "label": "ビデオ",
+          "description": "このサーバーでビデオ・画面共有・配信を許可します。"
+        },
+        "muteMembers": {
+          "label": "メンバーをミュート",
+          "description": "ボイスチャンネルで他のメンバーをミュートすることを許可します。"
+        },
+        "deafenMembers": {
+          "label": "メンバーをスピーカーオフ",
+          "description": "他のメンバーを聞けず話せない状態にすることを許可します。"
+        },
+        "moveMembers": {
+          "label": "メンバーを移動",
+          "description": "アクセスできるボイスチャンネル間でメンバーの切断・移動を許可します。"
+        },
+        "setVoiceChannelStatus": {
+          "label": "ボイスチャンネルステータスを設定",
+          "description": "ボイスチャンネルステータスの作成・編集を許可します。"
+        }
+      }
+    },
+    "serverContextMenu": {
+      "aria": "サーバーメニュー",
+      "markAsRead": "既読にする",
+      "inviteToServer": "サーバーに招待",
+      "muteServer": "サーバーをミュート",
+      "unmuteServer": "ミュートを解除",
+      "notificationSettings": "通知設定",
+      "hideVoiceChannels": "ミュートチャンネルを非表示",
+      "showAllChannels": "すべてのチャンネルを表示",
+      "serverSettings": "サーバー設定",
+      "createChannel": "チャンネルを作成",
+      "createCategory": "カテゴリーを作成",
+      "createEvent": "イベントを作成",
+      "leaveServer": "サーバーを退出",
+      "notifAll": "すべてのメッセージ",
+      "notifMentions": "@メンションのみ",
+      "notifNone": "なし",
+      "muteFor15m": "15分間",
+      "muteFor1h": "1時間",
+      "muteFor3h": "3時間",
+      "muteFor8h": "8時間",
+      "muteFor24h": "24時間",
+      "muteUntilReenable": "手動で解除するまで",
+      "suppressEveryone": "@everyone と @here を抑制",
+      "suppressRoles": "すべてのロール @メンションを抑制",
+      "hideHighlights": "新イベントのハイライトを非表示",
+      "muteNewEvents": "新イベントのアラートをミュート",
+      "mobileNotif": "モバイルプッシュ通知"
+    },
+    "profileEditor": {
+      "loading": "読み込み中…",
+      "serverLabel": "サーバー",
+      "selectServer": "— サーバーを選択 —",
+      "serverHint": "バナーとアバターはメインプロフィールと共有されます。プレビューにはこのサーバーでのニックネームが表示されます。",
+      "serverNickLabel": "サーバーニックネーム",
+      "serverNickPlaceholder": "このサーバーでの表示名",
+      "displayNameLabel": "表示名",
+      "usernameLabel": "ユーザー名",
+      "pronounsLabel": "代名詞",
+      "pronounsPlaceholder": "例: they/them",
+      "avatarLabel": "アバター",
+      "changeAvatar": "アバターを変更",
+      "removeAvatar": "アバターを削除",
+      "avatarDecoLabel": "アバターデコレーション",
+      "changeAvatarDeco": "デコレーションを変更",
+      "nameplateLabel": "ネームプレート",
+      "changeNameplate": "ネームプレートを変更",
+      "profileEffectLabel": "プロフィールエフェクト",
+      "changeProfileEffect": "エフェクトを変更",
+      "bannerColorLabel": "バナーカラー",
+      "changeBannerColorAria": "バナーカラーを選択",
+      "uploadBanner": "バナー画像をアップロード",
+      "removeBanner": "バナー画像を削除",
+      "bioLabel": "自己紹介",
+      "bioHint": "マークダウンやリンクを使用できます。",
+      "insertEmojiAria": "絵文字を挿入",
+      "previewTitle": "プレビュー",
+      "statusPlaceholder": "+ ステータスを追加",
+      "exampleBtn": "サンプルボタン",
+      "saveMain": "プロフィールを保存",
+      "saveServerNick": "サーバーニックネームを保存",
+      "errorLoadProfile": "プロフィールを読み込めませんでした。",
+      "savedProfile": "プロフィールを保存しました。",
+      "errorSaveProfile": "プロフィールを保存できませんでした。",
+      "savedNick": "サーバーニックネームを保存しました。",
+      "errorSaveNick": "保存できませんでした。",
+      "updatedAvatar": "アバターを更新しました。",
+      "removeAvatarDone": "アバターを削除しました。",
+      "errorRemoveAvatar": "アバターを削除できませんでした。",
+      "errorLoadBanner": "バナーをアップロードできませんでした。",
+      "errorOpenRecent": "最近の画像を開けませんでした (CORS またはネットワーク)。",
+      "errorGetUrl": "URLを取得できませんでした",
+      "comingSoon": "この機能は後日追加されます。"
+    },
+    "profileAvatarCrop": {
+      "title": "アバターをトリミング",
+      "subtitle": "ドラッグまたはズームして最適な表示範囲を選んでください。",
+      "closeAria": "閉じる",
+      "zoomLabel": "ズーム",
+      "cancel": "キャンセル",
+      "saving": "保存中…",
+      "save": "保存",
+      "errorNoCrop": "トリミング範囲が選択されていません。",
+      "errorUpload": "アップロードできませんでした。"
+    },
+    "profileImagePicker": {
+      "titleAvatar": "画像を選択",
+      "titleBanner": "バナー画像を選択",
+      "closeAria": "閉じる",
+      "uploadImage": "画像をアップロード",
+      "pickGif": "GIFを選択",
+      "recentTitle": "最近のアバター",
+      "recentHint": "最近アップロードした6枚のアバターにアクセスできます。",
+      "selectRecentAria": "最近の画像を選択",
+      "emptySlotAria": "空"
+    },
+    "profileBannerPicker": {
+      "hexLabel": "16進数",
+      "eyedropperTitle": "画面から色を取得"
+    },
+    "communityOverview": {
+      "title": "コミュニティ概要",
+      "subtitle": "ルール/ガイドラインのチャンネル、主要言語、サーバーの説明を設定します。",
+      "loading": "読み込み中…",
+      "rulesChannelLabel": "ルールまたはガイドラインのチャンネル",
+      "rulesChannelHint": "メンバーにルール/ガイドラインを表示するチャンネルを選択してください (例: #welcome-and-rules)。",
+      "noChannel": "— なし —",
+      "langLabel": "サーバーの主要言語",
+      "langHint": "ベトナム語と英語のみサポートされています。",
+      "langVi": "ベトナム語",
+      "langEn": "英語",
+      "descLabel": "サーバーの説明",
+      "descHint": "この説明は招待カードの招待リンクの下に表示されます。",
+      "descPlaceholder": "このサーバーについて世界に教えてください。",
+      "saving": "保存中…",
+      "save": "変更を保存",
+      "errorSave": "保存できませんでした"
+    },
+    "messagesPage": {
+      "contextExplore": "見つける",
+      "contextServer": "サーバー",
+      "contextDm": "ダイレクトメッセージ",
+      "inboxTitle": "受信トレイ",
+      "inboxAria": "受信トレイ",
+      "searchPlaceholder": "会話を検索または開始",
+      "directMessages": "ダイレクトメッセージ",
+      "userFallback": "ユーザー",
+      "micOn": "マイクのミュートを解除",
+      "micOff": "マイクをミュート",
+      "soundOn": "ミュートを解除",
+      "soundOff": "ミュート",
+      "createServerTitle": "サーバーを作成",
+      "exploreTitle": "見つける",
+      "exploreClose": "見つけるを閉じる",
+      "settingsTitle": "設定",
+      "sectionChat": "テキストチャンネル",
+      "sectionVoice": "ボイスチャンネル",
+      "createChannelSectionLabelDefault": "テキストチャンネル",
+      "reportDone": "メッセージを報告しました。ありがとうございます！",
+      "voiceMessageLabel": "ボイスメッセージ"
+    },
+    "channels": {
+      "catInfo": "情報",
+      "catText": "テキストチャンネル",
+      "catVoice": "ボイスチャンネル",
+      "general": "一般",
+      "highlights": "ハイライト",
+      "lobby": "ロビー",
+      "gaming": "ゲーム",
+      "music": "音楽",
+      "waitingRoom": "待機室",
+      "streamingRoom": "配信",
+      "welcomeAndRules": "ようこそ-ルール",
+      "notesResources": "ノート-リソース",
+      "homeworkHelp": "宿題サポート",
+      "sessionPlanning": "セッション計画",
+      "offTopic": "雑談",
+      "studyRoom1": "学習室-1",
+      "studyRoom2": "学習室-2",
+      "announcements": "お知らせ",
+      "resources": "リソース",
+      "meetingPlan": "会議計画",
+      "meetingRoom1": "会議室-1",
+      "meetingRoom2": "会議室-2",
+      "events": "イベント",
+      "feedback": "フィードバック",
+      "communityHub": "コミュニティハブ"
+    },
+    "serverInteractions": {
+      "title": "インタラクション",
+      "desc": "サーバーオーナーまたはサーバー管理権限を持つメンバーのみがこれらの設定を変更できます。",
+      "systemMessages": "システムメッセージ",
+      "enableSystem": "システムメッセージを有効にする",
+      "sendWelcome": "新しいメンバーへのウェルカムメッセージを送信する",
+      "stickerReply": "メンバーがスタンプでウェルカム通知に返信できるようにする",
+      "systemChannel": "システムメッセージチャンネル",
+      "noChannel": "なし",
+      "defaultNotif": "デフォルト通知レベル",
+      "notifAll": "すべてのメッセージ",
+      "notifMentions": "@メンションのみ",
+      "roleNotif": "ロール通知 (あなたへ)",
+      "roleNotifDesc": "ロールごとに通知を送信します。受信者は「あなたへ」タブで確認できます。",
+      "notifTitlePlaceholder": "通知タイトル",
+      "notifContentPlaceholder": "通知内容",
+      "targetEveryone": "@everyone",
+      "targetRole": "ロール別",
+      "sendBtn": "通知を送信",
+      "sendingBtn": "送信中...",
+      "loading": "インタラクション設定を読み込み中...",
+      "loadError": "データの読み込みに失敗しました",
+      "loadFail": "インタラクション設定の読み込みに失敗しました",
+      "saveError": "設定の保存に失敗しました",
+      "sendError": "通知の送信に失敗しました",
+      "errTitle": "通知のタイトルと内容を入力してください",
+      "errRole": "ロールを選択してください",
+      "sentAlert": "{n}人のメンバーに通知を送信しました。"
+    },
+    "serverSafety": {
+      "loadError": "安全設定を読み込めませんでした。",
+      "verifyTitle": "認証レベル",
+      "verifyDesc": "サーバーメンバーがテキストチャンネルでメッセージを送信したり、ダイレクトメッセージを開始したりするには、以下の条件を満たす必要があります。",
+      "verifyRecommend": "コミュニティサーバーには認証レベルを設定することをお勧めします。",
+      "changeBtn": "変更",
+      "verifyAriaLabel": "認証レベル",
+      "contentFilterTitle": "明示的なメディアコンテンツフィルター",
+      "contentFilterDesc": "サーバーメンバーが明示的なコンテンツを含むメディアを共有できるかどうかを選択します。この設定は年齢制限なしのチャンネルに適用されます。",
+      "learnMore": "詳しく見る",
+      "contentFilterAriaLabel": "明示的なメディアコンテンツフィルター",
+      "verifyNoneTitle": "なし",
+      "verifyNoneDesc": "制限なし",
+      "verifyLowTitle": "低",
+      "verifyLowDesc": "Cordigramアカウントのメール認証が必要です。",
+      "verifyMediumTitle": "中",
+      "verifyMediumDesc": "Cordigramに5分以上登録している必要があります。",
+      "verifyHighTitle": "高",
+      "verifyHighDesc": "このサーバーに10分以上メンバーとして参加している必要があります。",
+      "filterAllTitle": "すべてのメンバーのメッセージをフィルター",
+      "filterAllDesc": "すべてのメッセージが明示的なメディアコンテンツのスキャン対象になります。",
+      "filterNoRoleTitle": "ロールなしのサーバーメンバーのメッセージをフィルター",
+      "filterNoRoleDesc": "ロールを持たないサーバーメンバーのメッセージが明示的なコンテンツのスキャン対象になります。",
+      "filterNoneTitle": "フィルターしない",
+      "filterNoneDesc": "メッセージは明示的なメディアコンテンツのスキャン対象になりません。"
+    },
+    "serverEmoji": {
+      "denied": "サーバーオーナーまたはサーバー管理権限を持つメンバーのみが絵文字を編集できます。",
+      "loading": "絵文字を読み込み中…",
+      "loadError": "絵文字の読み込みエラー",
+      "fileTooLarge": "ファイルは2 MBを超えてはいけません。",
+      "fileInvalid": "PNG、JPG、GIF、またはWebPのみサポートされています。",
+      "title": "絵文字",
+      "desc": "メンバーはこのサーバーで最大{max}個のカスタム絵文字を使用できます。静止画像(PNG、JPG、WebP)またはアニメーションGIFをアップロードできます。",
+      "uploadBtn": "絵文字をアップロード",
+      "slotsLeft": "残り{n}/{max}スロット",
+      "dropHint": "ここにファイルをドラッグ＆ドロップしてアップロード (PNG、JPG、GIF、WebP — 最大2 MB)。",
+      "sectionTitle": "絵文字",
+      "sectionSub": "{n}スロット利用可能 (最大{max}カスタム絵文字、静止+GIF)",
+      "animSection": "アニメーション絵文字",
+      "animSub": "{n}個のGIF · {max}スロット中{r}個残り",
+      "colImage": "画像",
+      "colName": "名前",
+      "colUploader": "アップロード者",
+      "emptyStatic": "静止絵文字がありません",
+      "emptyAnimated": "なし"
+    },
+    "serverSticker": {
+      "denied": "サーバーオーナーまたはサーバー管理権限を持つメンバーのみがスタンプを編集できます。",
+      "loading": "スタンプを読み込み中…",
+      "loadError": "スタンプの読み込みエラー",
+      "fileTooLarge": "ファイルは2 MBを超えてはいけません。",
+      "fileInvalid": "PNG、JPG、またはWebPのみサポートされています。",
+      "bannerAriaLabel": "サーバーブースト",
+      "bannerTitle": "ブーストを入手",
+      "bannerDesc": "サーバーをレベル1以上にブーストすると、スタンプスロットが増え、他の特典も解放されます。現在サーバーには{n}個の無料スタンプスロットのみあります。",
+      "btnUpgrade": "サーバーをブースト",
+      "btnLearnMore": "詳しく見る",
+      "freeTitle": "無料スロット",
+      "freeSub": "{total}スロット中{n}個利用可能",
+      "uploadBtn": "スタンプをアップロード",
+      "notice": "静止画像(PNG/JPG/WebP): 正方形に切り取り、~500 KBに圧縮してCloudinaryにアップロード。スタンプGIF: 最大2 MBの生ファイルをCloudinaryにアップロード。現在の上限: サーバーあたり{max}スタンプ。",
+      "tierTitle": "レベル{n}",
+      "tierNote": "サーバーブーストが必要 (近日公開)",
+      "tierBonus10": "+10スタンプスロット",
+      "tierBonus15": "+15スタンプスロット (合計30)",
+      "tierBonus30": "+30スタンプスロット (合計60)",
+      "boosts": "{n}ブースト",
+      "buyBtn": "レベルを購入"
+    },
+    "serverMembers": {
+      "showInChannelLabel": "チャンネルリストにメンバーを表示",
+      "showInChannelDesc": "有効にすると、最大50人のメンバーを表示します: オンライン、新規アカウント(7日未満)、最近参加、7日以内のメッセージアクティビティ。",
+      "searchResults": "検索結果",
+      "searchPlaceholder": "ユーザー名またはユーザーIDで検索",
+      "sortBtn": "並び替え",
+      "sortNewest": "参加日 (新しい順)",
+      "sortOldest": "参加日 (古い順)",
+      "sortUsername": "ユーザー名 (A → Z)",
+      "sortActivity": "アクティビティ (多い → 少ない)",
+      "filterLabel": "フィルター",
+      "filterNewAccount": "新規アカウント (7日未満)",
+      "filterSpam": "スパム (10分で50件以上)",
+      "roleLabel": "ロール",
+      "roleAll": "全ロール",
+      "roleOwner": "オーナー",
+      "roleModerator": "モデレーター",
+      "roleMember": "メンバー",
+      "pruneBtn": "整理",
+      "loading": "読み込み中...",
+      "loadFail": "メンバーリストの読み込みに失敗しました",
+      "colCheck": "すべて選択",
+      "colName": "名前",
+      "memberOptions": "オプション",
+      "resultCount": "{n}人のメンバーを表示中",
+      "resultCountCapped": " (チャンネルリスト表示時は最大50人)",
+      "ownerBadge": "オーナー",
+      "modBadge": "Mod",
+      "memberBadge": "メンバー",
+      "menuProfile": "プロフィール",
+      "menuMessage": "メッセージ",
+      "menuTimeout": "{name}をタイムアウト",
+      "menuKick": "{name}をキック",
+      "menuBan": "{name}をBAN",
+      "filterTitle": "メンバーを整理 — サーバー",
+      "filterClose": "閉じる",
+      "filterLastSeen": "最終確認",
+      "filterDays7": "7日以上前",
+      "filterDays30": "30日以上前",
+      "filterIncludeRole": "ロールを持つメンバーも含める",
+      "filterRoleAll": "全ロール",
+      "filterRoleNone": "ロールなし (メンバー)",
+      "filterRoleMember": "メンバー",
+      "filterRoleMod": "Mod (サーバー管理者)",
+      "filterHint": "整理すると、選択した期間中に非アクティブだったメンバーが削除されます。再招待すれば再参加できます。",
+      "filterSelectHint": "条件を選択して整理されるメンバー数をプレビューします。",
+      "filterPreview": "{n}人のメンバーが整理されます。",
+      "filterCancel": "キャンセル",
+      "filterApply": "整理",
+      "filterApplying": "整理中...",
+      "filterConfirm": "{days}日以上非アクティブな{n}人のメンバーを整理しますか？",
+      "filterDone": "{n}人のメンバーを整理しました。",
+      "filterError": "整理に失敗しました",
+      "moderateKickTitle": "{name}をキック",
+      "moderateBanTitle": "{name}をBAN",
+      "moderateTimeoutTitle": "{name}をタイムアウト",
+      "kickDesc": "このユーザーはサーバーから削除されますが、招待されれば再参加できます。",
+      "banDesc": "このユーザーは永久にBANされ、サーバーに再参加できません。",
+      "timeoutDesc": "このユーザーはタイムアウトされ、選択した期間メッセージを送信できません。",
+      "timeoutDuration": "タイムアウト期間",
+      "reason": "理由 (任意)",
+      "reasonPlaceholder": "理由を入力...",
+      "moderateCancel": "キャンセル",
+      "moderateApplying": "処理中...",
+      "kick": "キック",
+      "ban": "BAN",
+      "timeout": "タイムアウト",
+      "moderateFail": "アクションの実行に失敗しました",
+      "transferTitle": "オーナー権限を移譲",
+      "transferDesc": "{name}にサーバーオーナー権限を移譲しますか？この人がサーバーオーナーになり、あなたはメンバーになります。",
+      "transferCancel": "キャンセル",
+      "transferApplying": "処理中...",
+      "transferBtn": "移譲",
+      "transferFail": "オーナー権限の移譲に失敗しました",
+      "joinOwner": "サーバーオーナー",
+      "joinInvited": "{name}に招待された",
+      "joinUrl": "URLで参加",
+      "timeout60s": "60秒",
+      "timeout5m": "5分",
+      "timeout10m": "10分",
+      "timeout1h": "1時間",
+      "timeout1d": "1日",
+      "timeout1w": "1週間"
+    },
+    "serverAccess": {
+      "loading": "アクセス設定を読み込み中...",
+      "loadError": "アクセス設定の読み込みに失敗しました",
+      "saveError": "アクセス設定の保存に失敗しました",
+      "title": "アクセス",
+      "desc": "メンバーの参加方法を選択し、(有効な場合) チャット前にルールへの同意を要求します。",
+      "inviteOnlyTitle": "招待のみ",
+      "inviteOnlyHint": "招待リンクで直接サーバーに参加できます",
+      "applyTitle": "申請が必要",
+      "applyHint": "申請を提出して承認を受けてから参加できます",
+      "discoverTitle": "発見可能",
+      "discoverHint": "誰でもサーバー発見でサーバーに直接参加できます",
+      "discoveryMet": "サーバーはサーバー発見に表示されるためのすべての要件を満たしています",
+      "discoveryNotMet": "サーバーは現在サーバー発見に表示されるためのすべての要件を満たしていません",
+      "checkingDiscovery": "確認中...",
+      "ageTitle": "年齢制限",
+      "ageDesc": "18歳未満のユーザーをブロックするには有効にしてください。",
+      "rulesToggleTitle": "サーバールール",
+      "rulesToggleDesc": "ユーザーにルールへの同意を要求するには有効にしてください。",
+      "rulesSection": "ルール",
+      "rulesEnabledDesc": "サーバーに適用されるルールを追加・管理します。",
+      "rulesDisabledDesc": "サーバールールを有効にしてルールを追加してください。",
+      "rulesPlaceholder": "ルール内容を入力",
+      "addRuleBtn": "ルールを追加",
+      "addRuleChipTitle": "テンプレートルールを追加",
+      "noRules": "ルールがありません。",
+      "addRuleError": "ルールの追加に失敗しました",
+      "joinFormTitle": "参加申請",
+      "joinFormDesc": "申請フォームに質問を追加してください。申請が承認されるまでサーバーに参加できません。",
+      "joinFormToggleTitle": "参加申請フォームの切り替え",
+      "agreeRulesQuestion": "サーバールールを読んで同意する",
+      "agreeRulesBadge": "サーバールール",
+      "editQuestion": "編集",
+      "deleteQuestion": "削除",
+      "addQuestionBtn": "+ 質問を追加",
+      "addQuestionChipTitle": "テンプレート質問を追加",
+      "maxQuestions": "最大{max}個の質問。残り: {n}。",
+      "joinFormSaveError": "参加申請フォームの保存に失敗しました",
+      "pickTypeTitle": "質問タイプを選択",
+      "typeShort": "短い回答",
+      "typeParagraph": "段落",
+      "typeMultiple": "複数選択",
+      "questionPlaceholder": "質問を入力してください",
+      "optionPlaceholder": "オプション{n}",
+      "addOption": "+ オプションを追加",
+      "removeOptionTitle": "オプションを削除",
+      "modalCancel": "キャンセル",
+      "modalSave": "保存"
+    },
+    "serverBans": {
+      "desc": "BANはアカウントとIPで実施されます。ユーザーはプロキシを使用してIPのBANを回避できる場合があります。",
+      "moderation": "モデレーション",
+      "searchPlaceholder": "ユーザーIDまたはユーザー名でBANを検索",
+      "searchBtn": "検索",
+      "loading": "リストを読み込み中...",
+      "noBansTitle": "BANなし",
+      "noBansDesc": "まだ誰もBANしていません... でも必要なら遠慮なく！",
+      "noBansSearch": "検索に一致するBANされたユーザーがいません。",
+      "reason": "理由: {reason}",
+      "unbanBtn": "BANを取り消す",
+      "resultCount": "{total}人のBANされたユーザーのうち{n}人を表示中",
+      "restrictedTitle": "制限されたメンバー (メンションスパム)",
+      "restrictedEmpty": "制限されているメンバーはいません。",
+      "restricted": "メッセージ送信を制限",
+      "mentionBlocked": "{date}までメンションをブロック",
+      "unrestrictBtn": "制限を解除",
+      "confirmTitle": "BANを取り消す",
+      "confirmDesc": "{name} (@{username}) のBANを取り消しますか？このユーザーは新しい招待で再参加できるようになります。",
+      "confirmCancel": "キャンセル",
+      "confirmSubmit": "BANを取り消す",
+      "confirming": "取り消し中...",
+      "loadFail": "BANリストの読み込みに失敗しました",
+      "unbanFail": "BANの取り消しに失敗しました"
+    },
+    "autoMod": {
+      "loadError": "AutoMod設定を読み込めませんでした。",
+      "spamTitle": "メンションスパムをブロック",
+      "spamDesc": "ロールとユーザーへのメンション数が上限を超えたメッセージをブロックします",
+      "settingsBtn": "設定",
+      "ruleNameLabel": "ルール名",
+      "ruleNameValue": "メンションスパムをブロック",
+      "toggleAriaLabel": "有効/無効",
+      "section1Title": "メンション制限を設定",
+      "mentionLimitTitle": "メッセージごとのユニークなメンション (ロール + ユーザー)",
+      "mentionLimitDesc": "メッセージごとのユニークなメンション数を制限",
+      "section2Title": "レスポンスを選択",
+      "blockTitle": "メッセージをブロック",
+      "blockDesc": "ユニークなメンション数の上限を超えたメッセージをブロックします。",
+      "blockDesc2": "カスタムエラー通知をメンバーに表示できます。",
+      "editNotifLink": "カスタム通知を編集",
+      "warnTitle": "警告を送信",
+      "warnDesc": "フラグされたメッセージを含む警告を選択したチャンネルに送信します。",
+      "restrictTitle": "メンバーを制限",
+      "restrictDesc": "メンバーのメッセージ送信またはボイスチャンネルへの参加を一時的に無効にします。",
+      "section3Title": "特定のロールまたはチャンネルを許可 (任意)",
+      "searchPlaceholder": "チャンネルまたはロールを検索",
+      "groupChannels": "チャンネル",
+      "groupRoles": "ロール",
+      "noResults": "結果が見つかりません",
+      "exemptNote": "注意 — 管理者とサーバー管理権限を持つメンバーは常にフィルターから除外されます。",
+      "cancelBtn": "キャンセル",
+      "saveBtn": "変更を保存",
+      "savingBtn": "保存中...",
+      "tagBlock": "メッセージをブロック",
+      "tagWarn": "警告を送信",
+      "tagRestrict": "メンバーを制限",
+      "notifModalTitle": "カスタム通知を編集",
+      "notifModalDesc": "AutoModがメンバーのメッセージをブロックしたときにカスタム通知が表示されます。",
+      "notifPlaceholder": "カスタム通知を入力してください",
+      "notifCancel": "キャンセル",
+      "notifSave": "保存"
+    },
+    "noMessages": "まだメッセージがありません。会話を始めましょう！",
+    "loadingMessages": "メッセージを読み込み中...",
+    "welcome": {
+      "title": "ようこそ",
+      "serverOf": "{name}のサーバーへ",
+      "channelBegin": "これが",
+      "startTalking": "チャンネルの最初です。チャットを始めましょう！",
+      "greeting": "はじめまして、{name}！",
+      "unknownUser": "誰か",
+      "waving": "送信中...",
+      "waveBtn": "{name}に手を振る！"
+    },
+    "dmList": {
+      "sent": "送信済み",
+      "seen": "既読"
+    },
+    "mention": {
+      "tooltip": "メンション (@mention)"
+    },
+    "applyPending": {
+      "title": "{server}への参加申請が審査中です！",
+      "desc": "更新があれば通知が届きます。",
+      "withdraw": "取り下げ",
+      "withdrawError": "申請を取り下げられませんでした",
+      "joinError": "サーバーに参加できませんでした"
+    }
+  },
+  "settings": {
+    "title": "設定",
+    "close": "閉じる",
+    "saved": "保存しました。",
+    "failedToLoad": "設定の読み込みに失敗しました。",
+    "sections": {
+      "general": "一般",
+      "privacy": "プライバシー",
+      "messages": "メッセージ・通話",
+      "appearance": "外観",
+      "notifications": "通知",
+      "profile": "プロフィール"
+    },
+    "general": {
+      "dmDirectoryTitle": "DM ディレクトリ",
+      "dmDirectoryHint": "ダイレクトメッセージでのみ適用されます。",
+      "dmDirectoryAllFriends": "すべての友だちを表示",
+      "dmDirectoryOnlineFriends": "オンラインの友だちのみ",
+      "languageTitle": "言語",
+      "languageHint": "チャット（このページ）とソーシャル（NEXT_LOCALE Cookie）に適用されます。",
+      "languageLabel": "表示言語",
+      "languageNames": {
+        "vi": "ベトナム語",
+        "en": "英語",
+        "ja": "日本語",
+        "zh": "中国語"
+      }
+    },
+    "privacy": {
+      "title": "プライバシー",
+      "hint": "公開プロフィールの参加日を非表示にします。オンライン/退席中/オフラインの状態共有をオフにできます。",
+      "showMemberSince": "参加日を表示",
+      "sharePresence": "ステータスを共有（オンライン / 退席中 / オフライン）"
+    },
+    "messages": {
+      "title": "メッセージ・通話",
+      "allowMessageLabel": "メッセージを許可",
+      "allowCallLabel": "通話を許可",
+      "everyone": "全員",
+      "followersOnly": "フォロー中のユーザーのみ",
+      "blockTitle": "メッセージのブロック",
+      "blockedList": "ブロック一覧 ›",
+      "ignoredList": "無視一覧 ›",
+      "blockedHeading": "ブロック中",
+      "ignoredHeading": "無視中",
+      "empty": "なし",
+      "unblock": "ブロック解除",
+      "unignored": "無視を解除"
+    },
+    "appearance": {
+      "title": "外観",
+      "hint": "ライト/ダーク（アカウントに同期）。",
+      "light": "ライト",
+      "dark": "ダーク"
+    },
+    "notifications": {
+      "title": "通知",
+      "masterLabel": "通知",
+      "masterHint": "オン: 通常の通知。オフ: すべての通知を無効化（ソーシャル + DM/サーバー）。",
+      "enabledToast": "通知をオンにしました。",
+      "disabledToast": "通知をオフにしました。",
+      "soundLabel": "通知サウンド（メッセージ・新着通知）"
+    },
+    "profile": {
+      "title": "プロフィール",
+      "main": "メイン",
+      "server": "サーバー"
+    },
+    "errorLoadBlocked": "ブロックリストを読み込めませんでした。",
+    "errorLoadIgnored": "無視リストを読み込めませんでした。",
+    "errorUpdate": "更新できませんでした。",
+    "errorSave": "保存できませんでした。",
+    "unblockedToast": "ブロックを解除しました。",
+    "errorUnblock": "ブロックを解除できませんでした。",
+    "unignoredToast": "無視を解除しました。",
+    "errorUnignore": "無視を解除できませんでした。",
+    "ariaShowMemberSince": "参加日の表示を切り替え",
+    "ariaSharePresence": "ステータスの共有を切り替え"
+  }
+}

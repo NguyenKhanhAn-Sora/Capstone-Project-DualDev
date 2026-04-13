@@ -1,0 +1,226 @@
+{
+  "explore": {
+    "backToChat": "← Quay lại chat",
+    "title": "Khám phá",
+    "subtitle": "Tìm cộng đồng đã được duyệt để tham gia. Nếu máy chủ dùng Đăng ký tham gia, bạn phải nộp đơn trước.",
+    "loading": "Đang tải…",
+    "loadError": "Không tải được",
+    "empty": "Chưa có máy chủ được duyệt để hiển thị.",
+    "members": "{count} thành viên",
+    "badgeApply": " • Đăng ký tham gia",
+    "badgeInviteOnly": " • Chỉ mời",
+    "join": "Tham gia",
+    "inviteOnly": "Chỉ mời",
+    "inviteOnlyTitle": "Máy chủ này chỉ dành cho lời mời"
+  },
+  "sidebar": {
+    "contextExplore": "Khám phá",
+    "contextServer": "Máy chủ",
+    "contextDm": "Tin nhắn trực tiếp",
+    "inboxAria": "Hộp thư đến",
+    "createServerTitle": "Tạo máy chủ",
+    "settingsAria": "Cài đặt",
+    "exploreOpen": "Khám phá",
+    "exploreClose": "Đóng Khám phá"
+  },
+  "toasts": {
+    "messageRemovedAll": "Đã xóa tin nhắn cho mọi người",
+    "messageDeletedSelf": "Bạn đã xóa một tin nhắn"
+  },
+  "channelUi": {
+    "sectionChat": "Kênh tin nhắn",
+    "sectionVoice": "Kênh thoại",
+    "defaultCategoryLabel": "Kênh"
+  },
+  "roleEditor": {
+    "back": "TRỞ LẠI",
+    "editTitle": "SỬA ĐỔI VAI TRÒ - ",
+    "tabDisplay": "Hiển thị",
+    "tabPermissions": "Quyền hạn",
+    "tabMembers": "Quản Lý thành viên ({count})",
+    "esc": "ESC",
+    "deleteRoleTitle": "Xóa vai trò",
+    "confirmDeleteRole": "Bạn có chắc muốn xóa vai trò \"{name}\"?",
+    "errorDeleteRole": "Không xóa được vai trò",
+    "newRoleName": "vai trò mới",
+    "errorCreateRole": "Không tạo được vai trò",
+    "viewServerByRole": "Xem Máy Chủ Theo Vai Trò",
+    "delete": "Xóa",
+    "deleteRoleAria": "Xóa vai trò"
+  },
+  "roleDisplay": {
+    "roleNameLabel": "Tên vai trò",
+    "required": "*",
+    "roleNamePlaceholder": "Nhập tên vai trò",
+    "styleTitle": "Phong cách Vai trò",
+    "previewName": "Wumpus",
+    "previewRole": "Ủng bộ nhạc",
+    "previewBadge": "Ổn định",
+    "colorLabel": "Màu vai trò",
+    "colorHint": "Các thành viên sử dụng màu của vai trò cao nhất mà họ có trong danh sách vai trò.",
+    "displaySeparateToggle": "Hiển thị vai trò thành viên riêng biệt với các thành viên trực tuyến",
+    "mentionableToggle": "Cho phép mọi người @mention vai trò này",
+    "mentionableHint": "Ghi chú: Thành viên có quyền sử dụng \"Đề cập @everyone, @here và Tất Cả Vai Trò\" sẽ luôn có thể đề cập người có vai trò này.",
+    "viewAsRoleTitle": "Xem Máy Chủ Theo Vai Trò",
+    "viewAsRoleDesc": "Tính năng này cho phép bạn kiểm tra xem vai trò này có thể thực hiện những tác vụ nào và truy cập những kênh nào. Chỉ dành cho Chủ Sở Hữu Máy Chủ và Quản Trị Viên.",
+    "viewAsRoleBtn": "Xem Máy Chủ Theo Vai Trò",
+    "saveFailed": "Không lưu được thay đổi",
+    "unsavedBar": "Cẩn thận - bạn có thay đổi chưa lưu!",
+    "reset": "Đặt lại",
+    "saving": "Đang lưu...",
+    "saveChanges": "Lưu thay đổi"
+  },
+  "roleMembers": {
+    "loading": "Đang tải danh sách thành viên...",
+    "noAccessTitle": "Không có quyền truy cập",
+    "noAccessDesc": "Chỉ chủ máy chủ hoặc thành viên có vai trò Quản lý máy chủ mới có thể xem và quản lý danh sách thành viên.",
+    "everyoneTitle": "@everyone",
+    "everyoneDesc": "Vai trò @everyone được áp dụng tự động cho tất cả thành viên trong máy chủ. Bạn không thể thêm hoặc xóa thành viên khỏi vai trò này.",
+    "memberCount": "{count} thành viên",
+    "searchPlaceholder": "Tìm kiếm thành viên",
+    "addMember": "Thêm Thành Viên",
+    "emptySearch": "Không tìm thấy thành viên nào phù hợp với \"{query}\"",
+    "emptyRole": "Chưa có thành viên nào trong vai trò này",
+    "removeFromRoleTitle": "Xóa khỏi vai trò",
+    "confirmRemove": "Bạn có chắc muốn xóa thành viên khỏi vai trò này?",
+    "errorAdd": "Không thêm được thành viên",
+    "errorRemove": "Không xóa được thành viên",
+    "allHaveRole": "Tất cả thành viên đã có vai trò này"
+  },
+  "rolePermissions": {
+    "sections": {
+      "serverManagement": "QUYỀN QUẢN LÝ MÁY CHỦ",
+      "member": "QUYỀN THÀNH VIÊN",
+      "textChannel": "QUYỀN KÊNH TIN NHẮN",
+      "voiceChannel": "QUYỀN KÊNH THOẠI"
+    },
+    "searchPlaceholder": "Quyền tìm kiếm",
+    "noResults": "Không có quyền nào khớp \"{query}\"",
+    "unsavedBar": "Cẩn thận - bạn có thay đổi chưa lưu!",
+    "reset": "Đặt lại",
+    "saving": "Đang lưu...",
+    "saveChanges": "Lưu thay đổi",
+    "saveFailed": "Không lưu được thay đổi",
+    "items": {
+      "manageServer": {
+        "label": "Quản Lý Máy Chủ",
+        "description": "Cho phép thành viên chỉnh sửa tên, hình ảnh và các cài đặt cơ bản của máy chủ.",
+        "warning": "Đây là quyền quản trị viên mạnh mẽ. Hãy cân nhắc kỹ trước khi cấp."
+      },
+      "manageChannels": {
+        "label": "Quản Lý Kênh",
+        "description": "Cho phép thành viên tạo, chỉnh sửa và xóa kênh trong máy chủ.",
+        "warning": "Đây là quyền quản trị viên mạnh mẽ. Hãy cân nhắc kỹ trước khi cấp."
+      },
+      "manageEvents": {
+        "label": "Quản Lý Sự Kiện",
+        "description": "Cho phép thành viên tạo, chỉnh sửa và xóa sự kiện của máy chủ."
+      },
+      "createInvite": {
+        "label": "Tạo Lời Mời",
+        "description": "Cho phép thành viên mời người mới vào máy chủ này."
+      },
+      "changeNickname": {
+        "label": "Đổi Biệt Danh",
+        "description": "Cho phép thành viên tùy ý thay đổi biệt danh trong máy chủ này."
+      },
+      "manageNicknames": {
+        "label": "Quản Lý Biệt Danh",
+        "description": "Cho phép thành viên thay đổi biệt danh của thành viên khác."
+      },
+      "kickMembers": {
+        "label": "Đuổi, Chấp thuận và Từ chối Thành viên",
+        "description": "Tính năng Đuổi sẽ xóa các thành viên khác khỏi máy chủ này. Thành viên bị đuổi có thể tham gia lại nếu nhận được lời mời khác. Nếu máy chủ kích hoạt Yêu Cầu Đối Với Thành Viên, quyền này cho phép chấp thuận hoặc từ chối các thành viên yêu cầu tham gia vào máy chủ."
+      },
+      "banMembers": {
+        "label": "Cấm Thành Viên",
+        "description": "Cho phép thành viên cấm vĩnh viễn và xóa lịch sử tin nhắn của các thành viên khác từ máy chủ này."
+      },
+      "timeoutMembers": {
+        "label": "Hạn chế thành viên",
+        "description": "Khi bạn đặt một người dùng về trạng thái chờ (timeout) thì họ sẽ không thể gửi tin nhắn trò chuyện, trả lời chủ đề thảo luận, tương tác với tin nhắn, hoặc nói trong kênh thoại hoặc kênh Sân Khấu."
+      },
+      "mentionEveryone": {
+        "label": "Đề cập @everyone, @here và Tất Cả Vai Trò",
+        "description": "Cho phép thành viên dùng @everyone và @here để thông báo tới mọi người trong kênh, và đề cập các vai trò được bật \"cho phép đề cập\".",
+        "warning": "Chỉ nên cấp cho người đáng tin cậy."
+      },
+      "sendMessages": {
+        "label": "Gửi tin nhắn và tạo bài đăng",
+        "description": "Cho phép thành viên gửi tin nhắn trong các kênh văn bản và tạo bài đăng trong các kênh diễn đàn."
+      },
+      "sendMessagesInThreads": {
+        "label": "Gửi tin nhắn trong chủ đề và bài đăng",
+        "description": "Cho phép các thành viên gửi tin nhắn trong chủ đề và trong bài đăng trên các kênh diễn đàn."
+      },
+      "createPublicThreads": {
+        "label": "Tạo Chủ Đề Công Khai",
+        "description": "Cho phép thành viên được tạo chủ đề mà mọi người trong kênh đều có thể xem."
+      },
+      "createPrivateThreads": {
+        "label": "Tạo Các Chủ Đề Riêng Tư",
+        "description": "Cho phép thành viên được tạo chủ đề theo chỉ được mời."
+      },
+      "embedLinks": {
+        "label": "Nhúng liên kết",
+        "description": "Cho phép hiển thị nội dung nhúng của liên kết do thành viên chia sẻ trong các kênh chat."
+      },
+      "attachFiles": {
+        "label": "Đính kèm tập tin",
+        "description": "Cho phép thành viên tải lên tệp hoặc tệp media trong kênh chat."
+      },
+      "addReactions": {
+        "label": "Thêm Biểu Cảm",
+        "description": "Cho phép thành viên thêm hiệu ứng tương tác emoji mới vào tin nhắn. Nếu không cấp quyền này, thành viên vẫn có thể sử dụng các tương tác có sẵn trong tin nhắn."
+      },
+      "manageMessages": {
+        "label": "Quản lý tin nhắn",
+        "description": "Cho phép thành viên xóa hoặc gỡ bỏ các nội dung nhúng khối tin nhắn của thành viên khác."
+      },
+      "pinMessages": {
+        "label": "Ghim Tin Nhắn",
+        "description": "Cho phép thành viên ghim hoặc bỏ ghim tin nhắn bất kỳ."
+      },
+      "viewMessageHistory": {
+        "label": "Đọc lịch sử tin nhắn",
+        "description": "Cho phép đọc tin nhắn trước đó. Nếu không có quyền này, có thể chỉ thấy tin nhắn khi đang trực tuyến."
+      },
+      "sendVoiceMessages": {
+        "label": "Gửi tin nhắn thoại",
+        "description": "Cho phép gửi tin nhắn thoại."
+      },
+      "createPolls": {
+        "label": "Tạo bình chọn",
+        "description": "Cho phép tạo bình chọn."
+      },
+      "connect": {
+        "label": "Kết nối",
+        "description": "Cho phép tham gia kênh thoại và nghe người khác."
+      },
+      "speak": {
+        "label": "Nói",
+        "description": "Cho phép nói trong kênh thoại. Nếu không có quyền, người dùng bị tắt tiếng cho đến khi được bật lại."
+      },
+      "video": {
+        "label": "Video",
+        "description": "Cho phép video, chia sẻ màn hình hoặc phát trực tiếp trên máy chủ này."
+      },
+      "muteMembers": {
+        "label": "Tắt tiếng thành viên",
+        "description": "Cho phép tắt tiếng thành viên khác trong kênh thoại."
+      },
+      "deafenMembers": {
+        "label": "Tắt nghe thành viên",
+        "description": "Cho phép tắt nghe người khác để họ không nghe và không nói được."
+      },
+      "moveMembers": {
+        "label": "Di chuyển thành viên",
+        "description": "Cho phép ngắt kết nối hoặc chuyển thành viên giữa các kênh thoại mà bạn có thể truy cập."
+      },
+      "setVoiceChannelStatus": {
+        "label": "Đặt trạng thái kênh thoại",
+        "description": "Cho phép tạo và chỉnh sửa trạng thái kênh thoại."
+      }
+    }
+  }
+}

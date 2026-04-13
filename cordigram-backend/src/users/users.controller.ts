@@ -75,15 +75,12 @@ export class UsersController {
   }
 
   @Get('settings')
-  async getSettings(
-    @Req() req: Request & { user?: AuthenticatedUser },
-  ): Promise<{ theme: 'light' | 'dark'; language: 'en' | 'vi' }> {
+  async getSettings(@Req() req: Request & { user?: AuthenticatedUser }) {
     const userId = req.user?.userId;
     if (!userId) {
       throw new UnauthorizedException('Unauthorized');
     }
-    const result = await this.usersService.getSettings(userId);
-    return result;
+    return this.usersService.getSettings(userId);
   }
 
   @Get('notifications/settings')
@@ -293,17 +290,21 @@ export class UsersController {
   async updateSettings(
     @Req() req: Request & { user?: AuthenticatedUser },
     @Body() dto: UpdateSettingsDto,
-  ): Promise<{ theme: 'light' | 'dark'; language: 'en' | 'vi' }> {
+  ) {
     const userId = req.user?.userId;
     if (!userId) {
       throw new UnauthorizedException('Unauthorized');
     }
-    const result = await this.usersService.updateSettings({
+    return this.usersService.updateSettings({
       userId,
       theme: dto.theme,
       language: dto.language,
+      dmListFrom: dto.dmListFrom,
+      dmCallFrom: dto.dmCallFrom,
+      showCordigramMemberSince: dto.showCordigramMemberSince,
+      sharePresence: dto.sharePresence,
+      chatSoundEnabled: dto.chatSoundEnabled,
     });
-    return result;
   }
 
   @Patch('notifications/settings')

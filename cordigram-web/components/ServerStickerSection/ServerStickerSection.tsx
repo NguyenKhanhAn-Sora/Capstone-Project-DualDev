@@ -4,10 +4,9 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./ServerStickerSection.module.css";
 import * as serversApi from "@/lib/servers-api";
 import AddServerStickerModal from "@/components/AddServerStickerModal/AddServerStickerModal";
+import { useLanguage } from "@/component/language-provider";
 
-const ACCEPT =
-  "image/png,image/jpeg,image/jpg,image/gif,image/webp,image/x-png";
-
+const ACCEPT = "image/png,image/jpeg,image/jpg,image/gif,image/webp,image/x-png";
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const FREE_SLOTS = 5;
 
@@ -23,17 +22,9 @@ type Props = {
   onStickersChanged?: () => void;
 };
 
-export default function ServerStickerSection({
-  serverId,
-  token,
-  canManage,
-  onStickersChanged,
-}: Props) {
-  const [data, setData] = useState<{
-    max: number;
-    count: number;
-    stickers: serversApi.ServerStickerManageRow[];
-  } | null>(null);
+export default function ServerStickerSection({ serverId, token, canManage, onStickersChanged }: Props) {
+  const { t } = useLanguage();
+  const [data, setData] = useState<{ max: number; count: number; stickers: serversApi.ServerStickerManageRow[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -46,58 +37,43 @@ export default function ServerStickerSection({
       const d = await serversApi.getServerStickersManage(serverId);
       setData(d);
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Lỗi tải sticker");
+      setErr(e instanceof Error ? e.message : t("chat.serverSticker.loadError"));
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [serverId]);
+  }, [serverId, t]);
 
   useEffect(() => {
-    if (!canManage) {
-      setLoading(false);
-      return;
-    }
+    if (!canManage) { setLoading(false); return; }
     void load();
   }, [canManage, load]);
 
   const handlePick = (files: FileList | null) => {
     if (!files?.length || !canManage) return;
     const file = files[0];
-    if (file.size > MAX_FILE_BYTES) {
-      setErr("File không được vượt quá 2 MB.");
-      return;
-    }
-    if (!isAllowedFile(file)) {
-      setErr("Chỉ hỗ trợ PNG, JPG hoặc WebP.");
-      return;
-    }
+    if (file.size > MAX_FILE_BYTES) { setErr(t("chat.serverSticker.fileTooLarge")); return; }
+    if (!isAllowedFile(file)) { setErr(t("chat.serverSticker.fileInvalid")); return; }
     setErr(null);
     setPendingFile(file);
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  if (!canManage) {
-    return (
-      <p className={styles.denied}>
-        Chỉ chủ máy chủ hoặc thành viên có quyền quản lý máy chủ mới chỉnh sửa
-        được sticker.
-      </p>
-    );
-  }
-
-  if (loading && !data) {
-    return <div className={styles.loading}>Đang tải sticker…</div>;
-  }
+  if (!canManage) return <p className={styles.denied}>{t("chat.serverSticker.denied")}</p>;
+  if (loading && !data) return <div className={styles.loading}>{t("chat.serverSticker.loading")}</div>;
 
   const max = data?.max ?? FREE_SLOTS;
   const count = data?.count ?? 0;
   const remaining = Math.max(0, max - count);
   const stickers = data?.stickers ?? [];
   const slots: (serversApi.ServerStickerManageRow | null)[] = [];
-  for (let i = 0; i < FREE_SLOTS; i++) {
-    slots.push(stickers[i] ?? null);
-  }
+  for (let i = 0; i < FREE_SLOTS; i++) slots.push(stickers[i] ?? null);
+
+  const TIERS = [
+    { level: 1, boosts: 2, bonus: t("chat.serverSticker.tierBonus10") },
+    { level: 2, boosts: 7, bonus: t("chat.serverSticker.tierBonus15") },
+    { level: 3, boosts: 14, bonus: t("chat.serverSticker.tierBonus30") },
+  ];
 
   return (
     <div className={styles.wrap}>
@@ -107,27 +83,17 @@ export default function ServerStickerSection({
         token={token}
         defaultServerId={serverId}
         onClose={() => setPendingFile(null)}
-        onSuccess={async () => {
-          await load();
-          onStickersChanged?.();
-        }}
+        onSuccess={async () => { await load(); onStickersChanged?.(); }}
       />
 
-      <section className={styles.banner} aria-label="Nâng cấp máy chủ">
-        <h2 className={styles.bannerTitle}>Nhận Nâng Cấp</h2>
+      <section className={styles.banner} aria-label={t("chat.serverSticker.bannerAriaLabel")}>
+        <h2 className={styles.bannerTitle}>{t("chat.serverSticker.bannerTitle")}</h2>
         <p className={styles.bannerDesc}>
-          Nâng cấp máy chủ lên Cấp 1 trở lên sẽ mở thêm ô sticker và các đặc
-          quyền khác. Hiện tại máy chủ chỉ dùng{" "}
-          <strong>{FREE_SLOTS} ô sticker miễn phí</strong> — phần nâng cấp sẽ
-          được bổ sung sau.
+          {t("chat.serverSticker.bannerDesc").replace("{n}", String(FREE_SLOTS))}
         </p>
         <div className={styles.bannerActions}>
-          <button type="button" className={styles.btnBannerPrimary} disabled>
-            Nâng Cấp Máy Chủ
-          </button>
-          <button type="button" className={styles.btnBannerGhost} disabled>
-            Tìm hiểu thêm
-          </button>
+          <button type="button" className={styles.btnBannerPrimary} disabled>{t("chat.serverSticker.btnUpgrade")}</button>
+          <button type="button" className={styles.btnBannerGhost} disabled>{t("chat.serverSticker.btnLearnMore")}</button>
         </div>
       </section>
 
@@ -140,104 +106,51 @@ export default function ServerStickerSection({
           <div className={styles.tierCard}>
             <div className={styles.tierHead}>
               <div>
-                <h3 className={styles.tierTitle}>Ô miễn phí</h3>
-                <p className={styles.tierSub}>
-                  {remaining} trong số {FREE_SLOTS} ô sẵn có
-                </p>
+                <h3 className={styles.tierTitle}>{t("chat.serverSticker.freeTitle")}</h3>
+                <p className={styles.tierSub}>{t("chat.serverSticker.freeSub").replace("{n}", String(remaining)).replace("{total}", String(FREE_SLOTS))}</p>
               </div>
-              <input
-                ref={inputRef}
-                type="file"
-                className={styles.hiddenInput}
-                accept={ACCEPT}
-                aria-hidden
-                tabIndex={-1}
-                onChange={(e) => handlePick(e.target.files)}
-              />
-              <button
-                type="button"
-                className={styles.uploadBtn}
-                disabled={remaining <= 0}
-                onClick={() => inputRef.current?.click()}
-              >
-                Tải Lên Sticker
+              <input ref={inputRef} type="file" className={styles.hiddenInput} accept={ACCEPT} aria-hidden tabIndex={-1} onChange={(e) => handlePick(e.target.files)} />
+              <button type="button" className={styles.uploadBtn} disabled={remaining <= 0} onClick={() => inputRef.current?.click()}>
+                {t("chat.serverSticker.uploadBtn")}
               </button>
             </div>
             <div className={styles.slotGrid}>
               {slots.map((st, i) => (
-                <div
-                  key={st?.id ?? `empty-${i}`}
-                  className={`${styles.slot} ${st ? styles.slotFilled : ""}`}
-                  title={st?.name || undefined}
-                >
+                <div key={st?.id ?? `empty-${i}`} className={`${styles.slot} ${st ? styles.slotFilled : ""}`} title={st?.name || undefined}>
                   {st ? (
-                    <img
-                      src={st.imageUrl}
-                      alt={st.name || ""}
-                      className={`${styles.slotImg} ${st.animated ? styles.slotImgAnim : ""}`}
-                      loading="lazy"
-                    />
+                    <img src={st.imageUrl} alt={st.name || ""} className={`${styles.slotImg} ${st.animated ? styles.slotImgAnim : ""}`} loading="lazy" />
                   ) : (
-                    <span className={styles.slotPh} aria-hidden>
-                      ◆
-                    </span>
+                    <span className={styles.slotPh} aria-hidden>◆</span>
                   )}
                 </div>
               ))}
             </div>
-            <p className={styles.notice}>
-              Ảnh tĩnh (PNG/JPG/WebP): cắt vuông, nén ~500 KB rồi tải lên Cloudinary
-              (URL lưu DB). Sticker GIF: tải nguyên file tối đa 2 MB lên Cloudinary.
-              Giới hạn hiện tại: <strong>{max} sticker</strong> trên máy chủ.
-            </p>
+            <p className={styles.notice}>{t("chat.serverSticker.notice").replace("{max}", String(max))}</p>
             {err ? <div className={styles.err}>{err}</div> : null}
           </div>
         </div>
 
-        {[
-          {
-            level: 1,
-            boosts: 2,
-            bonus: "+10 Ô Sticker",
-            note: "Cần nâng cấp máy chủ (sắp có)",
-          },
-          {
-            level: 2,
-            boosts: 7,
-            bonus: "+15 Ô Sticker (tổng cộng là 30)",
-            note: "Cần nâng cấp máy chủ (sắp có)",
-          },
-          {
-            level: 3,
-            boosts: 14,
-            bonus: "+30 Ô Sticker (tổng cộng là 60)",
-            note: "Cần nâng cấp máy chủ (sắp có)",
-          },
-        ].map((tier) => (
+        {TIERS.map((tier) => (
           <div key={tier.level} className={styles.tierRow}>
             <div className={styles.rail}>
-              <div className={`${styles.railDot} ${styles.railDotLocked}`}>
-                ◆
-              </div>
+              <div className={`${styles.railDot} ${styles.railDotLocked}`}>◆</div>
               <div className={styles.railLine} />
             </div>
             <div className={`${styles.tierCard} ${styles.tierCardLocked}`}>
               <div className={styles.tierHead}>
                 <div>
-                  <h3 className={styles.tierTitle}>Cấp {tier.level}</h3>
-                  <p className={styles.tierSub}>{tier.note}</p>
+                  <h3 className={styles.tierTitle}>{t("chat.serverSticker.tierTitle").replace("{n}", String(tier.level))}</h3>
+                  <p className={styles.tierSub}>{t("chat.serverSticker.tierNote")}</p>
                 </div>
                 <div className={styles.tierMeta}>
-                  <span>{tier.boosts} Nâng Cấp</span>
+                  <span>{t("chat.serverSticker.boosts").replace("{n}", String(tier.boosts))}</span>
                   <span aria-hidden>🔒</span>
                 </div>
               </div>
               <div className={styles.lockedBody}>
                 <div className={styles.lockedPh}>◇</div>
                 <div>{tier.bonus}</div>
-                <button type="button" className={styles.btnFake} disabled>
-                  Mua Cấp Độ
-                </button>
+                <button type="button" className={styles.btnFake} disabled>{t("chat.serverSticker.buyBtn")}</button>
               </div>
             </div>
           </div>

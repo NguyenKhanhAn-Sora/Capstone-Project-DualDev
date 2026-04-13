@@ -2,25 +2,27 @@
 
 import React, { useState } from "react";
 import styles from "./ReportMessageDialog.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 interface ReportMessageDialogProps {
   onSubmit: (reason: string, description?: string) => void;
   onClose: () => void;
 }
 
-const REPORT_REASONS = [
-  "Spam",
-  "Quấy rối",
-  "Nội dung không phù hợp",
-  "Thông tin sai lệch",
-  "Lừa đảo",
-  "Khác",
-];
+const REPORT_REASON_KEYS = [
+  "spam",
+  "harassment",
+  "inappropriate",
+  "misinfo",
+  "scam",
+  "other",
+] as const;
 
 export default function ReportMessageDialog({
   onSubmit,
   onClose,
 }: ReportMessageDialogProps) {
+  const { t } = useLanguage();
   const [selectedReason, setSelectedReason] = useState<string>("");
   const [description, setDescription] = useState("");
 
@@ -34,7 +36,7 @@ export default function ReportMessageDialog({
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
-          <h2 className={styles.title}>Báo cáo tin nhắn</h2>
+          <h2 className={styles.title}>{t("chat.reportMessage.title")}</h2>
           <button className={styles.closeButton} onClick={onClose}>
             ✕
           </button>
@@ -42,11 +44,15 @@ export default function ReportMessageDialog({
 
         <div className={styles.content}>
           <div className={styles.section}>
-            <label className={styles.label}>Lý do báo cáo *</label>
+            <label className={styles.label}>
+              {t("chat.reportMessage.reasonLabel")}
+            </label>
             <div className={styles.reasonList}>
-              {REPORT_REASONS.map((reason) => (
+              {REPORT_REASON_KEYS.map((key) => {
+                const reason = t(`chat.reportMessage.reasons.${key}`);
+                return (
                 <button
-                  key={reason}
+                  key={key}
                   className={`${styles.reasonButton} ${
                     selectedReason === reason ? styles.selected : ""
                   }`}
@@ -54,15 +60,18 @@ export default function ReportMessageDialog({
                 >
                   {reason}
                 </button>
-              ))}
+              );
+              })}
             </div>
           </div>
 
           <div className={styles.section}>
-            <label className={styles.label}>Mô tả chi tiết (tùy chọn)</label>
+            <label className={styles.label}>
+              {t("chat.reportMessage.descriptionLabel")}
+            </label>
             <textarea
               className={styles.textarea}
-              placeholder="Mô tả vấn đề bạn gặp phải..."
+              placeholder={t("chat.reportMessage.descriptionPlaceholder")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
@@ -72,14 +81,14 @@ export default function ReportMessageDialog({
 
         <div className={styles.footer}>
           <button className={styles.cancelButton} onClick={onClose}>
-            Hủy
+            {t("chat.common.cancel")}
           </button>
           <button
             className={styles.submitButton}
             onClick={handleSubmit}
             disabled={!selectedReason}
           >
-            Gửi báo cáo
+            {t("chat.reportMessage.submit")}
           </button>
         </div>
       </div>

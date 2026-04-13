@@ -19,7 +19,16 @@ export type RecentAccount = {
 
 export type UserSettings = {
   theme: 'light' | 'dark';
-  language: 'en' | 'vi';
+  language: 'vi' | 'en' | 'ja' | 'zh';
+  /** Ai hiện trong danh sách DM (chỉ UI + lọc client; mặc định everyone). */
+  dmListFrom?: 'everyone' | 'followers_only';
+  dmCallFrom?: 'everyone' | 'followers_only';
+  /** Hiển thị ngày tham gia Cordigram trên hồ sơ công khai. */
+  showCordigramMemberSince?: boolean;
+  /** Chia sẻ trạng thái online/idle/offline với người khác. */
+  sharePresence?: boolean;
+  /** Âm thanh thông báo tin (client có thể đọc). */
+  chatSoundEnabled?: boolean;
   notifications?: {
     mutedUntil?: Date | null;
     mutedIndefinitely?: boolean;
@@ -152,7 +161,20 @@ export class User extends Document {
   @Prop({
     type: {
       theme: { type: String, enum: ['light', 'dark'], default: 'light' },
-      language: { type: String, enum: ['en', 'vi'], default: 'en' },
+      language: { type: String, enum: ['vi', 'en', 'ja', 'zh'], default: 'vi' },
+      dmListFrom: {
+        type: String,
+        enum: ['everyone', 'followers_only'],
+        default: 'everyone',
+      },
+      dmCallFrom: {
+        type: String,
+        enum: ['everyone', 'followers_only'],
+        default: 'everyone',
+      },
+      showCordigramMemberSince: { type: Boolean, default: true },
+      sharePresence: { type: Boolean, default: true },
+      chatSoundEnabled: { type: Boolean, default: true },
       notifications: {
         mutedUntil: { type: Date, default: null },
         mutedIndefinitely: { type: Boolean, default: false },
@@ -179,7 +201,12 @@ export class User extends Document {
     },
     default: {
       theme: 'light',
-      language: 'en',
+      language: 'vi',
+      dmListFrom: 'everyone',
+      dmCallFrom: 'everyone',
+      showCordigramMemberSince: true,
+      sharePresence: true,
+      chatSoundEnabled: true,
       notifications: {
         mutedUntil: null,
         mutedIndefinitely: false,

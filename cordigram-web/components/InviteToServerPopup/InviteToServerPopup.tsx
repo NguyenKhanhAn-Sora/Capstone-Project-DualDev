@@ -5,6 +5,7 @@ import styles from "../InviteToVoiceChannelPopup/InviteToVoiceChannelPopup.modul
 import type { Friend } from "@/lib/servers-api";
 import { createServerInvite } from "@/lib/servers-api";
 import { sendDirectMessage } from "@/lib/api";
+import { useLanguage } from "@/component/language-provider";
 
 interface InviteToServerPopupProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export default function InviteToServerPopup({
   friends,
   onInviteSent,
 }: InviteToServerPopupProps) {
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [copied, setCopied] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
@@ -68,7 +70,9 @@ export default function InviteToServerPopup({
       setInvitedIds((prev) => new Set(prev).add(friend._id));
       onInviteSent?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không gửi được lời mời");
+      setError(
+        e instanceof Error ? e.message : t("chat.invite.errors.cannotSendInvite"),
+      );
       console.error("Failed to send server invite", e);
     } finally {
       setSendingId(null);
@@ -93,15 +97,15 @@ export default function InviteToServerPopup({
           type="button"
           className={styles.closeBtn}
           onClick={onClose}
-          aria-label="Đóng"
+          aria-label={t("settings.close")}
         >
           ×
         </button>
         <h2 id="invite-server-title" className={styles.headerTitle}>
-          Mời bạn bè vào Máy chủ của {serverName}
+          {t("chat.inviteServer.title", { serverName })}
         </h2>
         <p className={styles.headerSub}>
-          Người nhận sẽ đến # chung
+          {t("chat.inviteServer.sub")}
         </p>
         {error && (
           <p style={{ color: "var(--color-danger, #f23f43)", marginBottom: 8, fontSize: 13 }}>
@@ -124,14 +128,14 @@ export default function InviteToServerPopup({
           <input
             type="text"
             className={styles.searchInput}
-            placeholder="Tìm kiếm bạn bè"
+            placeholder={t("chat.invite.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
         <div className={styles.sectionLabel}>
-          Mời Vào Máy Chủ
+          {t("chat.invite.sectionLabel")}
           <svg
             width="14"
             height="14"
@@ -147,8 +151,8 @@ export default function InviteToServerPopup({
           {filteredFriends.length === 0 ? (
             <p className={styles.emptyFriends}>
               {friends.length === 0
-                ? "Chưa có bạn bè để mời."
-                : "Không tìm thấy bạn bè nào."}
+                ? t("chat.invite.empty.noFriends")
+                : t("chat.invite.empty.notFound")}
             </p>
           ) : (
             filteredFriends.map((friend) => (
@@ -171,7 +175,7 @@ export default function InviteToServerPopup({
                   <div className={styles.friendDisplayName}>
                     {friend.displayName ||
                       friend.username ||
-                      "Người dùng"}
+                      t("chat.common.user")}
                   </div>
                   <div className={styles.friendUsername}>
                     {friend.username}
@@ -184,10 +188,10 @@ export default function InviteToServerPopup({
                   disabled={sendingId === friend._id || invitedIds.has(friend._id)}
                 >
                   {sendingId === friend._id
-                    ? "Đang gửi…"
+                    ? t("chat.common.sending")
                     : invitedIds.has(friend._id)
-                      ? "Đã mời"
-                      : "Mời"}
+                      ? t("chat.invite.invited")
+                      : t("chat.invite.invite")}
                 </button>
               </div>
             ))
@@ -196,7 +200,7 @@ export default function InviteToServerPopup({
 
         <div className={styles.dividerWrap}>
           <p className={styles.dividerText}>
-            Hoặc, gửi link mời cho họ
+            {t("chat.invite.orSendLink")}
           </p>
         </div>
         <div className={styles.linkWrap}>
@@ -213,11 +217,11 @@ export default function InviteToServerPopup({
             }`}
             onClick={handleCopy}
           >
-            {copied ? "Đã sao chép" : "Sao chép"}
+            {copied ? t("chat.common.copied") : t("chat.common.copy")}
           </button>
         </div>
         <p className={styles.expireNote}>
-          Link mời của bạn sẽ hết hạn sau 7 ngày. Chỉnh sửa link mời.
+          {t("chat.inviteServer.expireNote")}
         </p>
       </div>
     </div>

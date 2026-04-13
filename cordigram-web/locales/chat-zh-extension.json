@@ -1,0 +1,226 @@
+{
+  "explore": {
+    "backToChat": "← 返回聊天",
+    "title": "发现",
+    "subtitle": "查找可加入的已审核社区。若服务器开启“申请加入”，需先提交申请。",
+    "loading": "加载中…",
+    "loadError": "无法加载",
+    "empty": "暂无可显示的服务器。",
+    "members": "{count} 位成员",
+    "badgeApply": " • 申请加入",
+    "badgeInviteOnly": " • 仅邀请",
+    "join": "加入",
+    "inviteOnly": "仅邀请",
+    "inviteOnlyTitle": "此服务器仅限邀请"
+  },
+  "sidebar": {
+    "contextExplore": "发现",
+    "contextServer": "服务器",
+    "contextDm": "私信",
+    "inboxAria": "收件箱",
+    "createServerTitle": "创建服务器",
+    "settingsAria": "设置",
+    "exploreOpen": "发现",
+    "exploreClose": "关闭发现"
+  },
+  "toasts": {
+    "messageRemovedAll": "已为所有人删除消息",
+    "messageDeletedSelf": "你已删除一条消息"
+  },
+  "channelUi": {
+    "sectionChat": "文字频道",
+    "sectionVoice": "语音频道",
+    "defaultCategoryLabel": "频道"
+  },
+  "roleEditor": {
+    "back": "返回",
+    "editTitle": "编辑身份组 - ",
+    "tabDisplay": "显示",
+    "tabPermissions": "权限",
+    "tabMembers": "成员管理 ({count})",
+    "esc": "ESC",
+    "deleteRoleTitle": "删除身份组",
+    "confirmDeleteRole": "确定要删除身份组「{name}」吗？",
+    "errorDeleteRole": "无法删除身份组",
+    "newRoleName": "新身份组",
+    "errorCreateRole": "无法创建身份组",
+    "viewServerByRole": "按身份组查看服务器",
+    "delete": "删除",
+    "deleteRoleAria": "删除身份组"
+  },
+  "roleDisplay": {
+    "roleNameLabel": "身份组名称",
+    "required": "*",
+    "roleNamePlaceholder": "输入身份组名称",
+    "styleTitle": "身份组样式",
+    "previewName": "Wumpus",
+    "previewRole": "音乐支持者",
+    "previewBadge": "稳定",
+    "colorLabel": "身份组颜色",
+    "colorHint": "成员将使用其在列表中最高身份组的颜色。",
+    "displaySeparateToggle": "将此身份组成员与在线成员分开显示",
+    "mentionableToggle": "允许所有人 @提及 此身份组",
+    "mentionableHint": "说明：拥有「提及 @everyone、@here 和所有身份组」权限的成员始终可以提及拥有此身份组的成员。",
+    "viewAsRoleTitle": "以身份组身份查看服务器",
+    "viewAsRoleDesc": "预览此身份组可执行的操作与可访问的频道。仅限服务器所有者与管理员。",
+    "viewAsRoleBtn": "以身份组身份查看服务器",
+    "saveFailed": "无法保存更改",
+    "unsavedBar": "注意 — 你有未保存的更改！",
+    "reset": "重置",
+    "saving": "保存中...",
+    "saveChanges": "保存更改"
+  },
+  "roleMembers": {
+    "loading": "正在加载成员列表…",
+    "noAccessTitle": "无访问权限",
+    "noAccessDesc": "仅服务器所有者或拥有「管理服务器」权限的成员可查看并管理成员列表。",
+    "everyoneTitle": "@everyone",
+    "everyoneDesc": "@everyone 身份组会自动应用于所有成员。你无法向此身份组添加或移除成员。",
+    "memberCount": "{count} 位成员",
+    "searchPlaceholder": "搜索成员",
+    "addMember": "添加成员",
+    "emptySearch": "没有与「{query}」匹配的成员",
+    "emptyRole": "此身份组尚无成员",
+    "removeFromRoleTitle": "从身份组移除",
+    "confirmRemove": "确定要将该成员从此身份组移除吗？",
+    "errorAdd": "无法添加成员",
+    "errorRemove": "无法移除成员",
+    "allHaveRole": "所有成员已拥有此身份组"
+  },
+  "rolePermissions": {
+    "sections": {
+      "serverManagement": "服务器管理权限",
+      "member": "成员权限",
+      "textChannel": "文字频道权限",
+      "voiceChannel": "语音频道权限"
+    },
+    "searchPlaceholder": "搜索权限",
+    "noResults": "没有与「{query}」匹配的权限",
+    "unsavedBar": "注意 — 你有未保存的更改！",
+    "reset": "重置",
+    "saving": "保存中...",
+    "saveChanges": "保存更改",
+    "saveFailed": "无法保存更改",
+    "items": {
+      "manageServer": {
+        "label": "管理服务器",
+        "description": "允许成员编辑服务器名称、头像和基本设置。",
+        "warning": "这是强大的管理员权限，请谨慎授予。"
+      },
+      "manageChannels": {
+        "label": "管理频道",
+        "description": "允许成员创建、编辑和删除频道。",
+        "warning": "这是强大的管理员权限，请谨慎授予。"
+      },
+      "manageEvents": {
+        "label": "管理活动",
+        "description": "允许成员创建、编辑和删除服务器活动。"
+      },
+      "createInvite": {
+        "label": "创建邀请",
+        "description": "允许成员邀请新用户加入此服务器。"
+      },
+      "changeNickname": {
+        "label": "更改昵称",
+        "description": "允许成员在此服务器更改自己的昵称。"
+      },
+      "manageNicknames": {
+        "label": "管理昵称",
+        "description": "允许成员更改其他成员的昵称。"
+      },
+      "kickMembers": {
+        "label": "踢出、批准与拒绝成员",
+        "description": "踢出会将成员移出服务器；若有新邀请可再次加入。若服务器启用加入申请，此权限可批准或拒绝申请。"
+      },
+      "banMembers": {
+        "label": "封禁成员",
+        "description": "允许永久封禁其他成员并清除其在此服务器的消息记录。"
+      },
+      "timeoutMembers": {
+        "label": "限制成员（超时）",
+        "description": "被超时后，用户无法发送聊天消息、回复主题、互动消息，也无法在语音或舞台频道发言。"
+      },
+      "mentionEveryone": {
+        "label": "提及 @everyone、@here 和所有身份组",
+        "description": "允许使用 @everyone / @here，以及提及可提及的身份组。",
+        "warning": "仅应授予可信任的人。"
+      },
+      "sendMessages": {
+        "label": "发送消息与创建帖子",
+        "description": "允许在文字频道发送消息，在论坛频道创建帖子。"
+      },
+      "sendMessagesInThreads": {
+        "label": "在线程与帖子中发送消息",
+        "description": "允许在线程和论坛帖子中发送消息。"
+      },
+      "createPublicThreads": {
+        "label": "创建公开线程",
+        "description": "允许创建频道内所有人可见的线程。"
+      },
+      "createPrivateThreads": {
+        "label": "创建私密线程",
+        "description": "允许创建仅限邀请的线程。"
+      },
+      "embedLinks": {
+        "label": "嵌入链接",
+        "description": "允许显示成员分享链接的富媒体嵌入。"
+      },
+      "attachFiles": {
+        "label": "附加文件",
+        "description": "允许在聊天中上传文件或媒体。"
+      },
+      "addReactions": {
+        "label": "添加反应",
+        "description": "允许为消息添加新的表情反应。"
+      },
+      "manageMessages": {
+        "label": "管理消息",
+        "description": "允许删除或移除其他成员消息的嵌入内容。"
+      },
+      "pinMessages": {
+        "label": "置顶消息",
+        "description": "允许置顶或取消置顶任意消息。"
+      },
+      "viewMessageHistory": {
+        "label": "阅读消息历史",
+        "description": "允许阅读更早的消息。若无此权限，可能仅显示在线时的消息。"
+      },
+      "sendVoiceMessages": {
+        "label": "发送语音消息",
+        "description": "允许发送语音消息。"
+      },
+      "createPolls": {
+        "label": "创建投票",
+        "description": "允许创建投票。"
+      },
+      "connect": {
+        "label": "连接",
+        "description": "允许加入语音并听到他人。"
+      },
+      "speak": {
+        "label": "发言",
+        "description": "允许在语音中发言。若无此权限，将被静音直到有人取消静音。"
+      },
+      "video": {
+        "label": "视频",
+        "description": "允许在此服务器进行视频、屏幕共享或直播。"
+      },
+      "muteMembers": {
+        "label": "静音成员",
+        "description": "允许在语音频道将其他成员静音。"
+      },
+      "deafenMembers": {
+        "label": "拒听成员",
+        "description": "允许使他人无法听与说。"
+      },
+      "moveMembers": {
+        "label": "移动成员",
+        "description": "允许在你可访问的语音频道之间断开或移动成员。"
+      },
+      "setVoiceChannelStatus": {
+        "label": "设置语音频道状态",
+        "description": "允许创建和编辑语音频道状态。"
+      }
+    }
+  }
+}

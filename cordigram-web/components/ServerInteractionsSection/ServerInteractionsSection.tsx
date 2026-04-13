@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
+import { useLanguage } from "@/component/language-provider";
 
 interface ServerInteractionsSectionProps {
   serverId: string;
@@ -14,6 +15,7 @@ export default function ServerInteractionsSection({
   canManageSettings,
   textChannels,
 }: ServerInteractionsSectionProps) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
@@ -43,16 +45,14 @@ export default function ServerInteractionsSection({
       })
       .catch((e) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Không tải được cài đặt tương tác");
+        setError(e instanceof Error ? e.message : t("chat.serverInteractions.loadFail"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [serverId]);
+    return () => { cancelled = true; };
+  }, [serverId, t]);
 
   const canEdit = useMemo(
     () => Boolean(canManageSettings && settings?.canEdit),
@@ -60,16 +60,13 @@ export default function ServerInteractionsSection({
   );
 
   const updateSetting = async (
-    patch: Partial<
-      Pick<
-        serversApi.ServerInteractionSettings,
-        | "systemMessagesEnabled"
-        | "welcomeMessageEnabled"
-        | "stickerReplyWelcomeEnabled"
-        | "defaultNotificationLevel"
-        | "systemChannelId"
-      >
-    >,
+    patch: Partial<Pick<serversApi.ServerInteractionSettings,
+      | "systemMessagesEnabled"
+      | "welcomeMessageEnabled"
+      | "stickerReplyWelcomeEnabled"
+      | "defaultNotificationLevel"
+      | "systemChannelId"
+    >>,
   ) => {
     if (!canEdit) return;
     setSaving(true);
@@ -78,7 +75,7 @@ export default function ServerInteractionsSection({
       const next = await serversApi.updateInteractionSettings(serverId, patch);
       setSettings(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không lưu được cài đặt");
+      setError(e instanceof Error ? e.message : t("chat.serverInteractions.saveError"));
     } finally {
       setSaving(false);
     }
@@ -87,11 +84,11 @@ export default function ServerInteractionsSection({
   const handleSendRoleNotification = async () => {
     if (!canEdit) return;
     if (!notifTitle.trim() || !notifContent.trim()) {
-      setError("Vui lòng nhập tiêu đề và nội dung thông báo");
+      setError(t("chat.serverInteractions.errTitle"));
       return;
     }
     if (notifTargetType === "role" && !notifRoleId) {
-      setError("Vui lòng chọn vai trò");
+      setError(t("chat.serverInteractions.errRole"));
       return;
     }
     setSending(true);
@@ -105,20 +102,20 @@ export default function ServerInteractionsSection({
       });
       setNotifTitle("");
       setNotifContent("");
-      window.alert(`Đã gửi thông báo cho ${res.recipients} thành viên.`);
+      window.alert(t("chat.serverInteractions.sentAlert").replace("{n}", String(res.recipients)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không gửi được thông báo");
+      setError(e instanceof Error ? e.message : t("chat.serverInteractions.sendError"));
     } finally {
       setSending(false);
     }
   };
 
   if (loading) {
-    return <div style={{ color: "var(--color-panel-text-muted)" }}>Đang tải cài đặt tương tác...</div>;
+    return <div style={{ color: "var(--color-panel-text-muted)" }}>{t("chat.serverInteractions.loading")}</div>;
   }
 
   if (!settings) {
-    return <div style={{ color: "var(--color-panel-danger)" }}>{error || "Không tải được dữ liệu"}</div>;
+    return <div style={{ color: "var(--color-panel-danger)" }}>{error || t("chat.serverInteractions.loadError")}</div>;
   }
 
   return (
@@ -128,17 +125,17 @@ export default function ServerInteractionsSection({
       )}
 
       <section>
-        <h3 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Tương Tác</h3>
+        <h3 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>{t("chat.serverInteractions.title")}</h3>
         <p style={{ marginTop: 4, color: "var(--color-panel-text-muted)", fontSize: 13 }}>
-          Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới có thể thay đổi các cài đặt này.
+          {t("chat.serverInteractions.desc")}
         </p>
       </section>
 
       <section style={{ borderTop: "1px solid var(--color-panel-border)", paddingTop: 16 }}>
-        <h4 style={{ margin: 0, fontSize: 20 }}>Tin Nhắn Hệ Thống</h4>
+        <h4 style={{ margin: 0, fontSize: 20 }}>{t("chat.serverInteractions.systemMessages")}</h4>
         <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
           <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>Bật tin nhắn hệ thống</span>
+            <span>{t("chat.serverInteractions.enableSystem")}</span>
             <input
               type="checkbox"
               checked={settings.systemMessagesEnabled}
@@ -147,7 +144,7 @@ export default function ServerInteractionsSection({
             />
           </label>
           <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>Gửi tin nhắn chào mừng thành viên mới</span>
+            <span>{t("chat.serverInteractions.sendWelcome")}</span>
             <input
               type="checkbox"
               checked={settings.welcomeMessageEnabled}
@@ -156,7 +153,7 @@ export default function ServerInteractionsSection({
             />
           </label>
           <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>Giúp thành viên trả lời thông báo chào mừng bằng sticker</span>
+            <span>{t("chat.serverInteractions.stickerReply")}</span>
             <input
               type="checkbox"
               checked={settings.stickerReplyWelcomeEnabled}
@@ -165,58 +162,49 @@ export default function ServerInteractionsSection({
             />
           </label>
           <label style={{ display: "grid", gap: 6 }}>
-            <span>Kênh tin nhắn hệ thống</span>
+            <span>{t("chat.serverInteractions.systemChannel")}</span>
             <select
               value={settings.systemChannelId ?? ""}
               disabled={!canEdit || saving}
-              onChange={(e) =>
-                updateSetting({
-                  systemChannelId: e.target.value || null,
-                })
-              }
+              onChange={(e) => updateSetting({ systemChannelId: e.target.value || null })}
             >
-              <option value="">Không chọn</option>
+              <option value="">{t("chat.serverInteractions.noChannel")}</option>
               {textChannels.map((ch) => (
-                <option key={ch._id} value={ch._id}>
-                  #{ch.name}
-                </option>
+                <option key={ch._id} value={ch._id}>#{ch.name}</option>
               ))}
             </select>
           </label>
           <label style={{ display: "grid", gap: 6 }}>
-            <span>Cài đặt thông báo mặc định</span>
+            <span>{t("chat.serverInteractions.defaultNotif")}</span>
             <select
               value={settings.defaultNotificationLevel}
               disabled={!canEdit || saving}
               onChange={(e) =>
-                updateSetting({
-                  defaultNotificationLevel:
-                    e.target.value === "mentions" ? "mentions" : "all",
-                })
+                updateSetting({ defaultNotificationLevel: e.target.value === "mentions" ? "mentions" : "all" })
               }
             >
-              <option value="all">Tất cả các tin nhắn</option>
-              <option value="mentions">Chỉ @mentions</option>
+              <option value="all">{t("chat.serverInteractions.notifAll")}</option>
+              <option value="mentions">{t("chat.serverInteractions.notifMentions")}</option>
             </select>
           </label>
         </div>
       </section>
 
       <section style={{ borderTop: "1px solid var(--color-panel-border)", paddingTop: 16 }}>
-        <h4 style={{ margin: 0, fontSize: 20 }}>Role Notification (Dành cho bạn)</h4>
+        <h4 style={{ margin: 0, fontSize: 20 }}>{t("chat.serverInteractions.roleNotif")}</h4>
         <p style={{ marginTop: 4, color: "var(--color-panel-text-muted)", fontSize: 13 }}>
-          Gửi thông báo theo vai trò, thành viên nhận được sẽ thấy trong tab Dành cho bạn.
+          {t("chat.serverInteractions.roleNotifDesc")}
         </p>
         <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
           <input
             type="text"
-            placeholder="Tiêu đề thông báo"
+            placeholder={t("chat.serverInteractions.notifTitlePlaceholder")}
             value={notifTitle}
             disabled={!canEdit || sending}
             onChange={(e) => setNotifTitle(e.target.value)}
           />
           <textarea
-            placeholder="Nội dung thông báo"
+            placeholder={t("chat.serverInteractions.notifContentPlaceholder")}
             value={notifContent}
             disabled={!canEdit || sending}
             onChange={(e) => setNotifContent(e.target.value)}
@@ -227,8 +215,8 @@ export default function ServerInteractionsSection({
             disabled={!canEdit || sending}
             onChange={(e) => setNotifTargetType(e.target.value as "everyone" | "role")}
           >
-            <option value="everyone">@everyone</option>
-            <option value="role">Theo vai trò</option>
+            <option value="everyone">{t("chat.serverInteractions.targetEveryone")}</option>
+            <option value="role">{t("chat.serverInteractions.targetRole")}</option>
           </select>
           {notifTargetType === "role" && (
             <select
@@ -236,13 +224,9 @@ export default function ServerInteractionsSection({
               disabled={!canEdit || sending}
               onChange={(e) => setNotifRoleId(e.target.value)}
             >
-              {roles
-                .filter((r) => !r.isDefault)
-                .map((r) => (
-                  <option key={r._id} value={r._id}>
-                    {r.name}
-                  </option>
-                ))}
+              {roles.filter((r) => !r.isDefault).map((r) => (
+                <option key={r._id} value={r._id}>{r.name}</option>
+              ))}
             </select>
           )}
           <button
@@ -251,7 +235,7 @@ export default function ServerInteractionsSection({
             onClick={handleSendRoleNotification}
             style={{ justifySelf: "start" }}
           >
-            {sending ? "Đang gửi..." : "Gửi thông báo"}
+            {sending ? t("chat.serverInteractions.sendingBtn") : t("chat.serverInteractions.sendBtn")}
           </button>
         </div>
       </section>

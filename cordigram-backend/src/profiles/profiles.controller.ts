@@ -168,10 +168,16 @@ export class ProfilesController {
       }
     }
 
+    if (dto.pronouns !== undefined && dto.pronouns.length > 80) {
+      throw new BadRequestException('pronouns must be at most 80 characters');
+    }
+
     await this.profilesService.updateForUserId(user.userId, {
       displayName: dto.displayName,
       username: nextUsername,
       bio: dto.bio,
+      pronouns: dto.pronouns,
+      coverUrl: dto.coverUrl,
       location: dto.location,
       gender: dto.gender,
       birthdate: dto.birthdate,

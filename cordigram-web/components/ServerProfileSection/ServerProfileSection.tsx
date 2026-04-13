@@ -10,6 +10,7 @@ import {
   optimizeBannerImageFile,
 } from "@/lib/server-banner";
 import styles from "./ServerProfileSection.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), {
   ssr: false,
@@ -44,6 +45,7 @@ export default function ServerProfileSection({
   initialServer,
   onUpdated,
 }: ServerProfileSectionProps) {
+  const { t, language } = useLanguage();
   const initialBanner = useMemo(() => normalizeServerBanner(initialServer), [initialServer]);
   const [name, setName] = useState(initialServer?.name ?? "");
   const [avatarUrl, setAvatarUrl] = useState(initialServer?.avatarUrl ?? "");
@@ -121,10 +123,12 @@ export default function ServerProfileSection({
       setError(null);
       const up = await uploadMedia({ token, file });
       const url = up.secureUrl || up.url;
-      if (!url) throw new Error("Không lấy được URL tệp");
+      if (!url) throw new Error(t("chat.serverProfile.errors.fileUrlMissing"));
       setAvatarUrl(url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không tải ảnh lên được");
+      setError(
+        e instanceof Error ? e.message : t("chat.serverProfile.errors.uploadAvatarFailed"),
+      );
     }
   };
 
@@ -135,10 +139,12 @@ export default function ServerProfileSection({
       const optimized = await optimizeBannerImageFile(file);
       const up = await uploadMedia({ token, file: optimized });
       const url = up.secureUrl || up.url;
-      if (!url) throw new Error("Không lấy được URL ảnh biểu ngữ");
+      if (!url) throw new Error(t("chat.serverProfile.errors.bannerUrlMissing"));
       setBannerImageUrl(url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không tải ảnh biểu ngữ được");
+      setError(
+        e instanceof Error ? e.message : t("chat.serverProfile.errors.uploadBannerFailed"),
+      );
     }
   };
 
@@ -165,10 +171,12 @@ export default function ServerProfileSection({
           profileTraits: payloadTraits,
         },
       );
-      setSuccess("Đã lưu hồ sơ máy chủ.");
+      setSuccess(t("chat.serverProfile.saved"));
       onUpdated?.(updated);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không lưu được hồ sơ máy chủ");
+      setError(
+        e instanceof Error ? e.message : t("chat.serverProfile.errors.saveFailed"),
+      );
     } finally {
       setSaving(false);
     }
@@ -178,32 +186,49 @@ export default function ServerProfileSection({
     <div className={styles.wrap}>
       <div className={styles.left}>
         <div className={styles.card}>
-          <div className={styles.label}>Thông tin máy chủ</div>
+          <div className={styles.label}>{t("chat.serverProfile.info.title")}</div>
           <div className={styles.hint}>
-            Trực tuyến: {profileStats?.onlineCount ?? 0} | Thành viên: {profileStats?.memberCount ?? initialServer?.memberCount ?? 0}
-            {" | "}Ngày thành lập: {new Date(profileStats?.createdAt ?? initialServer?.createdAt ?? Date.now()).toLocaleDateString("vi-VN")}
+            {t("chat.serverProfile.info.online", { count: profileStats?.onlineCount ?? 0 })}{" "}
+            |{" "}
+            {t("chat.serverProfile.info.members", {
+              count: profileStats?.memberCount ?? initialServer?.memberCount ?? 0,
+            })}{" "}
+            |{" "}
+            {t("chat.serverProfile.info.createdAt", {
+              date: new Date(
+                profileStats?.createdAt ?? initialServer?.createdAt ?? Date.now(),
+              ).toLocaleDateString(
+                language === "vi"
+                  ? "vi-VN"
+                  : language === "ja"
+                    ? "ja-JP"
+                    : language === "zh"
+                      ? "zh-CN"
+                      : "en-US",
+              ),
+            })}
           </div>
         </div>
 
         <div className={styles.card}>
-          <div className={styles.label}>Tên</div>
+          <div className={styles.label}>{t("chat.serverProfile.name.label")}</div>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={100}
             disabled={!canManageSettings}
-            placeholder="Tên máy chủ"
+            placeholder={t("chat.serverProfile.name.placeholder")}
           />
         </div>
 
         <div className={styles.card}>
-          <div className={styles.label}>Biểu tượng</div>
+          <div className={styles.label}>{t("chat.serverProfile.avatar.label")}</div>
           <div className={styles.row}>
             <button className={`${styles.btn} ${styles.btnPrimary}`} disabled={!canManageSettings} onClick={() => avatarInputRef.current?.click()}>
-              Thay đổi biểu tượng máy chủ
+              {t("chat.serverProfile.avatar.change")}
             </button>
             <button className={`${styles.btn} ${styles.btnDanger}`} disabled={!canManageSettings} onClick={() => setAvatarUrl("")}>
-              Xóa biểu tượng
+              {t("chat.serverProfile.avatar.remove")}
             </button>
             <input
               ref={avatarInputRef}
@@ -217,14 +242,14 @@ export default function ServerProfileSection({
             value={avatarUrl}
             onChange={(e) => setAvatarUrl(e.target.value)}
             disabled={!canManageSettings}
-            placeholder="Hoặc dán URL biểu tượng"
+            placeholder={t("chat.serverProfile.avatar.urlPlaceholder")}
           />
         </div>
 
         <div className={styles.card}>
-          <div className={styles.label}>Biểu ngữ</div>
+          <div className={styles.label}>{t("chat.serverProfile.banner.label")}</div>
           <div className={styles.hint}>
-            Chọn màu nền cho card (khám phá, lời mời, đơn đăng ký). Có thể thêm ảnh — ảnh được tối ưu trước khi tải lên.
+            {t("chat.serverProfile.banner.hint")}
           </div>
           <div className={styles.row} style={{ marginBottom: 10 }}>
             <button
@@ -233,7 +258,7 @@ export default function ServerProfileSection({
               disabled={!canManageSettings}
               onClick={() => bannerInputRef.current?.click()}
             >
-              Tải ảnh biểu ngữ
+              {t("chat.serverProfile.banner.upload")}
             </button>
             <button
               type="button"
@@ -241,7 +266,7 @@ export default function ServerProfileSection({
               disabled={!canManageSettings || !bannerImageUrl}
               onClick={() => setBannerImageUrl(null)}
             >
-              Xóa ảnh biểu ngữ
+              {t("chat.serverProfile.banner.remove")}
             </button>
             <input
               ref={bannerInputRef}
@@ -260,18 +285,18 @@ export default function ServerProfileSection({
                 style={{ background: preset }}
                 disabled={!canManageSettings}
                 onClick={() => setBannerColor(preset)}
-                aria-label="Chọn màu nền biểu ngữ"
+                aria-label={t("chat.serverProfile.banner.pickColorAria")}
               />
             ))}
           </div>
-          <div className={styles.hint}>Màu nền luôn áp dụng; nếu có ảnh, ảnh hiển thị phía trên màu nền.</div>
+          <div className={styles.hint}>{t("chat.serverProfile.banner.note")}</div>
         </div>
 
         <div className={styles.card}>
-          <div className={styles.label}>Đặc điểm</div>
-          <div className={styles.hint}>Thêm tối đa 5 đặc điểm để thể hiện sở thích và tính cách của máy chủ.</div>
+          <div className={styles.label}>{t("chat.serverProfile.traits.label")}</div>
+          <div className={styles.hint}>{t("chat.serverProfile.traits.hint")}</div>
           <div className={styles.traitsGrid}>
-            {traits.map((t, idx) => (
+            {traits.map((trait, idx) => (
               <div className={styles.traitField} key={`trait-${idx}`}>
                 <button
                   type="button"
@@ -291,33 +316,35 @@ export default function ServerProfileSection({
                     setEmojiPickerPos({ top, left });
                     setEmojiPickerIndex(idx);
                   }}
-                  title="Chọn emoji"
+                  title={t("chat.serverProfile.traits.pickEmoji")}
                 >
-                  {hoverEmoji[idx] || t.emoji || "🙂"}
+                  {hoverEmoji[idx] || trait.emoji || "🙂"}
                 </button>
                 <input
                   className={styles.traitInput}
-                  value={t.text}
+                  value={trait.text}
                   maxLength={80}
                   disabled={!canManageSettings}
                   onChange={(e) => updateTrait(idx, { text: e.target.value })}
-                  placeholder="Đặc điểm..."
+                  placeholder={t("chat.serverProfile.traits.placeholder")}
                 />
               </div>
             ))}
           </div>
-          <div className={styles.hint}>{traitsFilled}/5 đặc điểm đã điền</div>
+          <div className={styles.hint}>
+            {t("chat.serverProfile.traits.filledCount", { count: traitsFilled })}
+          </div>
         </div>
 
         <div className={styles.card}>
-          <div className={styles.label}>Mô tả</div>
-          <div className={styles.hint}>Mô tả cho server.</div>
+          <div className={styles.label}>{t("chat.serverProfile.description.label")}</div>
+          <div className={styles.hint}>{t("chat.serverProfile.description.hint")}</div>
           <textarea
             value={description ?? ""}
             onChange={(e) => setDescription(e.target.value)}
             disabled={!canManageSettings}
             maxLength={500}
-            placeholder="Hãy giới thiệu một chút về máy chủ này với thế giới."
+            placeholder={t("chat.serverProfile.description.placeholder")}
           />
         </div>
 
@@ -325,7 +352,7 @@ export default function ServerProfileSection({
         {success && <div className={styles.success}>{success}</div>}
         <div className={styles.row}>
           <button className={`${styles.btn} ${styles.btnPrimary}`} disabled={!canManageSettings || saving} onClick={handleSave}>
-            {saving ? "Đang lưu..." : "Lưu thay đổi"}
+            {saving ? t("chat.common.saving") : t("chat.common.saveChanges")}
           </button>
         </div>
       </div>
@@ -346,15 +373,17 @@ export default function ServerProfileSection({
             ) : (
               <div style={{ width: 46, height: 46, borderRadius: 14, background: "var(--color-panel-active)" }} />
             )}
-            <div className={styles.previewName}>{name || "Máy chủ"}</div>
+            <div className={styles.previewName}>{name || t("chat.common.server")}</div>
           </div>
-          <div className={styles.previewDesc}>{description || "Chưa có mô tả."}</div>
+          <div className={styles.previewDesc}>
+            {description || t("chat.serverProfile.preview.noDescription")}
+          </div>
           {traitsFilled > 0 && (
             <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
-              {traits.filter((t) => t.text.trim()).map((t, i) => (
-                <div key={`${t.text}-${i}`} style={{ fontSize: 13 }}>
-                  <span style={{ marginRight: 6 }}>{t.emoji || "🙂"}</span>
-                  <span>{t.text}</span>
+              {traits.filter((trait) => trait.text.trim()).map((trait, i) => (
+                <div key={`${trait.text}-${i}`} style={{ fontSize: 13 }}>
+                  <span style={{ marginRight: 6 }}>{trait.emoji || "🙂"}</span>
+                  <span>{trait.text}</span>
                 </div>
               ))}
             </div>

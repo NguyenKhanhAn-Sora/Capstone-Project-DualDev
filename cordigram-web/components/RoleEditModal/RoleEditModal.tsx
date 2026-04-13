@@ -7,6 +7,7 @@ import * as serversApi from "@/lib/servers-api";
 import DisplayTab from "./DisplayTab";
 import PermissionsTab from "./PermissionsTab";
 import MembersTab from "./MembersTab";
+import { useLanguage } from "@/component/language-provider";
 
 type TabType = "display" | "permissions" | "members";
 
@@ -37,6 +38,7 @@ export default function RoleEditModal({
   onDelete,
   onCreate,
 }: RoleEditModalProps) {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabType>("display");
   const [selectedRoleId, setSelectedRoleId] = useState<string>(role._id);
   const [localRoles, setLocalRoles] = useState<Role[]>(roles);
@@ -91,7 +93,7 @@ export default function RoleEditModal({
     const roleToDelete = contextMenu.role;
     setContextMenu(null);
     
-    if (!window.confirm(`Bạn có chắc muốn xóa vai trò "${roleToDelete.name}"?`)) {
+    if (!window.confirm(t("chat.roleEditor.confirmDeleteRole", { name: roleToDelete.name }))) {
       return;
     }
     try {
@@ -105,7 +107,7 @@ export default function RoleEditModal({
         }
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Không xóa được vai trò");
+      alert(err instanceof Error ? err.message : t("chat.roleEditor.errorDeleteRole"));
     }
   };
 
@@ -117,14 +119,14 @@ export default function RoleEditModal({
     if (!isOwner) return;
     try {
       const newRole = await serversApi.createRole(serverId, {
-        name: "vai trò mới",
+        name: t("chat.roleEditor.newRoleName"),
         color: "#99AAB5",
       });
       setLocalRoles((prev) => [newRole, ...prev]);
       setSelectedRoleId(newRole._id);
       onCreate(newRole);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Không tạo được vai trò");
+      alert(err instanceof Error ? err.message : t("chat.roleEditor.errorCreateRole"));
     }
   };
 
@@ -137,7 +139,7 @@ export default function RoleEditModal({
 
   const handleRoleDelete = async () => {
     if (!isOwner || selectedRole.isDefault) return;
-    if (!window.confirm(`Bạn có chắc muốn xóa vai trò "${selectedRole.name}"?`)) {
+    if (!window.confirm(t("chat.roleEditor.confirmDeleteRole", { name: selectedRole.name }))) {
       return;
     }
     try {
@@ -149,7 +151,7 @@ export default function RoleEditModal({
         setSelectedRoleId(remaining[0]._id);
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Không xóa được vai trò");
+      alert(err instanceof Error ? err.message : t("chat.roleEditor.errorDeleteRole"));
     }
   };
 
@@ -172,7 +174,7 @@ export default function RoleEditModal({
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
               </svg>
-              TRỞ LẠI
+              {t("chat.roleEditor.back")}
             </button>
             {isOwner && (
               <button className={styles.addRoleBtn} onClick={handleCreateRole}>
@@ -226,7 +228,7 @@ export default function RoleEditModal({
               }}
             >
               <button className={styles.contextMenuItem} disabled>
-                <span>Xem Máy Chủ Theo Vai Trò</span>
+                <span>{t("chat.roleEditor.viewServerByRole")}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
                 </svg>
@@ -236,7 +238,7 @@ export default function RoleEditModal({
                   className={`${styles.contextMenuItem} ${styles.contextMenuItemDanger}`}
                   onClick={handleContextMenuDelete}
                 >
-                  <span>Xóa</span>
+                  <span>{t("chat.roleEditor.delete")}</span>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
                   </svg>
@@ -251,12 +253,16 @@ export default function RoleEditModal({
           {/* Header */}
           <div className={styles.header}>
             <div className={styles.headerTitle}>
-              <span className={styles.editLabel}>SỬA ĐỔI VAI TRÒ - </span>
+              <span className={styles.editLabel}>{t("chat.roleEditor.editTitle")}</span>
               <span className={styles.roleNameHeader}>{selectedRole.name.toUpperCase()}</span>
             </div>
             <div className={styles.headerActions}>
               {!selectedRole.isDefault && isOwner && (
-                <button className={styles.moreBtn} onClick={handleRoleDelete} title="Xóa vai trò">
+                <button
+                  className={styles.moreBtn}
+                  onClick={handleRoleDelete}
+                  title={t("chat.roleEditor.deleteRoleAria")}
+                >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
                   </svg>
@@ -271,19 +277,19 @@ export default function RoleEditModal({
               className={`${styles.tab} ${activeTab === "display" ? styles.tabActive : ""}`}
               onClick={() => setActiveTab("display")}
             >
-              Hiển thị
+              {t("chat.roleEditor.tabDisplay")}
             </button>
             <button
               className={`${styles.tab} ${activeTab === "permissions" ? styles.tabActive : ""}`}
               onClick={() => setActiveTab("permissions")}
             >
-              Quyền hạn
+              {t("chat.roleEditor.tabPermissions")}
             </button>
             <button
               className={`${styles.tab} ${activeTab === "members" ? styles.tabActive : ""}`}
               onClick={() => setActiveTab("members")}
             >
-              Quản Lý thành viên ({memberCount})
+              {t("chat.roleEditor.tabMembers", { count: memberCount })}
             </button>
           </div>
 
@@ -293,7 +299,7 @@ export default function RoleEditModal({
               <circle cx="12" cy="12" r="10" />
               <path d="M15 9l-6 6M9 9l6 6" />
             </svg>
-            <span className={styles.escLabel}>ESC</span>
+            <span className={styles.escLabel}>{t("chat.roleEditor.esc")}</span>
           </button>
 
           {/* Tab Content */}
