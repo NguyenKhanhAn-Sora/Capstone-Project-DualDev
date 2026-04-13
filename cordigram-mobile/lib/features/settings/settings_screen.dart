@@ -5,8 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/api_service.dart';
+import '../post/post_detail_screen.dart';
 import '../profile/models/profile_detail.dart';
 import '../profile/profile_edit_sheet.dart';
+import '../profile/profile_screen.dart';
 import '../profile/services/profile_service.dart';
 
 enum SettingsTab {
@@ -14,6 +16,8 @@ enum SettingsTab {
   profile,
   creatorVerification,
   passwordSecurity,
+  content,
+  violations,
   notifications,
 }
 
@@ -237,6 +241,232 @@ class _NotificationSettingsState {
   }
 }
 
+class _ContentActivityMeta {
+  const _ContentActivityMeta({
+    required this.postCaption,
+    required this.postMediaUrl,
+    required this.postAuthorDisplayName,
+    required this.postAuthorUsername,
+    required this.commentSnippet,
+    required this.targetDisplayName,
+    required this.targetUsername,
+    required this.targetAvatarUrl,
+  });
+
+  final String? postCaption;
+  final String? postMediaUrl;
+  final String? postAuthorDisplayName;
+  final String? postAuthorUsername;
+  final String? commentSnippet;
+  final String? targetDisplayName;
+  final String? targetUsername;
+  final String? targetAvatarUrl;
+
+  factory _ContentActivityMeta.fromJson(Map<String, dynamic> j) {
+    return _ContentActivityMeta(
+      postCaption: j['postCaption'] as String?,
+      postMediaUrl: j['postMediaUrl'] as String?,
+      postAuthorDisplayName: j['postAuthorDisplayName'] as String?,
+      postAuthorUsername: j['postAuthorUsername'] as String?,
+      commentSnippet: j['commentSnippet'] as String?,
+      targetDisplayName: j['targetDisplayName'] as String?,
+      targetUsername: j['targetUsername'] as String?,
+      targetAvatarUrl: j['targetAvatarUrl'] as String?,
+    );
+  }
+}
+
+class _ContentActivityItem {
+  const _ContentActivityItem({
+    required this.id,
+    required this.type,
+    required this.postId,
+    required this.commentId,
+    required this.targetUserId,
+    required this.createdAt,
+    required this.meta,
+  });
+
+  final String id;
+  final String type;
+  final String? postId;
+  final String? commentId;
+  final String? targetUserId;
+  final String? createdAt;
+  final _ContentActivityMeta? meta;
+
+  factory _ContentActivityItem.fromJson(Map<String, dynamic> j) {
+    return _ContentActivityItem(
+      id: (j['id'] as String?) ?? '',
+      type: (j['type'] as String?) ?? '',
+      postId: j['postId'] as String?,
+      commentId: j['commentId'] as String?,
+      targetUserId: j['targetUserId'] as String?,
+      createdAt: j['createdAt'] as String?,
+      meta: j['meta'] is Map<String, dynamic>
+          ? _ContentActivityMeta.fromJson(j['meta'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+}
+
+class _HiddenPostMedia {
+  const _HiddenPostMedia({required this.url});
+
+  final String? url;
+
+  factory _HiddenPostMedia.fromJson(Map<String, dynamic> j) {
+    return _HiddenPostMedia(url: j['url'] as String?);
+  }
+}
+
+class _HiddenPostItem {
+  const _HiddenPostItem({
+    required this.id,
+    required this.content,
+    required this.authorDisplayName,
+    required this.authorUsername,
+    required this.media,
+  });
+
+  final String id;
+  final String? content;
+  final String? authorDisplayName;
+  final String? authorUsername;
+  final List<_HiddenPostMedia> media;
+
+  factory _HiddenPostItem.fromJson(Map<String, dynamic> j) {
+    final rawMedia = (j['media'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(_HiddenPostMedia.fromJson)
+        .toList(growable: false);
+    return _HiddenPostItem(
+      id: (j['id'] as String?) ?? '',
+      content: j['content'] as String?,
+      authorDisplayName: j['authorDisplayName'] as String?,
+      authorUsername: j['authorUsername'] as String?,
+      media: rawMedia,
+    );
+  }
+}
+
+class _BlockedUserItem {
+  const _BlockedUserItem({
+    required this.userId,
+    required this.username,
+    required this.displayName,
+    required this.avatarUrl,
+  });
+
+  final String userId;
+  final String? username;
+  final String? displayName;
+  final String? avatarUrl;
+
+  factory _BlockedUserItem.fromJson(Map<String, dynamic> j) {
+    return _BlockedUserItem(
+      userId: (j['userId'] as String?) ?? '',
+      username: j['username'] as String?,
+      displayName: j['displayName'] as String?,
+      avatarUrl: j['avatarUrl'] as String?,
+    );
+  }
+}
+
+class _ViolationMediaPreview {
+  const _ViolationMediaPreview({required this.type, required this.url});
+
+  final String type;
+  final String url;
+
+  factory _ViolationMediaPreview.fromJson(Map<String, dynamic> j) {
+    return _ViolationMediaPreview(
+      type: (j['type'] as String?) ?? 'image',
+      url: (j['url'] as String?) ?? '',
+    );
+  }
+}
+
+class _ViolationRelatedPostPreview {
+  const _ViolationRelatedPostPreview({required this.text, required this.media});
+
+  final String? text;
+  final _ViolationMediaPreview? media;
+
+  factory _ViolationRelatedPostPreview.fromJson(Map<String, dynamic> j) {
+    return _ViolationRelatedPostPreview(
+      text: j['text'] as String?,
+      media: j['media'] is Map<String, dynamic>
+          ? _ViolationMediaPreview.fromJson(j['media'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+}
+
+class _ViolationHistoryItem {
+  const _ViolationHistoryItem({
+    required this.id,
+    required this.targetType,
+    required this.targetId,
+    required this.action,
+    required this.category,
+    required this.reason,
+    required this.severity,
+    required this.strikeDelta,
+    required this.strikeTotalAfter,
+    required this.actionExpiresAt,
+    required this.previewText,
+    required this.previewMedia,
+    required this.relatedPostId,
+    required this.relatedPostPreview,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String targetType;
+  final String targetId;
+  final String action;
+  final String category;
+  final String reason;
+  final String? severity;
+  final int strikeDelta;
+  final int strikeTotalAfter;
+  final String? actionExpiresAt;
+  final String? previewText;
+  final _ViolationMediaPreview? previewMedia;
+  final String? relatedPostId;
+  final _ViolationRelatedPostPreview? relatedPostPreview;
+  final String? createdAt;
+
+  factory _ViolationHistoryItem.fromJson(Map<String, dynamic> j) {
+    return _ViolationHistoryItem(
+      id: (j['id'] as String?) ?? '',
+      targetType: (j['targetType'] as String?) ?? '',
+      targetId: (j['targetId'] as String?) ?? '',
+      action: (j['action'] as String?) ?? '',
+      category: (j['category'] as String?) ?? '',
+      reason: (j['reason'] as String?) ?? '',
+      severity: j['severity'] as String?,
+      strikeDelta: (j['strikeDelta'] as num?)?.toInt() ?? 0,
+      strikeTotalAfter: (j['strikeTotalAfter'] as num?)?.toInt() ?? 0,
+      actionExpiresAt: j['actionExpiresAt'] as String?,
+      previewText: j['previewText'] as String?,
+      previewMedia: j['previewMedia'] is Map<String, dynamic>
+          ? _ViolationMediaPreview.fromJson(
+              j['previewMedia'] as Map<String, dynamic>,
+            )
+          : null,
+      relatedPostId: j['relatedPostId'] as String?,
+      relatedPostPreview: j['relatedPostPreview'] is Map<String, dynamic>
+          ? _ViolationRelatedPostPreview.fromJson(
+              j['relatedPostPreview'] as Map<String, dynamic>,
+            )
+          : null,
+      createdAt: j['createdAt'] as String?,
+    );
+  }
+}
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.initialTab = SettingsTab.personalInfo});
 
@@ -253,6 +483,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const Color _textPrimary = Color(0xFFE8ECF8);
   static const Color _textSecondary = Color(0xFF7A8BB0);
   static const Color _accent = Color(0xFF4AA3E4);
+  static const Color _filterActiveBg = Color(0xFFA8D7FF);
+  static const Color _filterActiveText = Color(0xFF103A66);
   static const Color _danger = Color(0xFFE53935);
   static final RegExp _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
   static final RegExp _passwordRegex = RegExp(
@@ -305,6 +537,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     {'key': 'custom', 'label': 'Choose date & time', 'ms': null},
   ];
 
+  static const int _contentPageSize = 10;
+
+  static const List<Map<String, String>> _activityFilterOptions = [
+    {'key': 'all', 'label': 'All'},
+    {'key': 'post_like', 'label': 'Like post'},
+    {'key': 'comment_like', 'label': 'Like comment'},
+    {'key': 'comment', 'label': 'Comment'},
+    {'key': 'repost', 'label': 'Repost'},
+    {'key': 'save', 'label': 'Save'},
+    {'key': 'follow', 'label': 'Follow'},
+    {'key': 'report_post', 'label': 'Report post/reel'},
+    {'key': 'report_user', 'label': 'Report user'},
+  ];
+
   Timer? _cooldownTicker;
   SettingsTab? _selectedTab;
 
@@ -337,6 +583,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationLoading = false;
   bool _notificationSaving = false;
   String? _notificationError;
+
+  List<_HiddenPostItem> _hiddenPosts = const [];
+  bool _hiddenPostsLoading = false;
+  String? _hiddenPostsError;
+  int _hiddenPostsVisibleCount = _contentPageSize;
+  final Map<String, bool> _unhideSubmitting = {};
+
+  List<_BlockedUserItem> _blockedUsers = const [];
+  bool _blockedUsersLoading = false;
+  String? _blockedUsersError;
+  final Map<String, bool> _unblockSubmitting = {};
+
+  List<_ContentActivityItem> _activityItems = const [];
+  int _activityVisibleCount = _contentPageSize;
+  bool _activityLoading = false;
+  bool _activityLoadingMore = false;
+  String? _activityError;
+  String? _activityCursor;
+  String _activityFilter = 'all';
+
+  bool _contentActivityOpen = false;
+  bool _contentHiddenOpen = false;
+  bool _contentBlockedOpen = false;
+
+  List<_ViolationHistoryItem> _violationItems = const [];
+  bool _violationLoading = false;
+  String? _violationError;
+  int _currentStrikeTotal = 0;
 
   bool _showChangePassword = false;
   _PasswordChangeStep _passwordStep = _PasswordChangeStep.otp;
@@ -943,6 +1217,550 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _notificationSettings = _NotificationSettingsState.fromJson(res);
     });
+  }
+
+  void _toggleContentSection(String key) {
+    setState(() {
+      if (key == 'activity') {
+        _contentActivityOpen = !_contentActivityOpen;
+      } else if (key == 'hidden') {
+        _contentHiddenOpen = !_contentHiddenOpen;
+      } else if (key == 'blocked') {
+        _contentBlockedOpen = !_contentBlockedOpen;
+      }
+    });
+  }
+
+  void _resetContentViewState({bool clearData = false}) {
+    _contentActivityOpen = false;
+    _contentHiddenOpen = false;
+    _contentBlockedOpen = false;
+    _activityFilter = 'all';
+    _activityVisibleCount = _contentPageSize;
+    _hiddenPostsVisibleCount = _contentPageSize;
+    _activityLoading = false;
+    _activityLoadingMore = false;
+    _hiddenPostsLoading = false;
+    _blockedUsersLoading = false;
+    _activityError = null;
+    _hiddenPostsError = null;
+    _blockedUsersError = null;
+    _activityCursor = null;
+    _unhideSubmitting.clear();
+    _unblockSubmitting.clear();
+    if (clearData) {
+      _activityItems = const [];
+      _hiddenPosts = const [];
+      _blockedUsers = const [];
+    }
+  }
+
+  void _resetViolationsViewState({bool clearData = false}) {
+    _violationLoading = false;
+    _violationError = null;
+    if (clearData) {
+      _violationItems = const [];
+      _currentStrikeTotal = 0;
+    }
+  }
+
+  Future<void> _loadViolationCenter() async {
+    setState(() {
+      _violationLoading = true;
+      _violationError = null;
+    });
+    try {
+      final res = await ProfileService.fetchViolationHistory(limit: 100);
+      final items = (res['items'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(_ViolationHistoryItem.fromJson)
+          .where((item) => item.id.isNotEmpty)
+          .toList(growable: false);
+      if (!mounted) return;
+      setState(() {
+        _violationItems = items;
+        _currentStrikeTotal = (res['currentStrikeTotal'] as num?)?.toInt() ?? 0;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _violationError = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _violationError = 'Unable to load violation history.';
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _violationLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadContentSettings() async {
+    setState(() {
+      _hiddenPostsVisibleCount = _contentPageSize;
+      _hiddenPostsLoading = true;
+      _blockedUsersLoading = true;
+      _hiddenPostsError = null;
+      _blockedUsersError = null;
+    });
+
+    final results = await Future.wait<dynamic>([
+      () async {
+        try {
+          return await ProfileService.fetchHiddenPosts(limit: 50);
+        } catch (_) {
+          return null;
+        }
+      }(),
+      () async {
+        try {
+          return await ProfileService.fetchBlockedUsers(limit: 50);
+        } catch (_) {
+          return null;
+        }
+      }(),
+    ]);
+
+    if (!mounted) return;
+
+    if (results[0] is Map<String, dynamic>) {
+      final hiddenRaw = (results[0]['items'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(_HiddenPostItem.fromJson)
+          .where((item) => item.id.isNotEmpty)
+          .toList(growable: false);
+      setState(() {
+        _hiddenPosts = hiddenRaw;
+      });
+    } else {
+      setState(() {
+        _hiddenPostsError = 'Unable to load hidden posts.';
+      });
+    }
+
+    if (results[1] is Map<String, dynamic>) {
+      final blockedRaw = (results[1]['items'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(_BlockedUserItem.fromJson)
+          .where((item) => item.userId.isNotEmpty)
+          .toList(growable: false);
+      setState(() {
+        _blockedUsers = blockedRaw;
+      });
+    } else {
+      setState(() {
+        _blockedUsersError = 'Unable to load blocked users.';
+      });
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _hiddenPostsLoading = false;
+      _blockedUsersLoading = false;
+    });
+  }
+
+  Future<int> _loadActivityLog({bool reset = true}) async {
+    if (reset) {
+      setState(() {
+        _activityLoading = true;
+        _activityError = null;
+      });
+    } else {
+      setState(() {
+        _activityLoadingMore = true;
+      });
+    }
+
+    var loadedCount = 0;
+    try {
+      final res = await ProfileService.fetchActivityLog(
+        limit: 30,
+        cursor: reset ? null : _activityCursor,
+        types: _activityFilter == 'all' ? null : <String>[_activityFilter],
+      );
+      final fetched = (res['items'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(_ContentActivityItem.fromJson)
+          .where((item) => item.id.isNotEmpty)
+          .toList(growable: false);
+      loadedCount = fetched.length;
+      if (!mounted) return loadedCount;
+      setState(() {
+        _activityItems = reset
+            ? fetched
+            : <_ContentActivityItem>[..._activityItems, ...fetched];
+        _activityCursor = res['nextCursor'] as String?;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return loadedCount;
+      setState(() {
+        _activityError = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return loadedCount;
+      setState(() {
+        _activityError = 'Unable to load activity log.';
+      });
+    } finally {
+      if (!mounted) return loadedCount;
+      setState(() {
+        if (reset) {
+          _activityLoading = false;
+        } else {
+          _activityLoadingMore = false;
+        }
+      });
+    }
+    return loadedCount;
+  }
+
+  Future<void> _handleSeeMoreActivity() async {
+    if (_activityVisibleCount < _activityItems.length) {
+      setState(() {
+        _activityVisibleCount += _contentPageSize;
+      });
+      return;
+    }
+    if ((_activityCursor == null || _activityCursor!.isEmpty) ||
+        _activityLoadingMore) {
+      return;
+    }
+    final loaded = await _loadActivityLog(reset: false);
+    if (!mounted) return;
+    if (loaded > 0) {
+      setState(() {
+        _activityVisibleCount += _contentPageSize;
+      });
+    }
+  }
+
+  void _handleSeeMoreHiddenPosts() {
+    setState(() {
+      _hiddenPostsVisibleCount += _contentPageSize;
+    });
+  }
+
+  String _cleanSnippetText(String? raw, {required String fallback}) {
+    if (raw == null || raw.trim().isEmpty) return fallback;
+    final cleaned = raw
+        .replaceAll(RegExp(r'\[\[[A-Z0-9_]+\]\]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (cleaned.isEmpty) return fallback;
+    return cleaned;
+  }
+
+  String _formatViolationSeverityLabel(String? value) {
+    if (value == null || value.isEmpty) return 'N/A';
+    if (value == 'high') return 'High';
+    if (value == 'medium') return 'Medium';
+    return 'Low';
+  }
+
+  String _formatViolationActionLabel(String action) {
+    switch (action) {
+      case 'remove_post':
+        return 'Removed post';
+      case 'restrict_post':
+        return 'Restricted post';
+      case 'delete_comment':
+        return 'Deleted comment';
+      case 'warn':
+      case 'warn_user':
+        return 'Warning issued';
+      case 'mute_interaction':
+        return 'Interaction muted';
+      case 'suspend_user':
+        return 'Account suspended';
+      case 'limit_account':
+        return 'Account limited';
+      default:
+        return 'Policy action';
+    }
+  }
+
+  bool _isViolationWarnAction(String action) {
+    return action == 'warn' || action == 'warn_user';
+  }
+
+  String? _formatViolationRemainingHourMinute(String? value) {
+    if (value == null || value.isEmpty) return null;
+    final expiresAt = DateTime.tryParse(value);
+    if (expiresAt == null) return null;
+    final totalMinutes = (expiresAt.difference(DateTime.now()).inMinutes).clamp(
+      0,
+      1 << 30,
+    );
+    final hours = (totalMinutes / 60).floor();
+    final minutes = totalMinutes % 60;
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+  }
+
+  bool _canOpenViolationDetail(_ViolationHistoryItem item) {
+    return item.targetType != 'user';
+  }
+
+  String _violationSubtitle(_ViolationHistoryItem item) {
+    if (item.action == 'mute_interaction') {
+      final remaining = _formatViolationRemainingHourMinute(
+        item.actionExpiresAt,
+      );
+      return remaining != null
+          ? 'Interaction muted · Remaining $remaining'
+          : 'Interaction muted · Until turn on';
+    }
+    if (_isViolationWarnAction(item.action)) {
+      return 'Severity ${_formatViolationSeverityLabel(item.severity)} · No strike added';
+    }
+    return 'Severity ${_formatViolationSeverityLabel(item.severity)} · Strike +${item.strikeDelta} (Total ${item.strikeTotalAfter})';
+  }
+
+  Future<void> _openViolationDetail(_ViolationHistoryItem item) async {
+    if (!_canOpenViolationDetail(item) || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _ViolationDetailScreen(item: item),
+      ),
+    );
+  }
+
+  String _activityTitle(_ContentActivityItem item) {
+    final meta = item.meta;
+    final authorName = (meta?.postAuthorDisplayName?.trim().isNotEmpty == true)
+        ? meta!.postAuthorDisplayName!.trim()
+        : (meta?.postAuthorUsername?.trim().isNotEmpty == true)
+        ? '@${meta!.postAuthorUsername!.trim()}'
+        : 'this post';
+    final targetName = (meta?.targetDisplayName?.trim().isNotEmpty == true)
+        ? meta!.targetDisplayName!.trim()
+        : (meta?.targetUsername?.trim().isNotEmpty == true)
+        ? '@${meta!.targetUsername!.trim()}'
+        : 'this account';
+
+    switch (item.type) {
+      case 'post_like':
+        return 'Liked $authorName';
+      case 'comment_like':
+        return 'Liked a comment';
+      case 'comment':
+        return 'Commented on $authorName';
+      case 'repost':
+        return 'Reposted $authorName';
+      case 'save':
+        return 'Saved $authorName';
+      case 'follow':
+        return 'Followed $targetName';
+      case 'report_post':
+        return 'Reported $authorName';
+      case 'report_user':
+        return 'Reported $targetName';
+      default:
+        return 'Activity';
+    }
+  }
+
+  String _activitySubtitle(_ContentActivityItem item) {
+    final meta = item.meta;
+    final commentSnippet = meta?.commentSnippet?.trim();
+    final captionSnippet = meta?.postCaption;
+    if (item.type == 'comment_like' || item.type == 'comment') {
+      return (commentSnippet != null && commentSnippet.isNotEmpty)
+          ? commentSnippet
+          : 'Comment';
+    }
+    return _cleanSnippetText(captionSnippet, fallback: 'Post');
+  }
+
+  bool _isActivityClickable(_ContentActivityItem item) {
+    final hasPost = (item.postId?.isNotEmpty ?? false);
+    final hasFollowTarget =
+        item.type == 'follow' && (item.targetUserId?.isNotEmpty ?? false);
+    return hasPost || hasFollowTarget;
+  }
+
+  String? _activityThumbUrl(_ContentActivityItem item) {
+    return item.meta?.postMediaUrl ?? item.meta?.targetAvatarUrl;
+  }
+
+  String? _priorityCommentIdForActivity(_ContentActivityItem item) {
+    if (item.type == 'comment_like' || item.type == 'comment') {
+      final id = item.commentId;
+      if (id != null && id.isNotEmpty) return id;
+    }
+    return null;
+  }
+
+  Future<void> _openActivityTarget(_ContentActivityItem item) async {
+    if (!mounted) return;
+
+    if (item.type == 'follow' && (item.targetUserId?.isNotEmpty ?? false)) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ProfileScreen(userId: item.targetUserId!),
+        ),
+      );
+      return;
+    }
+
+    if (item.postId == null || item.postId!.isEmpty) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PostDetailScreen(
+          postId: item.postId!,
+          priorityCommentId: _priorityCommentIdForActivity(item),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openHiddenPost(_HiddenPostItem item) async {
+    if (item.id.isEmpty || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PostDetailScreen(postId: item.id),
+      ),
+    );
+  }
+
+  Future<void> _handleUnhidePost(String postId) async {
+    if (postId.isEmpty) return;
+    setState(() {
+      _unhideSubmitting[postId] = true;
+      _hiddenPostsError = null;
+    });
+    try {
+      await ProfileService.unhidePost(postId: postId);
+      if (!mounted) return;
+      setState(() {
+        _hiddenPosts = _hiddenPosts
+            .where((item) => item.id != postId)
+            .toList(growable: false);
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _hiddenPostsError = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _hiddenPostsError = 'Unable to unhide this post.';
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _unhideSubmitting[postId] = false;
+      });
+    }
+  }
+
+  Future<void> _confirmAndUnhide(_HiddenPostItem item) async {
+    final postId = item.id;
+    if (postId.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _surface,
+        title: const Text(
+          'Unhide this post?',
+          style: TextStyle(color: _textPrimary),
+        ),
+        content: const Text(
+          'This post will appear in your feed again.',
+          style: TextStyle(color: _textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Unhide'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _handleUnhidePost(postId);
+    }
+  }
+
+  Future<void> _openBlockedUser(_BlockedUserItem item) async {
+    if (item.userId.isEmpty || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProfileScreen(userId: item.userId),
+      ),
+    );
+  }
+
+  Future<void> _handleUnblockUser(String userId) async {
+    if (userId.isEmpty) return;
+    setState(() {
+      _unblockSubmitting[userId] = true;
+      _blockedUsersError = null;
+    });
+    try {
+      await ProfileService.unblockUser(userId: userId);
+      if (!mounted) return;
+      setState(() {
+        _blockedUsers = _blockedUsers
+            .where((item) => item.userId != userId)
+            .toList(growable: false);
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _blockedUsersError = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _blockedUsersError = 'Unable to unblock this account.';
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _unblockSubmitting[userId] = false;
+      });
+    }
+  }
+
+  Future<void> _confirmAndUnblock(_BlockedUserItem item) async {
+    if (item.userId.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _surface,
+        title: const Text(
+          'Unblock this account?',
+          style: TextStyle(color: _textPrimary),
+        ),
+        content: const Text(
+          'They will be able to see your profile and content again.',
+          style: TextStyle(color: _textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Unblock'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _handleUnblockUser(item.userId);
+    }
   }
 
   Future<void> _openNotificationMuteOverlay({
@@ -2041,6 +2859,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'Creator verification';
       case SettingsTab.passwordSecurity:
         return 'Password & Security';
+      case SettingsTab.content:
+        return 'Content';
+      case SettingsTab.violations:
+        return 'Violation Center';
       case SettingsTab.notifications:
         return 'Notifications';
     }
@@ -2056,6 +2878,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return Icons.verified_outlined;
       case SettingsTab.passwordSecurity:
         return Icons.lock_outline_rounded;
+      case SettingsTab.content:
+        return Icons.article_outlined;
+      case SettingsTab.violations:
+        return Icons.gpp_bad_outlined;
       case SettingsTab.notifications:
         return Icons.notifications_none_rounded;
     }
@@ -2071,6 +2897,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'Check eligibility and request creator badge verification.';
       case SettingsTab.passwordSecurity:
         return 'Manage password, two-factor, passkey, and login devices.';
+      case SettingsTab.content:
+        return 'Review activity log, hidden posts, and blocked users.';
+      case SettingsTab.violations:
+        return 'Review moderation actions and your strike history.';
       case SettingsTab.notifications:
         return 'Control when notification alerts are delivered.';
     }
@@ -2085,6 +2915,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (previous == SettingsTab.passwordSecurity &&
           tab != SettingsTab.passwordSecurity) {
         _resetPasswordSecurityViewState();
+      }
+      if (previous == SettingsTab.content && tab != SettingsTab.content) {
+        _resetContentViewState(clearData: true);
+      }
+      if (previous == SettingsTab.violations && tab != SettingsTab.violations) {
+        _resetViolationsViewState(clearData: true);
       }
       _selectedTab = tab;
     });
@@ -2103,6 +2939,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _notificationSettings == null &&
         !_notificationLoading) {
       _loadNotificationSettings();
+    }
+    if (tab == SettingsTab.content) {
+      setState(() {
+        _resetContentViewState();
+      });
+      _loadContentSettings();
+      _loadActivityLog(reset: true);
+    }
+    if (tab == SettingsTab.violations) {
+      setState(() {
+        _resetViolationsViewState();
+      });
+      _loadViolationCenter();
     }
   }
 
@@ -2387,6 +3236,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (tab == SettingsTab.personalInfo) return _buildPersonalInfoTab();
     if (tab == SettingsTab.profile) return _buildProfileTab();
     if (tab == SettingsTab.passwordSecurity) return _buildPasswordSecurityTab();
+    if (tab == SettingsTab.content) return _buildContentTab();
+    if (tab == SettingsTab.violations) return _buildViolationsTab();
     if (tab == SettingsTab.notifications) return _buildNotificationsTab();
     return _buildCreatorVerificationTab();
   }
@@ -4357,6 +5208,751 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildContentTab() {
+    final visibleActivityItems = _activityItems
+        .take(_activityVisibleCount)
+        .toList(growable: false);
+    final canSeeMoreActivity =
+        _activityVisibleCount < _activityItems.length ||
+        (_activityCursor?.isNotEmpty ?? false);
+
+    final visibleHiddenPosts = _hiddenPosts
+        .take(_hiddenPostsVisibleCount)
+        .toList(growable: false);
+    final canSeeMoreHiddenPosts =
+        _hiddenPostsVisibleCount < _hiddenPosts.length;
+
+    Widget buildAccordionHeader({
+      required String title,
+      required String desc,
+      required bool isOpen,
+      required VoidCallback onTap,
+    }) {
+      return InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: _textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      desc,
+                      style: const TextStyle(
+                        color: _textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                isOpen ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                color: _textSecondary,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Widget buildDivider() => Divider(
+      color: Colors.white.withValues(alpha: 0.06),
+      height: 1,
+      thickness: 1,
+    );
+
+    IconData activityIcon(String type) {
+      switch (type) {
+        case 'post_like':
+        case 'comment_like':
+          return Icons.thumb_up_alt_rounded;
+        case 'comment':
+          return Icons.mode_comment_outlined;
+        case 'repost':
+          return Icons.repeat_rounded;
+        case 'save':
+          return Icons.bookmark_rounded;
+        case 'follow':
+          return Icons.person_add_alt_1_rounded;
+        case 'report_post':
+        case 'report_user':
+          return Icons.flag_rounded;
+        default:
+          return Icons.bolt_rounded;
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Content',
+          style: TextStyle(
+            color: _textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Manage hidden posts, blocked users, and your activity log.',
+          style: TextStyle(color: _textSecondary, fontSize: 13),
+        ),
+        const SizedBox(height: 14),
+
+        _buildCard(
+          children: [
+            buildAccordionHeader(
+              title: 'Activity log',
+              desc: 'Track all of your interactions across the platform.',
+              isOpen: _contentActivityOpen,
+              onTap: () => _toggleContentSection('activity'),
+            ),
+            if (_contentActivityOpen) ...[
+              buildDivider(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _activityFilterOptions
+                      .map((option) {
+                        final key = option['key']!;
+                        final active = _activityFilter == key;
+                        return ChoiceChip(
+                          label: Text(option['label']!),
+                          selected: active,
+                          showCheckmark: false,
+                          onSelected: (_) {
+                            if (_activityFilter == key) return;
+                            setState(() {
+                              _activityFilter = key;
+                              _activityVisibleCount = _contentPageSize;
+                            });
+                            _loadActivityLog(reset: true);
+                          },
+                          selectedColor: _filterActiveBg,
+                          labelStyle: TextStyle(
+                            color: active ? _filterActiveText : _textSecondary,
+                            fontWeight: active
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            side: BorderSide(
+                              color: active ? _filterActiveBg : _border,
+                            ),
+                          ),
+                          backgroundColor: const Color(0xFF0F1A2F),
+                        );
+                      })
+                      .toList(growable: false),
+                ),
+              ),
+              if (_activityLoading)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(14, 0, 14, 12),
+                  child: Text(
+                    'Loading activity...',
+                    style: TextStyle(color: _textSecondary, fontSize: 12),
+                  ),
+                ),
+              if (_activityError != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                  child: Text(
+                    _activityError!,
+                    style: const TextStyle(color: _danger, fontSize: 12),
+                  ),
+                ),
+              if (!_activityLoading && visibleActivityItems.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(14, 0, 14, 14),
+                  child: Text(
+                    'No activity yet.',
+                    style: TextStyle(color: _textSecondary, fontSize: 12),
+                  ),
+                ),
+              if (visibleActivityItems.isNotEmpty)
+                ...visibleActivityItems.map((item) {
+                  final thumbUrl = _activityThumbUrl(item);
+                  final clickable = _isActivityClickable(item);
+                  return InkWell(
+                    onTap: clickable ? () => _openActivityTarget(item) : null,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.04),
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: _accent.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              activityIcon(item.type),
+                              color: _accent,
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _activityTitle(item),
+                                  style: const TextStyle(
+                                    color: _textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _activitySubtitle(item),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: _textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _formatRelativeTime(item.createdAt),
+                                  style: const TextStyle(
+                                    color: _textSecondary,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (thumbUrl != null && thumbUrl.isNotEmpty)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                thumbUrl,
+                                width: 36,
+                                height: 36,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0F1A2F),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F1A2F),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  '📝',
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              if (canSeeMoreActivity)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                  child: OutlinedButton(
+                    onPressed: _activityLoadingMore
+                        ? null
+                        : _handleSeeMoreActivity,
+                    child: Text(
+                      _activityLoadingMore ? 'Loading...' : 'See more',
+                    ),
+                  ),
+                ),
+            ],
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildCard(
+          children: [
+            buildAccordionHeader(
+              title: 'Hidden posts',
+              desc:
+                  'Posts you hide are removed from your feed. You can unhide them anytime.',
+              isOpen: _contentHiddenOpen,
+              onTap: () => _toggleContentSection('hidden'),
+            ),
+            if (_contentHiddenOpen) ...[
+              buildDivider(),
+              if (_hiddenPostsLoading)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: Text(
+                    'Loading hidden posts...',
+                    style: TextStyle(color: _textSecondary, fontSize: 12),
+                  ),
+                ),
+              if (_hiddenPostsError != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: Text(
+                    _hiddenPostsError!,
+                    style: const TextStyle(color: _danger, fontSize: 12),
+                  ),
+                ),
+              if (!_hiddenPostsLoading && visibleHiddenPosts.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
+                  child: Text(
+                    'No hidden posts.',
+                    style: TextStyle(color: _textSecondary, fontSize: 12),
+                  ),
+                ),
+              ...visibleHiddenPosts.map((post) {
+                final authorName =
+                    (post.authorDisplayName?.trim().isNotEmpty == true)
+                    ? post.authorDisplayName!.trim()
+                    : (post.authorUsername?.trim().isNotEmpty == true)
+                    ? '@${post.authorUsername!.trim()}'
+                    : 'Unknown';
+                final caption = _cleanSnippetText(
+                  post.content,
+                  fallback: 'No caption',
+                );
+                final thumbUrl = post.media.isNotEmpty
+                    ? post.media.first.url
+                    : null;
+                final isSubmitting = _unhideSubmitting[post.id] == true;
+
+                return InkWell(
+                  onTap: () => _openHiddenPost(post),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.04),
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: thumbUrl != null && thumbUrl.isNotEmpty
+                              ? Image.network(
+                                  thumbUrl,
+                                  width: 42,
+                                  height: 42,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 42,
+                                    height: 42,
+                                    color: const Color(0xFF0F1A2F),
+                                    alignment: Alignment.center,
+                                    child: const Text('📝'),
+                                  ),
+                                )
+                              : Container(
+                                  width: 42,
+                                  height: 42,
+                                  color: const Color(0xFF0F1A2F),
+                                  alignment: Alignment.center,
+                                  child: const Text('📝'),
+                                ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                authorName,
+                                style: const TextStyle(
+                                  color: _textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                caption,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: _textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton(
+                          onPressed: isSubmitting
+                              ? null
+                              : () => _confirmAndUnhide(post),
+                          child: Text(isSubmitting ? 'Unhiding...' : 'Unhide'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+              if (canSeeMoreHiddenPosts)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                  child: OutlinedButton(
+                    onPressed: _handleSeeMoreHiddenPosts,
+                    child: const Text('See more'),
+                  ),
+                ),
+            ],
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildCard(
+          children: [
+            buildAccordionHeader(
+              title: 'Blocked users',
+              desc: 'People you block cannot view your profile or content.',
+              isOpen: _contentBlockedOpen,
+              onTap: () => _toggleContentSection('blocked'),
+            ),
+            if (_contentBlockedOpen) ...[
+              buildDivider(),
+              if (_blockedUsersLoading)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: Text(
+                    'Loading blocked users...',
+                    style: TextStyle(color: _textSecondary, fontSize: 12),
+                  ),
+                ),
+              if (_blockedUsersError != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: Text(
+                    _blockedUsersError!,
+                    style: const TextStyle(color: _danger, fontSize: 12),
+                  ),
+                ),
+              if (!_blockedUsersLoading && _blockedUsers.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
+                  child: Text(
+                    'No blocked users.',
+                    style: TextStyle(color: _textSecondary, fontSize: 12),
+                  ),
+                ),
+              ..._blockedUsers.map((user) {
+                final label = (user.displayName?.trim().isNotEmpty == true)
+                    ? user.displayName!.trim()
+                    : (user.username?.trim().isNotEmpty == true)
+                    ? '@${user.username!.trim()}'
+                    : 'Unknown';
+                final handle = (user.username?.trim().isNotEmpty == true)
+                    ? '@${user.username!.trim()}'
+                    : 'Unknown';
+                final isSubmitting = _unblockSubmitting[user.userId] == true;
+
+                return InkWell(
+                  onTap: () => _openBlockedUser(user),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.04),
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: const Color(0xFF0F1A2F),
+                          backgroundImage:
+                              (user.avatarUrl != null &&
+                                  user.avatarUrl!.isNotEmpty)
+                              ? NetworkImage(user.avatarUrl!)
+                              : null,
+                          child:
+                              (user.avatarUrl == null ||
+                                  user.avatarUrl!.isEmpty)
+                              ? Text(
+                                  label.isNotEmpty
+                                      ? label[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(color: _textPrimary),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                label,
+                                style: const TextStyle(
+                                  color: _textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                handle,
+                                style: const TextStyle(
+                                  color: _textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton(
+                          onPressed: isSubmitting
+                              ? null
+                              : () => _confirmAndUnblock(user),
+                          child: Text(
+                            isSubmitting ? 'Unblocking...' : 'Unblock',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildViolationsTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Violation Center',
+          style: TextStyle(
+            color: _textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Review moderation actions and your strike history.',
+          style: TextStyle(color: _textSecondary, fontSize: 13),
+        ),
+        const SizedBox(height: 14),
+
+        _buildCard(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Current strike total',
+                          style: TextStyle(color: _textSecondary, fontSize: 12),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$_currentStrikeTotal',
+                          style: const TextStyle(
+                            color: _textPrimary,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  OutlinedButton(
+                    onPressed: _violationLoading ? null : _loadViolationCenter,
+                    child: Text(
+                      _violationLoading ? 'Refreshing...' : 'Refresh',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildCard(
+          children: [
+            if (_violationLoading)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Text(
+                  'Loading violation history...',
+                  style: TextStyle(color: _textSecondary, fontSize: 12),
+                ),
+              ),
+            if (_violationError != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Text(
+                  _violationError!,
+                  style: const TextStyle(color: _danger, fontSize: 12),
+                ),
+              ),
+            if (!_violationLoading && _violationItems.isEmpty)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
+                child: Text(
+                  'No violations found.',
+                  style: TextStyle(color: _textSecondary, fontSize: 12),
+                ),
+              ),
+            ..._violationItems.map((item) {
+              final canOpen = _canOpenViolationDetail(item);
+              final timeLabel = _formatRelativeTime(item.createdAt);
+              return InkWell(
+                onTap: canOpen ? () => _openViolationDetail(item) : null,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.04),
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: _accent.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.flag_rounded,
+                          color: _accent,
+                          size: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${_formatViolationActionLabel(item.action)} · ${item.targetType.toUpperCase()}',
+                              style: const TextStyle(
+                                color: _textPrimary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _violationSubtitle(item),
+                              style: const TextStyle(
+                                color: _textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Reason: ${item.reason.isEmpty ? 'No reason provided.' : item.reason}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            if (timeLabel.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                timeLabel,
+                                style: const TextStyle(
+                                  color: _textSecondary,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                            if (canOpen) ...[
+                              const SizedBox(height: 3),
+                              const Text(
+                                'Tap to view violated content',
+                                style: TextStyle(
+                                  color: _textSecondary,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildNotificationsTab() {
     final settings = _notificationSettings;
 
@@ -4675,6 +6271,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           await _loadNotificationSettings();
           return;
         }
+        if (_selectedTab == SettingsTab.violations) {
+          await _loadViolationCenter();
+          return;
+        }
+        if (_selectedTab == SettingsTab.content) {
+          await _loadContentSettings();
+          await _loadActivityLog(reset: true);
+          return;
+        }
         await _loadProfile();
       },
       color: _accent,
@@ -4695,10 +6300,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (_selectedTab == SettingsTab.passwordSecurity) {
               _resetPasswordSecurityViewState();
             }
+            if (_selectedTab == SettingsTab.content) {
+              _resetContentViewState(clearData: true);
+            }
+            if (_selectedTab == SettingsTab.violations) {
+              _resetViolationsViewState(clearData: true);
+            }
             _selectedTab = null;
           });
           return false;
         }
+        _resetContentViewState(clearData: true);
+        _resetViolationsViewState(clearData: true);
         _resetPasswordSecurityViewState();
         return true;
       },
@@ -4724,12 +6337,290 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (_selectedTab == SettingsTab.passwordSecurity) {
                         _resetPasswordSecurityViewState();
                       }
+                      if (_selectedTab == SettingsTab.content) {
+                        _resetContentViewState(clearData: true);
+                      }
+                      if (_selectedTab == SettingsTab.violations) {
+                        _resetViolationsViewState(clearData: true);
+                      }
                       _selectedTab = null;
                     });
                   },
                 ),
         ),
         body: _buildContent(),
+      ),
+    );
+  }
+}
+
+class _ViolationDetailScreen extends StatelessWidget {
+  const _ViolationDetailScreen({required this.item});
+
+  final _ViolationHistoryItem item;
+
+  static const Color _bg = Color(0xFF0F1829);
+  static const Color _surface = Color(0xFF131F33);
+  static const Color _border = Color(0xFF1E2D48);
+  static const Color _textPrimary = Color(0xFFE8ECF8);
+  static const Color _textSecondary = Color(0xFF7A8BB0);
+  static const Color _accent = Color(0xFF4AA3E4);
+
+  String _cleanSnippetText(String? raw, {required String fallback}) {
+    if (raw == null || raw.trim().isEmpty) return fallback;
+    final cleaned = raw
+        .replaceAll(RegExp(r'\[\[[A-Z0-9_]+\]\]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (cleaned.isEmpty) return fallback;
+    return cleaned;
+  }
+
+  String _formatActionLabel(String action) {
+    switch (action) {
+      case 'remove_post':
+        return 'Removed post';
+      case 'restrict_post':
+        return 'Restricted post';
+      case 'delete_comment':
+        return 'Deleted comment';
+      case 'warn':
+      case 'warn_user':
+        return 'Warning issued';
+      case 'mute_interaction':
+        return 'Interaction muted';
+      case 'suspend_user':
+        return 'Account suspended';
+      case 'limit_account':
+        return 'Account limited';
+      default:
+        return 'Policy action';
+    }
+  }
+
+  String _formatSeverityLabel(String? value) {
+    if (value == null || value.isEmpty) return 'N/A';
+    if (value == 'high') return 'High';
+    if (value == 'medium') return 'Medium';
+    return 'Low';
+  }
+
+  String _formatRelativeTime(String? value) {
+    if (value == null || value.isEmpty) return '';
+    final dt = DateTime.tryParse(value);
+    if (dt == null) return '';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    if (diff.inDays < 30) return '${diff.inDays}d ago';
+    final months = (diff.inDays / 30).floor();
+    if (months < 12) return '${months}mo ago';
+    final years = (diff.inDays / 365).floor();
+    return '${years}y ago';
+  }
+
+  Widget _buildCard({required List<Widget> children}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border),
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildMediaPreview(_ViolationMediaPreview media) {
+    final isVideo = media.type == 'video';
+    if (!isVideo) {
+      return Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(maxHeight: 320),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F1A2F),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Image.network(
+          media.url,
+          fit: BoxFit.contain,
+          width: double.infinity,
+          errorBuilder: (_, __, ___) => Container(
+            width: double.infinity,
+            height: 140,
+            color: const Color(0xFF0F1A2F),
+            alignment: Alignment.center,
+            child: const Text(
+              'Unable to load preview image',
+              style: TextStyle(color: _textSecondary, fontSize: 12),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1A2F),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _border),
+      ),
+      child: const Text(
+        'Video preview is available for this violation.',
+        style: TextStyle(color: _textSecondary, fontSize: 12),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final recordedAt = _formatRelativeTime(item.createdAt);
+    final severityText = _formatSeverityLabel(item.severity);
+    final reasonText = item.reason.trim().isEmpty
+        ? 'No reason provided.'
+        : item.reason.trim();
+    final contentText = _cleanSnippetText(
+      item.previewText,
+      fallback: 'No text content captured.',
+    );
+    final parentText = _cleanSnippetText(
+      item.relatedPostPreview?.text,
+      fallback: 'No captured.',
+    );
+
+    return Scaffold(
+      backgroundColor: _bg,
+      appBar: AppBar(
+        backgroundColor: _bg,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: _textPrimary),
+        title: const Text(
+          'Violated content',
+          style: TextStyle(color: _textPrimary, fontWeight: FontWeight.w700),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          _buildCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_formatActionLabel(item.action)} · ${item.targetType.toUpperCase()}',
+                      style: const TextStyle(
+                        color: _textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Severity $severityText · Strike +${item.strikeDelta} (Total ${item.strikeTotalAfter})',
+                      style: const TextStyle(
+                        color: _textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (recordedAt.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Recorded $recordedAt',
+                        style: const TextStyle(
+                          color: _textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'Reason: $reasonText',
+                      style: const TextStyle(
+                        color: _textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (item.targetType == 'comment')
+                      const Text(
+                        'Your violated comment',
+                        style: TextStyle(color: _textSecondary, fontSize: 11),
+                      ),
+                    if (item.targetType == 'comment') const SizedBox(height: 4),
+                    Text(
+                      contentText,
+                      style: const TextStyle(color: _textPrimary, fontSize: 13),
+                    ),
+                    if (item.previewMedia != null) ...[
+                      const SizedBox(height: 12),
+                      _buildMediaPreview(item.previewMedia!),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (item.targetType == 'comment' &&
+              item.relatedPostPreview != null) ...[
+            const SizedBox(height: 12),
+            _buildCard(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Parent post context',
+                        style: TextStyle(color: _textSecondary, fontSize: 11),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        parentText,
+                        style: const TextStyle(
+                          color: _textPrimary,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (item.relatedPostPreview?.media != null) ...[
+                        const SizedBox(height: 12),
+                        _buildMediaPreview(item.relatedPostPreview!.media!),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close_rounded),
+              label: const Text('Close'),
+            ),
+          ),
+        ],
       ),
     );
   }

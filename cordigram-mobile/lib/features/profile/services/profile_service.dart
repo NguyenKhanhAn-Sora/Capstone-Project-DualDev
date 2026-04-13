@@ -447,6 +447,88 @@ class ProfileService {
     );
   }
 
+  /// Fetch hidden posts for the current user.
+  static Future<Map<String, dynamic>> fetchHiddenPosts({int limit = 50}) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.get(
+      '/posts/hidden?limit=$limit',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Unhide a post from current user's hidden list.
+  static Future<Map<String, dynamic>> unhidePost({
+    required String postId,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.delete(
+      '/posts/${Uri.encodeComponent(postId)}/hide',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Fetch blocked users for the current user.
+  static Future<Map<String, dynamic>> fetchBlockedUsers({
+    int limit = 50,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.get(
+      '/users/blocked?limit=$limit',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Unblock a user.
+  static Future<Map<String, dynamic>> unblockUser({
+    required String userId,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.delete(
+      '/users/${Uri.encodeComponent(userId)}/block',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Fetch paginated activity log for current user.
+  static Future<Map<String, dynamic>> fetchActivityLog({
+    int limit = 30,
+    String? cursor,
+    List<String>? types,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+
+    final query = <String, String>{'limit': '$limit'};
+    if (cursor != null && cursor.isNotEmpty) {
+      query['cursor'] = cursor;
+    }
+    if (types != null && types.isNotEmpty) {
+      query['type'] = types.join(',');
+    }
+
+    final qs = Uri(queryParameters: query).query;
+    return ApiService.get(
+      '/users/activity?$qs',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  /// Fetch violation history and current strike total for current user.
+  static Future<Map<String, dynamic>> fetchViolationHistory({
+    int limit = 100,
+  }) async {
+    final token = AuthStorage.accessToken;
+    if (token == null) throw const ApiException('Not authenticated');
+    return ApiService.get(
+      '/users/violations?limit=$limit',
+      extraHeaders: {'Authorization': 'Bearer $token'},
+    );
+  }
+
   /// Request passkey OTP (password confirmation step).
   static Future<Map<String, dynamic>> requestPasskeyOtp({
     required String password,

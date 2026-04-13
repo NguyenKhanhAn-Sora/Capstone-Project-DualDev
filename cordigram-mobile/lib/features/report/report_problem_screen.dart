@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:video_player/video_player.dart';
 import 'dart:convert';
 import '../../core/config/app_config.dart';
 import '../../core/services/api_service.dart';
@@ -486,11 +488,18 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           ),
           const SizedBox(height: 10),
 
-          // File list
+          // Media preview grid
           if (_files.isNotEmpty) ...[
-            ...List.generate(
-              _files.length,
-              (i) => _FileChip(file: _files[i], onRemove: () => _removeFile(i)),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: List.generate(
+                _files.length,
+                (i) => _AttachmentPreviewTile(
+                  file: _files[i],
+                  onRemove: () => _removeFile(i),
+                ),
+              ),
             ),
             const SizedBox(height: 8),
           ],
@@ -673,56 +682,134 @@ class _FieldLabel extends StatelessWidget {
   }
 }
 
-// ── File chip ─────────────────────────────────────────────────────────────────
+// ── Attachment preview ────────────────────────────────────────────────────────
 
-class _FileChip extends StatelessWidget {
-  const _FileChip({required this.file, required this.onRemove});
+class _AttachmentPreviewTile extends StatefulWidget {
+  const _AttachmentPreviewTile({required this.file, required this.onRemove});
   final _PickedFile file;
   final VoidCallback onRemove;
 
+  @override
+  State<_AttachmentPreviewTile> createState() => _AttachmentPreviewTileState();
+}
+
+class _AttachmentPreviewTileState extends State<_AttachmentPreviewTile> {
+  VideoPlayerController? _videoController;
+  bool _videoReady = false;
+
+  _PickedFile get _file => widget.file;
+
   bool get _isVideo {
-    final ext = file.name.split('.').last.toLowerCase();
+    final ext = _file.name.split('.').last.toLowerCase();
     return ['mp4', 'mov', 'avi', 'mkv', 'webm'].contains(ext);
   }
 
   @override
+  void initState() {
+    super.initState();
+    if (_isVideo) {
+      _videoController = VideoPlayerController.file(File(_file.xFile.path));
+      _videoController!
+          .initialize()
+          .then((_) {
+            if (!mounted) return;
+            setState(() => _videoReady = true);
+          })
+          .catchError((_) {
+            if (!mounted) return;
+            setState(() => _videoReady = false);
+          });
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF111827),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF1E2D48)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            _isVideo ? Icons.videocam_outlined : Icons.image_outlined,
-            color: const Color(0xFF4AA3E4),
-            size: 18,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              file.name,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFFD0D8EE), fontSize: 13),
+    return SizedBox(
+      width: 104,
+      height: 104,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF111827),
+                border: Border.all(color: const Color(0xFF1E2D48)),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: _isVideo ? _buildVideoPreview() : _buildImagePreview(),
             ),
-          ),
-          GestureDetector(
-            onTap: onRemove,
-            child: const Padding(
-              padding: EdgeInsets.only(left: 8),
-              child: Icon(
-                Icons.close_rounded,
-                color: Color(0xFF7A8BB0),
-                size: 18,
+            if (_isVideo)
+              const Center(
+                child: Icon(
+                  Icons.play_circle_fill_rounded,
+                  color: Color(0xFFE8ECF8),
+                  size: 34,
+                ),
+              ),
+            Positioned(
+              top: 6,
+              right: 6,
+              child: GestureDetector(
+                onTap: widget.onRemove,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: const BoxDecoration(
+                    color: Color(0xCC0B1020),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFFD0D8EE),
+                    size: 16,
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildImagePreview() {
+    return Image.file(
+      File(_file.xFile.path),
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) {
+        return const Center(
+          child: Icon(
+            Icons.broken_image_outlined,
+            color: Color(0xFF7A8BB0),
+            size: 24,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVideoPreview() {
+    if (_videoController != null && _videoReady) {
+      return FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: _videoController!.value.size.width,
+          height: _videoController!.value.size.height,
+          child: VideoPlayer(_videoController!),
+        ),
+      );
+    }
+
+    return const Center(
+      child: Icon(Icons.videocam_outlined, color: Color(0xFF7A8BB0), size: 24),
     );
   }
 }
