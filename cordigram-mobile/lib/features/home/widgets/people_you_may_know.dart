@@ -42,7 +42,9 @@ const int _kExpandedLimit = 20;
 // ── Widget ────────────────────────────────────────────────────────────────────
 
 class PeopleYouMayKnow extends StatefulWidget {
-  const PeopleYouMayKnow({super.key});
+  const PeopleYouMayKnow({super.key, this.onOpenProfile});
+
+  final void Function(String userId)? onOpenProfile;
 
   @override
   State<PeopleYouMayKnow> createState() => _PeopleYouMayKnowState();
@@ -232,6 +234,8 @@ class _PeopleYouMayKnowState extends State<PeopleYouMayKnow> {
                         isFollowing: _effectiveFollowing(item),
                         isPending: _pending.contains(item.userId),
                         onFollow: () => _toggleFollow(item),
+                        onOpenProfile: () =>
+                            widget.onOpenProfile?.call(item.userId),
                         cardColor: bgCard,
                       );
                     },
@@ -312,6 +316,7 @@ class _SuggestionCard extends StatelessWidget {
     required this.isFollowing,
     required this.isPending,
     required this.onFollow,
+    required this.onOpenProfile,
     required this.cardColor,
   });
 
@@ -319,6 +324,7 @@ class _SuggestionCard extends StatelessWidget {
   final bool isFollowing;
   final bool isPending;
   final VoidCallback onFollow;
+  final VoidCallback onOpenProfile;
   final Color cardColor;
 
   @override
@@ -330,46 +336,53 @@ class _SuggestionCard extends StatelessWidget {
     final name = item.displayName.isNotEmpty ? item.displayName : item.username;
     final letter = name.trim().substring(0, 1).toUpperCase();
 
-    return Container(
-      width: 132,
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderCol, width: 1),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          _Avatar(avatarUrl: item.avatarUrl, letter: letter),
-          const SizedBox(height: 8),
-          Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: textPrime,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              height: 1.3,
+    return GestureDetector(
+      onTap: onOpenProfile,
+      child: Container(
+        width: 132,
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderCol, width: 1),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _Avatar(avatarUrl: item.avatarUrl, letter: letter),
+            const SizedBox(height: 8),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: textPrime,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '@${item.username}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: textSub, fontSize: 10.5, height: 1.3),
-          ),
-          const Spacer(),
-          _FollowButton(
-            isFollowing: isFollowing,
-            isPending: isPending,
-            onTap: onFollow,
-          ),
-        ],
+            const SizedBox(height: 2),
+            Text(
+              '@${item.username}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: textSub,
+                fontSize: 10.5,
+                height: 1.3,
+              ),
+            ),
+            const Spacer(),
+            _FollowButton(
+              isFollowing: isFollowing,
+              isPending: isPending,
+              onTap: onFollow,
+            ),
+          ],
+        ),
       ),
     );
   }

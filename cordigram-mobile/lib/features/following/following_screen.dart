@@ -8,6 +8,7 @@ import '../home/services/feed_service.dart';
 import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostCard, PostMenuAction;
 import '../post/post_detail_screen.dart';
+import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../profile/profile_screen.dart';
 import '../reels/reels_screen.dart';
@@ -373,6 +374,21 @@ class _FollowingScreenState extends State<FollowingScreen> {
             : PostInteractionService.permalink(post.id);
         await Clipboard.setData(ClipboardData(text: link));
         _showSnack('Link copied');
+        return;
+      case PostMenuAction.muteNotifications:
+        final label = post.kind.toLowerCase() == 'reel' ? 'reel' : 'post';
+        final muted = await showPostMuteOverlay(
+          context,
+          postId: post.id,
+          kindLabel: label,
+        );
+        if (muted) {
+          _showSnack(
+            label == 'reel'
+                ? 'Reel notifications muted'
+                : 'Post notifications muted',
+          );
+        }
         return;
       case PostMenuAction.reportPost:
         final token = AuthStorage.accessToken;

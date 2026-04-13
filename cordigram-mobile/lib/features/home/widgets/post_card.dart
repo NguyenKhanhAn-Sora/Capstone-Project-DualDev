@@ -135,6 +135,7 @@ enum PostMenuAction {
   editVisibility,
   toggleComments,
   toggleHideLike,
+  muteNotifications,
   goToAdsPost,
   detailAds,
   copyLink,
@@ -307,6 +308,13 @@ class _PostCardState extends State<PostCard> {
         label: post.hideLikeCount == true ? 'Show like' : 'Hide like',
         danger: false,
       ));
+      entries.add((
+        id: 'muteNotifications',
+        label: post.kind.toLowerCase() == 'reel'
+            ? 'Mute this reel'
+            : 'Mute this post',
+        danger: false,
+      ));
       entries.add((id: 'copyLink', label: 'Copy link', danger: false));
       entries.add((id: 'deletePost', label: 'Delete post', danger: true));
     } else {
@@ -389,6 +397,8 @@ class _PostCardState extends State<PostCard> {
         return _onMenuAction(PostMenuAction.toggleComments);
       case 'toggleHideLike':
         return _onMenuAction(PostMenuAction.toggleHideLike);
+      case 'muteNotifications':
+        return _onMenuAction(PostMenuAction.muteNotifications);
       case 'copyLink':
         return _onMenuAction(PostMenuAction.copyLink);
       case 'deletePost':

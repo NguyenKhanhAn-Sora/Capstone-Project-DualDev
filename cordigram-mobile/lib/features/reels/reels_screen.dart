@@ -22,6 +22,7 @@ import '../home/widgets/post_card.dart' show PostMenuAction;
 import '../profile/profile_screen.dart';
 import '../post/post_detail_screen.dart' show CommentItem, CommentLinkPreview;
 import '../post/utils/post_edit_utils.dart';
+import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../report/report_comment_sheet.dart';
 import '../report/report_post_sheet.dart';
@@ -742,6 +743,14 @@ class _ReelsScreenState extends State<ReelsScreen> {
         await Clipboard.setData(ClipboardData(text: link));
         _showSnack('Link copied');
         return;
+      case PostMenuAction.muteNotifications:
+        final muted = await showPostMuteOverlay(
+          context,
+          postId: reel.id,
+          kindLabel: 'reel',
+        );
+        if (muted) _showSnack('Reel notifications muted');
+        return;
       case PostMenuAction.deletePost:
         final confirmed = await showDialog<bool>(
           context: context,
@@ -1123,6 +1132,7 @@ class _ReelPageState extends State<_ReelPage> {
         label: reel.hideLikeCount == true ? 'Show like' : 'Hide like',
         danger: false,
       ));
+      entries.add((id: 'muteReel', label: 'Mute this reel', danger: false));
       if (canDownload) {
         entries.add((
           id: 'downloadReel',
@@ -1206,6 +1216,8 @@ class _ReelPageState extends State<_ReelPage> {
         return widget.onMenuAction(PostMenuAction.toggleComments);
       case 'toggleHideLike':
         return widget.onMenuAction(PostMenuAction.toggleHideLike);
+      case 'muteReel':
+        return widget.onMenuAction(PostMenuAction.muteNotifications);
       case 'copyLink':
         return widget.onMenuAction(PostMenuAction.copyLink);
       case 'downloadReel':

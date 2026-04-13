@@ -21,6 +21,7 @@ import '../home/widgets/media_carousel.dart';
 import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostCard, PostMenuAction;
 import 'utils/post_edit_utils.dart';
+import 'utils/post_mute_overlay.dart';
 
 // ── Comment media data (mirrors web's CommentMedia + local XFile) ─────────────
 
@@ -672,6 +673,21 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         final link = PostInteractionService.permalink(post.id);
         await Clipboard.setData(ClipboardData(text: link));
         _showSnack('Link copied');
+        return;
+      case PostMenuAction.muteNotifications:
+        final label = post.kind.toLowerCase() == 'reel' ? 'reel' : 'post';
+        final muted = await showPostMuteOverlay(
+          context,
+          postId: post.id,
+          kindLabel: label,
+        );
+        if (muted) {
+          _showSnack(
+            label == 'reel'
+                ? 'Reel notifications muted'
+                : 'Post notifications muted',
+          );
+        }
         return;
       case PostMenuAction.deletePost:
         final confirmed = await showDialog<bool>(

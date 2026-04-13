@@ -16,6 +16,7 @@ import '../notifications/notification_screen.dart';
 import '../post/create_tab_screen.dart';
 import '../post/post_detail_screen.dart';
 import '../post/utils/post_edit_utils.dart';
+import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../profile/profile_screen.dart';
 import '../reels/reels_screen.dart';
@@ -883,6 +884,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _showSnack('Failed to update like visibility', error: true);
         }
         return;
+      case PostMenuAction.muteNotifications:
+        final label = post.kind.toLowerCase() == 'reel' ? 'reel' : 'post';
+        final muted = await showPostMuteOverlay(
+          context,
+          postId: post.id,
+          kindLabel: label,
+        );
+        if (muted) {
+          _showSnack(
+            label == 'reel'
+                ? 'Reel notifications muted'
+                : 'Post notifications muted',
+          );
+        }
+        return;
       case PostMenuAction.goToAdsPost:
         _openPostDetail(state);
         return;
@@ -1423,7 +1439,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           // People you may know strip
-          const SliverToBoxAdapter(child: PeopleYouMayKnow()),
+          SliverToBoxAdapter(
+            child: PeopleYouMayKnow(onOpenProfile: _openUserProfile),
+          ),
           // Feed items
           SliverList(
             delegate: SliverChildBuilderDelegate((context, index) {

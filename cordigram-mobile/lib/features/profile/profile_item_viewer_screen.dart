@@ -15,6 +15,7 @@ import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostMenuAction;
 import '../post/post_detail_screen.dart';
 import '../post/utils/post_edit_utils.dart';
+import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../profile/profile_screen.dart';
 import '../reels/reels_screen.dart' show ReelCommentSheet;
@@ -312,8 +313,8 @@ Future<void> _openAdDestinationUrl(BuildContext context, String? rawUrl) async {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-/// Full-screen horizontal swipe viewer for posts/reels shown in a profile tab.
-/// Mirrors the web's "profile post nav" (up/down arrows) but as left/right swipe.
+/// Full-screen vertical swipe viewer for posts/reels shown in a profile tab.
+/// Keeps profile tab navigation consistent with vertical reel navigation.
 class ProfileItemViewerScreen extends StatefulWidget {
   const ProfileItemViewerScreen({
     super.key,
@@ -506,6 +507,7 @@ class _ProfileItemViewerScreenState extends State<ProfileItemViewerScreen> {
         ),
         body: PageView.builder(
           controller: _pageController,
+          scrollDirection: Axis.vertical,
           onPageChanged: _onPageChanged,
           itemCount: widget.items.length,
           itemBuilder: (context, index) => _ItemPage(
@@ -1361,6 +1363,14 @@ class _ItemPageState extends State<_ItemPage> {
         );
         _showSnack('Link copied');
         return;
+      case PostMenuAction.muteNotifications:
+        final muted = await showPostMuteOverlay(
+          context,
+          postId: id,
+          kindLabel: 'reel',
+        );
+        if (muted) _showSnack('Reel notifications muted');
+        return;
       case PostMenuAction.deletePost:
         final confirmed = await showDialog<bool>(
           context: context,
@@ -1542,6 +1552,7 @@ class _ItemPageState extends State<_ItemPage> {
         label: hideLike ? 'Show like' : 'Hide like',
         danger: false,
       ));
+      entries.add((id: 'muteReel', label: 'Mute this reel', danger: false));
       if (canDownload) {
         entries.add((
           id: 'downloadReel',
@@ -1625,6 +1636,8 @@ class _ItemPageState extends State<_ItemPage> {
         return _onReelMenuAction(PostMenuAction.toggleComments);
       case 'toggleHideLike':
         return _onReelMenuAction(PostMenuAction.toggleHideLike);
+      case 'muteReel':
+        return _onReelMenuAction(PostMenuAction.muteNotifications);
       case 'downloadReel':
         return _downloadCurrentReel();
       case 'copyLink':
@@ -2481,7 +2494,7 @@ class _ItemPageState extends State<_ItemPage> {
         if (mediaCount > 0)
           PageView.builder(
             controller: _mediaPageController,
-            physics: const NeverScrollableScrollPhysics(),
+            physics: const BouncingScrollPhysics(),
             itemCount: mediaCount,
             onPageChanged: (i) => setState(() => _mediaIndex = i),
             itemBuilder: (context, i) {
