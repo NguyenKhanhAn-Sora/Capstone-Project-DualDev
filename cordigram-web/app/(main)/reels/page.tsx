@@ -448,6 +448,17 @@ function ReelVideo({
     Boolean(authorOwnerId) &&
     (!initialFollowingRef.current || followToggledRef.current || !isFollowing);
   const viewSentRef = useRef(false);
+  const progressRef = useRef<HTMLDivElement | null>(null);
+  const scrubbingRef = useRef(false);
+  const [scrubPreview, setScrubPreview] = useState<{
+    visible: boolean;
+    xPercent: number;
+    time: number;
+  }>({
+    visible: false,
+    xPercent: 0,
+    time: 0,
+  });
 
   useEffect(() => {
     setExpanded(false);
@@ -561,18 +572,81 @@ function ReelVideo({
     setMuted((m) => !m);
   };
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
+  const seekToClientX = useCallback((clientX: number) => {
+    const rect = progressRef.current?.getBoundingClientRect();
+    if (!rect) return null;
     const ratio = Math.min(
       1,
-      Math.max(0, (e.clientX - rect.left) / Math.max(rect.width, 1)),
+      Math.max(0, (clientX - rect.left) / Math.max(rect.width, 1)),
     );
     const video = videoRef.current;
+    let nextTime = ratio * duration;
     if (video && duration) {
       video.currentTime = ratio * duration;
       setCurrent(video.currentTime);
+      nextTime = video.currentTime;
     }
+    return { ratio, time: nextTime };
+  }, [duration]);
+
+  const formatProgressTime = useCallback((seconds: number) => {
+    const safe = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+    const total = Math.floor(safe);
+    const hrs = Math.floor(total / 3600);
+    const mins = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+
+    if (hrs > 0) {
+      return `${hrs}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    }
+    return `${mins}:${String(secs).padStart(2, "0")}`;
+  }, []);
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    seekToClientX(e.clientX);
+  };
+
+  const handleSeekPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    scrubbingRef.current = true;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    const next = seekToClientX(e.clientX);
+    if (!next) return;
+    setScrubPreview({
+      visible: true,
+      xPercent: next.ratio * 100,
+      time: next.time,
+    });
+  };
+
+  const handleSeekPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!scrubbingRef.current) return;
+    e.stopPropagation();
+    const next = seekToClientX(e.clientX);
+    if (!next) return;
+    setScrubPreview({
+      visible: true,
+      xPercent: next.ratio * 100,
+      time: next.time,
+    });
+  };
+
+  const handleSeekPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!scrubbingRef.current) return;
+    e.stopPropagation();
+    seekToClientX(e.clientX);
+    scrubbingRef.current = false;
+    setScrubPreview((prev) => ({ ...prev, visible: false }));
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+  };
+
+  const handleSeekPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!scrubbingRef.current) return;
+    e.stopPropagation();
+    scrubbingRef.current = false;
+    setScrubPreview((prev) => ({ ...prev, visible: false }));
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -677,7 +751,23 @@ function ReelVideo({
           className="pt-4 pb-4 pr-3 pl-2"
         />
       </button>
-      <div className={styles.progressWrap} onClick={handleSeek}>
+      <div
+        ref={progressRef}
+        className={styles.progressWrap}
+        onClick={handleSeek}
+        onPointerDown={handleSeekPointerDown}
+        onPointerMove={handleSeekPointerMove}
+        onPointerUp={handleSeekPointerUp}
+        onPointerCancel={handleSeekPointerCancel}
+      >
+        {scrubPreview.visible ? (
+          <div
+            className={styles.progressTimePreview}
+            style={{ left: `${scrubPreview.xPercent}%` }}
+          >
+            {formatProgressTime(scrubPreview.time)}
+          </div>
+        ) : null}
         <div className={styles.progressTrack}>
           <div
             className={styles.progressFill}
