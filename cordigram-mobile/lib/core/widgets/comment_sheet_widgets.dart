@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../config/app_theme.dart';
 
 class CommentSheetAction {
   const CommentSheetAction({
@@ -18,11 +19,11 @@ class CommentActionSheet extends StatelessWidget {
   const CommentActionSheet({
     super.key,
     required this.actions,
-    this.backgroundColor = const Color(0xFF111827),
+    this.backgroundColor,
   });
 
   final List<CommentSheetAction> actions;
-  final Color backgroundColor;
+  final Color? backgroundColor;
 
   void _act(BuildContext context, VoidCallback? fn) {
     Navigator.of(context).pop();
@@ -31,9 +32,17 @@ class CommentActionSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return Container(
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: backgroundColor ?? tokens.panelMuted,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
@@ -45,19 +54,17 @@ class CommentActionSheet extends StatelessWidget {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFF374151),
+                color: scheme.outline,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
-          const Divider(height: 1, color: Color(0xFF1F2A3D)),
+          Divider(height: 1, color: tokens.panelBorder),
           ...actions.map(
             (action) => _CommentActionTile(
               icon: action.icon,
               label: action.label,
-              color: action.danger
-                  ? const Color(0xFFEF4444)
-                  : const Color(0xFFE8ECF8),
+              color: action.danger ? const Color(0xFFEF4444) : tokens.text,
               onTap: () => _act(context, action.onTap),
             ),
           ),
@@ -138,13 +145,20 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final bottomPad =
         MediaQuery.of(context).viewInsets.bottom +
         MediaQuery.of(context).viewPadding.bottom;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF111827),
+      decoration: BoxDecoration(
+        color: tokens.panelMuted,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
@@ -156,7 +170,7 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFF374151),
+                color: scheme.outline,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -167,8 +181,8 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
               children: [
                 Text(
                   widget.title,
-                  style: const TextStyle(
-                    color: Color(0xFFE8ECF8),
+                  style: TextStyle(
+                    color: tokens.text,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
@@ -176,16 +190,16 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
                 const Spacer(),
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
-                  child: const Icon(
+                  child: Icon(
                     Icons.close_rounded,
-                    color: Color(0xFF7A8BB0),
+                    color: tokens.textMuted,
                     size: 22,
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFF1F2A3D)),
+          Divider(height: 1, color: tokens.panelBorder),
           Padding(
             padding: EdgeInsets.fromLTRB(16, 14, 16, 14 + bottomPad),
             child: Column(
@@ -196,26 +210,23 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
                   autofocus: true,
                   maxLines: 5,
                   minLines: 2,
-                  style: const TextStyle(
-                    color: Color(0xFFE8ECF8),
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: tokens.text, fontSize: 14),
                   decoration: InputDecoration(
                     hintText: widget.hintText,
-                    hintStyle: const TextStyle(color: Color(0xFF4A5568)),
+                    hintStyle: TextStyle(color: scheme.onSurfaceVariant),
                     filled: true,
-                    fillColor: const Color(0xFF1A2235),
+                    fillColor: tokens.panel,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF1F2A3D)),
+                      borderSide: BorderSide(color: tokens.panelBorder),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF1F2A3D)),
+                      borderSide: BorderSide(color: tokens.panelBorder),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF2B74B0)),
+                      borderSide: BorderSide(color: scheme.primary),
                     ),
                   ),
                 ),
@@ -223,7 +234,7 @@ class _EditCommentSheetState extends State<EditCommentSheet> {
                 ElevatedButton(
                   onPressed: _submitting ? null : _submit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2B74B0),
+                    backgroundColor: scheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),

@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import 'ads_create_screen.dart';
 import 'ads_dashboard_screen.dart';
 import 'ads_service.dart';
+
+AppSemanticColors _appTokens(BuildContext context) {
+  final theme = Theme.of(context);
+  return theme.extension<AppSemanticColors>() ??
+      (theme.brightness == Brightness.dark
+          ? AppSemanticColors.dark
+          : AppSemanticColors.light);
+}
 
 class AdsEntryScreen extends StatefulWidget {
   const AdsEntryScreen({super.key});
@@ -59,28 +68,30 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0B1020);
-    const card = Color(0xFF111827);
-    const textPrimary = Color(0xFFE8ECF8);
-    const textSecondary = Color(0xFF7A8BB0);
-    const accent = Color(0xFF4AA3E4);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens = _appTokens(context);
+    final card = tokens.panelMuted;
+    final textPrimary = tokens.text;
+    final textSecondary = tokens.textMuted;
+    final accent = tokens.primary;
 
     if (!_loading && _hasCreatedAds) {
       return const AdsDashboardScreen();
     }
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: scheme.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: textPrimary),
-        title: const Text('Ads', style: TextStyle(color: textPrimary)),
+        iconTheme: IconThemeData(color: scheme.onSurface),
+        title: Text('Ads', style: TextStyle(color: scheme.onSurface)),
       ),
       body: SafeArea(
         child: _loading
-            ? const Center(
+            ? Center(
                 child: CircularProgressIndicator(color: accent, strokeWidth: 2),
               )
             : SingleChildScrollView(
@@ -90,7 +101,7 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
                   decoration: BoxDecoration(
                     color: card,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFF1E2D48)),
+                    border: Border.all(color: tokens.panelBorder),
                   ),
                   padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
                   child: Column(
@@ -100,10 +111,10 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
                         width: 56,
                         height: 56,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF182844),
+                          color: tokens.panel,
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.campaign_outlined,
                           color: accent,
                           size: 30,
@@ -112,7 +123,7 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
                       const SizedBox(height: 14),
                       Text(
                         _hasCreatedAds ? 'Create another ad' : 'No ads yet',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: textPrimary,
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
@@ -123,7 +134,7 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
                         _hasCreatedAds
                             ? 'Build a new campaign with your objective, media, audience, and Stripe payment.'
                             : 'Start your first ad campaign. Choose objective, budget package, upload creative, then pay securely with Stripe.',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: textSecondary,
                           fontSize: 14,
                           height: 1.5,
@@ -131,10 +142,7 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 12),
-                        Text(
-                          _error!,
-                          style: const TextStyle(color: Colors.redAccent),
-                        ),
+                        Text(_error!, style: TextStyle(color: scheme.error)),
                       ],
                       const SizedBox(height: 18),
                       _ChecklistTile(
@@ -158,7 +166,7 @@ class _AdsEntryScreenState extends State<AdsEntryScreen> {
                           onPressed: _openCreate,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: accent,
-                            foregroundColor: const Color(0xFF06162B),
+                            foregroundColor: scheme.onPrimary,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -192,6 +200,7 @@ class _ChecklistTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -201,20 +210,16 @@ class _ChecklistTile extends StatelessWidget {
             width: 30,
             height: 30,
             decoration: BoxDecoration(
-              color: const Color(0xFF182844),
+              color: tokens.panel,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: const Color(0xFF88BFF0), size: 17),
+            child: Icon(icon, color: tokens.primary, size: 17),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                color: Color(0xFFBCC8E0),
-                fontSize: 13,
-                height: 1.4,
-              ),
+              style: TextStyle(color: tokens.text, fontSize: 13, height: 1.4),
             ),
           ),
         ],

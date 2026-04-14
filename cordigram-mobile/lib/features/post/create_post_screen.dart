@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'create_post_service.dart';
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 
@@ -516,9 +517,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final seed = _scheduledAtLocal ?? _nextValidScheduleTime();
     DateTime draft = seed;
 
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: tokens.panel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -533,7 +540,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 height: 4,
                 margin: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: tokens.textMuted.withValues(alpha: 0.28),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -546,10 +553,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       child: const Text('Cancel'),
                     ),
                     const Spacer(),
-                    const Text(
+                    Text(
                       'Select time',
                       style: TextStyle(
-                        color: Color(0xFFE8ECF8),
+                        color: tokens.text,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -561,10 +568,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ],
                 ),
               ),
-              const Divider(height: 1, color: Color(0xFF1E2D48)),
+              Divider(height: 1, color: tokens.panelBorder),
               Expanded(
                 child: CupertinoTheme(
-                  data: const CupertinoThemeData(brightness: Brightness.dark),
+                  data: CupertinoThemeData(brightness: theme.brightness),
                   child: CupertinoDatePicker(
                     mode: CupertinoDatePickerMode.time,
                     use24hFormat: true,
@@ -608,10 +615,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: const Color(0xFF0B1020),
+        backgroundColor: theme.scaffoldBackgroundColor,
         body: SafeArea(
           child: Column(
             children: [
@@ -660,27 +668,28 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   // ── Header ─────────────────────────────────────────────────────────────────
 
   Widget _buildHeader() {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1526),
+        color: scheme.surface,
         border: Border(
           bottom: BorderSide(
-            color: Colors.white.withValues(alpha: 0.07),
+            color: scheme.outline.withValues(alpha: 0.4),
             width: 1,
           ),
         ),
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Create post',
                   style: TextStyle(
-                    color: Color(0xFFE8ECF8),
+                    color: scheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
@@ -688,18 +697,21 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 SizedBox(height: 2),
                 Text(
                   'Share genuine moments',
-                  style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
           ),
           if (_submitting)
-            const SizedBox(
+            SizedBox(
               width: 22,
               height: 22,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Color(0xFF4AA3E4),
+                color: scheme.primary,
               ),
             ),
         ],
@@ -746,43 +758,49 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Widget _buildDropzone() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return GestureDetector(
       onTap: () => _showMediaPicker(),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 36),
         decoration: BoxDecoration(
-          color: const Color(0xFF111827),
+          color: tokens.panel,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF2A3A5C), width: 1.5),
+          border: Border.all(color: tokens.panelBorder, width: 1.5),
         ),
         child: Column(
           children: [
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A2540),
+                color: tokens.primary.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(50),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.add_photo_alternate_outlined,
-                color: Color(0xFF4AA3E4),
+                color: tokens.primary,
                 size: 36,
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'Add a photo or video',
               style: TextStyle(
-                color: Color(0xFFE8ECF8),
+                color: tokens.text,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Supports .jpg, .png, .mp4, .mov · up to 10 files',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
+              style: TextStyle(color: tokens.textMuted, fontSize: 13),
             ),
             const SizedBox(height: 18),
             Row(
@@ -814,9 +832,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   void _showMediaPicker() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF141D30),
+      backgroundColor: tokens.panel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -829,18 +853,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               height: 4,
               margin: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
+                color: tokens.textMuted.withValues(alpha: 0.28),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.photo_library_outlined,
-                color: Color(0xFF9BAECF),
+                color: tokens.textMuted,
               ),
-              title: const Text(
+              title: Text(
                 'Choose photos',
-                style: TextStyle(color: Color(0xFFD0D8EE)),
+                style: TextStyle(color: tokens.text),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -848,28 +872,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(
-                Icons.videocam_outlined,
-                color: Color(0xFF9BAECF),
-              ),
-              title: const Text(
-                'Choose video',
-                style: TextStyle(color: Color(0xFFD0D8EE)),
-              ),
+              leading: Icon(Icons.videocam_outlined, color: tokens.textMuted),
+              title: Text('Choose video', style: TextStyle(color: tokens.text)),
               onTap: () {
                 Navigator.pop(context);
                 _pickVideo();
               },
             ),
             ListTile(
-              leading: const Icon(
-                Icons.camera_alt_outlined,
-                color: Color(0xFF9BAECF),
-              ),
-              title: const Text(
-                'Take photo',
-                style: TextStyle(color: Color(0xFFD0D8EE)),
-              ),
+              leading: Icon(Icons.camera_alt_outlined, color: tokens.textMuted),
+              title: Text('Take photo', style: TextStyle(color: tokens.text)),
               onTap: () {
                 Navigator.pop(context);
                 _pickFromCamera();
@@ -883,6 +895,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Widget _buildMediaGrid() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return SizedBox(
       height: 130,
       child: ListView.separated(
@@ -899,10 +917,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ? Container(
                         width: 110,
                         height: 130,
-                        color: const Color(0xFF1A2540),
-                        child: const Icon(
+                        color: tokens.panelMuted,
+                        child: Icon(
                           Icons.videocam_rounded,
-                          color: Color(0xFF4AA3E4),
+                          color: tokens.primary,
                           size: 40,
                         ),
                       )
@@ -952,6 +970,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   // ── Caption ───────────────────────────────────────────────────────────────
 
   Widget _buildCaptionField() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -959,9 +983,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF111827),
+            color: tokens.panel,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF2A3A5C)),
+            border: Border.all(color: tokens.panelBorder),
           ),
           child: TextField(
             controller: _captionCtrl,
@@ -970,16 +994,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             maxLines: 5,
             minLines: 3,
             maxLength: 2200,
-            style: const TextStyle(color: Color(0xFFD0D8EE), fontSize: 14),
+            style: TextStyle(color: tokens.text, fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Write a caption…',
-              hintStyle: const TextStyle(color: Color(0xFF475569)),
+              hintStyle: TextStyle(color: tokens.textMuted),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(14),
-              counterStyle: const TextStyle(
-                color: Color(0xFF5A6B8A),
-                fontSize: 11,
-              ),
+              counterStyle: TextStyle(color: tokens.textMuted, fontSize: 11),
             ),
           ),
         ),
@@ -990,15 +1011,21 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   // ── Mention dropdown ──────────────────────────────────────────────────────
 
   Widget _buildMentionDropdown() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return Container(
       margin: const EdgeInsets.only(top: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2540),
+        color: tokens.panelMuted,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF2A3A5C)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       child: _mentionLoading
-          ? const Padding(
+          ? Padding(
               padding: EdgeInsets.all(12),
               child: Center(
                 child: SizedBox(
@@ -1006,7 +1033,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Color(0xFF4AA3E4),
+                    color: tokens.primary,
                   ),
                 ),
               ),
@@ -1028,15 +1055,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       children: [
                         CircleAvatar(
                           radius: 16,
-                          backgroundColor: const Color(0xFF233050),
+                          backgroundColor: tokens.panel,
                           backgroundImage: s.avatarUrl != null
                               ? NetworkImage(s.avatarUrl!)
                               : null,
                           child: s.avatarUrl == null
                               ? Text(
                                   s.username.substring(0, 1).toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: tokens.text,
                                     fontSize: 12,
                                   ),
                                 )
@@ -1049,15 +1076,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                             if (s.displayName != null)
                               Text(
                                 s.displayName!,
-                                style: const TextStyle(
-                                  color: Color(0xFFE8ECF8),
+                                style: TextStyle(
+                                  color: tokens.text,
                                   fontSize: 13,
                                 ),
                               ),
                             Text(
                               '@${s.username}',
-                              style: const TextStyle(
-                                color: Color(0xFF7A8BB0),
+                              style: TextStyle(
+                                color: tokens.textMuted,
                                 fontSize: 12,
                               ),
                             ),
@@ -1075,6 +1102,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   // ── Location ──────────────────────────────────────────────────────────────
 
   Widget _buildLocationField() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1082,44 +1115,44 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF111827),
+            color: tokens.panel,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF2A3A5C)),
+            border: Border.all(color: tokens.panelBorder),
           ),
           child: TextField(
             controller: _locationCtrl,
             onChanged: _onLocationChanged,
-            style: const TextStyle(color: Color(0xFFD0D8EE), fontSize: 14),
+            style: TextStyle(color: tokens.text, fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Add a location…',
-              hintStyle: const TextStyle(color: Color(0xFF475569)),
+              hintStyle: TextStyle(color: tokens.textMuted),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 13,
               ),
-              prefixIcon: const Icon(
+              prefixIcon: Icon(
                 Icons.place_outlined,
-                color: Color(0xFF5A6B8A),
+                color: tokens.textMuted,
                 size: 20,
               ),
               suffixIcon: _locationLoading
-                  ? const Padding(
+                  ? Padding(
                       padding: EdgeInsets.all(12),
                       child: SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Color(0xFF4AA3E4),
+                          color: tokens.primary,
                         ),
                       ),
                     )
                   : _locationCtrl.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.close,
-                        color: Color(0xFF5A6B8A),
+                        color: tokens.textMuted,
                         size: 18,
                       ),
                       onPressed: () {
@@ -1141,12 +1174,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Widget _buildLocationDropdown() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return Container(
       margin: const EdgeInsets.only(top: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2540),
+        color: tokens.panelMuted,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF2A3A5C)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       child: ListView.builder(
         shrinkWrap: true,
@@ -1160,19 +1199,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.place_outlined,
-                    color: Color(0xFF9BAECF),
-                    size: 16,
-                  ),
+                  Icon(Icons.place_outlined, color: tokens.textMuted, size: 16),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       s.label,
-                      style: const TextStyle(
-                        color: Color(0xFFD0D8EE),
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: tokens.text, fontSize: 13),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1189,6 +1221,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   // ── Hashtags ──────────────────────────────────────────────────────────────
 
   Widget _buildHashtagSection() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1199,25 +1237,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF111827),
+                  color: tokens.panel,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF2A3A5C)),
+                  border: Border.all(color: tokens.panelBorder),
                 ),
                 child: TextField(
                   controller: _hashtagCtrl,
                   onSubmitted: (_) => _addHashtag(),
                   textInputAction: TextInputAction.done,
-                  style: const TextStyle(
-                    color: Color(0xFFD0D8EE),
-                    fontSize: 14,
-                  ),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: tokens.text, fontSize: 14),
+                  decoration: InputDecoration(
                     hintText: 'e.g. travel, photography',
-                    hintStyle: TextStyle(color: Color(0xFF475569)),
+                    hintStyle: TextStyle(color: tokens.textMuted),
                     border: InputBorder.none,
                     prefixText: '# ',
                     prefixStyle: TextStyle(
-                      color: Color(0xFF4AA3E4),
+                      color: tokens.primary,
                       fontWeight: FontWeight.w600,
                     ),
                     contentPadding: EdgeInsets.symmetric(
@@ -1234,15 +1269,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               child: Container(
                 padding: const EdgeInsets.all(13),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A2540),
+                  color: tokens.panelMuted,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF2A3A5C)),
+                  border: Border.all(color: tokens.panelBorder),
                 ),
-                child: const Icon(
-                  Icons.add_rounded,
-                  color: Color(0xFF4AA3E4),
-                  size: 20,
-                ),
+                child: Icon(Icons.add_rounded, color: tokens.primary, size: 20),
               ),
             ),
           ],
@@ -1270,6 +1301,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   // ── Audience ──────────────────────────────────────────────────────────────
 
   Widget _buildAudienceSelector() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1283,31 +1320,25 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: _audience == a
-                    ? const Color(0xFF1A3254)
-                    : const Color(0xFF111827),
+                    ? tokens.primary.withValues(alpha: 0.16)
+                    : tokens.panel,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _audience == a
-                      ? const Color(0xFF3470A2)
-                      : const Color(0xFF2A3A5C),
+                  color: _audience == a ? tokens.primary : tokens.panelBorder,
                 ),
               ),
               child: Row(
                 children: [
                   Icon(
                     a.icon,
-                    color: _audience == a
-                        ? const Color(0xFF4AA3E4)
-                        : const Color(0xFF7A8BB0),
+                    color: _audience == a ? tokens.primary : tokens.textMuted,
                     size: 20,
                   ),
                   const SizedBox(width: 12),
                   Text(
                     a.label,
                     style: TextStyle(
-                      color: _audience == a
-                          ? const Color(0xFFE8ECF8)
-                          : const Color(0xFF9BAECF),
+                      color: _audience == a ? tokens.text : tokens.textMuted,
                       fontSize: 14,
                       fontWeight: _audience == a
                           ? FontWeight.w600
@@ -1316,9 +1347,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ),
                   const Spacer(),
                   if (_audience == a)
-                    const Icon(
+                    Icon(
                       Icons.check_circle_rounded,
-                      color: Color(0xFF4AA3E4),
+                      color: tokens.primary,
                       size: 18,
                     ),
                 ],
@@ -1331,6 +1362,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Widget _buildPublishTimeSection() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final scheduled = _scheduledAtLocal;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1360,9 +1397,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             margin: const EdgeInsets.only(top: 10),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF111827),
+              color: tokens.panel,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF2A3A5C)),
+              border: Border.all(color: tokens.panelBorder),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1395,10 +1432,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Timezone: local device time',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.62),
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: tokens.textMuted, fontSize: 12),
                 ),
               ],
             ),
@@ -1410,11 +1444,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   // ── Toggles ───────────────────────────────────────────────────────────────
 
   Widget _buildToggles() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
+        color: tokens.panel,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF2A3A5C)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       child: Column(
         children: [
@@ -1499,26 +1539,32 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Widget _buildSubmitButton() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         onPressed: _submitting ? null : _submit,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF3470A2),
-          disabledBackgroundColor: const Color(0xFF1E3A5F),
-          foregroundColor: Colors.white,
+          backgroundColor: tokens.primary,
+          disabledBackgroundColor: tokens.primary.withValues(alpha: 0.45),
+          foregroundColor: theme.colorScheme.onPrimary,
           padding: const EdgeInsets.symmetric(vertical: 15),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
         child: _submitting
-            ? const SizedBox(
+            ? SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white,
+                  color: theme.colorScheme.onPrimary,
                 ),
               )
             : Text(
@@ -1574,10 +1620,17 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return Text(
       text,
-      style: const TextStyle(
-        color: Color(0xFF9BAECF),
+      style: TextStyle(
+        color: tokens.textMuted,
         fontSize: 12,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.5,
@@ -1593,24 +1646,28 @@ class _HashtagChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A3254),
+        color: tokens.primary.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF2A4A7A)),
+        border: Border.all(color: tokens.primary.withValues(alpha: 0.45)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '#$tag',
-            style: const TextStyle(color: Color(0xFF4AA3E4), fontSize: 12),
-          ),
+          Text('#$tag', style: TextStyle(color: tokens.primary, fontSize: 12)),
           const SizedBox(width: 4),
           GestureDetector(
             onTap: onRemove,
-            child: const Icon(Icons.close, color: Color(0xFF7A8BB0), size: 14),
+            child: Icon(Icons.close, color: tokens.textMuted, size: 14),
           ),
         ],
       ),
@@ -1634,12 +1691,17 @@ class _ToggleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return Container(
       decoration: BoxDecoration(
         border: Border(
-          top: isTop
-              ? BorderSide.none
-              : const BorderSide(color: Color(0xFF1E2D48)),
+          top: isTop ? BorderSide.none : BorderSide(color: tokens.panelBorder),
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -1648,16 +1710,16 @@ class _ToggleRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(color: Color(0xFFD0D8EE), fontSize: 14),
+              style: TextStyle(color: tokens.text, fontSize: 14),
             ),
           ),
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: const Color(0xFF4AA3E4),
-            activeTrackColor: const Color(0xFF1A3254),
-            inactiveThumbColor: const Color(0xFF5A6B8A),
-            inactiveTrackColor: const Color(0xFF1E2D48),
+            activeThumbColor: tokens.primary,
+            activeTrackColor: tokens.primary.withValues(alpha: 0.35),
+            inactiveThumbColor: tokens.textMuted,
+            inactiveTrackColor: tokens.panelBorder,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ],
@@ -1678,21 +1740,28 @@ class _OutlineButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFF2A3A5C)),
+          border: Border.all(color: tokens.panelBorder),
         ),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF9BAECF), size: 17),
+            Icon(icon, color: tokens.textMuted, size: 17),
             const SizedBox(width: 5),
             Text(
               label,
-              style: const TextStyle(color: Color(0xFF9BAECF), fontSize: 13),
+              style: TextStyle(color: tokens.textMuted, fontSize: 13),
             ),
           ],
         ),
@@ -1713,22 +1782,29 @@ class _AddMediaButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A2540),
+          color: tokens.panel,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF2A3A5C)),
+          border: Border.all(color: tokens.panelBorder),
         ),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF4AA3E4), size: 16),
+            Icon(icon, color: tokens.primary, size: 16),
             const SizedBox(width: 5),
             Text(
               label,
-              style: const TextStyle(color: Color(0xFF9BAECF), fontSize: 12),
+              style: TextStyle(color: tokens.textMuted, fontSize: 12),
             ),
           ],
         ),
@@ -1752,15 +1828,26 @@ class _PublishModeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF1A3254) : const Color(0xFF111827),
+          color: selected
+              ? tokens.primary.withValues(alpha: 0.16)
+              : tokens.panel,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? const Color(0xFF3470A2) : const Color(0xFF2A3A5C),
+            color: selected
+                ? tokens.primary.withValues(alpha: 0.7)
+                : tokens.panelBorder,
           ),
         ),
         child: Row(
@@ -1773,9 +1860,7 @@ class _PublishModeOption extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      color: selected
-                          ? const Color(0xFFE8ECF8)
-                          : const Color(0xFFD0D8EE),
+                      color: selected ? tokens.primary : tokens.text,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1783,10 +1868,7 @@ class _PublishModeOption extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      color: Color(0xFF7A8BB0),
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: tokens.textMuted, fontSize: 12),
                   ),
                 ],
               ),
@@ -1797,8 +1879,8 @@ class _PublishModeOption extends StatelessWidget {
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_unchecked_rounded,
               color: selected
-                  ? const Color(0xFF4AA3E4)
-                  : const Color(0xFF6C7EA3),
+                  ? tokens.primary
+                  : tokens.textMuted.withValues(alpha: 0.75),
               size: 19,
             ),
           ],
@@ -1823,22 +1905,29 @@ class _ScheduleFieldButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F172A),
+          color: tokens.panel,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFF2A3A5C)),
+          border: Border.all(color: tokens.panelBorder),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF7A8BB0),
+              style: TextStyle(
+                color: tokens.textMuted,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
@@ -1846,15 +1935,12 @@ class _ScheduleFieldButton extends StatelessWidget {
             const SizedBox(height: 7),
             Row(
               children: [
-                Icon(icon, color: const Color(0xFF4AA3E4), size: 16),
+                Icon(icon, color: tokens.primary, size: 16),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     value,
-                    style: const TextStyle(
-                      color: Color(0xFFE8ECF8),
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: tokens.text, fontSize: 13),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

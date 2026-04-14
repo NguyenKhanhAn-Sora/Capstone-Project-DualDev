@@ -108,12 +108,6 @@ class _LikesListSheet extends StatefulWidget {
 }
 
 class _LikesListSheetState extends State<_LikesListSheet> {
-  static const _bg = Color(0xFF0F1829);
-  static const _surface = Color(0xFF131F33);
-  static const _border = Color(0xFF1E2D48);
-  static const _textPrimary = Color(0xFFE8ECF8);
-  static const _textSecondary = Color(0xFF7A8BB0);
-  static const _accent = Color(0xFF4AA3E4);
   static const _defaultAvatar =
       'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
 
@@ -247,30 +241,38 @@ class _LikesListSheetState extends State<_LikesListSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final bg = scheme.surface;
+    final surface = scheme.surfaceContainerHighest;
+    final border = scheme.outline.withValues(alpha: 0.28);
+    final textPrimary = scheme.onSurface;
+    final textSecondary = scheme.onSurfaceVariant;
+    final accent = scheme.primary;
     final h = MediaQuery.of(context).size.height;
     final list = _filtered;
 
     return Container(
       height: h * 0.82,
-      decoration: const BoxDecoration(
-        color: _bg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
           Container(
             height: 52,
             padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: _border)),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: border)),
             ),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
                     widget.title,
-                    style: const TextStyle(
-                      color: _textPrimary,
+                    style: TextStyle(
+                      color: textPrimary,
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
                     ),
@@ -283,15 +285,13 @@ class _LikesListSheetState extends State<_LikesListSheet> {
                     height: 34,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF1A2740),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.12),
-                      ),
+                      color: scheme.surfaceContainerHigh,
+                      border: Border.all(color: border),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.close_rounded,
                       size: 20,
-                      color: _textPrimary,
+                      color: textPrimary,
                     ),
                   ),
                 ),
@@ -303,35 +303,32 @@ class _LikesListSheetState extends State<_LikesListSheet> {
             child: TextField(
               controller: _searchCtrl,
               onChanged: (_) => setState(() {}),
-              style: const TextStyle(color: _textPrimary),
+              style: TextStyle(color: textPrimary),
               decoration: InputDecoration(
                 hintText: 'Search username',
-                hintStyle: const TextStyle(color: _textSecondary),
-                prefixIcon: const Icon(
-                  Icons.search_rounded,
-                  color: _textSecondary,
-                ),
+                hintStyle: TextStyle(color: textSecondary),
+                prefixIcon: Icon(Icons.search_rounded, color: textSecondary),
                 filled: true,
-                fillColor: _surface,
+                fillColor: surface,
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: _border),
+                  borderSide: BorderSide(color: border),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: _border),
+                  borderSide: BorderSide(color: border),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: _accent, width: 1.1),
+                  borderSide: BorderSide(color: accent, width: 1.1),
                 ),
               ),
             ),
           ),
           Expanded(
             child: _loading && !_loaded
-                ? const Center(child: CircularProgressIndicator(color: _accent))
+                ? Center(child: CircularProgressIndicator(color: accent))
                 : _error.isNotEmpty
                 ? Center(
                     child: Padding(
@@ -339,15 +336,15 @@ class _LikesListSheetState extends State<_LikesListSheet> {
                       child: Text(
                         _error,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: _textSecondary),
+                        style: TextStyle(color: textSecondary),
                       ),
                     ),
                   )
                 : list.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       'No likes yet',
-                      style: TextStyle(color: _textSecondary),
+                      style: TextStyle(color: textSecondary),
                     ),
                   )
                 : ListView.separated(
@@ -355,20 +352,20 @@ class _LikesListSheetState extends State<_LikesListSheet> {
                     padding: const EdgeInsets.fromLTRB(10, 4, 10, 16),
                     itemCount: list.length + (_loadingMore ? 1 : 0),
                     separatorBuilder: (_, _) => Divider(
-                      color: Colors.white.withValues(alpha: 0.06),
+                      color: border.withValues(alpha: 0.7),
                       height: 1,
                     ),
                     itemBuilder: (context, index) {
                       if (index >= list.length) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 14),
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           child: Center(
                             child: SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: _accent,
+                                color: accent,
                               ),
                             ),
                           ),
@@ -391,7 +388,7 @@ class _LikesListSheetState extends State<_LikesListSheet> {
                         },
                         leading: CircleAvatar(
                           radius: 22,
-                          backgroundColor: const Color(0xFF1E2D48),
+                          backgroundColor: surface,
                           backgroundImage: NetworkImage(
                             item.avatarUrl.isNotEmpty
                                 ? item.avatarUrl
@@ -402,18 +399,15 @@ class _LikesListSheetState extends State<_LikesListSheet> {
                           item.displayName.isNotEmpty
                               ? item.displayName
                               : item.username,
-                          style: const TextStyle(
-                            color: _textPrimary,
+                          style: TextStyle(
+                            color: textPrimary,
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         subtitle: Text(
                           '@${item.username}',
-                          style: const TextStyle(
-                            color: _textSecondary,
-                            fontSize: 13,
-                          ),
+                          style: TextStyle(color: textSecondary, fontSize: 13),
                         ),
                         trailing: isSelf
                             ? Container(
@@ -422,13 +416,13 @@ class _LikesListSheetState extends State<_LikesListSheet> {
                                   vertical: 8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF6EC1FF),
+                                  color: scheme.primaryContainer,
                                   borderRadius: BorderRadius.circular(999),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'You',
                                   style: TextStyle(
-                                    color: Color(0xFF082B44),
+                                    color: scheme.onPrimaryContainer,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -444,9 +438,10 @@ class _LikesListSheetState extends State<_LikesListSheet> {
                                     vertical: 8,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: item.isFollowing
-                                        ? const Color(0xFF1E2D48)
-                                        : const Color(0xFF6EC1FF),
+                                    color: item.isFollowing ? surface : accent,
+                                    border: item.isFollowing
+                                        ? Border.all(color: border)
+                                        : null,
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
@@ -457,8 +452,8 @@ class _LikesListSheetState extends State<_LikesListSheet> {
                                               : 'Follow'),
                                     style: TextStyle(
                                       color: item.isFollowing
-                                          ? _textPrimary
-                                          : const Color(0xFF082B44),
+                                          ? textPrimary
+                                          : scheme.onPrimary,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13,
                                     ),

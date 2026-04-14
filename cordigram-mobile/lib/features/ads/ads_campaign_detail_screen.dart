@@ -5,12 +5,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import 'ads_payment_status_screen.dart';
 import 'ads_service.dart';
 
 const int _mediaEditLockUniqueViews = 100;
 const int _dayMs = 24 * 60 * 60 * 1000;
+
+AppSemanticColors _appTokens(BuildContext context) {
+  final theme = Theme.of(context);
+  return theme.extension<AppSemanticColors>() ??
+      (theme.brightness == Brightness.dark
+          ? AppSemanticColors.dark
+          : AppSemanticColors.light);
+}
 
 class AdsCampaignDetailScreen extends StatefulWidget {
   const AdsCampaignDetailScreen({super.key, required this.campaignId});
@@ -117,27 +126,6 @@ class _DurationPackage {
 }
 
 class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
-  static const List<String> _objectiveOptions = [
-    'awareness',
-    'traffic',
-    'engagement',
-    'leads',
-    'sales',
-    'messages',
-  ];
-
-  static const List<String> _adFormatOptions = ['single', 'carousel', 'video'];
-
-  static const List<String> _ctaOptions = [
-    'Shop Now',
-    'Learn More',
-    'Sign Up',
-    'Book Now',
-    'Contact Us',
-    'Get Offer',
-    'Watch More',
-  ];
-
   static const Map<String, String> _boostLabel = {
     'light': 'Light Boost',
     'standard': 'Standard Boost',
@@ -305,31 +293,33 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
   }
 
   Color _statusBg(String status) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     switch (status) {
       case 'active':
-        return const Color(0x1F10B981);
+        return isDark ? const Color(0x1F10B981) : const Color(0xFFE9F8F0);
       case 'hidden':
-        return const Color(0x3364758B);
+        return isDark ? const Color(0x3364758B) : const Color(0xFFF1F4F8);
       case 'paused':
-        return const Color(0x3394A3B8);
+        return isDark ? const Color(0x3394A3B8) : const Color(0xFFF1F4F8);
       case 'canceled':
-        return const Color(0x33DC2626);
+        return isDark ? const Color(0x33DC2626) : const Color(0xFFFDECED);
       default:
-        return const Color(0x3338BDF8);
+        return isDark ? const Color(0x3338BDF8) : const Color(0xFFEAF1FB);
     }
   }
 
   Color _statusFg(String status) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     switch (status) {
       case 'active':
-        return const Color(0xFF63E6B2);
+        return isDark ? const Color(0xFF63E6B2) : const Color(0xFF1E7A4D);
       case 'hidden':
       case 'paused':
-        return const Color(0xFFCBD5E1);
+        return isDark ? const Color(0xFFCBD5E1) : const Color(0xFF5F6B7A);
       case 'canceled':
-        return const Color(0xFFFCA5A5);
+        return isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB4232D);
       default:
-        return const Color(0xFFBAE6FD);
+        return isDark ? const Color(0xFFBAE6FD) : const Color(0xFF245A95);
     }
   }
 
@@ -769,16 +759,17 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
     required String body,
     required String confirmLabel,
   }) async {
+    final tokens = _appTokens(context);
     final shouldProceed = await showDialog<bool>(
       context: context,
       barrierDismissible: !_saving,
       builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF111827),
-          title: Text(title, style: const TextStyle(color: Color(0xFFE8ECF8))),
+          backgroundColor: tokens.panelMuted,
+          title: Text(title, style: TextStyle(color: tokens.text)),
           content: Text(
             body,
-            style: const TextStyle(color: Color(0xFFBFD5F3), height: 1.35),
+            style: TextStyle(color: tokens.textMuted, height: 1.35),
           ),
           actions: [
             TextButton(
@@ -851,11 +842,17 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0B1020);
-    const card = Color(0xFF111827);
-    const textPrimary = Color(0xFFE8ECF8);
-    const textSecondary = Color(0xFF7A8BB0);
-    const accent = Color(0xFF4AA3E4);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+    final card = tokens.panelMuted;
+    final textPrimary = tokens.text;
+    final textSecondary = tokens.textMuted;
+    final accent = tokens.primary;
 
     final detail = _detail;
     final currentBoostPackage = detail == null
@@ -873,24 +870,24 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
     final hasUpgradeSelection = upgradeTotalCost > 0;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: scheme.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: textPrimary),
-        title: const Text('Ad Details', style: TextStyle(color: textPrimary)),
+        iconTheme: IconThemeData(color: scheme.onSurface),
+        title: Text('Ad Details', style: TextStyle(color: scheme.onSurface)),
       ),
       body: SafeArea(
         child: _loading
-            ? const Center(
+            ? Center(
                 child: CircularProgressIndicator(color: accent, strokeWidth: 2),
               )
             : detail == null
             ? Center(
                 child: Text(
                   _error ?? 'Campaign not found.',
-                  style: const TextStyle(color: Colors.redAccent),
+                  style: TextStyle(color: scheme.error),
                 ),
               )
             : RefreshIndicator(
@@ -908,7 +905,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                         decoration: BoxDecoration(
                           color: card,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF1E2D48)),
+                          border: Border.all(color: tokens.panelBorder),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -923,7 +920,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                     children: [
                                       Text(
                                         detail.campaignName,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: textPrimary,
                                           fontSize: 22,
                                           fontWeight: FontWeight.w700,
@@ -932,7 +929,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                       const SizedBox(height: 4),
                                       Text(
                                         '${detail.startsAt?.toLocal().toString().split(' ').first ?? '--'} - ${detail.expiresAt?.toLocal().toString().split(' ').first ?? '--'}',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: textSecondary,
                                           fontSize: 12.5,
                                         ),
@@ -1169,7 +1166,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                               alignment: Alignment.centerLeft,
                               child: Text(
                                 'Creative Media',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: textSecondary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
@@ -1178,7 +1175,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                             ),
                             const SizedBox(height: 8),
                             if (detail.mediaUrls.isEmpty)
-                              const Text(
+                              Text(
                                 'No media available for this campaign.',
                                 style: TextStyle(color: textSecondary),
                               )
@@ -1204,16 +1201,16 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(
-                                          color: const Color(0xFF20365A),
+                                          color: tokens.panelBorder,
                                         ),
-                                        color: const Color(0xFF0F1B33),
+                                        color: tokens.panel,
                                       ),
                                       child: isVideo
-                                          ? const Center(
+                                          ? Center(
                                               child: Icon(
                                                 Icons
                                                     .play_circle_outline_rounded,
-                                                color: Color(0xFFBFD5F3),
+                                                color: tokens.textMuted,
                                                 size: 30,
                                               ),
                                             )
@@ -1224,10 +1221,10 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                                 url,
                                                 fit: BoxFit.contain,
                                                 errorBuilder: (_, __, ___) =>
-                                                    const Icon(
+                                                    Icon(
                                                       Icons
                                                           .broken_image_rounded,
-                                                      color: Color(0xFFBFD5F3),
+                                                      color: tokens.textMuted,
                                                     ),
                                               ),
                                             ),
@@ -1244,7 +1241,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'Upgrade boost and extend duration, then manage lifecycle state.',
                               style: TextStyle(
                                 color: textSecondary,
@@ -1252,7 +1249,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            const Text(
+                            Text(
                               '1. Boost strength',
                               style: TextStyle(
                                 color: textPrimary,
@@ -1290,7 +1287,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                               }).toList(),
                             ),
                             const SizedBox(height: 12),
-                            const Text(
+                            Text(
                               '2. Extend campaign days',
                               style: TextStyle(
                                 color: textPrimary,
@@ -1329,11 +1326,9 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                               width: double.infinity,
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0D1A30),
+                                color: tokens.panel,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: const Color(0xFF1D3658),
-                                ),
+                                border: Border.all(color: tokens.panelBorder),
                               ),
                               child: Column(
                                 children: [
@@ -1364,7 +1359,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                               const SizedBox(height: 8),
                               Text(
                                 _upgradeError!,
-                                style: const TextStyle(color: Colors.redAccent),
+                                style: TextStyle(color: scheme.error),
                               ),
                             ],
                             const SizedBox(height: 10),
@@ -1381,7 +1376,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                     : _startUpgradeCheckout,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: accent,
-                                  foregroundColor: const Color(0xFF041325),
+                                  foregroundColor: scheme.onPrimary,
                                 ),
                                 child: Text(
                                   _creatingUpgradeCheckout
@@ -1391,9 +1386,9 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                               ),
                             ),
                             const SizedBox(height: 14),
-                            const Divider(color: Color(0xFF1E2D48), height: 1),
+                            Divider(color: tokens.panelBorder, height: 1),
                             const SizedBox(height: 14),
-                            const Text(
+                            Text(
                               'Lifecycle Management',
                               style: TextStyle(
                                 color: textPrimary,
@@ -1401,7 +1396,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            const Text(
+                            Text(
                               'Hide the campaign temporarily or reopen it when delivery should resume.',
                               style: TextStyle(
                                 color: textSecondary,
@@ -1424,12 +1419,10 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                               confirmLabel: 'Confirm hide',
                                             ),
                                       style: OutlinedButton.styleFrom(
-                                        side: const BorderSide(
-                                          color: Color(0xFF355A88),
+                                        side: BorderSide(
+                                          color: tokens.panelBorder,
                                         ),
-                                        foregroundColor: const Color(
-                                          0xFFBFD5F3,
-                                        ),
+                                        foregroundColor: tokens.text,
                                       ),
                                       child: const Text('Hide Campaign'),
                                     ),
@@ -1456,9 +1449,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                                             ),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: accent,
-                                        foregroundColor: const Color(
-                                          0xFF041325,
-                                        ),
+                                        foregroundColor: scheme.onPrimary,
                                       ),
                                       child: const Text('Reopen Campaign'),
                                     ),
@@ -1477,10 +1468,7 @@ class _AdsCampaignDetailScreenState extends State<AdsCampaignDetailScreen> {
                       ],
                       if (_error != null) ...[
                         const SizedBox(height: 10),
-                        Text(
-                          _error!,
-                          style: const TextStyle(color: Colors.redAccent),
-                        ),
+                        Text(_error!, style: TextStyle(color: scheme.error)),
                       ],
                     ],
                   ),
@@ -1544,13 +1532,20 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
+        color: tokens.panelMuted,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF1E2D48)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1560,8 +1555,8 @@ class _SectionCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    color: Color(0xFFE8ECF8),
+                  style: TextStyle(
+                    color: tokens.text,
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
                   ),
@@ -1586,27 +1581,31 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1B33),
+        color: tokens.panel,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF20365A)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 11),
-          ),
+          Text(label, style: TextStyle(color: tokens.textMuted, fontSize: 11)),
           const SizedBox(height: 5),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFFE8ECF8),
+            style: TextStyle(
+              color: tokens.text,
               fontWeight: FontWeight.w800,
               fontSize: 17,
             ),
@@ -1625,25 +1624,29 @@ class _BreakdownItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1B33),
+        color: tokens.panel,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF20365A)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 11),
-          ),
+          Text(label, style: TextStyle(color: tokens.textMuted, fontSize: 11)),
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
-              color: Color(0xFFE8ECF8),
+            style: TextStyle(
+              color: tokens.text,
               fontWeight: FontWeight.w700,
               fontSize: 14,
             ),
@@ -1662,6 +1665,13 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -1671,14 +1681,14 @@ class _DetailRow extends StatelessWidget {
             width: 132,
             child: Text(
               label,
-              style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 12),
+              style: TextStyle(color: tokens.textMuted, fontSize: 12),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                color: Color(0xFFE8ECF8),
+              style: TextStyle(
+                color: tokens.text,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -1725,16 +1735,19 @@ class _EditBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const textPrimary = Color(0xFFE8ECF8);
-    const textSecondary = Color(0xFF7A8BB0);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens = _appTokens(context);
+    final textPrimary = tokens.text;
+    final textSecondary = tokens.textMuted;
 
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.92,
       ),
-      decoration: const BoxDecoration(
-        color: Color(0xFF111827),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      decoration: BoxDecoration(
+        color: tokens.panelMuted,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
       ),
       child: SafeArea(
         top: false,
@@ -1745,7 +1758,7 @@ class _EditBottomSheet extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Edit Campaign Details',
                       style: TextStyle(
@@ -1757,7 +1770,7 @@ class _EditBottomSheet extends StatelessWidget {
                   ),
                   IconButton(
                     onPressed: loading ? null : onClose,
-                    icon: const Icon(Icons.close_rounded, color: textPrimary),
+                    icon: Icon(Icons.close_rounded, color: textPrimary),
                   ),
                 ],
               ),
@@ -1770,8 +1783,8 @@ class _EditBottomSheet extends StatelessWidget {
                     ),
                   onChanged: (v) =>
                       onDraftChanged(draft.copyWith(campaignName: v)),
-                  style: const TextStyle(color: textPrimary),
-                  decoration: _editInputDecoration(),
+                  style: TextStyle(color: textPrimary),
+                  decoration: _editInputDecoration(context),
                 ),
               ),
               _EditField(
@@ -1820,8 +1833,8 @@ class _EditBottomSheet extends StatelessWidget {
                       onDraftChanged(draft.copyWith(primaryText: v)),
                   minLines: 3,
                   maxLines: 6,
-                  style: const TextStyle(color: textPrimary),
-                  decoration: _editInputDecoration(),
+                  style: TextStyle(color: textPrimary),
+                  decoration: _editInputDecoration(context),
                 ),
               ),
               _EditField(
@@ -1832,8 +1845,8 @@ class _EditBottomSheet extends StatelessWidget {
                       TextPosition(offset: draft.headline.length),
                     ),
                   onChanged: (v) => onDraftChanged(draft.copyWith(headline: v)),
-                  style: const TextStyle(color: textPrimary),
-                  decoration: _editInputDecoration(),
+                  style: TextStyle(color: textPrimary),
+                  decoration: _editInputDecoration(context),
                 ),
               ),
               _EditField(
@@ -1861,8 +1874,8 @@ class _EditBottomSheet extends StatelessWidget {
                     ),
                   onChanged: (v) =>
                       onDraftChanged(draft.copyWith(adDescription: v)),
-                  style: const TextStyle(color: textPrimary),
-                  decoration: _editInputDecoration(),
+                  style: TextStyle(color: textPrimary),
+                  decoration: _editInputDecoration(context),
                 ),
               ),
               _EditField(
@@ -1874,8 +1887,8 @@ class _EditBottomSheet extends StatelessWidget {
                     ),
                   onChanged: (v) =>
                       onDraftChanged(draft.copyWith(destinationUrl: v)),
-                  style: const TextStyle(color: textPrimary),
-                  decoration: _editInputDecoration(hint: 'https://'),
+                  style: TextStyle(color: textPrimary),
+                  decoration: _editInputDecoration(context, hint: 'https://'),
                 ),
               ),
               _EditField(
@@ -1884,8 +1897,8 @@ class _EditBottomSheet extends StatelessWidget {
                 child: TextField(
                   enabled: false,
                   controller: TextEditingController(text: draft.locationText),
-                  style: const TextStyle(color: textSecondary),
-                  decoration: _editInputDecoration(),
+                  style: TextStyle(color: textSecondary),
+                  decoration: _editInputDecoration(context),
                 ),
               ),
               _EditField(
@@ -1897,11 +1910,11 @@ class _EditBottomSheet extends StatelessWidget {
                       child: TextField(
                         enabled: false,
                         controller: TextEditingController(text: draft.ageMin),
-                        style: const TextStyle(color: Color(0xFF607091)),
-                        decoration: _editInputDecoration(),
+                        style: TextStyle(color: textSecondary),
+                        decoration: _editInputDecoration(context),
                       ),
                     ),
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(horizontal: 8),
                       child: Text('to', style: TextStyle(color: textSecondary)),
                     ),
@@ -1909,8 +1922,8 @@ class _EditBottomSheet extends StatelessWidget {
                       child: TextField(
                         enabled: false,
                         controller: TextEditingController(text: draft.ageMax),
-                        style: const TextStyle(color: Color(0xFF607091)),
-                        decoration: _editInputDecoration(),
+                        style: TextStyle(color: textSecondary),
+                        decoration: _editInputDecoration(context),
                       ),
                     ),
                   ],
@@ -1925,8 +1938,9 @@ class _EditBottomSheet extends StatelessWidget {
                         Expanded(
                           child: TextField(
                             controller: interestCtrl,
-                            style: const TextStyle(color: textPrimary),
+                            style: TextStyle(color: textPrimary),
                             decoration: _editInputDecoration(
+                              context,
                               hint: 'Type interest and click Add',
                             ),
                           ),
@@ -1935,8 +1949,8 @@ class _EditBottomSheet extends StatelessWidget {
                         TextButton(
                           onPressed: onAddInterest,
                           style: TextButton.styleFrom(
-                            backgroundColor: const Color(0xFF1A2E4B),
-                            foregroundColor: const Color(0xFFBFD5F3),
+                            backgroundColor: tokens.panel,
+                            foregroundColor: textPrimary,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -1958,12 +1972,10 @@ class _EditBottomSheet extends StatelessWidget {
                             (i) => InputChip(
                               label: Text(i),
                               onDeleted: () => onRemoveInterest(i),
-                              backgroundColor: const Color(0xFF1A2E4B),
-                              side: const BorderSide(color: Color(0xFF2A4C77)),
-                              labelStyle: const TextStyle(
-                                color: Color(0xFFBFD5F3),
-                              ),
-                              deleteIconColor: const Color(0xFF9FC6F0),
+                              backgroundColor: tokens.panel,
+                              side: BorderSide(color: tokens.panelBorder),
+                              labelStyle: TextStyle(color: textPrimary),
+                              deleteIconColor: textSecondary,
                             ),
                           )
                           .toList(),
@@ -1985,9 +1997,9 @@ class _EditBottomSheet extends StatelessWidget {
                             ? null
                             : onPickMedia,
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFBFD5F3),
-                          backgroundColor: const Color(0xFF12213D),
-                          side: const BorderSide(color: Color(0xFF2A4C77)),
+                          foregroundColor: textPrimary,
+                          backgroundColor: tokens.panel,
+                          side: BorderSide(color: tokens.panelBorder),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -2015,27 +2027,27 @@ class _EditBottomSheet extends StatelessWidget {
                                     width: 110,
                                     height: 72,
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF0F1B33),
+                                      color: tokens.panel,
                                       borderRadius: BorderRadius.circular(10),
                                       border: Border.all(
-                                        color: const Color(0xFF20365A),
+                                        color: tokens.panelBorder,
                                       ),
                                     ),
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(9),
                                       child: url.toLowerCase().contains('.mp4')
-                                          ? const Icon(
+                                          ? Icon(
                                               Icons.play_circle_outline_rounded,
-                                              color: Color(0xFFBFD5F3),
+                                              color: textSecondary,
                                               size: 26,
                                             )
                                           : Image.network(
                                               url,
                                               fit: BoxFit.contain,
                                               errorBuilder: (_, __, ___) =>
-                                                  const Icon(
+                                                  Icon(
                                                     Icons.broken_image_rounded,
-                                                    color: Color(0xFFBFD5F3),
+                                                    color: textSecondary,
                                                   ),
                                             ),
                                     ),
@@ -2046,7 +2058,7 @@ class _EditBottomSheet extends StatelessWidget {
                                         ? null
                                         : () => onRemoveMedia(url),
                                     style: TextButton.styleFrom(
-                                      foregroundColor: const Color(0xFFFCA5A5),
+                                      foregroundColor: scheme.error,
                                       minimumSize: const Size(0, 28),
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
@@ -2066,10 +2078,7 @@ class _EditBottomSheet extends StatelessWidget {
               if (error != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    error!,
-                    style: const TextStyle(color: Colors.redAccent),
-                  ),
+                  child: Text(error!, style: TextStyle(color: scheme.error)),
                 ),
               Row(
                 children: [
@@ -2077,9 +2086,9 @@ class _EditBottomSheet extends StatelessWidget {
                     child: OutlinedButton(
                       onPressed: loading ? null : onClose,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFBFD5F3),
-                        backgroundColor: const Color(0xFF12213D),
-                        side: const BorderSide(color: Color(0xFF2A4C77)),
+                        foregroundColor: textPrimary,
+                        backgroundColor: tokens.panel,
+                        side: BorderSide(color: tokens.panelBorder),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -2095,8 +2104,8 @@ class _EditBottomSheet extends StatelessWidget {
                           ? null
                           : onSave,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1B3A63),
-                        foregroundColor: const Color(0xFFDDEBFF),
+                        backgroundColor: tokens.primary,
+                        foregroundColor: scheme.onPrimary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -2114,28 +2123,32 @@ class _EditBottomSheet extends StatelessWidget {
     );
   }
 
-  InputDecoration _editInputDecoration({String? hint}) {
+  InputDecoration _editInputDecoration(BuildContext context, {String? hint}) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens = _appTokens(context);
+
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: Color(0xFF607091)),
+      hintStyle: TextStyle(color: tokens.textMuted),
       filled: true,
-      fillColor: const Color(0xFF131F36),
+      fillColor: tokens.panel,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF1E2D48)),
+        borderSide: BorderSide(color: tokens.panelBorder),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF1E2D48)),
+        borderSide: BorderSide(color: tokens.panelBorder),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF4AA3E4)),
+        borderSide: BorderSide(color: scheme.primary),
       ),
       disabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF1E2D48)),
+        borderSide: BorderSide(color: tokens.panelBorder),
       ),
     );
   }
@@ -2150,6 +2163,7 @@ class _EditField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -2157,8 +2171,8 @@ class _EditField extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFFE8ECF8),
+            style: TextStyle(
+              color: tokens.text,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -2169,7 +2183,7 @@ class _EditField extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               helper!,
-              style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 11.5),
+              style: TextStyle(color: tokens.textMuted, fontSize: 11.5),
             ),
           ],
         ],
@@ -2193,6 +2207,7 @@ class _SelectPillRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -2207,24 +2222,20 @@ class _SelectPillRow extends StatelessWidget {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: selected == value
-                      ? const Color(0xFF21456F)
-                      : const Color(0xFF13203A),
+                  color: selected == value ? tokens.primarySoft : tokens.panel,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: selected == value
-                        ? const Color(0xFF4B78A8)
-                        : const Color(0xFF254269),
+                        ? tokens.primary
+                        : tokens.panelBorder,
                   ),
                 ),
                 child: Text(
                   value,
                   style: TextStyle(
                     color: enabled
-                        ? (selected == value
-                              ? const Color(0xFFEAF3FF)
-                              : const Color(0xFFD5E2F6))
-                        : const Color(0xFF8DA2C8),
+                        ? (selected == value ? tokens.text : tokens.textMuted)
+                        : tokens.textMuted,
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
@@ -2258,6 +2269,7 @@ class _ActionPackageOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -2269,14 +2281,10 @@ class _ActionPackageOptionCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
             decoration: BoxDecoration(
-              color: selected
-                  ? const Color(0xFF183056)
-                  : const Color(0xFF12213D),
+              color: selected ? tokens.primarySoft : tokens.panel,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: selected
-                    ? const Color(0xFF62A5E4)
-                    : const Color(0xFF26466F),
+                color: selected ? tokens.primary : tokens.panelBorder,
                 width: selected ? 1.4 : 1,
               ),
             ),
@@ -2290,8 +2298,8 @@ class _ActionPackageOptionCard extends StatelessWidget {
                         children: [
                           Text(
                             title,
-                            style: const TextStyle(
-                              color: Color(0xFFE8ECF8),
+                            style: TextStyle(
+                              color: tokens.text,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -2303,13 +2311,13 @@ class _ActionPackageOptionCard extends StatelessWidget {
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0F3A63),
+                                color: tokens.panelMuted,
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
                                 highlight!,
-                                style: const TextStyle(
-                                  color: Color(0xFFA7D3FF),
+                                style: TextStyle(
+                                  color: tokens.primary,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 11,
                                 ),
@@ -2321,10 +2329,7 @@ class _ActionPackageOptionCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF8DA2C8),
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: tokens.textMuted, fontSize: 12),
                       ),
                     ],
                   ),
@@ -2335,8 +2340,8 @@ class _ActionPackageOptionCard extends StatelessWidget {
                   children: [
                     Text(
                       priceLabel,
-                      style: const TextStyle(
-                        color: Color(0xFFE8ECF8),
+                      style: TextStyle(
+                        color: tokens.text,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -2344,9 +2349,7 @@ class _ActionPackageOptionCard extends StatelessWidget {
                     Text(
                       selected ? 'Selected' : 'Tap to choose',
                       style: TextStyle(
-                        color: selected
-                            ? const Color(0xFF9FCAF2)
-                            : const Color(0xFF6A84AC),
+                        color: selected ? tokens.primary : tokens.textMuted,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -2379,6 +2382,7 @@ class _ActionDurationOptionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: disabled ? null : onTap,
@@ -2388,12 +2392,10 @@ class _ActionDurationOptionChip extends StatelessWidget {
           width: 150,
           padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF173055) : const Color(0xFF12213D),
+            color: selected ? tokens.primarySoft : tokens.panel,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: selected
-                  ? const Color(0xFF62A5E4)
-                  : const Color(0xFF26466F),
+              color: selected ? tokens.primary : tokens.panelBorder,
             ),
           ),
           child: Column(
@@ -2401,15 +2403,15 @@ class _ActionDurationOptionChip extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  color: Color(0xFFE8ECF8),
+                style: TextStyle(
+                  color: tokens.text,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 priceLabel,
-                style: const TextStyle(color: Color(0xFFA8BEDF), fontSize: 12),
+                style: TextStyle(color: tokens.textMuted, fontSize: 12),
               ),
             ],
           ),

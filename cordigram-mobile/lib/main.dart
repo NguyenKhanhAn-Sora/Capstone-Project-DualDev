@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'core/config/app_theme.dart';
 import 'core/services/auth_storage.dart';
 import 'core/services/push_notification_service.dart';
+import 'core/services/theme_controller.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
 
@@ -21,48 +23,35 @@ Future<void> _requestNotificationPermission() async {
   await Permission.notification.request();
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    ThemeController.instance.load();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: appNavigatorKey,
-      title: 'Cordigram Mobile',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3470A2)),
-        useMaterial3: true,
-        // Reset default padding/margin cho TextButton toàn app
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            padding: EdgeInsets.zero,
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        ),
-        // Reset padding mặc định của ElevatedButton
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        ),
-        // Reset padding mặc định của OutlinedButton
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        ),
-        // Reset padding mặc định của ListTile
-        listTileTheme: const ListTileThemeData(
-          contentPadding: EdgeInsets.zero,
-          minLeadingWidth: 0,
-          minVerticalPadding: 0,
-        ),
+    return AnimatedBuilder(
+      animation: ThemeController.instance,
+      builder: (context, _) => MaterialApp(
+        navigatorKey: appNavigatorKey,
+        title: 'Cordigram Mobile',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeController.instance.themeMode,
+        home: AuthStorage.accessToken != null
+            ? const HomeScreen()
+            : const LoginScreen(),
       ),
-      home: AuthStorage.accessToken != null
-          ? const HomeScreen()
-          : const LoginScreen(),
     );
   }
 }

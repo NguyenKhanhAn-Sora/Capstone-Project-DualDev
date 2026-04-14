@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/config/app_theme.dart';
 import '../../core/services/auth_storage.dart';
 import '../hashtag/hashtag_screen.dart';
 import '../hashtag/services/hashtag_feed_service.dart';
@@ -10,6 +11,7 @@ import '../home/models/feed_post.dart';
 import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostCard, PostMenuAction;
 import '../post/post_detail_screen.dart';
+import '../post/utils/post_confirm_dialogs.dart';
 import '../post/utils/post_edit_utils.dart';
 import '../post/utils/likes_list_sheet.dart';
 import '../post/utils/post_mute_overlay.dart';
@@ -64,6 +66,14 @@ class _SearchScreenState extends State<SearchScreen> {
   final Map<String, int> _viewCooldownMap = <String, int>{};
   static const int _kViewCooldownMs = 300000;
 
+  AppSemanticColors get _tokens {
+    final theme = Theme.of(context);
+    return theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -81,12 +91,11 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _showSnack(String message, {bool error = false}) {
     if (!mounted) return;
+    final scheme = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: error
-            ? const Color(0xFFB91C1C)
-            : const Color(0xFF1A2235),
+        backgroundColor: error ? scheme.error : scheme.surfaceContainerHighest,
       ),
     );
   }
@@ -823,32 +832,12 @@ class _SearchScreenState extends State<SearchScreen> {
         }
         return;
       case PostMenuAction.deletePost:
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF111827),
-            title: const Text(
-              'Delete post',
-              style: TextStyle(color: Colors.white),
-            ),
-            content: const Text(
-              'This action cannot be undone.',
-              style: TextStyle(color: Color(0xFF7A8BB0)),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(color: Color(0xFFEF4444)),
-                ),
-              ),
-            ],
-          ),
+        final confirmed = await showPostConfirmDialog(
+          context,
+          title: 'Delete post',
+          message: 'This action cannot be undone.',
+          confirmLabel: 'Delete',
+          danger: true,
         );
         if (confirmed != true) return;
         final snapshot = _findState(post.id);
@@ -944,6 +933,9 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _tabBtn(String label, _SearchTab tab) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final active = _activeTab == tab;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -952,23 +944,33 @@ class _SearchScreenState extends State<SearchScreen> {
         label: Text(label),
         selected: active,
         labelStyle: TextStyle(
-          color: active ? Colors.white : const Color(0xFF9BAECF),
+          color: active
+              ? (isDark ? _tokens.primarySoft : scheme.onPrimaryContainer)
+              : scheme.onSurfaceVariant,
           fontWeight: FontWeight.w600,
         ),
-        selectedColor: const Color(0xFF1F3B73),
-        backgroundColor: const Color(0xFF111C33),
+        selectedColor: isDark
+            ? scheme.primary.withValues(alpha: 0.28)
+            : scheme.primaryContainer,
+        backgroundColor: scheme.surface,
+        side: BorderSide(
+          color: active
+              ? scheme.primary.withValues(alpha: isDark ? 0.6 : 0.36)
+              : scheme.outline.withValues(alpha: 0.9),
+        ),
         onSelected: (_) => setState(() => _activeTab = tab),
       ),
     );
   }
 
   Widget _buildHistory() {
+    final scheme = Theme.of(context).colorScheme;
     if (_history.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 20),
+      return Padding(
+        padding: const EdgeInsets.only(top: 20),
         child: Text(
           'No recent searches',
-          style: TextStyle(color: Color(0xFF7A8BB0)),
+          style: TextStyle(color: scheme.onSurfaceVariant),
         ),
       );
     }
@@ -977,10 +979,10 @@ class _SearchScreenState extends State<SearchScreen> {
       children: [
         Row(
           children: [
-            const Text(
+            Text(
               'Recent',
               style: TextStyle(
-                color: Colors.white,
+                color: scheme.onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
@@ -996,7 +998,7 @@ class _SearchScreenState extends State<SearchScreen> {
           return ListTile(
             onTap: () => _openHistory(item),
             leading: CircleAvatar(
-              backgroundColor: const Color(0xFF1E293B),
+              backgroundColor: scheme.surfaceContainerHighest,
               backgroundImage: item.imageUrl.isNotEmpty
                   ? NetworkImage(item.imageUrl)
                   : null,
@@ -1009,7 +1011,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           : item.kind == SearchHistoryKind.reel
                           ? Icons.smart_display
                           : Icons.search,
-                      color: Colors.white70,
+                      color: scheme.onSurfaceVariant,
                     )
                   : null,
             ),
@@ -1017,7 +1019,7 @@ class _SearchScreenState extends State<SearchScreen> {
               item.label.isEmpty ? '(no caption)' : item.label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: scheme.onSurface),
             ),
             subtitle: item.subtitle.isEmpty
                 ? null
@@ -1025,10 +1027,10 @@ class _SearchScreenState extends State<SearchScreen> {
                     item.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Color(0xFF9BAECF)),
+                    style: TextStyle(color: scheme.onSurfaceVariant),
                   ),
             trailing: IconButton(
-              icon: const Icon(Icons.close, color: Color(0xFF9BAECF), size: 18),
+              icon: Icon(Icons.close, color: scheme.onSurfaceVariant, size: 18),
               onPressed: () => _deleteHistoryItem(item.id),
             ),
           );
@@ -1038,6 +1040,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildPeopleList(List<ProfileSearchItem> items, {int? take}) {
+    final scheme = Theme.of(context).colorScheme;
     final sliced = take == null
         ? items
         : items.take(take).toList(growable: false);
@@ -1045,12 +1048,12 @@ class _SearchScreenState extends State<SearchScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Text(
             'People',
             style: TextStyle(
-              color: Colors.white,
+              color: scheme.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -1060,7 +1063,7 @@ class _SearchScreenState extends State<SearchScreen> {
           (p) => ListTile(
             onTap: () => _openProfile(p),
             leading: CircleAvatar(
-              backgroundColor: const Color(0xFF334155),
+              backgroundColor: scheme.surfaceContainerHighest,
               backgroundImage: p.avatarUrl.isNotEmpty
                   ? NetworkImage(p.avatarUrl)
                   : null,
@@ -1068,17 +1071,17 @@ class _SearchScreenState extends State<SearchScreen> {
                   ? Text(
                       (p.displayName.isNotEmpty ? p.displayName[0] : 'U')
                           .toUpperCase(),
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: scheme.onSurface),
                     )
                   : null,
             ),
             title: Text(
               p.displayName,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: scheme.onSurface),
             ),
             subtitle: Text(
               '@${p.username}',
-              style: const TextStyle(color: Color(0xFF9BAECF)),
+              style: TextStyle(color: scheme.onSurfaceVariant),
             ),
           ),
         ),
@@ -1087,6 +1090,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildHashtagList(List<HashtagSearchItem> items, {int? take}) {
+    final scheme = Theme.of(context).colorScheme;
     final sliced = take == null
         ? items
         : items.take(take).toList(growable: false);
@@ -1094,12 +1098,12 @@ class _SearchScreenState extends State<SearchScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Text(
             'Hashtags',
             style: TextStyle(
-              color: Colors.white,
+              color: scheme.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -1108,23 +1112,23 @@ class _SearchScreenState extends State<SearchScreen> {
         ...sliced.map(
           (t) => ListTile(
             onTap: () => _openHashtag(t.name),
-            leading: const CircleAvatar(
-              backgroundColor: Color(0xFF1E293B),
+            leading: CircleAvatar(
+              backgroundColor: scheme.surfaceContainerHighest,
               child: Text(
                 '#',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: scheme.onSurface,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ),
             title: Text(
               '#${t.name}',
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: scheme.onSurface),
             ),
             subtitle: Text(
               '${t.usageCount} posts',
-              style: const TextStyle(color: Color(0xFF9BAECF)),
+              style: TextStyle(color: scheme.onSurfaceVariant),
             ),
           ),
         ),
@@ -1133,6 +1137,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildReelGrid(List<FeedPost> items, {int? take}) {
+    final scheme = Theme.of(context).colorScheme;
     final sliced = take == null
         ? items
         : items.take(take).toList(growable: false);
@@ -1141,12 +1146,12 @@ class _SearchScreenState extends State<SearchScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Text(
             'Reels',
             style: TextStyle(
-              color: Colors.white,
+              color: scheme.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -1180,7 +1185,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       source,
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) =>
-                          const ColoredBox(color: Color(0xFF1E293B)),
+                          ColoredBox(color: scheme.surfaceContainerHighest),
                     ),
                     Positioned(
                       right: 6,
@@ -1226,6 +1231,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildPostsList(List<FeedPostState> items, {int? take}) {
+    final scheme = Theme.of(context).colorScheme;
     final sliced = take == null
         ? items
         : items.take(take).toList(growable: false);
@@ -1234,12 +1240,12 @@ class _SearchScreenState extends State<SearchScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Text(
             'Posts',
             style: TextStyle(
-              color: Colors.white,
+              color: scheme.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -1271,6 +1277,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildResultsBody() {
+    final scheme = Theme.of(context).colorScheme;
     if (_query.isEmpty) {
       return _buildHistory();
     }
@@ -1280,18 +1287,16 @@ class _SearchScreenState extends State<SearchScreen> {
         _posts.isEmpty &&
         _reels.isEmpty &&
         _hashtags.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 20),
-        child: Center(
-          child: CircularProgressIndicator(color: Color(0xFF4AA3E4)),
-        ),
+      return Padding(
+        padding: const EdgeInsets.only(top: 20),
+        child: Center(child: CircularProgressIndicator(color: scheme.primary)),
       );
     }
 
     if (_error != null) {
       return Padding(
         padding: const EdgeInsets.only(top: 20),
-        child: Text(_error!, style: const TextStyle(color: Color(0xFFFCA5A5))),
+        child: Text(_error!, style: TextStyle(color: scheme.error)),
       );
     }
 
@@ -1348,16 +1353,18 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1020),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D1526),
+        backgroundColor: scheme.surface,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Color(0xFF9BAECF)),
-        title: const Text(
+        iconTheme: IconThemeData(color: scheme.onSurfaceVariant),
+        title: Text(
           'Search',
           style: TextStyle(
-            color: Color(0xFFE8ECF8),
+            color: scheme.onSurface,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -1374,17 +1381,17 @@ class _SearchScreenState extends State<SearchScreen> {
                 _runSearchInitial();
               },
               textInputAction: TextInputAction.search,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: scheme.onSurface),
               decoration: InputDecoration(
                 hintText: 'Search people, #hashtags, posts, reels',
-                hintStyle: const TextStyle(color: Color(0xFF9BAECF)),
-                prefixIcon: const Icon(
+                hintStyle: TextStyle(color: scheme.onSurfaceVariant),
+                prefixIcon: Icon(
                   Icons.search_rounded,
-                  color: Color(0xFF9BAECF),
+                  color: scheme.onSurfaceVariant,
                 ),
                 suffixIcon: _searchController.text.trim().isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.close, color: Color(0xFF9BAECF)),
+                        icon: Icon(Icons.close, color: scheme.onSurfaceVariant),
                         onPressed: () {
                           _searchController.clear();
                           _onQueryChanged('');
@@ -1393,7 +1400,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       )
                     : null,
                 filled: true,
-                fillColor: const Color(0xFF111C33),
+                fillColor: scheme.surface,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,

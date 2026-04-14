@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/widgets/comment_sheet_widgets.dart';
@@ -17,10 +18,10 @@ import '../profile/profile_screen.dart';
 import '../report/report_comment_sheet.dart';
 import '../report/report_post_sheet.dart';
 import '../home/models/feed_post.dart';
-import '../home/widgets/media_carousel.dart';
 import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostCard, PostMenuAction;
 import 'utils/post_edit_utils.dart';
+import 'utils/post_confirm_dialogs.dart';
 import 'utils/likes_list_sheet.dart';
 import 'utils/post_mute_overlay.dart';
 
@@ -691,41 +692,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         }
         return;
       case PostMenuAction.deletePost:
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF111827),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            title: const Text(
-              'Delete post',
-              style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-            ),
-            content: const Text(
-              'This action cannot be undone.',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Color(0xFF7A8BB0)),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        final confirmed = await showPostConfirmDialog(
+          context,
+          title: 'Delete post',
+          message: 'This action cannot be undone.',
+          confirmLabel: 'Delete',
+          danger: true,
         );
         if (confirmed != true) return;
         try {
@@ -771,41 +743,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         if (userId == null || userId.isEmpty) return;
         final username =
             post.authorUsername ?? post.author?.username ?? post.displayName;
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF111827),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            title: Text(
-              'Block @$username?',
-              style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-            ),
-            content: const Text(
-              'You will no longer see posts from this account.',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Color(0xFF7A8BB0)),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Block',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        final confirmed = await showPostConfirmDialog(
+          context,
+          title: 'Block @$username?',
+          message: 'You will no longer see posts from this account.',
+          confirmLabel: 'Block',
+          danger: true,
         );
         if (confirmed != true) return;
         try {
@@ -911,28 +854,30 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final commentsLocked = _postState?.post.allowComments == false;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1020),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D1526),
+        backgroundColor: scheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        title: const Text(
+        title: Text(
           'Post',
           style: TextStyle(
-            color: Color(0xFFE8ECF8),
+            color: scheme.onSurface,
             fontWeight: FontWeight.w700,
             fontSize: 17,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: Color(0xFF7A8BB0),
+            color: scheme.onSurfaceVariant,
             size: 20,
           ),
           onPressed: () => Navigator.of(context).pop(),
@@ -941,7 +886,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           preferredSize: const Size.fromHeight(1),
           child: Container(
             height: 1,
-            color: Colors.white.withValues(alpha: 0.07),
+            color: scheme.outline.withValues(alpha: 0.4),
           ),
         ),
       ),
@@ -951,16 +896,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           if (commentsLocked)
             Container(
               width: double.infinity,
-              color: const Color(0xFF0D1526),
+              color: scheme.surface,
               padding: EdgeInsets.fromLTRB(
                 16,
                 12,
                 16,
                 12 + MediaQuery.of(context).viewPadding.bottom,
               ),
-              child: const Text(
+              child: Text(
                 'Comments are turned off for this post.',
-                style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
                 textAlign: TextAlign.center,
               ),
             )
@@ -976,6 +921,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   Widget _buildBody() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     if (_postLoading && _postState == null) {
       return const Center(
         child: CircularProgressIndicator(color: Color(0xFF4AA3E4)),
@@ -1056,10 +1008,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: Row(
                 children: [
-                  const Text(
+                  Text(
                     'Comments',
                     style: TextStyle(
-                      color: Color(0xFFE8ECF8),
+                      color: tokens.text,
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
                     ),
@@ -1068,10 +1020,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     const SizedBox(width: 6),
                     Text(
                       '${_postState!.stats.comments}',
-                      style: const TextStyle(
-                        color: Color(0xFF7A8BB0),
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: tokens.textMuted, fontSize: 13),
                     ),
                   ],
                 ],
@@ -1088,16 +1037,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   vertical: 32,
                 ),
                 child: Column(
-                  children: const [
+                  children: [
                     Icon(
                       Icons.chat_bubble_outline_rounded,
                       size: 40,
-                      color: Color(0xFF4A5568),
+                      color: tokens.textMuted,
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     Text(
                       'No comments yet.',
-                      style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+                      style: TextStyle(color: tokens.textMuted, fontSize: 14),
                     ),
                   ],
                 ),
@@ -1260,20 +1209,20 @@ class _CommentTileState extends State<_CommentTile> {
   static String _stripTrailing(String url) =>
       url.replaceAll(RegExp(r'[),.;!?]+$'), '');
 
-  List<InlineSpan> _buildContentSpans(String text) {
+  List<InlineSpan> _buildContentSpans(
+    String text, {
+    required Color baseColor,
+    required Color linkColor,
+  }) {
     for (final r in _urlRecognizers) r.dispose();
     _urlRecognizers.clear();
-    const baseStyle = TextStyle(
-      color: Color(0xFFCDD5E0),
-      fontSize: 14,
-      height: 1.45,
-    );
-    const urlStyle = TextStyle(
-      color: Color(0xFF60A5FA),
+    final baseStyle = TextStyle(color: baseColor, fontSize: 14, height: 1.45);
+    final urlStyle = TextStyle(
+      color: linkColor,
       fontSize: 14,
       height: 1.45,
       decoration: TextDecoration.underline,
-      decorationColor: Color(0xFF60A5FA),
+      decorationColor: linkColor,
     );
     final spans = <InlineSpan>[];
     int lastEnd = 0;
@@ -1446,39 +1395,12 @@ class _CommentTileState extends State<_CommentTile> {
   }
 
   Future<void> _onDeleteComment() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF111827),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text(
-          'Delete comment',
-          style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-        ),
-        content: const Text(
-          'This will permanently delete your comment.',
-          style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Color(0xFF7A8BB0)),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Delete',
-              style: TextStyle(
-                color: Color(0xFFEF4444),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await showPostConfirmDialog(
+      context,
+      title: 'Delete comment',
+      message: 'This will permanently delete your comment.',
+      confirmLabel: 'Delete',
+      danger: true,
     );
     if (confirmed != true || !mounted) return;
     try {
@@ -1531,39 +1453,12 @@ class _CommentTileState extends State<_CommentTile> {
         widget.comment.author?.displayName ??
         'this user';
     if (userId == null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF111827),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          'Block $username?',
-          style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-        ),
-        content: Text(
-          'Blocking @$username will hide their content from you.',
-          style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Color(0xFF7A8BB0)),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Block',
-              style: TextStyle(
-                color: Color(0xFFEF4444),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await showPostConfirmDialog(
+      context,
+      title: 'Block $username?',
+      message: 'Blocking @$username will hide their content from you.',
+      confirmLabel: 'Block',
+      danger: true,
     );
     if (confirmed != true || !mounted) return;
     try {
@@ -1682,6 +1577,12 @@ class _CommentTileState extends State<_CommentTile> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final comment = widget.comment;
     final isPinned = comment.pinnedAt != null;
     final isReply = widget.depth > 0;
@@ -1726,8 +1627,8 @@ class _CommentTileState extends State<_CommentTile> {
                                   onTap: _openCommentAuthorProfile,
                                   child: Text(
                                     comment.displayUsername,
-                                    style: const TextStyle(
-                                      color: Color(0xFFE8ECF8),
+                                    style: TextStyle(
+                                      color: tokens.text,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13,
                                     ),
@@ -1743,16 +1644,16 @@ class _CommentTileState extends State<_CommentTile> {
                                 ],
                                 const Spacer(),
                                 if (isPinned) ...[
-                                  const Icon(
+                                  Icon(
                                     Icons.push_pin_rounded,
                                     size: 12,
-                                    color: Color(0xFF7A8BB0),
+                                    color: tokens.textMuted,
                                   ),
                                   const SizedBox(width: 3),
-                                  const Text(
+                                  Text(
                                     'Pinned',
                                     style: TextStyle(
-                                      color: Color(0xFF7A8BB0),
+                                      color: tokens.textMuted,
                                       fontSize: 11,
                                     ),
                                   ),
@@ -1760,8 +1661,8 @@ class _CommentTileState extends State<_CommentTile> {
                                 ],
                                 Text(
                                   _timeAgo(comment.createdAt),
-                                  style: const TextStyle(
-                                    color: Color(0xFF7A8BB0),
+                                  style: TextStyle(
+                                    color: tokens.textMuted,
                                     fontSize: 11,
                                   ),
                                 ),
@@ -1775,7 +1676,8 @@ class _CommentTileState extends State<_CommentTile> {
                                   final tp = TextPainter(
                                     text: TextSpan(
                                       text: _content,
-                                      style: const TextStyle(
+                                      style: TextStyle(
+                                        color: tokens.text,
                                         fontSize: 14,
                                         height: 1.45,
                                       ),
@@ -1792,6 +1694,8 @@ class _CommentTileState extends State<_CommentTile> {
                                         text: TextSpan(
                                           children: _buildContentSpans(
                                             _content,
+                                            baseColor: tokens.text,
+                                            linkColor: tokens.primary,
                                           ),
                                         ),
                                         maxLines: _textExpanded ? null : 4,
@@ -1813,8 +1717,8 @@ class _CommentTileState extends State<_CommentTile> {
                                               _textExpanded
                                                   ? 'See less'
                                                   : 'See more',
-                                              style: const TextStyle(
-                                                color: Color(0xFF4AA3E4),
+                                              style: TextStyle(
+                                                color: tokens.primary,
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.w600,
                                               ),
@@ -1861,16 +1765,16 @@ class _CommentTileState extends State<_CommentTile> {
                                         size: 15,
                                         filled: _liked,
                                         color: _liked
-                                            ? const Color(0xFF2b74b0)
-                                            : const Color(0xFF7A8BB0),
+                                            ? tokens.primary
+                                            : tokens.textMuted,
                                       ),
                                       const SizedBox(width: 3),
                                       Text(
                                         '$_likesCount',
                                         style: TextStyle(
                                           color: _liked
-                                              ? const Color(0xFF2b74b0)
-                                              : const Color(0xFF7A8BB0),
+                                              ? tokens.primary
+                                              : tokens.textMuted,
                                           fontSize: 12,
                                         ),
                                       ),
@@ -1883,10 +1787,10 @@ class _CommentTileState extends State<_CommentTile> {
                                     comment.id,
                                     comment.author?.username,
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     'Reply',
                                     style: TextStyle(
-                                      color: Color(0xFF7A8BB0),
+                                      color: tokens.textMuted,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -1905,16 +1809,16 @@ class _CommentTileState extends State<_CommentTile> {
                                     Container(
                                       width: 20,
                                       height: 1,
-                                      color: const Color(0xFF4A5568),
+                                      color: tokens.textMuted,
                                     ),
                                     const SizedBox(width: 7),
                                     if (_loading && _replies.isEmpty)
-                                      const SizedBox(
+                                      SizedBox(
                                         width: 12,
                                         height: 12,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 1.5,
-                                          color: Color(0xFF4AA3E4),
+                                          color: tokens.primary,
                                         ),
                                       )
                                     else
@@ -1924,8 +1828,8 @@ class _CommentTileState extends State<_CommentTile> {
                                             : 'View replies'
                                                   '${displayReplyCount > 0 ? " ($displayReplyCount)" : ""}',
 
-                                        style: const TextStyle(
-                                          color: Color(0xFF4AA3E4),
+                                        style: TextStyle(
+                                          color: tokens.primary,
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -1977,25 +1881,21 @@ class _CommentTileState extends State<_CommentTile> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 20,
-                      height: 1,
-                      color: const Color(0xFF4A5568),
-                    ),
+                    Container(width: 20, height: 1, color: tokens.textMuted),
                     const SizedBox(width: 7),
                     _loading
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 12,
                             height: 12,
                             child: CircularProgressIndicator(
                               strokeWidth: 1.5,
-                              color: Color(0xFF4AA3E4),
+                              color: tokens.primary,
                             ),
                           )
-                        : const Text(
+                        : Text(
                             'Load more replies',
                             style: TextStyle(
-                              color: Color(0xFF4AA3E4),
+                              color: tokens.primary,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -2006,14 +1906,14 @@ class _CommentTileState extends State<_CommentTile> {
             ),
           // Loading indicator while paginating
           if (_loading && _replies.isNotEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(44, 2, 12, 8),
               child: SizedBox(
                 width: 14,
                 height: 14,
                 child: CircularProgressIndicator(
                   strokeWidth: 1.5,
-                  color: Color(0xFF4AA3E4),
+                  color: tokens.primary,
                 ),
               ),
             ),
@@ -2850,10 +2750,16 @@ class _CommentInputBarState extends State<_CommentInputBar> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _sending = false);
+      final theme = Theme.of(context);
+      final tokens =
+          theme.extension<AppSemanticColors>() ??
+          (theme.brightness == Brightness.dark
+              ? AppSemanticColors.dark
+              : AppSemanticColors.light);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to post comment: $e'),
-          backgroundColor: const Color(0xFF1A2235),
+          backgroundColor: tokens.panelMuted,
         ),
       );
     }
@@ -2861,47 +2767,47 @@ class _CommentInputBarState extends State<_CommentInputBar> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final hasContent = _textCtrl.text.trim().isNotEmpty || _media != null;
 
     return Container(
-      color: const Color(0xFF0D1526),
+      color: tokens.panel,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Top divider
-          Container(height: 1, color: Colors.white.withValues(alpha: 0.07)),
+          Container(height: 1, color: tokens.panelBorder),
           // Reply banner
           if (widget.replyTarget != null)
             Container(
-              color: const Color(0xFF131929),
+              color: tokens.panelMuted,
               padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.reply_rounded,
-                    size: 14,
-                    color: Color(0xFF4AA3E4),
-                  ),
+                  Icon(Icons.reply_rounded, size: 14, color: tokens.primary),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       'Replying to @${widget.replyTarget!.username ?? 'user'}',
-                      style: const TextStyle(
-                        color: Color(0xFF4AA3E4),
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: tokens.primary, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   GestureDetector(
                     onTap: widget.onCancelReply,
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.all(4),
                       child: Icon(
                         Icons.close_rounded,
                         size: 16,
-                        color: Color(0xFF7A8BB0),
+                        color: tokens.textMuted,
                       ),
                     ),
                   ),
@@ -2918,12 +2824,12 @@ class _CommentInputBarState extends State<_CommentInputBar> {
             Container(
               margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
               decoration: BoxDecoration(
-                color: const Color(0xFF131929),
+                color: tokens.panelMuted,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                border: Border.all(color: tokens.panelBorder),
               ),
               child: _mentionLoading
-                  ? const Padding(
+                  ? Padding(
                       padding: EdgeInsets.all(12),
                       child: Row(
                         children: [
@@ -2932,14 +2838,14 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Color(0xFF4AA3E4),
+                              color: tokens.primary,
                             ),
                           ),
                           SizedBox(width: 10),
                           Text(
                             'Searching users…',
                             style: TextStyle(
-                              color: Color(0xFF9BAECF),
+                              color: tokens.textMuted,
                               fontSize: 12,
                             ),
                           ),
@@ -2947,14 +2853,11 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                       ),
                     )
                   : _mentionSuggestions.isEmpty
-                  ? const Padding(
+                  ? Padding(
                       padding: EdgeInsets.all(12),
                       child: Text(
                         'No users found',
-                        style: TextStyle(
-                          color: Color(0xFF9BAECF),
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: tokens.textMuted, fontSize: 12),
                       ),
                     )
                   : Column(
@@ -2973,7 +2876,7 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                                 children: [
                                   CircleAvatar(
                                     radius: 14,
-                                    backgroundColor: const Color(0xFF1A2235),
+                                    backgroundColor: tokens.panel,
                                     backgroundImage:
                                         (s.avatarUrl != null &&
                                             s.avatarUrl!.isNotEmpty)
@@ -2982,9 +2885,9 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                                     child:
                                         (s.avatarUrl == null ||
                                             s.avatarUrl!.isEmpty)
-                                        ? const Icon(
+                                        ? Icon(
                                             Icons.person,
-                                            color: Color(0xFF7A8BB0),
+                                            color: tokens.textMuted,
                                             size: 14,
                                           )
                                         : null,
@@ -2997,8 +2900,8 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                                       children: [
                                         Text(
                                           '@${s.username}',
-                                          style: const TextStyle(
-                                            color: Color(0xFFE8ECF8),
+                                          style: TextStyle(
+                                            color: tokens.text,
                                             fontSize: 13,
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -3007,8 +2910,8 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                                         if ((s.displayName ?? '').isNotEmpty)
                                           Text(
                                             s.displayName!,
-                                            style: const TextStyle(
-                                              color: Color(0xFF7A8BB0),
+                                            style: TextStyle(
+                                              color: tokens.textMuted,
                                               fontSize: 12,
                                             ),
                                             overflow: TextOverflow.ellipsis,
@@ -3033,11 +2936,9 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A2235),
+                      color: tokens.panelMuted,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.08),
-                      ),
+                      border: Border.all(color: tokens.panelBorder),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -3052,14 +2953,11 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                             },
                             maxLines: 4,
                             minLines: 1,
-                            style: const TextStyle(
-                              color: Color(0xFFE8ECF8),
-                              fontSize: 14,
-                            ),
-                            decoration: const InputDecoration(
+                            style: TextStyle(color: tokens.text, fontSize: 14),
+                            decoration: InputDecoration(
                               hintText: 'Write a comment…',
                               hintStyle: TextStyle(
-                                color: Color(0xFF4A5568),
+                                color: tokens.textMuted,
                                 fontSize: 14,
                               ),
                               contentPadding: EdgeInsets.symmetric(
@@ -3075,9 +2973,9 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                           width: 28,
                           height: 28,
                           child: IconButton(
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.image_outlined,
-                              color: Color(0xFF7A8BB0),
+                              color: tokens.textMuted,
                               size: 17,
                             ),
                             onPressed: _sending ? null : _pickMedia,
@@ -3099,15 +2997,15 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                                 ),
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                    color: const Color(0xFF4AA3E4),
+                                    color: tokens.primary,
                                     width: 1.2,
                                   ),
                                   borderRadius: BorderRadius.circular(3),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'GIF',
                                   style: TextStyle(
-                                    color: Color(0xFF4AA3E4),
+                                    color: tokens.primary,
                                     fontSize: 9,
                                     fontWeight: FontWeight.w700,
                                     height: 1,
@@ -3133,8 +3031,8 @@ class _CommentInputBarState extends State<_CommentInputBar> {
 </svg>''',
                               width: 17,
                               height: 17,
-                              colorFilter: const ColorFilter.mode(
-                                Color(0xFF7A8BB0),
+                              colorFilter: ColorFilter.mode(
+                                tokens.textMuted,
                                 BlendMode.srcIn,
                               ),
                             ),
@@ -3159,22 +3057,22 @@ class _CommentInputBarState extends State<_CommentInputBar> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: hasContent && !_sending
-                          ? const Color(0xFF3470A2)
-                          : const Color(0xFF1A2235),
+                          ? tokens.primary
+                          : tokens.panelMuted,
                     ),
                     child: _sending
-                        ? const Padding(
+                        ? Padding(
                             padding: EdgeInsets.all(10),
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: scheme.onPrimary,
                             ),
                           )
                         : Icon(
                             Icons.send_rounded,
                             color: hasContent
-                                ? Colors.white
-                                : const Color(0xFF4A5568),
+                                ? scheme.onPrimary
+                                : tokens.textMuted,
                             size: 18,
                           ),
                   ),
@@ -3229,6 +3127,12 @@ class _MediaPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final bool isVideo = media.type == 'video';
 
     Widget thumb;
@@ -3238,13 +3142,13 @@ class _MediaPreview extends StatelessWidget {
         width: 80,
         height: 80,
         decoration: BoxDecoration(
-          color: const Color(0xFF0B1220),
+          color: tokens.panelMuted,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Center(
+        child: Center(
           child: Icon(
             Icons.play_circle_fill_rounded,
-            color: Color(0xFF4AA3E4),
+            color: tokens.primary,
             size: 32,
           ),
         ),
@@ -3268,7 +3172,7 @@ class _MediaPreview extends StatelessWidget {
           height: 80,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) =>
-              Container(width: 80, height: 80, color: const Color(0xFF1A2235)),
+              Container(width: 80, height: 80, color: tokens.panelMuted),
         ),
       );
     }
@@ -3290,13 +3194,11 @@ class _MediaPreview extends StatelessWidget {
                   width: 20,
                   height: 20,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0D1526),
+                    color: tokens.panel,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.25),
-                    ),
+                    border: Border.all(color: tokens.panelBorder),
                   ),
-                  child: const Icon(Icons.close, color: Colors.white, size: 12),
+                  child: Icon(Icons.close, color: tokens.text, size: 12),
                 ),
               ),
             ),
@@ -3834,6 +3736,12 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final title = widget.mode == 'sticker' ? 'Stickers' : 'GIFs';
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
@@ -3841,9 +3749,9 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
       maxChildSize: 0.92,
       snap: true,
       builder: (ctx, scrollCtrl) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF0D1526),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        decoration: BoxDecoration(
+          color: tokens.panel,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
         child: Column(
           children: [
@@ -3853,7 +3761,7 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: tokens.textMuted.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -3864,16 +3772,16 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Color(0xFFE8ECF8),
+                    style: TextStyle(
+                      color: tokens.text,
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
                     ),
                   ),
                   const Spacer(),
-                  const Text(
+                  Text(
                     'Powered by GIPHY',
-                    style: TextStyle(color: Color(0xFF4A5568), fontSize: 10),
+                    style: TextStyle(color: tokens.textMuted, fontSize: 10),
                   ),
                 ],
               ),
@@ -3883,17 +3791,17 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
               child: TextField(
                 controller: _searchCtrl,
-                style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 14),
+                style: TextStyle(color: tokens.text, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: 'Search $title…',
-                  hintStyle: const TextStyle(color: Color(0xFF4A5568)),
-                  prefixIcon: const Icon(
+                  hintStyle: TextStyle(color: tokens.textMuted),
+                  prefixIcon: Icon(
                     Icons.search_rounded,
-                    color: Color(0xFF7A8BB0),
+                    color: tokens.textMuted,
                     size: 20,
                   ),
                   filled: true,
-                  fillColor: const Color(0xFF1A2235),
+                  fillColor: tokens.panelMuted,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -3910,10 +3818,8 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
             // Grid
             Expanded(
               child: _loading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF4AA3E4),
-                      ),
+                  ? Center(
+                      child: CircularProgressIndicator(color: tokens.primary),
                     )
                   : _error != null
                   ? Center(
@@ -3922,24 +3828,24 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
                         children: [
                           Text(
                             _error!,
-                            style: const TextStyle(color: Color(0xFF7A8BB0)),
+                            style: TextStyle(color: tokens.textMuted),
                           ),
                           const SizedBox(height: 8),
                           TextButton(
                             onPressed: () => _fetch(_searchCtrl.text),
-                            child: const Text(
+                            child: Text(
                               'Retry',
-                              style: TextStyle(color: Color(0xFF4AA3E4)),
+                              style: TextStyle(color: tokens.primary),
                             ),
                           ),
                         ],
                       ),
                     )
                   : _items.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'No results',
-                        style: TextStyle(color: Color(0xFF7A8BB0)),
+                        style: TextStyle(color: tokens.textMuted),
                       ),
                     )
                   : GridView.builder(
@@ -3979,16 +3885,16 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
                                   progress == null
                                   ? child
                                   : Container(
-                                      color: const Color(0xFF1A2235),
-                                      child: const Center(
+                                      color: tokens.panelMuted,
+                                      child: Center(
                                         child: CircularProgressIndicator(
                                           strokeWidth: 1.5,
-                                          color: Color(0xFF4AA3E4),
+                                          color: tokens.primary,
                                         ),
                                       ),
                                     ),
                               errorBuilder: (_, __, ___) =>
-                                  Container(color: const Color(0xFF1A2235)),
+                                  Container(color: tokens.panelMuted),
                             ),
                           ),
                         );

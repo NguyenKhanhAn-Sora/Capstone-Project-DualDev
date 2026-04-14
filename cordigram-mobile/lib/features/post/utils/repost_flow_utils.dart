@@ -42,9 +42,10 @@ Future<RepostFlowSelection?> showRepostFlowSheet({
   required String kind,
   required bool initialAllowDownload,
 }) async {
+  final scheme = Theme.of(context).colorScheme;
   final action = await showModalBottomSheet<_RepostIntent>(
     context: context,
-    backgroundColor: const Color(0xFF0B1732),
+    backgroundColor: scheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -59,7 +60,7 @@ Future<RepostFlowSelection?> showRepostFlowSheet({
   final quote = await showModalBottomSheet<RepostQuoteInput>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: const Color(0xFF0E1A35),
+    backgroundColor: scheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -82,25 +83,26 @@ class _RepostMenuSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dividerColor = Colors.white.withValues(alpha: 0.08);
+    final scheme = Theme.of(context).colorScheme;
+    final dividerColor = scheme.outline.withValues(alpha: 0.22);
     return SafeArea(
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF0B1732),
+            color: scheme.surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.24)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Repost',
                 style: TextStyle(
-                  color: Color(0xFFE8ECF8),
+                  color: scheme.onSurface,
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
                 ),
@@ -108,8 +110,8 @@ class _RepostMenuSheet extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 label,
-                style: const TextStyle(
-                  color: Color(0xFF93A2C5),
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -118,7 +120,7 @@ class _RepostMenuSheet extends StatelessWidget {
               Divider(height: 1, color: dividerColor),
               _RepostMenuButton(
                 text: 'Repost',
-                color: const Color(0xFF3AA6E5),
+                color: scheme.primary,
                 onTap: () => Navigator.of(context).pop(_RepostIntent.quick),
               ),
               Divider(height: 1, color: dividerColor),
@@ -152,19 +154,20 @@ class _RepostMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return SizedBox(
       width: double.infinity,
       child: TextButton(
         onPressed: onTap,
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          foregroundColor: color ?? const Color(0xFFE8ECF8),
+          foregroundColor: color ?? scheme.onSurface,
           shape: const RoundedRectangleBorder(),
         ),
         child: Text(
           text,
           style: TextStyle(
-            color: color ?? const Color(0xFFE8ECF8),
+            color: color ?? scheme.onSurface,
             fontSize: 18,
             fontWeight: FontWeight.w700,
           ),
@@ -300,6 +303,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return SafeArea(
       top: false,
@@ -310,10 +314,10 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Quote repost',
                 style: TextStyle(
-                  color: Color(0xFFE8ECF8),
+                  color: scheme.onSurface,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
@@ -321,35 +325,38 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
               const SizedBox(height: 6),
               Text(
                 widget.label,
-                style: const TextStyle(color: Color(0xFF93A2C5), fontSize: 12),
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _contentCtrl,
                 maxLines: 5,
                 maxLength: 500,
-                style: const TextStyle(color: Color(0xFFE8ECF8)),
+                style: TextStyle(color: scheme.onSurface),
                 decoration: _inputDecoration('Write your quote...'),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _hashtagsCtrl,
-                style: const TextStyle(color: Color(0xFFE8ECF8)),
+                style: TextStyle(color: scheme.onSurface),
                 decoration: _inputDecoration('Hashtags (comma separated)'),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _locationCtrl,
-                style: const TextStyle(color: Color(0xFFE8ECF8)),
+                style: TextStyle(color: scheme.onSurface),
                 decoration: _inputDecoration('Location (optional)'),
                 onChanged: _onLocationChanged,
               ),
               if (_locationLoading)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: Text(
                     'Searching location...',
-                    style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 12),
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               if (!_locationLoading && _locationError.isNotEmpty)
@@ -357,20 +364,17 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     _locationError,
-                    style: const TextStyle(
-                      color: Color(0xFFE57373),
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: scheme.error, fontSize: 12),
                   ),
                 ),
               if (_locationOptions.isNotEmpty)
                 Container(
                   margin: const EdgeInsets.only(top: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF111C37),
+                    color: scheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08),
+                      color: scheme.outline.withValues(alpha: 0.24),
                     ),
                   ),
                   constraints: const BoxConstraints(maxHeight: 180),
@@ -379,7 +383,7 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                     itemCount: _locationOptions.length,
                     separatorBuilder: (_, __) => Divider(
                       height: 1,
-                      color: Colors.white.withValues(alpha: 0.06),
+                      color: scheme.outline.withValues(alpha: 0.2),
                     ),
                     itemBuilder: (context, index) => InkWell(
                       onTap: () {
@@ -396,8 +400,8 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                         ),
                         child: Text(
                           _locationOptions[index],
-                          style: const TextStyle(
-                            color: Color(0xFFE8ECF8),
+                          style: TextStyle(
+                            color: scheme.onSurface,
                             fontSize: 13,
                           ),
                         ),
@@ -416,9 +420,9 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                   ),
                   DropdownMenuItem(value: 'private', child: Text('Private')),
                 ],
-                dropdownColor: const Color(0xFF111C37),
-                iconEnabledColor: const Color(0xFF9BAECF),
-                style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 14),
+                dropdownColor: scheme.surface,
+                iconEnabledColor: scheme.onSurfaceVariant,
+                style: TextStyle(color: scheme.onSurface, fontSize: 14),
                 decoration: _inputDecoration('Visibility'),
                 onChanged: (v) {
                   if (v != null) setState(() => _visibility = v);
@@ -428,32 +432,32 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
               SwitchListTile.adaptive(
                 value: _allowComments,
                 onChanged: (v) => setState(() => _allowComments = v),
-                title: const Text(
+                title: Text(
                   'Allow comments',
-                  style: TextStyle(color: Color(0xFFE8ECF8)),
+                  style: TextStyle(color: scheme.onSurface),
                 ),
                 contentPadding: EdgeInsets.zero,
-                activeColor: const Color(0xFF4AA3E4),
+                activeColor: scheme.primary,
               ),
               SwitchListTile.adaptive(
                 value: widget.initialAllowDownload,
                 onChanged: null,
-                title: const Text(
+                title: Text(
                   'Allow downloads (inherits original)',
-                  style: TextStyle(color: Color(0xFF7A8BB0)),
+                  style: TextStyle(color: scheme.onSurfaceVariant),
                 ),
                 contentPadding: EdgeInsets.zero,
-                activeColor: const Color(0xFF4AA3E4),
+                activeColor: scheme.primary,
               ),
               SwitchListTile.adaptive(
                 value: _hideLikeCount,
                 onChanged: (v) => setState(() => _hideLikeCount = v),
-                title: const Text(
+                title: Text(
                   'Hide like count',
-                  style: TextStyle(color: Color(0xFFE8ECF8)),
+                  style: TextStyle(color: scheme.onSurface),
                 ),
                 contentPadding: EdgeInsets.zero,
-                activeColor: const Color(0xFF4AA3E4),
+                activeColor: scheme.primary,
               ),
               const SizedBox(height: 10),
               Row(
@@ -463,9 +467,9 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                       onPressed: () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.18),
+                          color: scheme.outline.withValues(alpha: 0.4),
                         ),
-                        foregroundColor: const Color(0xFFE8ECF8),
+                        foregroundColor: scheme.onSurface,
                         padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
                       child: const Text('Cancel'),
@@ -487,8 +491,8 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
                         );
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4AA3E4),
-                        foregroundColor: Colors.white,
+                        backgroundColor: scheme.primary,
+                        foregroundColor: scheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
                       child: const Text('Share quote'),
@@ -504,18 +508,19 @@ class _QuoteComposerSheetState extends State<_QuoteComposerSheet> {
   }
 
   InputDecoration _inputDecoration(String hint) {
+    final scheme = Theme.of(context).colorScheme;
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: Color(0xFF6F82A8)),
+      hintStyle: TextStyle(color: scheme.onSurfaceVariant),
       filled: true,
-      fillColor: const Color(0xFF111C37),
+      fillColor: scheme.surface,
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        borderSide: BorderSide(color: scheme.outline.withValues(alpha: 0.24)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF4AA3E4)),
+        borderSide: BorderSide(color: scheme.primary),
       ),
     );
   }

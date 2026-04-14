@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:video_player/video_player.dart';
 import 'dart:convert';
 import '../../core/config/app_config.dart';
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 
@@ -45,6 +46,14 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
   static const int _maxChars = 2000;
   static const int _maxFiles = 5;
+
+  AppSemanticColors get _tokens {
+    final theme = Theme.of(context);
+    return theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+  }
 
   @override
   void dispose() {
@@ -198,22 +207,6 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     });
   }
 
-  String _guessMime(String filename) {
-    final ext = filename.split('.').last.toLowerCase();
-    const map = {
-      'jpg': 'image/jpeg',
-      'jpeg': 'image/jpeg',
-      'png': 'image/png',
-      'gif': 'image/gif',
-      'webp': 'image/webp',
-      'mp4': 'video/mp4',
-      'mov': 'video/quicktime',
-      'avi': 'video/x-msvideo',
-      'mkv': 'video/x-matroska',
-    };
-    return map[ext] ?? 'application/octet-stream';
-  }
-
   void _clear() {
     setState(() {
       _descController.clear();
@@ -229,25 +222,27 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1020),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D1526),
+        backgroundColor: scheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: Color(0xFF9BAECF),
+            color: scheme.onSurfaceVariant,
             size: 20,
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Report a Problem',
           style: TextStyle(
-            color: Color(0xFFE8ECF8),
+            color: scheme.onSurface,
             fontWeight: FontWeight.w600,
             fontSize: 16,
           ),
@@ -261,6 +256,8 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   // ── Success view ──────────────────────────────────────────────────────────
 
   Widget _buildSuccessView() {
+    final tokens = _tokens;
+    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -270,31 +267,27 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             Container(
               width: 72,
               height: 72,
-              decoration: const BoxDecoration(
-                color: Color(0xFF1A3B2A),
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: 0.14),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.check_rounded,
-                color: Color(0xFF34D399),
-                size: 38,
-              ),
+              child: Icon(Icons.check_rounded, color: scheme.primary, size: 38),
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Report sent',
               style: TextStyle(
-                color: Color(0xFFE8ECF8),
+                color: tokens.text,
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               'Thank you. Our team will review it soon.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Color(0xFF7A8BB0),
+                color: tokens.textMuted,
                 fontSize: 14,
                 height: 1.5,
               ),
@@ -305,8 +298,8 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               child: OutlinedButton(
                 onPressed: _clear,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF4AA3E4),
-                  side: const BorderSide(color: Color(0xFF233050)),
+                  foregroundColor: scheme.primary,
+                  side: BorderSide(color: tokens.panelBorder),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -324,7 +317,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               child: TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF7A8BB0),
+                  foregroundColor: tokens.textMuted,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: const Text(
@@ -342,6 +335,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   // ── Form ──────────────────────────────────────────────────────────────────
 
   Widget _buildForm() {
+    final theme = Theme.of(context);
+    final tokens = _tokens;
+    final scheme = theme.colorScheme;
     final descLen = _descController.text.length;
     final canSubmit = !_submitting && (_cooldownSec == null);
 
@@ -354,9 +350,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF111827),
+              color: tokens.panel,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF1E2D48)),
+              border: Border.all(color: tokens.panelBorder),
             ),
             child: Row(
               children: [
@@ -364,12 +360,12 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1C2E48),
+                    color: scheme.primary.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.flag_outlined,
-                    color: Color(0xFF4AA3E4),
+                    color: scheme.primary,
                     size: 20,
                   ),
                 ),
@@ -377,20 +373,20 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Tell us what went wrong',
                         style: TextStyle(
-                          color: Color(0xFFE8ECF8),
+                          color: tokens.text,
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
                         'Describe the issue and attach screenshots or a short video.',
                         style: TextStyle(
-                          color: Color(0xFF7A8BB0),
+                          color: tokens.textMuted,
                           fontSize: 12,
                           height: 1.4,
                         ),
@@ -421,33 +417,29 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                       maxLength,
                     }) => const SizedBox.shrink(),
                 onChanged: (_) => setState(() {}),
-                style: const TextStyle(
-                  color: Color(0xFFD0D8EE),
-                  fontSize: 14,
-                  height: 1.5,
-                ),
+                style: TextStyle(color: tokens.text, fontSize: 14, height: 1.5),
                 decoration: InputDecoration(
                   hintText:
                       'Explain what happened, where it happened, and any steps to reproduce.',
-                  hintStyle: const TextStyle(
-                    color: Color(0xFF50607A),
+                  hintStyle: TextStyle(
+                    color: tokens.textMuted,
                     fontSize: 14,
                     height: 1.5,
                   ),
                   filled: true,
-                  fillColor: const Color(0xFF111827),
+                  fillColor: tokens.panel,
                   contentPadding: const EdgeInsets.fromLTRB(14, 14, 14, 36),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF1E2D48)),
+                    borderSide: BorderSide(color: tokens.panelBorder),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF1E2D48)),
+                    borderSide: BorderSide(color: tokens.panelBorder),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF4AA3E4)),
+                    borderSide: BorderSide(color: scheme.primary),
                   ),
                 ),
               ),
@@ -459,8 +451,8 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                   '$descLen / $_maxChars',
                   style: TextStyle(
                     color: descLen > _maxChars * 0.9
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFF50607A),
+                        ? scheme.error
+                        : tokens.textMuted,
                     fontSize: 11,
                   ),
                 ),
@@ -477,14 +469,14 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               const Spacer(),
               Text(
                 '${_files.length} / $_maxFiles',
-                style: const TextStyle(color: Color(0xFF50607A), fontSize: 12),
+                style: TextStyle(color: tokens.textMuted, fontSize: 12),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Up to 5 files · images or videos',
-            style: TextStyle(color: Color(0xFF50607A), fontSize: 12),
+            style: TextStyle(color: tokens.textMuted, fontSize: 12),
           ),
           const SizedBox(height: 10),
 
@@ -511,26 +503,26 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               child: Container(
                 height: 52,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF111827),
+                  color: tokens.panel,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: const Color(0xFF1E2D48),
+                    color: tokens.panelBorder,
                     style: BorderStyle.solid,
                   ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     Icon(
                       Icons.add_photo_alternate_outlined,
-                      color: Color(0xFF4AA3E4),
+                      color: scheme.primary,
                       size: 20,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Text(
                       'Add images or videos',
                       style: TextStyle(
-                        color: Color(0xFF4AA3E4),
+                        color: scheme.primary,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -548,25 +540,22 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               margin: const EdgeInsets.only(bottom: 14),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF2A1215),
+                color: scheme.error.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF5A1A1A)),
+                border: Border.all(color: scheme.error.withValues(alpha: 0.32)),
               ),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.error_outline_rounded,
-                    color: Color(0xFFE53935),
+                    color: scheme.error,
                     size: 18,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _error!,
-                      style: const TextStyle(
-                        color: Color(0xFFE57373),
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: scheme.error, fontSize: 13),
                     ),
                   ),
                 ],
@@ -579,24 +568,19 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               margin: const EdgeInsets.only(bottom: 14),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1F2E),
+                color: scheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF2D3E5A)),
+                border: Border.all(
+                  color: scheme.primary.withValues(alpha: 0.24),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.timer_outlined,
-                    color: Color(0xFF4AA3E4),
-                    size: 18,
-                  ),
+                  Icon(Icons.timer_outlined, color: scheme.primary, size: 18),
                   const SizedBox(width: 8),
                   Text(
                     'You can send the next report in ${_cooldownSec}s.',
-                    style: const TextStyle(
-                      color: Color(0xFF7A8BB0),
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: tokens.textMuted, fontSize: 13),
                   ),
                 ],
               ),
@@ -609,8 +593,8 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                 child: OutlinedButton(
                   onPressed: _submitting ? null : _clear,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF7A8BB0),
-                    side: const BorderSide(color: Color(0xFF1E2D48)),
+                    foregroundColor: tokens.textMuted,
+                    side: BorderSide(color: tokens.panelBorder),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -625,10 +609,12 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                 child: ElevatedButton(
                   onPressed: canSubmit ? _submit : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    disabledBackgroundColor: const Color(0xFF1A2A45),
+                    backgroundColor: scheme.primary,
+                    disabledBackgroundColor: scheme.primary.withValues(
+                      alpha: 0.45,
+                    ),
                     foregroundColor: Colors.white,
-                    disabledForegroundColor: const Color(0xFF4A5568),
+                    disabledForegroundColor: Colors.white70,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -671,10 +657,16 @@ class _FieldLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return Text(
       text,
-      style: const TextStyle(
-        color: Color(0xFFB0BDD4),
+      style: TextStyle(
+        color: tokens.textMuted,
         fontSize: 13,
         fontWeight: FontWeight.w500,
       ),
@@ -730,6 +722,12 @@ class _AttachmentPreviewTileState extends State<_AttachmentPreviewTile> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return SizedBox(
       width: 104,
       height: 104,
@@ -740,17 +738,17 @@ class _AttachmentPreviewTileState extends State<_AttachmentPreviewTile> {
           children: [
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF111827),
-                border: Border.all(color: const Color(0xFF1E2D48)),
+                color: tokens.panel,
+                border: Border.all(color: tokens.panelBorder),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: _isVideo ? _buildVideoPreview() : _buildImagePreview(),
             ),
             if (_isVideo)
-              const Center(
+              Center(
                 child: Icon(
                   Icons.play_circle_fill_rounded,
-                  color: Color(0xFFE8ECF8),
+                  color: tokens.text,
                   size: 34,
                 ),
               ),
@@ -762,13 +760,13 @@ class _AttachmentPreviewTileState extends State<_AttachmentPreviewTile> {
                 child: Container(
                   width: 24,
                   height: 24,
-                  decoration: const BoxDecoration(
-                    color: Color(0xCC0B1020),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.close_rounded,
-                    color: Color(0xFFD0D8EE),
+                    color: tokens.text,
                     size: 16,
                   ),
                 ),
@@ -781,14 +779,20 @@ class _AttachmentPreviewTileState extends State<_AttachmentPreviewTile> {
   }
 
   Widget _buildImagePreview() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return Image.file(
       File(_file.xFile.path),
       fit: BoxFit.cover,
       errorBuilder: (_, __, ___) {
-        return const Center(
+        return Center(
           child: Icon(
             Icons.broken_image_outlined,
-            color: Color(0xFF7A8BB0),
+            color: tokens.textMuted,
             size: 24,
           ),
         );
@@ -797,6 +801,12 @@ class _AttachmentPreviewTileState extends State<_AttachmentPreviewTile> {
   }
 
   Widget _buildVideoPreview() {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     if (_videoController != null && _videoReady) {
       return FittedBox(
         fit: BoxFit.cover,
@@ -808,8 +818,8 @@ class _AttachmentPreviewTileState extends State<_AttachmentPreviewTile> {
       );
     }
 
-    return const Center(
-      child: Icon(Icons.videocam_outlined, color: Color(0xFF7A8BB0), size: 24),
+    return Center(
+      child: Icon(Icons.videocam_outlined, color: tokens.textMuted, size: 24),
     );
   }
 }

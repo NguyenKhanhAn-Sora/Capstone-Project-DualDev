@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 
 class _ReportCategory {
@@ -151,6 +152,12 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final bottomPad =
         MediaQuery.of(context).viewInsets.bottom +
         MediaQuery.of(context).viewPadding.bottom;
@@ -159,8 +166,8 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
-      decoration: const BoxDecoration(
-        color: Color(0xFF111827),
+      decoration: BoxDecoration(
+        color: tokens.panel,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
@@ -172,7 +179,7 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFF374151),
+                color: tokens.textMuted.withValues(alpha: 0.28),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -187,19 +194,19 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
                       _selectedCategory = null;
                       _selectedReason = null;
                     }),
-                    child: const Padding(
-                      padding: EdgeInsets.only(right: 10),
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 10),
                       child: Icon(
                         Icons.arrow_back_ios_new_rounded,
                         size: 16,
-                        color: Color(0xFF7A8BB0),
+                        color: tokens.textMuted,
                       ),
                     ),
                   ),
                 Text(
                   'Report ${widget.subjectLabel}',
-                  style: const TextStyle(
-                    color: Color(0xFFE8ECF8),
+                  style: TextStyle(
+                    color: tokens.text,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
@@ -207,22 +214,22 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
                 const Spacer(),
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(false),
-                  child: const Icon(
+                  child: Icon(
                     Icons.close_rounded,
-                    color: Color(0xFF7A8BB0),
+                    color: tokens.textMuted,
                     size: 22,
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFF1F2A3D)),
+          Divider(height: 1, color: tokens.panelBorder),
           Flexible(
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomPad),
               child: _selectedCategory == null
-                  ? _buildCategoryStep()
-                  : _buildReasonStep(),
+                  ? _buildCategoryStep(tokens)
+                  : _buildReasonStep(tokens, theme),
             ),
           ),
         ],
@@ -230,14 +237,14 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
     );
   }
 
-  Widget _buildCategoryStep() {
+  Widget _buildCategoryStep(AppSemanticColors tokens) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           "What's the issue?",
           style: TextStyle(
-            color: Color(0xFFCDD5E0),
+            color: tokens.text,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -259,14 +266,14 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF172138),
+                  color: tokens.panelMuted,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF26354F)),
+                  border: Border.all(color: tokens.panelBorder),
                 ),
                 child: Text(
                   g.label,
-                  style: const TextStyle(
-                    color: Color(0xFFE8ECF8),
+                  style: TextStyle(
+                    color: tokens.text,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -279,15 +286,15 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
     );
   }
 
-  Widget _buildReasonStep() {
+  Widget _buildReasonStep(AppSemanticColors tokens, ThemeData theme) {
     final category = _selectedCategory!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           category.label,
-          style: const TextStyle(
-            color: Color(0xFFE8ECF8),
+          style: TextStyle(
+            color: tokens.text,
             fontSize: 14,
             fontWeight: FontWeight.w700,
           ),
@@ -298,11 +305,11 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
             value: reason,
             groupValue: _selectedReason,
             contentPadding: EdgeInsets.zero,
-            activeColor: const Color(0xFF4AA3E4),
+            activeColor: tokens.primary,
             onChanged: (value) => setState(() => _selectedReason = value),
             title: Text(
               reason.label,
-              style: const TextStyle(color: Color(0xFFCDD5E0), fontSize: 14),
+              style: TextStyle(color: tokens.text, fontSize: 14),
             ),
           ),
         ),
@@ -311,12 +318,12 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
           controller: _noteCtrl,
           minLines: 2,
           maxLines: 4,
-          style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 14),
+          style: TextStyle(color: tokens.text, fontSize: 14),
           decoration: InputDecoration(
             hintText: 'Additional note (optional)',
-            hintStyle: const TextStyle(color: Color(0xFF7A8BB0)),
+            hintStyle: TextStyle(color: tokens.textMuted),
             filled: true,
-            fillColor: const Color(0xFF172138),
+            fillColor: tokens.panelMuted,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide.none,
@@ -327,7 +334,7 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
           const SizedBox(height: 10),
           Text(
             _error!,
-            style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13),
+            style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
           ),
         ],
         const SizedBox(height: 12),
@@ -336,20 +343,20 @@ class _ReportPostSheetState extends State<_ReportPostSheet> {
           child: ElevatedButton(
             onPressed: _selectedReason == null || _submitting ? null : _submit,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2B74B0),
-              foregroundColor: Colors.white,
+              backgroundColor: tokens.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
               padding: const EdgeInsets.symmetric(vertical: 12),
             ),
             child: _submitting
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: theme.colorScheme.onPrimary,
                     ),
                   )
                 : const Text('Submit report'),

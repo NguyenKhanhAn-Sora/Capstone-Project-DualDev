@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import 'ads_campaign_detail_screen.dart';
 import 'ads_service.dart';
+
+AppSemanticColors _appTokens(BuildContext context) {
+  final theme = Theme.of(context);
+  return theme.extension<AppSemanticColors>() ??
+      (theme.brightness == Brightness.dark
+          ? AppSemanticColors.dark
+          : AppSemanticColors.light);
+}
 
 enum _CampaignStatusFilter { all, active, hidden, canceled, completed }
 
@@ -96,30 +105,32 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
   }
 
   Color _statusBg(String status) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     switch (status) {
       case 'active':
-        return const Color(0x1F10B981);
+        return isDark ? const Color(0x1F10B981) : const Color(0xFFE9F8F0);
       case 'hidden':
       case 'paused':
-        return const Color(0x3364758B);
+        return isDark ? const Color(0x3364758B) : const Color(0xFFF1F4F8);
       case 'canceled':
-        return const Color(0x33DC2626);
+        return isDark ? const Color(0x33DC2626) : const Color(0xFFFDECED);
       default:
-        return const Color(0x3338BDF8);
+        return isDark ? const Color(0x3338BDF8) : const Color(0xFFEAF1FB);
     }
   }
 
   Color _statusFg(String status) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     switch (status) {
       case 'active':
-        return const Color(0xFF63E6B2);
+        return isDark ? const Color(0xFF63E6B2) : const Color(0xFF1E7A4D);
       case 'hidden':
       case 'paused':
-        return const Color(0xFFCBD5E1);
+        return isDark ? const Color(0xFFCBD5E1) : const Color(0xFF5F6B7A);
       case 'canceled':
-        return const Color(0xFFFCA5A5);
+        return isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB4232D);
       default:
-        return const Color(0xFFBAE6FD);
+        return isDark ? const Color(0xFFBAE6FD) : const Color(0xFF245A95);
     }
   }
 
@@ -288,11 +299,13 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0B1020);
-    const card = Color(0xFF111827);
-    const textPrimary = Color(0xFFE8ECF8);
-    const textSecondary = Color(0xFF7A8BB0);
-    const accent = Color(0xFF4AA3E4);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens = _appTokens(context);
+    final card = tokens.panelMuted;
+    final textPrimary = tokens.text;
+    final textSecondary = tokens.textMuted;
+    final accent = tokens.primary;
 
     final campaigns = _filtered;
     final total = _campaigns.length;
@@ -304,20 +317,20 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
     );
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: scheme.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: textPrimary),
-        title: const Text(
+        iconTheme: IconThemeData(color: scheme.onSurface),
+        title: Text(
           'All Ad Campaigns',
-          style: TextStyle(color: textPrimary),
+          style: TextStyle(color: scheme.onSurface),
         ),
       ),
       body: SafeArea(
         child: _loading
-            ? const Center(
+            ? Center(
                 child: CircularProgressIndicator(color: accent, strokeWidth: 2),
               )
             : RefreshIndicator(
@@ -334,7 +347,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: Text(
                             _error!,
-                            style: const TextStyle(color: Colors.redAccent),
+                            style: TextStyle(color: scheme.error),
                           ),
                         ),
                       GridView.count(
@@ -363,7 +376,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                         decoration: BoxDecoration(
                           color: card,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF1E2D48)),
+                          border: Border.all(color: tokens.panelBorder),
                         ),
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                         child: Column(
@@ -373,29 +386,27 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                               onChanged: (_) => setState(() {}),
                               decoration: InputDecoration(
                                 hintText: 'Search campaign name...',
-                                hintStyle: const TextStyle(
-                                  color: textSecondary,
-                                ),
+                                hintStyle: TextStyle(color: textSecondary),
                                 filled: true,
-                                fillColor: const Color(0xFF0F1B33),
+                                fillColor: tokens.panel,
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 12,
                                   vertical: 12,
                                 ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF20365A),
+                                  borderSide: BorderSide(
+                                    color: tokens.panelBorder,
                                   ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF20365A),
+                                  borderSide: BorderSide(
+                                    color: tokens.panelBorder,
                                   ),
                                 ),
                               ),
-                              style: const TextStyle(color: textPrimary),
+                              style: TextStyle(color: textPrimary),
                             ),
                             const SizedBox(height: 10),
                             Row(
@@ -410,9 +421,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                             _CampaignStatusFilter
                                           >(
                                             context: context,
-                                            backgroundColor: const Color(
-                                              0xFF0F1B33,
-                                            ),
+                                            backgroundColor: tokens.panel,
                                             builder: (_) =>
                                                 _SimpleSheet<
                                                   _CampaignStatusFilter
@@ -449,9 +458,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                             _CampaignSort
                                           >(
                                             context: context,
-                                            backgroundColor: const Color(
-                                              0xFF0F1B33,
-                                            ),
+                                            backgroundColor: tokens.panel,
                                             builder: (_) =>
                                                 _SimpleSheet<_CampaignSort>(
                                                   title: 'Sort campaigns',
@@ -498,7 +505,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                               children: [
                                 Text(
                                   '${campaigns.length} result${campaigns.length == 1 ? '' : 's'}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: textSecondary,
                                     fontSize: 12.5,
                                   ),
@@ -509,7 +516,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                       ? _clearFilters
                                       : null,
                                   style: TextButton.styleFrom(
-                                    foregroundColor: const Color(0xFF9CC7EF),
+                                    foregroundColor: tokens.primary,
                                   ),
                                   child: const Text('Clear'),
                                 ),
@@ -520,7 +527,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                       ),
                       const SizedBox(height: 12),
                       if (campaigns.isEmpty)
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.symmetric(vertical: 18),
                           child: Text(
                             'No campaigns match your filters.',
@@ -547,9 +554,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                 decoration: BoxDecoration(
                                   color: card,
                                   borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: const Color(0xFF1E2D48),
-                                  ),
+                                  border: Border.all(color: tokens.panelBorder),
                                 ),
                                 padding: const EdgeInsets.fromLTRB(
                                   12,
@@ -567,7 +572,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                             item.campaignName,
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               color: textPrimary,
                                               fontWeight: FontWeight.w700,
                                             ),
@@ -599,7 +604,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                     const SizedBox(height: 8),
                                     Text(
                                       'Start: ${_dateLite(item.startsAt)}   End: ${_dateLite(item.expiresAt)}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: textSecondary,
                                         fontSize: 12,
                                       ),
@@ -640,7 +645,7 @@ class _AdsCampaignsScreenState extends State<AdsCampaignsScreen> {
                                         padding: const EdgeInsets.only(top: 8),
                                         child: Text(
                                           'Admin reason: ${item.adminCancelReason!.trim()}',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: textSecondary,
                                             fontSize: 12,
                                           ),
@@ -669,20 +674,21 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
+        color: tokens.panelMuted,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1E2D48)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFF7A8BB0),
+            style: TextStyle(
+              color: tokens.textMuted,
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
@@ -692,8 +698,8 @@ class _StatCard extends StatelessWidget {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFFE8ECF8),
+            style: TextStyle(
+              color: tokens.text,
               fontWeight: FontWeight.w800,
               fontSize: 16,
             ),
@@ -717,23 +723,24 @@ class _PickerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Ink(
         padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F1B33),
+          color: tokens.panel,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFF20365A)),
+          border: Border.all(color: tokens.panelBorder),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF7A8BB0),
+              style: TextStyle(
+                color: tokens.textMuted,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
@@ -746,18 +753,15 @@ class _PickerButton extends StatelessWidget {
                     value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFFE8ECF8),
+                    style: TextStyle(
+                      color: tokens.text,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
                 const SizedBox(width: 6),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: Color(0xFF9CC7EF),
-                ),
+                Icon(Icons.keyboard_arrow_down_rounded, color: tokens.primary),
               ],
             ),
           ],
@@ -775,20 +779,18 @@ class _MiniMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 11),
-        ),
+        Text(label, style: TextStyle(color: tokens.textMuted, fontSize: 11)),
         const SizedBox(height: 4),
         Text(
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Color(0xFFE8ECF8),
+          style: TextStyle(
+            color: tokens.text,
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
@@ -818,6 +820,7 @@ class _SimpleSheet<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
@@ -827,8 +830,8 @@ class _SimpleSheet<T> extends StatelessWidget {
           children: [
             Text(
               title,
-              style: const TextStyle(
-                color: Color(0xFFE8ECF8),
+              style: TextStyle(
+                color: tokens.text,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
@@ -842,16 +845,14 @@ class _SimpleSheet<T> extends StatelessWidget {
                 title: Text(
                   item.label,
                   style: TextStyle(
-                    color: active
-                        ? const Color(0xFF7CD1FF)
-                        : const Color(0xFFE8ECF8),
+                    color: active ? tokens.primary : tokens.text,
                     fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),
                 trailing: active
-                    ? const Icon(
+                    ? Icon(
                         Icons.check_circle_rounded,
-                        color: Color(0xFF7CD1FF),
+                        color: tokens.primary,
                         size: 18,
                       )
                     : null,

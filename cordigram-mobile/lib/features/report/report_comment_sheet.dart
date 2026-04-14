@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 
 // ── Report category / reason model ───────────────────────────────────────────
@@ -201,6 +202,12 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final bottomPad =
         MediaQuery.of(context).viewInsets.bottom +
         MediaQuery.of(context).viewPadding.bottom;
@@ -209,8 +216,8 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
-      decoration: const BoxDecoration(
-        color: Color(0xFF111827),
+      decoration: BoxDecoration(
+        color: tokens.panel,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
@@ -223,7 +230,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFF374151),
+                color: tokens.textMuted.withValues(alpha: 0.28),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -239,19 +246,19 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
                       _selectedCategory = null;
                       _selectedReason = null;
                     }),
-                    child: const Padding(
-                      padding: EdgeInsets.only(right: 10),
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 10),
                       child: Icon(
                         Icons.arrow_back_ios_new_rounded,
                         size: 16,
-                        color: Color(0xFF7A8BB0),
+                        color: tokens.textMuted,
                       ),
                     ),
                   ),
-                const Text(
+                Text(
                   'Report Comment',
                   style: TextStyle(
-                    color: Color(0xFFE8ECF8),
+                    color: tokens.text,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
@@ -259,23 +266,23 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
                 const Spacer(),
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(false),
-                  child: const Icon(
+                  child: Icon(
                     Icons.close_rounded,
-                    color: Color(0xFF7A8BB0),
+                    color: tokens.textMuted,
                     size: 22,
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFF1F2A3D)),
+          Divider(height: 1, color: tokens.panelBorder),
           // Scrollable body
           Flexible(
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomPad),
               child: _selectedCategory == null
-                  ? _buildCategoryStep()
-                  : _buildReasonStep(),
+                  ? _buildCategoryStep(tokens)
+                  : _buildReasonStep(tokens, theme),
             ),
           ),
         ],
@@ -284,14 +291,14 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
   }
 
   // Step 1: Category selection
-  Widget _buildCategoryStep() {
+  Widget _buildCategoryStep(AppSemanticColors tokens) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           "What's the issue?",
           style: TextStyle(
-            color: Color(0xFFCDD5E0),
+            color: tokens.text,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -336,7 +343,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
   }
 
   // Step 2: Reason + optional note
-  Widget _buildReasonStep() {
+  Widget _buildReasonStep(AppSemanticColors tokens, ThemeData theme) {
     final cat = _selectedCategory!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,10 +365,10 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'Select a reason',
           style: TextStyle(
-            color: Color(0xFFCDD5E0),
+            color: tokens.text,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -377,12 +384,12 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
               decoration: BoxDecoration(
                 color: selected
                     ? cat.accent.withValues(alpha: 0.15)
-                    : const Color(0xFF1A2235),
+                    : tokens.panelMuted,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: selected
                       ? cat.accent.withValues(alpha: 0.6)
-                      : const Color(0xFF1F2A3D),
+                      : tokens.panelBorder,
                   width: 1,
                 ),
               ),
@@ -392,7 +399,7 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
                     child: Text(
                       r.label,
                       style: TextStyle(
-                        color: selected ? cat.accent : const Color(0xFFCDD5E0),
+                        color: selected ? cat.accent : tokens.text,
                         fontSize: 13,
                       ),
                     ),
@@ -411,10 +418,10 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
         // Note + submit (only after a reason is chosen)
         if (_selectedReason != null) ...[
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Additional note (optional)',
             style: TextStyle(
-              color: Color(0xFFCDD5E0),
+              color: tokens.text,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -424,19 +431,19 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
             controller: _noteCtrl,
             maxLines: 3,
             maxLength: 500,
-            style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 13),
+            style: TextStyle(color: tokens.text, fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Describe the issue (optional)…',
-              hintStyle: const TextStyle(color: Color(0xFF4A5568)),
+              hintStyle: TextStyle(color: tokens.textMuted),
               filled: true,
-              fillColor: const Color(0xFF1A2235),
+              fillColor: tokens.panelMuted,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF1F2A3D)),
+                borderSide: BorderSide(color: tokens.panelBorder),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF1F2A3D)),
+                borderSide: BorderSide(color: tokens.panelBorder),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -444,17 +451,14 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
                   color: cat.accent.withValues(alpha: 0.6),
                 ),
               ),
-              counterStyle: const TextStyle(
-                color: Color(0xFF4A5568),
-                fontSize: 11,
-              ),
+              counterStyle: TextStyle(color: tokens.textMuted, fontSize: 11),
             ),
           ),
           const SizedBox(height: 14),
           if (_error != null) ...[
             Text(
               _error!,
-              style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13),
+              style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
             ),
             const SizedBox(height: 10),
           ],
@@ -463,25 +467,26 @@ class _ReportCommentSheetState extends State<_ReportCommentSheet> {
             child: ElevatedButton(
               onPressed: _submitting ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2b74b0),
+                backgroundColor: tokens.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
               child: _submitting
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: theme.colorScheme.onPrimary,
                       ),
                     )
-                  : const Text(
+                  : Text(
                       'Submit Report',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: theme.colorScheme.onPrimary,
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),

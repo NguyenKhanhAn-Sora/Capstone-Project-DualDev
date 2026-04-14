@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/config/app_theme.dart';
 import '../../core/services/auth_storage.dart';
 import 'services/profile_service.dart';
 
@@ -118,12 +119,18 @@ class _FollowListSheetState extends State<_FollowListSheet>
   // value and immediately fires the reverse action (unfollow right after follow).
   final _pendingToggles = <String>{};
 
-  static const _bg = Color(0xFF0F1829);
-  static const _surface = Color(0xFF131F33);
-  static const _border = Color(0xFF1E2D48);
-  static const _textPrimary = Color(0xFFE8ECF8);
-  static const _textSecondary = Color(0xFF7A8BB0);
-  static const _accent = Color(0xFF4AA3E4);
+  AppSemanticColors get _tokens =>
+      Theme.of(context).extension<AppSemanticColors>() ??
+      (Theme.of(context).brightness == Brightness.dark
+          ? AppSemanticColors.dark
+          : AppSemanticColors.light);
+
+  Color get _bg => _tokens.panel;
+  Color get _surface => _tokens.panelMuted;
+  Color get _border => _tokens.panelBorder;
+  Color get _textPrimary => _tokens.text;
+  Color get _textSecondary => _tokens.textMuted;
+  Color get _accent => _tokens.primary;
   static const _defaultAvatar =
       'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
 
@@ -314,7 +321,7 @@ class _FollowListSheetState extends State<_FollowListSheet>
     final screenH = MediaQuery.of(context).size.height;
     return Container(
       height: screenH * 0.82,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _bg,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -324,7 +331,7 @@ class _FollowListSheetState extends State<_FollowListSheet>
           _buildHeader(),
           _buildTabs(),
           _buildSearch(),
-          const Divider(color: _border, height: 1),
+          Divider(color: _border, height: 1),
           Expanded(child: _buildTabView()),
         ],
       ),
@@ -355,7 +362,7 @@ class _FollowListSheetState extends State<_FollowListSheet>
           Expanded(
             child: Text(
               '@${widget.ownerUsername}',
-              style: const TextStyle(
+              style: TextStyle(
                 color: _textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -365,7 +372,7 @@ class _FollowListSheetState extends State<_FollowListSheet>
           ),
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close_rounded, color: _textSecondary),
+            icon: Icon(Icons.close_rounded, color: _textSecondary),
             tooltip: 'Close',
           ),
         ],
@@ -406,13 +413,13 @@ class _FollowListSheetState extends State<_FollowListSheet>
       child: TextField(
         controller: ctrl,
         onChanged: (_) => setState(() {}),
-        style: const TextStyle(color: _textPrimary, fontSize: 14),
+        style: TextStyle(color: _textPrimary, fontSize: 14),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(color: _textSecondary.withValues(alpha: 0.6)),
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             Icons.search_rounded,
-            color: Color(0xFF7A8BB0),
+            color: _textSecondary,
             size: 20,
           ),
           suffixIcon: ctrl.text.isNotEmpty
@@ -421,9 +428,9 @@ class _FollowListSheetState extends State<_FollowListSheet>
                     ctrl.clear();
                     setState(() {});
                   },
-                  child: const Icon(
+                  child: Icon(
                     Icons.close_rounded,
-                    color: Color(0xFF7A8BB0),
+                    color: _textSecondary,
                     size: 18,
                   ),
                 )
@@ -437,11 +444,11 @@ class _FollowListSheetState extends State<_FollowListSheet>
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(24),
-            borderSide: const BorderSide(color: _border),
+            borderSide: BorderSide(color: _border),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(24),
-            borderSide: const BorderSide(color: _accent),
+            borderSide: BorderSide(color: _accent),
           ),
         ),
       ),
@@ -462,11 +469,8 @@ class _FollowListSheetState extends State<_FollowListSheet>
     final data = tab == FollowTab.followers ? _followers : _following;
 
     if (data.loading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFF4AA3E4),
-          strokeWidth: 2,
-        ),
+      return Center(
+        child: CircularProgressIndicator(color: _accent, strokeWidth: 2),
       );
     }
 
@@ -479,16 +483,13 @@ class _FollowListSheetState extends State<_FollowListSheet>
             const SizedBox(height: 12),
             Text(
               data.error,
-              style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+              style: TextStyle(color: _textSecondary, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             TextButton(
               onPressed: () => _loadFirstPage(tab),
-              child: const Text(
-                'Retry',
-                style: TextStyle(color: Color(0xFF4AA3E4)),
-              ),
+              child: Text('Retry', style: TextStyle(color: _accent)),
             ),
           ],
         ),
@@ -506,7 +507,7 @@ class _FollowListSheetState extends State<_FollowListSheet>
       return Center(
         child: Text(
           searchActive ? 'No matches found' : 'No users yet',
-          style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
+          style: TextStyle(color: _textSecondary, fontSize: 14),
         ),
       );
     }
@@ -529,11 +530,11 @@ class _FollowListSheetState extends State<_FollowListSheet>
         itemCount: items.length + (data.loadingMore ? 1 : 0),
         itemBuilder: (ctx, i) {
           if (i == items.length) {
-            return const Padding(
+            return Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(
                 child: CircularProgressIndicator(
-                  color: Color(0xFF4AA3E4),
+                  color: _accent,
                   strokeWidth: 2,
                 ),
               ),
@@ -579,6 +580,12 @@ class _UserRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final isSelf = viewerId != null && item.userId == viewerId;
 
     return Padding(
@@ -590,7 +597,7 @@ class _UserRow extends StatelessWidget {
             onTap: onTap,
             child: CircleAvatar(
               radius: 22,
-              backgroundColor: const Color(0xFF1E2D48),
+              backgroundColor: tokens.panelBorder,
               backgroundImage:
                   (item.avatarUrl.isNotEmpty
                           ? NetworkImage(item.avatarUrl)
@@ -613,8 +620,8 @@ class _UserRow extends StatelessWidget {
                           item.displayName.isNotEmpty
                               ? item.displayName
                               : item.username,
-                          style: const TextStyle(
-                            color: Color(0xFFE8ECF8),
+                          style: TextStyle(
+                            color: tokens.text,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
@@ -623,9 +630,9 @@ class _UserRow extends StatelessWidget {
                       ),
                       if (item.isCreatorVerified) ...[
                         const SizedBox(width: 4),
-                        const Icon(
+                        Icon(
                           Icons.verified_rounded,
-                          color: Color(0xFF4AA3E4),
+                          color: tokens.primary,
                           size: 14,
                         ),
                       ],
@@ -634,10 +641,7 @@ class _UserRow extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '@${item.username}',
-                    style: const TextStyle(
-                      color: Color(0xFF7A8BB0),
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: tokens.textMuted, fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -656,13 +660,13 @@ class _UserRow extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E2D48),
+                color: tokens.panelBorder,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Text(
+              child: Text(
                 'You',
                 style: TextStyle(
-                  color: Color(0xFF7A8BB0),
+                  color: tokens.textMuted,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -686,6 +690,12 @@ class _FollowButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return GestureDetector(
       onTap: isPending ? null : onTap,
       child: AnimatedContainer(
@@ -693,21 +703,21 @@ class _FollowButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
         decoration: BoxDecoration(
           color: isPending
-              ? const Color(0xFF1E2D48)
+              ? tokens.panelBorder
               : isFollowing
               ? Colors.transparent
-              : const Color(0xFF4AA3E4),
+              : tokens.primary,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isPending
-                ? const Color(0xFF2A3D5A)
+                ? tokens.panelBorder
                 : isFollowing
-                ? const Color(0xFF4AA3E4)
+                ? tokens.primary
                 : Colors.transparent,
           ),
         ),
         child: isPending
-            ? const SizedBox(
+            ? SizedBox(
                 width: 48,
                 child: Center(
                   child: SizedBox(
@@ -715,7 +725,7 @@ class _FollowButton extends StatelessWidget {
                     height: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Color(0xFF4AA3E4),
+                      color: tokens.primary,
                     ),
                   ),
                 ),
@@ -723,7 +733,7 @@ class _FollowButton extends StatelessWidget {
             : Text(
                 isFollowing ? 'Following' : 'Follow',
                 style: TextStyle(
-                  color: isFollowing ? const Color(0xFF4AA3E4) : Colors.white,
+                  color: isFollowing ? tokens.primary : Colors.white,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),

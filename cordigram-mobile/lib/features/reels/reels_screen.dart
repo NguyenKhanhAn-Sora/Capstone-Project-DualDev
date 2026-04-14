@@ -13,6 +13,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/widgets/comment_sheet_widgets.dart';
@@ -21,6 +22,7 @@ import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostMenuAction;
 import '../profile/profile_screen.dart';
 import '../post/post_detail_screen.dart' show CommentItem, CommentLinkPreview;
+import '../post/utils/post_confirm_dialogs.dart';
 import '../post/utils/post_edit_utils.dart';
 import '../post/utils/likes_list_sheet.dart';
 import '../post/utils/post_mute_overlay.dart';
@@ -753,41 +755,12 @@ class _ReelsScreenState extends State<ReelsScreen> {
         if (muted) _showSnack('Reel notifications muted');
         return;
       case PostMenuAction.deletePost:
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF111827),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            title: const Text(
-              'Delete reel',
-              style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-            ),
-            content: const Text(
-              'This action cannot be undone.',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Color(0xFF7A8BB0)),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        final confirmed = await showPostConfirmDialog(
+          context,
+          title: 'Delete reel',
+          message: 'This action cannot be undone.',
+          confirmLabel: 'Delete',
+          danger: true,
         );
         if (confirmed != true) return;
         try {
@@ -831,41 +804,12 @@ class _ReelsScreenState extends State<ReelsScreen> {
         final userId = reel.authorId ?? reel.author?.id;
         if (userId == null || userId.isEmpty) return;
         final username = reel.authorUsername ?? reel.author?.username ?? 'user';
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF111827),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            title: Text(
-              'Block @$username?',
-              style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-            ),
-            content: const Text(
-              'You will no longer see reels from this account.',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Color(0xFF7A8BB0)),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Block',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        final confirmed = await showPostConfirmDialog(
+          context,
+          title: 'Block @$username?',
+          message: 'You will no longer see reels from this account.',
+          confirmLabel: 'Block',
+          danger: true,
         );
         if (confirmed != true) return;
         try {
@@ -934,37 +878,37 @@ class _ReelsScreenState extends State<ReelsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     if (_reels.isEmpty && _loading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF0B1020),
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF4AA3E4)),
-        ),
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: Center(child: CircularProgressIndicator(color: scheme.primary)),
       );
     }
 
     if (_reels.isEmpty && !_loading) {
       return Scaffold(
-        backgroundColor: const Color(0xFF0B1020),
+        backgroundColor: theme.scaffoldBackgroundColor,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.smart_display_outlined,
                 size: 56,
-                color: Color(0xFF4A5568),
+                color: scheme.onSurfaceVariant,
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'No reels yet',
-                style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 16),
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 16),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () => _loadReels(refresh: true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3470A2),
+                  backgroundColor: scheme.primary,
                 ),
                 child: const Text(
                   'Refresh',
@@ -978,7 +922,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
         children: [
           PageView.builder(
@@ -1106,6 +1050,12 @@ class _ReelPageState extends State<_ReelPage> {
 
   Future<void> _openReelMenu(BuildContext triggerContext) async {
     final reel = widget.state.post;
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final isOwner =
         widget.viewerId != null &&
         widget.viewerId!.isNotEmpty &&
@@ -1181,12 +1131,12 @@ class _ReelPageState extends State<_ReelPage> {
 
     final selected = await showMenu<String>(
       context: context,
-      color: const Color(0xFF0E1730),
+      color: tokens.panel,
       surfaceTintColor: Colors.transparent,
       position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        side: BorderSide(color: tokens.panelBorder),
       ),
       items: entries
           .map(
@@ -1195,9 +1145,7 @@ class _ReelPageState extends State<_ReelPage> {
               child: Text(
                 item.label,
                 style: TextStyle(
-                  color: item.danger
-                      ? const Color(0xFFF87171)
-                      : const Color(0xFFE5E7EB),
+                  color: item.danger ? theme.colorScheme.error : tokens.text,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -2252,6 +2200,12 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
       minChildSize: 0.4,
@@ -2259,9 +2213,9 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
       snap: true,
       builder: (context, sheetScrollController) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF111827),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          decoration: BoxDecoration(
+            color: tokens.panel,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           ),
           child: Column(
             children: [
@@ -2272,7 +2226,7 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF3A4A66),
+                    color: tokens.textMuted.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -2285,8 +2239,8 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'Comments',
-                    style: const TextStyle(
-                      color: Color(0xFFE8ECF8),
+                    style: TextStyle(
+                      color: tokens.text,
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
                     ),
@@ -2294,25 +2248,25 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
                 ),
               ),
               const SizedBox(height: 10),
-              Container(height: 1, color: Colors.white.withValues(alpha: 0.06)),
+              Container(height: 1, color: tokens.panelBorder),
 
               // Comment list
               Expanded(
                 child: _comments.isEmpty && !_loading
-                    ? const Center(
+                    ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.chat_bubble_outline_rounded,
                               size: 40,
-                              color: Color(0xFF4A5568),
+                              color: tokens.textMuted,
                             ),
                             SizedBox(height: 10),
                             Text(
                               'No comments yet.',
                               style: TextStyle(
-                                color: Color(0xFF7A8BB0),
+                                color: tokens.textMuted,
                                 fontSize: 14,
                               ),
                             ),
@@ -2325,12 +2279,12 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
                         itemCount: _comments.length + (_loading ? 1 : 0),
                         itemBuilder: (context, i) {
                           if (i == _comments.length) {
-                            return const Padding(
+                            return Padding(
                               padding: EdgeInsets.symmetric(vertical: 20),
                               child: Center(
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Color(0xFF4AA3E4),
+                                  color: tokens.primary,
                                 ),
                               ),
                             );
@@ -2374,16 +2328,16 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
               else
                 Container(
                   width: double.infinity,
-                  color: const Color(0xFF0D1526),
+                  color: tokens.panel,
                   padding: EdgeInsets.fromLTRB(
                     16,
                     12,
                     16,
                     12 + MediaQuery.of(context).viewPadding.bottom,
                   ),
-                  child: const Text(
+                  child: Text(
                     'Comments are turned off for this reel.',
-                    style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
+                    style: TextStyle(color: tokens.textMuted, fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -2629,39 +2583,12 @@ class _RCommentTileState extends State<_RCommentTile> {
   }
 
   Future<void> _onDeleteComment() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF111827),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text(
-          'Delete comment',
-          style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-        ),
-        content: const Text(
-          'This will permanently delete your comment.',
-          style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Color(0xFF7A8BB0)),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Delete',
-              style: TextStyle(
-                color: Color(0xFFEF4444),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await showPostConfirmDialog(
+      context,
+      title: 'Delete comment',
+      message: 'This will permanently delete your comment.',
+      confirmLabel: 'Delete',
+      danger: true,
     );
     if (confirmed != true || !mounted) return;
     try {
@@ -2714,39 +2641,12 @@ class _RCommentTileState extends State<_RCommentTile> {
         widget.comment.author?.displayName ??
         'this user';
     if (userId == null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF111827),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          'Block $username?',
-          style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-        ),
-        content: Text(
-          'Blocking @$username will hide their content from you.',
-          style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Color(0xFF7A8BB0)),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Block',
-              style: TextStyle(
-                color: Color(0xFFEF4444),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await showPostConfirmDialog(
+      context,
+      title: 'Block $username?',
+      message: 'Blocking @$username will hide their content from you.',
+      confirmLabel: 'Block',
+      danger: true,
     );
     if (confirmed != true || !mounted) return;
     try {
@@ -3439,10 +3339,16 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _sending = false);
+      final theme = Theme.of(context);
+      final tokens =
+          theme.extension<AppSemanticColors>() ??
+          (theme.brightness == Brightness.dark
+              ? AppSemanticColors.dark
+              : AppSemanticColors.light);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to post comment: $e'),
-          backgroundColor: const Color(0xFF1A2235),
+          backgroundColor: tokens.panelMuted,
         ),
       );
     }
@@ -3450,46 +3356,46 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final hasContent = _textCtrl.text.trim().isNotEmpty || _media != null;
 
     return Container(
-      color: const Color(0xFF0D1526),
+      color: tokens.panel,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(height: 1, color: Colors.white.withValues(alpha: 0.07)),
+          Container(height: 1, color: tokens.panelBorder),
           // Reply banner
           if (widget.replyTarget != null)
             Container(
-              color: const Color(0xFF131929),
+              color: tokens.panelMuted,
               padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.reply_rounded,
-                    size: 14,
-                    color: Color(0xFF4AA3E4),
-                  ),
+                  Icon(Icons.reply_rounded, size: 14, color: tokens.primary),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       'Replying to @${widget.replyTarget!.username ?? 'user'}',
-                      style: const TextStyle(
-                        color: Color(0xFF4AA3E4),
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: tokens.primary, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   GestureDetector(
                     onTap: widget.onCancelReply,
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.all(4),
                       child: Icon(
                         Icons.close_rounded,
                         size: 16,
-                        color: Color(0xFF7A8BB0),
+                        color: tokens.textMuted,
                       ),
                     ),
                   ),
@@ -3506,12 +3412,12 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
             Container(
               margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
               decoration: BoxDecoration(
-                color: const Color(0xFF131929),
+                color: tokens.panelMuted,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                border: Border.all(color: tokens.panelBorder),
               ),
               child: _mentionLoading
-                  ? const Padding(
+                  ? Padding(
                       padding: EdgeInsets.all(12),
                       child: Row(
                         children: [
@@ -3520,14 +3426,14 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Color(0xFF4AA3E4),
+                              color: tokens.primary,
                             ),
                           ),
                           SizedBox(width: 10),
                           Text(
                             'Searching users…',
                             style: TextStyle(
-                              color: Color(0xFF9BAECF),
+                              color: tokens.textMuted,
                               fontSize: 12,
                             ),
                           ),
@@ -3535,14 +3441,11 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                       ),
                     )
                   : _mentionSuggestions.isEmpty
-                  ? const Padding(
+                  ? Padding(
                       padding: EdgeInsets.all(12),
                       child: Text(
                         'No users found',
-                        style: TextStyle(
-                          color: Color(0xFF9BAECF),
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: tokens.textMuted, fontSize: 12),
                       ),
                     )
                   : Column(
@@ -3561,7 +3464,7 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                                 children: [
                                   CircleAvatar(
                                     radius: 14,
-                                    backgroundColor: const Color(0xFF1A2235),
+                                    backgroundColor: tokens.panel,
                                     backgroundImage:
                                         (s.avatarUrl != null &&
                                             s.avatarUrl!.isNotEmpty)
@@ -3570,9 +3473,9 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                                     child:
                                         (s.avatarUrl == null ||
                                             s.avatarUrl!.isEmpty)
-                                        ? const Icon(
+                                        ? Icon(
                                             Icons.person,
-                                            color: Color(0xFF7A8BB0),
+                                            color: tokens.textMuted,
                                             size: 14,
                                           )
                                         : null,
@@ -3585,8 +3488,8 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                                       children: [
                                         Text(
                                           '@${s.username}',
-                                          style: const TextStyle(
-                                            color: Color(0xFFE8ECF8),
+                                          style: TextStyle(
+                                            color: tokens.text,
                                             fontSize: 13,
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -3595,8 +3498,8 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                                         if ((s.displayName ?? '').isNotEmpty)
                                           Text(
                                             s.displayName!,
-                                            style: const TextStyle(
-                                              color: Color(0xFF7A8BB0),
+                                            style: TextStyle(
+                                              color: tokens.textMuted,
                                               fontSize: 12,
                                             ),
                                             overflow: TextOverflow.ellipsis,
@@ -3621,11 +3524,9 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A2235),
+                      color: tokens.panelMuted,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.08),
-                      ),
+                      border: Border.all(color: tokens.panelBorder),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -3640,14 +3541,11 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                             },
                             maxLines: 4,
                             minLines: 1,
-                            style: const TextStyle(
-                              color: Color(0xFFE8ECF8),
-                              fontSize: 14,
-                            ),
-                            decoration: const InputDecoration(
+                            style: TextStyle(color: tokens.text, fontSize: 14),
+                            decoration: InputDecoration(
                               hintText: 'Write a comment…',
                               hintStyle: TextStyle(
-                                color: Color(0xFF4A5568),
+                                color: tokens.textMuted,
                                 fontSize: 14,
                               ),
                               contentPadding: EdgeInsets.symmetric(
@@ -3663,9 +3561,9 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                           width: 28,
                           height: 28,
                           child: IconButton(
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.image_outlined,
-                              color: Color(0xFF7A8BB0),
+                              color: tokens.textMuted,
                               size: 17,
                             ),
                             onPressed: _sending ? null : _pickMedia,
@@ -3687,15 +3585,15 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                                 ),
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                    color: const Color(0xFF4AA3E4),
+                                    color: tokens.primary,
                                     width: 1.2,
                                   ),
                                   borderRadius: BorderRadius.circular(3),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'GIF',
                                   style: TextStyle(
-                                    color: Color(0xFF4AA3E4),
+                                    color: tokens.primary,
                                     fontSize: 9,
                                     fontWeight: FontWeight.w700,
                                     height: 1,
@@ -3721,8 +3619,8 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
 </svg>''',
                               width: 17,
                               height: 17,
-                              colorFilter: const ColorFilter.mode(
-                                Color(0xFF7A8BB0),
+                              colorFilter: ColorFilter.mode(
+                                tokens.textMuted,
                                 BlendMode.srcIn,
                               ),
                             ),
@@ -3747,22 +3645,22 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: hasContent && !_sending
-                          ? const Color(0xFF3470A2)
-                          : const Color(0xFF1A2235),
+                          ? tokens.primary
+                          : tokens.panelMuted,
                     ),
                     child: _sending
-                        ? const Padding(
+                        ? Padding(
                             padding: EdgeInsets.all(10),
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: scheme.onPrimary,
                             ),
                           )
                         : Icon(
                             Icons.send_rounded,
                             color: hasContent
-                                ? Colors.white
-                                : const Color(0xFF4A5568),
+                                ? scheme.onPrimary
+                                : tokens.textMuted,
                             size: 18,
                           ),
                   ),
@@ -3817,19 +3715,25 @@ class _RMediaPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     Widget thumb;
     if (media.type == 'video') {
       thumb = Container(
         width: 80,
         height: 80,
         decoration: BoxDecoration(
-          color: const Color(0xFF0B1220),
+          color: tokens.panelMuted,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Center(
+        child: Center(
           child: Icon(
             Icons.play_circle_fill_rounded,
-            color: Color(0xFF4AA3E4),
+            color: tokens.primary,
             size: 32,
           ),
         ),
@@ -3853,7 +3757,7 @@ class _RMediaPreview extends StatelessWidget {
           height: 80,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) =>
-              Container(width: 80, height: 80, color: const Color(0xFF1A2235)),
+              Container(width: 80, height: 80, color: tokens.panelMuted),
         ),
       );
     }
@@ -3874,13 +3778,11 @@ class _RMediaPreview extends StatelessWidget {
                   width: 20,
                   height: 20,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0D1526),
+                    color: tokens.panel,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.25),
-                    ),
+                    border: Border.all(color: tokens.panelBorder),
                   ),
-                  child: const Icon(Icons.close, color: Colors.white, size: 12),
+                  child: Icon(Icons.close, color: tokens.text, size: 12),
                 ),
               ),
             ),
@@ -3970,6 +3872,12 @@ class _RGiphyPickerSheetState extends State<_RGiphyPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final title = widget.mode == 'sticker' ? 'Stickers' : 'GIFs';
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
@@ -3977,9 +3885,9 @@ class _RGiphyPickerSheetState extends State<_RGiphyPickerSheet> {
       maxChildSize: 0.92,
       snap: true,
       builder: (ctx, scrollCtrl) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF0D1526),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        decoration: BoxDecoration(
+          color: tokens.panel,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
         child: Column(
           children: [
@@ -3988,7 +3896,7 @@ class _RGiphyPickerSheetState extends State<_RGiphyPickerSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: tokens.textMuted.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -3998,16 +3906,16 @@ class _RGiphyPickerSheetState extends State<_RGiphyPickerSheet> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Color(0xFFE8ECF8),
+                    style: TextStyle(
+                      color: tokens.text,
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
                     ),
                   ),
                   const Spacer(),
-                  const Text(
+                  Text(
                     'Powered by GIPHY',
-                    style: TextStyle(color: Color(0xFF4A5568), fontSize: 10),
+                    style: TextStyle(color: tokens.textMuted, fontSize: 10),
                   ),
                 ],
               ),
@@ -4016,17 +3924,17 @@ class _RGiphyPickerSheetState extends State<_RGiphyPickerSheet> {
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
               child: TextField(
                 controller: _searchCtrl,
-                style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 14),
+                style: TextStyle(color: tokens.text, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: 'Search $title…',
-                  hintStyle: const TextStyle(color: Color(0xFF4A5568)),
-                  prefixIcon: const Icon(
+                  hintStyle: TextStyle(color: tokens.textMuted),
+                  prefixIcon: Icon(
                     Icons.search_rounded,
-                    color: Color(0xFF7A8BB0),
+                    color: tokens.textMuted,
                     size: 20,
                   ),
                   filled: true,
-                  fillColor: const Color(0xFF1A2235),
+                  fillColor: tokens.panelMuted,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -4042,10 +3950,8 @@ class _RGiphyPickerSheetState extends State<_RGiphyPickerSheet> {
             ),
             Expanded(
               child: _loading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF4AA3E4),
-                      ),
+                  ? Center(
+                      child: CircularProgressIndicator(color: tokens.primary),
                     )
                   : _error != null
                   ? Center(
@@ -4054,24 +3960,24 @@ class _RGiphyPickerSheetState extends State<_RGiphyPickerSheet> {
                         children: [
                           Text(
                             _error!,
-                            style: const TextStyle(color: Color(0xFF7A8BB0)),
+                            style: TextStyle(color: tokens.textMuted),
                           ),
                           const SizedBox(height: 8),
                           TextButton(
                             onPressed: () => _fetch(_searchCtrl.text),
-                            child: const Text(
+                            child: Text(
                               'Retry',
-                              style: TextStyle(color: Color(0xFF4AA3E4)),
+                              style: TextStyle(color: tokens.primary),
                             ),
                           ),
                         ],
                       ),
                     )
                   : _items.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'No results',
-                        style: TextStyle(color: Color(0xFF7A8BB0)),
+                        style: TextStyle(color: tokens.textMuted),
                       ),
                     )
                   : GridView.builder(
@@ -4111,16 +4017,16 @@ class _RGiphyPickerSheetState extends State<_RGiphyPickerSheet> {
                                   progress == null
                                   ? child
                                   : Container(
-                                      color: const Color(0xFF1A2235),
-                                      child: const Center(
+                                      color: tokens.panelMuted,
+                                      child: Center(
                                         child: CircularProgressIndicator(
                                           strokeWidth: 1.5,
-                                          color: Color(0xFF4AA3E4),
+                                          color: tokens.primary,
                                         ),
                                       ),
                                     ),
                               errorBuilder: (_, __, ___) =>
-                                  Container(color: const Color(0xFF1A2235)),
+                                  Container(color: tokens.panelMuted),
                             ),
                           ),
                         );

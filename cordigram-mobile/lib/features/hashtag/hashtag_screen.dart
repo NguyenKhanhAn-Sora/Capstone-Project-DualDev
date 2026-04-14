@@ -6,6 +6,7 @@ import '../home/models/feed_post.dart';
 import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostCard, PostMenuAction;
 import '../post/post_detail_screen.dart';
+import '../post/utils/post_confirm_dialogs.dart';
 import '../post/utils/post_edit_utils.dart';
 import '../post/utils/likes_list_sheet.dart';
 import '../post/utils/post_mute_overlay.dart';
@@ -521,41 +522,12 @@ class _HashtagScreenState extends State<HashtagScreen> {
         if (reported) _showSnack('Report submitted');
         return;
       case PostMenuAction.deletePost:
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF111827),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            title: const Text(
-              'Delete post',
-              style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-            ),
-            content: const Text(
-              'This action cannot be undone.',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Color(0xFF7A8BB0)),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        final confirmed = await showPostConfirmDialog(
+          context,
+          title: 'Delete post',
+          message: 'This action cannot be undone.',
+          confirmLabel: 'Delete',
+          danger: true,
         );
         if (confirmed != true) return;
 
@@ -577,41 +549,12 @@ class _HashtagScreenState extends State<HashtagScreen> {
         if (userId == null || userId.isEmpty) return;
         final username =
             post.authorUsername ?? post.author?.username ?? post.displayName;
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF111827),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            title: Text(
-              'Block @$username?',
-              style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-            ),
-            content: const Text(
-              'You will no longer see posts from this account.',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Color(0xFF7A8BB0)),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Block',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        final confirmed = await showPostConfirmDialog(
+          context,
+          title: 'Block @$username?',
+          message: 'You will no longer see posts from this account.',
+          confirmLabel: 'Block',
+          danger: true,
         );
         if (confirmed != true) return;
 
@@ -753,15 +696,17 @@ class _HashtagScreenState extends State<HashtagScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1020),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0B1020),
+        backgroundColor: scheme.surface,
         elevation: 0,
         title: Text(
           '#$_normalizedTag',
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: scheme.onSurface,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -772,8 +717,10 @@ class _HashtagScreenState extends State<HashtagScreen> {
 
   Widget _buildBody() {
     if (_initialLoad && _loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF4AA3E4)),
+      return Center(
+        child: CircularProgressIndicator(
+          color: Theme.of(context).colorScheme.primary,
+        ),
       );
     }
 

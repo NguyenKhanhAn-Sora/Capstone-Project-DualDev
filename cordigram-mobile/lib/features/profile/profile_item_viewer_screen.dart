@@ -14,6 +14,7 @@ import '../home/models/feed_post.dart';
 import '../home/services/post_interaction_service.dart';
 import '../home/widgets/post_card.dart' show PostMenuAction;
 import '../post/post_detail_screen.dart';
+import '../post/utils/post_confirm_dialogs.dart';
 import '../post/utils/post_edit_utils.dart';
 import '../post/utils/likes_list_sheet.dart';
 import '../post/utils/post_mute_overlay.dart';
@@ -1373,41 +1374,12 @@ class _ItemPageState extends State<_ItemPage> {
         if (muted) _showSnack('Reel notifications muted');
         return;
       case PostMenuAction.deletePost:
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF111827),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            title: const Text(
-              'Delete reel',
-              style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-            ),
-            content: const Text(
-              'This action cannot be undone.',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Color(0xFF7A8BB0)),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        final confirmed = await showPostConfirmDialog(
+          context,
+          title: 'Delete reel',
+          message: 'This action cannot be undone.',
+          confirmLabel: 'Delete',
+          danger: true,
         );
         if (confirmed != true) return;
         try {
@@ -1456,41 +1428,12 @@ class _ItemPageState extends State<_ItemPage> {
             (normalized['authorUsername'] as String?) ??
             (author?['username'] as String?) ??
             'user';
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF111827),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            title: Text(
-              'Block @$username?',
-              style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-            ),
-            content: const Text(
-              'You will no longer see reels from this account.',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Color(0xFF7A8BB0)),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Block',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        final confirmed = await showPostConfirmDialog(
+          context,
+          title: 'Block @$username?',
+          message: 'You will no longer see reels from this account.',
+          confirmLabel: 'Block',
+          danger: true,
         );
         if (confirmed != true) return;
         try {

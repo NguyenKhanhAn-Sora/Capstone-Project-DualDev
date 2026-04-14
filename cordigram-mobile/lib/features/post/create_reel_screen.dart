@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'create_post_service.dart';
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 
@@ -111,6 +112,14 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   bool _mentionOpen = false;
   bool _mentionLoading = false;
   static final _mentionRegex = RegExp(r'@([a-zA-Z0-9_.]{0,30})$');
+
+  AppSemanticColors get _tokens {
+    final theme = Theme.of(context);
+    return theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+  }
 
   @override
   void dispose() {
@@ -558,9 +567,10 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     final seed = _scheduledAtLocal ?? _nextValidScheduleTime();
     DateTime draft = seed;
 
+    final tokens = _tokens;
     final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: tokens.panel,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -575,7 +585,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                 height: 4,
                 margin: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: tokens.textMuted.withValues(alpha: 0.28),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -585,28 +595,36 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: tokens.primary),
+                      ),
                     ),
                     const Spacer(),
-                    const Text(
+                    Text(
                       'Select time',
                       style: TextStyle(
-                        color: Color(0xFFE8ECF8),
+                        color: tokens.text,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const Spacer(),
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(draft),
-                      child: const Text('Done'),
+                      child: Text(
+                        'Done',
+                        style: TextStyle(color: tokens.primary),
+                      ),
                     ),
                   ],
                 ),
               ),
-              const Divider(height: 1, color: Color(0xFF1E2D48)),
+              Divider(height: 1, color: tokens.panelBorder),
               Expanded(
                 child: CupertinoTheme(
-                  data: const CupertinoThemeData(brightness: Brightness.dark),
+                  data: CupertinoThemeData(
+                    brightness: Theme.of(context).brightness,
+                  ),
                   child: CupertinoDatePicker(
                     mode: CupertinoDatePickerMode.time,
                     use24hFormat: true,
@@ -650,10 +668,11 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: const Color(0xFF0B1020),
+        backgroundColor: theme.scaffoldBackgroundColor,
         body: SafeArea(
           child: SingleChildScrollView(
             controller: _scrollCtrl,
@@ -695,25 +714,22 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   // ── Constraints banner ────────────────────────────────────────────────────
 
   Widget _buildConstraintsBanner() {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1A30),
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF1E3A5C)),
+        border: Border.all(color: scheme.outline),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.info_outline_rounded,
-            color: Color(0xFF4AA3E4),
-            size: 16,
-          ),
+          Icon(Icons.info_outline_rounded, color: scheme.primary, size: 16),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
               'Video only · max 90 s · max 50 MB',
-              style: TextStyle(color: Color(0xFF7A9EC8), fontSize: 12),
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
             ),
           ),
         ],
@@ -729,43 +745,44 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   }
 
   Widget _buildVideoPicker() {
+    final tokens = _tokens;
     return GestureDetector(
       onTap: _pickVideo,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 40),
         decoration: BoxDecoration(
-          color: const Color(0xFF111827),
+          color: tokens.panel,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF2A3A5C), width: 1.5),
+          border: Border.all(color: tokens.panelBorder, width: 1.5),
         ),
         child: Column(
           children: [
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A2540),
+                color: tokens.primary.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(50),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.videocam_outlined,
-                color: Color(0xFF4AA3E4),
+                color: tokens.primary,
                 size: 38,
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'Select a reel video',
               style: TextStyle(
-                color: Color(0xFFE8ECF8),
+                color: tokens.text,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'MP4 / MOV / WEBM  ·  up to 90 s  ·  up to 50 MB',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 12),
+              style: TextStyle(color: tokens.textMuted, fontSize: 12),
             ),
             const SizedBox(height: 20),
             Row(
@@ -791,6 +808,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   }
 
   Widget _buildVideoPreview() {
+    final tokens = _tokens;
     final ctrl = _previewCtrl;
     final durationLabel = _videoDurationSec != null
         ? '${_videoDurationSec!.toStringAsFixed(1)} s'
@@ -808,7 +826,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
           children: [
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF0A0E1A),
+                color: tokens.panel,
                 borderRadius: BorderRadius.circular(12),
               ),
               clipBehavior: Clip.antiAlias,
@@ -816,10 +834,8 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                 aspectRatio: 9 / 16,
                 child: ctrl != null && ctrl.value.isInitialized
                     ? VideoPlayer(ctrl)
-                    : const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF4AA3E4),
-                        ),
+                    : Center(
+                        child: CircularProgressIndicator(color: tokens.primary),
                       ),
               ),
             ),
@@ -837,11 +853,11 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
             ),
             // Play icon hint
             if (ctrl != null && !ctrl.value.isPlaying)
-              const Positioned.fill(
+              Positioned.fill(
                 child: Center(
                   child: Icon(
                     Icons.play_circle_outline_rounded,
-                    color: Colors.white70,
+                    color: tokens.text.withValues(alpha: 0.72),
                     size: 56,
                   ),
                 ),
@@ -854,8 +870,8 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                 onTap: _removeVideo,
                 child: Container(
                   padding: const EdgeInsets.all(5),
-                  decoration: const BoxDecoration(
-                    color: Color(0xCC000000),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.close, color: Colors.white, size: 16),
@@ -884,14 +900,14 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
             const Spacer(),
             TextButton.icon(
               onPressed: _pickVideo,
-              icon: const Icon(
+              icon: Icon(
                 Icons.swap_horiz_rounded,
                 size: 16,
-                color: Color(0xFF4AA3E4),
+                color: tokens.primary,
               ),
-              label: const Text(
+              label: Text(
                 'Change',
-                style: TextStyle(color: Color(0xFF4AA3E4), fontSize: 13),
+                style: TextStyle(color: tokens.primary, fontSize: 13),
               ),
               style: TextButton.styleFrom(
                 minimumSize: Size.zero,
@@ -908,6 +924,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   // ── Caption ───────────────────────────────────────────────────────────────
 
   Widget _buildCaptionField() {
+    final tokens = _tokens;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -915,9 +932,9 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF111827),
+            color: tokens.panel,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF2A3A5C)),
+            border: Border.all(color: tokens.panelBorder),
           ),
           child: TextField(
             controller: _captionCtrl,
@@ -925,13 +942,13 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
             maxLines: 4,
             minLines: 2,
             maxLength: 2200,
-            style: const TextStyle(color: Color(0xFFD0D8EE), fontSize: 14),
-            decoration: const InputDecoration(
+            style: TextStyle(color: tokens.text, fontSize: 14),
+            decoration: InputDecoration(
               hintText: 'Write a caption…',
-              hintStyle: TextStyle(color: Color(0xFF475569)),
+              hintStyle: TextStyle(color: tokens.textMuted),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.all(14),
-              counterStyle: TextStyle(color: Color(0xFF5A6B8A), fontSize: 11),
+              contentPadding: const EdgeInsets.all(14),
+              counterStyle: TextStyle(color: tokens.textMuted, fontSize: 11),
             ),
           ),
         ),
@@ -942,15 +959,16 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   // ── Mention dropdown ──────────────────────────────────────────────────────
 
   Widget _buildMentionDropdown() {
+    final tokens = _tokens;
     return Container(
       margin: const EdgeInsets.only(top: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2540),
+        color: tokens.panelMuted,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF2A3A5C)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       child: _mentionLoading
-          ? const Padding(
+          ? Padding(
               padding: EdgeInsets.all(12),
               child: Center(
                 child: SizedBox(
@@ -958,7 +976,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Color(0xFF4AA3E4),
+                    color: tokens.primary,
                   ),
                 ),
               ),
@@ -980,15 +998,15 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                       children: [
                         CircleAvatar(
                           radius: 16,
-                          backgroundColor: const Color(0xFF233050),
+                          backgroundColor: tokens.panel,
                           backgroundImage: s.avatarUrl != null
                               ? NetworkImage(s.avatarUrl!)
                               : null,
                           child: s.avatarUrl == null
                               ? Text(
                                   s.username.substring(0, 1).toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: tokens.text,
                                     fontSize: 12,
                                   ),
                                 )
@@ -1001,15 +1019,15 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                             if (s.displayName != null)
                               Text(
                                 s.displayName!,
-                                style: const TextStyle(
-                                  color: Color(0xFFE8ECF8),
+                                style: TextStyle(
+                                  color: tokens.text,
                                   fontSize: 13,
                                 ),
                               ),
                             Text(
                               '@${s.username}',
-                              style: const TextStyle(
-                                color: Color(0xFF7A8BB0),
+                              style: TextStyle(
+                                color: tokens.textMuted,
                                 fontSize: 12,
                               ),
                             ),
@@ -1027,6 +1045,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   // ── Location ──────────────────────────────────────────────────────────────
 
   Widget _buildLocationField() {
+    final tokens = _tokens;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1034,44 +1053,44 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF111827),
+            color: tokens.panel,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF2A3A5C)),
+            border: Border.all(color: tokens.panelBorder),
           ),
           child: TextField(
             controller: _locationCtrl,
             onChanged: _onLocationChanged,
-            style: const TextStyle(color: Color(0xFFD0D8EE), fontSize: 14),
+            style: TextStyle(color: tokens.text, fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Add a location…',
-              hintStyle: const TextStyle(color: Color(0xFF475569)),
+              hintStyle: TextStyle(color: tokens.textMuted),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 13,
               ),
-              prefixIcon: const Icon(
+              prefixIcon: Icon(
                 Icons.place_outlined,
-                color: Color(0xFF5A6B8A),
+                color: tokens.textMuted,
                 size: 20,
               ),
               suffixIcon: _locationLoading
-                  ? const Padding(
+                  ? Padding(
                       padding: EdgeInsets.all(12),
                       child: SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Color(0xFF4AA3E4),
+                          color: tokens.primary,
                         ),
                       ),
                     )
                   : _locationCtrl.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.close,
-                        color: Color(0xFF5A6B8A),
+                        color: tokens.textMuted,
                         size: 18,
                       ),
                       onPressed: () {
@@ -1093,12 +1112,13 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   }
 
   Widget _buildLocationDropdown() {
+    final tokens = _tokens;
     return Container(
       margin: const EdgeInsets.only(top: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2540),
+        color: tokens.panelMuted,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF2A3A5C)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       child: ListView.builder(
         shrinkWrap: true,
@@ -1112,19 +1132,12 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.place_outlined,
-                    color: Color(0xFF9BAECF),
-                    size: 16,
-                  ),
+                  Icon(Icons.place_outlined, color: tokens.textMuted, size: 16),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       s.label,
-                      style: const TextStyle(
-                        color: Color(0xFFD0D8EE),
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: tokens.text, fontSize: 13),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1141,6 +1154,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   // ── Hashtags ──────────────────────────────────────────────────────────────
 
   Widget _buildHashtagSection() {
+    final tokens = _tokens;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1151,28 +1165,25 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF111827),
+                  color: tokens.panel,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF2A3A5C)),
+                  border: Border.all(color: tokens.panelBorder),
                 ),
                 child: TextField(
                   controller: _hashtagCtrl,
                   onSubmitted: (_) => _addHashtag(),
                   textInputAction: TextInputAction.done,
-                  style: const TextStyle(
-                    color: Color(0xFFD0D8EE),
-                    fontSize: 14,
-                  ),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: tokens.text, fontSize: 14),
+                  decoration: InputDecoration(
                     hintText: 'e.g. travel, photography',
-                    hintStyle: TextStyle(color: Color(0xFF475569)),
+                    hintStyle: TextStyle(color: tokens.textMuted),
                     border: InputBorder.none,
                     prefixText: '# ',
                     prefixStyle: TextStyle(
-                      color: Color(0xFF4AA3E4),
+                      color: tokens.primary,
                       fontWeight: FontWeight.w600,
                     ),
-                    contentPadding: EdgeInsets.symmetric(
+                    contentPadding: const EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 13,
                     ),
@@ -1186,15 +1197,11 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
               child: Container(
                 padding: const EdgeInsets.all(13),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A2540),
+                  color: tokens.panelMuted,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF2A3A5C)),
+                  border: Border.all(color: tokens.panelBorder),
                 ),
-                child: const Icon(
-                  Icons.add_rounded,
-                  color: Color(0xFF4AA3E4),
-                  size: 20,
-                ),
+                child: Icon(Icons.add_rounded, color: tokens.primary, size: 20),
               ),
             ),
           ],
@@ -1222,6 +1229,9 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   // ── Audience ──────────────────────────────────────────────────────────────
 
   Widget _buildAudienceSelector() {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1235,13 +1245,15 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: _audience == a
-                    ? const Color(0xFF1A3254)
-                    : const Color(0xFF111827),
+                    ? (isDark
+                          ? scheme.primary.withValues(alpha: 0.24)
+                          : scheme.primaryContainer)
+                    : scheme.surface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: _audience == a
-                      ? const Color(0xFF3470A2)
-                      : const Color(0xFF2A3A5C),
+                      ? scheme.primary.withValues(alpha: isDark ? 0.62 : 0.4)
+                      : scheme.outline,
                 ),
               ),
               child: Row(
@@ -1249,8 +1261,8 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                   Icon(
                     a.icon,
                     color: _audience == a
-                        ? const Color(0xFF4AA3E4)
-                        : const Color(0xFF7A8BB0),
+                        ? (isDark ? scheme.primary : scheme.onPrimaryContainer)
+                        : scheme.onSurfaceVariant,
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -1258,8 +1270,10 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                     a.label,
                     style: TextStyle(
                       color: _audience == a
-                          ? const Color(0xFFE8ECF8)
-                          : const Color(0xFF9BAECF),
+                          ? (isDark
+                                ? scheme.onSurface
+                                : scheme.onPrimaryContainer)
+                          : scheme.onSurfaceVariant,
                       fontSize: 14,
                       fontWeight: _audience == a
                           ? FontWeight.w600
@@ -1268,9 +1282,9 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                   ),
                   const Spacer(),
                   if (_audience == a)
-                    const Icon(
+                    Icon(
                       Icons.check_circle_rounded,
-                      color: Color(0xFF4AA3E4),
+                      color: scheme.primary,
                       size: 18,
                     ),
                 ],
@@ -1283,6 +1297,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   }
 
   Widget _buildPublishTimeSection() {
+    final tokens = _tokens;
     final scheduled = _scheduledAtLocal;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1312,9 +1327,9 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
             margin: const EdgeInsets.only(top: 10),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF111827),
+              color: tokens.panel,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF2A3A5C)),
+              border: Border.all(color: tokens.panelBorder),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1347,10 +1362,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Timezone: local device time',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.62),
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: tokens.textMuted, fontSize: 12),
                 ),
               ],
             ),
@@ -1362,11 +1374,12 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   // ── Toggles ───────────────────────────────────────────────────────────────
 
   Widget _buildToggles() {
+    final tokens = _tokens;
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
+        color: tokens.panel,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF2A3A5C)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       child: Column(
         children: [
@@ -1451,13 +1464,14 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
   }
 
   Widget _buildSubmitButton() {
+    final tokens = _tokens;
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         onPressed: _submitting ? null : _submit,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF3470A2),
-          disabledBackgroundColor: const Color(0xFF1E3A5F),
+          backgroundColor: tokens.primary,
+          disabledBackgroundColor: tokens.primary.withValues(alpha: 0.45),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 15),
           shape: RoundedRectangleBorder(
@@ -1524,10 +1538,16 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return Text(
       text,
-      style: const TextStyle(
-        color: Color(0xFF9BAECF),
+      style: TextStyle(
+        color: tokens.textMuted,
         fontSize: 12,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.5,
@@ -1548,7 +1568,13 @@ class _MetaBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = warning ? const Color(0xFFF87171) : const Color(0xFF7A8BB0);
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+    final color = warning ? theme.colorScheme.error : tokens.textMuted;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1567,24 +1593,27 @@ class _HashChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A3254),
+        color: tokens.primary.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF2A4A7A)),
+        border: Border.all(color: tokens.primary.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '#$tag',
-            style: const TextStyle(color: Color(0xFF4AA3E4), fontSize: 12),
-          ),
+          Text('#$tag', style: TextStyle(color: tokens.primary, fontSize: 12)),
           const SizedBox(width: 4),
           GestureDetector(
             onTap: onRemove,
-            child: const Icon(Icons.close, color: Color(0xFF7A8BB0), size: 14),
+            child: Icon(Icons.close, color: tokens.textMuted, size: 14),
           ),
         ],
       ),
@@ -1608,12 +1637,18 @@ class _ToggleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
         border: Border(
-          top: isTop
-              ? BorderSide.none
-              : const BorderSide(color: Color(0xFF1E2D48)),
+          top: isTop ? BorderSide.none : BorderSide(color: tokens.panelBorder),
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -1622,16 +1657,18 @@ class _ToggleRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(color: Color(0xFFD0D8EE), fontSize: 14),
+              style: TextStyle(color: tokens.text, fontSize: 14),
             ),
           ),
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: const Color(0xFF4AA3E4),
-            activeTrackColor: const Color(0xFF1A3254),
-            inactiveThumbColor: const Color(0xFF5A6B8A),
-            inactiveTrackColor: const Color(0xFF1E2D48),
+            activeThumbColor: scheme.primary,
+            activeTrackColor: isDark
+                ? scheme.primary.withValues(alpha: 0.42)
+                : scheme.primary.withValues(alpha: 0.32),
+            inactiveThumbColor: tokens.textMuted,
+            inactiveTrackColor: tokens.panelBorder,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ],
@@ -1652,21 +1689,22 @@ class _OutlineBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFF2A3A5C)),
+          border: Border.all(color: scheme.outline),
         ),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF9BAECF), size: 17),
+            Icon(icon, color: scheme.onSurfaceVariant, size: 17),
             const SizedBox(width: 5),
             Text(
               label,
-              style: const TextStyle(color: Color(0xFF9BAECF), fontSize: 13),
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
             ),
           ],
         ),
@@ -1690,15 +1728,24 @@ class _PublishModeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF1A3254) : const Color(0xFF111827),
+          color: selected
+              ? (isDark
+                    ? scheme.primary.withValues(alpha: 0.24)
+                    : scheme.primaryContainer)
+              : scheme.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? const Color(0xFF3470A2) : const Color(0xFF2A3A5C),
+            color: selected
+                ? scheme.primary.withValues(alpha: isDark ? 0.62 : 0.4)
+                : scheme.outline,
           ),
         ),
         child: Row(
@@ -1712,8 +1759,10 @@ class _PublishModeOption extends StatelessWidget {
                     title,
                     style: TextStyle(
                       color: selected
-                          ? const Color(0xFFE8ECF8)
-                          : const Color(0xFFD0D8EE),
+                          ? (isDark
+                                ? scheme.onSurface
+                                : scheme.onPrimaryContainer)
+                          : scheme.onSurface,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1721,8 +1770,8 @@ class _PublishModeOption extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      color: Color(0xFF7A8BB0),
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
                       fontSize: 12,
                     ),
                   ),
@@ -1734,9 +1783,7 @@ class _PublishModeOption extends StatelessWidget {
               selected
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_unchecked_rounded,
-              color: selected
-                  ? const Color(0xFF4AA3E4)
-                  : const Color(0xFF6C7EA3),
+              color: selected ? scheme.primary : scheme.onSurfaceVariant,
               size: 19,
             ),
           ],
@@ -1761,22 +1808,28 @@ class _ScheduleFieldButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F172A),
+          color: tokens.panelMuted,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFF2A3A5C)),
+          border: Border.all(color: tokens.panelBorder),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF7A8BB0),
+              style: TextStyle(
+                color: tokens.textMuted,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
@@ -1784,15 +1837,12 @@ class _ScheduleFieldButton extends StatelessWidget {
             const SizedBox(height: 7),
             Row(
               children: [
-                Icon(icon, color: const Color(0xFF4AA3E4), size: 16),
+                Icon(icon, color: tokens.primary, size: 16),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     value,
-                    style: const TextStyle(
-                      color: Color(0xFFE8ECF8),
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: tokens.text, fontSize: 13),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

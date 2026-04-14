@@ -8,11 +8,20 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import 'ads_dashboard_screen.dart';
 import 'ads_payment_status_screen.dart';
 import 'ads_service.dart';
+
+AppSemanticColors _appTokens(BuildContext context) {
+  final theme = Theme.of(context);
+  return theme.extension<AppSemanticColors>() ??
+      (theme.brightness == Brightness.dark
+          ? AppSemanticColors.dark
+          : AppSemanticColors.light);
+}
 
 enum _Objective { awareness, traffic, engagement, leads, sales, messages }
 
@@ -508,34 +517,6 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
     return 'đ${_formatVnd(value).replaceAll(' VND', '')}';
   }
 
-  String _objectiveLabel(_Objective value) {
-    switch (value) {
-      case _Objective.awareness:
-        return 'Awareness';
-      case _Objective.traffic:
-        return 'Traffic';
-      case _Objective.engagement:
-        return 'Engagement';
-      case _Objective.leads:
-        return 'Leads';
-      case _Objective.sales:
-        return 'Sales';
-      case _Objective.messages:
-        return 'Messages';
-    }
-  }
-
-  String _adFormatLabel(_AdFormat value) {
-    switch (value) {
-      case _AdFormat.single:
-        return 'Single';
-      case _AdFormat.carousel:
-        return 'Carousel';
-      case _AdFormat.video:
-        return 'Video';
-    }
-  }
-
   Future<void> _openTermsPage() async {
     final uri = Uri.parse('${AppConfig.webBaseUrl}/terms');
     await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -755,22 +736,22 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0B1020);
-    const card = Color(0xFF111827);
-    const textPrimary = Color(0xFFE8ECF8);
-    const textSecondary = Color(0xFF7A8BB0);
-    const accent = Color(0xFF4AA3E4);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens = _appTokens(context);
+    final textPrimary = tokens.text;
+    final textSecondary = tokens.textMuted;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: scheme.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: textPrimary),
-        title: const Text(
+        iconTheme: IconThemeData(color: scheme.onSurface),
+        title: Text(
           'Create Ad Campaign',
-          style: TextStyle(color: textPrimary),
+          style: TextStyle(color: scheme.onSurface),
         ),
       ),
       body: SafeArea(
@@ -824,9 +805,9 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                     const _Heading('CTA'),
                     DropdownButtonFormField<_Cta>(
                       value: _cta,
-                      decoration: _fieldDecoration(),
-                      dropdownColor: const Color(0xFF152443),
-                      style: const TextStyle(color: Color(0xFFE8ECF8)),
+                      decoration: _fieldDecoration(context),
+                      dropdownColor: tokens.panelMuted,
+                      style: TextStyle(color: tokens.text),
                       items: _Cta.values
                           .map(
                             (v) => DropdownMenuItem(
@@ -892,9 +873,9 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                       child: OutlinedButton.icon(
                         onPressed: _uploading ? null : _pickMedia,
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF2A4C77)),
-                          foregroundColor: const Color(0xFFBFD5F3),
-                          backgroundColor: const Color(0xFF12213D),
+                          side: BorderSide(color: tokens.panelBorder),
+                          foregroundColor: tokens.text,
+                          backgroundColor: tokens.panel,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -915,10 +896,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                     const SizedBox(height: 8),
                     Text(
                       'Selected: ${_pickedFiles.length} • Uploaded: ${_uploadedMedia.length}',
-                      style: const TextStyle(
-                        color: textSecondary,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: textSecondary, fontSize: 12),
                     ),
                     if (_pickedFiles.isNotEmpty) ...[
                       const SizedBox(height: 10),
@@ -934,19 +912,17 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                                 width: 72,
                                 height: 72,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF10203A),
+                                  color: tokens.panel,
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: const Color(0xFF2A4C77),
-                                  ),
+                                  border: Border.all(color: tokens.panelBorder),
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(9),
                                   child: isVideo
-                                      ? const Center(
+                                      ? Center(
                                           child: Icon(
                                             Icons.play_circle_outline_rounded,
-                                            color: Color(0xFFA8C7E8),
+                                            color: textSecondary,
                                             size: 26,
                                           ),
                                         )
@@ -1018,13 +994,13 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                       value: _countryOptions.contains(_locationCtrl.text.trim())
                           ? _locationCtrl.text.trim()
                           : null,
-                      decoration: _fieldDecoration().copyWith(
+                      decoration: _fieldDecoration(context).copyWith(
                         hintText: _countriesLoading
                             ? 'Loading countries...'
                             : 'Select location',
                       ),
-                      dropdownColor: const Color(0xFF152443),
-                      style: const TextStyle(color: Color(0xFFE8ECF8)),
+                      dropdownColor: tokens.panelMuted,
+                      style: TextStyle(color: tokens.text),
                       items: _countryOptions
                           .map(
                             (country) => DropdownMenuItem(
@@ -1045,10 +1021,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                     const SizedBox(height: 6),
                     Text(
                       'Popular countries loaded from global API (same logic as web).',
-                      style: const TextStyle(
-                        color: Color(0xFF7A8BB0),
-                        fontSize: 11.5,
-                      ),
+                      style: TextStyle(color: textSecondary, fontSize: 11.5),
                     ),
                     const SizedBox(height: 12),
                     const _Heading('Interests'),
@@ -1077,8 +1050,8 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                             });
                           },
                           style: TextButton.styleFrom(
-                            backgroundColor: const Color(0xFF1A2E4B),
-                            foregroundColor: const Color(0xFFBFD5F3),
+                            backgroundColor: tokens.panel,
+                            foregroundColor: tokens.text,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -1098,13 +1071,13 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                       children: _interests
                           .map(
                             (i) => Chip(
-                              backgroundColor: const Color(0xFF1A2E4B),
-                              side: const BorderSide(color: Color(0xFF2A4C77)),
-                              labelStyle: const TextStyle(
-                                color: Color(0xFFBFD5F3),
+                              backgroundColor: tokens.panel,
+                              side: BorderSide(color: tokens.panelBorder),
+                              labelStyle: TextStyle(
+                                color: tokens.text,
                                 fontWeight: FontWeight.w600,
                               ),
-                              deleteIconColor: const Color(0xFF9FC6F0),
+                              deleteIconColor: tokens.textMuted,
                               label: Text(i),
                               onDeleted: () =>
                                   setState(() => _interests.remove(i)),
@@ -1131,7 +1104,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                         ),
                         Text(
                           '$_ageMin',
-                          style: const TextStyle(color: textSecondary),
+                          style: TextStyle(color: textSecondary),
                         ),
                       ],
                     ),
@@ -1152,7 +1125,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                         ),
                         Text(
                           '$_ageMax',
-                          style: const TextStyle(color: textSecondary),
+                          style: TextStyle(color: textSecondary),
                         ),
                       ],
                     ),
@@ -1199,12 +1172,13 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF182844),
+                        color: tokens.panel,
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: tokens.panelBorder),
                       ),
                       child: Text(
                         'Total budget: ${_formatVnd(_totalBudget)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: textPrimary,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1219,10 +1193,7 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.redAccent),
-                    ),
+                    child: Text(_error!, style: TextStyle(color: scheme.error)),
                   ),
                 ),
               SizedBox(
@@ -1230,8 +1201,8 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
                 child: ElevatedButton(
                   onPressed: _submitting ? null : _startCheckout,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1B3A63),
-                    foregroundColor: const Color(0xFFDDEBFF),
+                    backgroundColor: tokens.primary,
+                    foregroundColor: scheme.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1256,21 +1227,24 @@ class _AdsCreateScreenState extends State<AdsCreateScreen> {
     );
   }
 
-  InputDecoration _fieldDecoration() {
+  InputDecoration _fieldDecoration(BuildContext context) {
+    final tokens = _appTokens(context);
+    final scheme = Theme.of(context).colorScheme;
+
     return InputDecoration(
       filled: true,
-      fillColor: const Color(0xFF131F36),
+      fillColor: tokens.panel,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF1E2D48)),
+        borderSide: BorderSide(color: tokens.panelBorder),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF1E2D48)),
+        borderSide: BorderSide(color: tokens.panelBorder),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF4AA3E4)),
+        borderSide: BorderSide(color: scheme.primary),
       ),
     );
   }
@@ -1283,12 +1257,13 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
+        color: tokens.panelMuted,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF1E2D48)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       child: child,
@@ -1303,12 +1278,13 @@ class _Heading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         text,
-        style: const TextStyle(
-          color: Color(0xFFE8ECF8),
+        style: TextStyle(
+          color: tokens.text,
           fontSize: 13,
           fontWeight: FontWeight.w700,
         ),
@@ -1332,27 +1308,30 @@ class _Input extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
+    final scheme = Theme.of(context).colorScheme;
+
     return TextField(
       controller: controller,
       minLines: minLines,
       maxLines: maxLines,
-      style: const TextStyle(color: Color(0xFFE8ECF8)),
+      style: TextStyle(color: tokens.text),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF607091)),
+        hintStyle: TextStyle(color: tokens.textMuted),
         filled: true,
-        fillColor: const Color(0xFF131F36),
+        fillColor: tokens.panel,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF1E2D48)),
+          borderSide: BorderSide(color: tokens.panelBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF1E2D48)),
+          borderSide: BorderSide(color: tokens.panelBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF4AA3E4)),
+          borderSide: BorderSide(color: scheme.primary),
         ),
       ),
     );
@@ -1390,22 +1369,23 @@ class _SelectablePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF21456F) : const Color(0xFF13203A),
+          color: selected ? tokens.primarySoft : tokens.panel,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? const Color(0xFF4B78A8) : const Color(0xFF254269),
+            color: selected ? tokens.primary : tokens.panelBorder,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? const Color(0xFFEAF3FF) : const Color(0xFFD5E2F6),
+            color: selected ? tokens.text : tokens.textMuted,
             fontWeight: FontWeight.w700,
             fontSize: 13,
           ),
@@ -1428,6 +1408,7 @@ class _FormatTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
@@ -1435,16 +1416,16 @@ class _FormatTab extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF21456F) : const Color(0xFF13203A),
+          color: selected ? tokens.primarySoft : tokens.panel,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? const Color(0xFF4B78A8) : const Color(0xFF254269),
+            color: selected ? tokens.primary : tokens.panelBorder,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? const Color(0xFFEAF3FF) : const Color(0xFFD5E2F6),
+            color: selected ? tokens.text : tokens.textMuted,
             fontWeight: FontWeight.w700,
             fontSize: 13,
           ),
@@ -1467,13 +1448,14 @@ class _InvoiceLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     final labelStyle = TextStyle(
-      color: emphasis ? const Color(0xFFD3E6FF) : const Color(0xFFC7D7EC),
+      color: emphasis ? tokens.text : tokens.textMuted,
       fontSize: emphasis ? 16 : 14,
       fontWeight: emphasis ? FontWeight.w700 : FontWeight.w600,
     );
     final valueStyle = TextStyle(
-      color: emphasis ? const Color(0xFF7FD8FF) : const Color(0xFFE8EEF8),
+      color: emphasis ? tokens.primary : tokens.text,
       fontSize: emphasis ? 18 : 14,
       fontWeight: emphasis ? FontWeight.w800 : FontWeight.w700,
     );
@@ -1527,6 +1509,7 @@ class _PackageOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -1536,12 +1519,10 @@ class _PackageOptionCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF183056) : const Color(0xFF12213D),
+            color: selected ? tokens.primarySoft : tokens.panel,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: selected
-                  ? const Color(0xFF62A5E4)
-                  : const Color(0xFF26466F),
+              color: selected ? tokens.primary : tokens.panelBorder,
               width: selected ? 1.4 : 1,
             ),
           ),
@@ -1555,8 +1536,8 @@ class _PackageOptionCard extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
-                            color: Color(0xFFE8ECF8),
+                          style: TextStyle(
+                            color: tokens.text,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -1568,13 +1549,13 @@ class _PackageOptionCard extends StatelessWidget {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0F3A63),
+                              color: tokens.panelMuted,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               highlight!,
-                              style: const TextStyle(
-                                color: Color(0xFFA7D3FF),
+                              style: TextStyle(
+                                color: tokens.primary,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 11,
                               ),
@@ -1586,10 +1567,7 @@ class _PackageOptionCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFF8DA2C8),
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: tokens.textMuted, fontSize: 12),
                     ),
                   ],
                 ),
@@ -1600,8 +1578,8 @@ class _PackageOptionCard extends StatelessWidget {
                 children: [
                   Text(
                     priceLabel,
-                    style: const TextStyle(
-                      color: Color(0xFFE8ECF8),
+                    style: TextStyle(
+                      color: tokens.text,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -1609,9 +1587,7 @@ class _PackageOptionCard extends StatelessWidget {
                   Text(
                     selected ? 'Selected' : 'Tap to choose',
                     style: TextStyle(
-                      color: selected
-                          ? const Color(0xFF9FCAF2)
-                          : const Color(0xFF6A84AC),
+                      color: selected ? tokens.primary : tokens.textMuted,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1641,6 +1617,7 @@ class _DurationOptionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
@@ -1648,10 +1625,10 @@ class _DurationOptionChip extends StatelessWidget {
         width: 150,
         padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF173055) : const Color(0xFF12213D),
+          color: selected ? tokens.primarySoft : tokens.panel,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? const Color(0xFF62A5E4) : const Color(0xFF26466F),
+            color: selected ? tokens.primary : tokens.panelBorder,
           ),
         ),
         child: Column(
@@ -1659,15 +1636,12 @@ class _DurationOptionChip extends StatelessWidget {
           children: [
             Text(
               '$days days',
-              style: const TextStyle(
-                color: Color(0xFFE8ECF8),
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(color: tokens.text, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 2),
             Text(
               priceLabel,
-              style: const TextStyle(color: Color(0xFFA8BEDF), fontSize: 12),
+              style: TextStyle(color: tokens.textMuted, fontSize: 12),
             ),
           ],
         ),
@@ -1742,6 +1716,7 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     final displayName = (widget.displayName ?? '').trim().isNotEmpty
         ? widget.displayName!.trim()
         : (widget.campaignName.isEmpty ? 'Cordigram Ads' : widget.campaignName);
@@ -1757,9 +1732,9 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1A31),
+        color: tokens.panel,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF24456D)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1770,7 +1745,7 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
               children: [
                 CircleAvatar(
                   radius: 17,
-                  backgroundColor: const Color(0xFF21456F),
+                  backgroundColor: tokens.primarySoft,
                   backgroundImage:
                       (widget.avatarUrl != null && widget.avatarUrl!.isNotEmpty)
                       ? NetworkImage(widget.avatarUrl!)
@@ -1780,8 +1755,8 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
                       ? null
                       : Text(
                           avatarLetter,
-                          style: const TextStyle(
-                            color: Color(0xFFE8ECF8),
+                          style: TextStyle(
+                            color: tokens.text,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -1795,8 +1770,8 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
                         displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFFE8ECF8),
+                        style: TextStyle(
+                          color: tokens.text,
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
                         ),
@@ -1804,8 +1779,8 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
                       const SizedBox(height: 2),
                       Text(
                         '@$username • Sponsored',
-                        style: const TextStyle(
-                          color: Color(0xFF8CB1D8),
+                        style: TextStyle(
+                          color: tokens.textMuted,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1813,7 +1788,7 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
                     ],
                   ),
                 ),
-                const Icon(Icons.more_horiz_rounded, color: Color(0xFF7A8BB0)),
+                Icon(Icons.more_horiz_rounded, color: tokens.textMuted),
               ],
             ),
           ),
@@ -1823,11 +1798,7 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
               widget.primaryText.isEmpty
                   ? 'Primary text preview'
                   : widget.primaryText,
-              style: const TextStyle(
-                color: Color(0xFFC4D2EB),
-                fontSize: 13,
-                height: 1.35,
-              ),
+              style: TextStyle(color: tokens.text, fontSize: 13, height: 1.35),
             ),
           ),
           ClipRRect(
@@ -1869,8 +1840,8 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
                         ),
                         child: Text(
                           '${_index + 1}/$_mediaCount',
-                          style: const TextStyle(
-                            color: Color(0xFFE8ECF8),
+                          style: TextStyle(
+                            color: tokens.text,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1896,8 +1867,8 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
                             widget.headline.isEmpty
                                 ? 'Headline'
                                 : widget.headline,
-                            style: const TextStyle(
-                              color: Color(0xFFE8ECF8),
+                            style: TextStyle(
+                              color: tokens.text,
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1909,8 +1880,8 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
                                 : widget.description,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF98AFD2),
+                            style: TextStyle(
+                              color: tokens.textMuted,
                               fontSize: 12,
                             ),
                           ),
@@ -1924,13 +1895,13 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
                         vertical: 9,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF3CC1EA),
+                        color: tokens.primary,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         widget.ctaLabel,
-                        style: const TextStyle(
-                          color: Color(0xFFF0FEFF),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onPrimary,
                           fontWeight: FontWeight.w700,
                           fontSize: 12,
                         ),
@@ -1947,14 +1918,15 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
   }
 
   Widget _buildMedia(int index) {
+    final tokens = _appTokens(context);
     if (widget.adFormat == _AdFormat.video) {
       return Container(
         height: 210,
-        color: const Color(0xFF17253E),
-        child: const Center(
+        color: tokens.panelMuted,
+        child: Center(
           child: Icon(
             Icons.play_circle_outline_rounded,
-            color: Color(0xFFA6C8EC),
+            color: tokens.textMuted,
             size: 48,
           ),
         ),
@@ -1967,7 +1939,7 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
         height: double.infinity,
         width: double.infinity,
         child: DecoratedBox(
-          decoration: const BoxDecoration(color: Color(0xFF0A1730)),
+          decoration: BoxDecoration(color: tokens.panelMuted),
           child: Image.network(
             widget.networkImages[index],
             fit: BoxFit.contain,
@@ -1981,20 +1953,16 @@ class _AdPreviewCardState extends State<_AdPreviewCard> {
         height: double.infinity,
         width: double.infinity,
         child: DecoratedBox(
-          decoration: const BoxDecoration(color: Color(0xFF0A1730)),
+          decoration: BoxDecoration(color: tokens.panelMuted),
           child: Image.file(widget.localImages[index], fit: BoxFit.contain),
         ),
       );
     }
 
     return Container(
-      color: const Color(0xFF17253E),
+      color: tokens.panelMuted,
       alignment: Alignment.center,
-      child: const Icon(
-        Icons.image_outlined,
-        color: Color(0xFF7A8BB0),
-        size: 42,
-      ),
+      child: Icon(Icons.image_outlined, color: tokens.textMuted, size: 42),
     );
   }
 }
@@ -2012,6 +1980,7 @@ class _PreviewNavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Align(
       alignment: alignment,
       child: Padding(
@@ -2026,7 +1995,7 @@ class _PreviewNavButton extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
             ),
-            child: Icon(icon, color: const Color(0xFFE8ECF8), size: 20),
+            child: Icon(icon, color: tokens.text, size: 20),
           ),
         ),
       ),

@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../core/config/app_theme.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/theme_controller.dart';
 import '../post/post_detail_screen.dart';
 import '../profile/models/profile_detail.dart';
 import '../profile/profile_edit_sheet.dart';
@@ -19,6 +21,7 @@ enum SettingsTab {
   content,
   violations,
   notifications,
+  system,
 }
 
 enum _EmailChangeStep { password, currentOtp, newEmail, newOtp, done }
@@ -477,14 +480,22 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  static const Color _bg = Color(0xFF0F1829);
-  static const Color _surface = Color(0xFF131F33);
-  static const Color _border = Color(0xFF1E2D48);
-  static const Color _textPrimary = Color(0xFFE8ECF8);
-  static const Color _textSecondary = Color(0xFF7A8BB0);
-  static const Color _accent = Color(0xFF4AA3E4);
-  static const Color _filterActiveBg = Color(0xFFA8D7FF);
-  static const Color _filterActiveText = Color(0xFF103A66);
+  AppSemanticColors get _tokens =>
+      Theme.of(context).extension<AppSemanticColors>() ??
+      (Theme.of(context).brightness == Brightness.dark
+          ? AppSemanticColors.dark
+          : AppSemanticColors.light);
+
+  Color get _bg => _tokens.panel;
+  Color get _surface => _tokens.panelMuted;
+  Color get _border => _tokens.panelBorder;
+  Color get _textPrimary => _tokens.text;
+  Color get _textSecondary => _tokens.textMuted;
+  Color get _accent => _tokens.primary;
+  Color get _filterActiveBg => _tokens.primarySoft;
+  Color get _filterActiveText => Theme.of(context).brightness == Brightness.dark
+      ? const Color(0xFF103A66)
+      : const Color(0xFF0F355F);
   static const Color _danger = Color(0xFFE53935);
   static final RegExp _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
   static final RegExp _passwordRegex = RegExp(
@@ -684,7 +695,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedTab = null;
+    _selectedTab = widget.initialTab == SettingsTab.personalInfo
+        ? null
+        : widget.initialTab;
     _currentEmail = _decodeEmailFromToken(AuthStorage.accessToken);
     _cooldownTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
@@ -1182,13 +1195,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (ctx, child) {
         return Theme(
           data: Theme.of(ctx).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: _accent,
-              surface: Color(0xFF0F172A),
-            ),
-            dialogTheme: const DialogThemeData(
-              backgroundColor: Color(0xFF0F172A),
-            ),
+            colorScheme: Theme.of(
+              ctx,
+            ).colorScheme.copyWith(primary: _accent, surface: _surface),
+            dialogTheme: DialogThemeData(backgroundColor: _surface),
           ),
           child: child ?? const SizedBox.shrink(),
         );
@@ -1666,22 +1676,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: _surface,
-        title: const Text(
-          'Unhide this post?',
-          style: TextStyle(color: _textPrimary),
-        ),
-        content: const Text(
+        title: Text('Unhide this post?', style: TextStyle(color: _textPrimary)),
+        content: Text(
           'This post will appear in your feed again.',
           style: TextStyle(color: _textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Unhide'),
+            child: Text('Unhide'),
           ),
         ],
       ),
@@ -1738,22 +1745,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: _surface,
-        title: const Text(
+        title: Text(
           'Unblock this account?',
           style: TextStyle(color: _textPrimary),
         ),
-        content: const Text(
+        content: Text(
           'They will be able to see your profile and content again.',
           style: TextStyle(color: _textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Unblock'),
+            child: Text('Unblock'),
           ),
         ],
       ),
@@ -1770,6 +1777,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required bool mutedIndefinitely,
     required Future<void> Function(String? until, bool indefinitely) onSave,
   }) async {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     String selected = '5m';
     String customDate = '';
     String customTime = '';
@@ -1831,11 +1841,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: active
-                          ? const Color(0xFF5E86C2)
-                          : const Color(0xFF233B63),
+                          ? scheme.primary.withValues(
+                              alpha: isDark ? 0.62 : 0.4,
+                            )
+                          : scheme.outline,
                     ),
                     color: active
-                        ? const Color(0xFF1B3558)
+                        ? (isDark
+                              ? scheme.primary.withValues(alpha: 0.25)
+                              : scheme.primaryContainer)
                         : Colors.transparent,
                   ),
                   child: Text(
@@ -1844,8 +1858,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: active
-                          ? const Color(0xFFE8ECF8)
-                          : const Color(0xFF9BAECF),
+                          ? (isDark
+                                ? _tokens.primarySoft
+                                : scheme.onPrimaryContainer)
+                          : scheme.onSurfaceVariant,
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
                     ),
@@ -1855,9 +1871,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }
 
             return Dialog(
-              backgroundColor: const Color(0xFF0E1730),
+              backgroundColor: scheme.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
+                side: BorderSide(color: scheme.outline.withValues(alpha: 0.75)),
               ),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -1873,8 +1890,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             children: [
                               Text(
                                 title,
-                                style: const TextStyle(
-                                  color: Color(0xFFE8ECF8),
+                                style: TextStyle(
+                                  color: scheme.onSurface,
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -1882,8 +1899,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               const SizedBox(height: 6),
                               Text(
                                 subtitle,
-                                style: const TextStyle(
-                                  color: Color(0xFF9BAECF),
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
                                   fontSize: 14,
                                 ),
                               ),
@@ -1894,9 +1911,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed: saving
                               ? null
                               : () => Navigator.of(dialogCtx).pop(),
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.close_rounded,
-                            color: Color(0xFFD0D8EE),
+                            color: scheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -1957,7 +1974,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         error = null;
                                       });
                                     },
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.calendar_today_outlined,
                                 size: 16,
                               ),
@@ -1981,10 +1998,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         error = null;
                                       });
                                     },
-                              icon: const Icon(
-                                Icons.schedule_rounded,
-                                size: 16,
-                              ),
+                              icon: Icon(Icons.schedule_rounded, size: 16),
                               label: Text(
                                 customTime.isEmpty ? 'Select time' : customTime,
                               ),
@@ -1997,10 +2011,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 10),
                       Text(
                         error!,
-                        style: const TextStyle(
-                          color: Color(0xFFF87171),
-                          fontSize: 13,
-                        ),
+                        style: TextStyle(color: scheme.error, fontSize: 13),
                       ),
                     ],
                     const SizedBox(height: 14),
@@ -2011,7 +2022,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed: saving
                               ? null
                               : () => Navigator.of(dialogCtx).pop(),
-                          child: const Text('Cancel'),
+                          child: Text('Cancel'),
                         ),
                         const SizedBox(width: 8),
                         FilledButton(
@@ -2865,6 +2876,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'Violation Center';
       case SettingsTab.notifications:
         return 'Notifications';
+      case SettingsTab.system:
+        return 'System';
     }
   }
 
@@ -2884,6 +2897,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return Icons.gpp_bad_outlined;
       case SettingsTab.notifications:
         return Icons.notifications_none_rounded;
+      case SettingsTab.system:
+        return Icons.tune_rounded;
     }
   }
 
@@ -2903,6 +2918,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'Review moderation actions and your strike history.';
       case SettingsTab.notifications:
         return 'Control when notification alerts are delivered.';
+      case SettingsTab.system:
+        return 'Manage app appearance and global behavior.';
     }
   }
 
@@ -3046,10 +3063,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       title: Text(
                         _toVisibilityLabel(option),
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                       ),
                       trailing: option == currentValue
-                          ? const Icon(Icons.check_rounded, color: _accent)
+                          ? Icon(Icons.check_rounded, color: _accent)
                           : null,
                       onTap: () => Navigator.pop(ctx, option),
                     ),
@@ -3155,23 +3172,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      itemCount: sections.length + 1,
+      itemCount: sections.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        if (index == 0) {
-          return const Padding(
-            padding: EdgeInsets.only(bottom: 6),
-            child: Text(
-              '',
-              style: TextStyle(
-                color: _textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          );
-        }
-        final section = sections[index - 1];
+        final section = sections[index];
         return InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: () => _openSection(section),
@@ -3200,7 +3204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       Text(
                         _sectionTitle(section),
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _textPrimary,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -3209,16 +3213,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 4),
                       Text(
                         _sectionDescription(section),
-                        style: const TextStyle(
-                          color: _textSecondary,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   color: _textSecondary,
                   size: 22,
@@ -3231,6 +3232,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildSystemTab() {
+    return AnimatedBuilder(
+      animation: ThemeController.instance,
+      builder: (context, _) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: _accent.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                ThemeController.instance.isDarkMode
+                    ? Icons.dark_mode_rounded
+                    : Icons.light_mode_rounded,
+                color: _accent,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Appearance',
+                    style: TextStyle(
+                      color: _textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Switch between Dark and Light mode',
+                    style: TextStyle(color: _textSecondary, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Switch(
+              value: ThemeController.instance.isDarkMode,
+              activeColor: _accent,
+              onChanged: (value) {
+                ThemeController.instance.setThemeMode(
+                  value ? ThemeMode.dark : ThemeMode.light,
+                );
+                setState(() {});
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSectionDetail() {
     final tab = _selectedTab ?? SettingsTab.personalInfo;
     if (tab == SettingsTab.personalInfo) return _buildPersonalInfoTab();
@@ -3239,6 +3305,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (tab == SettingsTab.content) return _buildContentTab();
     if (tab == SettingsTab.violations) return _buildViolationsTab();
     if (tab == SettingsTab.notifications) return _buildNotificationsTab();
+    if (tab == SettingsTab.system) return _buildSystemTab();
     return _buildCreatorVerificationTab();
   }
 
@@ -3260,9 +3327,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   InputDecoration _emailInputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: _textSecondary),
+      hintStyle: TextStyle(color: _textSecondary),
       filled: true,
-      fillColor: const Color(0xFF0F1A2F),
+      fillColor: _surface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -3274,7 +3341,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: _accent),
+        borderSide: BorderSide(color: _accent),
       ),
     );
   }
@@ -3312,7 +3379,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: _accent,
               foregroundColor: Colors.white,
-              disabledBackgroundColor: const Color(0xFF2C456A),
+              disabledBackgroundColor: _border,
               disabledForegroundColor: _textPrimary,
               padding: const EdgeInsets.symmetric(vertical: 12),
               shape: RoundedRectangleBorder(
@@ -3332,7 +3399,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Account email',
           style: TextStyle(
             color: _textPrimary,
@@ -3341,7 +3408,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Manage your sign-in email and verification steps.',
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
@@ -3357,7 +3424,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Current email',
                             style: TextStyle(
                               color: _textSecondary,
@@ -3368,7 +3435,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(height: 6),
                           Text(
                             currentEmail,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: _textPrimary,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -3391,7 +3458,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      child: const Text('Change email'),
+                      child: Text('Change email'),
                     ),
                   ],
                 ),
@@ -3410,12 +3477,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         TextButton.icon(
                           onPressed: _emailSubmitting ? null : _handleEmailBack,
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.arrow_back_rounded,
                             size: 16,
                             color: _textPrimary,
                           ),
-                          label: const Text(
+                          label: Text(
                             'Back',
                             style: TextStyle(color: _textPrimary),
                           ),
@@ -3432,7 +3499,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           child: Text(
                             _stepLabel(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: _textSecondary,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -3443,7 +3510,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 8),
                     if (_emailStep == _EmailChangeStep.password) ...[
-                      const Text(
+                      Text(
                         'Current password',
                         style: TextStyle(
                           color: _textPrimary,
@@ -3458,13 +3525,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         enableSuggestions: false,
                         autocorrect: false,
                         onChanged: (v) => _password = v,
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           'Enter your password',
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'We\'ll send a 6-digit OTP to your current email.',
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
@@ -3477,7 +3544,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ],
                     if (_emailStep == _EmailChangeStep.currentOtp) ...[
-                      const Text(
+                      Text(
                         'Enter OTP from current email',
                         style: TextStyle(
                           color: _textPrimary,
@@ -3492,7 +3559,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         maxLength: 6,
                         onChanged: (v) =>
                             _currentOtp = v.replaceAll(RegExp(r'\D'), ''),
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           '------',
                         ).copyWith(counterText: ''),
@@ -3502,10 +3569,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _currentExpiresSec != null
                             ? 'OTP expires in ${_currentExpiresSec}s.'
                             : 'OTP expires in 5 minutes.',
-                        style: const TextStyle(
-                          color: _textSecondary,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
@@ -3522,7 +3586,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ],
                     if (_emailStep == _EmailChangeStep.newEmail) ...[
-                      const Text(
+                      Text(
                         'New email',
                         style: TextStyle(
                           color: _textPrimary,
@@ -3535,16 +3599,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         key: const ValueKey('email-change-new-email-input'),
                         keyboardType: TextInputType.emailAddress,
                         onChanged: (v) => _newEmail = v,
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration('name@example.com'),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'We\'ll send a 6-digit OTP to the new email.',
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         'After this change, your old email is removed and sign-in uses the new email.',
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
@@ -3557,7 +3621,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ],
                     if (_emailStep == _EmailChangeStep.newOtp) ...[
-                      const Text(
+                      Text(
                         'OTP for new email',
                         style: TextStyle(
                           color: _textPrimary,
@@ -3572,7 +3636,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         maxLength: 6,
                         onChanged: (v) =>
                             _newOtp = v.replaceAll(RegExp(r'\D'), ''),
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           '------',
                         ).copyWith(counterText: ''),
@@ -3582,10 +3646,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _newExpiresSec != null
                             ? 'OTP expires in ${_newExpiresSec}s.'
                             : 'OTP expires in 5 minutes.',
-                        style: const TextStyle(
-                          color: _textSecondary,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
@@ -3613,14 +3674,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         child: Text(
                           _emailSuccess ?? 'Email updated successfully.',
-                          style: const TextStyle(color: _textPrimary),
+                          style: TextStyle(color: _textPrimary),
                         ),
                       ),
                     if (_emailError != null) ...[
                       const SizedBox(height: 10),
                       Text(
                         _emailError!,
-                        style: const TextStyle(color: _danger, fontSize: 12),
+                        style: TextStyle(color: _danger, fontSize: 12),
                       ),
                     ],
                     if (_emailSuccess != null &&
@@ -3628,10 +3689,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 10),
                       Text(
                         _emailSuccess!,
-                        style: const TextStyle(
-                          color: _textPrimary,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: _textPrimary, fontSize: 12),
                       ),
                     ],
                   ],
@@ -3668,7 +3726,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: _textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -3677,7 +3735,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 5),
                 Text(
                   value,
-                  style: const TextStyle(color: _textSecondary, fontSize: 13),
+                  style: TextStyle(color: _textSecondary, fontSize: 13),
                 ),
               ],
             ),
@@ -3739,7 +3797,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         _buildAccountEmailSection(),
         const SizedBox(height: 18),
-        const Text(
+        Text(
           'Personal info',
           style: TextStyle(
             color: _textPrimary,
@@ -3748,7 +3806,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Details shown on your profile.',
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
@@ -3799,7 +3857,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           Text(
             _visibilityError!,
-            style: const TextStyle(color: _danger, fontSize: 13),
+            style: TextStyle(color: _danger, fontSize: 13),
           ),
         ],
         const SizedBox(height: 14),
@@ -3824,7 +3882,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text('Edit profile'),
+            child: Text('Edit profile'),
           ),
         ),
       ],
@@ -3836,7 +3894,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Profile visibility',
           style: TextStyle(
             color: _textPrimary,
@@ -3845,7 +3903,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Control who can view your profile, About section, and follower lists.',
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
@@ -3882,7 +3940,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           Text(
             _visibilityError!,
-            style: const TextStyle(color: _danger, fontSize: 13),
+            style: TextStyle(color: _danger, fontSize: 13),
           ),
         ],
       ],
@@ -3916,7 +3974,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: _textPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
@@ -3925,7 +3983,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(color: _textSecondary, fontSize: 13),
+                  style: TextStyle(color: _textSecondary, fontSize: 13),
                 ),
               ],
             ),
@@ -3933,7 +3991,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(width: 10),
           Text(
             threshold,
-            style: const TextStyle(color: _textSecondary, fontSize: 12),
+            style: TextStyle(color: _textSecondary, fontSize: 12),
           ),
         ],
       ),
@@ -3945,7 +4003,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF101D35),
+        color: _surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _border),
       ),
@@ -3954,7 +4012,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'Latest request',
                 style: TextStyle(
                   color: _textPrimary,
@@ -3971,7 +4029,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 child: Text(
                   request.status,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: _textPrimary,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -3984,28 +4042,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 6),
             Text(
               'Submitted ${_formatRelativeTime(request.createdAt)}',
-              style: const TextStyle(color: _textSecondary, fontSize: 12),
+              style: TextStyle(color: _textSecondary, fontSize: 12),
             ),
           ],
           if ((request.reviewedAt ?? '').isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
               'Reviewed ${_formatRelativeTime(request.reviewedAt)}',
-              style: const TextStyle(color: _textSecondary, fontSize: 12),
+              style: TextStyle(color: _textSecondary, fontSize: 12),
             ),
           ],
           if ((request.decisionReason ?? '').isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
               'Reason: ${request.decisionReason}',
-              style: const TextStyle(color: _textSecondary, fontSize: 12),
+              style: TextStyle(color: _textSecondary, fontSize: 12),
             ),
           ],
           if ((request.cooldownUntil ?? '').isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
               'You can request again ${_formatRelativeTime(request.cooldownUntil)}',
-              style: const TextStyle(color: _textSecondary, fontSize: 12),
+              style: TextStyle(color: _textSecondary, fontSize: 12),
             ),
           ],
         ],
@@ -4019,7 +4077,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Creator verification',
           style: TextStyle(
             color: _textPrimary,
@@ -4028,7 +4086,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Apply for the blue creator badge and unlock creator privileges once your account meets quality requirements.',
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
@@ -4041,7 +4099,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (_creatorLoading)
-                    const Text(
+                    Text(
                       'Loading creator eligibility...',
                       style: TextStyle(color: _textSecondary, fontSize: 13),
                     ),
@@ -4053,13 +4111,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF17344F),
+                        color: _accent.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: _accent.withValues(alpha: 0.45),
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Your account is creator verified.',
                         style: TextStyle(color: _textPrimary),
                       ),
@@ -4070,14 +4128,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF101D35),
+                        color: _surface,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: _border),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Creator score',
                             style: TextStyle(
                               color: _textPrimary,
@@ -4088,7 +4146,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(height: 6),
                           Text(
                             '${_formatNum(status.eligibility.score)} / ${_formatNum(status.eligibility.minimumScore)}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: _textPrimary,
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
@@ -4099,7 +4157,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             status.eligibility.eligible
                                 ? 'Your account currently meets all conditions.'
                                 : 'Improve the missing conditions below to become eligible.',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: _textSecondary,
                               fontSize: 12,
                             ),
@@ -4153,7 +4211,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 10),
                       Text(
                         'Missing requirements: ${status.eligibility.failedRequirements.map(_formatRequirementLabel).join(', ')}',
-                        style: const TextStyle(color: _danger, fontSize: 12),
+                        style: TextStyle(color: _danger, fontSize: 12),
                       ),
                     ],
                     if (status.latestRequest != null) ...[
@@ -4161,7 +4219,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _buildCreatorLatestRequest(status.latestRequest!),
                     ],
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'Request note (optional)',
                       style: TextStyle(
                         color: _textPrimary,
@@ -4175,7 +4233,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       minLines: 4,
                       maxLines: 4,
                       onChanged: (v) => _creatorNote = v,
-                      style: const TextStyle(color: _textPrimary),
+                      style: TextStyle(color: _textPrimary),
                       decoration: _emailInputDecoration(
                         'Share details that help admin understand your creator journey.',
                       ),
@@ -4184,17 +4242,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 10),
                       Text(
                         _creatorError!,
-                        style: const TextStyle(color: _danger, fontSize: 12),
+                        style: TextStyle(color: _danger, fontSize: 12),
                       ),
                     ],
                     if (_creatorSuccess != null) ...[
                       const SizedBox(height: 10),
                       Text(
                         _creatorSuccess!,
-                        style: const TextStyle(
-                          color: _textPrimary,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: _textPrimary, fontSize: 12),
                       ),
                     ],
                     const SizedBox(height: 12),
@@ -4214,7 +4269,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            child: const Text('Refresh status'),
+                            child: Text('Refresh status'),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -4250,7 +4305,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   if (_creatorError != null && status == null)
                     Text(
                       _creatorError!,
-                      style: const TextStyle(color: _danger, fontSize: 12),
+                      style: TextStyle(color: _danger, fontSize: 12),
                     ),
                 ],
               ),
@@ -4287,8 +4342,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         TextButton.icon(
           onPressed: onBack,
-          icon: const Icon(Icons.arrow_back_rounded, size: 16),
-          label: const Text('Back'),
+          icon: Icon(Icons.arrow_back_rounded, size: 16),
+          label: Text('Back'),
           style: TextButton.styleFrom(foregroundColor: _textPrimary),
         ),
         const Spacer(),
@@ -4300,7 +4355,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           child: Text(
             stepLabel,
-            style: const TextStyle(
+            style: TextStyle(
               color: _textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -4320,7 +4375,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Password & Security',
           style: TextStyle(
             color: _textPrimary,
@@ -4329,7 +4384,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Manage your login protection and password updates.',
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
@@ -4343,7 +4398,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Change password',
                       style: TextStyle(
                         color: _textPrimary,
@@ -4358,10 +4413,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           : (_passwordChangedAt != null
                                 ? 'Last changed ${_formatRelativeTime(_passwordChangedAt)}'
                                 : 'Password has not been changed yet.'),
-                      style: const TextStyle(
-                        color: _textSecondary,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: _textSecondary, fontSize: 12),
                     ),
                     const SizedBox(height: 12),
                     SizedBox(
@@ -4372,7 +4424,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           backgroundColor: _accent,
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('Change password'),
+                        child: Text('Change password'),
                       ),
                     ),
                   ],
@@ -4390,7 +4442,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 8),
                     if (_passwordStep == _PasswordChangeStep.otp) ...[
-                      const Text(
+                      Text(
                         'OTP for password change',
                         style: TextStyle(
                           color: _textPrimary,
@@ -4405,7 +4457,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         maxLength: 6,
                         onChanged: (v) =>
                             _passwordOtp = v.replaceAll(RegExp(r'\D'), ''),
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           '------',
                         ).copyWith(counterText: ''),
@@ -4415,10 +4467,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _passwordExpiresSec != null
                             ? 'OTP expires in ${_passwordExpiresSec}s.'
                             : 'OTP expires in 5 minutes.',
-                        style: const TextStyle(
-                          color: _textSecondary,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
@@ -4437,7 +4486,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ],
                     if (_passwordStep == _PasswordChangeStep.form) ...[
-                      const Text(
+                      Text(
                         'Current password',
                         style: TextStyle(
                           color: _textPrimary,
@@ -4452,13 +4501,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         enableSuggestions: false,
                         autocorrect: false,
                         onChanged: (v) => _passwordCurrent = v,
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           'Enter current password',
                         ),
                       ),
                       const SizedBox(height: 10),
-                      const Text(
+                      Text(
                         'New password',
                         style: TextStyle(
                           color: _textPrimary,
@@ -4473,13 +4522,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         enableSuggestions: false,
                         autocorrect: false,
                         onChanged: (v) => _passwordNew = v,
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           'Create a new password',
                         ),
                       ),
                       const SizedBox(height: 10),
-                      const Text(
+                      Text(
                         'Confirm new password',
                         style: TextStyle(
                           color: _textPrimary,
@@ -4494,13 +4543,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         enableSuggestions: false,
                         autocorrect: false,
                         onChanged: (v) => _passwordConfirm = v,
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           'Re-enter new password',
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'Password must be at least 8 characters and include uppercase, lowercase, and a number.',
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
@@ -4527,12 +4576,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         child: Text(
                           _passwordSuccess ?? 'Password updated successfully.',
-                          style: const TextStyle(color: _textPrimary),
+                          style: TextStyle(color: _textPrimary),
                         ),
                       ),
                       if (_passwordLogoutPrompt) ...[
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           'Do you want to log out of all other devices?',
                           style: TextStyle(color: _textSecondary, fontSize: 12),
                         ),
@@ -4540,10 +4589,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(height: 8),
                           Text(
                             _passwordLogoutError!,
-                            style: const TextStyle(
-                              color: _danger,
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: _danger, fontSize: 12),
                           ),
                         ],
                         const SizedBox(height: 10),
@@ -4568,7 +4614,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 10),
                       Text(
                         _passwordError!,
-                        style: const TextStyle(color: _danger, fontSize: 12),
+                        style: TextStyle(color: _danger, fontSize: 12),
                       ),
                     ],
                   ],
@@ -4586,7 +4632,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Two-factor authentication',
                       style: TextStyle(
                         color: _textPrimary,
@@ -4595,7 +4641,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
+                    Text(
                       'Require an email OTP each time you sign in.',
                       style: TextStyle(color: _textSecondary, fontSize: 12),
                     ),
@@ -4640,7 +4686,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _twoFactorTarget
                             ? 'OTP to enable two-factor'
                             : 'OTP to disable two-factor',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _textPrimary,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -4653,7 +4699,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         maxLength: 6,
                         onChanged: (v) =>
                             _twoFactorOtp = v.replaceAll(RegExp(r'\D'), ''),
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           '------',
                         ).copyWith(counterText: ''),
@@ -4663,10 +4709,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _twoFactorExpiresSec != null
                             ? 'OTP expires in ${_twoFactorExpiresSec}s.'
                             : 'OTP expires in 5 minutes.',
-                        style: const TextStyle(
-                          color: _textSecondary,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
@@ -4698,14 +4741,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         child: Text(
                           _twoFactorSuccess ?? 'Two-factor updated.',
-                          style: const TextStyle(color: _textPrimary),
+                          style: TextStyle(color: _textPrimary),
                         ),
                       ),
                     if (_twoFactorError != null) ...[
                       const SizedBox(height: 10),
                       Text(
                         _twoFactorError!,
-                        style: const TextStyle(color: _danger, fontSize: 12),
+                        style: TextStyle(color: _danger, fontSize: 12),
                       ),
                     ],
                   ],
@@ -4722,7 +4765,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Passkeys',
                     style: TextStyle(
                       color: _textPrimary,
@@ -4731,7 +4774,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
+                  Text(
                     'Use a 6-digit passkey for quick verification.',
                     style: TextStyle(color: _textSecondary, fontSize: 12),
                   ),
@@ -4739,10 +4782,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 6),
                     Text(
                       _passkeyEnabled ? 'Status: Enabled' : 'Status: Disabled',
-                      style: const TextStyle(
-                        color: _textSecondary,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: _textSecondary, fontSize: 12),
                     ),
                   ],
                   if (!_showPasskeyFlow) ...[
@@ -4797,7 +4837,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
                 child: Text(
                   _passkeyToggleError!,
-                  style: const TextStyle(color: _danger, fontSize: 12),
+                  style: TextStyle(color: _danger, fontSize: 12),
                 ),
               ),
             if (_showPasskeyFlow)
@@ -4812,7 +4852,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 8),
                     if (_passkeyStep == _PasskeyStep.password) ...[
-                      const Text(
+                      Text(
                         'Current password',
                         style: TextStyle(
                           color: _textPrimary,
@@ -4825,13 +4865,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         key: const ValueKey('passkey-password-input'),
                         obscureText: true,
                         onChanged: (v) => _passkeyPassword = v,
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           'Enter your password',
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'We\'ll send a 6-digit OTP to confirm your passkey change.',
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
@@ -4846,7 +4886,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ],
                     if (_passkeyStep == _PasskeyStep.otp) ...[
-                      const Text(
+                      Text(
                         'OTP for passkey setup',
                         style: TextStyle(
                           color: _textPrimary,
@@ -4861,7 +4901,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         maxLength: 6,
                         onChanged: (v) =>
                             _passkeyOtp = v.replaceAll(RegExp(r'\D'), ''),
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           '------',
                         ).copyWith(counterText: ''),
@@ -4871,10 +4911,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _passkeyExpiresSec != null
                             ? 'OTP expires in ${_passkeyExpiresSec}s.'
                             : 'OTP expires in 5 minutes.',
-                        style: const TextStyle(
-                          color: _textSecondary,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
                       const SizedBox(height: 12),
                       _buildStepActions(
@@ -4894,7 +4931,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                     if (_passkeyStep == _PasskeyStep.form) ...[
                       if (_hasPasskey) ...[
-                        const Text(
+                        Text(
                           'Current passkey',
                           style: TextStyle(
                             color: _textPrimary,
@@ -4909,7 +4946,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             vertical: 12,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0F1A2F),
+                            color: _surface,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: _border.withValues(alpha: 0.9),
@@ -4922,7 +4959,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   _showCurrentPasskey
                                       ? _passkeyCurrent
                                       : ('*' * _passkeyCurrent.length),
-                                  style: const TextStyle(color: _textPrimary),
+                                  style: TextStyle(color: _textPrimary),
                                 ),
                               ),
                               IconButton(
@@ -4943,7 +4980,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         const SizedBox(height: 10),
                       ],
-                      const Text(
+                      Text(
                         'New passkey',
                         style: TextStyle(
                           color: _textPrimary,
@@ -4958,13 +4995,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         maxLength: 6,
                         obscureText: true,
                         onChanged: (v) => _passkeyNew = sixDigits(v),
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           'Enter 6-digit passkey',
                         ).copyWith(counterText: ''),
                       ),
                       const SizedBox(height: 10),
-                      const Text(
+                      Text(
                         'Confirm passkey',
                         style: TextStyle(
                           color: _textPrimary,
@@ -4979,13 +5016,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         maxLength: 6,
                         obscureText: true,
                         onChanged: (v) => _passkeyConfirm = sixDigits(v),
-                        style: const TextStyle(color: _textPrimary),
+                        style: TextStyle(color: _textPrimary),
                         decoration: _emailInputDecoration(
                           'Re-enter passkey',
                         ).copyWith(counterText: ''),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'Passkey must be exactly 6 digits.',
                         style: TextStyle(color: _textSecondary, fontSize: 12),
                       ),
@@ -5000,7 +5037,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1A2B4A),
+                          color: _accent.withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: _accent.withValues(alpha: 0.4),
@@ -5008,14 +5045,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         child: Text(
                           _passkeySuccess ?? 'Passkey updated successfully.',
-                          style: const TextStyle(color: _textPrimary),
+                          style: TextStyle(color: _textPrimary),
                         ),
                       ),
                     if (_passkeyError != null) ...[
                       const SizedBox(height: 10),
                       Text(
                         _passkeyError!,
-                        style: const TextStyle(color: _danger, fontSize: 12),
+                        style: TextStyle(color: _danger, fontSize: 12),
                       ),
                     ],
                   ],
@@ -5032,7 +5069,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Where you\'re logged in',
                     style: TextStyle(
                       color: _textPrimary,
@@ -5041,7 +5078,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
+                  Text(
                     'Review devices that have accessed your account.',
                     style: TextStyle(color: _textSecondary, fontSize: 12),
                   ),
@@ -5054,7 +5091,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         backgroundColor: _accent,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('View devices'),
+                      child: Text('View devices'),
                     ),
                   ),
                 ],
@@ -5067,7 +5104,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (_loginDevicesLoading)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(bottom: 8),
                         child: Text(
                           'Loading devices...',
@@ -5079,11 +5116,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Text(
                           _loginDevicesError!,
-                          style: const TextStyle(color: _danger, fontSize: 12),
+                          style: TextStyle(color: _danger, fontSize: 12),
                         ),
                       ),
                     if (!_loginDevicesLoading && _loginDevices.isEmpty)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(bottom: 8),
                         child: Text(
                           'No login devices found.',
@@ -5107,7 +5144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF101D35),
+                          color: _surface,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: _border),
                         ),
@@ -5120,7 +5157,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 children: [
                                   Text(
                                     resolvedName,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: _textPrimary,
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
@@ -5129,13 +5166,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   const SizedBox(height: 4),
                                   Text(
                                     _resolveDeviceTime(device),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: _textSecondary,
                                       fontSize: 12,
                                     ),
                                   ),
                                   if (isCurrent)
-                                    const Padding(
+                                    Padding(
                                       padding: EdgeInsets.only(top: 4),
                                       child: Text(
                                         'Current device',
@@ -5171,10 +5208,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Text(
                             _logoutAllError!,
-                            style: const TextStyle(
-                              color: _danger,
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: _danger, fontSize: 12),
                           ),
                         ),
                       SizedBox(
@@ -5241,7 +5275,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: _textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -5250,10 +5284,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       desc,
-                      style: const TextStyle(
-                        color: _textSecondary,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: _textSecondary, fontSize: 12),
                     ),
                   ],
                 ),
@@ -5299,7 +5330,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Content',
           style: TextStyle(
             color: _textPrimary,
@@ -5308,7 +5339,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Manage hidden posts, blocked users, and your activity log.',
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
@@ -5359,14 +5390,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               color: active ? _filterActiveBg : _border,
                             ),
                           ),
-                          backgroundColor: const Color(0xFF0F1A2F),
+                          backgroundColor: _surface,
                         );
                       })
                       .toList(growable: false),
                 ),
               ),
               if (_activityLoading)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(14, 0, 14, 12),
                   child: Text(
                     'Loading activity...',
@@ -5378,11 +5409,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
                   child: Text(
                     _activityError!,
-                    style: const TextStyle(color: _danger, fontSize: 12),
+                    style: TextStyle(color: _danger, fontSize: 12),
                   ),
                 ),
               if (!_activityLoading && visibleActivityItems.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(14, 0, 14, 14),
                   child: Text(
                     'No activity yet.',
@@ -5427,7 +5458,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               children: [
                                 Text(
                                   _activityTitle(item),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: _textPrimary,
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
@@ -5438,7 +5469,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   _activitySubtitle(item),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: _textSecondary,
                                     fontSize: 12,
                                   ),
@@ -5446,7 +5477,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 const SizedBox(height: 4),
                                 Text(
                                   _formatRelativeTime(item.createdAt),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: _textSecondary,
                                     fontSize: 11,
                                   ),
@@ -5467,7 +5498,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   width: 36,
                                   height: 36,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF0F1A2F),
+                                    color: _surface,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
@@ -5478,7 +5509,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0F1A2F),
+                                color: _surface,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Center(
@@ -5523,7 +5554,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (_contentHiddenOpen) ...[
               buildDivider(),
               if (_hiddenPostsLoading)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
                   child: Text(
                     'Loading hidden posts...',
@@ -5535,11 +5566,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   child: Text(
                     _hiddenPostsError!,
-                    style: const TextStyle(color: _danger, fontSize: 12),
+                    style: TextStyle(color: _danger, fontSize: 12),
                   ),
                 ),
               if (!_hiddenPostsLoading && visibleHiddenPosts.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
                   child: Text(
                     'No hidden posts.',
@@ -5586,17 +5617,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   errorBuilder: (_, __, ___) => Container(
                                     width: 42,
                                     height: 42,
-                                    color: const Color(0xFF0F1A2F),
+                                    color: _surface,
                                     alignment: Alignment.center,
-                                    child: const Text('📝'),
+                                    child: Text('📝'),
                                   ),
                                 )
                               : Container(
                                   width: 42,
                                   height: 42,
-                                  color: const Color(0xFF0F1A2F),
+                                  color: _surface,
                                   alignment: Alignment.center,
-                                  child: const Text('📝'),
+                                  child: Text('📝'),
                                 ),
                         ),
                         const SizedBox(width: 10),
@@ -5606,7 +5637,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             children: [
                               Text(
                                 authorName,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: _textPrimary,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -5617,7 +5648,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 caption,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: _textSecondary,
                                   fontSize: 12,
                                 ),
@@ -5642,7 +5673,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                   child: OutlinedButton(
                     onPressed: _handleSeeMoreHiddenPosts,
-                    child: const Text('See more'),
+                    child: Text('See more'),
                   ),
                 ),
             ],
@@ -5662,7 +5693,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (_contentBlockedOpen) ...[
               buildDivider(),
               if (_blockedUsersLoading)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
                   child: Text(
                     'Loading blocked users...',
@@ -5674,11 +5705,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   child: Text(
                     _blockedUsersError!,
-                    style: const TextStyle(color: _danger, fontSize: 12),
+                    style: TextStyle(color: _danger, fontSize: 12),
                   ),
                 ),
               if (!_blockedUsersLoading && _blockedUsers.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
                   child: Text(
                     'No blocked users.',
@@ -5711,7 +5742,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         CircleAvatar(
                           radius: 20,
-                          backgroundColor: const Color(0xFF0F1A2F),
+                          backgroundColor: _surface,
                           backgroundImage:
                               (user.avatarUrl != null &&
                                   user.avatarUrl!.isNotEmpty)
@@ -5724,7 +5755,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   label.isNotEmpty
                                       ? label[0].toUpperCase()
                                       : '?',
-                                  style: const TextStyle(color: _textPrimary),
+                                  style: TextStyle(color: _textPrimary),
                                 )
                               : null,
                         ),
@@ -5735,7 +5766,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             children: [
                               Text(
                                 label,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: _textPrimary,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -5744,7 +5775,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 handle,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: _textSecondary,
                                   fontSize: 12,
                                 ),
@@ -5777,7 +5808,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Violation Center',
           style: TextStyle(
             color: _textPrimary,
@@ -5786,7 +5817,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Review moderation actions and your strike history.',
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
@@ -5802,14 +5833,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Current strike total',
                           style: TextStyle(color: _textSecondary, fontSize: 12),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '$_currentStrikeTotal',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: _textPrimary,
                             fontSize: 22,
                             fontWeight: FontWeight.w700,
@@ -5835,7 +5866,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _buildCard(
           children: [
             if (_violationLoading)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
                 child: Text(
                   'Loading violation history...',
@@ -5847,11 +5878,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                 child: Text(
                   _violationError!,
-                  style: const TextStyle(color: _danger, fontSize: 12),
+                  style: TextStyle(color: _danger, fontSize: 12),
                 ),
               ),
             if (!_violationLoading && _violationItems.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
                 child: Text(
                   'No violations found.',
@@ -5882,7 +5913,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           color: _accent.withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.flag_rounded,
                           color: _accent,
                           size: 16,
@@ -5895,7 +5926,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           children: [
                             Text(
                               '${_formatViolationActionLabel(item.action)} · ${item.targetType.toUpperCase()}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: _textPrimary,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -5904,7 +5935,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             const SizedBox(height: 2),
                             Text(
                               _violationSubtitle(item),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: _textSecondary,
                                 fontSize: 12,
                               ),
@@ -5914,7 +5945,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               'Reason: ${item.reason.isEmpty ? 'No reason provided.' : item.reason}',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: _textSecondary,
                                 fontSize: 12,
                               ),
@@ -5923,7 +5954,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 timeLabel,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: _textSecondary,
                                   fontSize: 11,
                                 ),
@@ -5931,7 +5962,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ],
                             if (canOpen) ...[
                               const SizedBox(height: 3),
-                              const Text(
+                              Text(
                                 'Tap to view violated content',
                                 style: TextStyle(
                                   color: _textSecondary,
@@ -5955,6 +5986,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildNotificationsTab() {
     final settings = _notificationSettings;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     Widget buildRow({
       required String title,
@@ -5976,22 +6008,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 color: _textPrimary,
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              status,
-              style: const TextStyle(color: _textSecondary, fontSize: 13),
-            ),
+            Text(status, style: TextStyle(color: _textSecondary, fontSize: 13)),
             const SizedBox(height: 5),
-            Text(
-              hint,
-              style: const TextStyle(color: _textSecondary, fontSize: 12),
-            ),
+            Text(hint, style: TextStyle(color: _textSecondary, fontSize: 12)),
             const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerRight,
@@ -6005,7 +6031,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         : onMute,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _textPrimary,
-                      side: BorderSide(color: _border),
+                      side: BorderSide(
+                        color: isDark
+                            ? _border
+                            : _textSecondary.withValues(alpha: 0.45),
+                      ),
                     ),
                     child: Text(enabled ? 'Mute' : 'Edit'),
                   ),
@@ -6018,7 +6048,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         backgroundColor: _accent,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('Enable'),
+                      child: Text('Enable'),
                     ),
                 ],
               ),
@@ -6031,7 +6061,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Notifications',
           style: TextStyle(
             color: _textPrimary,
@@ -6040,7 +6070,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Control when you receive notification alerts.',
           style: TextStyle(color: _textSecondary, fontSize: 13),
         ),
@@ -6121,7 +6151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                 child: Text(
                   _notificationError!,
-                  style: const TextStyle(color: _danger, fontSize: 12),
+                  style: TextStyle(color: _danger, fontSize: 12),
                 ),
               ),
           ],
@@ -6224,7 +6254,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildContent() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: _accent));
+      return Center(child: CircularProgressIndicator(color: _accent));
     }
 
     if (_error != null) {
@@ -6237,13 +6267,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: _danger, fontSize: 14),
+                style: TextStyle(color: _danger, fontSize: 14),
               ),
               const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: _loadProfile,
-                child: const Text('Retry'),
-              ),
+              ElevatedButton(onPressed: _loadProfile, child: Text('Retry')),
             ],
           ),
         ),
@@ -6322,16 +6349,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           elevation: 0,
           title: Text(
             _selectedTab == null ? 'Settings' : _sectionTitle(_selectedTab!),
-            style: const TextStyle(
-              color: _textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(color: _textPrimary, fontWeight: FontWeight.w700),
           ),
-          iconTheme: const IconThemeData(color: _textPrimary),
+          iconTheme: IconThemeData(color: _textPrimary),
           leading: _selectedTab == null
               ? null
               : IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded),
+                  icon: Icon(Icons.arrow_back_rounded),
                   onPressed: () {
                     setState(() {
                       if (_selectedTab == SettingsTab.passwordSecurity) {
@@ -6359,12 +6383,12 @@ class _ViolationDetailScreen extends StatelessWidget {
 
   final _ViolationHistoryItem item;
 
-  static const Color _bg = Color(0xFF0F1829);
-  static const Color _surface = Color(0xFF131F33);
-  static const Color _border = Color(0xFF1E2D48);
-  static const Color _textPrimary = Color(0xFFE8ECF8);
-  static const Color _textSecondary = Color(0xFF7A8BB0);
-  static const Color _accent = Color(0xFF4AA3E4);
+  AppSemanticColors _tokens(BuildContext context) {
+    return Theme.of(context).extension<AppSemanticColors>() ??
+        (Theme.of(context).brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+  }
 
   String _cleanSnippetText(String? raw, {required String fallback}) {
     if (raw == null || raw.trim().isEmpty) return fallback;
@@ -6420,27 +6444,32 @@ class _ViolationDetailScreen extends StatelessWidget {
     return '${years}y ago';
   }
 
-  Widget _buildCard({required List<Widget> children}) {
+  Widget _buildCard(BuildContext context, {required List<Widget> children}) {
+    final tokens = _tokens(context);
     return Container(
       decoration: BoxDecoration(
-        color: _surface,
+        color: tokens.panelMuted,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _border),
+        border: Border.all(color: tokens.panelBorder),
       ),
       child: Column(children: children),
     );
   }
 
-  Widget _buildMediaPreview(_ViolationMediaPreview media) {
+  Widget _buildMediaPreview(
+    BuildContext context,
+    _ViolationMediaPreview media,
+  ) {
+    final tokens = _tokens(context);
     final isVideo = media.type == 'video';
     if (!isVideo) {
       return Container(
         width: double.infinity,
         constraints: const BoxConstraints(maxHeight: 320),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F1A2F),
+          color: tokens.panel,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _border),
+          border: Border.all(color: tokens.panelBorder),
         ),
         clipBehavior: Clip.antiAlias,
         child: Image.network(
@@ -6450,11 +6479,11 @@ class _ViolationDetailScreen extends StatelessWidget {
           errorBuilder: (_, __, ___) => Container(
             width: double.infinity,
             height: 140,
-            color: const Color(0xFF0F1A2F),
+            color: tokens.panel,
             alignment: Alignment.center,
-            child: const Text(
+            child: Text(
               'Unable to load preview image',
-              style: TextStyle(color: _textSecondary, fontSize: 12),
+              style: TextStyle(color: tokens.textMuted, fontSize: 12),
             ),
           ),
         ),
@@ -6465,19 +6494,20 @@ class _ViolationDetailScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1A2F),
+        color: tokens.panel,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _border),
+        border: Border.all(color: tokens.panelBorder),
       ),
-      child: const Text(
+      child: Text(
         'Video preview is available for this violation.',
-        style: TextStyle(color: _textSecondary, fontSize: 12),
+        style: TextStyle(color: tokens.textMuted, fontSize: 12),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _tokens(context);
     final recordedAt = _formatRelativeTime(item.createdAt);
     final severityText = _formatSeverityLabel(item.severity);
     final reasonText = item.reason.trim().isEmpty
@@ -6493,20 +6523,21 @@ class _ViolationDetailScreen extends StatelessWidget {
     );
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: tokens.panel,
       appBar: AppBar(
-        backgroundColor: _bg,
+        backgroundColor: tokens.panel,
         elevation: 0,
-        iconTheme: const IconThemeData(color: _textPrimary),
-        title: const Text(
+        iconTheme: IconThemeData(color: tokens.text),
+        title: Text(
           'Violated content',
-          style: TextStyle(color: _textPrimary, fontWeight: FontWeight.w700),
+          style: TextStyle(color: tokens.text, fontWeight: FontWeight.w700),
         ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           _buildCard(
+            context,
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
@@ -6515,8 +6546,8 @@ class _ViolationDetailScreen extends StatelessWidget {
                   children: [
                     Text(
                       '${_formatActionLabel(item.action)} · ${item.targetType.toUpperCase()}',
-                      style: const TextStyle(
-                        color: _textPrimary,
+                      style: TextStyle(
+                        color: tokens.text,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -6524,28 +6555,19 @@ class _ViolationDetailScreen extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       'Severity $severityText · Strike +${item.strikeDelta} (Total ${item.strikeTotalAfter})',
-                      style: const TextStyle(
-                        color: _textSecondary,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: tokens.textMuted, fontSize: 12),
                     ),
                     if (recordedAt.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
                         'Recorded $recordedAt',
-                        style: const TextStyle(
-                          color: _textSecondary,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: tokens.textMuted, fontSize: 12),
                       ),
                     ],
                     const SizedBox(height: 8),
                     Text(
                       'Reason: $reasonText',
-                      style: const TextStyle(
-                        color: _textSecondary,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: tokens.textMuted, fontSize: 12),
                     ),
                   ],
                 ),
@@ -6554,6 +6576,7 @@ class _ViolationDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _buildCard(
+            context,
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -6561,18 +6584,18 @@ class _ViolationDetailScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (item.targetType == 'comment')
-                      const Text(
+                      Text(
                         'Your violated comment',
-                        style: TextStyle(color: _textSecondary, fontSize: 11),
+                        style: TextStyle(color: tokens.textMuted, fontSize: 11),
                       ),
                     if (item.targetType == 'comment') const SizedBox(height: 4),
                     Text(
                       contentText,
-                      style: const TextStyle(color: _textPrimary, fontSize: 13),
+                      style: TextStyle(color: tokens.text, fontSize: 13),
                     ),
                     if (item.previewMedia != null) ...[
                       const SizedBox(height: 12),
-                      _buildMediaPreview(item.previewMedia!),
+                      _buildMediaPreview(context, item.previewMedia!),
                     ],
                   ],
                 ),
@@ -6583,27 +6606,28 @@ class _ViolationDetailScreen extends StatelessWidget {
               item.relatedPostPreview != null) ...[
             const SizedBox(height: 12),
             _buildCard(
+              context,
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Parent post context',
-                        style: TextStyle(color: _textSecondary, fontSize: 11),
+                        style: TextStyle(color: tokens.textMuted, fontSize: 11),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         parentText,
-                        style: const TextStyle(
-                          color: _textPrimary,
-                          fontSize: 13,
-                        ),
+                        style: TextStyle(color: tokens.text, fontSize: 13),
                       ),
                       if (item.relatedPostPreview?.media != null) ...[
                         const SizedBox(height: 12),
-                        _buildMediaPreview(item.relatedPostPreview!.media!),
+                        _buildMediaPreview(
+                          context,
+                          item.relatedPostPreview!.media!,
+                        ),
                       ],
                     ],
                   ),
@@ -6616,8 +6640,8 @@ class _ViolationDetailScreen extends StatelessWidget {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close_rounded),
-              label: const Text('Close'),
+              icon: Icon(Icons.close_rounded),
+              label: Text('Close'),
             ),
           ),
         ],

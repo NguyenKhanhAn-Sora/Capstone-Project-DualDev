@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/config/app_theme.dart';
 import '../../../core/services/api_service.dart';
 import '../../notifications/services/notification_service.dart';
 
@@ -17,22 +18,13 @@ const List<Map<String, dynamic>> _muteOptions = [
 Future<String?> _pickCustomDate(BuildContext context, String current) async {
   final now = DateTime.now();
   final initial = DateTime.tryParse(current) ?? now;
+  final theme = Theme.of(context);
   final picked = await showDatePicker(
     context: context,
     initialDate: initial,
     firstDate: now,
     lastDate: now.add(const Duration(days: 3650)),
-    builder: (ctx, child) => Theme(
-      data: Theme.of(ctx).copyWith(
-        colorScheme: const ColorScheme.dark(
-          surface: Color(0xFF101A33),
-          primary: Color(0xFF5E86C2),
-          onSurface: Color(0xFFE8ECF8),
-        ),
-        dialogTheme: const DialogThemeData(backgroundColor: Color(0xFF101A33)),
-      ),
-      child: child!,
-    ),
+    builder: (ctx, child) => Theme(data: theme, child: child!),
   );
   if (picked == null) return null;
   final y = picked.year.toString().padLeft(4, '0');
@@ -49,20 +41,11 @@ Future<String?> _pickCustomTime(BuildContext context, String current) async {
     final m = int.tryParse(pieces[1]);
     if (h != null && m != null) initial = TimeOfDay(hour: h, minute: m);
   }
+  final theme = Theme.of(context);
   final picked = await showTimePicker(
     context: context,
     initialTime: initial,
-    builder: (ctx, child) => Theme(
-      data: Theme.of(ctx).copyWith(
-        colorScheme: const ColorScheme.dark(
-          surface: Color(0xFF101A33),
-          primary: Color(0xFF5E86C2),
-          onSurface: Color(0xFFE8ECF8),
-        ),
-        dialogTheme: const DialogThemeData(backgroundColor: Color(0xFF101A33)),
-      ),
-      child: child!,
-    ),
+    builder: (ctx, child) => Theme(data: theme, child: child!),
   );
   if (picked == null) return null;
   final h = picked.hour.toString().padLeft(2, '0');
@@ -81,6 +64,12 @@ Future<bool> showPostMuteOverlay(
   required String postId,
   required String kindLabel,
 }) async {
+  final theme = Theme.of(context);
+  final tokens =
+      theme.extension<AppSemanticColors>() ??
+      (theme.brightness == Brightness.dark
+          ? AppSemanticColors.dark
+          : AppSemanticColors.light);
   String selected = '5m';
   String customDate = '';
   String customTime = '';
@@ -95,7 +84,7 @@ Future<bool> showPostMuteOverlay(
       return StatefulBuilder(
         builder: (ctx, setModalState) {
           return Dialog(
-            backgroundColor: const Color(0xFF0E1730),
+            backgroundColor: tokens.panel,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
             ),
@@ -113,17 +102,17 @@ Future<bool> showPostMuteOverlay(
                           children: [
                             Text(
                               'Mute this $kindLabel',
-                              style: const TextStyle(
-                                color: Color(0xFFE8ECF8),
+                              style: TextStyle(
+                                color: tokens.text,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
                             const SizedBox(height: 6),
-                            const Text(
+                            Text(
                               'Choose how long to pause notifications.',
                               style: TextStyle(
-                                color: Color(0xFF9BAECF),
+                                color: tokens.textMuted,
                                 fontSize: 14,
                               ),
                             ),
@@ -134,10 +123,7 @@ Future<bool> showPostMuteOverlay(
                         onPressed: saving
                             ? null
                             : () => Navigator.of(dialogCtx).pop(),
-                        icon: const Icon(
-                          Icons.close_rounded,
-                          color: Color(0xFFD0D8EE),
-                        ),
+                        icon: Icon(Icons.close_rounded, color: tokens.text),
                       ),
                     ],
                   ),
@@ -169,11 +155,11 @@ Future<bool> showPostMuteOverlay(
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: active
-                                    ? const Color(0xFF5E86C2)
-                                    : const Color(0xFF233B63),
+                                    ? tokens.primary
+                                    : tokens.panelBorder,
                               ),
                               color: active
-                                  ? const Color(0xFF1B3558)
+                                  ? tokens.primary.withValues(alpha: 0.2)
                                   : Colors.transparent,
                             ),
                             child: Text(
@@ -181,9 +167,7 @@ Future<bool> showPostMuteOverlay(
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: active
-                                    ? const Color(0xFFE8ECF8)
-                                    : const Color(0xFF9BAECF),
+                                color: active ? tokens.text : tokens.textMuted,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13,
                               ),
@@ -296,8 +280,8 @@ Future<bool> showPostMuteOverlay(
                     const SizedBox(height: 10),
                     Text(
                       error!,
-                      style: const TextStyle(
-                        color: Color(0xFFF87171),
+                      style: TextStyle(
+                        color: theme.colorScheme.error,
                         fontSize: 13,
                       ),
                     ),

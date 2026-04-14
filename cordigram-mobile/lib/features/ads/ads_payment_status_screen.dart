@@ -2,8 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import 'ads_service.dart';
+
+AppSemanticColors _appTokens(BuildContext context) {
+  final theme = Theme.of(context);
+  return theme.extension<AppSemanticColors>() ??
+      (theme.brightness == Brightness.dark
+          ? AppSemanticColors.dark
+          : AppSemanticColors.light);
+}
 
 class AdsPaymentStatusScreen extends StatefulWidget {
   const AdsPaymentStatusScreen({
@@ -172,22 +181,24 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0B1020);
-    const card = Color(0xFF111827);
-    const textPrimary = Color(0xFFE8ECF8);
-    const textSecondary = Color(0xFF7A8BB0);
-    const accent = Color(0xFF4AA3E4);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens = _appTokens(context);
+    final card = tokens.panelMuted;
+    final textPrimary = tokens.text;
+    final textSecondary = tokens.textMuted;
+    final accent = tokens.primary;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: scheme.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: textPrimary),
-        title: const Text(
+        iconTheme: IconThemeData(color: scheme.onSurface),
+        title: Text(
           'Payment status',
-          style: TextStyle(color: textPrimary),
+          style: TextStyle(color: scheme.onSurface),
         ),
       ),
       body: SafeArea(
@@ -198,7 +209,7 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
             decoration: BoxDecoration(
               color: card,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFF1E2D48)),
+              border: Border.all(color: tokens.panelBorder),
             ),
             padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
             child: Column(
@@ -217,7 +228,7 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
                           ? const Color(0xFF55D49C)
                           : _uiState == _PaymentUiState.failed ||
                                 _uiState == _PaymentUiState.timedOut
-                          ? const Color(0xFFFF7A7A)
+                          ? scheme.error
                           : accent,
                     ),
                     const SizedBox(width: 10),
@@ -229,7 +240,7 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
                           : _uiState == _PaymentUiState.timedOut
                           ? 'Verification timed out'
                           : 'Checkout returned',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: textPrimary,
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -244,11 +255,11 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
                       : _uiState == _PaymentUiState.timedOut
                       ? 'No success signal was detected within 15 minutes. Returning to Ads...'
                       : 'We are verifying your Stripe payment. This can take a few seconds.',
-                  style: const TextStyle(color: textSecondary, fontSize: 13),
+                  style: TextStyle(color: textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 16),
                 if (_uiState == _PaymentUiState.verifying)
-                  const Center(
+                  Center(
                     child: Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: CircularProgressIndicator(
@@ -263,17 +274,14 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
                     child: Text(
                       'Auto-cancel in: ${_formatRemaining(_remainingSeconds)}',
                       style: const TextStyle(
-                        color: Color(0xFFFFCA7A),
+                        color: Color(0xFFF4B35E),
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 if (_error != null)
-                  Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.redAccent),
-                  ),
+                  Text(_error!, style: TextStyle(color: scheme.error)),
                 if (_status != null) ...[
                   _DetailRow(label: 'Session ID', value: _status!.id),
                   _DetailRow(
@@ -297,7 +305,7 @@ class _AdsPaymentStatusScreenState extends State<AdsPaymentStatusScreen> {
                           ).pop(_uiState == _PaymentUiState.success),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: accent,
-                      foregroundColor: const Color(0xFF06162B),
+                      foregroundColor: scheme.onPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),

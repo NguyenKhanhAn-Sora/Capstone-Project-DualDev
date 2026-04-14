@@ -391,10 +391,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     if (_initialLoading && _loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF4AA3E4)),
-      );
+      return Center(child: CircularProgressIndicator(color: scheme.primary));
     }
 
     if (_error != null && _items.isEmpty) {
@@ -405,8 +404,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
 
     return RefreshIndicator(
-      color: const Color(0xFF4AA3E4),
-      backgroundColor: const Color(0xFF131929),
+      color: scheme.primary,
+      backgroundColor: scheme.surface,
       onRefresh: () => _loadPage(refresh: true),
       child: CustomScrollView(
         controller: _scrollController,
@@ -419,15 +418,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.grid_view_rounded,
                       size: 40,
-                      color: Color(0xFF7A8BB0),
+                      color: scheme.onSurfaceVariant,
                     ),
                     const SizedBox(height: 10),
-                    const Text(
+                    Text(
                       'No explore posts yet',
-                      style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 15),
+                      style: TextStyle(color: scheme.onSurface, fontSize: 15),
                     ),
                     const SizedBox(height: 6),
                     TextButton(

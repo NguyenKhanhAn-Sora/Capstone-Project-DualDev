@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../post/post_detail_screen.dart';
 import '../profile/profile_screen.dart';
@@ -47,6 +48,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
     'report',
     'system_notice',
   };
+
+  AppSemanticColors get _tokens {
+    final theme = Theme.of(context);
+    return theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+  }
 
   @override
   void initState() {
@@ -390,6 +399,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Widget _buildTab({required _NotificationTab tab, required String label}) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final active = _activeTab == tab;
     return GestureDetector(
       onTap: () => setState(() => _activeTab = tab),
@@ -398,14 +410,22 @@ class _NotificationScreenState extends State<NotificationScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: active ? const Color(0xFF5E86C2) : const Color(0xFF2A3A5C),
+            color: active
+                ? scheme.primary.withValues(alpha: isDark ? 0.62 : 0.4)
+                : scheme.outline,
           ),
-          color: active ? const Color(0xFF173154) : Colors.transparent,
+          color: active
+              ? (isDark
+                    ? scheme.primary.withValues(alpha: 0.24)
+                    : scheme.primaryContainer)
+              : Colors.transparent,
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: active ? const Color(0xFFE8ECF8) : const Color(0xFF9BAECF),
+            color: active
+                ? (isDark ? _tokens.primarySoft : scheme.onPrimaryContainer)
+                : scheme.onSurfaceVariant,
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
@@ -416,12 +436,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   void _showSnack(String message, {bool error = false}) {
     if (!mounted) return;
+    final scheme = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: error
-            ? const Color(0xFFB91C1C)
-            : const Color(0xFF1A2235),
+        backgroundColor: error ? scheme.error : scheme.surfaceContainerHighest,
       ),
     );
   }
@@ -466,6 +485,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Future<String?> _pickCustomTime(String current) async {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final now = DateTime.now();
     DateTime seed;
     if (current.isNotEmpty) {
@@ -484,7 +505,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     DateTime draft = seed;
     final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: scheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -499,7 +520,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 height: 4,
                 margin: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -512,10 +533,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       child: const Text('Cancel'),
                     ),
                     const Spacer(),
-                    const Text(
+                    Text(
                       'Select time',
                       style: TextStyle(
-                        color: Color(0xFFE8ECF8),
+                        color: scheme.onSurface,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -527,10 +548,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   ],
                 ),
               ),
-              const Divider(height: 1, color: Color(0xFF1E2D48)),
+              Divider(height: 1, color: scheme.outline.withValues(alpha: 0.8)),
               Expanded(
                 child: CupertinoTheme(
-                  data: const CupertinoThemeData(brightness: Brightness.dark),
+                  data: CupertinoThemeData(brightness: theme.brightness),
                   child: CupertinoDatePicker(
                     mode: CupertinoDatePickerMode.time,
                     use24hFormat: true,
@@ -612,6 +633,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
   Future<void> _openMuteOverlay(AppNotificationItem item) async {
     if (item.postId == null) return;
 
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens = _tokens;
+    final isDark = theme.brightness == Brightness.dark;
+
     const options = <Map<String, dynamic>>[
       {'key': '5m', 'label': '5 minutes', 'ms': 5 * 60 * 1000},
       {'key': '10m', 'label': '10 minutes', 'ms': 10 * 60 * 1000},
@@ -636,9 +662,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
             return Dialog(
-              backgroundColor: const Color(0xFF0E1730),
+              backgroundColor: scheme.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
+                side: BorderSide(color: scheme.outline.withValues(alpha: 0.7)),
               ),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -648,23 +675,23 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   children: [
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'Mute notifications',
                                 style: TextStyle(
-                                  color: Color(0xFFE8ECF8),
+                                  color: scheme.onSurface,
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
-                              SizedBox(height: 6),
+                              const SizedBox(height: 6),
                               Text(
                                 'Choose how long to pause alerts for this post.',
                                 style: TextStyle(
-                                  color: Color(0xFF9BAECF),
+                                  color: scheme.onSurfaceVariant,
                                   fontSize: 14,
                                 ),
                               ),
@@ -675,9 +702,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           onPressed: saving
                               ? null
                               : () => Navigator.of(dialogCtx).pop(),
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.close_rounded,
-                            color: Color(0xFFD0D8EE),
+                            color: scheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -709,11 +736,17 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: active
-                                      ? const Color(0xFF5E86C2)
-                                      : const Color(0xFF233B63),
+                                      ? scheme.primary.withValues(
+                                          alpha: isDark ? 0.6 : 0.4,
+                                        )
+                                      : scheme.outline,
                                 ),
                                 color: active
-                                    ? const Color(0xFF1B3558)
+                                    ? (isDark
+                                          ? scheme.primary.withValues(
+                                              alpha: 0.25,
+                                            )
+                                          : scheme.primaryContainer)
                                     : Colors.transparent,
                               ),
                               child: Text(
@@ -722,8 +755,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: active
-                                      ? const Color(0xFFE8ECF8)
-                                      : const Color(0xFF9BAECF),
+                                      ? (isDark
+                                            ? tokens.primarySoft
+                                            : scheme.onPrimaryContainer)
+                                      : scheme.onSurfaceVariant,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13,
                                 ),
@@ -837,10 +872,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       const SizedBox(height: 10),
                       Text(
                         error!,
-                        style: const TextStyle(
-                          color: Color(0xFFF87171),
-                          fontSize: 13,
-                        ),
+                        style: TextStyle(color: scheme.error, fontSize: 13),
                       ),
                     ],
                     const SizedBox(height: 14),
@@ -962,9 +994,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Future<void> _openItemMenu(AppNotificationItem item) async {
+    final scheme = Theme.of(context).colorScheme;
     final action = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: const Color(0xFF101D35),
+      backgroundColor: scheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
@@ -979,7 +1012,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.22),
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -989,34 +1022,31 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 item.isUnread
                     ? Icons.mark_email_read_outlined
                     : Icons.mark_email_unread_outlined,
-                color: const Color(0xFF9BAECF),
+                color: scheme.onSurfaceVariant,
               ),
               title: Text(
                 item.isUnread ? 'Mark as read' : 'Mark as unread',
-                style: const TextStyle(color: Color(0xFFD0D8EE)),
+                style: TextStyle(color: scheme.onSurface),
               ),
               onTap: () => Navigator.pop(context, 'toggle-read'),
             ),
             if (_canMuteItem(item))
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.notifications_off_outlined,
-                  color: Color(0xFF9BAECF),
+                  color: scheme.onSurfaceVariant,
                 ),
                 title: Text(
                   item.postKind == 'reel' ? 'Mute this reel' : 'Mute this post',
-                  style: const TextStyle(color: Color(0xFFD0D8EE)),
+                  style: TextStyle(color: scheme.onSurface),
                 ),
                 onTap: () => Navigator.pop(context, 'mute'),
               ),
             ListTile(
-              leading: const Icon(
-                Icons.delete_outline_rounded,
-                color: Color(0xFFF87171),
-              ),
-              title: const Text(
+              leading: Icon(Icons.delete_outline_rounded, color: scheme.error),
+              title: Text(
                 'Delete notification',
-                style: TextStyle(color: Color(0xFFF87171)),
+                style: TextStyle(color: scheme.error),
               ),
               onTap: () => Navigator.pop(context, 'delete'),
             ),
@@ -1042,21 +1072,28 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final refreshIconColor = theme.brightness == Brightness.dark
+        ? scheme.onSurfaceVariant
+        : scheme.primary;
+    final tokens = _tokens;
+    final isDark = theme.brightness == Brightness.dark;
     final items = _filtered;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1020),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D1526),
+        backgroundColor: scheme.surface,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Color(0xFFE8ECF8)),
-        title: const Column(
+        iconTheme: IconThemeData(color: scheme.onSurface),
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Notifications',
               style: TextStyle(
-                color: Color(0xFFE8ECF8),
+                color: scheme.onSurface,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
@@ -1066,7 +1103,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         actions: [
           IconButton(
             onPressed: _load,
-            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF9BAECF)),
+            icon: Icon(Icons.refresh_rounded, color: refreshIconColor),
           ),
         ],
       ),
@@ -1089,8 +1126,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
           Expanded(
             child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF4AA3E4)),
+                ? Center(
+                    child: CircularProgressIndicator(color: scheme.primary),
                   )
                 : _error != null
                 ? Center(
@@ -1099,40 +1136,37 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       child: Text(
                         _error!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFFF87171),
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: scheme.error, fontSize: 14),
                       ),
                     ),
                   )
                 : items.isEmpty
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.notifications_none_rounded,
-                            color: Color(0xFF7A8BB0),
+                            color: scheme.onSurfaceVariant,
                             size: 54,
                           ),
-                          SizedBox(height: 12),
+                          const SizedBox(height: 12),
                           Text(
                             'Nothing here yet',
                             style: TextStyle(
-                              color: Color(0xFFE8ECF8),
+                              color: scheme.onSurface,
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          SizedBox(height: 6),
+                          const SizedBox(height: 6),
                           Text(
                             'When you get notifications, they will appear here.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Color(0xFF7A8BB0),
+                              color: scheme.onSurfaceVariant,
                               fontSize: 13,
                             ),
                           ),
@@ -1142,7 +1176,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   )
                 : RefreshIndicator(
                     onRefresh: _load,
-                    color: const Color(0xFF4AA3E4),
+                    color: scheme.primary,
                     child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(12, 6, 12, 18),
                       itemCount: items.length,
@@ -1150,8 +1184,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       itemBuilder: (_, i) {
                         final item = items[i];
                         final baseColor = item.isUnread
-                            ? const Color(0xFF142847)
-                            : const Color(0xFF111827);
+                            ? (isDark
+                                  ? const Color(0xFF142847)
+                                  : scheme.primary.withValues(alpha: 0.1))
+                            : (isDark ? tokens.panel : scheme.surface);
                         final isPressed = _pressedItemId == item.id;
 
                         return GestureDetector(
@@ -1189,8 +1225,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
                                 color: item.isUnread
-                                    ? const Color(0xFF2E5384)
-                                    : const Color(0xFF1E2D48),
+                                    ? scheme.primary.withValues(
+                                        alpha: isDark ? 0.65 : 0.4,
+                                      )
+                                    : scheme.outline,
                               ),
                             ),
                             child: Row(
@@ -1198,7 +1236,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
                               children: [
                                 CircleAvatar(
                                   radius: 22,
-                                  backgroundColor: const Color(0xFF233050),
+                                  backgroundColor:
+                                      scheme.surfaceContainerHighest,
                                   backgroundImage:
                                       item.actor.avatarUrl.isNotEmpty
                                       ? NetworkImage(item.actor.avatarUrl)
@@ -1206,7 +1245,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                   child: item.actor.avatarUrl.isEmpty
                                       ? Icon(
                                           _iconFor(item.type),
-                                          color: const Color(0xFF9BAECF),
+                                          color: scheme.onSurfaceVariant,
                                           size: 20,
                                         )
                                       : null,
@@ -1220,7 +1259,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                       Text(
                                         _message(item),
                                         style: TextStyle(
-                                          color: const Color(0xFFD0D8EE),
+                                          color: scheme.onSurface,
                                           fontSize: 13.5,
                                           fontWeight: item.isUnread
                                               ? FontWeight.w700
@@ -1230,8 +1269,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                       const SizedBox(height: 6),
                                       Text(
                                         _relativeTime(item.activityAt),
-                                        style: const TextStyle(
-                                          color: Color(0xFF7A8BB0),
+                                        style: TextStyle(
+                                          color: scheme.onSurfaceVariant,
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -1248,8 +1287,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                           child: Container(
                                             width: 10,
                                             height: 10,
-                                            decoration: const BoxDecoration(
-                                              color: Color(0xFF4AA3E4),
+                                            decoration: BoxDecoration(
+                                              color: scheme.primary,
                                               shape: BoxShape.circle,
                                             ),
                                           ),

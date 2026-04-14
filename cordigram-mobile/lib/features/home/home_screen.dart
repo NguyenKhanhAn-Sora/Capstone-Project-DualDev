@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
+import '../../core/services/theme_controller.dart';
 import '../ads/ads_campaign_detail_screen.dart';
 import '../ads/ads_entry_screen.dart';
 import '../ads/ads_service.dart';
@@ -10,12 +11,12 @@ import '../auth/login_screen.dart';
 import '../explore/explore_screen.dart';
 import '../following/following_screen.dart';
 import '../hashtag/hashtag_screen.dart';
-import '../notifications/models/app_notification_item.dart';
 import '../notifications/services/notification_realtime_service.dart';
 import '../notifications/notification_screen.dart';
 import '../post/create_tab_screen.dart';
 import '../post/post_detail_screen.dart';
 import '../post/utils/post_edit_utils.dart';
+import '../post/utils/post_confirm_dialogs.dart';
 import '../post/utils/likes_list_sheet.dart';
 import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
@@ -137,6 +138,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _showTopNav();
     _scrollTriggerAccumulated = 0;
     _scrollTriggerDirection = 0;
+  }
+
+  Future<void> _goHomeOrScrollTop() async {
+    _showTopNav();
+    _scrollTriggerAccumulated = 0;
+    _scrollTriggerDirection = 0;
+
+    if (_tabController.index != 0) {
+      _tabController.animateTo(0);
+      return;
+    }
+
+    if (!_scrollController.hasClients) return;
+    final offset = _scrollController.position.pixels;
+    if (offset <= 0) return;
+
+    await _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _onTopTabTap(int index) {
+    if (index == 0) {
+      unawaited(_goHomeOrScrollTop());
+    }
   }
 
   void _showTopNav() {
@@ -912,41 +940,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _showSnack('Link copied');
         return;
       case PostMenuAction.deletePost:
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF111827),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            title: const Text(
-              'Delete post',
-              style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-            ),
-            content: const Text(
-              'This action cannot be undone.',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Color(0xFF7A8BB0)),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        final confirmed = await showPostConfirmDialog(
+          context,
+          title: 'Delete post',
+          message: 'This action cannot be undone.',
+          confirmLabel: 'Delete',
+          danger: true,
         );
         if (confirmed != true) return;
 
@@ -992,41 +991,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (userId == null || userId.isEmpty) return;
         final username =
             post.authorUsername ?? post.author?.username ?? post.displayName;
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF111827),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            title: Text(
-              'Block @$username?',
-              style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
-            ),
-            content: const Text(
-              'You will no longer see posts from this account.',
-              style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Color(0xFF7A8BB0)),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Block',
-                  style: TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        final confirmed = await showPostConfirmDialog(
+          context,
+          title: 'Block @$username?',
+          message: 'You will no longer see posts from this account.',
+          confirmLabel: 'Block',
+          danger: true,
         );
         if (confirmed != true) return;
 
@@ -1190,7 +1160,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return WillPopScope(
           onWillPop: _onWillPop,
           child: Scaffold(
-            backgroundColor: const Color(0xFF0B1020),
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             appBar: navFullyHidden
                 ? null
                 : PreferredSize(
@@ -1221,13 +1191,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ── Profile menu ──────────────────────────────────────────────────────────
 
   void _showProfileMenu() {
+    final scheme = Theme.of(context).colorScheme;
     final letter = (_displayName ?? _username ?? 'U')
         .trim()
         .substring(0, 1)
         .toUpperCase();
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF141D30),
+      backgroundColor: scheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1256,6 +1227,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             context,
           ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
         },
+        onSaved: () {
+          Navigator.pop(ctx);
+          if (_viewerId != null) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) =>
+                    ProfileScreen(userId: _viewerId!, initialTabKey: 'saved'),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Unable to open saved items right now'),
+              ),
+            );
+          }
+        },
+        onToggleTheme: () {
+          Navigator.pop(ctx);
+          ThemeController.instance.toggle();
+        },
         onReportProblem: () {
           Navigator.pop(ctx);
           Navigator.of(context).push(
@@ -1275,44 +1267,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ── Build ─────────────────────────────────────────────────────────────────
 
   PreferredSizeWidget _buildAppBar() {
+    final scheme = Theme.of(context).colorScheme;
     final letter = (_displayName ?? _username ?? 'U')
         .trim()
         .substring(0, 1)
         .toUpperCase();
 
     return AppBar(
-      backgroundColor: const Color(0xFF0D1526),
+      backgroundColor: scheme.surface,
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
       centerTitle: false,
       titleSpacing: 14,
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Image(
-            image: AssetImage('assets/images/cordigram-logo.png'),
-            width: 32,
-            height: 32,
-          ),
-          SizedBox(width: 8),
-          Text(
-            'CORDIGRAM',
-            style: TextStyle(
-              color: Color(0xFFE8ECF8),
-              fontWeight: FontWeight.w800,
-              fontSize: 17,
-              letterSpacing: 1.2,
+      title: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => unawaited(_goHomeOrScrollTop()),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Image(
+              image: AssetImage('assets/images/cordigram-logo.png'),
+              width: 32,
+              height: 32,
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Text(
+              'CORDIGRAM',
+              style: TextStyle(
+                color: scheme.onSurface,
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
       ),
       actions: [
         // Search
         IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.search_rounded,
-            color: Color(0xFF9BAECF),
+            color: scheme.onSurfaceVariant,
             size: 27,
           ),
           tooltip: 'Search',
@@ -1347,7 +1344,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ? CircleAvatar(
                     radius: 16,
                     backgroundImage: NetworkImage(_avatarUrl!),
-                    backgroundColor: const Color(0xFF233050),
+                    backgroundColor: scheme.surfaceContainerHighest,
                   )
                 : CircleAvatar(
                     radius: 16,
@@ -1368,12 +1365,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(44),
         child: ColoredBox(
-          color: const Color(0xFF0D1526),
+          color: scheme.surface,
           child: TabBar(
             controller: _tabController,
+            onTap: _onTopTabTap,
             isScrollable: false,
-            labelColor: const Color(0xFFE8ECF8),
-            unselectedLabelColor: const Color(0xFF5A6B8A),
+            labelColor: scheme.onSurface,
+            unselectedLabelColor: scheme.onSurfaceVariant,
             labelStyle: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
@@ -1383,9 +1381,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               fontWeight: FontWeight.w400,
             ),
             labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-            indicatorColor: const Color(0xFF4AA3E4),
+            indicatorColor: scheme.primary,
             indicatorWeight: 2.5,
-            dividerColor: Color.fromRGBO(255, 255, 255, 0.07),
+            dividerColor: scheme.outline.withValues(alpha: 0.4),
             tabs: const [
               Tab(icon: Icon(Icons.home_rounded, size: 26)),
               Tab(icon: Icon(Icons.how_to_reg_outlined, size: 26)),
@@ -1540,13 +1538,14 @@ class _NavBadgeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return IconButton(
       tooltip: tooltip,
       onPressed: onTap,
       icon: Stack(
         clipBehavior: Clip.none,
         children: [
-          Icon(icon, color: const Color(0xFF9BAECF), size: iconSize),
+          Icon(icon, color: scheme.onSurfaceVariant, size: iconSize),
           if (count > 0)
             Positioned(
               top: -4,
@@ -1584,6 +1583,8 @@ class _ProfileMenuSheet extends StatelessWidget {
     required this.onLogout,
     required this.onReportProblem,
     required this.onProfile,
+    required this.onSaved,
+    required this.onToggleTheme,
     required this.onSettings,
     required this.onAds,
     this.avatarUrl,
@@ -1597,11 +1598,15 @@ class _ProfileMenuSheet extends StatelessWidget {
   final VoidCallback onLogout;
   final VoidCallback onReportProblem;
   final VoidCallback onProfile;
+  final VoidCallback onSaved;
+  final VoidCallback onToggleTheme;
   final VoidCallback onSettings;
   final VoidCallback onAds;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1612,7 +1617,7 @@ class _ProfileMenuSheet extends StatelessWidget {
             height: 4,
             margin: const EdgeInsets.only(top: 10, bottom: 16),
             decoration: BoxDecoration(
-              color: Color.fromRGBO(255, 255, 255, 0.18),
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -1625,15 +1630,15 @@ class _ProfileMenuSheet extends StatelessWidget {
                     ? CircleAvatar(
                         radius: 24,
                         backgroundImage: NetworkImage(avatarUrl!),
-                        backgroundColor: const Color(0xFF233050),
+                        backgroundColor: scheme.surfaceContainerHighest,
                       )
                     : CircleAvatar(
                         radius: 24,
-                        backgroundColor: const Color(0xFF3470A2),
+                        backgroundColor: scheme.primary,
                         child: Text(
                           avatarLetter,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: scheme.onPrimary,
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1646,8 +1651,8 @@ class _ProfileMenuSheet extends StatelessWidget {
                     if (displayName != null)
                       Text(
                         displayName!,
-                        style: const TextStyle(
-                          color: Color(0xFFE8ECF8),
+                        style: TextStyle(
+                          color: scheme.onSurface,
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1655,8 +1660,8 @@ class _ProfileMenuSheet extends StatelessWidget {
                     if (username != null)
                       Text(
                         username!,
-                        style: const TextStyle(
-                          color: Color(0xFF7A8BB0),
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant,
                           fontSize: 13,
                         ),
                       ),
@@ -1665,7 +1670,7 @@ class _ProfileMenuSheet extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(color: Color(0xFF1E2D48), height: 1),
+          Divider(color: scheme.outline, height: 1),
           _SheetItem(
             icon: Icons.person_outline_rounded,
             label: 'Profile',
@@ -1679,10 +1684,18 @@ class _ProfileMenuSheet extends StatelessWidget {
           _SheetItem(
             icon: Icons.bookmark_border_rounded,
             label: 'Saved',
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Saved coming soon')),
+            onTap: onSaved,
+          ),
+          AnimatedBuilder(
+            animation: ThemeController.instance,
+            builder: (_, __) {
+              final isDark = ThemeController.instance.isDarkMode;
+              return _SheetItem(
+                icon: isDark
+                    ? Icons.light_mode_outlined
+                    : Icons.dark_mode_outlined,
+                label: isDark ? 'Switch to light mode' : 'Switch to dark mode',
+                onTap: onToggleTheme,
               );
             },
           ),
@@ -2043,18 +2056,19 @@ class _SheetItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, color: iconColor ?? const Color(0xFF9BAECF), size: 22),
+            Icon(icon, color: iconColor ?? scheme.onSurfaceVariant, size: 22),
             const SizedBox(width: 16),
             Text(
               label,
               style: TextStyle(
-                color: labelColor ?? const Color(0xFFD0D8EE),
+                color: labelColor ?? scheme.onSurface,
                 fontSize: 15,
               ),
             ),

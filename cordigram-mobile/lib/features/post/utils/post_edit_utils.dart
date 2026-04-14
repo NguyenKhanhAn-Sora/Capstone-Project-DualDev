@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../core/config/app_theme.dart';
 
 import '../../home/models/feed_post.dart';
 import '../../home/services/post_interaction_service.dart';
@@ -52,7 +53,7 @@ Future<FeedPost?> showEditPostSheet(
   return showModalBottomSheet<FeedPost>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: const Color(0xFF10192C),
+    backgroundColor: Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
     ),
@@ -67,7 +68,7 @@ Future<String?> showEditVisibilitySheet(
 }) {
   return showModalBottomSheet<String>(
     context: context,
-    backgroundColor: const Color(0xFF10192C),
+    backgroundColor: Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
     ),
@@ -262,6 +263,12 @@ class _EditPostSheetState extends State<_EditPostSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final bottomPad =
         MediaQuery.of(context).viewInsets.bottom +
         MediaQuery.of(context).viewPadding.bottom;
@@ -278,7 +285,7 @@ class _EditPostSheetState extends State<_EditPostSheet> {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: tokens.textMuted.withValues(alpha: 0.28),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -286,8 +293,8 @@ class _EditPostSheetState extends State<_EditPostSheet> {
             const SizedBox(height: 14),
             Text(
               'Edit ${widget.entityLabel}',
-              style: const TextStyle(
-                color: Color(0xFFE8ECF8),
+              style: TextStyle(
+                color: tokens.text,
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
               ),
@@ -304,28 +311,28 @@ class _EditPostSheetState extends State<_EditPostSheet> {
               controller: _locationCtrl,
               label: 'Location (optional)',
               onChanged: _onLocationChanged,
-              prefixIcon: const Icon(
+              prefixIcon: Icon(
                 Icons.place_outlined,
-                color: Color(0xFF5A6B8A),
+                color: tokens.textMuted,
                 size: 20,
               ),
               suffixIcon: _locationLoading
-                  ? const Padding(
+                  ? Padding(
                       padding: EdgeInsets.all(12),
                       child: SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Color(0xFF4AA3E4),
+                          color: tokens.primary,
                         ),
                       ),
                     )
                   : _locationCtrl.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.close,
-                        color: Color(0xFF5A6B8A),
+                        color: tokens.textMuted,
                         size: 18,
                       ),
                       onPressed: () {
@@ -344,9 +351,9 @@ class _EditPostSheetState extends State<_EditPostSheet> {
               Container(
                 margin: const EdgeInsets.only(top: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A2540),
+                  color: tokens.panelMuted,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF2A3A5C)),
+                  border: Border.all(color: tokens.panelBorder),
                 ),
                 child: ListView.builder(
                   shrinkWrap: true,
@@ -363,10 +370,7 @@ class _EditPostSheetState extends State<_EditPostSheet> {
                         ),
                         child: Text(
                           s.label,
-                          style: const TextStyle(
-                            color: Color(0xFFD0D8EE),
-                            fontSize: 13,
-                          ),
+                          style: TextStyle(color: tokens.text, fontSize: 13),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -400,7 +404,7 @@ class _EditPostSheetState extends State<_EditPostSheet> {
               const SizedBox(height: 10),
               Text(
                 _error!,
-                style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13),
+                style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
               ),
             ],
             const SizedBox(height: 14),
@@ -409,23 +413,23 @@ class _EditPostSheetState extends State<_EditPostSheet> {
               child: ElevatedButton(
                 onPressed: _saving ? null : _submit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2B74B0),
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(
-                    0xFF2B74B0,
-                  ).withValues(alpha: 0.45),
+                  backgroundColor: tokens.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  disabledBackgroundColor: tokens.primary.withValues(
+                    alpha: 0.45,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 child: _saving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: theme.colorScheme.onPrimary,
                         ),
                       )
                     : const Text('Save changes'),
@@ -451,14 +455,17 @@ class _ToggleTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
-      title: Text(
-        title,
-        style: const TextStyle(color: Color(0xFFCDD5E0), fontSize: 14),
-      ),
+      title: Text(title, style: TextStyle(color: tokens.text, fontSize: 14)),
       value: value,
-      activeColor: const Color(0xFF4AA3E4),
+      activeColor: tokens.primary,
       onChanged: onChanged,
     );
   }
@@ -513,6 +520,12 @@ class _EditVisibilitySheetState extends State<_EditVisibilitySheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final bottomPad =
         MediaQuery.of(context).viewInsets.bottom +
         MediaQuery.of(context).viewPadding.bottom;
@@ -528,16 +541,16 @@ class _EditVisibilitySheetState extends State<_EditVisibilitySheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: tokens.textMuted.withValues(alpha: 0.28),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
+          Text(
             'Edit visibility',
             style: TextStyle(
-              color: Color(0xFFE8ECF8),
+              color: tokens.text,
               fontSize: 17,
               fontWeight: FontWeight.w700,
             ),
@@ -548,21 +561,21 @@ class _EditVisibilitySheetState extends State<_EditVisibilitySheet> {
               contentPadding: EdgeInsets.zero,
               value: option,
               groupValue: _selected,
-              activeColor: const Color(0xFF4AA3E4),
+              activeColor: tokens.primary,
               onChanged: (value) {
                 if (value == null) return;
                 setState(() => _selected = value);
               },
               title: Text(
                 option.label,
-                style: const TextStyle(color: Color(0xFFCDD5E0), fontSize: 14),
+                style: TextStyle(color: tokens.text, fontSize: 14),
               ),
             ),
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(
               _error!,
-              style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13),
+              style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
             ),
           ],
           const SizedBox(height: 10),
@@ -571,20 +584,20 @@ class _EditVisibilitySheetState extends State<_EditVisibilitySheet> {
             child: ElevatedButton(
               onPressed: _saving ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2B74B0),
-                foregroundColor: Colors.white,
+                backgroundColor: tokens.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
               child: _saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: theme.colorScheme.onPrimary,
                       ),
                     )
                   : const Text('Save visibility'),
@@ -617,17 +630,23 @@ class _Field extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return TextField(
       controller: controller,
       minLines: minLines,
       maxLines: maxLines,
       onChanged: onChanged,
-      style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 14),
+      style: TextStyle(color: tokens.text, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Color(0xFF7A8BB0)),
+        labelStyle: TextStyle(color: tokens.textMuted),
         filled: true,
-        fillColor: const Color(0xFF1A2235),
+        fillColor: tokens.panelMuted,
         prefixIcon: prefixIcon,
         suffixIcon: suffixIcon,
         border: OutlineInputBorder(

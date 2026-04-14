@@ -31,8 +31,9 @@ class _CreateTabScreenState extends State<CreateTabScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1020),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -54,13 +55,14 @@ class _CreateTabScreenState extends State<CreateTabScreen>
   }
 
   Widget _buildHeader() {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1526),
+        color: scheme.surface,
         border: Border(
           bottom: BorderSide(
-            color: Colors.white.withValues(alpha: 0.07),
+            color: scheme.outline.withValues(alpha: 0.4),
             width: 1,
           ),
         ),
@@ -76,8 +78,8 @@ class _CreateTabScreenState extends State<CreateTabScreen>
                   children: [
                     Text(
                       _tabCtrl.index == 0 ? 'Create post' : 'Create reel',
-                      style: const TextStyle(
-                        color: Color(0xFFE8ECF8),
+                      style: TextStyle(
+                        color: scheme.onSurface,
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                       ),
@@ -87,8 +89,8 @@ class _CreateTabScreenState extends State<CreateTabScreen>
                       _tabCtrl.index == 0
                           ? 'Share genuine moments'
                           : 'Share a short reel',
-                      style: const TextStyle(
-                        color: Color(0xFF7A8BB0),
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
                         fontSize: 13,
                       ),
                     ),
@@ -101,9 +103,9 @@ class _CreateTabScreenState extends State<CreateTabScreen>
           // Pill-style mode toggle
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF111827),
+              color: scheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF1E2D48)),
+              border: Border.all(color: scheme.outline),
             ),
             padding: const EdgeInsets.all(4),
             child: Row(
@@ -143,6 +145,9 @@ class _PillTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -151,9 +156,19 @@ class _PillTab extends StatelessWidget {
           curve: Curves.easeInOut,
           padding: const EdgeInsets.symmetric(vertical: 9),
           decoration: BoxDecoration(
-            color: active ? const Color(0xFF1A3254) : Colors.transparent,
+            color: active
+                ? (isDark
+                      ? scheme.primary.withValues(alpha: 0.26)
+                      : scheme.primaryContainer)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(9),
-            border: active ? Border.all(color: const Color(0xFF2A4A7A)) : null,
+            border: active
+                ? Border.all(
+                    color: scheme.primary.withValues(
+                      alpha: isDark ? 0.55 : 0.36,
+                    ),
+                  )
+                : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -162,8 +177,8 @@ class _PillTab extends StatelessWidget {
                 icon,
                 size: 15,
                 color: active
-                    ? const Color(0xFF4AA3E4)
-                    : const Color(0xFF5A6B8A),
+                    ? (isDark ? scheme.primary : scheme.onPrimaryContainer)
+                    : scheme.onSurfaceVariant,
               ),
               const SizedBox(width: 6),
               Text(
@@ -172,8 +187,8 @@ class _PillTab extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: active ? FontWeight.w700 : FontWeight.w400,
                   color: active
-                      ? const Color(0xFF4AA3E4)
-                      : const Color(0xFF5A6B8A),
+                      ? (isDark ? scheme.primary : scheme.onPrimaryContainer)
+                      : scheme.onSurfaceVariant,
                 ),
               ),
             ],

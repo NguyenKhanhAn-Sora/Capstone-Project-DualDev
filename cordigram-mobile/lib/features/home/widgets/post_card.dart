@@ -269,6 +269,7 @@ class _PostCardState extends State<PostCard> {
   }
 
   Future<void> _openMoreMenu(BuildContext triggerContext) async {
+    final scheme = Theme.of(context).colorScheme;
     final isOwner =
         widget.viewerId != null &&
         widget.state.post.authorId != null &&
@@ -358,12 +359,12 @@ class _PostCardState extends State<PostCard> {
 
     final selected = await showMenu<String>(
       context: context,
-      color: const Color(0xFF0E1730),
+      color: scheme.surface,
       surfaceTintColor: Colors.transparent,
       position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        side: BorderSide(color: scheme.outline.withValues(alpha: 0.4)),
       ),
       items: entries
           .map(
@@ -374,7 +375,7 @@ class _PostCardState extends State<PostCard> {
                 style: TextStyle(
                   color: item.danger
                       ? const Color(0xFFF87171)
-                      : const Color(0xFFE5E7EB),
+                      : scheme.onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
@@ -421,6 +422,8 @@ class _PostCardState extends State<PostCard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final state = widget.state;
     final post = state.post;
 
@@ -457,7 +460,7 @@ class _PostCardState extends State<PostCard> {
             ? EdgeInsets.zero
             : const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF131929),
+          color: scheme.surface,
           borderRadius: widget.fullWidth
               ? BorderRadius.zero
               : BorderRadius.circular(16),
@@ -466,7 +469,7 @@ class _PostCardState extends State<PostCard> {
               : Border.all(
                   color: isAdPost
                       ? const Color(0xFF0EA5E9).withValues(alpha: 0.35)
-                      : Colors.white.withValues(alpha: 0.06),
+                      : scheme.outline.withValues(alpha: 0.35),
                 ),
           boxShadow: widget.fullWidth
               ? null
@@ -605,6 +608,7 @@ class _PostHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final canOpenProfile =
         post.authorId != null &&
         post.authorId!.isNotEmpty &&
@@ -638,8 +642,8 @@ class _PostHeader extends StatelessWidget {
                         useUsername && post.username.isNotEmpty
                             ? post.username
                             : post.displayName,
-                        style: const TextStyle(
-                          color: Color(0xFFE8ECF8),
+                        style: TextStyle(
+                          color: scheme.onSurface,
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
                         ),
@@ -651,10 +655,10 @@ class _PostHeader extends StatelessWidget {
                       const _VerifiedBadge(),
                     ],
                     if (showInlineFollow) ...[
-                      const Text(
+                      Text(
                         ' · ',
                         style: TextStyle(
-                          color: Color(0xFF7A8BB0),
+                          color: scheme.onSurfaceVariant,
                           fontSize: 13,
                         ),
                       ),
@@ -664,8 +668,8 @@ class _PostHeader extends StatelessWidget {
                           isFollowing ? 'Following' : 'Follow',
                           style: TextStyle(
                             color: isFollowing
-                                ? const Color(0xFF7A8BB0)
-                                : const Color(0xFF4AA3E4),
+                                ? scheme.onSurfaceVariant
+                                : scheme.primary,
                             fontWeight: FontWeight.w600,
                             fontSize: 13,
                           ),
@@ -681,16 +685,16 @@ class _PostHeader extends StatelessWidget {
                       if (post.username.isNotEmpty) ...[
                         Text(
                           '${post.username} · ',
-                          style: const TextStyle(
-                            color: Color(0xFF7A8BB0),
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
                             fontSize: 12,
                           ),
                         ),
                       ],
-                      const Text(
+                      Text(
                         'Sponsored',
                         style: TextStyle(
-                          color: Color(0xFF4AA3E4),
+                          color: scheme.primary,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -700,8 +704,8 @@ class _PostHeader extends StatelessWidget {
                 else
                   Text(
                     _timeAgo(post.displayAt),
-                    style: const TextStyle(
-                      color: Color(0xFF7A8BB0),
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
                       fontSize: 12,
                     ),
                   ),
@@ -775,11 +779,12 @@ class _HeaderIconBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => onTap(context),
       child: Padding(
         padding: const EdgeInsets.all(4),
-        child: Icon(icon, color: const Color(0xFF7A8BB0), size: 18),
+        child: Icon(icon, color: scheme.onSurfaceVariant, size: 18),
       ),
     );
   }
@@ -895,10 +900,11 @@ class _PostContentState extends State<_PostContent> {
       url.replaceAll(RegExp(r'[),.;!?]+$'), '');
 
   List<InlineSpan> _buildSpans(String text) {
+    final scheme = Theme.of(context).colorScheme;
     for (final r in _recognizers) r.dispose();
     _recognizers.clear();
-    const baseStyle = TextStyle(
-      color: Color(0xFFE8ECF8),
+    final baseStyle = TextStyle(
+      color: scheme.onSurface,
       fontSize: 14,
       height: 1.55,
     );
@@ -1044,19 +1050,20 @@ class _RepostBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final repostAuthorId =
         post.repostOfAuthor?.id ?? post.repostOfAuthorId ?? '';
 
     return Row(
       children: [
-        const Icon(Icons.repeat_rounded, size: 15, color: Color(0xFF7A8BB0)),
+        Icon(Icons.repeat_rounded, size: 15, color: scheme.onSurfaceVariant),
         const SizedBox(width: 6),
         Flexible(
           child: Row(
             children: [
-              const Text(
+              Text(
                 'Reposted from ',
-                style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 13),
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
               ),
               Expanded(
                 child: GestureDetector(
@@ -1074,8 +1081,8 @@ class _RepostBanner extends StatelessWidget {
                     post.repostAuthorName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFFE8ECF8),
+                    style: TextStyle(
+                      color: scheme.onSurface,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1123,6 +1130,7 @@ class _LocationChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: _openMaps,
       child: Container(
@@ -1137,16 +1145,16 @@ class _LocationChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.location_on_rounded,
               size: 13,
-              color: Color(0xFF7A8BB0),
+              color: scheme.onSurfaceVariant,
             ),
             const SizedBox(width: 5),
             Flexible(
               child: Text(
                 location,
-                style: const TextStyle(color: Color(0xFFE8ECF8), fontSize: 13),
+                style: TextStyle(color: scheme.onSurface, fontSize: 13),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -1174,6 +1182,7 @@ class _AdCtaBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1193,8 +1202,8 @@ class _AdCtaBanner extends StatelessWidget {
                 if (creative.headline.isNotEmpty)
                   Text(
                     creative.headline,
-                    style: const TextStyle(
-                      color: Color(0xFFE8ECF8),
+                    style: TextStyle(
+                      color: scheme.onSurface,
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       height: 1.2,
@@ -1204,8 +1213,8 @@ class _AdCtaBanner extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     creative.description,
-                    style: const TextStyle(
-                      color: Color(0xFF7A8BB0),
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
                       fontSize: 13,
                       height: 1.4,
                     ),
@@ -1279,6 +1288,7 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final stats = state.stats;
     final isOwner =
         viewerId != null &&
@@ -1289,7 +1299,7 @@ class _StatsRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2235),
+        color: scheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -1309,11 +1319,11 @@ class _StatsRow extends StatelessWidget {
                         filled: state.liked,
                         color: state.liked
                             ? const Color(0xFF2b74b0)
-                            : const Color(0xFF7A8BB0),
+                            : scheme.onSurfaceVariant,
                       ),
                       iconColor: state.liked
                           ? const Color(0xFF2b74b0)
-                          : const Color(0xFF7A8BB0),
+                          : scheme.onSurfaceVariant,
                       value: _fmt(stats.hearts),
                     ),
                   ),
@@ -1321,7 +1331,7 @@ class _StatsRow extends StatelessWidget {
                 ],
                 _StatChip(
                   icon: Icons.chat_bubble_outline_rounded,
-                  iconColor: const Color(0xFF7A8BB0),
+                  iconColor: scheme.onSurfaceVariant,
                   value: _fmt(stats.comments),
                 ),
               ],
@@ -1332,14 +1342,14 @@ class _StatsRow extends StatelessWidget {
             children: [
               _StatChip(
                 icon: Icons.remove_red_eye_outlined,
-                iconColor: const Color(0xFF7A8BB0),
+                iconColor: scheme.onSurfaceVariant,
                 value: _fmt(stats.viewCount),
               ),
               if (!hideReposts) ...[
                 const SizedBox(width: 12),
                 _StatChip(
                   icon: Icons.repeat_rounded,
-                  iconColor: const Color(0xFF7A8BB0),
+                  iconColor: scheme.onSurfaceVariant,
                   value: _fmt(stats.reposts),
                 ),
               ],
@@ -1365,6 +1375,7 @@ class _StatChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1372,8 +1383,8 @@ class _StatChip extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           value,
-          style: const TextStyle(
-            color: Color(0xFF7A8BB0),
+          style: TextStyle(
+            color: scheme.onSurfaceVariant,
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -1418,6 +1429,7 @@ class _ActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final commentsLocked = state.post.allowComments == false;
 
     return Padding(
@@ -1431,12 +1443,12 @@ class _ActionBar extends StatelessWidget {
                 filled: state.liked,
                 color: state.liked
                     ? const Color(0xFF2b74b0)
-                    : const Color(0xFF7A8BB0),
+                    : scheme.onSurfaceVariant,
               ),
               label: 'Like',
               color: state.liked
                   ? const Color(0xFF2b74b0)
-                  : const Color(0xFF7A8BB0),
+                  : scheme.onSurfaceVariant,
               onTap: onLike,
               onLongPress: onLikeLongPress,
             ),
@@ -1447,7 +1459,7 @@ class _ActionBar extends StatelessWidget {
               label: commentsLocked ? 'Comments off' : 'Comment',
               color: commentsLocked
                   ? const Color(0xFF5A6786)
-                  : const Color(0xFF7A8BB0),
+                  : scheme.onSurfaceVariant,
               onTap: commentsLocked ? () {} : (onComment ?? () {}),
             ),
           ),
@@ -1455,7 +1467,7 @@ class _ActionBar extends StatelessWidget {
             child: _ActionButton(
               icon: Icons.repeat_rounded,
               label: 'Repost',
-              color: const Color(0xFF7A8BB0),
+              color: scheme.onSurfaceVariant,
               onTap:
                   onRepost ??
                   () {
@@ -1476,7 +1488,7 @@ class _ActionBar extends StatelessWidget {
               label: 'Save',
               color: state.saved
                   ? const Color(0xFF4AA3E4)
-                  : const Color(0xFF7A8BB0),
+                  : scheme.onSurfaceVariant,
               onTap: onSave,
             ),
           ),

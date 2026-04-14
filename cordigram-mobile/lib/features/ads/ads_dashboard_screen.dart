@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import 'ads_campaigns_screen.dart';
 import 'ads_campaign_detail_screen.dart';
 import 'ads_create_screen.dart';
 import 'ads_service.dart';
+
+AppSemanticColors _appTokens(BuildContext context) {
+  final theme = Theme.of(context);
+  return theme.extension<AppSemanticColors>() ??
+      (theme.brightness == Brightness.dark
+          ? AppSemanticColors.dark
+          : AppSemanticColors.light);
+}
 
 class AdsDashboardScreen extends StatefulWidget {
   const AdsDashboardScreen({super.key});
@@ -98,42 +107,49 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
   }
 
   Color _statusBg(String status) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     switch (status) {
       case 'active':
-        return const Color(0x1F10B981);
+        return isDark ? const Color(0x1F10B981) : const Color(0xFFE9F8F0);
       case 'hidden':
-        return const Color(0x3364758B);
+        return isDark ? const Color(0x3364758B) : const Color(0xFFF1F4F8);
       case 'paused':
-        return const Color(0x3394A3B8);
+        return isDark ? const Color(0x3394A3B8) : const Color(0xFFF1F4F8);
       case 'canceled':
-        return const Color(0x33DC2626);
+        return isDark ? const Color(0x33DC2626) : const Color(0xFFFDECED);
       default:
-        return const Color(0x33475569);
+        return isDark ? const Color(0x33475569) : const Color(0xFFEAF1FB);
     }
   }
 
   Color _statusFg(String status) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     switch (status) {
       case 'active':
-        return const Color(0xFF63E6B2);
+        return isDark ? const Color(0xFF63E6B2) : const Color(0xFF1E7A4D);
       case 'hidden':
-        return const Color(0xFFCBD5E1);
+        return isDark ? const Color(0xFFCBD5E1) : const Color(0xFF5F6B7A);
       case 'paused':
-        return const Color(0xFFCBD5E1);
+        return isDark ? const Color(0xFFCBD5E1) : const Color(0xFF5F6B7A);
       case 'canceled':
-        return const Color(0xFFFCA5A5);
+        return isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB4232D);
       default:
-        return const Color(0xFFB8C5DE);
+        return isDark ? const Color(0xFFB8C5DE) : const Color(0xFF245A95);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0B1020);
-    const card = Color(0xFF111827);
-    const textPrimary = Color(0xFFE8ECF8);
-    const textSecondary = Color(0xFF7A8BB0);
-    const accent = Color(0xFF4AA3E4);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tokens = _appTokens(context);
+    final refreshIconColor = theme.brightness == Brightness.dark
+        ? scheme.onSurface
+        : tokens.primary;
+    final card = tokens.panelMuted;
+    final textPrimary = tokens.text;
+    final textSecondary = tokens.textMuted;
+    final accent = tokens.primary;
 
     final dashboard = _dashboard;
     final hasAnyCampaign = (dashboard?.campaigns.length ?? 0) > 0;
@@ -175,20 +191,17 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
           });
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: scheme.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: textPrimary),
-        title: const Text(
-          'Ads Dashboard',
-          style: TextStyle(color: textPrimary),
-        ),
+        iconTheme: IconThemeData(color: scheme.onSurface),
+        title: Text('Ads Dashboard', style: TextStyle(color: scheme.onSurface)),
         actions: [
           IconButton(
             onPressed: _loading ? null : _loadDashboard,
-            icon: const Icon(Icons.refresh_rounded, color: textPrimary),
+            icon: Icon(Icons.refresh_rounded, color: refreshIconColor),
           ),
         ],
       ),
@@ -196,7 +209,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
           ? FloatingActionButton.extended(
               onPressed: _openCreate,
               backgroundColor: accent,
-              foregroundColor: const Color(0xFF041325),
+              foregroundColor: scheme.onPrimary,
               icon: const Icon(Icons.add_rounded),
               label: const Text(
                 'Create new ad',
@@ -206,7 +219,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
           : null,
       body: SafeArea(
         child: _loading
-            ? const Center(
+            ? Center(
                 child: CircularProgressIndicator(color: accent, strokeWidth: 2),
               )
             : RefreshIndicator(
@@ -223,7 +236,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                           padding: const EdgeInsets.only(bottom: 10),
                           child: Text(
                             _error!,
-                            style: const TextStyle(color: Colors.redAccent),
+                            style: TextStyle(color: scheme.error),
                           ),
                         ),
                       if (!hasAnyCampaign)
@@ -232,13 +245,13 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                           decoration: BoxDecoration(
                             color: card,
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0xFF1E2D48)),
+                            border: Border.all(color: tokens.panelBorder),
                           ),
                           padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Row(
+                              Row(
                                 children: [
                                   Icon(
                                     Icons.campaign_outlined,
@@ -257,7 +270,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                                 ],
                               ),
                               const SizedBox(height: 10),
-                              const Text(
+                              Text(
                                 'Start your first ad campaign with objective, budget package, targeting, and creative.',
                                 style: TextStyle(
                                   color: textSecondary,
@@ -285,7 +298,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                                   onPressed: _openCreate,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: accent,
-                                    foregroundColor: const Color(0xFF06162B),
+                                    foregroundColor: scheme.onPrimary,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -318,13 +331,13 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                           decoration: BoxDecoration(
                             color: card,
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0xFF1E2D48)),
+                            border: Border.all(color: tokens.panelBorder),
                           ),
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 '7-day impressions trend',
                                 style: TextStyle(
                                   color: textPrimary,
@@ -333,7 +346,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              const Text(
+                              Text(
                                 'Track ad delivery and CTA clicks over the last 7 days.',
                                 style: TextStyle(
                                   color: textSecondary,
@@ -377,7 +390,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                                           const SizedBox(height: 8),
                                           Text(
                                             dayLabel,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               color: textSecondary,
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
@@ -398,13 +411,13 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                           decoration: BoxDecoration(
                             color: card,
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0xFF1E2D48)),
+                            border: Border.all(color: tokens.panelBorder),
                           ),
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Active campaigns',
                                 style: TextStyle(
                                   color: textPrimary,
@@ -415,7 +428,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                               const SizedBox(height: 6),
                               Row(
                                 children: [
-                                  const Expanded(
+                                  Expanded(
                                     child: Text(
                                       'Quick view of your 5 latest active campaigns.',
                                       style: TextStyle(
@@ -453,7 +466,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                               ),
                               const SizedBox(height: 12),
                               if (activePreview.isEmpty)
-                                const Text(
+                                Text(
                                   'No active campaigns right now.',
                                   style: TextStyle(color: textSecondary),
                                 )
@@ -496,7 +509,7 @@ class _AdsDashboardScreenState extends State<AdsDashboardScreen> {
                                                   Expanded(
                                                     child: Text(
                                                       item.campaignName,
-                                                      style: const TextStyle(
+                                                      style: TextStyle(
                                                         color: textPrimary,
                                                         fontWeight:
                                                             FontWeight.w700,
@@ -648,11 +661,12 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
+        color: tokens.panelMuted,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF1E2D48)),
+        border: Border.all(color: tokens.panelBorder),
       ),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       child: Column(
@@ -660,8 +674,8 @@ class _MetricCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFF7A8BB0),
+            style: TextStyle(
+              color: tokens.textMuted,
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
@@ -671,8 +685,8 @@ class _MetricCard extends StatelessWidget {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFFE8ECF8),
+            style: TextStyle(
+              color: tokens.text,
               fontWeight: FontWeight.w800,
               fontSize: 17,
             ),
@@ -682,7 +696,7 @@ class _MetricCard extends StatelessWidget {
             hint,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 11.5),
+            style: TextStyle(color: tokens.textMuted, fontSize: 11.5),
           ),
         ],
       ),
@@ -698,6 +712,7 @@ class _ChecklistTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -707,20 +722,16 @@ class _ChecklistTile extends StatelessWidget {
             width: 30,
             height: 30,
             decoration: BoxDecoration(
-              color: const Color(0xFF182844),
+              color: tokens.panel,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: const Color(0xFF88BFF0), size: 17),
+            child: Icon(icon, color: tokens.primary, size: 17),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                color: Color(0xFFBCC8E0),
-                fontSize: 13,
-                height: 1.4,
-              ),
+              style: TextStyle(color: tokens.text, fontSize: 13, height: 1.4),
             ),
           ),
         ],
@@ -737,20 +748,18 @@ class _StatSmall extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _appTokens(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 11),
-        ),
+        Text(label, style: TextStyle(color: tokens.textMuted, fontSize: 11)),
         const SizedBox(height: 4),
         Text(
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Color(0xFFE8ECF8),
+          style: TextStyle(
+            color: tokens.text,
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),

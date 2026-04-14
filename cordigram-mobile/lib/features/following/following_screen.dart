@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../home/models/feed_post.dart';
@@ -492,10 +493,9 @@ class _FollowingScreenState extends State<FollowingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     if (_initialLoad && _loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF4AA3E4)),
-      );
+      return Center(child: CircularProgressIndicator(color: scheme.primary));
     }
 
     if (_error != null && _items.isEmpty) {
@@ -510,8 +510,8 @@ class _FollowingScreenState extends State<FollowingScreen> {
     }
 
     return RefreshIndicator(
-      color: const Color(0xFF4AA3E4),
-      backgroundColor: const Color(0xFF131929),
+      color: scheme.primary,
+      backgroundColor: scheme.surface,
       onRefresh: () => _loadFeed(refresh: true),
       child: ListView.builder(
         controller: _scrollController,
@@ -522,9 +522,7 @@ class _FollowingScreenState extends State<FollowingScreen> {
             if (!_loading) _loadFeed();
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(
-                child: CircularProgressIndicator(color: Color(0xFF4AA3E4)),
-              ),
+              child: Center(child: CircularProgressIndicator()),
             );
           }
 
@@ -581,6 +579,13 @@ class _ReelFeedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     final media = post.media.isNotEmpty ? post.media.first : null;
     if (media == null) return const SizedBox.shrink();
 
@@ -593,8 +598,22 @@ class _ReelFeedCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      decoration: BoxDecoration(
+        color: tokens.panel,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.35),
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x59000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
       child: Material(
-        color: const Color(0xFF0F172A),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
@@ -615,7 +634,7 @@ class _ReelFeedCard extends StatelessWidget {
                         previewUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) =>
-                            const ColoredBox(color: Color(0xFF1E293B)),
+                            ColoredBox(color: tokens.panelMuted),
                       ),
                       Align(
                         alignment: Alignment.topRight,
@@ -693,7 +712,7 @@ class _ReelFeedCard extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 16,
-                      backgroundColor: const Color(0xFF334155),
+                      backgroundColor: tokens.panelBorder,
                       backgroundImage: (post.authorAvatarUrl ?? '').isNotEmpty
                           ? NetworkImage(post.authorAvatarUrl!)
                           : null,
@@ -702,8 +721,8 @@ class _ReelFeedCard extends StatelessWidget {
                           : Text(
                               (displayName.isNotEmpty ? displayName[0] : 'U')
                                   .toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: tokens.text,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -717,8 +736,8 @@ class _ReelFeedCard extends StatelessWidget {
                             displayName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: tokens.text,
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
@@ -728,8 +747,8 @@ class _ReelFeedCard extends StatelessWidget {
                             subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF94A3B8),
+                            style: TextStyle(
+                              color: tokens.textMuted,
                               fontSize: 12,
                             ),
                           ),

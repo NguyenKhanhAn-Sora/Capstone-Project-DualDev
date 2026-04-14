@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/config/app_theme.dart';
 import '../../core/services/auth_storage.dart';
 import '../post/post_detail_screen.dart';
 import '../report/report_user_sheet.dart';
@@ -212,9 +213,14 @@ enum _BlockedViewKind { generic, blockedByYou, blockedByUser, unavailable }
 // ── Screen ───────────────────────────────────────────────────────────────────
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, required this.userId});
+  const ProfileScreen({
+    super.key,
+    required this.userId,
+    this.initialTabKey = 'posts',
+  });
 
   final String userId;
+  final String initialTabKey;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -274,21 +280,36 @@ class _ProfileScreenState extends State<ProfileScreen>
   final Map<String, Map<String, String?>> _repostOriginCache = {};
 
   late final String? _viewerId;
+  String? _pendingInitialTabKey;
 
-  static const Color _bg = Color(0xFF0B1020);
-  static const Color _surface = Color(0xFF111827);
-  static const Color _border = Color(0xFF1E2D48);
-  static const Color _textPrimary = Color(0xFFE8ECF8);
-  static const Color _textSecondary = Color(0xFF7A8BB0);
-  static const Color _accent = Color(0xFF4AA3E4);
-  static const Color _danger = Color(0xFFE53935);
+  AppSemanticColors get _tokens {
+    final theme = Theme.of(context);
+    return theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+  }
+
+  Color get _bg => Theme.of(context).scaffoldBackgroundColor;
+  Color get _surface => _tokens.panel;
+  Color get _border => _tokens.panelBorder;
+  Color get _textPrimary => _tokens.text;
+  Color get _textSecondary => _tokens.textMuted;
+  Color get _accent => _tokens.primary;
+  Color get _danger => Theme.of(context).colorScheme.error;
   static const String _defaultAvatar =
       'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _viewerTabKeys.length, vsync: this);
+    _pendingInitialTabKey = widget.initialTabKey;
+    final initialIndex = _viewerTabKeys.indexOf(_pendingInitialTabKey!);
+    _tabController = TabController(
+      length: _viewerTabKeys.length,
+      vsync: this,
+      initialIndex: initialIndex >= 0 ? initialIndex : 0,
+    );
     _tabController.addListener(_onTabChanged);
     _viewerId = _decodeViewerId();
     _loadProfile();
@@ -304,8 +325,20 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     _isOwnerProfile = isOwner;
     final newKeys = _visibleTabKeys;
-    final nextIndex = newKeys.indexOf(currentKey);
-    final initialIndex = nextIndex >= 0 ? nextIndex : 0;
+    int initialIndex = 0;
+    if (_pendingInitialTabKey != null) {
+      final requested = newKeys.indexOf(_pendingInitialTabKey!);
+      if (requested >= 0) {
+        initialIndex = requested;
+        _pendingInitialTabKey = null;
+      } else {
+        final nextIndex = newKeys.indexOf(currentKey);
+        initialIndex = nextIndex >= 0 ? nextIndex : 0;
+      }
+    } else {
+      final nextIndex = newKeys.indexOf(currentKey);
+      initialIndex = nextIndex >= 0 ? nextIndex : 0;
+    }
 
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
@@ -1013,7 +1046,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
               ),
             ),
-            const Text(
+            Text(
               'About',
               style: TextStyle(
                 color: _textPrimary,
@@ -1105,11 +1138,15 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     try {
-      return Scaffold(backgroundColor: _bg, body: _buildBody());
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: _buildBody(),
+      );
     } catch (e) {
       return Scaffold(
-        backgroundColor: _bg,
+        backgroundColor: theme.scaffoldBackgroundColor,
         body: _SpecialStateView(
           icon: Icons.error_outline_rounded,
           iconColor: _danger,
@@ -1277,11 +1314,13 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ── Sliver app bar with cover ─────────────────────────────────────────────
 
   Widget _buildSliverAppBar(ProfileDetail p, bool isOwner) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final hasCover = p.coverUrl != null && p.coverUrl!.isNotEmpty;
     return SliverAppBar(
       expandedHeight: hasCover ? 180 : 60,
       pinned: true,
-      backgroundColor: const Color(0xFF0D1526),
+      backgroundColor: scheme.surface,
       surfaceTintColor: Colors.transparent,
       flexibleSpace: hasCover
           ? FlexibleSpaceBar(
@@ -1292,14 +1331,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                     p.coverUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) =>
-                        const ColoredBox(color: Color(0xFF0D1526)),
+                        ColoredBox(color: scheme.surface),
                   ),
                   Container(
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0xCC0B1020)],
+                        colors: [
+                          Colors.transparent,
+                          scheme.surface.withValues(alpha: 0.82),
+                        ],
                       ),
                     ),
                   ),
@@ -1308,16 +1350,16 @@ class _ProfileScreenState extends State<ProfileScreen>
             )
           : null,
       leading: IconButton(
-        icon: const Icon(
+        icon: Icon(
           Icons.arrow_back_ios_new_rounded,
-          color: Color(0xFF9BAECF),
+          color: scheme.onSurfaceVariant,
           size: 20,
         ),
         onPressed: () => Navigator.of(context).pop(),
       ),
       title: Text(
         '@${p.username}',
-        style: const TextStyle(
+        style: TextStyle(
           color: _textPrimary,
           fontWeight: FontWeight.w600,
           fontSize: 15,
@@ -1327,9 +1369,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       actions: [
         if (!isOwner)
           IconButton(
-            icon: const Icon(
+            icon: Icon(
               Icons.more_vert_rounded,
-              color: Color(0xFF9BAECF),
+              color: scheme.onSurfaceVariant,
               size: 22,
             ),
             onPressed: _showMoreMenu,
@@ -1435,7 +1477,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     Flexible(
                       child: Text(
                         p.displayName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _textPrimary,
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
@@ -1456,7 +1498,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 const SizedBox(height: 2),
                 Text(
                   '@${p.username}',
-                  style: const TextStyle(color: _textSecondary, fontSize: 14),
+                  style: TextStyle(color: _textSecondary, fontSize: 14),
                 ),
               ],
             ),
@@ -1480,10 +1522,11 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _showAvatarMenu(ProfileDetail p) {
+    final scheme = Theme.of(context).colorScheme;
     final hasCustomAvatar = !_isDefaultAvatar(p);
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF141D30),
+      backgroundColor: scheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1496,19 +1539,19 @@ class _ProfileScreenState extends State<ProfileScreen>
               height: 4,
               margin: const EdgeInsets.only(top: 10, bottom: 16),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.person_outline_rounded,
-                color: Color(0xFF9BAECF),
+                color: scheme.onSurfaceVariant,
                 size: 22,
               ),
-              title: const Text(
+              title: Text(
                 'View avatar',
-                style: TextStyle(color: Color(0xFFD0D8EE), fontSize: 15),
+                style: TextStyle(color: scheme.onSurface, fontSize: 15),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -1518,14 +1561,14 @@ class _ProfileScreenState extends State<ProfileScreen>
               contentPadding: const EdgeInsets.symmetric(horizontal: 20),
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.photo_library_outlined,
-                color: Color(0xFF9BAECF),
+                color: scheme.onSurfaceVariant,
                 size: 22,
               ),
-              title: const Text(
+              title: Text(
                 'Upload photo',
-                style: TextStyle(color: Color(0xFFD0D8EE), fontSize: 15),
+                style: TextStyle(color: scheme.onSurface, fontSize: 15),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -1536,14 +1579,14 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             if (hasCustomAvatar)
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.delete_outline_rounded,
-                  color: Color(0xFFE53935),
+                  color: scheme.error,
                   size: 22,
                 ),
-                title: const Text(
+                title: Text(
                   'Remove current photo',
-                  style: TextStyle(color: Color(0xFFE53935), fontSize: 15),
+                  style: TextStyle(color: scheme.error, fontSize: 15),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -1553,14 +1596,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20),
               ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.close_rounded,
-                color: Color(0xFF7A8BB0),
+                color: scheme.onSurfaceVariant,
                 size: 22,
               ),
-              title: const Text(
+              title: Text(
                 'Cancel',
-                style: TextStyle(color: Color(0xFF7A8BB0), fontSize: 15),
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 15),
               ),
               onTap: () => Navigator.pop(context),
               dense: true,
@@ -1642,34 +1685,32 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ── Remove avatar confirm ─────────────────────────────────────────────────
 
   Future<void> _confirmRemoveAvatar() async {
+    final scheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
       barrierColor: Colors.black54,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141D30),
+        backgroundColor: scheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text(
+        title: Text(
           'Remove profile photo',
-          style: TextStyle(color: Color(0xFFE8ECF8), fontSize: 16),
+          style: TextStyle(color: scheme.onSurface, fontSize: 16),
         ),
-        content: const Text(
+        content: Text(
           'Are you sure you want to remove your current profile photo? It will be replaced with the default avatar.',
-          style: TextStyle(color: Color(0xFF9BAECF), fontSize: 14),
+          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: Color(0xFF7A8BB0)),
+              style: TextStyle(color: scheme.onSurfaceVariant),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Remove',
-              style: TextStyle(color: Color(0xFFE53935)),
-            ),
+            child: Text('Remove', style: TextStyle(color: scheme.error)),
           ),
         ],
       ),
@@ -1909,7 +1950,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   _bioExpanded ? 'See less' : 'See more',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: _accent,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -2052,12 +2093,13 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ── Loading skeleton ──────────────────────────────────────────────────────
 
   Widget _buildLoadingSkeleton() {
+    final scheme = Theme.of(context).colorScheme;
     return CustomScrollView(
       slivers: [
-        const SliverAppBar(
-          backgroundColor: Color(0xFF0D1526),
+        SliverAppBar(
+          backgroundColor: scheme.surface,
           pinned: true,
-          leading: BackButton(color: Color(0xFF9BAECF)),
+          leading: BackButton(color: scheme.onSurfaceVariant),
         ),
         SliverPadding(
           padding: const EdgeInsets.all(16),
@@ -2164,15 +2206,22 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFF111827),
+            color: tokens.panel,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFF1E2D48)),
+            border: Border.all(color: tokens.panelBorder),
           ),
           child: Column(
             children: [
@@ -2181,19 +2230,19 @@ class _StatCard extends StatelessWidget {
                 children: [
                   Text(
                     value,
-                    style: const TextStyle(
-                      color: Color(0xFFE8ECF8),
+                    style: TextStyle(
+                      color: tokens.text,
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   if (locked)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.only(left: 3),
                       child: Icon(
                         Icons.lock_outline_rounded,
                         size: 11,
-                        color: Color(0xFF4A5568),
+                        color: tokens.textMuted.withValues(alpha: 0.8),
                       ),
                     ),
                 ],
@@ -2201,7 +2250,7 @@ class _StatCard extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 label,
-                style: const TextStyle(color: Color(0xFF7A8BB0), fontSize: 11),
+                style: TextStyle(color: tokens.textMuted, fontSize: 11),
               ),
             ],
           ),
@@ -2225,19 +2274,23 @@ class _PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+    final fill = followStyle ? tokens.primarySoft : tokens.primary;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 11),
         decoration: BoxDecoration(
-          color: ghost
-              ? Colors.transparent
-              : (followStyle
-                    ? const Color(0xFF1F5FCC)
-                    : const Color(0xFF2563EB)),
+          color: ghost ? Colors.transparent : fill,
           gradient: (!ghost && followStyle)
-              ? const LinearGradient(
-                  colors: [Color(0xFF2F79F3), Color(0xFF1F5FCC)],
+              ? LinearGradient(
+                  colors: [tokens.primary, tokens.primarySoft],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 )
@@ -2245,15 +2298,17 @@ class _PrimaryButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: ghost
-                ? const Color(0xFF2563EB)
-                : (followStyle ? const Color(0xFF3A7DE0) : Colors.transparent),
+                ? tokens.primary
+                : (followStyle
+                      ? tokens.primarySoft.withValues(alpha: 0.9)
+                      : Colors.transparent),
           ),
         ),
         alignment: Alignment.center,
         child: Text(
           label,
           style: TextStyle(
-            color: ghost ? const Color(0xFF4AA3E4) : Colors.white,
+            color: ghost ? tokens.primary : theme.colorScheme.onPrimary,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -2270,6 +2325,13 @@ class _SecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -2277,13 +2339,13 @@ class _SecondaryButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF1E2D48)),
+          border: Border.all(color: tokens.panelBorder),
         ),
         alignment: Alignment.center,
         child: Text(
           label,
-          style: const TextStyle(
-            color: Color(0xFFD0D8EE),
+          style: TextStyle(
+            color: tokens.text,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -2300,6 +2362,13 @@ class _IconActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -2308,9 +2377,9 @@ class _IconActionButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF1E2D48)),
+          border: Border.all(color: tokens.panelBorder),
         ),
-        child: Icon(icon, color: const Color(0xFF9BAECF), size: 20),
+        child: Icon(icon, color: tokens.textMuted, size: 20),
       ),
     );
   }
@@ -2330,6 +2399,12 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     final display = lockedBadge ?? value ?? '—';
     final isMuted = muted || (lockedBadge != null);
 
@@ -2337,7 +2412,7 @@ class _InfoRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFF4A6080), size: 18),
+          Icon(icon, color: tokens.textMuted.withValues(alpha: 0.85), size: 18),
           const SizedBox(width: 12),
           Expanded(
             child: Row(
@@ -2347,18 +2422,18 @@ class _InfoRow extends StatelessWidget {
                     display,
                     style: TextStyle(
                       color: isMuted
-                          ? const Color(0xFF4A5568)
-                          : const Color(0xFFBCC8E0),
+                          ? tokens.textMuted.withValues(alpha: 0.7)
+                          : tokens.text,
                       fontSize: 14,
                     ),
                   ),
                 ),
                 if (lockedBadge != null) ...[
                   const SizedBox(width: 6),
-                  const Icon(
+                  Icon(
                     Icons.lock_outline_rounded,
                     size: 12,
-                    color: Color(0xFF4A5568),
+                    color: tokens.textMuted.withValues(alpha: 0.7),
                   ),
                 ],
               ],
@@ -2384,12 +2459,19 @@ class _AboutRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF4AA3E4)),
+          Icon(icon, size: 18, color: tokens.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -2397,8 +2479,8 @@ class _AboutRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: Color(0xFF7A8BB0),
+                  style: TextStyle(
+                    color: tokens.textMuted,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
@@ -2408,8 +2490,8 @@ class _AboutRow extends StatelessWidget {
                   value,
                   style: TextStyle(
                     color: muted
-                        ? const Color(0xFF4A5568)
-                        : const Color(0xFFD0D8EE),
+                        ? tokens.textMuted.withValues(alpha: 0.7)
+                        : tokens.text,
                     fontSize: 14,
                   ),
                 ),
@@ -2434,12 +2516,16 @@ class _MoreMenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return ListTile(
-      leading: Icon(icon, color: const Color(0xFF9BAECF), size: 22),
-      title: Text(
-        label,
-        style: const TextStyle(color: Color(0xFFD0D8EE), fontSize: 15),
-      ),
+      leading: Icon(icon, color: tokens.textMuted, size: 22),
+      title: Text(label, style: TextStyle(color: tokens.text, fontSize: 15)),
       onTap: onTap,
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20),
@@ -2467,15 +2553,17 @@ class _SpecialStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1020),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D1526),
+        backgroundColor: scheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: Color(0xFF9BAECF),
+            color: scheme.onSurfaceVariant,
             size: 20,
           ),
           onPressed: () => Navigator.of(context).pop(),
@@ -2500,8 +2588,8 @@ class _SpecialStateView extends StatelessWidget {
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFFE8ECF8),
+                style: TextStyle(
+                  color: scheme.onSurface,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
@@ -2510,8 +2598,8 @@ class _SpecialStateView extends StatelessWidget {
               Text(
                 body,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF7A8BB0),
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
                   fontSize: 14,
                   height: 1.5,
                 ),
@@ -2522,8 +2610,8 @@ class _SpecialStateView extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: onButton,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E2D48),
-                    foregroundColor: const Color(0xFFE8ECF8),
+                    backgroundColor: scheme.surfaceContainerHighest,
+                    foregroundColor: scheme.onSurface,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -2558,11 +2646,18 @@ class _SkeletonBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return Container(
       width: width == double.infinity ? double.infinity : width,
       height: height,
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2740),
+        color: tokens.panelMuted,
         borderRadius: BorderRadius.circular(radius),
       ),
     );

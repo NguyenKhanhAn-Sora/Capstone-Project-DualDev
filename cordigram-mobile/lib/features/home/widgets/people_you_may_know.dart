@@ -1,5 +1,6 @@
 ﻿import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../core/config/app_theme.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/auth_storage.dart';
 
@@ -159,12 +160,18 @@ class _PeopleYouMayKnowState extends State<PeopleYouMayKnow> {
       return const SizedBox.shrink();
     }
 
-    const bgPage = Color(0xFF0B1020);
-    const bgCard = Color(0xFF131929);
-    const textPrime = Color(0xFFE8ECF8);
-    const textDim = Color(0xFF5A6B8A);
-    const accent = Color(0xFF4AA3E4);
-    const divColor = Color(0xFF1E2D48);
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
+    final bgPage = tokens.panel;
+    final bgCard = tokens.panelMuted;
+    final textPrime = tokens.text;
+    final textDim = tokens.textMuted;
+    final divColor = tokens.panelBorder;
 
     return ColoredBox(
       color: bgPage,
@@ -177,7 +184,7 @@ class _PeopleYouMayKnowState extends State<PeopleYouMayKnow> {
             padding: const EdgeInsets.fromLTRB(16, 14, 8, 0),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'People you may know',
                   style: TextStyle(
                     color: textPrime,
@@ -244,7 +251,7 @@ class _PeopleYouMayKnowState extends State<PeopleYouMayKnow> {
 
           // ── Bottom divider ─────────────────────────────────────────────────
           const SizedBox(height: 10),
-          const Divider(height: 1, thickness: 1, color: divColor),
+          Divider(height: 1, thickness: 1, color: divColor),
         ],
       ),
     );
@@ -329,9 +336,16 @@ class _SuggestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const textPrime = Color(0xFFE8ECF8);
-    const textSub = Color(0xFF9BAECF);
-    const borderCol = Color(0xFF1E2D48);
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
+    final textPrime = tokens.text;
+    final textSub = tokens.textMuted;
+    final borderCol = tokens.panelBorder;
 
     final name = item.displayName.isNotEmpty ? item.displayName : item.username;
     final letter = name.trim().substring(0, 1).toUpperCase();
@@ -356,7 +370,7 @@ class _SuggestionCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: textPrime,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -369,11 +383,7 @@ class _SuggestionCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: textSub,
-                fontSize: 10.5,
-                height: 1.3,
-              ),
+              style: TextStyle(color: textSub, fontSize: 10.5, height: 1.3),
             ),
             const Spacer(),
             _FollowButton(
@@ -397,21 +407,28 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     if (avatarUrl != null && avatarUrl!.isNotEmpty) {
       return CircleAvatar(
         radius: 30,
         backgroundImage: NetworkImage(avatarUrl!),
-        backgroundColor: const Color(0xFF233050),
+        backgroundColor: tokens.panelBorder,
         onBackgroundImageError: (_, __) {},
       );
     }
     return CircleAvatar(
       radius: 30,
-      backgroundColor: const Color(0xFF3470A2),
+      backgroundColor: tokens.primary,
       child: Text(
         letter,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: theme.colorScheme.onPrimary,
           fontSize: 20,
           fontWeight: FontWeight.w700,
         ),
@@ -434,6 +451,13 @@ class _FollowButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     if (isPending) {
       return SizedBox(
         height: 30,
@@ -444,9 +468,7 @@ class _FollowButton extends StatelessWidget {
             height: 15,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: isFollowing
-                  ? const Color(0xFF5A6B8A)
-                  : const Color(0xFF4AA3E4),
+              color: isFollowing ? tokens.textMuted : tokens.primary,
             ),
           ),
         ),
@@ -461,12 +483,14 @@ class _FollowButton extends StatelessWidget {
         height: 30,
         width: double.infinity,
         decoration: BoxDecoration(
-          color: isFollowing ? Colors.transparent : const Color(0xFF1A3254),
+          color: isFollowing
+              ? Colors.transparent
+              : tokens.primary.withValues(alpha: 0.16),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isFollowing
-                ? const Color(0xFF3A4D6A)
-                : const Color(0xFF2A4A7A),
+                ? tokens.panelBorder
+                : tokens.primary.withValues(alpha: 0.5),
             width: 1,
           ),
         ),
@@ -476,15 +500,13 @@ class _FollowButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (!isFollowing) ...[
-              const Icon(Icons.add, size: 12, color: Color(0xFF4AA3E4)),
+              Icon(Icons.add, size: 12, color: tokens.primary),
               const SizedBox(width: 3),
             ],
             Text(
               isFollowing ? 'Following' : 'Follow',
               style: TextStyle(
-                color: isFollowing
-                    ? const Color(0xFF7A8BB0)
-                    : const Color(0xFF4AA3E4),
+                color: isFollowing ? tokens.textMuted : tokens.primary,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
@@ -528,17 +550,24 @@ class _SkeletonRowState extends State<_SkeletonRow>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+
     return AnimatedBuilder(
       animation: _anim,
       builder: (_, __) {
         final shimmer = Color.lerp(
-          const Color(0xFF1A2540),
-          const Color(0xFF2A3A55),
+          tokens.panelMuted,
+          tokens.panelBorder,
           _anim.value,
         )!;
         final bright = Color.lerp(
-          const Color(0xFF1E2D48),
-          const Color(0xFF304060),
+          tokens.panelBorder,
+          tokens.panelBorder.withValues(alpha: 0.6),
           _anim.value,
         )!;
 

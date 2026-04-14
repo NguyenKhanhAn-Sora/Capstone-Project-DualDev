@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import 'models/profile_detail.dart';
@@ -147,14 +148,21 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
   // List scroll controller (reference from DraggableScrollableSheet builder)
   ScrollController? _listCtrl;
 
-  // Colors
-  static const Color _bg = Color(0xFF0F1829);
-  static const Color _surface = Color(0xFF131F33);
-  static const Color _border = Color(0xFF1E2D48);
-  static const Color _textPrimary = Color(0xFFE8ECF8);
-  static const Color _textSecondary = Color(0xFF7A8BB0);
-  static const Color _accent = Color(0xFF4AA3E4);
-  static const Color _danger = Color(0xFFE53935);
+  AppSemanticColors get _tokens {
+    final theme = Theme.of(context);
+    return theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
+  }
+
+  Color get _bg => _tokens.panel;
+  Color get _surface => _tokens.panelMuted;
+  Color get _border => _tokens.panelBorder;
+  Color get _textPrimary => _tokens.text;
+  Color get _textSecondary => _tokens.textMuted;
+  Color get _accent => _tokens.primary;
+  Color get _danger => Theme.of(context).colorScheme.error;
 
   @override
   void initState() {
@@ -423,11 +431,10 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
       lastDate: DateTime.now(),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFF4AA3E4),
-            onPrimary: Colors.white,
-            surface: Color(0xFF1A2740),
-            onSurface: Color(0xFFE8ECF8),
+          colorScheme: Theme.of(ctx).colorScheme.copyWith(
+            primary: _accent,
+            surface: _surface,
+            onSurface: _textPrimary,
           ),
         ),
         child: child!,
@@ -458,9 +465,11 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
 
   void _showGenderPicker() {
     FocusScope.of(context).unfocus();
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF141D30),
+      backgroundColor: _bg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -475,17 +484,17 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
                 height: 4,
                 margin: const EdgeInsets.only(top: 10, bottom: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
               child: Text(
                 'Select Gender',
                 style: TextStyle(
-                  color: Color(0xFFE8ECF8),
+                  color: _textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
@@ -497,19 +506,13 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
                 title: Text(
                   g.$2,
                   style: TextStyle(
-                    color: selected
-                        ? const Color(0xFF4AA3E4)
-                        : const Color(0xFFD0D8EE),
+                    color: selected ? _accent : _textPrimary,
                     fontSize: 15,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
                 trailing: selected
-                    ? const Icon(
-                        Icons.check_rounded,
-                        color: Color(0xFF4AA3E4),
-                        size: 20,
-                      )
+                    ? Icon(Icons.check_rounded, color: _accent, size: 20)
                     : null,
                 onTap: () {
                   setState(() => _gender = g.$1);
@@ -612,7 +615,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
       builder: (_, ctrl) {
         _listCtrl = ctrl;
         return Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: _bg,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
@@ -625,14 +628,16 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               const SizedBox(height: 14),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -658,12 +663,12 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: _danger, size: 16),
+                      Icon(Icons.error_outline, color: _danger, size: 16),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _saveError!,
-                          style: const TextStyle(color: _danger, fontSize: 13),
+                          style: TextStyle(color: _danger, fontSize: 13),
                         ),
                       ),
                     ],
@@ -704,8 +709,8 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
               ),
               // Bottom action bar (sticky)
               Container(
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: Color(0xFF1E2D48))),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: _border)),
                 ),
                 padding: EdgeInsets.fromLTRB(
                   16,
@@ -751,7 +756,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: _textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.w500,
@@ -812,7 +817,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
           maxLength: maxLength,
           maxLines: maxLines,
           onChanged: onChanged,
-          style: const TextStyle(color: _textPrimary, fontSize: 14),
+          style: TextStyle(color: _textPrimary, fontSize: 14),
           decoration: _baseDecoration(hint: hint).copyWith(
             counterStyle: TextStyle(
               color: _textSecondary.withValues(alpha: 0.6),
@@ -826,15 +831,12 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
   Widget _buildUsernameField() {
     Widget? suffix;
     if (_checkingUsername) {
-      suffix = const Padding(
-        padding: EdgeInsets.all(12),
+      suffix = Padding(
+        padding: const EdgeInsets.all(12),
         child: SizedBox(
           width: 16,
           height: 16,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: Color(0xFF4AA3E4),
-          ),
+          child: CircularProgressIndicator(strokeWidth: 2, color: _accent),
         ),
       );
     } else if (_usernameAvailable == true) {
@@ -863,7 +865,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
           controller: _usernameCtrl,
           maxLength: 30,
           onChanged: _onUsernameChanged,
-          style: const TextStyle(color: _textPrimary, fontSize: 14),
+          style: TextStyle(color: _textPrimary, fontSize: 14),
           decoration:
               _baseDecoration(
                 hint: 'e.g. john_doe',
@@ -880,7 +882,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               _usernameError!,
-              style: const TextStyle(color: _danger, fontSize: 11, height: 1.4),
+              style: TextStyle(color: _danger, fontSize: 11, height: 1.4),
             ),
           ),
       ],
@@ -897,7 +899,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
           controller: _bioCtrl,
           maxLines: 4,
           onChanged: (_) => setState(() {}),
-          style: const TextStyle(color: _textPrimary, fontSize: 14),
+          style: TextStyle(color: _textPrimary, fontSize: 14),
           decoration: _baseDecoration(
             hint: 'Tell people a little about yourself...',
             borderColor: bioLen > 300 ? _danger : null,
@@ -1004,20 +1006,20 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
         TextField(
           controller: _locationCtrl,
           maxLength: 200,
-          style: const TextStyle(color: _textPrimary, fontSize: 14),
+          style: TextStyle(color: _textPrimary, fontSize: 14),
           onChanged: _onLocationChanged,
           decoration:
               _baseDecoration(
                 hint: 'Where are you based?',
                 suffix: _locationLoading
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
+                    ? Padding(
+                        padding: const EdgeInsets.all(12),
                         child: SizedBox(
                           width: 14,
                           height: 14,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Color(0xFF4AA3E4),
+                            color: _accent,
                           ),
                         ),
                       )
@@ -1053,20 +1055,20 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
         TextField(
           controller: _workplaceCtrl,
           maxLength: 100,
-          style: const TextStyle(color: _textPrimary, fontSize: 14),
+          style: TextStyle(color: _textPrimary, fontSize: 14),
           onChanged: _onWorkplaceChanged,
           decoration:
               _baseDecoration(
                 hint: 'Company or employer',
                 suffix: _workplaceLoading
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
+                    ? Padding(
+                        padding: const EdgeInsets.all(12),
                         child: SizedBox(
                           width: 14,
                           height: 14,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Color(0xFF4AA3E4),
+                            color: _accent,
                           ),
                         ),
                       )
@@ -1104,12 +1106,18 @@ class _SuggestionList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return Container(
       margin: const EdgeInsets.only(top: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2740),
+        color: tokens.panelMuted,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF1E2D48)),
+        border: Border.all(color: tokens.panelBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.3),
@@ -1140,13 +1148,19 @@ class _SuggestionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            Icon(icon, size: 16, color: const Color(0xFF4AA3E4)),
+            Icon(icon, size: 16, color: tokens.primary),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -1154,20 +1168,14 @@ class _SuggestionTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Color(0xFFD0D8EE),
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: tokens.text, fontSize: 13),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (subtitle != null)
                     Text(
                       subtitle!,
-                      style: const TextStyle(
-                        color: Color(0xFF7A8BB0),
-                        fontSize: 11,
-                      ),
+                      style: TextStyle(color: tokens.textMuted, fontSize: 11),
                     ),
                 ],
               ),
@@ -1188,6 +1196,12 @@ class _OutlineButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<AppSemanticColors>() ??
+        (theme.brightness == Brightness.dark
+            ? AppSemanticColors.dark
+            : AppSemanticColors.light);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1195,15 +1209,15 @@ class _OutlineButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF1E2D48)),
+          border: Border.all(color: tokens.panelBorder),
         ),
         alignment: Alignment.center,
         child: Text(
           label,
           style: TextStyle(
             color: onTap == null
-                ? const Color(0xFF4A5568)
-                : const Color(0xFFD0D8EE),
+                ? tokens.textMuted.withValues(alpha: 0.7)
+                : tokens.text,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -1225,14 +1239,15 @@ class _FillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
           color: onTap == null
-              ? const Color(0xFF1E3A6E)
-              : const Color(0xFF2563EB),
+              ? scheme.primary.withValues(alpha: 0.42)
+              : scheme.primary,
           borderRadius: BorderRadius.circular(8),
         ),
         alignment: Alignment.center,
@@ -1248,7 +1263,9 @@ class _FillButton extends StatelessWidget {
             : Text(
                 label,
                 style: TextStyle(
-                  color: onTap == null ? const Color(0xFF7A8BB0) : Colors.white,
+                  color: onTap == null
+                      ? scheme.onPrimary.withValues(alpha: 0.6)
+                      : scheme.onPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
