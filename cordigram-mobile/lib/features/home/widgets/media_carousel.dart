@@ -530,26 +530,17 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
                       onTap: () {},
                       onLongPress: () => _showOverlayMediaActions(item),
                       child: SafeArea(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 24,
-                          ),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 980),
-                              child: _ZoomableImage(
-                                url: item.displayUrl(
-                                  revealed: _revealedMap[item.url] == true,
-                                ),
-                                onZoomChanged: (zoomed) {
-                                  // Only update if this is the current visible page
-                                  if (i == _index && zoomed != _isZoomed) {
-                                    setState(() => _isZoomed = zoomed);
-                                  }
-                                },
-                              ),
+                        child: SizedBox.expand(
+                          child: _ZoomableImage(
+                            url: item.displayUrl(
+                              revealed: _revealedMap[item.url] == true,
                             ),
+                            onZoomChanged: (zoomed) {
+                              // Only update if this is the current visible page
+                              if (i == _index && zoomed != _isZoomed) {
+                                setState(() => _isZoomed = zoomed);
+                              }
+                            },
                           ),
                         ),
                       ),
@@ -744,14 +735,14 @@ class _ZoomableImageState extends State<_ZoomableImage> {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: InteractiveViewer(
-        transformationController: _transformCtrl,
-        minScale: 1.0,
-        maxScale: 3.0,
-        clipBehavior: Clip.none,
-        onInteractionEnd: _onInteractionEnd,
+    return InteractiveViewer(
+      transformationController: _transformCtrl,
+      minScale: 1.0,
+      maxScale: 4.0,
+      boundaryMargin: const EdgeInsets.all(320),
+      clipBehavior: Clip.none,
+      onInteractionEnd: _onInteractionEnd,
+      child: SizedBox.expand(
         child: Image.network(
           widget.url,
           fit: BoxFit.contain,

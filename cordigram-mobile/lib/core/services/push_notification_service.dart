@@ -15,6 +15,9 @@ import '../../features/profile/profile_screen.dart';
 class PushNotificationService {
   PushNotificationService._();
 
+  static const String _androidSmallIcon = 'ic_stat_cordigram';
+  static const String _androidLargeIcon = 'cordigram_logo';
+
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   static final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
@@ -43,7 +46,7 @@ class PushNotificationService {
 
     await _local.initialize(
       const InitializationSettings(
-        android: AndroidInitializationSettings('@drawable/ic_stat_cordigram'),
+        android: AndroidInitializationSettings(_androidSmallIcon),
       ),
       onDidReceiveNotificationResponse: (response) {
         final payload = response.payload;
@@ -89,7 +92,8 @@ class PushNotificationService {
             _highChannel.id,
             _highChannel.name,
             channelDescription: _highChannel.description,
-            icon: '@drawable/ic_stat_cordigram',
+            icon: _androidSmallIcon,
+            largeIcon: DrawableResourceAndroidBitmap(_androidLargeIcon),
             importance: Importance.max,
             priority: Priority.high,
             visibility: NotificationVisibility.public,

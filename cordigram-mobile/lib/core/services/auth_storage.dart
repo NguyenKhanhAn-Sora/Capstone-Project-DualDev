@@ -1,5 +1,53 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class RecentAccountEntry {
+  const RecentAccountEntry({
+    required this.email,
+    this.username,
+    this.displayName,
+    this.avatarUrl,
+    required this.lastUsed,
+  });
+
+  final String email;
+  final String? username;
+  final String? displayName;
+  final String? avatarUrl;
+  final int lastUsed;
+
+  String get label {
+    final value = (displayName ?? username ?? email).trim();
+    return value.isEmpty ? email : value;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'email': email,
+    if (username != null) 'username': username,
+    if (displayName != null) 'displayName': displayName,
+    if (avatarUrl != null) 'avatarUrl': avatarUrl,
+    'lastUsed': lastUsed,
+  };
+
+  static RecentAccountEntry? fromJson(dynamic source) {
+    if (source is! Map) return null;
+    final map = source.cast<String, dynamic>();
+    final email = (map['email'] as String? ?? '').trim().toLowerCase();
+    if (email.isEmpty) return null;
+    final lastUsedRaw = map['lastUsed'];
+    final parsedLastUsed = lastUsedRaw is int
+        ? lastUsedRaw
+        : int.tryParse(lastUsedRaw?.toString() ?? '');
+    return RecentAccountEntry(
+      email: email,
+      username: (map['username'] as String?)?.trim(),
+      displayName: (map['displayName'] as String?)?.trim(),
+      avatarUrl: (map['avatarUrl'] as String?)?.trim(),
+      lastUsed: parsedLastUsed ?? DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+}
 
 /// Mirrors what cordigram-web stores in localStorage + cookies:
 ///   - accessToken  → localStorage key "accessToken"
@@ -10,6 +58,8 @@ class AuthStorage {
   static const _keyAccessToken = 'access_token';
   static const _keyRefreshToken = 'refresh_token';
   static const _keyDeviceId = 'cordigram_device_id';
+  static const _keyRecentAccounts = 'recent_accounts';
+  static const _maxRecentAccounts = 6;
 
   static String? _accessToken;
   static String? _refreshToken;
@@ -64,6 +114,91 @@ class AuthStorage {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyAccessToken);
     await prefs.remove(_keyRefreshToken);
+  }
+
+  static Future<List<RecentAccountEntry>> loadRecentAccounts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_keyRecentAccounts);
+    if (raw == null || raw.isEmpty) return const [];
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      final items =
+          decoded
+              .map(RecentAccountEntry.fromJson)
+              .whereType<RecentAccountEntry>()
+              .toList(growable: false)
+            ..sort((a, b) => b.lastUsed.compareTo(a.lastUsed));
+      return items;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<List<RecentAccountEntry>> upsertRecentAccount({
+    required String email,
+    String? username,
+    String? displayName,
+    String? avatarUrl,
+  }) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) {
+      return loadRecentAccounts();
+    }
+
+    final current = await loadRecentAccounts();
+    final filtered = current
+        .where((item) => item.email != normalizedEmail)
+        .toList(growable: true);
+
+    filtered.insert(
+      0,
+      RecentAccountEntry(
+        email: normalizedEmail,
+        username: username,
+        displayName: displayName,
+        avatarUrl: avatarUrl,
+        lastUsed: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+
+    final next = filtered.take(_maxRecentAccounts).toList(growable: false);
+    await _saveRecentAccounts(next);
+    return next;
+  }
+
+  static Future<List<RecentAccountEntry>> removeRecentAccount(
+    String email,
+  ) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    final current = await loadRecentAccounts();
+    final next = current
+        .where((item) => item.email != normalizedEmail)
+        .toList(growable: false);
+    await _saveRecentAccounts(next);
+    return next;
+  }
+
+  static Future<void> clearRecentAccounts() async {
+    await _saveRecentAccounts(const []);
+  }
+
+  static Future<List<RecentAccountEntry>> replaceRecentAccounts(
+    List<RecentAccountEntry> items,
+  ) async {
+    final next = [...items]..sort((a, b) => b.lastUsed.compareTo(a.lastUsed));
+    final limited = next.take(_maxRecentAccounts).toList(growable: false);
+    await _saveRecentAccounts(limited);
+    return limited;
+  }
+
+  static Future<void> _saveRecentAccounts(
+    List<RecentAccountEntry> items,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = jsonEncode(items.map((item) => item.toJson()).toList());
+    await prefs.setString(_keyRecentAccounts, encoded);
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────

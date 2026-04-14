@@ -27,6 +27,166 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   String _error = '';
   bool _googleLoading = false;
+  List<RecentAccountEntry> _recentAccounts = const [];
+  bool _recentLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentAccounts();
+  }
+
+  Future<void> _loadRecentAccounts() async {
+    final items = await AuthStorage.loadRecentAccounts();
+    if (!mounted) return;
+    setState(() {
+      _recentAccounts = items;
+      _recentLoading = false;
+    });
+  }
+
+  Future<void> _clearRecentAccounts() async {
+    final previous = [..._recentAccounts];
+    await AuthStorage.clearRecentAccounts();
+    if (mounted) setState(() => _recentAccounts = const []);
+
+    final token = await _getActiveTokenForRecentSync();
+    if (token == null) return;
+
+    try {
+      final payload = await ApiService.delete(
+        '/auth/recent-accounts',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+      await _applyServerRecentAccounts(payload);
+    } catch (_) {
+      final restored = await AuthStorage.replaceRecentAccounts(previous);
+      if (!mounted) return;
+      setState(() => _recentAccounts = restored);
+    }
+  }
+
+  Future<void> _removeRecentAccount(String email) async {
+    final previous = [..._recentAccounts];
+    final next = await AuthStorage.removeRecentAccount(email);
+    if (mounted) setState(() => _recentAccounts = next);
+
+    final token = await _getActiveTokenForRecentSync();
+    if (token == null) return;
+
+    try {
+      final encodedEmail = Uri.encodeComponent(email.trim().toLowerCase());
+      final payload = await ApiService.delete(
+        '/auth/recent-accounts/$encodedEmail',
+        extraHeaders: {'Authorization': 'Bearer $token'},
+      );
+      await _applyServerRecentAccounts(payload);
+    } catch (_) {
+      final restored = await AuthStorage.replaceRecentAccounts(previous);
+      if (!mounted) return;
+      setState(() => _recentAccounts = restored);
+    }
+  }
+
+  Future<String?> _getActiveTokenForRecentSync() async {
+    final existing = AuthStorage.accessToken;
+    if (existing != null && existing.isNotEmpty) return existing;
+
+    final refreshToken = AuthStorage.refreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) return null;
+
+    try {
+      final refreshed = await ApiService.postAuth(
+        '/auth/refresh',
+        extraHeaders: {'Cookie': 'refresh_token=$refreshToken'},
+      );
+      final token = refreshed.body['accessToken'] as String?;
+      if (token == null || token.isEmpty) return null;
+
+      await AuthStorage.saveTokens(
+        accessToken: token,
+        refreshToken: refreshed.refreshToken ?? refreshToken,
+      );
+      return token;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _applyServerRecentAccounts(Map<String, dynamic> payload) async {
+    final raw = payload['recentAccounts'];
+    if (raw is! List) return;
+
+    final mapped = raw
+        .whereType<Map>()
+        .map((item) {
+          final map = item.cast<String, dynamic>();
+          final lastUsedRaw = map['lastUsed'];
+          final parsed = DateTime.tryParse(lastUsedRaw?.toString() ?? '');
+          return RecentAccountEntry(
+            email: (map['email'] as String? ?? '').trim().toLowerCase(),
+            username: (map['username'] as String?)?.trim(),
+            displayName: (map['displayName'] as String?)?.trim(),
+            avatarUrl: (map['avatarUrl'] as String?)?.trim(),
+            lastUsed:
+                parsed?.millisecondsSinceEpoch ??
+                DateTime.now().millisecondsSinceEpoch,
+          );
+        })
+        .where((item) => item.email.isNotEmpty)
+        .toList(growable: false);
+
+    final synced = await AuthStorage.replaceRecentAccounts(mapped);
+    if (!mounted) return;
+    setState(() => _recentAccounts = synced);
+  }
+
+  Future<void> _upsertRecentAfterLogin({
+    required String email,
+    required String accessToken,
+  }) async {
+    String? username;
+    String? displayName;
+    String? avatarUrl;
+
+    try {
+      final me = await ApiService.get(
+        '/profiles/me',
+        extraHeaders: {'Authorization': 'Bearer $accessToken'},
+      );
+      username = (me['username'] as String?)?.trim();
+      displayName = (me['displayName'] as String?)?.trim();
+      avatarUrl = (me['avatarUrl'] as String?)?.trim();
+    } catch (_) {
+      // Keep local cache update even if profile lookup fails.
+    }
+
+    final next = await AuthStorage.upsertRecentAccount(
+      email: email,
+      username: username,
+      displayName: displayName,
+      avatarUrl: avatarUrl,
+    );
+
+    try {
+      await ApiService.post(
+        '/auth/recent-accounts',
+        body: {
+          'email': email,
+          if (username != null && username.isNotEmpty) 'username': username,
+          if (displayName != null && displayName.isNotEmpty)
+            'displayName': displayName,
+          if (avatarUrl != null && avatarUrl.isNotEmpty) 'avatarUrl': avatarUrl,
+        },
+        extraHeaders: {'Authorization': 'Bearer $accessToken'},
+      );
+    } catch (_) {
+      // Local data remains source of truth on login screen.
+    }
+
+    if (!mounted) return;
+    setState(() => _recentAccounts = next);
+  }
 
   @override
   void dispose() {
@@ -69,6 +229,12 @@ class _LoginScreenState extends State<LoginScreen> {
         accessToken: accessToken,
         refreshToken: result.refreshToken,
       );
+      if (_rememberMe) {
+        await _upsertRecentAfterLogin(
+          email: _emailController.text.trim().toLowerCase(),
+          accessToken: accessToken,
+        );
+      }
       await PushNotificationService.syncCurrentToken();
       if (!mounted) return;
       Navigator.of(
@@ -115,6 +281,10 @@ class _LoginScreenState extends State<LoginScreen> {
           accessToken: accessToken,
           refreshToken: refreshToken,
         );
+        final email = _decodeEmailFromToken(accessToken);
+        if (email.isNotEmpty) {
+          await _upsertRecentAfterLogin(email: email, accessToken: accessToken);
+        }
         await PushNotificationService.syncCurrentToken();
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
@@ -161,6 +331,69 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _openRecentAccountLogin(RecentAccountEntry account) async {
+    final password = await showDialog<String>(
+      context: context,
+      builder: (_) => _RecentPasswordDialog(account: account),
+    );
+    if (!mounted || password == null) return;
+
+    setState(() {
+      _loading = true;
+      _error = '';
+    });
+
+    try {
+      final deviceId = AuthStorage.deviceId;
+      final result = await ApiService.postAuth(
+        '/auth/login',
+        body: {
+          'email': account.email,
+          'password': password,
+          'loginMethod': 'recent',
+        },
+        extraHeaders: {
+          if (deviceId != null) 'x-device-id': deviceId,
+          'x-login-method': 'recent',
+        },
+      );
+
+      final accessToken = result.body['accessToken'] as String?;
+      if (accessToken == null) {
+        setState(() {
+          _loading = false;
+          _error = 'Two-factor authentication is not yet supported on mobile.';
+        });
+        return;
+      }
+
+      await AuthStorage.saveTokens(
+        accessToken: accessToken,
+        refreshToken: result.refreshToken,
+      );
+      await _upsertRecentAfterLogin(
+        email: account.email,
+        accessToken: accessToken,
+      );
+      await PushNotificationService.syncCurrentToken();
+
+      if (!mounted) return;
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+    } on ApiException catch (e) {
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _error = 'Could not connect to server. Please try again.';
+        _loading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -200,214 +433,276 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Center(
-                              child: Text(
-                                'Login',
-                                style: theme.textTheme.headlineSmall?.copyWith(
-                                  color: const Color(0xFF0F172A),
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 18),
-                            TextFormField(
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              autofillHints: const [AutofillHints.email],
-                              decoration: _fieldDecoration(
-                                label: 'Email',
-                                hint: 'you@example.com',
-                                icon: Icons.mail_outline_rounded,
-                              ),
-                              validator: (value) {
-                                final input = (value ?? '').trim();
-                                if (input.isEmpty) return 'Please enter email';
-                                final ok = RegExp(
-                                  r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-                                ).hasMatch(input);
-                                if (!ok) return 'Email format is invalid';
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            TextFormField(
-                              controller: _passwordController,
-                              obscureText: !_showPassword,
-                              autofillHints: const [AutofillHints.password],
-                              decoration: _fieldDecoration(
-                                label: 'Password',
-                                hint: 'Enter your password',
-                                icon: Icons.lock_outline_rounded,
-                                suffix: IconButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _showPassword = !_showPassword;
-                                    });
-                                  },
-                                  icon: Icon(
-                                    _showPassword
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Center(
+                                  child: Text(
+                                    'Login',
+                                    style: theme.textTheme.headlineSmall
+                                        ?.copyWith(
+                                          color: const Color(0xFF0F172A),
+                                          fontWeight: FontWeight.w800,
+                                        ),
                                   ),
                                 ),
-                              ),
-                              validator: (value) {
-                                if ((value ?? '').isEmpty) {
-                                  return 'Please enter password';
-                                }
-                                if ((value ?? '').length < 8) {
-                                  return 'Password must be at least 8 characters';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Checkbox(
-                                  value: _rememberMe,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _rememberMe = value ?? false;
-                                    });
+                                const SizedBox(height: 18),
+                                TextFormField(
+                                  controller: _emailController,
+                                  keyboardType: TextInputType.emailAddress,
+                                  autofillHints: const [AutofillHints.email],
+                                  decoration: _fieldDecoration(
+                                    label: 'Email',
+                                    hint: 'you@example.com',
+                                    icon: Icons.mail_outline_rounded,
+                                  ),
+                                  validator: (value) {
+                                    final input = (value ?? '').trim();
+                                    if (input.isEmpty)
+                                      return 'Please enter email';
+                                    final ok = RegExp(
+                                      r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                                    ).hasMatch(input);
+                                    if (!ok) return 'Email format is invalid';
+                                    return null;
                                   },
-                                  visualDensity: VisualDensity.compact,
                                 ),
-                                const Text('Remember me'),
-                                const Spacer(),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const ForgotPasswordScreen(),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _passwordController,
+                                  obscureText: !_showPassword,
+                                  autofillHints: const [AutofillHints.password],
+                                  decoration: _fieldDecoration(
+                                    label: 'Password',
+                                    hint: 'Enter your password',
+                                    icon: Icons.lock_outline_rounded,
+                                    suffix: IconButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _showPassword = !_showPassword;
+                                        });
+                                      },
+                                      icon: Icon(
+                                        _showPassword
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined,
                                       ),
-                                    );
+                                    ),
+                                  ),
+                                  validator: (value) {
+                                    if ((value ?? '').isEmpty) {
+                                      return 'Please enter password';
+                                    }
+                                    if ((value ?? '').length < 8) {
+                                      return 'Password must be at least 8 characters';
+                                    }
+                                    return null;
                                   },
-                                  child: const Text('Forgot password?'),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _rememberMe,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _rememberMe = value ?? false;
+                                        });
+                                      },
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    const Text('Remember me'),
+                                    const Spacer(),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const ForgotPasswordScreen(),
+                                          ),
+                                        );
+                                      },
+                                      child: const Text('Forgot password?'),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                if (_error.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade50,
+                                        border: Border.all(
+                                          color: Colors.red.shade200,
+                                        ),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        _error,
+                                        style: TextStyle(
+                                          color: Colors.red.shade700,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 50,
+                                  child: FilledButton(
+                                    onPressed: _loading ? null : _submit,
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFF3470A2),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    child: _loading
+                                        ? const SizedBox(
+                                            width: 22,
+                                            height: 22,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.5,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation(
+                                                    Colors.white,
+                                                  ),
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Sign in',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 48,
+                                  child: OutlinedButton.icon(
+                                    onPressed: _googleLoading
+                                        ? null
+                                        : _handleGoogleLogin,
+                                    icon: _googleLoading
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation(
+                                                    Color(0xFF1F2937),
+                                                  ),
+                                            ),
+                                          )
+                                        : const _GoogleBadge(),
+                                    label: const Text('Continue with Google'),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(
+                                        color: Color(0xFFD7E5F2),
+                                      ),
+                                      foregroundColor: const Color(0xFF1F2937),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Text("Don't have an account? "),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const SignupScreen(),
+                                          ),
+                                        );
+                                      },
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        minimumSize: Size.zero,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      child: const Text('Sign up'),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 6),
-                            if (_error.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.shade50,
-                                    border: Border.all(
-                                      color: Colors.red.shade200,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    _error,
-                                    style: TextStyle(
-                                      color: Colors.red.shade700,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 50,
-                              child: FilledButton(
-                                onPressed: _loading ? null : _submit,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFF3470A2),
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                child: _loading
-                                    ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.5,
-                                          valueColor: AlwaysStoppedAnimation(
-                                            Colors.white,
-                                          ),
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Sign in',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                              ),
+                          ),
+                          if (_recentLoading)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 14),
+                              child: LinearProgressIndicator(minHeight: 2),
                             ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: OutlinedButton.icon(
-                                onPressed: _googleLoading
-                                    ? null
-                                    : _handleGoogleLogin,
-                                icon: _googleLoading
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation(
-                                            Color(0xFF1F2937),
-                                          ),
-                                        ),
-                                      )
-                                    : const _GoogleBadge(),
-                                label: const Text('Continue with Google'),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: Color(0xFFD7E5F2),
-                                  ),
-                                  foregroundColor: const Color(0xFF1F2937),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                              ),
-                            ),
+                          if (_recentAccounts.isNotEmpty) ...[
                             const SizedBox(height: 14),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text("Don't have an account? "),
+                                Text(
+                                  'Recent accounts',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const Spacer(),
                                 TextButton(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const SignupScreen(),
-                                      ),
-                                    );
-                                  },
+                                  onPressed: _clearRecentAccounts,
                                   style: TextButton.styleFrom(
-                                    padding: EdgeInsets.zero,
                                     minimumSize: Size.zero,
                                     tapTargetSize:
                                         MaterialTapTargetSize.shrinkWrap,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 6,
+                                    ),
                                   ),
-                                  child: const Text('Sign up'),
+                                  child: const Text('Delete all'),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 8),
+                            Column(
+                              children: _recentAccounts
+                                  .map(
+                                    (account) => Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 10,
+                                      ),
+                                      child: _RecentAccountTile(
+                                        account: account,
+                                        onTap: () =>
+                                            _openRecentAccountLogin(account),
+                                        onRemove: () =>
+                                            _removeRecentAccount(account.email),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(growable: false),
+                            ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
                   ],
@@ -446,6 +741,193 @@ class _LoginScreenState extends State<LoginScreen> {
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: Color(0xFF3470A2), width: 1.4),
       ),
+    );
+  }
+}
+
+class _RecentAccountTile extends StatelessWidget {
+  const _RecentAccountTile({
+    required this.account,
+    required this.onTap,
+    required this.onRemove,
+  });
+
+  final RecentAccountEntry account;
+  final VoidCallback onTap;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = account.label;
+    final initial = label.isNotEmpty ? label.characters.first : '?';
+
+    return Material(
+      color: const Color(0xFFF6FAFF),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFD7E5F2)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 21,
+                backgroundColor: const Color(0xFF3470A2).withValues(alpha: 0.2),
+                backgroundImage:
+                    (account.avatarUrl != null && account.avatarUrl!.isNotEmpty)
+                    ? NetworkImage(account.avatarUrl!)
+                    : null,
+                child: (account.avatarUrl == null || account.avatarUrl!.isEmpty)
+                    ? Text(
+                        initial.toUpperCase(),
+                        style: const TextStyle(
+                          color: Color(0xFF1D4E89),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: onRemove,
+                icon: const Icon(Icons.close_rounded),
+                color: const Color(0xFF64748B),
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Remove account',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentPasswordDialog extends StatefulWidget {
+  const _RecentPasswordDialog({required this.account});
+
+  final RecentAccountEntry account;
+
+  @override
+  State<_RecentPasswordDialog> createState() => _RecentPasswordDialogState();
+}
+
+class _RecentPasswordDialogState extends State<_RecentPasswordDialog> {
+  final TextEditingController _passwordController = TextEditingController();
+  bool _showPassword = false;
+  String _error = '';
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final password = _passwordController.text;
+    if (password.isEmpty) {
+      setState(() => _error = 'Please enter password');
+      return;
+    }
+    Navigator.of(context).pop(password);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      titlePadding: const EdgeInsets.fromLTRB(20, 18, 10, 0),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              widget.account.label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+          ),
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              widget.account.email,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passwordController,
+            obscureText: !_showPassword,
+            autofocus: true,
+            onSubmitted: (_) => _submit(),
+            decoration: InputDecoration(
+              labelText: 'Password',
+              suffixIcon: IconButton(
+                onPressed: () {
+                  setState(() => _showPassword = !_showPassword);
+                },
+                icon: Icon(
+                  _showPassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                ),
+              ),
+            ),
+          ),
+          if (_error.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _error,
+                  style: const TextStyle(
+                    color: Color(0xFFB91C1C),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Log in')),
+      ],
     );
   }
 }
