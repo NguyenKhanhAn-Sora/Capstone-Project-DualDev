@@ -29,15 +29,12 @@ export class FollowsController {
     }
 
     const userId = new Types.ObjectId(req.user.userId);
-    console.log('Getting following for userId:', userId.toString());
 
     const followingIds = await this.followsService.getFollowing(userId);
-    console.log('followingIds:', followingIds);
 
     const profiles = await Promise.all(
       followingIds.map((id) =>
         this.profilesService.findByUserId(id).then((profile) => {
-          console.log('Profile for', id.toString(), ':', profile);
           return {
             id: profile?._id?.toString?.() ?? (profile as any)?.id,
             displayName: profile?.displayName,
@@ -49,7 +46,6 @@ export class FollowsController {
       ),
     );
 
-    console.log('Final profiles:', profiles);
     return profiles.filter((p) => p.displayName); // Filter out null profiles
   }
 

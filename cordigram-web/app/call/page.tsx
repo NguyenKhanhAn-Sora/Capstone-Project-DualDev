@@ -40,7 +40,6 @@ export default function CallPage() {
           return;
         }
 
-        console.log("📞 [CALL PAGE] Initializing call for room:", roomName);
 
         const { token: livekitToken, url } = await getLiveKitToken(
           roomName,
@@ -48,7 +47,6 @@ export default function CallPage() {
           token,
         );
 
-        console.log("✅ [CALL PAGE] Got LiveKit credentials");
 
         setCallToken(livekitToken);
         setCallServerUrl(url);
@@ -64,7 +62,6 @@ export default function CallPage() {
   }, [roomName, participantName]);
 
   const handleDisconnect = useCallback(() => {
-    console.log("📞 [CALL PAGE] User left call, closing window");
     // Close the tab/window
     window.close();
 

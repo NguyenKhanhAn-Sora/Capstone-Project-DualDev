@@ -29,12 +29,10 @@ describe('Call Feature - Infinite Loop Prevention', () => {
           useEffect(() => {
             if (!callEnded) return;
 
-            console.log('[TEST] call-ended event received');
 
             // ✅ Use callback to avoid dependency on incomingCall state
             setIncomingCall(prev => {
               if (prev && prev.from === callEnded.from) {
-                console.log('[TEST] Updating to cancelled');
                 return { ...prev, status: 'cancelled' };
               }
               return prev;
@@ -95,7 +93,6 @@ describe('Call Feature - Infinite Loop Prevention', () => {
 
       // ✅ Verify no infinite loop (render count should stay low)
       expect(result.current.renderCount).toBeLessThan(10);
-      console.log('[TEST] ✅ Render count:', result.current.renderCount, '(no infinite loop)');
 
       // Wait for auto-close
       await act(async () => {
@@ -174,12 +171,10 @@ describe('Call Feature - Infinite Loop Prevention', () => {
 
             // Check if this is a call-rejected event
             if (callEvent.type === undefined && callEvent.sdpOffer === undefined && callEvent.callerInfo === undefined) {
-              console.log('[TEST] call-rejected event received');
 
               // ✅ Use callback to avoid dependency on outgoingCall state
               setOutgoingCall(prev => {
                 if (prev && prev.status !== 'rejected') {
-                  console.log('[TEST] Updating to rejected');
                   return { ...prev, status: 'rejected' };
                 }
                 return prev;
@@ -241,7 +236,6 @@ describe('Call Feature - Infinite Loop Prevention', () => {
 
       // ✅ Verify no infinite loop
       expect(result.current.renderCount).toBeLessThan(10);
-      console.log('[TEST] ✅ Render count:', result.current.renderCount, '(no infinite loop)');
 
       // Wait for auto-close
       await act(async () => {
@@ -389,7 +383,6 @@ describe('Call Feature - Infinite Loop Prevention', () => {
       const finalRenders = totalRenders;
       const renderDiff = finalRenders - initialRenders;
       
-      console.log('[TEST] Total renders:', renderDiff);
       expect(renderDiff).toBeLessThan(20); // Should be much less than infinite loop
     });
   });

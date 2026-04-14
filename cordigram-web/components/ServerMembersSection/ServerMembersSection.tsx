@@ -109,26 +109,15 @@ export default function ServerMembersSection({
 
     try {
       // Sử dụng API mới trả về role info
-      console.log("[ServerMembersSection] Calling NEW API: getServerMembersWithRoles");
       const response = await serversApi.getServerMembersWithRoles(serverId);
       // DEBUG: Log để kiểm tra displayColor
-      console.log("[ServerMembersSection] ✅ NEW API Response:", {
-        members: response.members.map(m => ({
-          displayName: m.displayName,
-          roles: m.roles,
-          displayColor: m.displayColor,
-        })),
-        permissions: response.currentUserPermissions,
-      });
       setMembers(response.members as ExtendedMember[]);
       setPermissions(response.currentUserPermissions);
     } catch (err) {
       // Fallback to old API nếu API mới fail
       console.error("[ServerMembersSection] ❌ NEW API FAILED:", err);
-      console.log("[ServerMembersSection] Falling back to OLD API");
       try {
         const oldList = await serversApi.getServerMembers(serverId);
-        console.log("[ServerMembersSection] OLD API Response:", oldList);
         // Convert sang ExtendedMember format
         const converted: ExtendedMember[] = oldList.map((m) => ({
           userId: m.userId,

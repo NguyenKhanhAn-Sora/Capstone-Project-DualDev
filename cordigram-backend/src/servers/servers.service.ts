@@ -515,52 +515,32 @@ export class ServersService {
     serverId: string,
     newMemberId: string,
   ): Promise<void> {
-    console.log(
-      '[sendWelcomeMessage] serverId:',
-      serverId,
-      'newMemberId:',
-      newMemberId,
-    );
     const server = await this.serverModel
       .findById(serverId)
       .select('interactionSettings')
       .lean()
       .exec();
     if (!server) {
-      console.log('[sendWelcomeMessage] Server not found');
       return;
     }
 
     const settings = (server as any).interactionSettings ?? {};
-    console.log('[sendWelcomeMessage] settings:', JSON.stringify(settings));
     if (!settings.systemMessagesEnabled) {
-      console.log('[sendWelcomeMessage] systemMessagesEnabled=false, skip');
       return;
     }
     if (!settings.welcomeMessageEnabled) {
-      console.log('[sendWelcomeMessage] welcomeMessageEnabled=false, skip');
       return;
     }
 
     const systemChannelId = settings.systemChannelId;
     if (!systemChannelId) {
-      console.log('[sendWelcomeMessage] No systemChannelId, skip');
       return;
     }
 
     const channel = await this.channelModel.findById(systemChannelId).exec();
     if (!channel || channel.type !== 'text') {
-      console.log(
-        '[sendWelcomeMessage] Channel not found or not text, type:',
-        channel?.type,
-      );
       return;
     }
-    console.log(
-      '[sendWelcomeMessage] Sending to channel:',
-      channel.name,
-      channel._id,
-    );
 
     const profile = await this.profileModel
       .findOne({ userId: new Types.ObjectId(newMemberId) })

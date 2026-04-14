@@ -98,12 +98,10 @@ export const useDirectMessages = ({
     );
 
     socket.on("connect", () => {
-      console.log("Connected to WebSocket - Direct Messages");
       setIsConnected(true);
     });
 
     socket.on("disconnect", () => {
-      console.log("Disconnected from WebSocket");
       setIsConnected(false);
     });
 
@@ -113,13 +111,11 @@ export const useDirectMessages = ({
         message: DirectMessage;
         fromUser?: { userId: string; username: string };
       }) => {
-        console.log("New message received from socket:", data);
         setNewMessage(data);
       },
     );
 
     socket.on("message-sent", (data: { message: DirectMessage }) => {
-      console.log("Message sent confirmation:", data);
       setMessageSent(data.message);
       setTimeout(() => setMessageSent(false), 1000);
     });
@@ -146,14 +142,12 @@ export const useDirectMessages = ({
     socket.on(
       "messages-read",
       (data: { byUserId: string; messageIds: string[] }) => {
-        console.log("📖 Messages-read event received:", data);
         // ✅ Create new object to trigger React re-render
         setMessagesRead({ ...data, timestamp: Date.now() } as any);
       },
     );
 
     socket.on("reaction-added", (data: any) => {
-      console.log("Reaction added:", data);
       if (data?.messageId && Array.isArray(data?.reactions)) {
         setReactionUpdate({ messageId: data.messageId, reactions: data.reactions });
         setTimeout(() => setReactionUpdate(null), 500);
@@ -161,7 +155,6 @@ export const useDirectMessages = ({
     });
 
     socket.on("reaction-updated", (data: any) => {
-      console.log("Reaction updated:", data);
       if (data?.messageId && Array.isArray(data?.reactions)) {
         setReactionUpdate({ messageId: data.messageId, reactions: data.reactions });
         setTimeout(() => setReactionUpdate(null), 500);
@@ -181,50 +174,27 @@ export const useDirectMessages = ({
           avatar?: string;
         };
       }) => {
-        console.log("📞 [SOCKET] ========== INCOMING CALL EVENT ==========");
-        console.log(
-          "📞 [SOCKET] Raw data received:",
-          JSON.stringify(data, null, 2),
-        );
-        console.log("📞 [SOCKET] data.from:", data.from);
-        console.log("📞 [SOCKET] data.type:", data.type);
-        console.log("📞 [SOCKET] data.callerInfo:", data.callerInfo);
         if (data.callerInfo) {
-          console.log("📞 [SOCKET] callerInfo.userId:", data.callerInfo.userId);
-          console.log(
-            "📞 [SOCKET] callerInfo.username:",
-            data.callerInfo.username,
-          );
-          console.log(
-            "📞 [SOCKET] callerInfo.displayName:",
-            data.callerInfo.displayName,
-          );
-          console.log("📞 [SOCKET] callerInfo.avatar:", data.callerInfo.avatar);
         } else {
           console.error("❌ [SOCKET] callerInfo is UNDEFINED or NULL!");
         }
-        console.log("📞 [SOCKET] ========================================");
         setCallEvent(data);
       },
     );
 
     socket.on("call-answer", (data: { from: string; sdpOffer: any }) => {
-      console.log("📞 [SOCKET] Call answered event received:", data);
       setCallEvent(data);
     });
 
     socket.on("call-rejected", (data: { from: string }) => {
-      console.log("📞 [SOCKET] Call rejected event received:", data);
       setCallEvent({ from: data.from } as any); // Trigger rejection handling
     });
 
     socket.on("ice-candidate", (data: { from: string; candidate: any }) => {
-      console.log("ICE candidate:", data);
       setCallEvent(data);
     });
 
     socket.on("call-ended", (data: { from: string }) => {
-      console.log("Call ended:", data);
       setCallEnded(data);
       setTimeout(() => setCallEnded(null), 1000);
     });
@@ -248,7 +218,6 @@ export const useDirectMessages = ({
   const sendMessage = useCallback(
     (receiverId: string, content: string, attachments?: string[]) => {
       if (socketRef.current && socketRef.current.connected) {
-        console.log("Sending message to:", receiverId, "Content:", content);
         socketRef.current.emit("send-message", {
           receiverId,
           content,

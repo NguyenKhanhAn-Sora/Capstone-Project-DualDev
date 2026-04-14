@@ -477,15 +477,6 @@ export class RolesService {
     const roles = await this.getMemberRoles(serverId, memberId);
 
     // DEBUG: Log roles tìm được
-    console.log(
-      `[getMemberRoleInfo] memberId=${memberId}, found roles:`,
-      roles.map((r) => ({
-        name: r.name,
-        color: r.color,
-        isDefault: r.isDefault,
-        position: r.position,
-      })),
-    );
 
     const roleInfos = roles
       .filter((r) => !r.isDefault) // Không hiển thị @everyone trong danh sách badges
@@ -512,10 +503,6 @@ export class RolesService {
     const displayColor = highestRole?.color || '#99AAB5';
 
     // DEBUG: Log kết quả
-    console.log(
-      `[getMemberRoleInfo] memberId=${memberId}, displayColor=${displayColor}, highestRole:`,
-      highestRole,
-    );
 
     return {
       roles: roleInfos,

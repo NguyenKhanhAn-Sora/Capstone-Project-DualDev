@@ -38,11 +38,9 @@ export default function CallRoom({
         video={!isAudioOnly}
         audio={true}
         onConnected={() => {
-          console.log("Connected to LiveKit room");
           setIsConnected(true);
         }}
         onDisconnected={() => {
-          console.log("Disconnected from LiveKit room");
           setIsConnected(false);
           onDisconnect();
         }}

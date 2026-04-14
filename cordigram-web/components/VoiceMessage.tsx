@@ -14,11 +14,6 @@ export default function VoiceMessage({
   duration,
   isFromCurrentUser = false,
 }: VoiceMessageProps) {
-  console.log("🎤 [VOICE-COMPONENT] Rendering with:", {
-    voiceUrl,
-    duration,
-    isFromCurrentUser,
-  });
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -29,7 +24,6 @@ export default function VoiceMessage({
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    console.log("🎤 [VOICE-COMPONENT] useEffect loading audio:", voiceUrl);
     // Create audio element
     const audio = new Audio(voiceUrl);
     audioRef.current = audio;

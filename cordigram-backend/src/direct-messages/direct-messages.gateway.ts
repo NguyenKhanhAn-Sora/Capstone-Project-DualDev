@@ -136,7 +136,6 @@ export class DirectMessagesGateway
         status: 'online',
       });
 
-      console.log(`User ${userId} connected with socket ${socket.id}`);
     } catch (error) {
       console.error('Connection error:', error);
       socket.disconnect();
@@ -154,7 +153,6 @@ export class DirectMessagesGateway
         status: 'offline',
       });
 
-      console.log(`User ${userId} disconnected`);
     }
   }
 
@@ -166,7 +164,6 @@ export class DirectMessagesGateway
   ) {
     try {
       const senderId = socket.data.userId;
-      console.log(`Sending message from ${senderId} to ${data.receiverId}`);
 
       const message = await this.directMessagesService.createDirectMessage(
         senderId,
@@ -182,17 +179,10 @@ export class DirectMessagesGateway
           message._id.toString(),
         );
 
-      console.log('Message saved:', populatedMessage);
-      console.log('Receiver ID:', data.receiverId);
-      console.log(
-        'All connected users:',
-        Array.from(this.connectedUsers.keys()),
-      );
 
       // Send to receiver
       const receiverSocket = this.connectedUsers.get(data.receiverId);
       if (receiverSocket) {
-        console.log('Sending message to receiver socket:', receiverSocket);
         this.server.to(receiverSocket).emit('new-message', {
           message: populatedMessage,
           fromUser: {
@@ -203,7 +193,6 @@ export class DirectMessagesGateway
         // Push unread count update to receiver (badge)
         await this.emitDmUnreadCount(data.receiverId, senderId);
       } else {
-        console.log('Receiver not online, message saved to database');
       }
 
       // Confirm to sender
@@ -229,7 +218,6 @@ export class DirectMessagesGateway
 
       if (receiverSocket) {
         // ✅ Debug: Log userId
-        console.log('🔍 Typing - userId:', userId);
 
         // ✅ Import Types from mongoose and convert userId to ObjectId
         const { Types } = require('mongoose');
@@ -242,12 +230,10 @@ export class DirectMessagesGateway
           .lean()
           .exec();
 
-        console.log('🔍 Typing - senderProfile:', senderProfile);
 
         const username =
           senderProfile?.username || senderProfile?.displayName || 'Unknown';
 
-        console.log('🔍 Typing - username to send:', username);
 
         this.server.to(receiverSocket).emit('user-typing', {
           fromUserId: userId,
@@ -358,34 +344,11 @@ export class DirectMessagesGateway
       const { Types } = require('mongoose');
       const senderObjectId = new Types.ObjectId(senderId);
 
-      console.log(
-        '📞 [CALL] User',
-        senderId,
-        'initiating',
-        data.type,
-        'call to',
-        data.receiverId,
-      );
-      console.log('📞 [CALL-DEBUG] Looking up profile for userId:', senderId);
-      console.log(
-        '📞 [CALL-DEBUG] ObjectId created:',
-        senderObjectId.toString(),
-      );
 
       const senderProfile = await this.profileModel.findOne({
         userId: senderObjectId,
       });
 
-      console.log('📞 [CALL-DEBUG] Profile query completed');
-      console.log('📞 [CALL-DEBUG] Sender profile found:', {
-        _id: senderProfile?._id?.toString(),
-        userId: senderProfile?.userId?.toString(),
-        username: senderProfile?.username,
-        displayName: senderProfile?.displayName,
-        avatarUrl: senderProfile?.avatarUrl,
-        hasProfile: !!senderProfile,
-        rawProfile: senderProfile ? JSON.stringify(senderProfile) : 'null',
-      });
 
       const callerInfo = {
         userId: senderId,
@@ -396,10 +359,6 @@ export class DirectMessagesGateway
         avatar: senderProfile?.avatarUrl || null,
       };
 
-      console.log(
-        '📞 [CALL-DEBUG] CallerInfo constructed:',
-        JSON.stringify(callerInfo, null, 2),
-      );
 
       if (receiverSocket) {
         const payload = {
@@ -408,30 +367,10 @@ export class DirectMessagesGateway
           callerInfo,
         };
 
-        console.log(
-          '📞 [CALL-DEBUG] Emitting call-incoming event with payload:',
-          JSON.stringify(payload, null, 2),
-        );
 
         this.server.to(receiverSocket).emit('call-incoming', payload);
 
-        console.log(
-          '✅ [CALL] Call notification sent to receiver socket:',
-          receiverSocket,
-        );
-        console.log(
-          '✅ [CALL] CallerInfo.displayName sent:',
-          callerInfo.displayName,
-        );
       } else {
-        console.log(
-          '⚠️ [CALL] Receiver not online - receiverId:',
-          data.receiverId,
-        );
-        console.log(
-          '⚠️ [CALL] Connected users:',
-          Array.from(this.connectedUsers.keys()),
-        );
       }
     } catch (error) {
       console.error('❌ [CALL] Error initiating call:', error);
@@ -493,23 +432,12 @@ export class DirectMessagesGateway
     const userId = socket.data.userId;
     const peerSocket = this.connectedUsers.get(data.peerId);
 
-    console.log(
-      '📞 [CALL-END] User',
-      userId,
-      'ending/canceling call with',
-      data.peerId,
-    );
 
     if (peerSocket) {
       this.server.to(peerSocket).emit('call-ended', {
         from: userId,
       });
-      console.log(
-        '✅ [CALL-END] Call cancellation notification sent to',
-        data.peerId,
-      );
     } else {
-      console.log('⚠️ [CALL-END] Peer not online');
     }
   }
 

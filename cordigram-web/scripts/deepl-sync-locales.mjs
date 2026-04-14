@@ -205,11 +205,9 @@ async function main() {
     });
 
     if (!leavesToTranslate.length) {
-      console.log(`[${locale}] no missing keys, skipping`);
       continue;
     }
 
-    console.log(`[${locale}] translating ${leavesToTranslate.length} entries`);
 
     const prepared = leavesToTranslate.map(({ path: itemPath, value }) => {
       const { protectedText, placeholders } = protectPlaceholders(value);
@@ -237,7 +235,6 @@ async function main() {
 
     if (!args.dryRun) {
       await writeJson(targetFile, targetMessages);
-      console.log(`[${locale}] written to ${path.relative(WORKING_DIR, targetFile)}`);
     }
   }
 }

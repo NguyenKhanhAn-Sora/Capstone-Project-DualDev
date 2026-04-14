@@ -697,7 +697,6 @@ function LiveComments({
         for (const item of queued) {
           try {
             await publishCommentPacket(item);
-            console.debug(`${debugPrefix} pending publish resolved`, { commentId: item.commentId });
           } catch (err) {
             const next = { ...item, retries: item.retries + 1 };
             if (next.retries < 4) {
@@ -736,14 +735,7 @@ function LiveComments({
   }, []);
 
   useEffect(() => {
-    console.debug(`${debugPrefix} mounted`, {
-      localIdentity: localParticipant.identity,
-      localName: localParticipant.name,
-    });
     return () => {
-      console.debug(`${debugPrefix} unmounted`, {
-        localIdentity: localParticipant.identity,
-      });
     };
   }, [localParticipant.identity, localParticipant.name]);
 
@@ -820,12 +812,6 @@ function LiveComments({
           comments?: HistoryWireComment[];
         };
 
-        console.debug(`${debugPrefix} data received`, {
-          type: parsed.type,
-          fromIdentity: participant?.identity,
-          fromName: participant?.name,
-          commentId: parsed.commentId,
-        });
 
         if (parsed.type === "comment_history" && Array.isArray(parsed.comments)) {
           parsed.comments.forEach((item) => {
@@ -875,11 +861,6 @@ function LiveComments({
 
   useEffect(() => {
     const onParticipantConnected = (participant: any) => {
-      console.debug(`${debugPrefix} participant connected`, {
-        identity: participant?.identity,
-        name: participant?.name,
-        remoteParticipants: room.remoteParticipants.size,
-      });
       void sendCommentHistoryToParticipant(participant);
     };
 
@@ -951,20 +932,12 @@ function LiveComments({
         throw new Error("Livestream room is reconnecting. Please try again.");
       }
 
-      console.debug(`${debugPrefix} sending comment`, {
-        commentId,
-        textLength: content.length,
-        localIdentity: localParticipant.identity,
-        localName: localParticipant.name,
-        remoteParticipants: room.remoteParticipants.size,
-      });
       await publishCommentPacket({
         commentId,
         text: content,
         author,
         isHost,
       });
-      console.debug(`${debugPrefix} publishData resolved`, { commentId });
     } catch (err) {
       // Publish failed — keep the local comment visible (optimistic update).
       pendingCommentsRef.current.push({
@@ -2012,11 +1985,6 @@ export default function LivestreamHub({
         }
 
         const tokenPayload = decodeJwtPayload(response.token);
-        console.debug("[LivestreamHub] join token payload", {
-          role: response.role,
-          videoGrant: tokenPayload?.video,
-          payload: tokenPayload,
-        });
         setActiveStreamId(streamId);
         setActiveStreamMeta(response.stream);
         setJoinToken(response.token);

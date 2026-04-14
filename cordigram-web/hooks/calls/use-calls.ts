@@ -109,7 +109,6 @@ export const useCalls = ({ userId, token }: UseCallsOptions) => {
 
     // Handle remote stream
     peerConnection.ontrack = (event) => {
-      console.log("Received remote track:", event.track.kind);
       if (!remoteStreamRef.current) {
         remoteStreamRef.current = new MediaStream();
         setRemoteStream(remoteStreamRef.current);
@@ -126,7 +125,6 @@ export const useCalls = ({ userId, token }: UseCallsOptions) => {
 
     // Handle connection state changes
     peerConnection.onconnectionstatechange = () => {
-      console.log("Connection state:", peerConnection.connectionState);
       if (
         peerConnection.connectionState === "failed" ||
         peerConnection.connectionState === "disconnected"

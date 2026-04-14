@@ -109,9 +109,6 @@ export class LinkPreviewService {
         clearTimeout(timeout);
       }
     } catch (error) {
-      this.logger.debug(
-        `Skip link preview for url=${rawUrl}: ${error instanceof Error ? error.message : 'unknown'}`,
-      );
       return null;
     }
   }

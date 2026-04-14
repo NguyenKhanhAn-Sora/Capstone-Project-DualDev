@@ -32,7 +32,7 @@ export const IncomingCallNotification: React.FC<IncomingCallNotificationProps> =
     setRinging(true);
     const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj==');
     audio.loop = true;
-    audio.play().catch(e => console.log('Audio play failed:', e));
+    audio.play().catch(() => {});
 
     return () => {
       audio.pause();
