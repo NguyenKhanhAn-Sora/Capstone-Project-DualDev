@@ -1,133 +1,48 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import styles from "./ServerSettingsPanel.module.css";
 import DeleteServerModal from "@/components/DeleteServerModal";
+import { useLanguage, type LanguageCode } from "@/component/language-provider";
 
 export type ServerSettingsSection =
   | "profile"
-  | "identity"
   | "interactions"
   | "privileges"
   | "emoji"
   | "sticker"
-  | "voice-emotes"
   | "members"
   | "roles"
   | "invites"
   | "access"
-  | "integrations"
-  | "app-directory"
   | "safety"
-  | "audit-log"
   | "bans"
   | "automod"
   | "community"
-  | "template"
+  | "community-overview"
+  | "community-onboarding"
   | "delete-server";
 
 interface SidebarEntry {
   id: ServerSettingsSection;
-  label: string;
   external?: boolean;
   danger?: boolean;
 }
-
-const SIDEBAR_SECTIONS: { title: string; items: SidebarEntry[]; key: string }[] = [
-  {
-    key: "group-profile",
-    title: "",
-    items: [
-      { id: "profile", label: "Hồ Sơ Máy Chủ" },
-      { id: "identity", label: "Số Nhận Diện Máy Chủ" },
-      { id: "interactions", label: "Tương Tác" },
-      { id: "privileges", label: "Đặc Quyền Nâng Cấp" },
-    ],
-  },
-  {
-    key: "group-bieu-cam",
-    title: "BIỂU CẢM",
-    items: [
-      { id: "emoji", label: "Emoji" },
-      { id: "sticker", label: "Sticker" },
-      { id: "voice-emotes", label: "Biểu Cảm Tiếng" },
-    ],
-  },
-  {
-    key: "group-moi-nguoi",
-    title: "MỌI NGƯỜI",
-    items: [
-      { id: "members", label: "Thành viên" },
-      { id: "roles", label: "Vai trò" },
-      { id: "invites", label: "Lời mời" },
-      { id: "access", label: "Truy cập" },
-    ],
-  },
-  {
-    key: "group-ung-dung",
-    title: "ỨNG DỤNG",
-    items: [
-      { id: "integrations", label: "Tích hợp" },
-      { id: "app-directory", label: "Thư Mục App", external: true },
-    ],
-  },
-  {
-    key: "group-dieu-chinh",
-    title: "ĐIỀU CHỈNH",
-    items: [
-      { id: "safety", label: "Thiết lập An toàn" },
-      { id: "audit-log", label: "Nhật Ký Chỉnh Sửa" },
-      { id: "bans", label: "Chặn" },
-      { id: "automod", label: "AutoMod" },
-    ],
-  },
-  {
-    key: "group-community",
-    title: "",
-    items: [
-      { id: "community", label: "Cài Đặt Cộng Đồng" },
-      { id: "template", label: "Mẫu Máy Chủ" },
-    ],
-  },
-  {
-    key: "group-delete",
-    title: "",
-    items: [{ id: "delete-server", label: "Xóa máy chủ", danger: true }],
-  },
-];
-
-const SECTION_LABELS: Record<ServerSettingsSection, string> = {
-  profile: "Hồ Sơ Máy Chủ",
-  identity: "Số Nhận Diện Máy Chủ",
-  interactions: "Tương Tác",
-  privileges: "Đặc Quyền Nâng Cấp",
-  emoji: "Emoji",
-  sticker: "Sticker",
-  "voice-emotes": "Biểu Cảm Tiếng",
-  members: "Thành viên",
-  roles: "Vai trò",
-  invites: "Lời mời",
-  access: "Truy cập",
-  integrations: "Tích hợp",
-  "app-directory": "Thư Mục App",
-  safety: "Thiết lập An toàn",
-  "audit-log": "Nhật Ký Chỉnh Sửa",
-  bans: "Chặn",
-  automod: "AutoMod",
-  community: "Cài Đặt Cộng Đồng",
-  template: "Mẫu Máy Chủ",
-  "delete-server": "Xóa máy chủ",
-};
 
 export interface ServerSettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   serverName: string;
   serverId: string;
+  /** Khi mở panel, nhảy thẳng tới mục này (ví dụ sticker / emoji). Không truyền thì mặc định Hồ sơ máy chủ. */
+  initialSection?: ServerSettingsSection;
+  locale?: LanguageCode;
   /** Chỉ người tạo (chủ sở hữu) máy chủ mới xóa được. Khi false sẽ ẩn mục "Xóa máy chủ". */
   isOwner?: boolean;
+  communityEnabled?: boolean;
   /** Render nội dung cho từng mục (Hồ Sơ Máy Chủ, v.v.). Nếu không truyền thì hiển thị placeholder. */
   renderSection?: (section: ServerSettingsSection) => React.ReactNode;
+  onCommunityActivated?: () => void;
   /** Gọi khi người dùng xác nhận xóa máy chủ. Sau khi xóa xong nên đóng panel và cập nhật danh sách. */
   onDeleteServer?: (serverId: string) => Promise<void>;
 }
@@ -137,12 +52,27 @@ export default function ServerSettingsPanel({
   onClose,
   serverName,
   serverId,
+  initialSection,
+  locale,
   isOwner = true,
+  communityEnabled = false,
   renderSection,
+  onCommunityActivated,
   onDeleteServer,
 }: ServerSettingsPanelProps) {
+  const { t: tt, language } = useLanguage();
+  const t = tt;
+  const effectiveLocale = (locale ?? language) as LanguageCode;
   const [activeSection, setActiveSection] = useState<ServerSettingsSection>("profile");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [localCommunityEnabled, setLocalCommunityEnabled] = useState(communityEnabled);
+  useEffect(() => setLocalCommunityEnabled(communityEnabled), [communityEnabled]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (initialSection) setActiveSection(initialSection);
+    else setActiveSection("profile");
+  }, [isOpen, initialSection]);
 
   const handleSidebarClick = (section: ServerSettingsSection) => {
     if (section === "delete-server") {
@@ -161,11 +91,50 @@ export default function ServerSettingsPanel({
 
   if (!isOpen) return null;
 
+  const groups: Array<{ key: string; titleKey?: string; items: SidebarEntry[] }> = [
+    {
+      key: "group-profile",
+      items: [
+        { id: "profile" },
+        { id: "interactions" },
+        { id: "privileges" },
+      ],
+    },
+    {
+      key: "group-expressions",
+      titleKey: "chat.serverSettings.groups.expressions",
+      items: [{ id: "emoji" }, { id: "sticker" }],
+    },
+    {
+      key: "group-people",
+      titleKey: "chat.serverSettings.groups.people",
+      items: [{ id: "members" }, { id: "roles" }, { id: "invites" }, { id: "access" }],
+    },
+    {
+      key: "group-moderation",
+      titleKey: "chat.serverSettings.groups.moderation",
+      items: [{ id: "safety" }, { id: "bans" }, { id: "automod" }],
+    },
+    {
+      key: "group-community",
+      items: [{ id: "community" }],
+    },
+    {
+      key: "group-delete",
+      items: [{ id: "delete-server", danger: true }],
+    },
+  ];
+
+  const sectionLabelKey = (section: ServerSettingsSection) =>
+    `chat.serverSettings.sections.${section}`;
+
   const defaultPlaceholder = (
     <div className={styles.placeholderNote}>
       {activeSection === "profile"
-        ? "Trang chỉnh sửa Hồ Sơ Máy Chủ sẽ được minh họa từng mục sau."
-        : `Nội dung cho mục "${SECTION_LABELS[activeSection]}" sẽ được bổ sung sau.`}
+        ? t("chat.serverSettings.placeholder.profile")
+        : t("chat.serverSettings.placeholder.section", {
+            label: t(sectionLabelKey(activeSection)),
+          })}
     </div>
   );
 
@@ -174,25 +143,44 @@ export default function ServerSettingsPanel({
     : defaultPlaceholder;
 
   return (
-    <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal aria-label="Cài đặt máy chủ">
+    <div
+      className={styles.overlay}
+      onClick={onClose}
+      role="dialog"
+      aria-modal
+      aria-label={t("chat.serverSettings.ariaLabel")}
+      data-locale={effectiveLocale}
+    >
       <div className={styles.panel} onClick={(e) => e.stopPropagation()}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarTitle} style={{ paddingTop: 8 }}>
-            MÁY CHỦ CỦA {serverName.toUpperCase()}
+            {t("chat.serverSettings.sidebarTitlePrefix")} {serverName.toUpperCase()}
           </div>
-          {SIDEBAR_SECTIONS.filter((group) => (group.key === "group-delete" ? isOwner : true)).map((group) => (
+          {groups
+            .filter((group) => (group.key === "group-delete" ? isOwner : true))
+            .map((group) => {
+            let items = group.items;
+            if (group.key === "group-community") {
+              if (localCommunityEnabled) {
+                items = [
+                  { id: "community-overview" as ServerSettingsSection },
+                  { id: "community-onboarding" as ServerSettingsSection },
+                ];
+              }
+            }
+            return (
             <div key={group.key}>
-              {group.title ? (
-                <div className={styles.sidebarTitle}>{group.title}</div>
+              {group.titleKey ? (
+                <div className={styles.sidebarTitle}>{t(group.titleKey)}</div>
               ) : null}
-              {group.items.map((item) => (
+              {items.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   className={`${styles.sidebarItem} ${activeSection === item.id ? styles.active : ""} ${item.danger ? styles.sidebarItemDanger : ""}`}
                   onClick={() => handleSidebarClick(item.id)}
                 >
-                  {item.label}
+                  {t(sectionLabelKey(item.id))}
                   {item.external && (
                     <span className={styles.sidebarItemExternal} aria-hidden>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -205,23 +193,24 @@ export default function ServerSettingsPanel({
                 </button>
               ))}
             </div>
-          ))}
+            );
+          })}
         </aside>
         <div className={styles.contentWrapper}>
           <button
             type="button"
             className={styles.closeBtn}
             onClick={onClose}
-            aria-label="Đóng"
+            aria-label={t("settings.close")}
           >
             ×
           </button>
           <div className={styles.content}>
             <div className={styles.contentHeader}>
-              <h2 className={styles.contentTitle}>{SECTION_LABELS[activeSection]}</h2>
+              <h2 className={styles.contentTitle}>{t(sectionLabelKey(activeSection))}</h2>
               {activeSection === "profile" && (
                 <p className={styles.contentDesc}>
-                  Tùy chỉnh cách máy chủ của bạn xuất hiện trong liên kết mời và, nếu được bật, trong Khám Phá Máy Chủ và tin nhắn Kênh Thông Báo
+                  {t("chat.serverSettings.profileDesc")}
                 </p>
               )}
             </div>

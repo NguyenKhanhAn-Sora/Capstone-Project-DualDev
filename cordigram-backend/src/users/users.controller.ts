@@ -18,6 +18,8 @@ import type { Request } from 'express';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { BlocksService } from './blocks.service';
 import { IgnoredService } from './ignored.service';
+import { MentionMuteService } from './mention-mute.service';
+import { UpsertMentionMuteDto } from './dto/mention-mute.dto';
 import { RequestChangeEmailCurrentOtpDto } from './dto/request-change-email-current-otp.dto';
 import { VerifyChangeEmailCurrentOtpDto } from './dto/verify-change-email-current-otp.dto';
 import { RequestChangeEmailNewOtpDto } from './dto/request-change-email-new-otp.dto';
@@ -45,19 +47,42 @@ export class UsersController {
     private readonly usersService: UsersService,
     private readonly blocksService: BlocksService,
     private readonly ignoredService: IgnoredService,
+    private readonly mentionMuteService: MentionMuteService,
     private readonly authService: AuthService,
   ) {}
 
-  @Get('settings')
-  async getSettings(
+  @Post('mention-mutes')
+  async upsertMentionMute(
     @Req() req: Request & { user?: AuthenticatedUser },
-  ): Promise<{ theme: 'light' | 'dark'; language: SupportedLanguage }> {
+    @Body() dto: UpsertMentionMuteDto,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) throw new UnauthorizedException('Unauthorized');
+    return this.mentionMuteService.upsertMute(
+      userId,
+      dto.mutedUserId,
+      dto.duration,
+    );
+  }
+
+  @Delete('mention-mutes/:mutedUserId')
+  async deleteMentionMute(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Param('mutedUserId') mutedUserId: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) throw new UnauthorizedException('Unauthorized');
+    await this.mentionMuteService.removeMute(userId, mutedUserId);
+    return { ok: true };
+  }
+
+  @Get('settings')
+  async getSettings(@Req() req: Request & { user?: AuthenticatedUser }) {
     const userId = req.user?.userId;
     if (!userId) {
       throw new UnauthorizedException('Unauthorized');
     }
-    const result = await this.usersService.getSettings(userId);
-    return result;
+    return this.usersService.getSettings(userId);
   }
 
   @Get('notifications/settings')
@@ -267,17 +292,21 @@ export class UsersController {
   async updateSettings(
     @Req() req: Request & { user?: AuthenticatedUser },
     @Body() dto: UpdateSettingsDto,
-  ): Promise<{ theme: 'light' | 'dark'; language: SupportedLanguage }> {
+  ) {
     const userId = req.user?.userId;
     if (!userId) {
       throw new UnauthorizedException('Unauthorized');
     }
-    const result = await this.usersService.updateSettings({
+    return this.usersService.updateSettings({
       userId,
       theme: dto.theme,
       language: dto.language,
+      dmListFrom: dto.dmListFrom,
+      dmCallFrom: dto.dmCallFrom,
+      showCordigramMemberSince: dto.showCordigramMemberSince,
+      sharePresence: dto.sharePresence,
+      chatSoundEnabled: dto.chatSoundEnabled,
     });
-    return result;
   }
 
   @Patch('notifications/settings')

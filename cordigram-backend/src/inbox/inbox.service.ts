@@ -252,13 +252,14 @@ export class InboxService {
             channelId,
           );
         if (unreadCount <= 0) continue;
-        const messages = await this.messagesService.getMessagesByChannelId(
+        const pack = await this.messagesService.getMessagesByChannelId(
           channelId,
           1,
           0,
           userId,
         );
-        const lastMsg = messages[0];
+        if (pack.chatViewBlocked) continue;
+        const lastMsg = pack.messages[0];
         if (!lastMsg) continue;
         const senderId = lastMsg.senderId?._id ?? lastMsg.senderId;
         const senderStr = senderId?.toString?.();
@@ -285,8 +286,18 @@ export class InboxService {
     return result.slice(0, 50);
   }
 
-  /** Đề cập trong kênh — trả về các tin nhắn mà user bị @mention. */
+  /** Đề cập trong kênh — trả về các tin nhắn mà user bị @mention (chưa đánh dấu đã xem). */
   async getMentions(userId: string): Promise<unknown[]> {
-    return this.messagesService.getChannelMentionsForUser(userId);
+    const raw = await this.messagesService.getChannelMentionsForUser(userId);
+    const userObjectId = new Types.ObjectId(userId);
+    const seenDocs = await this.inboxSeenModel
+      .find({ userId: userObjectId, sourceType: 'channel_mention' })
+      .select('sourceId')
+      .lean()
+      .exec();
+    const seen = new Set(
+      (seenDocs as { sourceId: string }[]).map((d) => d.sourceId),
+    );
+    return (raw as { id: string }[]).filter((item) => !seen.has(item.id));
   }
 }

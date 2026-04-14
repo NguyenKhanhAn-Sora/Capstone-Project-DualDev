@@ -4,11 +4,13 @@ import { RolesService } from './roles.service';
 import { RolesController } from './roles.controller';
 import { Role, RoleSchema } from './role.schema';
 import { ServersModule } from '../servers/servers.module';
+import { AuditLogModule } from '../audit-log/audit-log.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Role.name, schema: RoleSchema }]),
     forwardRef(() => ServersModule),
+    AuditLogModule,
   ],
   controllers: [RolesController],
   providers: [RolesService],

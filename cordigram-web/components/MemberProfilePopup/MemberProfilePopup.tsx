@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import styles from "./MemberProfilePopup.module.css";
 import type { ServerMemberRow, MemberWithRoles } from "@/lib/servers-api";
 import { checkFollowStatus, followUser, unfollowUser } from "@/lib/api";
+import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 
 // Union type để hỗ trợ cả ServerMemberRow cũ và MemberWithRoles mới
 type MemberData = ServerMemberRow | MemberWithRoles;
@@ -41,6 +42,7 @@ export default function MemberProfilePopup({
   onClose,
   onMessage,
 }: MemberProfilePopupProps) {
+  const { t, language } = useLanguage();
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [checkingFollow, setCheckingFollow] = useState(true);
@@ -80,12 +82,18 @@ export default function MemberProfilePopup({
   };
 
   const displayName = member.displayName || member.username;
-  const joinDate = serverJoinDate ? new Date(serverJoinDate).toLocaleDateString("vi-VN", { day: "numeric", month: "short", year: "numeric" }) : "";
+  const joinDate = serverJoinDate
+    ? new Date(serverJoinDate).toLocaleDateString(localeTagForLanguage(language), {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "";
 
   return (
-    <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal aria-label="Hồ sơ thành viên">
+    <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal aria-label={t("chat.popups.memberProfile.aria")}>
       <div className={styles.popup} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Đóng">
+        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label={t("chat.popups.closeAria")}>
           ×
         </button>
 
@@ -125,15 +133,15 @@ export default function MemberProfilePopup({
               onClick={handleFollowClick}
               disabled={followLoading || checkingFollow}
             >
-              {checkingFollow ? "..." : followLoading ? "..." : isFollowing ? "Đã follow" : "Follow"}
+              {checkingFollow ? "..." : followLoading ? "..." : isFollowing ? t("chat.popups.memberProfile.following") : t("chat.popups.memberProfile.follow")}
             </button>
           )}
-          <button type="button" className={styles.btnIcon} onClick={onMessage} title="Nhắn tin" aria-label="Nhắn tin">
+          <button type="button" className={styles.btnIcon} onClick={onMessage} title={t("chat.popups.memberProfile.message")} aria-label={t("chat.popups.memberProfile.messageAria")}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
           </button>
-          <button type="button" className={styles.btnIcon} aria-label="Tùy chọn">
+          <button type="button" className={styles.btnIcon} aria-label={t("chat.popups.memberProfile.optionsAria")}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="12" cy="6" r="1.5" />
               <circle cx="12" cy="12" r="1.5" />
@@ -143,7 +151,7 @@ export default function MemberProfilePopup({
         </div>
 
         <div className={styles.section}>
-          <div className={styles.sectionLabel}>Gia Nhập Từ</div>
+          <div className={styles.sectionLabel}>{t("chat.popups.memberProfile.joinFrom")}</div>
           <div className={styles.sectionRow}>
             <span className={styles.date}>{joinDate || "—"}</span>
             <span className={styles.serverIcon} aria-hidden>📋</span>
@@ -151,14 +159,14 @@ export default function MemberProfilePopup({
         </div>
 
         <div className={styles.section}>
-          <div className={styles.sectionLabel}>Vai trò</div>
+          <div className={styles.sectionLabel}>{t("chat.popups.memberProfile.roles")}</div>
           {/* Hiển thị role badges nếu có */}
           {isMemberWithRoles(member) && member.roles.length > 0 ? (
             <div className={styles.roleBadges}>
               {member.isOwner && (
                 <span className={styles.roleBadgeOwner}>
                   <span className={styles.ownerIcon}>👑</span>
-                  Chủ sở hữu
+                  {t("chat.popups.memberProfile.ownerBadge")}
                 </span>
               )}
               {member.roles.map((role) => (
@@ -182,8 +190,8 @@ export default function MemberProfilePopup({
             <div className={styles.sectionRow}>
               <span>
                 {'role' in member 
-                  ? (member.role === "owner" ? "Chủ" : member.role === "moderator" ? "Mod" : "Thành viên")
-                  : (member as MemberWithRoles).isOwner ? "Chủ" : "Thành viên"
+                  ? (member.role === "owner" ? t("chat.popups.memberProfile.owner") : member.role === "moderator" ? t("chat.popups.memberProfile.moderator") : t("chat.popups.memberProfile.member"))
+                  : (member as MemberWithRoles).isOwner ? t("chat.popups.memberProfile.owner") : t("chat.popups.memberProfile.member")
                 }
               </span>
             </div>
@@ -191,8 +199,8 @@ export default function MemberProfilePopup({
         </div>
 
         <div className={styles.section}>
-          <div className={styles.sectionLabel}>Ghi chú (chỉ hiển thị cho bạn)</div>
-          <p className={styles.notesHint}>Nhấp để thêm ghi chú</p>
+          <div className={styles.sectionLabel}>{t("chat.popups.memberProfile.notes")}</div>
+          <p className={styles.notesHint}>{t("chat.popups.memberProfile.notesHint")}</p>
         </div>
 
         <div className={styles.tabs}>
@@ -201,33 +209,33 @@ export default function MemberProfilePopup({
             className={activeTab === "activity" ? styles.tabActive : styles.tab}
             onClick={() => setActiveTab("activity")}
           >
-            Hoạt động
+            {t("chat.popups.memberProfile.tabActivity")}
           </button>
           <button
             type="button"
             className={activeTab === "followers" ? styles.tabActive : styles.tab}
             onClick={() => setActiveTab("followers")}
           >
-            Follower chung
+            {t("chat.popups.memberProfile.tabFollowers")}
           </button>
         </div>
 
         <div className={styles.tabContent}>
           {activeTab === "activity" && (
             <div className={styles.activityEmpty}>
-              <p>{displayName} không có hoạt động nào để chia sẻ ở đây.</p>
-              <p className={styles.activityHint}>Vẫn đang chờ xem họ sẽ chia sẻ nội dung gì tiếp theo - sao không phá vỡ bầu không khí ngại ngùng này nhỉ?</p>
+              <p>{t("chat.popups.memberProfile.activityEmpty", { name: displayName })}</p>
+              <p className={styles.activityHint}>{t("chat.popups.memberProfile.activityHint")}</p>
               <button type="button" className={styles.btnMessage} onClick={onMessage}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
-                Nhắn tin
+                {t("chat.popups.memberProfile.message")}
               </button>
             </div>
           )}
           {activeTab === "followers" && (
             <div className={styles.activityEmpty}>
-              <p>Follower chung sẽ hiển thị tại đây.</p>
+              <p>{t("chat.popups.memberProfile.followersEmpty")}</p>
             </div>
           )}
         </div>

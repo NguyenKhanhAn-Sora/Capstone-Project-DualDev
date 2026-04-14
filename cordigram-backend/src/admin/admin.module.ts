@@ -37,6 +37,26 @@ import {
   ReportProblem,
   ReportProblemSchema,
 } from '../reportproblem/reportproblem.schema';
+import { Server, ServerSchema } from '../servers/server.schema';
+import { Channel, ChannelSchema } from '../channels/channel.schema';
+import {
+  ChannelCategory,
+  ChannelCategorySchema,
+} from '../channels/channel-category.schema';
+import {
+  ServerNotification,
+  ServerNotificationSchema,
+} from '../servers/server-notification.schema';
+import { Message, MessageSchema } from '../messages/message.schema';
+import { Role, RoleSchema } from '../roles/role.schema';
+import {
+  UserServer,
+  UserServerSchema,
+} from '../access/user-server.schema';
+import {
+  CommunityDiscoveryHistory,
+  CommunityDiscoveryHistorySchema,
+} from './community-discovery-history.schema';
 
 @Module({
   imports: [
@@ -61,6 +81,17 @@ import {
     ]),
     MongooseModule.forFeature([
       { name: ReportProblem.name, schema: ReportProblemSchema },
+      { name: Server.name, schema: ServerSchema },
+      { name: Channel.name, schema: ChannelSchema },
+      { name: ChannelCategory.name, schema: ChannelCategorySchema },
+      { name: ServerNotification.name, schema: ServerNotificationSchema },
+      { name: Message.name, schema: MessageSchema },
+      { name: Role.name, schema: RoleSchema },
+      { name: UserServer.name, schema: UserServerSchema },
+      {
+        name: CommunityDiscoveryHistory.name,
+        schema: CommunityDiscoveryHistorySchema,
+      },
     ]),
     LivekitModule,
     NotificationsModule,

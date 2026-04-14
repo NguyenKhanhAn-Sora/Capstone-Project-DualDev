@@ -23,7 +23,7 @@ export default function MessageActionsMenu({
   position,
   isOwnMessage = false,
   isPinned = false,
-}: MessageActionsMenuProps) {
+}: MessageActionsMenuProps) {    
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

@@ -1,0 +1,109 @@
+.wrapper {
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle, #e3e5e8);
+  background: var(--background-secondary, #f2f3f5);
+  overflow: hidden;
+}
+
+.headerRow {
+  display: grid;
+  grid-template-columns: 2.4fr 1.3fr 1.2fr 1.8fr 2fr 1.5fr;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #6a7480);
+  background: var(--background-tertiary, #e3e5e8);
+}
+
+.body {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 2.4fr 1.3fr 1.2fr 1.8fr 2fr 1.5fr;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:nth-child(odd) {
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.row:hover {
+  background: rgba(88, 101, 242, 0.06);
+}
+
+.colUser,
+.colDate,
+.colJoinMethod,
+.colRoles,
+.colFlags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.colUser {
+  gap: 8px;
+}
+
+.avatarPlaceholder {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #99aab5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.userText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.displayName {
+  font-weight: 500;
+}
+
+.username {
+  font-size: 12px;
+  color: var(--text-muted, #6a7480);
+}
+
+.colDate {
+  font-size: 12px;
+}
+
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid #99aab5;
+  font-size: 11px;
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.loading,
+.empty {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text-muted, #6a7480);
+}
+

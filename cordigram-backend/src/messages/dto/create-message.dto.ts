@@ -3,6 +3,7 @@ import {
   IsOptional,
   IsArray,
   IsIn,
+  IsNumber,
   MinLength,
   MaxLength,
 } from 'class-validator';
@@ -34,4 +35,20 @@ export class CreateMessageDto {
   @IsOptional()
   @IsString()
   giphyId?: string;
+
+  @IsOptional()
+  @IsString()
+  customStickerUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  serverStickerId?: string;
+
+  @IsOptional()
+  @IsString()
+  voiceUrl?: string;
+
+  @IsOptional()
+  @IsNumber()
+  voiceDuration?: number;
 }

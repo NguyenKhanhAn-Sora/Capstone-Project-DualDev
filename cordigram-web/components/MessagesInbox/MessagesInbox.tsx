@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { io, type Socket } from "socket.io-client";
 import styles from "./MessagesInbox.module.css";
@@ -15,8 +15,13 @@ import {
   type InboxMentionItem,
 } from "@/lib/inbox-api";
 import { getApiBaseUrl } from "@/lib/api";
-import { acceptServerInvite, declineServerInvite } from "@/lib/servers-api";
+import { markDmConversationRead } from "@/lib/api";
+import { acceptServerInvite, declineServerInvite, getServerAccessSettings, markChannelAsRead } from "@/lib/servers-api";
+import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 type TabKey = "for-you" | "unread" | "mentions";
+
+type UiUnreadItem = InboxUnreadItem & { read?: boolean };
+type UiMentionItem = InboxMentionItem & { seen?: boolean };
 
 interface MessagesInboxProps {
   onClose: () => void;
@@ -27,30 +32,84 @@ interface MessagesInboxProps {
   onMarkSeen?: () => void;
   /** Sau khi chấp nhận lời mời: parent load lại danh sách server và chọn server vừa tham gia. */
   onAcceptInvite?: (serverId: string) => Promise<void>;
+  /**
+   * Nếu server bật apply-to-join, gọi callback để parent mở modal câu hỏi thay vì accept invite ngay.
+   * Trả true nếu đã mở popup apply (inbox sẽ dừng luồng accept).
+   */
+  onApplyToJoinBeforeAccept?: (serverId: string, inviteId: string) => Promise<boolean>;
 }
 
-function formatTimeAgo(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffM = Math.floor(diffMs / 60000);
-  const diffH = Math.floor(diffMs / 3600000);
-  const diffD = Math.floor(diffMs / 86400000);
-  if (diffM < 60) return `${diffM} phút`;
-  if (diffH < 24) return `${diffH} giờ`;
-  if (diffD < 28) return `${diffD} ngày`;
-  return d.toLocaleDateString("vi-VN");
-}
-
-export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigateToDM, onMarkSeen, onAcceptInvite }: MessagesInboxProps) {
+export default function MessagesInbox({
+  onClose,
+  onNavigateToChannel,
+  onNavigateToDM,
+  onMarkSeen,
+  onAcceptInvite,
+  onApplyToJoinBeforeAccept,
+}: MessagesInboxProps) {
+  const { t, language } = useLanguage();
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("for-you");
   const [forYouItems, setForYouItems] = useState<InboxForYouItem[]>([]);
-  const [unreadItems, setUnreadItems] = useState<InboxUnreadItem[]>([]);
-  const [mentionItems, setMentionItems] = useState<InboxMentionItem[]>([]);
+  const [unreadItems, setUnreadItems] = useState<UiUnreadItem[]>([]);
+  const [mentionItems, setMentionItems] = useState<UiMentionItem[]>([]);
   const [loading, setLoading] = useState({ "for-you": true, unread: true, mentions: true });
+  const [markAllLoading, setMarkAllLoading] = useState(false);
   const dmSocketRef = useRef<Socket | null>(null);
   const unreadRefreshTimerRef = useRef<number | null>(null);
+
+  const resolveNotifText = useCallback(
+    (raw: string | undefined): string => {
+      if (!raw) return "";
+
+      // Current __SYS: markers (new notifications)
+      if (raw === "__SYS:adminView") return t("chat.popups.inbox.adminViewTitle");
+      if (raw.startsWith("__SYS:adminViewContent:")) {
+        const server = raw.slice("__SYS:adminViewContent:".length);
+        return t("chat.popups.inbox.adminViewContent").replace("{server}", server);
+      }
+      if (raw === "__SYS:mentionSpamTitle") return t("chat.popups.inbox.mentionSpamTitle");
+      if (raw.startsWith("__SYS:mentionSpamWarning:")) {
+        const server = raw.slice("__SYS:mentionSpamWarning:".length);
+        return t("chat.popups.inbox.mentionSpamWarning").replace("{server}", server);
+      }
+
+      // Legacy Vietnamese strings stored in DB before migration
+      if (raw === "Quản trị viên hệ thống đang xem máy chủ") {
+        return t("chat.popups.inbox.adminViewTitle");
+      }
+      const adminContentVi = raw.match(/^Quản trị viên hệ thống đang kiểm tra máy chủ "(.+)" của bạn\./);
+      if (adminContentVi) {
+        return t("chat.popups.inbox.adminViewContent").replace("{server}", adminContentVi[1]);
+      }
+      if (raw === "⚠️ Cảnh báo spam đề cập") {
+        return t("chat.popups.inbox.mentionSpamTitle");
+      }
+      const spamVi = raw.match(/^Bạn đã bị cảnh báo vì spam đề cập trong kênh của máy chủ "(.+)"\./);
+      if (spamVi) {
+        return t("chat.popups.inbox.mentionSpamWarning").replace("{server}", spamVi[1]);
+      }
+
+      return raw;
+    },
+    [t],
+  );
+
+  const formatTimeAgo = useCallback(
+    (iso: string) => {
+      const d = new Date(iso);
+      const now = new Date();
+      const diffMs = now.getTime() - d.getTime();
+      const diffM = Math.floor(diffMs / 60000);
+      const diffH = Math.floor(diffMs / 3600000);
+      const diffD = Math.floor(diffMs / 86400000);
+      if (diffM < 60) return t("chat.popups.inbox.timeMinutes", { n: Math.max(0, diffM) });
+      if (diffH < 24) return t("chat.popups.inbox.timeHours", { n: diffH });
+      if (diffD < 28) return t("chat.popups.inbox.timeDays", { n: diffD });
+      return d.toLocaleDateString(localeTagForLanguage(language));
+    },
+    [t, language],
+  );
 
   const authToken = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -67,35 +126,79 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
     }
     unreadRefreshTimerRef.current = window.setTimeout(() => {
       fetchInboxUnread()
-        .then((res) => setUnreadItems(res.items ?? []))
+        .then((res) => {
+          // API returns only unread; merge in to keep already-read items visible in UI
+          setUnreadItems((prev) => {
+            const map = new Map<string, UiUnreadItem>();
+            prev.forEach((it) => {
+              const key = it.type === "dm" ? `dm:${it.userId}` : `ch:${it.serverId}:${it.channelId}`;
+              map.set(key, it);
+            });
+            (res.items ?? []).forEach((it) => {
+              const key = it.type === "dm" ? `dm:${it.userId}` : `ch:${it.serverId}:${it.channelId}`;
+              map.set(key, { ...(it as any), read: false });
+            });
+            return Array.from(map.values());
+          });
+        })
         .catch(() => undefined);
     }, 250);
+  };
+
+  const handleMarkAllRead = async () => {
+    if (markAllLoading) return;
+    setMarkAllLoading(true);
+    try {
+      const toMarkForYou = forYouItems.filter((i) => i.seen !== true);
+      const toMarkMentions = mentionItems;
+      const toMarkUnread = unreadItems;
+
+      await Promise.allSettled([
+        ...toMarkForYou.map((i) => markInboxSeen(i.type, i._id)),
+        ...toMarkMentions.map((m) => markInboxSeen("channel_mention", m.id)),
+        ...toMarkUnread.map((u) => {
+          if (u.type === "dm") {
+            if (!authToken) return Promise.resolve();
+            return markDmConversationRead({ token: authToken, userId: u.userId }).then(() => undefined);
+          }
+          // channel
+          return markChannelAsRead(u.channelId).then(() => undefined);
+        }),
+      ]);
+
+      // Clear dots for existing items immediately but keep the items visible.
+      setForYouItems((prev) => prev.map((i) => (i.seen !== true ? { ...i, seen: true } : i)));
+      setMentionItems((prev) => prev.map((m) => ({ ...m, seen: true })));
+      setUnreadItems((prev) =>
+        prev.map((u) =>
+          u.type === "dm"
+            ? ({ ...u, unreadCount: 0, read: true } as any)
+            : ({ ...u, unreadCount: 0, read: true } as any),
+        ),
+      );
+      onMarkSeen?.();
+    } finally {
+      setMarkAllLoading(false);
+    }
   };
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const [forYouRes, unreadRes, mentionsRes] = await Promise.all([
-          fetchInboxForYou(),
-          fetchInboxUnread(),
-          fetchInboxMentions(),
-        ]);
-        if (cancelled) return;
-        setForYouItems(forYouRes.items ?? []);
-        setUnreadItems(unreadRes.items ?? []);
-        setMentionItems(mentionsRes.items ?? []);
-      } catch (e) {
-        if (!cancelled) {
-          setForYouItems([]);
-          setUnreadItems([]);
-          setMentionItems([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading({ "for-you": false, unread: false, mentions: false });
-        }
-      }
+      setLoading({ "for-you": true, unread: true, mentions: true });
+      const results = await Promise.allSettled([
+        fetchInboxForYou(),
+        fetchInboxUnread(),
+        fetchInboxMentions(),
+      ]);
+      if (cancelled) return;
+      const forYouRes = results[0].status === "fulfilled" ? results[0].value : null;
+      const unreadRes = results[1].status === "fulfilled" ? results[1].value : null;
+      const mentionsRes = results[2].status === "fulfilled" ? results[2].value : null;
+      setForYouItems(forYouRes?.items ?? []);
+      setUnreadItems((unreadRes?.items ?? []).map((i) => ({ ...(i as any), read: false })));
+      setMentionItems((mentionsRes?.items ?? []).map((i) => ({ ...(i as any), seen: false })));
+      setLoading({ "for-you": false, unread: false, mentions: false });
     })();
     return () => {
       cancelled = true;
@@ -133,7 +236,14 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
     chSocket.on("channel-notification", (data: any) => {
       if (data?.isMention) {
         fetchInboxMentions()
-          .then((res) => setMentionItems(res.items ?? []))
+          .then((res) =>
+            setMentionItems((prev) => {
+              const map = new Map<string, UiMentionItem>();
+              prev.forEach((m) => map.set(m.id, m));
+              (res.items ?? []).forEach((m) => map.set(m.id, { ...(m as any), seen: false }));
+              return Array.from(map.values());
+            }),
+          )
           .catch(() => undefined);
       }
       scheduleRefreshUnread();
@@ -149,6 +259,26 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
       chSocket.disconnect();
     };
   }, [authToken]);
+
+  useEffect(() => {
+    if (tab !== "mentions") return;
+    let cancelled = false;
+    fetchInboxMentions()
+      .then((res) => {
+        if (cancelled) return;
+        // Merge in new unseen mentions; keep existing (even if already marked seen locally)
+        setMentionItems((prev) => {
+          const map = new Map<string, UiMentionItem>();
+          prev.forEach((m) => map.set(m.id, m));
+          (res.items ?? []).forEach((m) => map.set(m.id, { ...(m as any), seen: false }));
+          return Array.from(map.values());
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [tab]);
 
   /** Mở item trong tab Dành cho bạn và đánh dấu đã xem. */
   const handleForYouClick = async (item: InboxForYouItem) => {
@@ -180,6 +310,24 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
   /** Chấp nhận lời mời vào máy chủ (nút ✓). */
   const handleAcceptInvite = async (item: InboxServerInviteItem) => {
     try {
+      // Nếu server bật apply-to-join, để parent mở modal câu hỏi trước.
+      if (onApplyToJoinBeforeAccept) {
+        try {
+          const settings = await getServerAccessSettings(item.serverId);
+          if (settings.accessMode === "apply") {
+            const opened = await onApplyToJoinBeforeAccept(item.serverId, item._id);
+            if (opened) {
+              await markInboxSeen("server_invite", item._id);
+              removeInviteFromList(item._id);
+              onClose();
+              return;
+            }
+          }
+        } catch {
+          // Nếu không lấy được settings, tiếp tục luồng accept bình thường.
+        }
+      }
+
       await acceptServerInvite(item._id);
       await markInboxSeen("server_invite", item._id);
       removeInviteFromList(item._id);
@@ -216,7 +364,11 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
     onClose();
   };
 
-  const handleMentionClick = (item: InboxMentionItem) => {
+  const handleMentionClick = async (item: InboxMentionItem) => {
+    try {
+      await markInboxSeen("channel_mention", item.messageId || item.id);
+      setMentionItems((prev) => prev.filter((m) => m.id !== item.id));
+    } catch (_) {}
     if (onNavigateToChannel) onNavigateToChannel(item.serverId, item.channelId);
     else router.push(`/messages?server=${item.serverId}&channel=${item.channelId}`);
     onClose();
@@ -234,9 +386,9 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                 <polyline points="22,6 12,13 2,6" />
               </svg>
             </span>
-            Hộp thư đến
+            {t("chat.popups.inbox.title")}
           </h2>
-          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Đóng">
+          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label={t("chat.popups.closeAria")}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
@@ -249,21 +401,30 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
             className={`${styles.tab} ${tab === "for-you" ? styles.tabActive : ""}`}
             onClick={() => setTab("for-you")}
           >
-            Dành cho Bạn
+            {t("chat.popups.inbox.tabForYou")}
           </button>
           <button
             type="button"
             className={`${styles.tab} ${tab === "unread" ? styles.tabActive : ""}`}
             onClick={() => setTab("unread")}
           >
-            Chưa đọc
+            {t("chat.popups.inbox.tabUnread")}
           </button>
           <button
             type="button"
             className={`${styles.tab} ${tab === "mentions" ? styles.tabActive : ""}`}
             onClick={() => setTab("mentions")}
           >
-            Đề cập
+            {t("chat.popups.inbox.tabMentions")}
+          </button>
+          <button
+            type="button"
+            className={styles.markAllBtn}
+            onClick={handleMarkAllRead}
+            disabled={markAllLoading}
+            title={t("chat.popups.inbox.markAllTitle")}
+          >
+            {markAllLoading ? t("chat.popups.inbox.markAllDoing") : t("chat.popups.inbox.markAll")}
           </button>
         </div>
 
@@ -271,10 +432,10 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
           {tab === "for-you" && (
             <>
               {loading["for-you"] ? (
-                <div className={styles.loading}>Đang tải...</div>
+                <div className={styles.loading}>{t("chat.popups.inbox.loading")}</div>
               ) : forYouItems.length === 0 ? (
                 <div className={styles.empty}>
-                  Không có sự kiện, lời mời hoặc thông báo vai trò nào từ các máy chủ của bạn.
+                  {t("chat.popups.inbox.emptyForYou")}
                 </div>
               ) : (
                 forYouItems.map((item) =>
@@ -302,11 +463,11 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                         <p className={styles.eventTitle}>
                           {item.topic}
                           {item.status === "live" && (
-                            <span style={{ color: "var(--color-primary)", marginLeft: 6 }}>• Đang diễn ra</span>
+                            <span style={{ color: "var(--color-primary)", marginLeft: 6 }}>{t("chat.popups.inbox.eventLive")}</span>
                           )}
                         </p>
                         <p className={styles.eventMeta}>
-                          đã bắt đầu trong Máy chủ của {item.serverName}.
+                          {t("chat.popups.inbox.eventStarted", { serverName: item.serverName })}
                         </p>
                         <p className={styles.eventTime}>{formatTimeAgo(item.startAt)}</p>
                       </div>
@@ -332,13 +493,13 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                         {item.seen !== true && <span className={styles.eventItemUnreadDot} aria-hidden />}
                       </div>
                       <div className={styles.eventBody}>
-                        <p className={styles.eventTitle}>{item.title}</p>
+                        <p className={styles.eventTitle}>{resolveNotifText(item.title)}</p>
                         <p className={styles.eventMeta}>
                           {item.serverName}
                           {item.targetRoleName ? ` • ${item.targetRoleName}` : ""}
                         </p>
                         <p className={styles.unreadPreview}>
-                          {item.content}
+                          {resolveNotifText(item.content)}
                         </p>
                         <p className={styles.eventTime}>{formatTimeAgo(item.createdAt)}</p>
                       </div>
@@ -363,10 +524,13 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                       </div>
                       <div className={styles.eventBody}>
                         <p className={styles.eventTitle}>
-                          Lời mời vào máy chủ
+                          {t("chat.popups.inbox.inviteTitle")}
                         </p>
                         <p className={styles.eventMeta}>
-                          {item.inviterDisplay} mời bạn tham gia {item.serverName}.
+                          {t("chat.popups.inbox.inviteMeta", {
+                            inviter: item.inviterDisplay,
+                            serverName: item.serverName,
+                          })}
                         </p>
                         <p className={styles.eventTime}>{formatTimeAgo(item.createdAt)}</p>
                       </div>
@@ -374,9 +538,9 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                         <button
                           type="button"
                           className={styles.inviteActionBtn}
-                          title="Chấp nhận"
+                          title={t("chat.popups.inbox.accept")}
                           onClick={() => handleAcceptInvite(item)}
-                          aria-label="Chấp nhận lời mời"
+                          aria-label={t("chat.popups.inbox.acceptInviteAria")}
                         >
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <polyline points="20 6 9 17 4 12" />
@@ -385,9 +549,9 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                         <button
                           type="button"
                           className={`${styles.inviteActionBtn} ${styles.inviteActionBtnDecline}`}
-                          title="Từ chối"
+                          title={t("chat.popups.inbox.decline")}
                           onClick={() => handleDeclineInvite(item)}
-                          aria-label="Từ chối lời mời"
+                          aria-label={t("chat.popups.inbox.declineInviteAria")}
                         >
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <line x1="18" y1="6" x2="6" y2="18" />
@@ -405,10 +569,10 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
           {tab === "unread" && (
             <>
               {loading.unread ? (
-                <div className={styles.loading}>Đang tải...</div>
+                <div className={styles.loading}>{t("chat.popups.inbox.loading")}</div>
               ) : unreadItems.length === 0 ? (
                 <div className={styles.empty}>
-                  Không có tin nhắn hoặc thông báo chưa đọc từ các kênh.
+                  {t("chat.popups.inbox.emptyUnread")}
                 </div>
               ) : (
                 unreadItems.map((item) =>
@@ -425,12 +589,14 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                             item.username?.charAt(0)?.toUpperCase() ??
                             "?"}
                         </div>
-                        <span className={styles.eventItemUnreadDot} aria-hidden />
+                        {(item.unreadCount ?? 0) > 0 ? (
+                          <span className={styles.eventItemUnreadDot} aria-hidden />
+                        ) : null}
                       </div>
                       <div className={styles.eventBody}>
                         <div className={styles.unreadTopRow}>
                           <p className={styles.unreadTitle}>
-                            {item.displayName || item.username || "Tin nhắn"}
+                            {item.displayName || item.username || t("chat.popups.inbox.dmFallback")}
                           </p>
                           <div className={styles.unreadRight}>
                             <span className={styles.unreadTime}>
@@ -446,7 +612,7 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                         <p className={styles.unreadPreview}>
                           {item.lastMessage?.trim()
                             ? item.lastMessage
-                            : "Bạn có tin nhắn mới"}
+                            : t("chat.popups.inbox.newMessageFallback")}
                         </p>
                       </div>
                     </button>
@@ -461,7 +627,9 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                         <div className={styles.eventAvatar}>
                           {item.serverName?.charAt(0)?.toUpperCase() ?? "#"}
                         </div>
-                        <span className={styles.eventItemUnreadDot} aria-hidden />
+                        {(item.unreadCount ?? 0) > 0 ? (
+                          <span className={styles.eventItemUnreadDot} aria-hidden />
+                        ) : null}
                       </div>
                       <div className={styles.eventBody}>
                         <div className={styles.unreadTopRow}>
@@ -484,7 +652,7 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
                         <p className={styles.unreadPreview}>
                           {item.lastMessage?.trim()
                             ? item.lastMessage
-                            : "Bạn có tin nhắn mới"}
+                            : t("chat.popups.inbox.newMessageFallback")}
                         </p>
                       </div>
                     </button>
@@ -497,28 +665,41 @@ export default function MessagesInbox({ onClose, onNavigateToChannel, onNavigate
           {tab === "mentions" && (
             <>
               {loading.mentions ? (
-                <div className={styles.loading}>Đang tải...</div>
+                <div className={styles.loading}>{t("chat.popups.inbox.loading")}</div>
               ) : mentionItems.length === 0 ? (
                 <div className={styles.empty}>
-                  Chưa có ai đề cập bạn trong kênh.
+                  {t("chat.popups.inbox.emptyMentions")}
                 </div>
               ) : (
                 mentionItems.map((item) => (
                   <button
                     key={item.id}
                     type="button"
-                    className={styles.mentionItem}
+                    className={styles.unreadItem}
                     onClick={() => handleMentionClick(item)}
                   >
-                    <div className={styles.eventAvatar}>
-                      {item.actorName.charAt(0).toUpperCase()}
+                    <div className={styles.eventItemAvatarWrap}>
+                      <div className={styles.eventAvatar}>
+                        {(item.serverName?.trim() || "#").charAt(0).toUpperCase()}
+                      </div>
+                      {item.seen !== true ? (
+                        <span className={styles.eventItemUnreadDot} aria-hidden />
+                      ) : null}
                     </div>
                     <div className={styles.eventBody}>
-                      <p className={styles.eventTitle}>
-                        {item.actorName} đã đề cập bạn trong # {item.channelName}
-                      </p>
-                      <p className={styles.eventMeta}>
-                        {item.serverName} • {formatTimeAgo(item.createdAt)}
+                      <div className={styles.unreadTopRow}>
+                        <p className={styles.unreadTitle}>
+                          {item.serverName?.trim() || t("chat.popups.inbox.serverFallback")}, #{item.channelName}
+                        </p>
+                        <span className={styles.unreadTime}>
+                          {formatTimeAgo(item.createdAt)}
+                        </span>
+                      </div>
+                      <p className={styles.unreadPreview}>
+                        <strong>{item.actorName}</strong> {t("chat.popups.inbox.mentionYou")}
+                        {item.excerpt?.trim()
+                          ? ` — ${item.excerpt.trim().slice(0, 140)}`
+                          : ""}
                       </p>
                     </div>
                   </button>

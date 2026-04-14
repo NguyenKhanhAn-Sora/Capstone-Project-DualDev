@@ -1,10 +1,11 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import styles from "./MessageSearchPanel.module.css";
 import * as serversApi from "@/lib/servers-api";
 import { searchDirectMessages } from "@/lib/api";
+import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 
 interface MessageSearchPanelProps {
   isOpen: boolean;
@@ -33,19 +34,6 @@ function highlightText(text: string, query: string): React.ReactNode {
   );
 }
 
-function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) {
-    return `H\u00f4m nay l\u00fac ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-  }
-  if (diffDays === 1) return "H\u00f4m qua";
-  if (diffDays < 7) return `${diffDays} ng\u00e0y tr\u01b0\u1edbc`;
-  return d.toLocaleDateString("vi-VN");
-}
-
 export default function MessageSearchPanel({
   isOpen,
   onClose,
@@ -58,6 +46,7 @@ export default function MessageSearchPanel({
   dmPartnerName,
   onResultClick,
 }: MessageSearchPanelProps) {
+  const { t, language } = useLanguage();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -185,6 +174,24 @@ export default function MessageSearchPanel({
 
   const hasActiveFilters = filterChannelId || filterSenderId || filterBefore || filterAfter || filterHasFile;
 
+  const formatTime = useCallback(
+    (dateStr: string) => {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - d.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) {
+        return t("chat.popups.messageSearch.todayAt", {
+          time: `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`,
+        });
+      }
+      if (diffDays === 1) return t("chat.popups.messageSearch.yesterday");
+      if (diffDays < 7) return t("chat.popups.messageSearch.daysAgo", { n: diffDays });
+      return d.toLocaleDateString(localeTagForLanguage(language));
+    },
+    [t, language],
+  );
+
   if (!isOpen) return null;
 
   const panelContent = (
@@ -199,9 +206,9 @@ export default function MessageSearchPanel({
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
             </span>
-            T\u00ecm ki\u1ebfm tin nh\u1eafn
+            {t("chat.popups.messageSearch.title")}
           </h3>
-          <button className={styles.closeBtn} onClick={onClose} title="\u0110\u00f3ng">
+          <button className={styles.closeBtn} onClick={onClose} title={t("chat.popups.closeAria")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
@@ -221,7 +228,13 @@ export default function MessageSearchPanel({
               ref={inputRef}
               className={styles.searchInput}
               type="text"
-              placeholder={mode === "dm" ? `T\u00ecm trong cu\u1ed9c tr\u00f2 chuy\u1ec7n v\u1edbi ${dmPartnerName || "..."}` : "T\u00ecm n\u1ed9i dung tin nh\u1eafn..."}
+              placeholder={
+                mode === "dm"
+                  ? t("chat.popups.messageSearch.placeholderDm", {
+                      name: dmPartnerName || "...",
+                    })
+                  : t("chat.popups.messageSearch.placeholderServer")
+              }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -235,7 +248,7 @@ export default function MessageSearchPanel({
                 value={filterChannelId}
                 onChange={(e) => setFilterChannelId(e.target.value)}
               >
-                <option value="">T\u1ea5t c\u1ea3 k\u00eanh</option>
+                <option value="">{t("chat.popups.messageSearch.allChannels")}</option>
                 {channels.filter((c) => c.type === "text").map((ch) => (
                   <option key={ch._id} value={ch._id}>#{ch.name}</option>
                 ))}
@@ -248,7 +261,7 @@ export default function MessageSearchPanel({
                 value={filterSenderId}
                 onChange={(e) => setFilterSenderId(e.target.value)}
               >
-                <option value="">T\u1ea5t c\u1ea3 ng\u01b0\u1eddi d\u00f9ng</option>
+                <option value="">{t("chat.popups.messageSearch.allUsers")}</option>
                 {members.map((m) => (
                   <option key={m.userId} value={m.userId}>
                     {m.displayName || m.username || m.userId}
@@ -264,7 +277,7 @@ export default function MessageSearchPanel({
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
               </svg>
-              C\u00f3 file
+              {t("chat.popups.messageSearch.hasFile")}
             </button>
 
             <button
@@ -277,7 +290,7 @@ export default function MessageSearchPanel({
                 <line x1="8" y1="2" x2="8" y2="6" />
                 <line x1="3" y1="10" x2="21" y2="10" />
               </svg>
-              Th\u1eddi gian
+              {t("chat.popups.messageSearch.time")}
             </button>
           </div>
 
@@ -288,16 +301,16 @@ export default function MessageSearchPanel({
                 className={styles.dateInput}
                 value={filterAfter}
                 onChange={(e) => setFilterAfter(e.target.value)}
-                placeholder="T\u1eeb ng\u00e0y"
-                title="T\u1eeb ng\u00e0y"
+                placeholder={t("chat.popups.messageSearch.fromDate")}
+                title={t("chat.popups.messageSearch.fromDate")}
               />
               <input
                 type="date"
                 className={styles.dateInput}
                 value={filterBefore}
                 onChange={(e) => setFilterBefore(e.target.value)}
-                placeholder="\u0110\u1ebfn ng\u00e0y"
-                title="\u0110\u1ebfn ng\u00e0y"
+                placeholder={t("chat.popups.messageSearch.toDate")}
+                title={t("chat.popups.messageSearch.toDate")}
               />
             </div>
           )}
@@ -307,12 +320,12 @@ export default function MessageSearchPanel({
           <div className={styles.resultsMeta}>
             <span>
               {totalCount > 0
-                ? `T\u00ecm th\u1ea5y ${totalCount} k\u1ebft qu\u1ea3`
-                : "Kh\u00f4ng t\u00ecm th\u1ea5y k\u1ebft qu\u1ea3"}
+                ? t("chat.popups.messageSearch.found", { count: totalCount })
+                : t("chat.popups.messageSearch.none")}
             </span>
             {hasActiveFilters && (
               <button className={styles.clearFilters} onClick={clearAllFilters}>
-                X\u00f3a b\u1ed9 l\u1ecdc
+                {t("chat.popups.messageSearch.clearFilters")}
               </button>
             )}
           </div>
@@ -322,7 +335,7 @@ export default function MessageSearchPanel({
           {loading && results.length === 0 ? (
             <div className={styles.loadingState}>
               <div className={styles.spinner} />
-              <span>\u0110ang t\u00ecm ki\u1ebfm...</span>
+              <span>{t("chat.popups.messageSearch.searching")}</span>
             </div>
           ) : hasSearched && results.length === 0 ? (
             <div className={styles.emptyState}>
@@ -332,8 +345,8 @@ export default function MessageSearchPanel({
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
               </div>
-              <div className={styles.emptyText}>Kh\u00f4ng t\u00ecm th\u1ea5y k\u1ebft qu\u1ea3</div>
-              <div className={styles.emptyHint}>Th\u1eed t\u1eeb kh\u00f3a kh\u00e1c ho\u1eb7c thay \u0111\u1ed5i b\u1ed9 l\u1ecdc</div>
+              <div className={styles.emptyText}>{t("chat.popups.messageSearch.empty")}</div>
+              <div className={styles.emptyHint}>{t("chat.popups.messageSearch.emptyHint")}</div>
             </div>
           ) : (
             <>
@@ -374,7 +387,7 @@ export default function MessageSearchPanel({
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                         </svg>
-                        {msg.attachments.length} file \u0111\u00ednh k\u00e8m
+                        {t("chat.popups.messageSearch.attachments", { count: msg.attachments.length })}
                       </div>
                     )}
                   </div>
@@ -388,7 +401,11 @@ export default function MessageSearchPanel({
                     onClick={handleLoadMore}
                     disabled={loading}
                   >
-                    {loading ? "\u0110ang t\u1ea3i..." : `Xem th\u00eam (${totalCount - results.length} k\u1ebft qu\u1ea3)`}
+                    {loading
+                      ? t("chat.popups.messageSearch.loadingMore")
+                      : t("chat.popups.messageSearch.loadMore", {
+                          count: totalCount - results.length,
+                        })}
                   </button>
                 </div>
               )}

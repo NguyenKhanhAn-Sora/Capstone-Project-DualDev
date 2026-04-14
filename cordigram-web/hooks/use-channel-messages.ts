@@ -30,6 +30,17 @@ export interface ChannelReactionUpdateEvent {
   reactions: any[];
 }
 
+export interface ChannelNotificationEvent {
+  type?: string;
+  serverId?: string;
+  channelId?: string;
+  messageId?: string;
+  senderName?: string;
+  excerpt?: string;
+  isMention?: boolean;
+  createdAt?: string;
+}
+
 interface UseChannelMessagesOptions {
   token: string | null;
 }
@@ -39,6 +50,7 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
   const [isConnected, setIsConnected] = useState(false);
   const [newMessageChannel, setNewMessageChannel] = useState<ChannelNewMessageEvent | null>(null);
   const [reactionUpdateChannel, setReactionUpdateChannel] = useState<ChannelReactionUpdateEvent | null>(null);
+  const [channelNotification, setChannelNotification] = useState<ChannelNotificationEvent | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -67,6 +79,10 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
       }
     });
 
+    socket.on("channel-notification", (data: ChannelNotificationEvent) => {
+      if (data) setChannelNotification(data);
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
@@ -86,13 +102,16 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
   }, []);
 
   const clearNewMessageChannel = useCallback(() => setNewMessageChannel(null), []);
+  const clearChannelNotification = useCallback(() => setChannelNotification(null), []);
 
   return {
     isConnected,
     newMessageChannel,
     reactionUpdateChannel,
+    channelNotification,
     joinChannel,
     leaveChannel,
     clearNewMessageChannel,
+    clearChannelNotification,
   };
 }

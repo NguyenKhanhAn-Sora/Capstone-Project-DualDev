@@ -5,6 +5,8 @@ import { useRouter, useParams } from "next/navigation";
 import * as serversApi from "@/lib/servers-api";
 import type { EventPreviewResponse } from "@/lib/servers-api";
 import { fetchCurrentProfile } from "@/lib/api";
+import ApplyToJoinQuestionsModal from "@/components/ApplyToJoinQuestionsModal/ApplyToJoinQuestionsModal";
+import ServerBannerStrip from "@/components/ServerBannerStrip/ServerBannerStrip";
 
 function getToken(): string {
   if (typeof window === "undefined") return "";
@@ -34,6 +36,18 @@ export default function EventSharePage() {
   const [allowDMs, setAllowDMs] = useState(true);
   const [showActivity, setShowActivity] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(true);
+  const [applyModalOpen, setApplyModalOpen] = useState(false);
+  const [applySubmitted, setApplySubmitted] = useState(false);
+  const [applyForm, setApplyForm] = useState<{
+    enabled: boolean;
+    questions: Array<{
+      id: string;
+      title: string;
+      type: "short" | "paragraph" | "multiple_choice";
+      required: boolean;
+      options?: string[];
+    }>;
+  } | null>(null);
 
   useEffect(() => {
     if (!serverId || !eventId) return;
@@ -69,8 +83,58 @@ export default function EventSharePage() {
     setJoining(true);
     setError(null);
     try {
+      const settings = await serversApi.getServerAccessSettings(serverId);
+      if (settings.accessMode === "apply") {
+        const form = settings.joinApplicationForm ?? { enabled: false, questions: [] };
+        setApplyForm({
+          enabled: Boolean(form.enabled),
+          questions: form.questions ?? [],
+        });
+        setApplyModalOpen(true);
+        return;
+      }
+
       await serversApi.joinServer(serverId);
       router.replace(`/messages?server=${serverId}&event=${eventId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không thể tham gia máy chủ");
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const submitApplyJoin = async (applyAnswers: Record<string, { text?: string; selectedOption?: string }>) => {
+    if (!applyForm) return;
+
+    for (const q of applyForm.questions) {
+      if (!q.required) continue;
+      const a = applyAnswers[q.id];
+      if (q.type === "multiple_choice") {
+        if (!a?.selectedOption) {
+          setError("Vui lòng trả lời tất cả câu hỏi bắt buộc");
+          return;
+        }
+      } else if (!a?.text?.trim()) {
+        setError("Vui lòng trả lời tất cả câu hỏi bắt buộc");
+        return;
+      }
+    }
+
+    setJoining(true);
+    setError(null);
+    try {
+      await serversApi.joinServer(serverId, {
+        applicationAnswers: applyForm.questions.map((q) => {
+          const a = applyAnswers[q.id] || {};
+          return {
+            questionId: q.id,
+            text: q.type === "multiple_choice" ? undefined : (a.text ?? ""),
+            selectedOption: q.type === "multiple_choice" ? a.selectedOption : undefined,
+          };
+        }),
+      });
+      setApplyModalOpen(false);
+      setApplySubmitted(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể tham gia máy chủ");
     } finally {
@@ -140,13 +204,62 @@ export default function EventSharePage() {
   if (!data) return null;
 
   const { server } = data;
+
+  if (applySubmitted) {
+    return (
+      <div className="min-h-screen bg-[#313338] flex items-center justify-center p-4">
+        <div className="w-full max-w-[420px] rounded-xl bg-[#2b2d31] shadow-xl overflow-hidden p-8 text-center">
+          <div className="flex justify-center mb-4">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="#f0b232">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-2h2v2h-2zm0-4V7h2v6h-2z" />
+            </svg>
+          </div>
+          <h2 className="text-[#f2f3f5] text-xl font-bold mb-2">Đơn đăng ký đã được gửi</h2>
+          <p className="text-[#b5bac1] text-sm mb-6">
+            Đơn đăng ký tham gia <strong className="text-[#f2f3f5]">{server.name}</strong> của bạn đã được gửi thành công. Vui lòng chờ chủ máy chủ hoặc quản trị viên duyệt đơn.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="px-6 py-2 rounded-lg bg-[#5865f2] hover:bg-[#4752c4] text-white font-medium"
+          >
+            Về trang chủ
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const hasAvatar = isValidAvatarUrl(server.avatarUrl ?? undefined);
   const initial = server.name.charAt(0).toUpperCase();
   const acceptLabel = userDisplayName ? `Chấp nhận với tên ${userDisplayName}` : "Chấp nhận tham gia";
 
   return (
     <div className="min-h-screen bg-[#313338] flex items-center justify-center p-4">
+      <ApplyToJoinQuestionsModal
+        open={applyModalOpen && !!applyForm}
+        onClose={() => {
+          if (joining) return;
+          setApplyModalOpen(false);
+          setError(null);
+        }}
+        server={{
+          name: server.name,
+          avatarUrl: server.avatarUrl,
+          bannerUrl: server.bannerUrl,
+          bannerImageUrl: server.bannerImageUrl,
+          bannerColor: server.bannerColor,
+          memberCount: undefined,
+          createdAt: undefined,
+        }}
+        questions={applyForm?.questions ?? []}
+        submitting={joining}
+        error={error}
+        onSubmit={submitApplyJoin}
+      />
+
       <div className="w-full max-w-[420px] rounded-xl bg-[#2b2d31] shadow-xl overflow-hidden">
+        <ServerBannerStrip server={server} height={112} />
         {/* Invite header */}
         <div className="pt-8 pb-4 px-6 text-center">
           <p className="text-[#f2f3f5] text-sm mb-2">Bạn được mời tham gia</p>
@@ -247,7 +360,7 @@ export default function EventSharePage() {
 
         {/* Actions */}
         <div className="px-6 pb-6 space-y-2">
-          {error && (
+          {error && !applyModalOpen && (
             <p className="text-red-400 text-sm text-center">{error}</p>
           )}
           <button

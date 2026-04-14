@@ -1,0 +1,841 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10060;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 0;
+}
+
+.popoverWrap {
+  position: absolute;
+  max-height: calc(100vh - 16px);
+  overflow: visible;
+  border-radius: 12px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.55);
+}
+
+.popoverMini {
+  max-width: 328px;
+}
+
+.popoverFull {
+  max-width: 720px;
+}
+
+/* Một card DiscordCard + nút góc phải */
+.miniCardShell {
+  position: relative;
+  width: 328px;
+  border-radius: 8px;
+  overflow: visible;
+}
+
+.fullCardShell {
+  position: relative;
+  width: 328px;
+  flex-shrink: 0;
+}
+
+.cardTopActions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 50;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.cardTopActionsFull {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 50;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: auto;
+}
+
+.profileTextBtn {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #f2f3f5;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.profileTextBtn:hover {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.profileIconBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f2f3f5;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.profileIconBtn:hover {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.popoverLight .profileTextBtn,
+.popoverLight .profileIconBtn {
+  color: #1e1f22;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.popoverLight .profileTextBtn:hover,
+.popoverLight .profileIconBtn:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.moreWrap {
+  position: relative;
+}
+
+.dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  min-width: 220px;
+  background: #111214;
+  border: 1px solid #2b2d31;
+  border-radius: 8px;
+  padding: 6px 0;
+  z-index: 60;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.popoverLight .dropdown {
+  background: #ffffff;
+  border-color: #e3e5e8;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.dropdownItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: #f2f3f5;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.dropdownItem:hover {
+  background: #2b2d31;
+}
+
+.popoverLight .dropdownItem {
+  color: #1e1f22;
+}
+
+.popoverLight .dropdownItem:hover {
+  background: #f2f3f5;
+}
+
+.dropdownItem.danger {
+  color: #ed4245;
+}
+
+.dropdownSep {
+  height: 1px;
+  margin: 6px 0;
+  background: #2b2d31;
+}
+
+.popoverLight .dropdownSep {
+  background: #e3e5e8;
+}
+
+.gifRow {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 8px 10px;
+  margin-top: -4px;
+}
+
+.gifBtn {
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  color: #f2f3f5;
+  background: #3f4147;
+}
+
+.gifBtn:hover {
+  background: #4e5058;
+}
+
+.popoverLight .gifBtn {
+  color: #1e1f22;
+  background: #e3e5e8;
+}
+
+.popoverLight .gifBtn:hover {
+  background: #d1d3d6;
+}
+
+.loadingBox,
+.errorBox {
+  padding: 20px;
+  background: #2b2d31;
+  color: #f2f3f5;
+  border-radius: 8px;
+}
+
+.popoverMini .loadingBox,
+.popoverMini .errorBox {
+  width: 328px;
+  box-sizing: border-box;
+}
+
+.popoverLight .loadingBox,
+.popoverLight .errorBox {
+  background: #e3e5e8;
+  color: #1e1f22;
+}
+
+.errorBox {
+  color: #ed4245;
+}
+
+.fullLayout {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: #111214;
+  border-radius: 0 0 12px 12px;
+  padding: 10px;
+}
+
+.popoverLight .fullLayout {
+  background: #f2f3f5;
+}
+
+.fullMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.fullAside {
+  width: 200px;
+  flex-shrink: 0;
+  background: #2b2d31;
+  border-radius: 10px;
+  padding: 12px;
+  color: #dbdee1;
+  font-size: 13px;
+}
+
+.asideTitle {
+  margin: 0 0 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #949ba4;
+}
+
+.asideLine {
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+
+.followRow {
+  margin-bottom: 12px;
+}
+
+.followBtn,
+.followBtnSecondary {
+  width: 100%;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.followBtn {
+  background: #5865f2;
+  color: #fff;
+}
+
+.followBtnSecondary {
+  background: #404249;
+  color: #f2f3f5;
+}
+
+.backMini {
+  margin-top: 12px;
+  width: 100%;
+  border: 1px solid #3f4147;
+  border-radius: 6px;
+  padding: 8px;
+  background: transparent;
+  color: #dbdee1;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.dropdownItemRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.menuChevron {
+  color: #949ba4;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.subMenuAnchor {
+  position: relative;
+}
+
+.subDropdown {
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 0;
+  min-width: 220px;
+  background: #111214;
+  border: 1px solid #2b2d31;
+  border-radius: 8px;
+  padding: 6px 0;
+  z-index: 80;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.popoverLight .subDropdown {
+  background: #ffffff;
+  border-color: #e3e5e8;
+}
+
+.subDropdownItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: #f2f3f5;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.subDropdownItem:hover {
+  background: #2b2d31;
+}
+
+.popoverLight .subDropdownItem {
+  color: #1e1f22;
+}
+
+.popoverLight .subDropdownItem:hover {
+  background: #f2f3f5;
+}
+
+.inviteModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10080;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.inviteModalCard {
+  width: min(400px, 92vw);
+  background: #111214;
+  border: 1px solid #2b2d31;
+  border-radius: 12px;
+  padding: 16px 16px 12px;
+  color: #f2f3f5;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+.popoverLight .inviteModalCard {
+  background: #ffffff;
+  border-color: #e3e5e8;
+  color: #1e1f22;
+}
+
+.inviteModalTitle {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.inviteModalHint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #949ba4;
+}
+
+.popoverLight .inviteModalHint {
+  color: #5c5f66;
+}
+
+.inviteServerList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.inviteServerRow {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #2b2d31;
+  color: #f2f3f5;
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+.inviteServerRow:hover {
+  background: #3f4147;
+}
+
+.popoverLight .inviteServerRow {
+  background: #f2f3f5;
+  color: #1e1f22;
+}
+
+.inviteServerEmpty {
+  padding: 12px;
+  font-size: 13px;
+  color: #949ba4;
+}
+
+.inviteModalClose {
+  margin-top: 12px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #3f4147;
+  background: transparent;
+  color: #dbdee1;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.fullModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10070;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.fullModalCard {
+  position: relative;
+  width: min(720px, 96vw);
+  max-height: min(640px, 92vh);
+  overflow: auto;
+  background: #111214;
+  border-radius: 12px;
+  border: 1px solid #2b2d31;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.popoverLight .fullModalCard {
+  background: #ffffff;
+  border-color: #e3e5e8;
+}
+
+.fullModalCloseX {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 8;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fullModalToolbar {
+  position: absolute;
+  top: 10px;
+  right: 50px;
+  z-index: 8;
+}
+
+.fullModalGrid {
+  display: flex;
+  align-items: stretch;
+  min-height: 360px;
+}
+
+.fullModalLeft {
+  width: 300px;
+  flex-shrink: 0;
+  padding: 20px 16px 20px;
+  border-right: 1px solid #2b2d31;
+}
+
+.popoverLight .fullModalLeft {
+  border-right-color: #e3e5e8;
+}
+
+.fullModalBanner {
+  height: 100px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: -40px;
+}
+
+.fullModalBannerImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.fullModalAvatarWrap {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  margin-bottom: 12px;
+}
+
+.fullModalAvatarImg {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  border: 4px solid #111214;
+  object-fit: cover;
+  display: block;
+}
+
+.popoverLight .fullModalAvatarImg {
+  border-color: #ffffff;
+}
+
+.fullStatusDot {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 3px solid #111214;
+  box-sizing: border-box;
+}
+
+.popoverLight .fullStatusDot {
+  border-color: #ffffff;
+}
+
+.status_online {
+  background: #23a559;
+}
+
+.status_idle {
+  background: #f0b232;
+}
+
+.status_dnd {
+  background: #f23f43;
+}
+
+.status_offline {
+  background: #80848e;
+}
+
+.fullDisplayName {
+  margin: 8px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #f2f3f5;
+}
+
+.popoverLight .fullDisplayName {
+  color: #1e1f22;
+}
+
+.fullUsername {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #949ba4;
+}
+
+.fullActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.fullMsgBtn {
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  background: #404249;
+  color: #f2f3f5;
+}
+
+.fullMsgBtn:hover {
+  background: #4e5058;
+}
+
+.popoverLight .fullMsgBtn {
+  background: #e3e5e8;
+  color: #1e1f22;
+}
+
+.fullJoinLine {
+  font-size: 13px;
+  color: #dbdee1;
+  margin: 0 0 14px;
+  line-height: 1.4;
+}
+
+.popoverLight .fullJoinLine {
+  color: #5c5f66;
+}
+
+.fullRolesSection {
+  margin-top: 4px;
+}
+
+.fullRolesTitle {
+  margin: 0 0 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #949ba4;
+}
+
+.fullRolesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.roleChip {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.roleChipMuted {
+  font-size: 12px;
+  color: #949ba4;
+}
+
+.fullModalRight {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 16px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.fullTabRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid #2b2d31;
+  margin-bottom: 12px;
+}
+
+.popoverLight .fullTabRow {
+  border-bottom-color: #e3e5e8;
+}
+
+.fullTab,
+.fullTabActive {
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #949ba4;
+  border-radius: 6px 6px 0 0;
+  margin-bottom: -1px;
+}
+
+.fullTab:hover {
+  color: #dbdee1;
+}
+
+.fullTabActive {
+  color: #f2f3f5;
+  border-bottom: 2px solid #f2f3f5;
+}
+
+.popoverLight .fullTabActive {
+  color: #1e1f22;
+  border-bottom-color: #1e1f22;
+}
+
+.popoverLight .fullTab {
+  color: #5c5f66;
+}
+
+.fullTabPanel {
+  flex: 1;
+  min-height: 120px;
+}
+
+.fullTabPlaceholder,
+.fullTabBody {
+  margin: 0;
+  font-size: 14px;
+  color: #dbdee1;
+  line-height: 1.5;
+}
+
+.popoverLight .fullTabPlaceholder,
+.popoverLight .fullTabBody {
+  color: #5c5f66;
+}
+
+.fullActionRow .followBtn,
+.fullActionRow .followBtnSecondary {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.mutualServerList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.mutualServerRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #2b2d31;
+}
+
+.popoverLight .mutualServerRow {
+  background: #f2f3f5;
+}
+
+.mutualServerAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.mutualServerAvatarPh {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  background: #5865f2;
+}
+
+.mutualServerName {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f2f3f5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popoverLight .mutualServerName {
+  color: #1e1f22;
+}
+
+.mutualFollowTextCol {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mutualFollowSub {
+  font-size: 13px;
+  font-weight: 500;
+  color: #949ba4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popoverLight .mutualFollowSub {
+  color: #5c5f66;
+}
+
+.mutualFollowMoreHint {
+  list-style: none;
+  margin: 0;
+  padding: 6px 10px 0;
+  font-size: 13px;
+  color: #949ba4;
+}
+
+.popoverLight .mutualFollowMoreHint {
+  color: #5c5f66;
+}

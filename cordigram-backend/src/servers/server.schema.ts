@@ -12,11 +12,39 @@ export type ServerTemplate =
   | 'artists-creators';
 export type ServerPurpose = 'club-community' | 'me-and-friends';
 
+export type ServerAccessMode = 'invite_only' | 'apply' | 'discoverable';
+export type CommunityDiscoveryStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'removed';
+
+export type ServerPrimaryLanguage = 'vi' | 'en';
+
+export type JoinFormQuestionType = 'short' | 'paragraph' | 'multiple_choice';
+
+export interface JoinFormQuestion {
+  id: string;
+  title: string;
+  type: JoinFormQuestionType;
+  required: boolean;
+  options?: string[]; // for multiple_choice
+}
+
+export interface JoinApplicationFormSettings {
+  enabled: boolean;
+  questions: JoinFormQuestion[];
+  updatedAt: Date | null;
+}
+
 export interface ServerMember {
   userId: Types.ObjectId;
   role: 'owner' | 'moderator' | 'member';
   joinedAt: Date;
-  timeoutUntil?: Date | null; // Thời điểm hết timeout (null = không bị timeout)
+  nickname?: string | null;
+  timeoutUntil?: Date | null;
+  mentionBlockedUntil?: Date | null;
+  mentionRestricted?: boolean;
 }
 
 export interface BannedUser {
@@ -41,6 +69,47 @@ export interface ServerInteractionSettings {
   systemChannelId?: Types.ObjectId | null;
 }
 
+export type ContentFilterLevel = 'none' | 'all_members' | 'no_role_members';
+
+export interface MentionSpamFilter {
+  enabled: boolean;
+  mentionLimit: number;
+  responses: {
+    blockMessage: boolean;
+    sendWarning: boolean;
+    restrictMember: boolean;
+  };
+  customNotification: string;
+  blockDurationHours: number;
+  exemptRoleIds: string[];
+  exemptChannelIds: string[];
+}
+
+export interface ServerSafetySettings {
+  spamProtection: {
+    verificationLevel: 'none' | 'low' | 'medium' | 'high';
+    hideMutedDm: boolean;
+    filterDmSpam: boolean;
+    warnExternalLinks: boolean;
+    hideSpamMessages: boolean;
+    deleteSpammerMessages: boolean;
+  };
+  contentFilter: {
+    level: ContentFilterLevel;
+  };
+  automod: {
+    bannedWords: string[];
+    blockInUsername: boolean;
+    bannedWordResponse: 'warn' | 'delete';
+    exemptRoleIds: string[];
+    mentionSpamFilter: MentionSpamFilter;
+  };
+  privileges: {
+    bypassRoleIds: string[];
+    managerRoleIds: string[];
+  };
+}
+
 @Schema({ timestamps: true })
 export class Server extends Document {
   @Prop({ required: true, trim: true })
@@ -49,8 +118,37 @@ export class Server extends Document {
   @Prop({ type: String, default: null })
   description: string | null;
 
+  @Prop({
+    type: String,
+    enum: ['vi', 'en'],
+    default: 'vi',
+  })
+  primaryLanguage: ServerPrimaryLanguage;
+
   @Prop({ type: String, default: null })
   avatarUrl: string | null;
+
+  @Prop({ type: String, default: null })
+  bannerUrl: string | null;
+
+  /** Ảnh biểu ngữ (URL); màu nền card dùng bannerColor. */
+  @Prop({ type: String, default: null })
+  bannerImageUrl: string | null;
+
+  /** Gradient / màu nền biểu ngữ (preset), luôn có kể cả khi có ảnh. */
+  @Prop({ type: String, default: null })
+  bannerColor: string | null;
+
+  @Prop({
+    type: [
+      {
+        emoji: { type: String, trim: true, default: '🙂' },
+        text: { type: String, trim: true, maxlength: 80, default: '' },
+      },
+    ],
+    default: [],
+  })
+  profileTraits: Array<{ emoji: string; text: string }>;
 
   @Prop({
     type: String,
@@ -87,7 +185,10 @@ export class Server extends Document {
           default: 'member',
         },
         joinedAt: { type: Date, default: Date.now },
-        timeoutUntil: { type: Date, default: null }, // Thời điểm hết timeout
+        nickname: { type: String, default: null },
+        timeoutUntil: { type: Date, default: null },
+        mentionBlockedUntil: { type: Date, default: null },
+        mentionRestricted: { type: Boolean, default: false },
       },
     ],
     default: [],
@@ -132,6 +233,56 @@ export class Server extends Document {
   @Prop({ type: Boolean, default: true })
   isPublic: boolean;
 
+  /**
+   * Control cách user tham gia server + điều kiện chat.
+   * Default set discoverable để tương thích với behavior hiện tại.
+   */
+  @Prop({
+    type: String,
+    enum: ['invite_only', 'apply', 'discoverable'],
+    default: 'discoverable',
+  })
+  accessMode: ServerAccessMode;
+
+  @Prop({ type: Boolean, default: false })
+  isAgeRestricted: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  hasRules: boolean;
+
+  /**
+   * Application form used when accessMode = 'apply'.
+   * Stored separately from Rules; UI will prepend an implicit rules-accept question if hasRules=true.
+   */
+  @Prop({
+    type: {
+      enabled: { type: Boolean, default: false },
+      questions: {
+        type: [
+          {
+            id: { type: String, required: true },
+            title: { type: String, trim: true, maxlength: 200, required: true },
+            type: {
+              type: String,
+              enum: ['short', 'paragraph', 'multiple_choice'],
+              required: true,
+            },
+            required: { type: Boolean, default: true },
+            options: { type: [String], default: [] },
+          },
+        ],
+        default: [],
+      },
+      updatedAt: { type: Date, default: null },
+    },
+    default: () => ({
+      enabled: false,
+      questions: [],
+      updatedAt: null,
+    }),
+  })
+  joinApplicationForm: JoinApplicationFormSettings;
+
   @Prop({
     type: {
       systemMessagesEnabled: { type: Boolean, default: true },
@@ -153,6 +304,174 @@ export class Server extends Document {
     }),
   })
   interactionSettings: ServerInteractionSettings;
+
+  @Prop({
+    type: {
+      spamProtection: {
+        verificationLevel: {
+          type: String,
+          enum: ['none', 'low', 'medium', 'high'],
+          default: 'none',
+        },
+        hideMutedDm: { type: Boolean, default: false },
+        filterDmSpam: { type: Boolean, default: false },
+        warnExternalLinks: { type: Boolean, default: true },
+        hideSpamMessages: { type: Boolean, default: false },
+        deleteSpammerMessages: { type: Boolean, default: false },
+      },
+      contentFilter: {
+        level: {
+          type: String,
+          enum: ['none', 'all_members', 'no_role_members'],
+          default: 'none',
+        },
+      },
+      automod: {
+        bannedWords: { type: [String], default: [] },
+        blockInUsername: { type: Boolean, default: false },
+        bannedWordResponse: {
+          type: String,
+          enum: ['warn', 'delete'],
+          default: 'warn',
+        },
+        exemptRoleIds: { type: [String], default: [] },
+        mentionSpamFilter: {
+          enabled: { type: Boolean, default: false },
+          mentionLimit: { type: Number, default: 20 },
+          responses: {
+            blockMessage: { type: Boolean, default: true },
+            sendWarning: { type: Boolean, default: false },
+            restrictMember: { type: Boolean, default: false },
+          },
+          customNotification: { type: String, default: '' },
+          blockDurationHours: { type: Number, default: 8 },
+          exemptRoleIds: { type: [String], default: [] },
+          exemptChannelIds: { type: [String], default: [] },
+        },
+      },
+      privileges: {
+        bypassRoleIds: { type: [String], default: [] },
+        managerRoleIds: { type: [String], default: [] },
+      },
+    },
+    default: () => ({
+      spamProtection: {
+        verificationLevel: 'none',
+        hideMutedDm: false,
+        filterDmSpam: false,
+        warnExternalLinks: true,
+        hideSpamMessages: false,
+        deleteSpammerMessages: false,
+      },
+      contentFilter: {
+        level: 'none',
+      },
+      automod: {
+        bannedWords: [],
+        blockInUsername: false,
+        bannedWordResponse: 'warn',
+        exemptRoleIds: [],
+        mentionSpamFilter: {
+          enabled: false,
+          mentionLimit: 20,
+          responses: {
+            blockMessage: true,
+            sendWarning: false,
+            restrictMember: false,
+          },
+          customNotification: '',
+          blockDurationHours: 8,
+          exemptRoleIds: [],
+          exemptChannelIds: [],
+        },
+      },
+      privileges: {
+        bypassRoleIds: [],
+        managerRoleIds: [],
+      },
+    }),
+  })
+  safetySettings: ServerSafetySettings;
+
+  @Prop({
+    type: {
+      enabled: { type: Boolean, default: false },
+      rulesChannelId: { type: String, default: null },
+      updatesChannelId: { type: String, default: null },
+      activatedAt: { type: Date, default: null },
+    },
+    default: () => ({
+      enabled: false,
+      rulesChannelId: null,
+      updatesChannelId: null,
+      activatedAt: null,
+    }),
+  })
+  communitySettings: CommunitySettings;
+
+  /**
+   * Approval status for appearing in public Explore/Discovery surfaces.
+   * - pending: waiting for admin review (default once community enabled)
+   * - approved: can show in Explore list
+   * - rejected: hidden from Explore list
+   */
+  @Prop({
+    type: String,
+    enum: ['pending', 'approved', 'rejected', 'removed'],
+    default: 'pending',
+  })
+  communityDiscoveryStatus: CommunityDiscoveryStatus;
+
+  /** Sticker tùy chỉnh do máy chủ quản lý (hiển thị trong picker; chỉ dùng được trong kênh cùng server). */
+  @Prop({
+    type: [
+      {
+        imageUrl: { type: String, required: true, trim: true },
+        name: { type: String, default: '', trim: true, maxlength: 80 },
+        animated: { type: Boolean, default: false },
+        addedByUserId: { type: Types.ObjectId, ref: 'User', required: true },
+        addedAt: { type: Date, default: Date.now },
+      },
+    ],
+    default: [],
+  })
+  customStickers: Array<{
+    _id?: Types.ObjectId;
+    imageUrl: string;
+    name: string;
+    animated?: boolean;
+    addedByUserId: Types.ObjectId;
+    addedAt: Date;
+  }>;
+
+  /** Emoji tùy chỉnh (ảnh / GIF + tên dạng :name:), cùng kiểu lưu trữ như sticker. */
+  @Prop({
+    type: [
+      {
+        imageUrl: { type: String, required: true, trim: true },
+        name: { type: String, default: '', trim: true, maxlength: 80 },
+        animated: { type: Boolean, default: false },
+        addedByUserId: { type: Types.ObjectId, ref: 'User', required: true },
+        addedAt: { type: Date, default: Date.now },
+      },
+    ],
+    default: [],
+  })
+  customEmojis: Array<{
+    _id?: Types.ObjectId;
+    imageUrl: string;
+    name: string;
+    animated?: boolean;
+    addedByUserId: Types.ObjectId;
+    addedAt: Date;
+  }>;
+}
+
+export interface CommunitySettings {
+  enabled: boolean;
+  rulesChannelId: string | null;
+  updatesChannelId: string | null;
+  activatedAt: Date | null;
 }
 
 export const ServerSchema = SchemaFactory.createForClass(Server);

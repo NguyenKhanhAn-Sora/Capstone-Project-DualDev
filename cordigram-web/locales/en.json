@@ -1,0 +1,1223 @@
+{
+  "chat": {
+    "common": {
+      "back": "Back",
+      "create": "Create",
+      "creating": "Creating...",
+      "uploading": "Uploading...",
+      "saving": "Saving...",
+      "saveChanges": "Save changes",
+      "cancel": "Cancel",
+      "remove": "Remove",
+      "copy": "Copy",
+      "copied": "Copied",
+      "sending": "Sending…",
+      "user": "User",
+      "server": "Server"
+    },
+    "loading": {
+      "gif": "Loading GIF...",
+      "sticker": "Loading sticker...",
+      "generic": "Loading..."
+    },
+    "createServer": {
+      "errors": {
+        "nameRequired": "Please enter a server name",
+        "createFailed": "Couldn't create the server. Please try again."
+      },
+      "template": {
+        "title": "Create Your Server",
+        "subtitleLine1": "Your server is where you hang out with friends.",
+        "subtitleLine2": "Create your own and start chatting.",
+        "startFromTemplate": "START FROM A TEMPLATE",
+        "haveInvite": "Already have an invite?",
+        "joinServer": "Join a server",
+        "items": {
+          "custom": {
+            "name": "Create My Own"
+          },
+          "gaming": {
+            "name": "Gaming"
+          },
+          "friends": {
+            "name": "Friends"
+          },
+          "study-group": {
+            "name": "Study Group"
+          },
+          "school-club": {
+            "name": "School Club"
+          },
+          "local-community": {
+            "name": "Local Community"
+          },
+          "artists-creators": {
+            "name": "Artists & Creators"
+          }
+        }
+      },
+      "purpose": {
+        "title": "Tell us more about your server",
+        "subtitle": "So we can help you set it up, is your server for a few friends or a larger community?",
+        "items": {
+          "club-community": "A club or community",
+          "me-and-friends": "Me and my friends"
+        },
+        "notSure": "Not sure? You can",
+        "skip": "skip this question"
+      },
+      "customize": {
+        "title": "Customize your server",
+        "subtitle": "Personalize your server with a name and an icon. You can always change it later.",
+        "serverNameLabel": "Server name",
+        "serverNamePlaceholder": "Enter server name",
+        "communityGuidelinesPrefix": "By creating a server, you agree to Discord's",
+        "communityGuidelinesLink": "Community Guidelines",
+        "communityGuidelinesSuffix": ".",
+        "errors": {
+          "imageOnly": "Please choose an image file",
+          "maxSize5mb": "File size must be 5MB or less",
+          "loginRequired": "You must be signed in to upload an image",
+          "uploadFailed": "Couldn't upload the image. Please try again."
+        }
+      }
+    },
+    "serverSettings": {
+      "ariaLabel": "Server settings",
+      "sidebarTitlePrefix": "SERVER OF",
+      "groups": {
+        "expressions": "EXPRESSIONS",
+        "people": "PEOPLE",
+        "moderation": "MODERATION"
+      },
+      "sections": {
+        "profile": "Server Profile",
+        "interactions": "Interactions",
+        "privileges": "Boosting Privileges",
+        "emoji": "Emoji",
+        "sticker": "Stickers",
+        "members": "Members",
+        "roles": "Roles",
+        "invites": "Invites",
+        "access": "Access",
+        "safety": "Safety Setup",
+        "bans": "Bans",
+        "automod": "AutoMod",
+        "community": "Community Settings",
+        "community-overview": "Community Overview",
+        "community-onboarding": "Onboarding",
+        "delete-server": "Delete Server"
+      },
+      "profileDesc": "Customize how your server appears in invite links and, if enabled, in Server Discovery and Safety Alerts channel messages.",
+      "placeholder": {
+        "profile": "Server Profile editor will be added here.",
+        "section": "Content for \"{label}\" will be added later."
+      }
+    },
+    "deleteMessage": {
+      "title": "Who should see this message removed?",
+      "forEveryone": {
+        "title": "Remove for everyone",
+        "desc": "This message will be removed for everyone in the chat. Others may have already seen or forwarded it. Removed messages can still be reported."
+      },
+      "forMe": {
+        "title": "Remove for you",
+        "desc": "This message will be removed from your device, but it will still be visible to other members in the chat."
+      }
+    },
+    "reportMessage": {
+      "title": "Report message",
+      "reasonLabel": "Report reason *",
+      "descriptionLabel": "Details (optional)",
+      "descriptionPlaceholder": "Describe what happened...",
+      "submit": "Submit report",
+      "reasons": {
+        "spam": "Spam",
+        "harassment": "Harassment",
+        "inappropriate": "Inappropriate content",
+        "misinfo": "Misinformation",
+        "scam": "Scam",
+        "other": "Other"
+      }
+    },
+    "invite": {
+      "searchPlaceholder": "Search friends",
+      "sectionLabel": "Invite to server",
+      "invite": "Invite",
+      "invited": "Invited",
+      "orSendLink": "Or send them an invite link",
+      "empty": {
+        "noFriends": "No friends to invite yet.",
+        "notFound": "No friends found."
+      },
+      "errors": {
+        "cannotSendInvite": "Couldn't send the invite"
+      }
+    },
+    "inviteServer": {
+      "title": "Invite friends to {serverName}",
+      "sub": "Recipients will land in #general",
+      "expireNote": "Your invite link expires in 7 days. Edit invite link."
+    },
+    "inviteVoice": {
+      "title": "Invite friends to {serverName}",
+      "sub": "Recipients will land in {channelName}",
+      "expireNote": "This link opens this voice channel. If they're not in the server yet, they'll see the join page first."
+    },
+    "serverProfile": {
+      "saved": "Server profile saved.",
+      "errors": {
+        "fileUrlMissing": "Missing file URL",
+        "bannerUrlMissing": "Missing banner image URL",
+        "uploadAvatarFailed": "Couldn't upload the avatar",
+        "uploadBannerFailed": "Couldn't upload the banner",
+        "saveFailed": "Couldn't save server profile"
+      },
+      "info": {
+        "title": "Server info",
+        "online": "Online: {count}",
+        "members": "Members: {count}",
+        "createdAt": "Created: {date}"
+      },
+      "name": {
+        "label": "Name",
+        "placeholder": "Server name"
+      },
+      "avatar": {
+        "label": "Icon",
+        "change": "Change server icon",
+        "remove": "Remove icon",
+        "urlPlaceholder": "Or paste icon URL"
+      },
+      "banner": {
+        "label": "Banner",
+        "hint": "Pick a card background color (discovery, invites, applications). You can also upload an image — it will be optimized before upload.",
+        "upload": "Upload banner image",
+        "remove": "Remove banner image",
+        "pickColorAria": "Pick banner background color",
+        "note": "Background color always applies; if an image exists, it renders on top."
+      },
+      "traits": {
+        "label": "Traits",
+        "hint": "Add up to 5 traits to show what your server is about.",
+        "pickEmoji": "Pick emoji",
+        "placeholder": "Trait...",
+        "filledCount": "{count}/5 filled"
+      },
+      "description": {
+        "label": "Description",
+        "hint": "A short description for your server.",
+        "placeholder": "Tell the world what this server is about."
+      },
+      "preview": {
+        "noDescription": "No description yet."
+      }
+    },
+    "popups": {
+      "closeAria": "Close",
+      "loading": "Loading...",
+      "applyToJoin": {
+        "ariaLabel": "Server join application",
+        "serverFallback": "Server",
+        "members": "{count} members",
+        "establishedPrefix": "Established",
+        "titleBeforeChat": "Before you start chatting here...",
+        "subtitleSteps": "You'll need to complete the steps below.",
+        "sectionLabel": "Join application",
+        "emptyHint": "The server owner hasn't added questions yet. Press Submit to send your join request.",
+        "answerPlaceholder": "Enter your answer...",
+        "submit": "Submit",
+        "submitting": "Sending…"
+      },
+      "createChannel": {
+        "title": "Create channel",
+        "channelType": "Channel type",
+        "textName": "Text",
+        "textDesc": "Send messages, images, GIFs, emoji, opinions, and wordplay",
+        "voiceName": "Voice",
+        "voiceDesc": "Hang out with voice, video, and screen share",
+        "channelName": "Channel name",
+        "defaultName": "new-channel",
+        "emojiTitle": "Add emoji / kaomoji",
+        "privateLabel": "Private channel",
+        "privateDesc": "Only selected members and roles can see this channel.",
+        "creating": "Creating...",
+        "createBtn": "Create channel"
+      },
+      "createCategory": {
+        "title": "Create category",
+        "nameLabel": "Category name",
+        "placeholder": "New category",
+        "defaultName": "New category",
+        "privateLabel": "Private category",
+        "privateDesc": "Only selected members and roles can see this category.",
+        "creating": "Creating...",
+        "createBtn": "Create category"
+      },
+      "deleteServer": {
+        "title": "Delete \"{serverName}\"",
+        "message": "Are you sure you want to delete {serverName}? This cannot be undone.",
+        "confirmLabel": "Enter server name",
+        "deleting": "Deleting…",
+        "deleteBtn": "Delete server",
+        "error": "Couldn't delete server"
+      },
+      "events": {
+        "title": "Events",
+        "create": "Create event",
+        "emptyTitle": "No upcoming events.",
+        "emptyDesc": "Schedule events for any activity in your server.",
+        "emptyHint": "You can let others create events in Server settings › Roles."
+      },
+      "shareEvent": {
+        "title": "Ready. Now share your event!",
+        "desc": "Copy the event link below to invite people. This link also works as a server invite.",
+        "expireNote": "Your invite link expires in 7 days."
+      },
+      "eventDetail": {
+        "headerCount": "1 event",
+        "createAnother": "Create event",
+        "location": "{serverName}'s server{channel}",
+        "locationChannel": " > #{name}",
+        "copyLink": "Copy link",
+        "interested": "Interested",
+        "start": "Start",
+        "starting": "Starting...",
+        "countdown": {
+          "started": "Started",
+          "seconds": "Starting in a few seconds",
+          "minutes": "Starting in {m} min",
+          "hours": "Starting in {h} h",
+          "hoursMinutes": "Starting in {h} h {m} min"
+        }
+      },
+      "incomingCall": {
+        "canceled": "Call was canceled",
+        "incoming": "Incoming call...",
+        "videoCall": "Video call",
+        "voiceCall": "Voice call",
+        "close": "Close",
+        "decline": "Decline",
+        "accept": "Accept call",
+        "declineAria": "Decline call",
+        "acceptAria": "Accept call",
+        "closeAria": "Close"
+      },
+      "outgoingCall": {
+        "calling": "Calling...",
+        "rejected": "Recipient is unavailable",
+        "noAnswer": "No answer",
+        "videoCall": "Video call",
+        "voiceCall": "Voice call",
+        "cancelCall": "Cancel call",
+        "close": "Close",
+        "cancelAria": "Cancel call",
+        "closeAria": "Close"
+      },
+      "ignoreUser": {
+        "ariaIgnore": "Ignore user",
+        "ariaIgnored": "User ignored",
+        "titleIgnored": "You've ignored {name}",
+        "subtitleIgnored": "Their messages and notifications are hidden. Restore to message and receive inbox notifications as usual (DMs and server channels).",
+        "restore": "Restore",
+        "restoring": "Working...",
+        "title": "Ignore {name}?",
+        "subtitle": "Stop interacting without them knowing",
+        "hideProfile": "Hide their profile and messages",
+        "hideProfileDesc": "You can unhide them anytime",
+        "muteNotif": "Mute their notifications and activity",
+        "muteNotifDesc": "You'll see less of them across the app (DMs, text channels, voice)",
+        "info": "They can still message you and see your activity. They won't know you ignored them.",
+        "blockTitle": "Still not enough?",
+        "blockText": "Block instead",
+        "blockDesc": "Stop direct contact and limit what they see. No messages or calls from blocked users (DMs and server channels).",
+        "block": "Block",
+        "ignore": "Ignore"
+      },
+      "memberProfile": {
+        "aria": "Member profile",
+        "follow": "Follow",
+        "following": "Following",
+        "message": "Message",
+        "messageAria": "Message",
+        "optionsAria": "More options",
+        "joinFrom": "Member since",
+        "roles": "Roles",
+        "owner": "Owner",
+        "moderator": "Mod",
+        "member": "Member",
+        "ownerBadge": "Owner",
+        "notes": "Notes (only visible to you)",
+        "notesHint": "Click to add a note",
+        "tabActivity": "Activity",
+        "tabFollowers": "Mutual followers",
+        "activityEmpty": "{name} has no activity to share here yet.",
+        "activityHint": "Waiting to see what they share next — why not break the ice?",
+        "followersEmpty": "Mutual followers will appear here."
+      },
+      "messageSearch": {
+        "title": "Search messages",
+        "placeholderDm": "Search in conversation with {name}",
+        "placeholderServer": "Search message content...",
+        "allChannels": "All channels",
+        "allUsers": "All users",
+        "hasFile": "Has file",
+        "time": "Time",
+        "fromDate": "From date",
+        "toDate": "To date",
+        "found": "Found {count} results",
+        "none": "No results",
+        "clearFilters": "Clear filters",
+        "searching": "Searching...",
+        "empty": "No results",
+        "emptyHint": "Try different keywords or change filters",
+        "attachments": "{count} attachment(s)",
+        "loadMore": "Load more ({count} left)",
+        "loadingMore": "Loading...",
+        "todayAt": "Today at {time}",
+        "yesterday": "Yesterday",
+        "daysAgo": "{n} days ago"
+      },
+      "inbox": {
+        "title": "Inbox",
+        "tabForYou": "For You",
+        "tabUnread": "Unread",
+        "tabMentions": "Mentions",
+        "markAllTitle": "Mark all as read",
+        "markAllDoing": "Marking...",
+        "markAll": "Mark as read",
+        "loading": "Loading...",
+        "emptyForYou": "No events, invites, or role notifications from your servers.",
+        "emptyUnread": "No unread messages or notifications from channels.",
+        "emptyMentions": "No one has mentioned you in a channel yet.",
+        "eventLive": "• Live",
+        "eventStarted": "Started in {serverName}'s server.",
+        "inviteTitle": "Server invite",
+        "inviteMeta": "{inviter} invited you to join {serverName}.",
+        "accept": "Accept",
+        "acceptInviteAria": "Accept invite",
+        "decline": "Decline",
+        "declineInviteAria": "Decline invite",
+        "dmFallback": "Message",
+        "newMessageFallback": "You have a new message",
+        "serverFallback": "Server",
+        "mentionYou": "mentioned you",
+        "timeMinutes": "{n} min",
+        "timeHours": "{n} h",
+        "timeDays": "{n} d",
+        "adminViewTitle": "System administrator is viewing the server",
+        "adminViewContent": "The system administrator is reviewing your server \"{server}\". This is a periodic moderation activity.",
+        "mentionSpamWarning": "You have been warned for mention spam in a channel of server \"{server}\". Please reduce the number of mentions in your messages.",
+        "mentionSpamTitle": "⚠️ Mention Spam Warning"
+      }
+    },
+    "explore": {
+      "backToChat": "← Back to chat",
+      "title": "Explore",
+      "subtitle": "Find reviewed communities to join. If a server uses Apply to join, you must submit an application first.",
+      "loading": "Loading…",
+      "loadError": "Could not load",
+      "empty": "No approved servers to show yet.",
+      "members": "{count} members",
+      "badgeApply": " • Apply to join",
+      "badgeInviteOnly": " • Invite only",
+      "join": "Join",
+      "inviteOnly": "Invite only",
+      "inviteOnlyTitle": "This server is invite-only"
+    },
+    "sidebar": {
+      "contextExplore": "Explore",
+      "contextServer": "Server",
+      "contextDm": "Direct messages",
+      "inboxAria": "Inbox",
+      "createServerTitle": "Create server",
+      "settingsAria": "Settings",
+      "exploreOpen": "Explore",
+      "exploreClose": "Close Explore",
+      "liveEvent": "Live",
+      "eventDetail": "Event Details",
+      "events": "Events",
+      "eventsCount": "{count} Events",
+      "boostServer": "Boost Server",
+      "members": "Members",
+      "noChannels": "No channels",
+      "noChatChannels": "No text channels",
+      "noVoiceChannels": "No voice channels",
+      "closeAria": "Close",
+      "eventDetailLive": "Live – Ending {time}",
+      "eventDetailHostedBy": "Server of {name}",
+      "eventDetailCopyLink": "Copy Link",
+      "eventDetailInterested": "Interested",
+      "eventDetailStart": "Start",
+      "eventDetailEnd": "End Event"
+    },
+    "toasts": {
+      "messageRemovedAll": "Message removed for everyone",
+      "messageDeletedSelf": "You deleted a message"
+    },
+    "channelUi": {
+      "sectionChat": "Text channels",
+      "sectionVoice": "Voice channels",
+      "defaultCategoryLabel": "Channels"
+    },
+    "roleEditor": {
+      "back": "Back",
+      "editTitle": "EDIT ROLE - ",
+      "tabDisplay": "Display",
+      "tabPermissions": "Permissions",
+      "tabMembers": "Manage members ({count})",
+      "esc": "ESC",
+      "deleteRoleTitle": "Delete role",
+      "confirmDeleteRole": "Are you sure you want to delete the role \"{name}\"?",
+      "errorDeleteRole": "Could not delete role",
+      "newRoleName": "new role",
+      "errorCreateRole": "Could not create role",
+      "viewServerByRole": "View server by role",
+      "delete": "Delete",
+      "deleteRoleAria": "Delete role"
+    },
+    "roleDisplay": {
+      "roleNameLabel": "Role name",
+      "required": "*",
+      "roleNamePlaceholder": "Enter role name",
+      "styleTitle": "Role style",
+      "previewName": "Wumpus",
+      "previewRole": "Music supporter",
+      "previewBadge": "Stable",
+      "colorLabel": "Role color",
+      "colorHint": "Members use the color of their highest role in the list.",
+      "displaySeparateToggle": "Display this role's members separately from online members",
+      "mentionableToggle": "Allow anyone to @mention this role",
+      "mentionableHint": "Note: Members with \"Mention @everyone, @here and all roles\" can always mention members with this role.",
+      "viewAsRoleTitle": "View server as role",
+      "viewAsRoleDesc": "Preview what this role can do and which channels it can access. For owners and admins only.",
+      "viewAsRoleBtn": "View server as role",
+      "saveFailed": "Could not save changes",
+      "unsavedBar": "Careful — you have unsaved changes!",
+      "reset": "Reset",
+      "saving": "Saving...",
+      "saveChanges": "Save changes"
+    },
+    "roleMembers": {
+      "loading": "Loading member list…",
+      "noAccessTitle": "No access",
+      "noAccessDesc": "Only the server owner or members with Manage Server can view and manage the member list.",
+      "everyoneTitle": "@everyone",
+      "everyoneDesc": "The @everyone role applies to all members automatically. You cannot add or remove members from this role.",
+      "memberCount": "{count} members",
+      "searchPlaceholder": "Search members",
+      "addMember": "Add member",
+      "emptySearch": "No members match \"{query}\"",
+      "emptyRole": "No members in this role yet",
+      "removeFromRoleTitle": "Remove from role",
+      "confirmRemove": "Remove this member from the role?",
+      "errorAdd": "Could not add member",
+      "errorRemove": "Could not remove member",
+      "allHaveRole": "All members already have this role"
+    },
+    "rolePermissions": {
+      "sections": {
+        "serverManagement": "SERVER MANAGEMENT PERMISSIONS",
+        "member": "MEMBER PERMISSIONS",
+        "textChannel": "TEXT CHANNEL PERMISSIONS",
+        "voiceChannel": "VOICE CHANNEL PERMISSIONS"
+      },
+      "searchPlaceholder": "Search permissions",
+      "noResults": "No permissions match \"{query}\"",
+      "unsavedBar": "Careful — you have unsaved changes!",
+      "reset": "Reset",
+      "saving": "Saving...",
+      "saveChanges": "Save changes",
+      "saveFailed": "Could not save changes",
+      "items": {
+        "manageServer": {
+          "label": "Manage Server",
+          "description": "Allows members to edit the server name, image, and basic settings.",
+          "warning": "This is a powerful permission. Grant carefully."
+        },
+        "manageChannels": {
+          "label": "Manage Channels",
+          "description": "Allows members to create, edit, and delete channels.",
+          "warning": "This is a powerful permission. Grant carefully."
+        },
+        "manageEvents": {
+          "label": "Manage Events",
+          "description": "Allows members to create, edit, and delete server events."
+        },
+        "createInvite": {
+          "label": "Create Invite",
+          "description": "Allows members to invite new people to this server."
+        },
+        "changeNickname": {
+          "label": "Change Nickname",
+          "description": "Allows members to change their own nickname in this server."
+        },
+        "manageNicknames": {
+          "label": "Manage Nicknames",
+          "description": "Allows members to change other members nicknames."
+        },
+        "kickMembers": {
+          "label": "Kick, approve and reject members",
+          "description": "Kick removes members; they can rejoin with a new invite. If the server uses join applications, this permission approves or rejects requests."
+        },
+        "banMembers": {
+          "label": "Ban members",
+          "description": "Allows members to permanently ban others and remove their message history from this server."
+        },
+        "timeoutMembers": {
+          "label": "Timeout members",
+          "description": "When timed out, users cannot send messages, reply, react, or speak in voice/stage."
+        },
+        "mentionEveryone": {
+          "label": "Mention @everyone, @here and all roles",
+          "description": "Allows @everyone/@here and mentioning mentionable roles.",
+          "warning": "Only grant to trusted members."
+        },
+        "sendMessages": {
+          "label": "Send messages and create posts",
+          "description": "Allows sending messages in text channels and posts in forum channels."
+        },
+        "sendMessagesInThreads": {
+          "label": "Send messages in threads and posts",
+          "description": "Allows sending messages in threads and forum posts."
+        },
+        "createPublicThreads": {
+          "label": "Create public threads",
+          "description": "Allows creating threads visible to everyone in the channel."
+        },
+        "createPrivateThreads": {
+          "label": "Create private threads",
+          "description": "Allows creating invite-only threads."
+        },
+        "embedLinks": {
+          "label": "Embed links",
+          "description": "Shows rich embeds for links shared in chat."
+        },
+        "attachFiles": {
+          "label": "Attach files",
+          "description": "Allows uploading files or media in chat."
+        },
+        "addReactions": {
+          "label": "Add reactions",
+          "description": "Allows adding new emoji reactions to messages."
+        },
+        "manageMessages": {
+          "label": "Manage messages",
+          "description": "Allows deleting or removing embeds from other members messages."
+        },
+        "pinMessages": {
+          "label": "Pin messages",
+          "description": "Allows pinning or unpinning any message."
+        },
+        "viewMessageHistory": {
+          "label": "Read message history",
+          "description": "Allows reading earlier messages. Without it, only messages while online may be visible."
+        },
+        "sendVoiceMessages": {
+          "label": "Send voice messages",
+          "description": "Allows sending voice messages."
+        },
+        "createPolls": {
+          "label": "Create polls",
+          "description": "Allows creating polls."
+        },
+        "connect": {
+          "label": "Connect",
+          "description": "Allows joining voice and hearing others."
+        },
+        "speak": {
+          "label": "Speak",
+          "description": "Allows speaking in voice. Without it, users are muted until someone unmutes them."
+        },
+        "video": {
+          "label": "Video",
+          "description": "Allows video, screen share, or streaming in this server."
+        },
+        "muteMembers": {
+          "label": "Mute members",
+          "description": "Allows muting other members in voice channels."
+        },
+        "deafenMembers": {
+          "label": "Deafen members",
+          "description": "Allows deafening others so they cannot hear or speak."
+        },
+        "moveMembers": {
+          "label": "Move members",
+          "description": "Allows disconnecting or moving members between voice channels you can access."
+        },
+        "setVoiceChannelStatus": {
+          "label": "Set voice channel status",
+          "description": "Allows creating and editing voice channel status."
+        }
+      }
+    },
+    "serverContextMenu": {
+      "aria": "Server menu",
+      "markAsRead": "Mark as read",
+      "inviteToServer": "Invite to server",
+      "muteServer": "Mute server",
+      "unmuteServer": "Unmute server",
+      "notificationSettings": "Notification settings",
+      "hideVoiceChannels": "Hide muted channels",
+      "showAllChannels": "Show all channels",
+      "serverSettings": "Server settings",
+      "createChannel": "Create channel",
+      "createCategory": "Create category",
+      "createEvent": "Create event",
+      "leaveServer": "Leave server",
+      "notifAll": "All messages",
+      "notifMentions": "Only @mentions",
+      "notifNone": "Nothing",
+      "muteFor15m": "For 15 minutes",
+      "muteFor1h": "For 1 hour",
+      "muteFor3h": "For 3 hours",
+      "muteFor8h": "For 8 hours",
+      "muteFor24h": "For 24 hours",
+      "muteUntilReenable": "Until I turn it on",
+      "suppressEveryone": "Suppress @everyone and @here",
+      "suppressRoles": "Suppress all role @mentions",
+      "hideHighlights": "Hide new event highlights",
+      "muteNewEvents": "Mute new event alerts",
+      "mobileNotif": "Mobile push notifications"
+    },
+    "profileEditor": {
+      "loading": "Loading…",
+      "serverLabel": "Server",
+      "selectServer": "— Select server —",
+      "serverHint": "Banner and avatar are shared with your main profile; preview shows your nickname on this server.",
+      "serverNickLabel": "Server nickname",
+      "serverNickPlaceholder": "Display name in this server",
+      "displayNameLabel": "Display name",
+      "usernameLabel": "Username",
+      "pronounsLabel": "Pronouns",
+      "pronounsPlaceholder": "e.g. they/them",
+      "avatarLabel": "Avatar",
+      "changeAvatar": "Change Avatar",
+      "removeAvatar": "Remove Avatar",
+      "avatarDecoLabel": "Avatar Decoration",
+      "changeAvatarDeco": "Change Decoration",
+      "nameplateLabel": "Nameplate",
+      "changeNameplate": "Change Nameplate",
+      "profileEffectLabel": "Profile Effect",
+      "changeProfileEffect": "Change Effect",
+      "bannerColorLabel": "Banner Color",
+      "changeBannerColorAria": "Pick banner color",
+      "uploadBanner": "Upload banner image",
+      "removeBanner": "Remove banner image",
+      "bioLabel": "About me",
+      "bioHint": "You can use markdown and links if you want.",
+      "insertEmojiAria": "Insert emoji",
+      "previewTitle": "Preview",
+      "statusPlaceholder": "+ Add a status",
+      "exampleBtn": "Example button",
+      "saveMain": "Save profile",
+      "saveServerNick": "Save server nickname",
+      "errorLoadProfile": "Could not load profile.",
+      "savedProfile": "Profile saved.",
+      "errorSaveProfile": "Could not save profile.",
+      "savedNick": "Server nickname saved.",
+      "errorSaveNick": "Could not save.",
+      "updatedAvatar": "Avatar updated.",
+      "removeAvatarDone": "Avatar removed.",
+      "errorRemoveAvatar": "Could not remove avatar.",
+      "errorLoadBanner": "Could not upload banner.",
+      "errorOpenRecent": "Could not open recent image (CORS or network).",
+      "errorGetUrl": "Could not get URL",
+      "comingSoon": "Feature coming soon."
+    },
+    "profileAvatarCrop": {
+      "title": "Crop avatar",
+      "subtitle": "Drag and zoom to choose the best crop.",
+      "closeAria": "Close",
+      "zoomLabel": "Zoom",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "save": "Save",
+      "errorNoCrop": "No crop area selected.",
+      "errorUpload": "Could not upload."
+    },
+    "profileImagePicker": {
+      "titleAvatar": "Choose an Image",
+      "titleBanner": "Choose banner image",
+      "closeAria": "Close",
+      "uploadImage": "Upload Image",
+      "pickGif": "Choose GIF",
+      "recentTitle": "Recent Avatars",
+      "recentHint": "Access your 6 most recently uploaded avatars.",
+      "selectRecentAria": "Select recent image",
+      "emptySlotAria": "Empty"
+    },
+    "profileBannerPicker": {
+      "hexLabel": "Hex",
+      "eyedropperTitle": "Pick screen color"
+    },
+    "communityOverview": {
+      "title": "Community Overview",
+      "subtitle": "Set the rules/guidelines channel, primary language and server description.",
+      "loading": "Loading…",
+      "rulesChannelLabel": "Rules or guidelines channel",
+      "rulesChannelHint": "Choose the channel that will display rules/guidelines to members (e.g. #welcome-and-rules).",
+      "noChannel": "— None —",
+      "langLabel": "Primary server language",
+      "langHint": "Only Vietnamese and English are supported.",
+      "langVi": "Vietnamese",
+      "langEn": "English",
+      "descLabel": "Server description",
+      "descHint": "This description is shown below the invite link on invite cards.",
+      "descPlaceholder": "Tell the world a bit about this server.",
+      "saving": "Saving…",
+      "save": "Save changes",
+      "errorSave": "Could not save"
+    },
+    "messagesPage": {
+      "contextExplore": "Explore",
+      "contextServer": "Server",
+      "contextDm": "Direct messages",
+      "inboxTitle": "Inbox",
+      "inboxAria": "Inbox",
+      "searchPlaceholder": "Find or start a conversation",
+      "directMessages": "DIRECT MESSAGES",
+      "userFallback": "User",
+      "micOn": "Unmute mic",
+      "micOff": "Mute mic",
+      "soundOn": "Unmute",
+      "soundOff": "Mute",
+      "createServerTitle": "Create server",
+      "exploreTitle": "Explore",
+      "exploreClose": "Close Explore",
+      "settingsTitle": "Settings",
+      "sectionChat": "Text channels",
+      "sectionVoice": "Voice channels",
+      "createChannelSectionLabelDefault": "Text channels",
+      "reportDone": "Message reported. Thank you!",
+      "voiceMessageLabel": "Voice message"
+    },
+    "channels": {
+      "catInfo": "Information",
+      "catText": "Text Channels",
+      "catVoice": "Voice Channels",
+      "general": "general",
+      "highlights": "highlights",
+      "lobby": "Lobby",
+      "gaming": "gaming",
+      "music": "music",
+      "waitingRoom": "Waiting Room",
+      "streamingRoom": "Streaming",
+      "welcomeAndRules": "welcome-and-rules",
+      "notesResources": "notes-and-resources",
+      "homeworkHelp": "homework-help",
+      "sessionPlanning": "session-planning",
+      "offTopic": "off-topic",
+      "studyRoom1": "Study Room 1",
+      "studyRoom2": "Study Room 2",
+      "announcements": "announcements",
+      "resources": "resources",
+      "meetingPlan": "meeting-plan",
+      "meetingRoom1": "Meeting Room 1",
+      "meetingRoom2": "Meeting Room 2",
+      "events": "events",
+      "feedback": "feedback",
+      "communityHub": "Community Hub"
+    },
+    "serverInteractions": {
+      "title": "Interactions",
+      "desc": "Only the server owner or members with Manage Server permission can change these settings.",
+      "systemMessages": "System Messages",
+      "enableSystem": "Enable system messages",
+      "sendWelcome": "Send welcome message for new members",
+      "stickerReply": "Help members reply to welcome notifications with stickers",
+      "systemChannel": "System message channel",
+      "noChannel": "None",
+      "defaultNotif": "Default notification level",
+      "notifAll": "All messages",
+      "notifMentions": "Only @mentions",
+      "roleNotif": "Role Notification (For You)",
+      "roleNotifDesc": "Send notifications by role; recipients will see it in the For You tab.",
+      "notifTitlePlaceholder": "Notification title",
+      "notifContentPlaceholder": "Notification content",
+      "targetEveryone": "@everyone",
+      "targetRole": "By role",
+      "sendBtn": "Send notification",
+      "sendingBtn": "Sending...",
+      "loading": "Loading interaction settings...",
+      "loadError": "Failed to load data",
+      "loadFail": "Failed to load interaction settings",
+      "saveError": "Failed to save settings",
+      "sendError": "Failed to send notification",
+      "errTitle": "Please enter a title and content for the notification",
+      "errRole": "Please select a role",
+      "sentAlert": "Notification sent to {n} members."
+    },
+    "serverSafety": {
+      "loadError": "Failed to load safety settings.",
+      "verifyTitle": "Verification Level",
+      "verifyDesc": "Server members must meet the following criteria to send messages in text channels or start direct message conversations. If members have been assigned a role and the server's onboarding is disabled, these criteria no longer apply.",
+      "verifyRecommend": "We recommend setting a verification level for Community Servers.",
+      "changeBtn": "Change",
+      "verifyAriaLabel": "Verification Level",
+      "contentFilterTitle": "Explicit Media Content Filter",
+      "contentFilterDesc": "Choose whether server members can share media containing explicit content detected by the filter. This setting applies to non-age-restricted channels.",
+      "learnMore": "Learn more",
+      "contentFilterAriaLabel": "Explicit Media Content Filter",
+      "verifyNoneTitle": "None",
+      "verifyNoneDesc": "Unrestricted",
+      "verifyLowTitle": "Low",
+      "verifyLowDesc": "Must have a verified email on their Cordigram account.",
+      "verifyMediumTitle": "Medium",
+      "verifyMediumDesc": "Must be registered on Cordigram for longer than 5 minutes.",
+      "verifyHighTitle": "High",
+      "verifyHighDesc": "Must be a member of this server for longer than 10 minutes.",
+      "filterAllTitle": "Filter messages from all members",
+      "filterAllDesc": "All messages will be scanned for explicit media content.",
+      "filterNoRoleTitle": "Filter messages from server members without a role",
+      "filterNoRoleDesc": "Messages from server members without a role will be scanned for explicit media content.",
+      "filterNoneTitle": "Do not filter",
+      "filterNoneDesc": "Messages will not be scanned for explicit media content."
+    },
+    "serverEmoji": {
+      "denied": "Only the server owner or members with Manage Server permission can edit emojis.",
+      "loading": "Loading emojis…",
+      "loadError": "Error loading emojis",
+      "fileTooLarge": "File must not exceed 2 MB.",
+      "fileInvalid": "Only PNG, JPG, GIF or WebP are supported.",
+      "title": "Emoji",
+      "desc": "Members can use up to {max} custom emojis on this server. You can upload static images (PNG, JPG, WebP) or animated GIFs. Emoji names default to the file name (letters, numbers and underscores only).",
+      "uploadBtn": "Upload Emoji",
+      "slotsLeft": "{n}/{max} slots remaining",
+      "dropHint": "Drag and drop files here to upload quickly (PNG, JPG, GIF, WebP — max 2 MB).",
+      "sectionTitle": "Emoji",
+      "sectionSub": "{n} slots available (max {max} custom emojis, static + GIF)",
+      "animSection": "Animated Emoji",
+      "animSub": "{n} GIFs · {r} slots remaining out of {max}",
+      "colImage": "Image",
+      "colName": "Name",
+      "colUploader": "Uploaded by",
+      "emptyStatic": "No static emojis yet",
+      "emptyAnimated": "NONE"
+    },
+    "serverSticker": {
+      "denied": "Only the server owner or members with Manage Server permission can edit stickers.",
+      "loading": "Loading stickers…",
+      "loadError": "Error loading stickers",
+      "fileTooLarge": "File must not exceed 2 MB.",
+      "fileInvalid": "Only PNG, JPG or WebP are supported.",
+      "bannerAriaLabel": "Server upgrade",
+      "bannerTitle": "Get a Boost",
+      "bannerDesc": "Boosting the server to Level 1 or higher unlocks more sticker slots and other perks. Currently the server only has {n} free sticker slots — the upgrade feature is coming soon.",
+      "btnUpgrade": "Boost Server",
+      "btnLearnMore": "Learn more",
+      "freeTitle": "Free slots",
+      "freeSub": "{n} of {total} slots available",
+      "uploadBtn": "Upload Sticker",
+      "notice": "Static images (PNG/JPG/WebP): square-cropped, ~500 KB compressed then uploaded to Cloudinary (URL stored in DB). Sticker GIFs: upload raw file up to 2 MB to Cloudinary. Current limit: {max} stickers per server.",
+      "tierTitle": "Level {n}",
+      "tierNote": "Server boost required (coming soon)",
+      "tierBonus10": "+10 Sticker Slots",
+      "tierBonus15": "+15 Sticker Slots (30 total)",
+      "tierBonus30": "+30 Sticker Slots (60 total)",
+      "boosts": "{n} Boosts",
+      "buyBtn": "Purchase Level"
+    },
+    "serverMembers": {
+      "showInChannelLabel": "Show members in channel list",
+      "showInChannelDesc": "When enabled, shows up to 50 members: online, new accounts (< 7 days), recently joined, or with message activity in 7 days — suitable for the channel member list.",
+      "searchResults": "Search results",
+      "searchPlaceholder": "Search by username or user ID (filters instantly)",
+      "sortBtn": "Sort",
+      "sortNewest": "Join date (newest first)",
+      "sortOldest": "Join date (oldest first)",
+      "sortUsername": "Username (A → Z)",
+      "sortActivity": "Activity (most → least)",
+      "filterLabel": "Filter",
+      "filterNewAccount": "New accounts (< 7 days)",
+      "filterSpam": "Spam (> 50 messages / 10 min)",
+      "roleLabel": "Role",
+      "roleAll": "All roles",
+      "roleOwner": "Owner",
+      "roleModerator": "Moderator",
+      "roleMember": "Member",
+      "pruneBtn": "Prune",
+      "loading": "Loading...",
+      "loadFail": "Failed to load member list",
+      "colCheck": "Select all",
+      "colName": "NAME",
+      "memberOptions": "Options",
+      "resultCount": "Showing {n} members",
+      "resultCountCapped": " (max 50 when channel list is enabled)",
+      "ownerBadge": "Owner",
+      "modBadge": "Mod",
+      "memberBadge": "Member",
+      "menuProfile": "Profile",
+      "menuMessage": "Message",
+      "menuTimeout": "Timeout {name}",
+      "menuKick": "Kick {name}",
+      "menuBan": "Ban {name}",
+      "filterTitle": "Prune members — Server",
+      "filterClose": "Close",
+      "filterLastSeen": "Last seen",
+      "filterDays7": "more than 7 days ago",
+      "filterDays30": "more than 30 days ago",
+      "filterIncludeRole": "Also include members with role",
+      "filterRoleAll": "All roles",
+      "filterRoleNone": "No role (members)",
+      "filterRoleMember": "Member",
+      "filterRoleMod": "Mod (server moderator)",
+      "filterHint": "Pruning removes members who have been inactive during the selected period. They can rejoin if re-invited.",
+      "filterSelectHint": "Select conditions to preview how many members will be pruned.",
+      "filterPreview": "Will prune {n} members.",
+      "filterCancel": "Cancel",
+      "filterApply": "Prune",
+      "filterApplying": "Pruning...",
+      "filterConfirm": "Are you sure you want to prune {n} members who have been inactive for more than {days} days?",
+      "filterDone": "Pruned {n} members.",
+      "filterError": "Failed to prune",
+      "moderateKickTitle": "Kick {name}",
+      "moderateBanTitle": "Ban {name}",
+      "moderateTimeoutTitle": "Timeout {name}",
+      "kickDesc": "This person will be removed from the server but can rejoin if invited.",
+      "banDesc": "This person will be permanently banned and cannot rejoin the server.",
+      "timeoutDesc": "This person will be timed out and cannot send messages for the selected duration.",
+      "timeoutDuration": "Timeout duration",
+      "reason": "Reason (optional)",
+      "reasonPlaceholder": "Enter reason...",
+      "moderateCancel": "Cancel",
+      "moderateApplying": "Processing...",
+      "kick": "Kick",
+      "ban": "Ban",
+      "timeout": "Timeout",
+      "moderateFail": "Failed to execute action",
+      "transferTitle": "Transfer Ownership",
+      "transferDesc": "Transfer server ownership to {name}? They will become the server owner and you will become a member.",
+      "transferCancel": "Cancel",
+      "transferApplying": "Processing...",
+      "transferBtn": "Transfer",
+      "transferFail": "Failed to transfer ownership",
+      "joinOwner": "Server Owner",
+      "joinInvited": "Invited by {name}",
+      "joinUrl": "Joined via URL",
+      "timeout60s": "60 seconds",
+      "timeout5m": "5 minutes",
+      "timeout10m": "10 minutes",
+      "timeout1h": "1 hour",
+      "timeout1d": "1 day",
+      "timeout1w": "1 week"
+    },
+    "serverAccess": {
+      "loading": "Loading access settings...",
+      "loadError": "Failed to load access settings",
+      "saveError": "Failed to save access settings",
+      "title": "Access",
+      "desc": "Choose how members join and (if enabled) require them to accept rules before chatting.",
+      "inviteOnlyTitle": "Invite Only",
+      "inviteOnlyHint": "People can join your server directly with an invite link",
+      "applyTitle": "Application Required",
+      "applyHint": "Must submit an application and be approved to join",
+      "discoverTitle": "Discoverable",
+      "discoverHint": "Anyone can directly join your server through Server Discovery",
+      "discoveryMet": "Your server meets all the requirements to be listed in Server Discovery",
+      "discoveryNotMet": "Your server does not currently meet all the requirements to be listed in Server Discovery",
+      "checkingDiscovery": "Checking...",
+      "ageTitle": "Age Restricted",
+      "ageDesc": "Enable to block users under 18.",
+      "rulesToggleTitle": "Server Rules",
+      "rulesToggleDesc": "Enable to require users to accept rules.",
+      "rulesSection": "Rules",
+      "rulesEnabledDesc": "Add and manage rules that apply to the server.",
+      "rulesDisabledDesc": "Enable Server Rules to add rules.",
+      "rulesPlaceholder": "Enter rule content",
+      "addRuleBtn": "Add rule",
+      "addRuleChipTitle": "Add template rule",
+      "noRules": "No rules yet.",
+      "addRuleError": "Failed to add rule",
+      "joinFormTitle": "Join Application",
+      "joinFormDesc": "Add questions to your application form. People cannot join the server until you approve their application.",
+      "joinFormToggleTitle": "Toggle join application form",
+      "agreeRulesQuestion": "Read and agree to Server Rules",
+      "agreeRulesBadge": "Server Rules",
+      "editQuestion": "Edit",
+      "deleteQuestion": "Delete",
+      "addQuestionBtn": "+ Add question",
+      "addQuestionChipTitle": "Add template question",
+      "maxQuestions": "Max {max} questions. Remaining: {n}.",
+      "joinFormSaveError": "Failed to save join application form",
+      "pickTypeTitle": "Choose question type",
+      "typeShort": "Short Answer",
+      "typeParagraph": "Paragraph",
+      "typeMultiple": "Multiple Choice",
+      "questionPlaceholder": "Enter your question",
+      "optionPlaceholder": "Option {n}",
+      "addOption": "+ Add option",
+      "removeOptionTitle": "Remove option",
+      "modalCancel": "Cancel",
+      "modalSave": "Save"
+    },
+    "serverBans": {
+      "desc": "Bans are enforced by account and IP. A user may bypass an IP ban by using a proxy. Bypassing bans is much harder when phone verification is enabled in",
+      "moderation": "Moderation",
+      "searchPlaceholder": "Search bans by user ID or username",
+      "searchBtn": "Search",
+      "loading": "Loading list...",
+      "noBansTitle": "NO BANS",
+      "noBansDesc": "You haven't banned anyone yet... but if and when you need to, don't hesitate!",
+      "noBansSearch": "No banned users match your search.",
+      "reason": "Reason: {reason}",
+      "unbanBtn": "Revoke Ban",
+      "resultCount": "Showing {n} of {total} banned users",
+      "restrictedTitle": "Restricted Members (Mention Spam)",
+      "restrictedEmpty": "No restricted members.",
+      "restricted": "Restricted from sending messages",
+      "mentionBlocked": "Mention blocked until {date}",
+      "unrestrictBtn": "Unrestrict",
+      "confirmTitle": "Revoke Ban",
+      "confirmDesc": "Are you sure you want to revoke the ban for {name} (@{username})? This user will be able to rejoin the server with a new invite.",
+      "confirmCancel": "Cancel",
+      "confirmSubmit": "Revoke Ban",
+      "confirming": "Revoking...",
+      "loadFail": "Failed to load ban list",
+      "unbanFail": "Failed to revoke ban"
+    },
+    "autoMod": {
+      "loadError": "Failed to load AutoMod settings.",
+      "spamTitle": "Block Mention Spam",
+      "spamDesc": "Block messages that exceed the mention limit for roles and users",
+      "settingsBtn": "Settings",
+      "ruleNameLabel": "Rule name",
+      "ruleNameValue": "Block mention spam",
+      "toggleAriaLabel": "Enable/Disable",
+      "section1Title": "Configure mention limit",
+      "mentionLimitTitle": "Unique mentions (roles + users) per message",
+      "mentionLimitDesc": "Limit the number of unique mentions per message",
+      "section2Title": "Choose a response",
+      "blockTitle": "Block message",
+      "blockDesc": "Block messages that exceed the unique mention limit.",
+      "blockDesc2": "A custom error notification can be shown to members.",
+      "editNotifLink": "Edit Custom Notification",
+      "warnTitle": "Send alert",
+      "warnDesc": "Send an alert containing the flagged message to a chosen channel.",
+      "restrictTitle": "Restrict member",
+      "restrictDesc": "Temporarily disable the member's ability to send messages or join voice channels.",
+      "section3Title": "Allow certain roles or channels (optional)",
+      "searchPlaceholder": "Search channels or roles",
+      "groupChannels": "CHANNELS",
+      "groupRoles": "ROLES",
+      "noResults": "No results found",
+      "exemptNote": "Note — members with Administrator and Manage Server permissions are always exempt from filters.",
+      "cancelBtn": "Cancel",
+      "saveBtn": "Save changes",
+      "savingBtn": "Saving...",
+      "tagBlock": "block message",
+      "tagWarn": "send alert",
+      "tagRestrict": "restrict member",
+      "notifModalTitle": "Edit Custom Notification",
+      "notifModalDesc": "Your custom notification will be displayed when AutoMod blocks a member's message. This is an opportunity to help members understand the server rules!",
+      "notifPlaceholder": "Enter your custom notification",
+      "notifCancel": "Cancel",
+      "notifSave": "Save"
+    },
+    "noMessages": "No messages yet. Start a conversation!",
+    "loadingMessages": "Loading messages...",
+    "welcome": {
+      "title": "Welcome to",
+      "serverOf": "{name}'s Server",
+      "channelBegin": "This is the beginning of the",
+      "startTalking": " channel. Start chatting!",
+      "greeting": "Nice to meet you, {name}!",
+      "unknownUser": "Someone",
+      "waving": "Sending...",
+      "waveBtn": "Wave to {name}!"
+    },
+    "dmList": {
+      "sent": "Sent",
+      "seen": "Seen"
+    },
+    "mention": {
+      "tooltip": "Mention (@mention)"
+    },
+    "applyPending": {
+      "title": "Your application to join {server} is under review!",
+      "desc": "You will receive a notification when there is an update.",
+      "withdraw": "Withdraw",
+      "withdrawError": "Could not withdraw application",
+      "joinError": "Could not join server"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "close": "Close",
+    "saved": "Saved.",
+    "failedToLoad": "Failed to load settings.",
+    "sections": {
+      "general": "General",
+      "privacy": "Privacy",
+      "messages": "Messages & calls",
+      "appearance": "Appearance",
+      "notifications": "Notifications",
+      "profile": "Profile"
+    },
+    "general": {
+      "dmDirectoryTitle": "DM directory",
+      "dmDirectoryHint": "Only applies in Direct Messages.",
+      "dmDirectoryAllFriends": "Show all friends",
+      "dmDirectoryOnlineFriends": "Only friends who are online",
+      "languageTitle": "Language",
+      "languageHint": "Applies to Chat (this page) and Social (NEXT_LOCALE cookie).",
+      "languageLabel": "Display language",
+      "languageNames": {
+        "vi": "Vietnamese",
+        "en": "English",
+        "ja": "Japanese",
+        "zh": "Chinese"
+      }
+    },
+    "privacy": {
+      "title": "Privacy",
+      "hint": "Hide Cordigram member-since date on your public profile. Turn off sharing your online/idle/offline presence with others.",
+      "showMemberSince": "Show Cordigram member since",
+      "sharePresence": "Share presence (online / idle / offline)"
+    },
+    "messages": {
+      "title": "Messages & calls",
+      "allowMessageLabel": "Who can message you",
+      "allowCallLabel": "Who can call you",
+      "everyone": "Everyone",
+      "followersOnly": "Only people you follow",
+      "blockTitle": "Message blocking",
+      "blockedList": "Blocked list ›",
+      "ignoredList": "Ignored list ›",
+      "blockedHeading": "Blocked",
+      "ignoredHeading": "Ignored",
+      "empty": "Empty",
+      "unblock": "Unblock",
+      "unignored": "Remove ignore"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "hint": "Light / dark mode (synced to your account).",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "masterLabel": "Notifications",
+      "masterHint": "On: normal notifications. Off: disable all notifications (social + DM/server).",
+      "enabledToast": "Notifications enabled.",
+      "disabledToast": "Notifications disabled.",
+      "soundLabel": "Notification sounds (messages & new notifications)"
+    },
+    "profile": {
+      "title": "Profile",
+      "main": "Main profile",
+      "server": "Server profile"
+    },
+    "errorLoadBlocked": "Could not load blocked list.",
+    "errorLoadIgnored": "Could not load ignored list.",
+    "errorUpdate": "Could not update.",
+    "errorSave": "Could not save.",
+    "unblockedToast": "Unblocked.",
+    "errorUnblock": "Could not unblock.",
+    "unignoredToast": "Ignore removed.",
+    "errorUnignore": "Could not remove ignore.",
+    "ariaShowMemberSince": "Toggle join date",
+    "ariaSharePresence": "Toggle presence"
+  }
+}

@@ -1,4 +1,25 @@
-import { IsOptional, IsString, IsBoolean, MaxLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsBoolean,
+  MaxLength,
+  IsArray,
+  ValidateNested,
+  IsObject,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+class UpdateServerTraitDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  emoji?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  text?: string;
+}
 
 export class UpdateServerDto {
   @IsOptional()
@@ -16,6 +37,28 @@ export class UpdateServerDto {
   avatarUrl?: string | null;
 
   @IsOptional()
+  @IsString()
+  bannerUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  bannerImageUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  bannerColor?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateServerTraitDto)
+  profileTraits?: UpdateServerTraitDto[];
+
+  @IsOptional()
   @IsBoolean()
   isPublic?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  safetySettings?: Record<string, any>;
 }

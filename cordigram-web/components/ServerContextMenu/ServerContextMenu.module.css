@@ -39,6 +39,10 @@
   background: var(--color-panel-hover);
 }
 
+.menuItemOpen {
+  background: var(--color-panel-hover) !important;
+}
+
 .menuItemDanger {
   color: var(--color-panel-danger) !important;
 }

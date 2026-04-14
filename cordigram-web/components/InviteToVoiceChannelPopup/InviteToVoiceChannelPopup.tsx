@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from "react";
 import styles from "./InviteToVoiceChannelPopup.module.css";
 import type { Friend } from "@/lib/servers-api";
+import { useLanguage } from "@/component/language-provider";
 
 interface InviteToVoiceChannelPopupProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export default function InviteToVoiceChannelPopup({
   channelName,
   friends,
 }: InviteToVoiceChannelPopupProps) {
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -60,11 +62,11 @@ export default function InviteToVoiceChannelPopup({
   return (
     <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal aria-labelledby="invite-voice-title">
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Đóng">
+        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label={t("settings.close")}>
           ×
         </button>
         <h2 id="invite-voice-title" className={styles.headerTitle}>
-          Mời bạn bè vào {serverName}
+          {t("chat.inviteVoice.title", { serverName })}
         </h2>
         <p className={styles.headerSub}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -73,7 +75,7 @@ export default function InviteToVoiceChannelPopup({
             <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" />
             <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" />
           </svg>
-          Người nhận sẽ đến {channelName}
+          {t("chat.inviteVoice.sub", { channelName })}
         </p>
 
         <div className={styles.searchWrap}>
@@ -84,14 +86,14 @@ export default function InviteToVoiceChannelPopup({
           <input
             type="text"
             className={styles.searchInput}
-            placeholder="Tìm kiếm bạn bè"
+            placeholder={t("chat.invite.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
         <div className={styles.sectionLabel}>
-          Mời Vào Máy Chủ
+          {t("chat.invite.sectionLabel")}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M6 9l6 6 6-6" />
           </svg>
@@ -99,7 +101,9 @@ export default function InviteToVoiceChannelPopup({
         <div className={styles.friendList}>
           {filteredFriends.length === 0 ? (
             <p className={styles.emptyFriends}>
-              {friends.length === 0 ? "Chưa có bạn bè để mời." : "Không tìm thấy bạn bè nào."}
+              {friends.length === 0
+                ? t("chat.invite.empty.noFriends")
+                : t("chat.invite.empty.notFound")}
             </p>
           ) : (
             filteredFriends.map((friend) => (
@@ -117,7 +121,7 @@ export default function InviteToVoiceChannelPopup({
                 </div>
                 <div className={styles.friendInfo}>
                   <div className={styles.friendDisplayName}>
-                    {friend.displayName || friend.username || "Người dùng"}
+                    {friend.displayName || friend.username || t("chat.common.user")}
                   </div>
                   <div className={styles.friendUsername}>{friend.username}</div>
                 </div>
@@ -126,7 +130,7 @@ export default function InviteToVoiceChannelPopup({
                   className={styles.inviteFriendBtn}
                   onClick={handleInviteFriend}
                 >
-                  Mời
+                  {t("chat.invite.invite")}
                 </button>
               </div>
             ))
@@ -134,7 +138,7 @@ export default function InviteToVoiceChannelPopup({
         </div>
 
         <div className={styles.dividerWrap}>
-          <p className={styles.dividerText}>Hoặc, gửi link mời cho họ</p>
+          <p className={styles.dividerText}>{t("chat.invite.orSendLink")}</p>
         </div>
         <div className={styles.linkWrap}>
           <input type="text" className={styles.linkInput} readOnly value={inviteLink} />
@@ -143,11 +147,11 @@ export default function InviteToVoiceChannelPopup({
             className={`${styles.copyBtn} ${copied ? styles.copied : ""}`}
             onClick={handleCopy}
           >
-            {copied ? "Đã sao chép" : "Sao chép"}
+            {copied ? t("chat.common.copied") : t("chat.common.copy")}
           </button>
         </div>
         <p className={styles.expireNote}>
-          Link mời dẫn thẳng vào kênh thoại này. Người chưa vào máy chủ sẽ thấy trang mời tham gia trước.
+          {t("chat.inviteVoice.expireNote")}
         </p>
       </div>
     </div>

@@ -3,6 +3,7 @@
 import React from "react";
 import { useCallSound } from "@/hooks/use-call-sound";
 import styles from "./OutgoingCallPopup.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 interface OutgoingCallPopupProps {
   receiverName: string;
@@ -19,7 +20,7 @@ export default function OutgoingCallPopup({
   onCancel,
   status,
 }: OutgoingCallPopupProps) {
-  const callTypeText = callType === "video" ? "Video" : "Voice";
+  const { t } = useLanguage();
 
   // ✅ Play outgoing call dialing tone (only when status is 'calling')
   useCallSound("outgoing", status === "calling");
@@ -27,13 +28,13 @@ export default function OutgoingCallPopup({
   const getStatusText = () => {
     switch (status) {
       case "calling":
-        return "Calling...";
+        return t("chat.popups.outgoingCall.calling");
       case "rejected":
-        return "Recipient is unavailable";
+        return t("chat.popups.outgoingCall.rejected");
       case "no-answer":
-        return "No answer";
+        return t("chat.popups.outgoingCall.noAnswer");
       default:
-        return "Calling...";
+        return t("chat.popups.outgoingCall.calling");
     }
   };
 
@@ -71,7 +72,11 @@ export default function OutgoingCallPopup({
 
         {/* Receiver info */}
         <h2 className={styles.receiverName}>{receiverName}</h2>
-        <p className={styles.callType}>{callTypeText} call</p>
+        <p className={styles.callType}>
+          {callType === "video"
+            ? t("chat.popups.outgoingCall.videoCall")
+            : t("chat.popups.outgoingCall.voiceCall")}
+        </p>
         <p className={styles.statusText} style={{ color: getStatusColor() }}>
           {getStatusText()}
         </p>
@@ -81,7 +86,11 @@ export default function OutgoingCallPopup({
           <button
             onClick={onCancel}
             className={`${styles.button} ${styles.cancelButton}`}
-            aria-label={status === "calling" ? "Cancel call" : "Close"}
+            aria-label={
+              status === "calling"
+                ? t("chat.popups.outgoingCall.cancelAria")
+                : t("chat.popups.outgoingCall.closeAria")
+            }
           >
             <svg
               width="28"
@@ -93,7 +102,11 @@ export default function OutgoingCallPopup({
             >
               <path d="M23 1L1 23M1 1l22 22" />
             </svg>
-            <span>{status === "calling" ? "Cancel call" : "Close"}</span>
+            <span>
+              {status === "calling"
+                ? t("chat.popups.outgoingCall.cancelCall")
+                : t("chat.popups.outgoingCall.close")}
+            </span>
           </button>
         </div>
       </div>

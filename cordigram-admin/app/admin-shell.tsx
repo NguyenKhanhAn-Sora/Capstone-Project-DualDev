@@ -9,7 +9,7 @@ import styles from "./admin-shell.module.css";
 type NavItem = {
   href: string;
   label: string;
-  icon: "dashboard" | "report" | "resolved" | "moderation" | "problem" | "content" | "ads" | "audit" | "broadcast" | "verification";
+  icon: "dashboard" | "report" | "resolved" | "moderation" | "problem" | "content" | "ads" | "audit" | "broadcast" | "verification" | "discovery";
   matcher: (pathname: string) => boolean;
 };
 
@@ -96,6 +96,15 @@ function NavIcon({ icon }: { icon: NavItem["icon"] }) {
     );
   }
 
+  if (icon === "discovery") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M14.5 9.5l-1.2 3.8-3.8 1.2 1.2-3.8z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
@@ -165,6 +174,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: "verification",
     matcher: (pathname) => pathname === "/creator-verification" || pathname.startsWith("/creator-verification/"),
   },
+  {
+    href: "/community-discovery",
+    label: "Community Discovery",
+    icon: "discovery",
+    matcher: (pathname) => pathname === "/community-discovery" || pathname.startsWith("/community-discovery/"),
+  },
 ];
 
 export default function AdminShell({
@@ -179,6 +194,9 @@ export default function AdminShell({
 
   const isLoginRoute = pathname === "/login" || pathname.startsWith("/login/");
   const isRootRoute = pathname === "/";
+  /** Xem máy chủ chỉ đọc: fullscreen, không sidebar điều hướng admin. */
+  const isServerReadOnlyPreview =
+    pathname.startsWith("/community-discovery/server-view/");
 
   useEffect(() => {
     if (!signOutConfirmOpen || typeof window === "undefined") return;
@@ -212,7 +230,7 @@ export default function AdminShell({
     router.replace("/login");
   };
 
-  if (isLoginRoute || isRootRoute) {
+  if (isLoginRoute || isRootRoute || isServerReadOnlyPreview) {
     return <>{children}</>;
   }
 

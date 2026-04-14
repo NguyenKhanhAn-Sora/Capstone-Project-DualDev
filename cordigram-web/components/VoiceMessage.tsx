@@ -14,7 +14,6 @@ export default function VoiceMessage({
   duration,
   isFromCurrentUser = false,
 }: VoiceMessageProps) {
-
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,30 +27,40 @@ export default function VoiceMessage({
     const audio = new Audio(voiceUrl);
     audioRef.current = audio;
 
-    audio.addEventListener("loadeddata", () => {
+    const onLoadedData = () => {
       setIsLoading(false);
-    });
+    };
 
-    audio.addEventListener("error", () => {
+    const onError = () => {
       setIsLoading(false);
       setError(true);
-      console.error("Failed to load voice message");
-    });
+    };
 
-    audio.addEventListener("ended", () => {
+    const onEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
       }
-    });
+    };
+
+    audio.addEventListener("loadeddata", onLoadedData);
+    audio.addEventListener("error", onError);
+    audio.addEventListener("ended", onEnded);
 
     return () => {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
       }
+      audio.removeEventListener("loadeddata", onLoadedData);
+      audio.removeEventListener("error", onError);
+      audio.removeEventListener("ended", onEnded);
       audio.pause();
-      audio.src = "";
+      audio.removeAttribute("src");
+      audio.load();
+      if (audioRef.current === audio) {
+        audioRef.current = null;
+      }
     };
   }, [voiceUrl]);
 

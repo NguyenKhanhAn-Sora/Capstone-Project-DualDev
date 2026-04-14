@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import styles from "./DeleteServerModal.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 export interface DeleteServerModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export default function DeleteServerModal({
   serverId,
   onConfirm,
 }: DeleteServerModalProps) {
+  const { t } = useLanguage();
   const [confirmName, setConfirmName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function DeleteServerModal({
       await onConfirm(serverId);
       onClose(); // Đóng modal sau khi xóa thành công (panel đã được parent đóng)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không xóa được máy chủ");
+      setError(err instanceof Error ? err.message : t("chat.popups.deleteServer.error"));
     } finally {
       setIsSubmitting(false);
     }
@@ -55,19 +57,19 @@ export default function DeleteServerModal({
           type="button"
           className={styles.closeBtn}
           onClick={onClose}
-          aria-label="Đóng"
+          aria-label={t("chat.popups.closeAria")}
         >
           ×
         </button>
         <h2 id="delete-server-title" className={styles.title}>
-          Xóa &quot;{serverName}&quot;
+          {t("chat.popups.deleteServer.title", { serverName })}
         </h2>
         <p className={styles.message}>
-          Bạn có chắc bạn muốn xoá {serverName}? Hành động này không thể hoàn tác.
+          {t("chat.popups.deleteServer.message", { serverName })}
         </p>
         <form onSubmit={handleConfirm}>
           <label className={styles.label} htmlFor="delete-server-confirm-name">
-            Nhập tên máy chủ
+            {t("chat.popups.deleteServer.confirmLabel")}
           </label>
           <input
             id="delete-server-confirm-name"
@@ -82,10 +84,10 @@ export default function DeleteServerModal({
           {error && <p className={styles.error}>{error}</p>}
           <div className={styles.footer}>
             <button type="button" className={styles.cancelBtn} onClick={onClose} disabled={isSubmitting}>
-              Hủy bỏ
+              {t("chat.common.cancel")}
             </button>
             <button type="submit" className={styles.deleteBtn} disabled={!canDelete}>
-              {isSubmitting ? "Đang xóa…" : "Xóa máy chủ"}
+              {isSubmitting ? t("chat.popups.deleteServer.deleting") : t("chat.popups.deleteServer.deleteBtn")}
             </button>
           </div>
         </form>

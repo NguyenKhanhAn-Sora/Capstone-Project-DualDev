@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import styles from "./MembersTab.module.css";
 import type { Role, ServerMemberRow } from "@/lib/servers-api";
 import * as serversApi from "@/lib/servers-api";
+import { useLanguage } from "@/component/language-provider";
 
 interface MembersTabProps {
   serverId: string;
@@ -18,20 +19,26 @@ export default function MembersTab({
   isOwner,
   onUpdate,
 }: MembersTabProps) {
+  const { t } = useLanguage();
   const [allMembers, setAllMembers] = useState<ServerMemberRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [addSearchQuery, setAddSearchQuery] = useState("");
   const [saving, setSaving] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const fetchMembers = useCallback(async () => {
     try {
       setLoading(true);
+      setPermissionDenied(false);
       const members = await serversApi.getServerMembers(serverId);
       setAllMembers(members);
     } catch (err) {
-      console.error("Failed to fetch members:", err);
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("quyền") || msg.includes("403") || msg.includes("Forbidden")) {
+        setPermissionDenied(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -70,7 +77,7 @@ export default function MembersTab({
       setShowAddModal(false);
       setAddSearchQuery("");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Không thêm được thành viên");
+      alert(err instanceof Error ? err.message : t("chat.roleMembers.errorAdd"));
     } finally {
       setSaving(false);
     }
@@ -78,7 +85,7 @@ export default function MembersTab({
 
   const handleRemoveMember = async (memberId: string) => {
     if (!isOwner || role.isDefault) return;
-    if (!window.confirm("Bạn có chắc muốn xóa thành viên khỏi vai trò này?")) {
+    if (!window.confirm(t("chat.roleMembers.confirmRemove"))) {
       return;
     }
     setSaving(true);
@@ -86,7 +93,7 @@ export default function MembersTab({
       const updated = await serversApi.removeMemberFromRole(serverId, role._id, memberId);
       onUpdate(updated);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Không xóa được thành viên");
+      alert(err instanceof Error ? err.message : t("chat.roleMembers.errorRemove"));
     } finally {
       setSaving(false);
     }
@@ -95,7 +102,21 @@ export default function MembersTab({
   if (loading) {
     return (
       <div className={styles.container}>
-        <div className={styles.loading}>Đang tải danh sách thành viên...</div>
+        <div className={styles.loading}>{t("chat.roleMembers.loading")}</div>
+      </div>
+    );
+  }
+
+  if (permissionDenied) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.defaultRoleMessage}>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+          </svg>
+          <h3>{t("chat.roleMembers.noAccessTitle")}</h3>
+          <p>{t("chat.roleMembers.noAccessDesc")}</p>
+        </div>
       </div>
     );
   }
@@ -107,13 +128,10 @@ export default function MembersTab({
           <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
           </svg>
-          <h3>@everyone</h3>
-          <p>
-            Vai trò @everyone được áp dụng tự động cho tất cả thành viên trong máy chủ.
-            Bạn không thể thêm hoặc xóa thành viên khỏi vai trò này.
-          </p>
+          <h3>{t("chat.roleMembers.everyoneTitle")}</h3>
+          <p>{t("chat.roleMembers.everyoneDesc")}</p>
           <div className={styles.memberCount}>
-            {allMembers.length} thành viên
+            {t("chat.roleMembers.memberCount", { count: allMembers.length })}
           </div>
         </div>
       </div>
@@ -137,7 +155,7 @@ export default function MembersTab({
           <input
             type="text"
             className={styles.searchInput}
-            placeholder="Tìm kiếm thành viên"
+            placeholder={t("chat.roleMembers.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -148,7 +166,7 @@ export default function MembersTab({
             onClick={() => setShowAddModal(true)}
             disabled={saving}
           >
-            Thêm Thành Viên
+            {t("chat.roleMembers.addMember")}
           </button>
         )}
       </div>
@@ -158,19 +176,19 @@ export default function MembersTab({
         {filteredRoleMembers.length === 0 ? (
           <div className={styles.emptyState}>
             {searchQuery ? (
-              <>Không tìm thấy thành viên nào phù hợp với "{searchQuery}"</>
+              <>{t("chat.roleMembers.emptySearch", { query: searchQuery })}</>
             ) : (
               <>
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                 </svg>
-                <p>Chưa có thành viên nào trong vai trò này</p>
+                <p>{t("chat.roleMembers.emptyRole")}</p>
                 {isOwner && (
                   <button
                     className={styles.addBtnSecondary}
                     onClick={() => setShowAddModal(true)}
                   >
-                    Thêm Thành Viên
+                    {t("chat.roleMembers.addMember")}
                   </button>
                 )}
               </>
@@ -183,16 +201,18 @@ export default function MembersTab({
                 {member.avatarUrl ? (
                   <img
                     src={member.avatarUrl}
-                    alt={member.displayName}
+                    alt={member.nickname?.trim() ? member.nickname.trim() : member.displayName}
                     className={styles.memberAvatar}
                   />
                 ) : (
                   <div className={styles.memberAvatarPlaceholder}>
-                    {member.displayName.charAt(0).toUpperCase()}
+                    {(member.nickname?.trim() ? member.nickname.trim() : member.displayName).charAt(0).toUpperCase()}
                   </div>
                 )}
                 <div className={styles.memberText}>
-                  <span className={styles.memberName}>{member.displayName}</span>
+                  <span className={styles.memberName}>
+                    {member.nickname?.trim() ? member.nickname.trim() : member.displayName}
+                  </span>
                   <span className={styles.memberUsername}>@{member.username}</span>
                 </div>
               </div>
@@ -201,7 +221,7 @@ export default function MembersTab({
                   className={styles.removeBtn}
                   onClick={() => handleRemoveMember(member.userId)}
                   disabled={saving}
-                  title="Xóa khỏi vai trò"
+                  title={t("chat.roleMembers.removeFromRoleTitle")}
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
@@ -218,7 +238,7 @@ export default function MembersTab({
         <div className={styles.modalOverlay} onClick={() => setShowAddModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3>Thêm Thành Viên</h3>
+              <h3>{t("chat.roleMembers.addMember")}</h3>
               <button
                 className={styles.modalCloseBtn}
                 onClick={() => setShowAddModal(false)}
@@ -242,7 +262,7 @@ export default function MembersTab({
                 <input
                   type="text"
                   className={styles.searchInput}
-                  placeholder="Tìm kiếm thành viên"
+                  placeholder={t("chat.roleMembers.searchPlaceholder")}
                   value={addSearchQuery}
                   onChange={(e) => setAddSearchQuery(e.target.value)}
                   autoFocus
@@ -252,8 +272,8 @@ export default function MembersTab({
                 {filteredAvailableMembers.length === 0 ? (
                   <div className={styles.noMembers}>
                     {addSearchQuery
-                      ? `Không tìm thấy thành viên nào phù hợp với "${addSearchQuery}"`
-                      : "Tất cả thành viên đã có vai trò này"}
+                      ? t("chat.roleMembers.emptySearch", { query: addSearchQuery })
+                      : t("chat.roleMembers.allHaveRole")}
                   </div>
                 ) : (
                   filteredAvailableMembers.map((member) => (

@@ -34,6 +34,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { CreatorVerificationModule } from './creator-verification/creator-verification.module';
 import { RolesModule } from './roles/roles.module';
 import { LivestreamModule } from './livestream/livestream.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { LivestreamModule } from './livestream/livestream.module';
     CreatorVerificationModule,
     RolesModule,
     LivestreamModule,
+    AuditLogModule,
   ],
   controllers: [AppController],
   providers: [AppService],

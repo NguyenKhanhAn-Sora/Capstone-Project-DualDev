@@ -1,0 +1,250 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  width: min(780px, 96vw);
+  max-height: min(680px, 90vh);
+  background: var(--color-panel-bg);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.cardBanner {
+  border-radius: 12px 12px 0 0;
+}
+
+.cardMain {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.left {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px 24px;
+  background: var(--color-panel-sidebar);
+  border-right: 1px solid var(--color-panel-border);
+  gap: 10px;
+}
+
+.avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  background: var(--color-panel-accent) center / cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.serverName {
+  margin: 0;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--color-panel-text);
+  text-align: center;
+}
+
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-panel-text-muted);
+}
+
+.onlineDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-panel-success);
+  display: inline-block;
+}
+
+.muted {
+  color: var(--color-panel-text-muted);
+}
+
+.established {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--color-panel-text-faint);
+  text-align: center;
+}
+
+.right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 28px;
+  overflow: auto;
+  min-width: 0;
+}
+
+.rightHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-panel-text);
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--color-panel-text-muted);
+  line-height: 1.45;
+}
+
+.closeBtn {
+  border: none;
+  background: transparent;
+  color: var(--color-panel-text-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.closeBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.emptyHint {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-panel-text-muted);
+}
+
+.emptyHint strong {
+  color: var(--color-panel-text);
+  font-weight: 700;
+}
+
+.sectionLabel {
+  margin: 20px 0 10px;
+  font-weight: 800;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--color-panel-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.questions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.qBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qTitle {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--color-panel-text);
+}
+
+.req {
+  color: var(--color-panel-danger);
+  margin-left: 2px;
+}
+
+.choiceList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.choiceRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--color-panel-text-muted);
+  cursor: pointer;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-panel-border);
+  background: var(--color-panel-deep);
+  color: var(--color-panel-text);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.input:focus,
+.textarea:focus {
+  border-color: var(--color-panel-accent);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.err {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--color-panel-danger);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 20px;
+}
+
+.submitBtn {
+  border: none;
+  background: var(--color-panel-success);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -1230,6 +1230,19 @@ export async function fetchBlockedUsers(opts: {
   });
 }
 
+export async function fetchIgnoredUserIds(opts: {
+  token: string;
+}): Promise<{ ignoredUserIds: string[] }> {
+  const { token } = opts;
+  return apiFetch<{ ignoredUserIds: string[] }>({
+    path: "/users/ignored-ids",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function fetchActivityLog(opts: {
   token: string;
   limit?: number;
@@ -1439,7 +1452,12 @@ export type UpdateAvatarResponse = {
 
 export type UserSettingsResponse = {
   theme: "light" | "dark";
-  language?: LanguageCode;
+  language?: "vi" | "en" | "ja" | "zh";
+  dmListFrom?: "everyone" | "followers_only";
+  dmCallFrom?: "everyone" | "followers_only";
+  showCordigramMemberSince?: boolean;
+  sharePresence?: boolean;
+  chatSoundEnabled?: boolean;
 };
 
 export type NotificationCategoryKey =
@@ -1708,16 +1726,38 @@ export async function fetchUserSettings(opts: {
 export async function updateUserSettings(opts: {
   token: string;
   theme?: "light" | "dark";
-  language?: LanguageCode;
+  language?: "vi" | "en" | "ja" | "zh";
+  dmListFrom?: "everyone" | "followers_only";
+  dmCallFrom?: "everyone" | "followers_only";
+  showCordigramMemberSince?: boolean;
+  sharePresence?: boolean;
+  chatSoundEnabled?: boolean;
 }): Promise<UserSettingsResponse> {
-  const { token, theme, language } = opts;
+  const {
+    token,
+    theme,
+    language,
+    dmListFrom,
+    dmCallFrom,
+    showCordigramMemberSince,
+    sharePresence,
+    chatSoundEnabled,
+  } = opts;
   return apiFetch<UserSettingsResponse>({
     path: "/users/settings",
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ theme, language }),
+    body: JSON.stringify({
+      theme,
+      language,
+      dmListFrom,
+      dmCallFrom,
+      showCordigramMemberSince,
+      sharePresence,
+      chatSoundEnabled,
+    }),
   });
 }
 
@@ -2221,6 +2261,7 @@ export type ProfileDetailResponse = {
   avatarOriginalUrl?: string;
   coverUrl?: string;
   bio?: string;
+  pronouns?: string;
   gender?: string;
   location?: string;
   workplace?: {
@@ -2238,7 +2279,63 @@ export type ProfileDetailResponse = {
   };
   isCreatorVerified?: boolean;
   isFollowing?: boolean;
+  /** Ngày tham gia Cordigram (tài khoản), định dạng theo locale khi trả về từ API */
+  cordigramMemberSince?: string;
+  /** Số máy chủ chung với người đang xem hồ sơ */
+  mutualServerCount?: number;
+  /** Danh sách máy chủ chung (tên + icon) */
+  mutualServers?: Array<{
+    serverId: string;
+    name: string;
+    avatarUrl: string | null;
+  }>;
+  /**
+   * Số người theo dõi cả bạn và chủ hồ sơ (giao followers — social).
+   */
+  mutualFollowCount?: number;
+  /** Tối đa 30 người (preview). */
+  mutualFollowUsers?: Array<{
+    userId: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string;
+  }>;
 };
+
+export type MentionMuteDuration =
+  | "15m"
+  | "1h"
+  | "3h"
+  | "8h"
+  | "24h"
+  | "forever";
+
+export async function upsertMentionMute(opts: {
+  token: string;
+  mutedUserId: string;
+  duration: MentionMuteDuration;
+}): Promise<{ until: string }> {
+  return apiFetch<{ until: string }>({
+    path: "/users/mention-mutes",
+    method: "POST",
+    headers: { Authorization: `Bearer ${opts.token}` },
+    body: JSON.stringify({
+      mutedUserId: opts.mutedUserId,
+      duration: opts.duration,
+    }),
+  });
+}
+
+export async function deleteMentionMute(opts: {
+  token: string;
+  mutedUserId: string;
+}): Promise<void> {
+  await apiFetch<{ ok: boolean }>({
+    path: `/users/mention-mutes/${encodeURIComponent(opts.mutedUserId)}`,
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${opts.token}` },
+  });
+}
 
 export async function searchProfiles(opts: {
   token: string;
@@ -2277,6 +2374,8 @@ export type UpdateMyProfilePayload = {
   displayName?: string;
   username?: string;
   bio?: string;
+  pronouns?: string;
+  coverUrl?: string;
   location?: string;
   gender?: "male" | "female" | "other" | "prefer_not_to_say";
   birthdate?: string;

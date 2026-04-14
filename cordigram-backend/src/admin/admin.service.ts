@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { JwtService } from '@nestjs/jwt';
@@ -32,11 +34,22 @@ import {
   ReportProblemStatus,
 } from '../reportproblem/reportproblem.schema';
 import { ConfigService } from '../config/config.service';
+import { Server } from '../servers/server.schema';
+import { Channel } from '../channels/channel.schema';
+import { ChannelCategory } from '../channels/channel-category.schema';
+import { ServerNotification } from '../servers/server-notification.schema';
+import { Message } from '../messages/message.schema';
+import { Role } from '../roles/role.schema';
+import { UserServer } from '../access/user-server.schema';
+import {
+  CommunityDiscoveryHistory,
+  CommunityDiscoveryHistoryAction,
+} from './community-discovery-history.schema';
 
 @Injectable()
-export class AdminService {
+export class AdminService implements OnModuleInit {
   private readonly jwt = new JwtService();
-
+  private readonly logger = new Logger(AdminService.name);
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
@@ -69,7 +82,33 @@ export class AdminService {
     private readonly livekit: LivekitService,
     private readonly configService: ConfigService,
     @InjectConnection() private readonly connection: Connection,
+    @InjectModel(Server.name) private readonly serverModel: Model<Server>,
+    @InjectModel(Channel.name) private readonly channelModel: Model<Channel>,
+    @InjectModel(ChannelCategory.name)
+    private readonly channelCategoryModel: Model<ChannelCategory>,
+    @InjectModel(ServerNotification.name)
+    private readonly serverNotificationModel: Model<ServerNotification>,
+    @InjectModel(Message.name)
+    private readonly messageModel: Model<Message>,
+    @InjectModel(Role.name)
+    private readonly roleModel: Model<Role>,
+    @InjectModel(UserServer.name)
+    private readonly userServerModel: Model<UserServer>,
+    @InjectModel(CommunityDiscoveryHistory.name)
+    private readonly communityDiscoveryHistoryModel: Model<CommunityDiscoveryHistory>,
   ) {}
+
+  async onModuleInit() {
+    try {
+      const result = await this.migrateNotificationI18nKeys();
+      if (result.updated > 0) {
+        this.logger.log(`Migrated ${result.updated} notification records to i18n keys`);
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Notification i18n migration skipped: ${errorMessage}`);
+    }
+  }
 
   private async getAdsRevenueStats(params: {
     since: Date;
@@ -7626,5 +7665,740 @@ export class AdminService {
       note: params.note ?? 'Rollback auto-hidden content and mark no violation',
       adminId: params.adminId,
     });
+  }
+
+  async getCommunityDiscoveryServers(params?: {
+    status?: 'all' | 'pending' | 'approved' | 'rejected' | 'removed';
+  }) {
+    const status = params?.status ?? 'all';
+    const statusFilter = (() => {
+      if (status === 'approved' || status === 'rejected' || status === 'removed') {
+        return { communityDiscoveryStatus: status };
+      }
+      if (status === 'pending') {
+        // Back-compat: existing servers may not have this field yet.
+        return {
+          $or: [
+            { communityDiscoveryStatus: 'pending' },
+            { communityDiscoveryStatus: { $exists: false } },
+            { communityDiscoveryStatus: null as any },
+          ],
+        };
+      }
+      return {};
+    })();
+    const servers = await this.serverModel
+      .find({ 'communitySettings.enabled': true, ...statusFilter })
+      .select(
+        'name description avatarUrl ownerId members memberCount channels ' +
+          'safetySettings communitySettings accessMode createdAt communityDiscoveryStatus',
+      )
+      .populate('ownerId', 'displayName username email')
+      .lean()
+      .exec();
+
+    const results = await Promise.all(
+      servers.map(async (server) => {
+        const serverId = (server as any)._id;
+
+        const [channels, categories] = await Promise.all([
+          this.channelModel
+            .find({ serverId })
+            .select('name type categoryId category position isActive')
+            .sort({ position: 1 })
+            .lean()
+            .exec(),
+          this.channelCategoryModel
+            .find({ serverId })
+            .select('name position type')
+            .sort({ position: 1 })
+            .lean()
+            .exec(),
+        ]);
+
+        const memberCount =
+          (server as any).memberCount ||
+          ((server as any).members || []).length ||
+          0;
+
+        const safety = (server as any).safetySettings || {};
+        const automod = safety.automod || {};
+        const contentFilter = safety.contentFilter || {};
+        const spamProtection = safety.spamProtection || {};
+
+        const hasAutoMod =
+          (automod.bannedWords || []).length > 0 ||
+          automod.blockInUsername === true ||
+          automod.mentionSpamFilter?.enabled === true;
+        const hasContentFilter =
+          contentFilter.level && contentFilter.level !== 'none';
+        const hasSafetyFullyConfigured =
+          hasContentFilter &&
+          spamProtection.verificationLevel &&
+          spamProtection.verificationLevel !== 'none';
+
+        const channelsByCategory = categories.map((cat) => ({
+          categoryId: String((cat as any)._id),
+          categoryName: cat.name,
+          channels: channels
+            .filter(
+              (ch) =>
+                String((ch as any).categoryId || (ch as any).category) ===
+                String((cat as any)._id),
+            )
+            .map((ch) => ({
+              id: String((ch as any)._id),
+              name: ch.name,
+              type: ch.type,
+            })),
+        }));
+
+        const uncategorized = channels
+          .filter((ch) => !(ch as any).categoryId && !(ch as any).category)
+          .map((ch) => ({
+            id: String((ch as any)._id),
+            name: ch.name,
+            type: ch.type,
+          }));
+
+        const owner = (server as any).ownerId || {};
+
+        return {
+          id: String(serverId),
+          name: (server as any).name,
+          description: (server as any).description,
+          avatarUrl: (server as any).avatarUrl,
+          communityDiscoveryStatus:
+            (server as any).communityDiscoveryStatus || 'pending',
+          owner: {
+            id: String(owner._id || owner),
+            displayName: owner.displayName || null,
+            username: owner.username || null,
+          },
+          memberCount,
+          totalChannels: channels.length,
+          channelsByCategory,
+          uncategorizedChannels: uncategorized,
+          accessMode: (server as any).accessMode || 'discoverable',
+          communityActivatedAt:
+            (server as any).communitySettings?.activatedAt || null,
+          safety: {
+            hasAutoMod,
+            hasContentFilter,
+            hasSafetyFullyConfigured,
+            verificationLevel: spamProtection.verificationLevel || 'none',
+            contentFilterLevel: contentFilter.level || 'none',
+            bannedWordsCount: (automod.bannedWords || []).length,
+          },
+          hasAbnormalActivity: false,
+          createdAt: (server as any).createdAt,
+        };
+      }),
+    );
+
+    return results;
+  }
+
+  async setCommunityDiscoveryApproval(params: {
+    serverId: string;
+    status: 'approved' | 'rejected';
+    adminId?: string;
+    note?: string | null;
+  }) {
+    const updated = await this.serverModel
+      .findByIdAndUpdate(
+        params.serverId,
+        { $set: { communityDiscoveryStatus: params.status } },
+        { new: true },
+      )
+      .select(
+        '_id name avatarUrl description ownerId memberCount accessMode communitySettings communityDiscoveryStatus',
+      )
+      .lean()
+      .exec();
+    if (!updated?._id) throw new NotFoundException('Server not found');
+
+    const adminId = params.adminId;
+    if (adminId) {
+      const action: CommunityDiscoveryHistoryAction =
+        params.status === 'approved' ? 'approve' : 'reject';
+      await this.communityDiscoveryHistoryModel.create({
+        serverId: new Types.ObjectId(params.serverId),
+        adminId: new Types.ObjectId(adminId),
+        action,
+        note: params.note ?? null,
+        serverSnapshot: {
+          name: (updated as any).name,
+          avatarUrl: (updated as any).avatarUrl ?? null,
+          description: (updated as any).description ?? null,
+          ownerId: String((updated as any).ownerId),
+          memberCount: (updated as any).memberCount ?? 0,
+          accessMode: (updated as any).accessMode ?? 'discoverable',
+          communityActivatedAt:
+            (updated as any).communitySettings?.activatedAt?.toISOString?.() ??
+            (updated as any).communitySettings?.activatedAt ??
+            null,
+          communityDiscoveryStatus: (updated as any).communityDiscoveryStatus,
+        },
+      });
+    }
+
+    return { ok: true, status: (updated as any).communityDiscoveryStatus };
+  }
+
+  async removeFromDiscovery(params: {
+    serverId: string;
+    adminId: string;
+    note?: string | null;
+  }) {
+    const server = await this.serverModel
+      .findById(params.serverId)
+      .select(
+        '_id name avatarUrl description ownerId memberCount accessMode communitySettings communityDiscoveryStatus',
+      )
+      .lean()
+      .exec();
+    if (!server?._id) throw new NotFoundException('Server not found');
+    if ((server as any).communityDiscoveryStatus !== 'approved') {
+      throw new BadRequestException('Only approved servers can be removed');
+    }
+
+    // "Gỡ khỏi discovery" => server quay về trạng thái bình thường trước khi bật Community.
+    // Disable community settings and mark discovery status as removed for auditability.
+    const updated = await this.serverModel
+      .findByIdAndUpdate(
+        params.serverId,
+        {
+          $set: {
+            communityDiscoveryStatus: 'removed',
+            'communitySettings.enabled': false,
+            'communitySettings.rulesChannelId': null,
+            'communitySettings.updatesChannelId': null,
+            'communitySettings.activatedAt': null,
+          },
+        },
+        { new: true },
+      )
+      .select('_id communityDiscoveryStatus communitySettings')
+      .lean()
+      .exec();
+
+    await this.communityDiscoveryHistoryModel.create({
+      serverId: new Types.ObjectId(params.serverId),
+      adminId: new Types.ObjectId(params.adminId),
+      action: 'remove',
+      note: params.note ?? null,
+      serverSnapshot: {
+        name: (server as any).name,
+        avatarUrl: (server as any).avatarUrl ?? null,
+        description: (server as any).description ?? null,
+        ownerId: String((server as any).ownerId),
+        memberCount: (server as any).memberCount ?? 0,
+        accessMode: (server as any).accessMode ?? 'discoverable',
+        communityActivatedAt:
+          (server as any).communitySettings?.activatedAt?.toISOString?.() ??
+          (server as any).communitySettings?.activatedAt ??
+          null,
+        communityDiscoveryStatus: 'removed',
+      },
+    });
+
+    return { ok: true, status: (updated as any).communityDiscoveryStatus };
+  }
+
+  async restoreDiscovery(params: {
+    serverId: string;
+    adminId: string;
+    note?: string | null;
+  }) {
+    const server = await this.serverModel
+      .findById(params.serverId)
+      .select(
+        '_id name avatarUrl description ownerId memberCount accessMode communitySettings communityDiscoveryStatus',
+      )
+      .lean()
+      .exec();
+    if (!server?._id) throw new NotFoundException('Server not found');
+
+    const prev = (server as any).communityDiscoveryStatus;
+    if (prev !== 'removed') {
+      throw new BadRequestException('Only removed servers can be restored');
+    }
+
+    const updated = await this.serverModel
+      .findByIdAndUpdate(
+        params.serverId,
+        { $set: { communityDiscoveryStatus: 'approved' } },
+        { new: true },
+      )
+      .select('_id communityDiscoveryStatus')
+      .lean()
+      .exec();
+
+    await this.communityDiscoveryHistoryModel.create({
+      serverId: new Types.ObjectId(params.serverId),
+      adminId: new Types.ObjectId(params.adminId),
+      action: 'restore',
+      note: params.note ?? null,
+      serverSnapshot: {
+        name: (server as any).name,
+        avatarUrl: (server as any).avatarUrl ?? null,
+        description: (server as any).description ?? null,
+        ownerId: String((server as any).ownerId),
+        memberCount: (server as any).memberCount ?? 0,
+        accessMode: (server as any).accessMode ?? 'discoverable',
+        communityActivatedAt:
+          (server as any).communitySettings?.activatedAt?.toISOString?.() ??
+          (server as any).communitySettings?.activatedAt ??
+          null,
+        communityDiscoveryStatus: 'approved',
+      },
+    });
+
+    return { ok: true, status: (updated as any).communityDiscoveryStatus };
+  }
+
+  async getCommunityDiscoveryHistory(params: {
+    serverId?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const limit = Math.max(1, Math.min(200, params.limit ?? 50));
+    const offset = Math.max(0, params.offset ?? 0);
+    const filter = params.serverId
+      ? { serverId: new Types.ObjectId(params.serverId) }
+      : {};
+    const items = await this.communityDiscoveryHistoryModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(offset)
+      .limit(limit)
+      .lean()
+      .exec();
+    const total =
+      await this.communityDiscoveryHistoryModel.countDocuments(filter);
+    return { items, total };
+  }
+
+  async adminGetServerView(serverId: string, adminUserId?: string) {
+    const server = await this.serverModel
+      .findById(serverId)
+      .populate('ownerId', 'email')
+      .exec();
+    if (!server) throw new NotFoundException('Server not found');
+
+    const [channels, categories] = await Promise.all([
+      this.channelModel
+        .find({ serverId: new Types.ObjectId(serverId) })
+        .sort({ position: 1 })
+        .lean()
+        .exec(),
+      this.channelCategoryModel
+        .find({ serverId: new Types.ObjectId(serverId) })
+        .sort({ position: 1 })
+        .lean()
+        .exec(),
+    ]);
+
+    // Send notification to server owner and members with manageServer permission
+    this.sendAdminViewNotification(serverId, server, adminUserId).catch(
+      (err) => console.error('Failed to send admin view notification:', err),
+    );
+
+    return { server, channels, categories };
+  }
+
+  /** Emoji máy chủ cho chế độ admin xem server (không cần là thành viên). Cùng dạng với GET /servers/emoji-picker. */
+  async adminGetEmojiPickerData(serverId: string): Promise<{
+    contextServerId: string | null;
+    groups: Array<{
+      serverId: string;
+      serverName: string;
+      serverAvatarUrl: string | null;
+      locked: boolean;
+      emojis: Array<{
+        id: string;
+        imageUrl: string;
+        name: string;
+        animated: boolean;
+        addedBy: {
+          displayName: string;
+          username: string;
+          avatarUrl: string;
+        };
+      }>;
+    }>;
+  }> {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('_id name avatarUrl customEmojis')
+      .lean()
+      .exec();
+    if (!server) throw new NotFoundException('Server not found');
+
+    const emojisRaw = (server as any).customEmojis || [];
+    const userIdsNeedingProfile = new Set<string>();
+    if (Array.isArray(emojisRaw)) {
+      for (const em of emojisRaw) {
+        if (em?.addedByUserId)
+          userIdsNeedingProfile.add(String(em.addedByUserId));
+      }
+    }
+    const profileList =
+      userIdsNeedingProfile.size === 0
+        ? []
+        : await this.profileModel
+            .find({
+              userId: {
+                $in: [...userIdsNeedingProfile].map(
+                  (id) => new Types.ObjectId(id),
+                ),
+              },
+            })
+            .select('userId displayName username avatarUrl')
+            .lean()
+            .exec();
+    const profileByUserId = new Map(
+      profileList.map((p: any) => [String(p.userId), p]),
+    );
+
+    const emojiOut = Array.isArray(emojisRaw)
+      ? emojisRaw.map((em: any) => {
+          const prof = profileByUserId.get(String(em.addedByUserId));
+          return {
+            id: em._id?.toString(),
+            imageUrl: em.imageUrl,
+            name: (em.name || '').trim(),
+            animated: !!em.animated,
+            addedBy: {
+              displayName: prof?.displayName || '',
+              username: prof?.username || '',
+              avatarUrl: prof?.avatarUrl || '',
+            },
+          };
+        })
+      : [];
+
+    const sid = String(server._id);
+    const groups =
+      emojiOut.length > 0
+        ? [
+            {
+              serverId: sid,
+              serverName: (server as any).name || '',
+              serverAvatarUrl: (server as any).avatarUrl ?? null,
+              locked: false,
+              emojis: emojiOut,
+            },
+          ]
+        : [];
+
+    return { contextServerId: sid, groups };
+  }
+
+  /** Sticker máy chủ cho chế độ admin xem server. Cùng dạng với GET /servers/sticker-picker. */
+  async adminGetStickerPickerData(serverId: string): Promise<{
+    contextServerId: string | null;
+    groups: Array<{
+      serverId: string;
+      serverName: string;
+      serverAvatarUrl: string | null;
+      locked: boolean;
+      stickers: Array<{
+        id: string;
+        imageUrl: string;
+        name: string;
+        animated: boolean;
+        addedBy: {
+          displayName: string;
+          username: string;
+          avatarUrl: string;
+        };
+      }>;
+    }>;
+  }> {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('_id name avatarUrl customStickers')
+      .lean()
+      .exec();
+    if (!server) throw new NotFoundException('Server not found');
+
+    const stickersRaw = (server as any).customStickers || [];
+    const userIdsNeedingProfile = new Set<string>();
+    if (Array.isArray(stickersRaw)) {
+      for (const st of stickersRaw) {
+        if (st?.addedByUserId)
+          userIdsNeedingProfile.add(String(st.addedByUserId));
+      }
+    }
+    const profileList =
+      userIdsNeedingProfile.size === 0
+        ? []
+        : await this.profileModel
+            .find({
+              userId: {
+                $in: [...userIdsNeedingProfile].map(
+                  (id) => new Types.ObjectId(id),
+                ),
+              },
+            })
+            .select('userId displayName username avatarUrl')
+            .lean()
+            .exec();
+    const profileByUserId = new Map(
+      profileList.map((p: any) => [String(p.userId), p]),
+    );
+
+    const stickerOut = Array.isArray(stickersRaw)
+      ? stickersRaw.map((st: any) => {
+          const prof = profileByUserId.get(String(st.addedByUserId));
+          return {
+            id: st._id?.toString(),
+            imageUrl: st.imageUrl,
+            name: (st.name || '').trim(),
+            animated: !!st.animated,
+            addedBy: {
+              displayName: prof?.displayName || '',
+              username: prof?.username || '',
+              avatarUrl: prof?.avatarUrl || '',
+            },
+          };
+        })
+      : [];
+
+    const sid = String(server._id);
+    const groups =
+      stickerOut.length > 0
+        ? [
+            {
+              serverId: sid,
+              serverName: (server as any).name || '',
+              serverAvatarUrl: (server as any).avatarUrl ?? null,
+              locked: false,
+              stickers: stickerOut,
+            },
+          ]
+        : [];
+
+    return { contextServerId: sid, groups };
+  }
+
+  async adminLeaveServer(serverId: string, adminUserId?: string) {
+    if (!adminUserId) return { ok: true };
+
+    const uid = new Types.ObjectId(adminUserId);
+    const sid = new Types.ObjectId(serverId);
+
+    const memberResult = await this.serverModel.updateOne(
+      { _id: sid },
+      { $pull: { members: { userId: uid } } },
+    );
+    console.log(
+      `[AdminLeave] Removed from server.members: serverId=${serverId}, userId=${adminUserId}, modified=${memberResult.modifiedCount}`,
+    );
+
+    const userServerResult = await this.userServerModel.deleteMany({
+      userId: uid,
+      serverId: sid,
+    });
+    console.log(
+      `[AdminLeave] Removed UserServer records: deleted=${userServerResult.deletedCount}`,
+    );
+
+    // Also decrement memberCount if the member was actually removed
+    if (memberResult.modifiedCount > 0) {
+      await this.serverModel.updateOne(
+        { _id: sid, memberCount: { $gt: 0 } },
+        { $inc: { memberCount: -1 } },
+      );
+    }
+
+    return { ok: true };
+  }
+
+  private async sendAdminViewNotification(
+    serverId: string,
+    server: any,
+    adminUserId?: string,
+  ) {
+    const ownerId =
+      typeof server.ownerId === 'object' && server.ownerId._id
+        ? server.ownerId._id.toString()
+        : server.ownerId.toString();
+
+    const recipientSet = new Set<string>([ownerId]);
+
+    const rolesWithManage = await this.roleModel
+      .find({
+        serverId: new Types.ObjectId(serverId),
+        'permissions.manageServer': true,
+        isDefault: false,
+      })
+      .select('memberIds')
+      .lean()
+      .exec();
+
+    for (const role of rolesWithManage) {
+      for (const uid of role.memberIds ?? []) {
+        recipientSet.add(uid.toString());
+      }
+    }
+
+    const recipientUserIds = Array.from(recipientSet).map(
+      (id) => new Types.ObjectId(id),
+    );
+
+    const createdBy = adminUserId
+      ? new Types.ObjectId(adminUserId)
+      : new Types.ObjectId(ownerId);
+
+    await this.serverNotificationModel.create({
+      serverId: new Types.ObjectId(serverId),
+      createdBy,
+      title: '__SYS:adminView',
+      content: `__SYS:adminViewContent:${server.name}`,
+      targetType: 'role',
+      recipientUserIds,
+    });
+  }
+
+  /**
+   * One-time migration: convert old hardcoded Vietnamese notification texts
+   * to language-neutral __SYS:* key markers so the frontend can translate them.
+   */
+  async migrateNotificationI18nKeys(): Promise<{ updated: number }> {
+    const docs = await this.serverNotificationModel
+      .find({
+        $or: [
+          { title: 'Quản trị viên hệ thống đang xem máy chủ' },
+          { title: '⚠️ Cảnh báo spam đề cập' },
+        ],
+      })
+      .exec();
+
+    let updated = 0;
+    for (const doc of docs) {
+      const updates: Record<string, string> = {};
+
+      if (doc.title === 'Quản trị viên hệ thống đang xem máy chủ') {
+        updates['title'] = '__SYS:adminView';
+        const match = typeof doc.content === 'string'
+          ? doc.content.match(/máy chủ "(.+)" của bạn/)
+          : null;
+        if (match) {
+          updates['content'] = `__SYS:adminViewContent:${match[1]}`;
+        }
+      }
+
+      if (doc.title === '⚠️ Cảnh báo spam đề cập') {
+        updates['title'] = '__SYS:mentionSpamTitle';
+        const match = typeof doc.content === 'string'
+          ? doc.content.match(/máy chủ "(.+)"\./)
+          : null;
+        if (match) {
+          updates['content'] = `__SYS:mentionSpamWarning:${match[1]}`;
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await this.serverNotificationModel.updateOne(
+          { _id: doc._id },
+          { $set: updates },
+        );
+        updated++;
+      }
+    }
+
+    return { updated };
+  }
+
+  async adminGetChannelMessages(
+    serverId: string,
+    channelId: string,
+    limit = 50,
+    skip = 0,
+  ) {
+    const channel = await this.channelModel
+      .findOne({
+        _id: new Types.ObjectId(channelId),
+        serverId: new Types.ObjectId(serverId),
+      })
+      .lean()
+      .exec();
+    if (!channel) throw new NotFoundException('Channel not found in this server');
+
+    const messages = await this.messageModel
+      .find({ channelId: new Types.ObjectId(channelId), isDeleted: false })
+      .populate('senderId', 'email')
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'senderId', select: 'email' },
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip(skip)
+      .lean()
+      .exec();
+
+    const enriched = await Promise.all(
+      messages.map(async (msg: any) => {
+        const rawId = msg.senderId?._id ?? msg.senderId;
+        const uid = rawId
+          ? new Types.ObjectId(rawId.toString())
+          : null;
+        const profile = uid
+          ? await this.profileModel
+              .findOne({ userId: uid })
+              .select('username displayName avatarUrl')
+              .lean()
+              .exec()
+          : null;
+
+        const result: any = {
+          ...msg,
+          senderId: {
+            ...(typeof msg.senderId === 'object'
+              ? msg.senderId
+              : { _id: msg.senderId, email: '' }),
+            displayName: profile?.displayName,
+            username: profile?.username,
+            avatarUrl: profile?.avatarUrl,
+          },
+        };
+
+        if (msg.replyTo && typeof msg.replyTo === 'object') {
+          const rtId = msg.replyTo.senderId?._id ?? msg.replyTo.senderId;
+          const rtUid = rtId
+            ? new Types.ObjectId(rtId.toString())
+            : null;
+          const rtProfile = rtUid
+            ? await this.profileModel
+                .findOne({ userId: rtUid })
+                .select('username displayName avatarUrl')
+                .lean()
+                .exec()
+            : null;
+          result.replyTo = {
+            ...msg.replyTo,
+            senderId: {
+              ...(typeof msg.replyTo.senderId === 'object'
+                ? msg.replyTo.senderId
+                : { _id: msg.replyTo.senderId, email: '' }),
+              displayName: rtProfile?.displayName,
+              username: rtProfile?.username,
+            },
+          };
+        }
+
+        return result;
+      }),
+    );
+
+    return {
+      messages: enriched.reverse(),
+      chatViewBlocked: false,
+      chatBlockReason: null,
+    };
   }
 }

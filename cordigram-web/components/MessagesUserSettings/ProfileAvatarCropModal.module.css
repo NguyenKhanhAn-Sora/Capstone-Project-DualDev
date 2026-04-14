@@ -1,0 +1,142 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3600;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.card {
+  width: min(520px, 96vw);
+  background: #313338;
+  border-radius: 12px;
+  border: 1px solid #1e1f22;
+  color: #f2f3f5;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid #2b2d31;
+}
+
+.head h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.head p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #b5bac1;
+}
+
+.close {
+  border: none;
+  background: transparent;
+  color: #b5bac1;
+  font-size: 22px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 1fr 160px;
+  gap: 16px;
+  padding: 16px 18px 18px;
+}
+
+@media (max-width: 520px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cropWrap {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #1e1f22;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.thumb {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #1e1f22;
+  align-self: center;
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sliderRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #b5bac1;
+}
+
+.sliderRow input[type="range"] {
+  width: 100%;
+}
+
+.err {
+  font-size: 12px;
+  color: #ed4245;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.btnGhost {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #4e5058;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnPrimary {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #5865f2;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnPrimary:disabled,
+.btnGhost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

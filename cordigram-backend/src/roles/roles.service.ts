@@ -15,12 +15,14 @@ import {
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto, ReorderRolesDto } from './dto/update-role.dto';
 import { Server } from '../servers/server.schema';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Injectable()
 export class RolesService {
   constructor(
     @InjectModel(Role.name) private roleModel: Model<Role>,
     @InjectModel(Server.name) private serverModel: Model<Server>,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -48,6 +50,27 @@ export class RolesService {
     return this.roleModel
       .find({ serverId: new Types.ObjectId(serverId) })
       .sort({ position: -1 }) // Roles có position cao hơn hiển thị trước
+      .exec();
+  }
+
+  /**
+   * Remove a member from all non-default roles in a server.
+   * Used to prevent stale role carry-over when a member leaves/rejoins.
+   */
+  async removeMemberFromAllNonDefaultRoles(
+    serverId: string,
+    memberId: string,
+  ): Promise<void> {
+    const memberObjectId = new Types.ObjectId(memberId);
+    await this.roleModel
+      .updateMany(
+        {
+          serverId: new Types.ObjectId(serverId),
+          isDefault: { $ne: true },
+          memberIds: memberObjectId,
+        },
+        { $pull: { memberIds: memberObjectId } },
+      )
       .exec();
   }
 
@@ -252,7 +275,19 @@ export class RolesService {
     }
 
     role.memberIds.push(memberObjectId);
-    return role.save();
+    const saved = await role.save();
+
+    // Ghi audit log
+    await this.auditLogService.logRoleChange({
+      serverId,
+      targetUserId: memberId,
+      actorUserId: userId,
+      action: 'role.add',
+      roleId,
+      roleNameSnapshot: role.name,
+    });
+
+    return saved;
   }
 
   /**
@@ -277,7 +312,19 @@ export class RolesService {
 
     const memberObjectId = new Types.ObjectId(memberId);
     role.memberIds = role.memberIds.filter((id) => !id.equals(memberObjectId));
-    return role.save();
+    const saved = await role.save();
+
+    // Ghi audit log
+    await this.auditLogService.logRoleChange({
+      serverId,
+      targetUserId: memberId,
+      actorUserId: userId,
+      action: 'role.remove',
+      roleId,
+      roleNameSnapshot: role.name,
+    });
+
+    return saved;
   }
 
   /**
@@ -289,11 +336,20 @@ export class RolesService {
         serverId: new Types.ObjectId(serverId),
         $or: [
           { memberIds: new Types.ObjectId(memberId) },
-          { isDefault: true }, // @everyone áp dụng cho tất cả
+          { isDefault: true },
         ],
       })
       .sort({ position: -1 })
       .exec();
+  }
+
+  async hasAnyRole(serverId: string, memberId: string): Promise<boolean> {
+    const count = await this.roleModel.countDocuments({
+      serverId: new Types.ObjectId(serverId),
+      memberIds: new Types.ObjectId(memberId),
+      isDefault: { $ne: true },
+    });
+    return count > 0;
   }
 
   /**
@@ -318,6 +374,7 @@ export class RolesService {
       kickMembers: false,
       banMembers: false,
       timeoutMembers: false,
+      mentionEveryone: false,
       sendMessages: false,
       sendMessagesInThreads: false,
       createPublicThreads: false,
@@ -327,10 +384,7 @@ export class RolesService {
       addReactions: false,
       manageMessages: false,
       pinMessages: false,
-      bypassSlowMode: false,
-      manageThreads: false,
       viewMessageHistory: false,
-      sendTTS: false,
       sendVoiceMessages: false,
       createPolls: false,
       connect: false,
@@ -477,6 +531,15 @@ export class RolesService {
     const roles = await this.getMemberRoles(serverId, memberId);
 
     // DEBUG: Log roles tìm được
+    console.log(
+      `[getMemberRoleInfo] memberId=${memberId}, found roles:`,
+      roles.map((r) => ({
+        name: r.name,
+        color: r.color,
+        isDefault: r.isDefault,
+        position: r.position,
+      })),
+    );
 
     const roleInfos = roles
       .filter((r) => !r.isDefault) // Không hiển thị @everyone trong danh sách badges
@@ -503,6 +566,10 @@ export class RolesService {
     const displayColor = highestRole?.color || '#99AAB5';
 
     // DEBUG: Log kết quả
+    console.log(
+      `[getMemberRoleInfo] memberId=${memberId}, displayColor=${displayColor}, highestRole:`,
+      highestRole,
+    );
 
     return {
       roles: roleInfos,
@@ -561,8 +628,17 @@ export class RolesService {
       })
       .exec();
 
-    if (!server) {
-      throw new ForbiddenException('Only server owner can manage roles');
+    if (server) return;
+
+    const canManage = await this.hasPermission(
+      serverId,
+      userId,
+      'manageServer',
+    );
+    if (!canManage) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ hoặc thành viên có quyền Quản lý máy chủ mới có thể thực hiện',
+      );
     }
   }
 

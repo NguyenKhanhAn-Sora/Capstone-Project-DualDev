@@ -1,0 +1,274 @@
+.wrap {
+  padding: 0 8px 24px;
+  max-width: 920px;
+  color: #dbdee1;
+}
+
+.denied {
+  padding: 16px;
+  color: #ed4245;
+  font-size: 14px;
+}
+
+.loading {
+  padding: 24px;
+  color: #949ba4;
+}
+
+.banner {
+  margin-bottom: 24px;
+  border-radius: 8px;
+  padding: 24px 28px;
+  background: linear-gradient(135deg, #5865f2 0%, #9b59f6 45%, #6c3ec7 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.bannerTitle {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.bannerDesc {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 520px;
+}
+
+.bannerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btnBannerPrimary {
+  padding: 10px 18px;
+  border-radius: 4px;
+  border: none;
+  background: #fff;
+  color: #000;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.btnBannerGhost {
+  padding: 10px 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: transparent;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tierRow {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.railDot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #23a559;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.railDotLocked {
+  background: #4e5058;
+  color: #b5bac1;
+  font-size: 14px;
+}
+
+.railLine {
+  flex: 1;
+  width: 2px;
+  min-height: 24px;
+  background: #3f4147;
+  margin: 4px 0;
+}
+
+.tierCard {
+  flex: 1;
+  background: #2b2d31;
+  border: 1px solid #1e1f22;
+  border-radius: 8px;
+  padding: 16px 18px;
+  min-width: 0;
+}
+
+.tierCardLocked {
+  opacity: 0.72;
+}
+
+.tierHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tierTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #f2f3f5;
+}
+
+.tierSub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #949ba4;
+}
+
+.tierMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #949ba4;
+  flex-shrink: 0;
+}
+
+.uploadBtn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  background: #5865f2;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.uploadBtn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.uploadBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.slotGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .slotGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.slot {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 2px dashed #4e5058;
+  background: #1e1f22;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.slotFilled {
+  border-style: solid;
+  border-color: #3f4147;
+}
+
+.slotImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 6px;
+}
+
+.slotImgAnim {
+  image-rendering: auto;
+}
+
+.slotPh {
+  font-size: 28px;
+  opacity: 0.25;
+}
+
+.lockedBody {
+  text-align: center;
+  padding: 20px 12px;
+  color: #949ba4;
+  font-size: 13px;
+}
+
+.lockedPh {
+  font-size: 40px;
+  opacity: 0.35;
+  margin-bottom: 8px;
+}
+
+.btnFake {
+  margin-top: 12px;
+  padding: 8px 20px;
+  border-radius: 4px;
+  border: none;
+  background: #248046;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.err {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #ed4245;
+}
+
+.hiddenInput {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.notice {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #949ba4;
+  line-height: 1.4;
+}

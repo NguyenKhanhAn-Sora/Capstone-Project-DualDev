@@ -12,14 +12,28 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ServersService } from './servers.service';
+import { ServerAccessService } from '../access/server-access.service';
 import { CreateServerDto } from './dto/create-server.dto';
 import { UpdateServerDto } from './dto/update-server.dto';
+import { AddServerStickerDto } from './dto/add-server-sticker.dto';
+import { AddServerEmojiDto } from './dto/add-server-emoji.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('servers')
 @UseGuards(JwtAuthGuard)
 export class ServersController {
-  constructor(private readonly serversService: ServersService) {}
+  constructor(
+    private readonly serversService: ServersService,
+    private readonly serverAccessService: ServerAccessService,
+  ) {}
+
+  /**
+   * Explore servers list (approved only)
+   */
+  @Get('explore')
+  async listExploreServers() {
+    return this.serversService.listExploreServers();
+  }
 
   @Post()
   async createServer(
@@ -35,11 +49,102 @@ export class ServersController {
   }
 
   /**
+   * Sticker máy chủ cho picker (theo mọi server user tham gia).
+   * Query contextServerId = server đang mở chat để đánh dấu khóa/mở.
+   */
+  @Get('sticker-picker')
+  async getStickerPicker(
+    @Query('contextServerId') contextServerId: string | undefined,
+    @Request() req: any,
+  ) {
+    return this.serversService.getStickerPickerData(
+      req.user.userId,
+      contextServerId,
+    );
+  }
+
+  @Get('emoji-picker')
+  async getEmojiPicker(
+    @Query('contextServerId') contextServerId: string | undefined,
+    @Request() req: any,
+  ) {
+    return this.serversService.getEmojiPickerData(
+      req.user.userId,
+      contextServerId,
+    );
+  }
+
+  @Get('emoji-upload-targets')
+  async getEmojiUploadTargets(@Request() req: any) {
+    return this.serversService.getEmojiUploadTargets(req.user.userId);
+  }
+
+  @Get('sticker-upload-targets')
+  async getStickerUploadTargets(@Request() req: any) {
+    return this.serversService.getStickerUploadTargets(req.user.userId);
+  }
+
+  /**
    * Lấy danh sách thành viên (chỉ owner - API cũ)
    */
+  @Get(':id/mentions')
+  async getMentionSuggestions(
+    @Param('id') serverId: string,
+    @Query('keyword') keyword: string = '',
+    @Request() req: any,
+  ) {
+    return this.serversService.getMentionSuggestions(
+      serverId,
+      req.user.userId,
+      keyword,
+    );
+  }
+
   @Get(':id/members')
   async getServerMembers(@Param('id') serverId: string, @Request() req: any) {
     return this.serversService.getServerMembers(serverId, req.user.userId);
+  }
+
+  @Post(':id/stickers')
+  async addServerSticker(
+    @Param('id') serverId: string,
+    @Body() body: AddServerStickerDto,
+    @Request() req: any,
+  ) {
+    return this.serversService.addServerSticker(serverId, req.user.userId, body);
+  }
+
+  /** Danh sách sticker tùy chỉnh (cài đặt máy chủ) — chỉ người có quyền quản lý. */
+  @Get(':id/stickers/manage')
+  async getServerStickersManage(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getServerStickersManage(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  @Post(':id/emojis')
+  async addServerEmoji(
+    @Param('id') serverId: string,
+    @Body() body: AddServerEmojiDto,
+    @Request() req: any,
+  ) {
+    return this.serversService.addServerEmoji(serverId, req.user.userId, body);
+  }
+
+  /** Danh sách emoji tùy chỉnh (màn cài đặt máy chủ) — chỉ người có quyền quản lý. */
+  @Get(':id/emojis/manage')
+  async getServerEmojisManage(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getServerEmojisManage(
+      serverId,
+      req.user.userId,
+    );
   }
 
   /**
@@ -53,6 +158,42 @@ export class ServersController {
   ) {
     return this.serversService.getServerMembersWithRoles(
       serverId,
+      req.user.userId,
+    );
+  }
+
+  // =====================================================
+  // MODERATOR VIEW
+  // =====================================================
+
+  /**
+   * Moderator View: danh sách thành viên mở rộng cho bảng
+   * GET /servers/:id/mod-view/members
+   */
+  @Get(':id/mod-view/members')
+  async getModeratorMembers(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getModeratorMembersSummary(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  /**
+   * Moderator View: chi tiết 1 thành viên cho panel bên phải
+   * GET /servers/:id/mod-view/members/:memberId
+   */
+  @Get(':id/mod-view/members/:memberId')
+  async getModeratorMemberDetail(
+    @Param('id') serverId: string,
+    @Param('memberId') memberId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getModeratorMemberDetail(
+      serverId,
+      memberId,
       req.user.userId,
     );
   }
@@ -279,6 +420,11 @@ export class ServersController {
     return this.serversService.getServerById(serverId);
   }
 
+  @Get(':id/profile-stats')
+  async getServerProfileStats(@Param('id') serverId: string) {
+    return this.serversService.getServerProfileStats(serverId);
+  }
+
   @Patch(':id')
   async updateServer(
     @Param('id') serverId: string,
@@ -292,6 +438,44 @@ export class ServersController {
     );
   }
 
+  @Get(':id/safety-settings')
+  async getSafetySettings(@Param('id') serverId: string, @Request() req: any) {
+    return this.serversService.getServerSafetySettings(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  @Patch(':id/safety-settings')
+  async updateSafetySettings(
+    @Param('id') serverId: string,
+    @Body() body: Record<string, any>,
+    @Request() req: any,
+  ) {
+    return this.serversService.updateServerSafetySettings(
+      serverId,
+      req.user.userId,
+      body,
+    );
+  }
+
+  @Get(':id/audit-logs')
+  async getServerAuditLogs(
+    @Param('id') serverId: string,
+    @Request() req: any,
+    @Query('action') action?: string,
+    @Query('actorUserId') actorUserId?: string,
+    @Query('limit') limit?: string,
+    @Query('before') before?: string,
+  ) {
+    return this.serversService.getServerAuditLogs(serverId, req.user.userId, {
+      action,
+      actorUserId,
+      limit: limit ? Number(limit) : undefined,
+      before,
+    });
+  }
+
   @Delete(':id')
   async deleteServer(@Param('id') serverId: string, @Request() req: any) {
     await this.serversService.deleteServer(serverId, req.user.userId);
@@ -299,14 +483,217 @@ export class ServersController {
   }
 
   @Post(':id/join')
-  async joinServer(@Param('id') serverId: string, @Request() req: any) {
-    return this.serversService.joinServer(serverId, req.user.userId);
+  async joinServer(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      rulesAccepted?: boolean;
+      nickname?: string;
+      applicationAnswers?: Array<{
+        questionId: string;
+        text?: string;
+        selectedOption?: string;
+      }>;
+    },
+    @Request() req: any,
+  ) {
+    return this.serversService.joinServer(serverId, req.user.userId, body ?? {});
+  }
+
+  // =====================================================
+  // Access Control (Discord tab "Truy cập")
+  // =====================================================
+
+  @Get(':id/access/settings')
+  async getAccessSettings(@Param('id') serverId: string) {
+    return this.serverAccessService.getAccessSettings(serverId);
+  }
+
+  @Patch(':id/access/settings')
+  async updateAccessSettings(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      accessMode?: 'invite_only' | 'apply' | 'discoverable';
+      isAgeRestricted?: boolean;
+      hasRules?: boolean;
+    },
+    @Request() req: any,
+  ) {
+    if (!body) throw new BadRequestException('Missing body');
+    return this.serverAccessService.updateAccessSettings(
+      serverId,
+      req.user.userId,
+      body,
+    );
+  }
+
+  @Post(':id/access/rules')
+  async addAccessRule(
+    @Param('id') serverId: string,
+    @Body() body: { content: string },
+    @Request() req: any,
+  ) {
+    if (!body?.content) throw new BadRequestException('content is required');
+    return this.serverAccessService.addRule(
+      serverId,
+      req.user.userId,
+      body.content,
+    );
+  }
+
+  @Get(':id/access/join-form')
+  async getJoinApplicationForm(@Param('id') serverId: string, @Request() req: any) {
+    return this.serverAccessService.getJoinApplicationForm(serverId, req.user.userId);
+  }
+
+  @Patch(':id/access/join-form')
+  async updateJoinApplicationForm(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      enabled?: boolean;
+      questions?: Array<{
+        id: string;
+        title: string;
+        type: 'short' | 'paragraph' | 'multiple_choice';
+        required?: boolean;
+        options?: string[];
+      }>;
+    },
+    @Request() req: any,
+  ) {
+    if (!body) throw new BadRequestException('Missing body');
+    return this.serverAccessService.updateJoinApplicationForm(
+      serverId,
+      req.user.userId,
+      body,
+    );
+  }
+
+  @Get(':id/access/my-status')
+  async getMyAccessStatus(@Param('id') serverId: string, @Request() req: any) {
+    return this.serverAccessService.getMyStatus(serverId, req.user.userId);
+  }
+
+  @Post(':id/access/approve')
+  async approveAccessUser(
+    @Param('id') serverId: string,
+    @Body() body: { userId: string },
+    @Request() req: any,
+  ) {
+    if (!body?.userId) throw new BadRequestException('userId is required');
+    return this.serverAccessService.approveUser(
+      serverId,
+      req.user.userId,
+      body.userId,
+    );
+  }
+
+  @Post(':id/access/reject')
+  async rejectAccessUser(
+    @Param('id') serverId: string,
+    @Body() body: { userId: string },
+    @Request() req: any,
+  ) {
+    if (!body?.userId) throw new BadRequestException('userId is required');
+    return this.serverAccessService.rejectUser(
+      serverId,
+      req.user.userId,
+      body.userId,
+    );
+  }
+
+  @Get(':id/access/join-applications')
+  async listJoinApplications(
+    @Param('id') serverId: string,
+    @Query('status') status: string = 'pending',
+    @Request() req: any,
+  ) {
+    return this.serverAccessService.listJoinApplications(
+      serverId,
+      req.user.userId,
+      status,
+    );
+  }
+
+  @Get(':id/access/join-applications/:applicantUserId')
+  async getJoinApplicationDetail(
+    @Param('id') serverId: string,
+    @Param('applicantUserId') applicantUserId: string,
+    @Request() req: any,
+  ) {
+    return this.serverAccessService.getJoinApplicationDetail(
+      serverId,
+      req.user.userId,
+      applicantUserId,
+    );
+  }
+
+  @Post(':id/access/withdraw')
+  async withdrawMyJoinApplication(@Param('id') serverId: string, @Request() req: any) {
+    return this.serverAccessService.withdrawJoinApplication(serverId, req.user.userId);
+  }
+
+  @Post(':id/access/accept-rules')
+  async acceptAccessRules(@Param('id') serverId: string, @Request() req: any) {
+    return this.serverAccessService.acceptRules(serverId, req.user.userId);
+  }
+
+  @Post(':id/access/acknowledge-age')
+  async acknowledgeAgeRestricted(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serverAccessService.acknowledgeAgeRestriction(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  @Post(':id/access/request-email-otp')
+  async requestServerEmailOtp(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serverAccessService.requestServerEmailOtp(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  @Post(':id/access/verify-email-otp')
+  async verifyServerEmailOtp(
+    @Param('id') serverId: string,
+    @Body() body: { code: string },
+    @Request() req: any,
+  ) {
+    if (!body?.code) throw new BadRequestException('code is required');
+    return this.serverAccessService.verifyServerEmailOtp(
+      serverId,
+      req.user.userId,
+      body.code,
+    );
   }
 
   @Post(':id/leave')
   async leaveServer(@Param('id') serverId: string, @Request() req: any) {
     await this.serversService.leaveServer(serverId, req.user.userId);
     return { message: 'Left server successfully' };
+  }
+
+  @Patch(':id/me/nickname')
+  async updateMyServerNickname(
+    @Param('id') serverId: string,
+    @Body() body: { nickname?: string },
+    @Request() req: any,
+  ) {
+    await this.serversService.updateMyServerNickname(
+      serverId,
+      req.user.userId,
+      body?.nickname ?? '',
+    );
+    return { ok: true };
   }
 
   @Post(':id/members/:memberId')
@@ -363,5 +750,94 @@ export class ServersController {
   @Get(':id/categories')
   async getCategories(@Param('id') serverId: string) {
     return this.serversService.getCategories(serverId);
+  }
+
+  @Get(':id/mention-restricted')
+  async getMentionRestrictedMembers(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getMentionRestrictedMembers(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  @Post(':id/unrestrict/:memberId')
+  async unrestrictMember(
+    @Param('id') serverId: string,
+    @Param('memberId') memberId: string,
+    @Request() req: any,
+  ) {
+    await this.serversService.unrestrictMember(
+      serverId,
+      req.user.userId,
+      memberId,
+    );
+    return { success: true };
+  }
+
+  // =====================================================
+  // Discovery Eligibility
+  // =====================================================
+
+  @Get(':id/discovery-eligibility')
+  async getDiscoveryEligibility(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getDiscoveryEligibility(
+      serverId,
+      req.user.userId,
+    );
+  }
+
+  // =====================================================
+  // Community Settings
+  // =====================================================
+
+  @Get(':id/community')
+  async getCommunitySettings(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serversService.getCommunitySettings(serverId, req.user.userId);
+  }
+
+  @Post(':id/community/activate')
+  async activateCommunity(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      rulesChannelId?: string | null;
+      updatesChannelId?: string | null;
+      createRulesChannel?: boolean;
+      createUpdatesChannel?: boolean;
+    },
+    @Request() req: any,
+  ) {
+    return this.serversService.activateCommunity(
+      serverId,
+      req.user.userId,
+      body,
+    );
+  }
+
+  @Post(':id/community/overview')
+  async updateCommunityOverview(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      rulesChannelId?: string | null;
+      primaryLanguage?: 'vi' | 'en';
+      description?: string | null;
+    },
+    @Request() req: any,
+  ) {
+    return this.serversService.updateCommunityOverview(
+      serverId,
+      req.user.userId,
+      body,
+    );
   }
 }

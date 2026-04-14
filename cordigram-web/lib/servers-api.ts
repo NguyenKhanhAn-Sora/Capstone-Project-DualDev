@@ -1,6 +1,6 @@
 import { decodeJwt } from "./auth";
 
-const API_BASE_URL = "http://localhost:9999";
+export const API_BASE_URL = "http://localhost:9999";
 
 function getToken(): string {
   return (
@@ -8,7 +8,7 @@ function getToken(): string {
   );
 }
 
-function getHeaders() {
+export function getHeaders() {
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${getToken()}`,
@@ -37,7 +37,14 @@ export interface Server {
   _id: string;
   name: string;
   description?: string;
+  primaryLanguage?: "vi" | "en";
   avatarUrl?: string;
+  bannerUrl?: string;
+  /** Ảnh biểu ngữ (URL); màu nền dùng bannerColor. */
+  bannerImageUrl?: string | null;
+  /** Gradient / màu nền biểu ngữ (preset). */
+  bannerColor?: string | null;
+  profileTraits?: Array<{ emoji: string; text: string }>;
   template?: ServerTemplate;
   purpose?: ServerPurpose;
   ownerId: string;
@@ -45,13 +52,75 @@ export interface Server {
     userId: string;
     role: "owner" | "moderator" | "member";
     joinedAt: string;
+    nickname?: string | null;
   }>;
   channels: Channel[];
   memberCount: number;
   isActive: boolean;
   isPublic?: boolean;
+  isAgeRestricted?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ServerProfileStats {
+  onlineCount: number;
+  memberCount: number;
+  createdAt: string;
+}
+
+export interface ServerAuditLogRow {
+  _id: string;
+  actorUserId?: string;
+  action: string;
+  targetType?: "server" | "channel" | "member";
+  targetId?: string;
+  targetName?: string;
+  changes?: Array<{ field: string; from?: string | null; to?: string | null }>;
+  createdAt: string;
+}
+
+export type ServerVerificationLevel = "none" | "low" | "medium" | "high";
+
+export type ContentFilterLevel = "none" | "all_members" | "no_role_members";
+
+export interface MentionSpamFilter {
+  enabled: boolean;
+  mentionLimit: number;
+  responses: {
+    blockMessage: boolean;
+    sendWarning: boolean;
+    restrictMember: boolean;
+  };
+  customNotification: string;
+  blockDurationHours: number;
+  exemptRoleIds: string[];
+  exemptChannelIds: string[];
+}
+
+export interface ServerSafetySettings {
+  spamProtection: {
+    verificationLevel: ServerVerificationLevel;
+    hideMutedDm: boolean;
+    filterDmSpam: boolean;
+    warnExternalLinks: boolean;
+    hideSpamMessages: boolean;
+    deleteSpammerMessages: boolean;
+  };
+  contentFilter: {
+    level: ContentFilterLevel;
+  };
+  automod: {
+    bannedWords: string[];
+    blockInUsername: boolean;
+    bannedWordResponse: "warn" | "delete";
+    exemptRoleIds: string[];
+    mentionSpamFilter: MentionSpamFilter;
+  };
+  privileges: {
+    bypassRoleIds: string[];
+    managerRoleIds: string[];
+  };
 }
 
 export interface ServerCategory {
@@ -80,6 +149,7 @@ export interface Channel {
   /** ID danh mục người dùng tạo */
   categoryId?: string | null;
   position?: number;
+  isRulesChannel?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -113,7 +183,77 @@ export interface Message {
   mentions?: string[];
   messageType?: string;
   giphyId?: string;
+  customStickerUrl?: string | null;
+  serverStickerId?: string | null;
+  voiceUrl?: string;
+  voiceDuration?: number;
   stickerReplyWelcomeEnabled?: boolean;
+  contentModerationResult?: "none" | "blurred" | "rejected";
+}
+
+export interface StickerPickerSticker {
+  id: string;
+  imageUrl: string;
+  name: string;
+  /** GIF động (URL Cloudinary). */
+  animated?: boolean;
+  addedBy: {
+    displayName: string;
+    username: string;
+    avatarUrl: string;
+  };
+}
+
+export interface StickerPickerGroup {
+  serverId: string;
+  serverName: string;
+  serverAvatarUrl: string | null;
+  locked: boolean;
+  stickers: StickerPickerSticker[];
+}
+
+export interface StickerPickerResponse {
+  contextServerId: string | null;
+  groups: StickerPickerGroup[];
+}
+
+export interface EmojiPickerEmoji {
+  id: string;
+  imageUrl: string;
+  name: string;
+  /** GIF động trong picker */
+  animated?: boolean;
+  addedBy: {
+    displayName: string;
+    username: string;
+    avatarUrl: string;
+  };
+}
+
+/** Một hàng trong màn quản lý emoji máy chủ */
+export interface ServerEmojiManageRow {
+  id: string;
+  imageUrl: string;
+  name: string;
+  animated: boolean;
+  addedBy: {
+    displayName: string;
+    username: string;
+    avatarUrl: string;
+  };
+}
+
+export interface EmojiPickerGroup {
+  serverId: string;
+  serverName: string;
+  serverAvatarUrl: string | null;
+  locked: boolean;
+  emojis: EmojiPickerEmoji[];
+}
+
+export interface EmojiPickerResponse {
+  contextServerId: string | null;
+  groups: EmojiPickerGroup[];
 }
 
 export interface Friend {
@@ -123,6 +263,8 @@ export interface Friend {
   avatarUrl: string;
   email: string;
   bio?: string;
+  /** Trạng thái hoạt động (DM) — từ API available-users. */
+  isOnline?: boolean;
 }
 
 // Servers
@@ -132,11 +274,12 @@ export async function createServer(
   avatarUrl?: string,
   template?: ServerTemplate,
   purpose?: ServerPurpose,
+  language?: "vi" | "en" | "ja" | "zh",
 ): Promise<Server> {
   const response = await fetch(`${API_BASE_URL}/servers`, {
     method: "POST",
     headers: getHeaders(),
-    body: JSON.stringify({ name, description, avatarUrl, template, purpose }),
+    body: JSON.stringify({ name, description, avatarUrl, template, purpose, language }),
   });
 
   if (!response.ok) {
@@ -160,6 +303,176 @@ export async function getMyServers(): Promise<Server[]> {
   return response.json();
 }
 
+export async function getStickerPickerData(
+  contextServerId?: string | null,
+): Promise<StickerPickerResponse> {
+  const params = new URLSearchParams();
+  if (contextServerId) params.set("contextServerId", contextServerId);
+  const qs = params.toString();
+  const response = await fetch(
+    `${API_BASE_URL}/servers/sticker-picker${qs ? `?${qs}` : ""}`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message || "Không tải được sticker máy chủ",
+    );
+  }
+  return response.json();
+}
+
+export async function getEmojiPickerData(
+  contextServerId?: string | null,
+): Promise<EmojiPickerResponse> {
+  const params = new URLSearchParams();
+  if (contextServerId) params.set("contextServerId", contextServerId);
+  const qs = params.toString();
+  const response = await fetch(
+    `${API_BASE_URL}/servers/emoji-picker${qs ? `?${qs}` : ""}`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message || "Không tải được emoji máy chủ",
+    );
+  }
+  return response.json();
+}
+
+/** Máy chủ có quyền tải emoji + slot còn lại (modal Thêm emoji). */
+export interface EmojiUploadTarget {
+  serverId: string;
+  name: string;
+  avatarUrl: string | null;
+  count: number;
+  max: number;
+  remaining: number;
+}
+
+export async function getEmojiUploadTargets(): Promise<{
+  targets: EmojiUploadTarget[];
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/emoji-upload-targets`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message ||
+        "Không tải được danh sách máy chủ",
+    );
+  }
+  return response.json();
+}
+
+/** Cùng dạng slot với emoji; max sticker hiện 5. */
+export type StickerUploadTarget = EmojiUploadTarget;
+
+export async function getStickerUploadTargets(): Promise<{
+  targets: StickerUploadTarget[];
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/sticker-upload-targets`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message ||
+        "Không tải được danh sách máy chủ",
+    );
+  }
+  return response.json();
+}
+
+export async function getServerEmojisManage(serverId: string): Promise<{
+  max: number;
+  count: number;
+  emojis: ServerEmojiManageRow[];
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/emojis/manage`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message || "Không tải được danh sách emoji",
+    );
+  }
+  return response.json();
+}
+
+/** Một sticker trên màn quản lý máy chủ */
+export interface ServerStickerManageRow {
+  id: string;
+  imageUrl: string;
+  name: string;
+  animated?: boolean;
+  addedBy: {
+    displayName: string;
+    username: string;
+    avatarUrl: string;
+  };
+}
+
+export async function getServerStickersManage(serverId: string): Promise<{
+  max: number;
+  count: number;
+  stickers: ServerStickerManageRow[];
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/stickers/manage`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message || "Không tải được danh sách sticker",
+    );
+  }
+  return response.json();
+}
+
+export async function addServerEmoji(
+  serverId: string,
+  body: { imageUrl: string; name?: string; animated?: boolean },
+): Promise<{
+  emoji: { id: string; imageUrl: string; name: string; animated: boolean };
+}> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/emojis`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { message?: string }).message || "Không thêm được emoji");
+  }
+  return response.json();
+}
+
+export async function addServerSticker(
+  serverId: string,
+  body: { imageUrl: string; name?: string; animated?: boolean },
+): Promise<{
+  sticker: { id: string; imageUrl: string; name: string; animated: boolean };
+}> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/stickers`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as { message?: string }).message || "Không thêm được sticker");
+  }
+  return response.json();
+}
+
 export async function getServer(serverId: string): Promise<Server> {
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}`, {
     headers: getHeaders(),
@@ -172,16 +485,76 @@ export async function getServer(serverId: string): Promise<Server> {
   return response.json();
 }
 
+export async function getServerProfileStats(serverId: string): Promise<ServerProfileStats> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/profile-stats`, {
+    headers: getHeaders(),
+  });
+  if (!response.ok) throw new Error("Không tải được thống kê máy chủ");
+  return response.json();
+}
+
+export async function getServerAuditLogs(
+  serverId: string,
+  query?: { action?: string; actorUserId?: string; limit?: number; before?: string },
+): Promise<ServerAuditLogRow[]> {
+  const params = new URLSearchParams();
+  if (query?.action) params.set("action", query.action);
+  if (query?.actorUserId) params.set("actorUserId", query.actorUserId);
+  if (query?.limit) params.set("limit", String(query.limit));
+  if (query?.before) params.set("before", query.before);
+  const qs = params.toString();
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/audit-logs${qs ? `?${qs}` : ""}`, {
+    headers: getHeaders(),
+  });
+  if (!response.ok) throw new Error("Không tải được nhật ký chỉnh sửa");
+  return response.json();
+}
+
+export async function getServerSafetySettings(serverId: string): Promise<ServerSafetySettings> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/safety-settings`, {
+    headers: getHeaders(),
+  });
+  if (!response.ok) throw new Error("Không tải được thiết lập an toàn");
+  return response.json();
+}
+
+export async function updateServerSafetySettings(
+  serverId: string,
+  patch: Partial<ServerSafetySettings>,
+): Promise<ServerSafetySettings> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/safety-settings`, {
+    method: "PATCH",
+    headers: getHeaders(),
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) throw new Error("Không cập nhật được thiết lập an toàn");
+  return response.json();
+}
+
 export async function updateServer(
   serverId: string,
-  name?: string,
-  description?: string,
-  avatarUrl?: string,
+  name?: string | null,
+  description?: string | null,
+  avatarUrl?: string | null,
+  extra?: {
+    bannerUrl?: string | null;
+    bannerImageUrl?: string | null;
+    bannerColor?: string | null;
+    profileTraits?: Array<{ emoji: string; text: string }>;
+  },
 ): Promise<Server> {
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}`, {
     method: "PATCH",
     headers: getHeaders(),
-    body: JSON.stringify({ name, description, avatarUrl }),
+    body: JSON.stringify({
+      name,
+      description,
+      avatarUrl,
+      bannerUrl: extra?.bannerUrl,
+      bannerImageUrl: extra?.bannerImageUrl,
+      bannerColor: extra?.bannerColor,
+      profileTraits: extra?.profileTraits,
+    }),
   });
 
   if (!response.ok) {
@@ -206,6 +579,8 @@ export type ServerMemberRow = {
   userId: string;
   displayName: string;
   username: string;
+  /** Biệt danh trong máy chủ (nếu có), từ server.members[].nickname */
+  nickname?: string | null;
   avatarUrl: string;
   joinedAt: string;
   joinedCordigramAt: string;
@@ -278,6 +653,7 @@ export interface RolePermissions {
   timeoutMembers: boolean;
 
   // Quyền Kênh Tin Nhắn
+  mentionEveryone: boolean;
   sendMessages: boolean;
   sendMessagesInThreads: boolean;
   createPublicThreads: boolean;
@@ -287,10 +663,7 @@ export interface RolePermissions {
   addReactions: boolean;
   manageMessages: boolean;
   pinMessages: boolean;
-  bypassSlowMode: boolean;
-  manageThreads: boolean;
   viewMessageHistory: boolean;
-  sendTTS: boolean;
   sendVoiceMessages: boolean;
   createPolls: boolean;
 
@@ -507,11 +880,13 @@ export async function removeMemberFromRole(
  */
 export interface MemberWithRoles {
   userId: string;
+  nickname?: string | null;
   displayName: string;
   username: string;
   avatarUrl: string;
   joinedAt: string;
   isOwner: boolean;
+  serverMemberRole: "owner" | "moderator" | "member";
   roles: Array<{
     _id: string;
     name: string;
@@ -520,6 +895,14 @@ export interface MemberWithRoles {
   }>;
   highestRolePosition: number;
   displayColor: string; // Màu hiển thị username (từ role cao nhất)
+  accountCreatedAt: string;
+  accountAgeDays: number;
+  messagesLast10Min: number;
+  messagesLast30d: number;
+  lastMessageAt: string | null;
+  isOnline: boolean;
+  joinMethod: "owner" | "invited" | "link";
+  invitedBy?: { id: string; username: string };
 }
 
 /**
@@ -712,6 +1095,8 @@ export interface CurrentUserServerPermissions {
   canManageChannels: boolean;
   canManageEvents: boolean;
   canCreateInvite: boolean;
+  /** Được dùng đề cập (@) — không ảnh hưởng việc nhận tin khi người khác @ bạn. */
+  mentionEveryone?: boolean;
 }
 
 export interface ServerInteractionSettings {
@@ -747,6 +1132,7 @@ export async function getCurrentUserPermissions(
         canManageChannels: membersResponse.currentUserPermissions.isOwner,
         canManageEvents: membersResponse.currentUserPermissions.isOwner,
         canCreateInvite: true,
+        mentionEveryone: membersResponse.currentUserPermissions.isOwner,
       };
     } catch {
       return {
@@ -759,6 +1145,7 @@ export async function getCurrentUserPermissions(
         canManageChannels: false,
         canManageEvents: false,
         canCreateInvite: true,
+        mentionEveryone: false,
       };
     }
   }
@@ -924,6 +1311,152 @@ export async function declineServerInvite(inviteId: string): Promise<void> {
   }
 }
 
+// Mention Spam Restricted Members
+export interface MentionRestrictedMember {
+  userId: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string;
+  mentionBlockedUntil: string | null;
+  mentionRestricted: boolean;
+}
+
+export async function getMentionRestrictedMembers(
+  serverId: string,
+): Promise<MentionRestrictedMember[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/mention-restricted`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function unrestrictMember(
+  serverId: string,
+  memberId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/unrestrict/${memberId}`,
+    { method: "POST", headers: getHeaders() },
+  );
+  if (!response.ok) throw new Error("Không mở hạn chế được");
+}
+
+// ===================== COMMUNITY SETTINGS =====================
+
+export interface CommunitySettings {
+  enabled: boolean;
+  rulesChannelId: string | null;
+  updatesChannelId: string | null;
+  activatedAt: string | null;
+}
+
+export interface DiscoveryCheck {
+  id: string;
+  label: string;
+  description: string;
+  passed: boolean;
+  warning?: boolean;
+}
+
+export interface DiscoveryEligibility {
+  eligible: boolean;
+  communityEnabled: boolean;
+  memberCount: number;
+  serverAgeMinutes: number;
+  checks: DiscoveryCheck[];
+}
+
+export async function getDiscoveryEligibility(
+  serverId: string,
+): Promise<DiscoveryEligibility> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/discovery-eligibility`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) throw new Error("Không tải được điều kiện khám phá");
+  return response.json();
+}
+
+export async function getCommunitySettings(
+  serverId: string,
+): Promise<CommunitySettings> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/community`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) throw new Error("Không tải được cài đặt cộng đồng");
+  return response.json();
+}
+
+export async function activateCommunity(
+  serverId: string,
+  body: {
+    rulesChannelId?: string | null;
+    updatesChannelId?: string | null;
+    createRulesChannel?: boolean;
+    createUpdatesChannel?: boolean;
+  },
+): Promise<CommunitySettings> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/community/activate`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(body),
+    },
+  );
+  if (!response.ok) throw new Error("Không kích hoạt được cộng đồng");
+  return response.json();
+}
+
+export type CommunityOverviewUpdate = {
+  rulesChannelId?: string | null;
+  primaryLanguage?: "vi" | "en";
+  description?: string | null;
+};
+
+export async function updateCommunityOverview(
+  serverId: string,
+  body: CommunityOverviewUpdate,
+): Promise<{ ok: true; description: string | null; primaryLanguage: "vi" | "en"; rulesChannelId: string | null }> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/community/overview`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(body),
+    },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không cập nhật được tổng quan cộng đồng");
+  }
+  return response.json();
+}
+
+// Mentions
+export interface MentionSuggestion {
+  id: string;
+  name: string;
+  type: "special" | "role" | "user";
+  description: string;
+  avatarUrl?: string;
+  color?: string;
+}
+
+export async function getMentionSuggestions(
+  serverId: string,
+  keyword: string = "",
+): Promise<MentionSuggestion[]> {
+  const url = new URL(`${API_BASE_URL}/servers/${serverId}/mentions`);
+  if (keyword) url.searchParams.set("keyword", keyword);
+  const response = await fetch(url.toString(), { headers: getHeaders() });
+  if (!response.ok) return [];
+  return response.json();
+}
+
 // Channels
 export async function createChannel(
   serverId: string,
@@ -965,10 +1498,45 @@ export async function createCategory(
   return response.json();
 }
 
+export async function updateCategory(
+  serverId: string,
+  categoryId: string,
+  name: string,
+): Promise<ServerCategory> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/channels/categories/${categoryId}`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      cache: "no-store",
+      body: JSON.stringify({ name }),
+    },
+  );
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || "Không đổi tên được danh mục");
+  }
+  return response.json();
+}
+
+export async function deleteCategory(
+  serverId: string,
+  categoryId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/channels/categories/${categoryId}`,
+    {
+      method: "DELETE",
+      headers: getHeaders(),
+    },
+  );
+  if (!response.ok) throw new Error("Không xóa được danh mục");
+}
+
 export async function getCategories(serverId: string): Promise<ServerCategory[]> {
   const response = await fetch(
     `${API_BASE_URL}/servers/${serverId}/channels/categories/list`,
-    { headers: getHeaders() },
+    { headers: getHeaders(), cache: "no-store" },
   );
   if (!response.ok) return [];
   return response.json();
@@ -1016,6 +1584,7 @@ export async function getChannels(
 
   const response = await fetch(url.toString(), {
     headers: getHeaders(),
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -1054,12 +1623,14 @@ export async function updateChannel(
     {
       method: "PATCH",
       headers: getHeaders(),
+      cache: "no-store",
       body: JSON.stringify({ name, description }),
     },
   );
 
   if (!response.ok) {
-    throw new Error("Không cập nhật được kênh");
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || "Không cập nhật được kênh");
   }
 
   return response.json();
@@ -1204,10 +1775,22 @@ export async function getEventPreview(
 }
 
 /** Join a public server (requires auth) */
-export async function joinServer(serverId: string): Promise<Server> {
+export async function joinServer(
+  serverId: string,
+  opts?: {
+    rulesAccepted?: boolean;
+    nickname?: string;
+    applicationAnswers?: Array<{
+      questionId: string;
+      text?: string;
+      selectedOption?: string;
+    }>;
+  },
+): Promise<Server> {
   const res = await fetch(`${API_BASE_URL}/servers/${serverId}/join`, {
     method: "POST",
     headers: getHeaders(),
+    body: JSON.stringify(opts ?? {}),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -1224,6 +1807,27 @@ export async function leaveServer(serverId: string): Promise<void> {
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || "Không thể rời máy chủ");
+  }
+}
+
+export async function updateMyServerNickname(
+  serverId: string,
+  nickname: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/me/nickname`,
+    {
+      method: "PATCH",
+      headers: {
+        ...getHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ nickname }),
+    },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không lưu biệt danh");
   }
 }
 
@@ -1266,6 +1870,8 @@ export async function createServerEvent(
 }
 
 // Messages
+export type ChatGateBlockReason = "verification" | "age_under_18" | "age_ack";
+
 export async function createMessage(
   channelId: string,
   content: string,
@@ -1274,6 +1880,9 @@ export async function createMessage(
   mentions?: string[],
   messageType?: string,
   giphyId?: string,
+  voiceUrl?: string,
+  voiceDuration?: number,
+  stickerExtras?: { customStickerUrl?: string; serverStickerId?: string },
 ): Promise<Message> {
   const body: Record<string, unknown> = {
     content,
@@ -1282,6 +1891,14 @@ export async function createMessage(
     ...(mentions?.length ? { mentions } : {}),
     ...(messageType && messageType !== "text" ? { messageType } : {}),
     ...(giphyId ? { giphyId } : {}),
+    ...(voiceUrl ? { voiceUrl } : {}),
+    ...(voiceDuration != null ? { voiceDuration } : {}),
+    ...(stickerExtras?.customStickerUrl
+      ? { customStickerUrl: stickerExtras.customStickerUrl }
+      : {}),
+    ...(stickerExtras?.serverStickerId
+      ? { serverStickerId: stickerExtras.serverStickerId }
+      : {}),
   };
   const response = await fetch(
     `${API_BASE_URL}/channels/${channelId}/messages`,
@@ -1293,7 +1910,16 @@ export async function createMessage(
   );
 
   if (!response.ok) {
-    throw new Error("Không tạo được tin nhắn");
+    let message = "Không tạo được tin nhắn";
+    try {
+      const data = await response.json();
+      if (data?.message) {
+        message = Array.isArray(data.message) ? data.message.join(", ") : String(data.message);
+      }
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
   }
 
   return response.json();
@@ -1321,11 +1947,17 @@ export async function sendWaveSticker(
   return response.json();
 }
 
+export interface GetChannelMessagesResponse {
+  messages: Message[];
+  chatViewBlocked: boolean;
+  chatBlockReason: ChatGateBlockReason | null;
+}
+
 export async function getMessages(
   channelId: string,
   limit: number = 50,
   skip: number = 0,
-): Promise<Message[]> {
+): Promise<GetChannelMessagesResponse> {
   const url = new URL(`${API_BASE_URL}/channels/${channelId}/messages`);
   url.searchParams.append("limit", limit.toString());
   url.searchParams.append("skip", skip.toString());
@@ -1335,10 +1967,19 @@ export async function getMessages(
   });
 
   if (!response.ok) {
-    throw new Error("Không tải được tin nhắn");
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được tin nhắn");
   }
 
-  return response.json();
+  const raw = await response.json();
+  if (Array.isArray(raw)) {
+    return {
+      messages: raw as Message[],
+      chatViewBlocked: false,
+      chatBlockReason: null,
+    };
+  }
+  return raw as GetChannelMessagesResponse;
 }
 
 /** Đánh dấu toàn bộ tin nhắn trong kênh là đã đọc (để thông báo chưa đọc trong Hộp thư biến mất). */
@@ -1574,4 +2215,432 @@ export async function isFollowing(userId: string): Promise<boolean> {
     console.error("Failed to check following status", err);
     return false;
   }
+}
+
+// =========================================================
+// Server Access Control (Discord tab "Truy cập")
+// =========================================================
+
+export type ServerAccessMode = "invite_only" | "apply" | "discoverable";
+
+export interface ServerAccessRule {
+  id: string;
+  content: string;
+}
+
+export interface ServerAccessSettings {
+  accessMode: ServerAccessMode;
+  isAgeRestricted: boolean;
+  hasRules: boolean;
+  rules: ServerAccessRule[];
+  joinApplicationForm?: {
+    enabled: boolean;
+    questions: Array<{
+      id: string;
+      title: string;
+      type: "short" | "paragraph" | "multiple_choice";
+      required: boolean;
+      options?: string[];
+    }>;
+  };
+}
+
+export type MyServerAccessStatusValue = "pending" | "accepted" | "rejected" | null;
+
+export interface MyServerAccessStatus {
+  status: MyServerAccessStatusValue;
+  acceptedRules: boolean;
+  hasRules: boolean;
+  accessMode: ServerAccessMode;
+  isAgeRestricted: boolean;
+  ageRestrictedAcknowledged: boolean;
+  ageYears: number | null;
+  verificationLevel: ServerVerificationLevel;
+  verificationChecks?: {
+    emailVerified: boolean;
+    accountOver5Min: boolean;
+    memberOver10Min: boolean;
+  };
+  verificationWait?: {
+    waitAccountSec: number | null;
+    waitMemberSec: number | null;
+  };
+  chatViewBlocked: boolean;
+  chatBlockReason: ChatGateBlockReason | null;
+  showAgeRestrictedChannelNotice: boolean;
+}
+
+export async function getServerAccessSettings(serverId: string): Promise<ServerAccessSettings> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/settings`, {
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được cài đặt truy cập");
+  }
+
+  return response.json();
+}
+
+export async function updateServerAccessSettings(
+  serverId: string,
+  patch: Partial<Pick<ServerAccessSettings, "accessMode" | "isAgeRestricted" | "hasRules">>,
+): Promise<Pick<ServerAccessSettings, "accessMode" | "isAgeRestricted" | "hasRules">> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/settings`, {
+    method: "PATCH",
+    headers: getHeaders(),
+    body: JSON.stringify(patch),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không lưu được cài đặt truy cập");
+  }
+
+  return response.json();
+}
+
+export async function updateJoinApplicationForm(
+  serverId: string,
+  body: {
+    enabled?: boolean;
+    questions?: Array<{
+      id: string;
+      title: string;
+      type: "short" | "paragraph" | "multiple_choice";
+      required?: boolean;
+      options?: string[];
+    }>;
+  },
+): Promise<{
+  enabled: boolean;
+  questions: Array<{
+    id: string;
+    title: string;
+    type: "short" | "paragraph" | "multiple_choice";
+    required: boolean;
+    options?: string[];
+  }>;
+}> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/join-form`, {
+    method: "PATCH",
+    headers: getHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không lưu được đơn đăng ký tham gia");
+  }
+  return response.json();
+}
+
+export async function getJoinApplicationForm(serverId: string): Promise<{
+  enabled: boolean;
+  questions: Array<{
+    id: string;
+    title: string;
+    type: "short" | "paragraph" | "multiple_choice";
+    required: boolean;
+    options?: string[];
+  }>;
+}> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/join-form`, {
+    headers: getHeaders(),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được đơn đăng ký tham gia");
+  }
+  return response.json();
+}
+
+export type JoinApplicationListStatus = "all" | "pending" | "rejected" | "approved";
+
+export interface JoinApplicationListItem {
+  userId: string;
+  displayName: string;
+  username: string;
+  avatarUrl?: string;
+  status: "pending" | "accepted" | "rejected";
+  registeredAt: string;
+  acceptedRules: boolean;
+}
+
+export async function listJoinApplications(
+  serverId: string,
+  status: JoinApplicationListStatus = "pending",
+): Promise<{ pendingCount: number; items: JoinApplicationListItem[] }> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/access/join-applications?status=${encodeURIComponent(status)}`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được danh sách đơn");
+  }
+  return response.json();
+}
+
+export interface JoinApplicationDetail {
+  userId: string;
+  displayName: string;
+  username: string;
+  avatarUrl?: string;
+  status: "pending" | "accepted" | "rejected";
+  acceptedRules: boolean;
+  accountCreatedAt: string | null;
+  applicationSubmittedAt: string | null;
+  questionsWithAnswers: Array<{
+    questionId: string;
+    title: string;
+    type: string;
+    answerText?: string;
+    selectedOption?: string;
+  }>;
+}
+
+export async function getJoinApplicationDetail(
+  serverId: string,
+  applicantUserId: string,
+): Promise<JoinApplicationDetail> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/${serverId}/access/join-applications/${encodeURIComponent(applicantUserId)}`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được chi tiết đơn");
+  }
+  return response.json();
+}
+
+export async function rejectAccessUser(serverId: string, userId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/reject`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ userId }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không từ chối được");
+  }
+}
+
+export async function withdrawMyJoinApplication(serverId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/withdraw`, {
+    method: "POST",
+    headers: getHeaders(),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không thu hồi được đơn đăng ký");
+  }
+}
+
+export async function addServerAccessRule(serverId: string, content: string): Promise<ServerAccessRule> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/rules`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ content }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không thêm được quy định");
+  }
+
+  return response.json();
+}
+
+export async function getMyServerAccessStatus(serverId: string): Promise<MyServerAccessStatus> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/my-status`, {
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được trạng thái truy cập");
+  }
+
+  return response.json();
+}
+
+export async function acceptServerRules(serverId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/accept-rules`, {
+    method: "POST",
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không thể đồng ý quy định");
+  }
+}
+
+export async function acknowledgeServerAgeRestriction(serverId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/acknowledge-age`, {
+    method: "POST",
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không thể xác nhận");
+  }
+}
+
+export async function requestServerEmailOtp(serverId: string): Promise<{ ok: boolean; retryAfterSec?: number }> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/request-email-otp`, {
+    method: "POST",
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không thể gửi mã xác minh");
+  }
+
+  return response.json();
+}
+
+export async function verifyServerEmailOtp(serverId: string, code: string): Promise<{ ok: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/verify-email-otp`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ code }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Mã xác minh không hợp lệ");
+  }
+
+  return response.json();
+}
+
+export async function approveServerAccessUser(
+  serverId: string,
+  userId: string,
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/servers/${serverId}/access/approve`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ userId }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Không thể duyệt yêu cầu gia nhập");
+  }
+}
+
+// ── Admin read-only view APIs ──
+
+function adminHeaders(adminToken: string) {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${adminToken}`,
+  };
+}
+
+export async function adminGetServerView(
+  serverId: string,
+  adminToken: string,
+): Promise<{ server: Server; channels: Channel[]; categories: ServerCategory[] }> {
+  const res = await fetch(
+    `${API_BASE_URL}/admin/community-discovery/${serverId}/view`,
+    { headers: adminHeaders(adminToken) },
+  );
+  if (!res.ok) throw new Error("Không tải được thông tin server");
+  return res.json();
+}
+
+export async function adminGetEmojiPickerData(
+  serverId: string,
+  adminToken: string,
+): Promise<EmojiPickerResponse> {
+  const res = await fetch(
+    `${API_BASE_URL}/admin/community-discovery/${serverId}/emoji-picker`,
+    { headers: adminHeaders(adminToken) },
+  );
+  if (!res.ok) throw new Error("Không tải được emoji máy chủ (admin)");
+  return res.json();
+}
+
+export async function adminGetStickerPickerData(
+  serverId: string,
+  adminToken: string,
+): Promise<StickerPickerResponse> {
+  const res = await fetch(
+    `${API_BASE_URL}/admin/community-discovery/${serverId}/sticker-picker`,
+    { headers: adminHeaders(adminToken) },
+  );
+  if (!res.ok) throw new Error("Không tải được sticker máy chủ (admin)");
+  return res.json();
+}
+
+export async function adminGetChannelMessages(
+  serverId: string,
+  channelId: string,
+  adminToken: string,
+  limit = 50,
+  skip = 0,
+): Promise<GetChannelMessagesResponse> {
+  const url = new URL(
+    `${API_BASE_URL}/admin/community-discovery/${serverId}/channels/${channelId}/messages`,
+  );
+  url.searchParams.append("limit", limit.toString());
+  url.searchParams.append("skip", skip.toString());
+  const res = await fetch(url.toString(), {
+    headers: adminHeaders(adminToken),
+  });
+  if (!res.ok) throw new Error("Không tải được tin nhắn");
+  const raw = await res.json();
+  if (Array.isArray(raw)) {
+    return { messages: raw, chatViewBlocked: false, chatBlockReason: null };
+  }
+  return raw as GetChannelMessagesResponse;
+}
+
+export async function adminLeaveServer(
+  serverId: string,
+  adminToken: string,
+): Promise<void> {
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/admin/community-discovery/${serverId}/leave`,
+      { method: "POST", headers: adminHeaders(adminToken) },
+    );
+    if (!res.ok) {
+      console.error("[adminLeaveServer] Failed:", res.status, await res.text().catch(() => ""));
+    }
+  } catch (err) {
+    console.error("[adminLeaveServer] Network error:", err);
+  }
+}
+
+export type ExploreServer = {
+  id: string;
+  name: string;
+  description: string | null;
+  avatarUrl: string | null;
+  bannerUrl: string | null;
+  bannerImageUrl: string | null;
+  bannerColor: string | null;
+  memberCount: number;
+  accessMode: "invite_only" | "apply" | "discoverable";
+  isPublic: boolean;
+};
+
+export async function listExploreServers(): Promise<ExploreServer[]> {
+  const res = await fetch(`${API_BASE_URL}/servers/explore`, {
+    headers: getHeaders(),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được danh sách khám phá");
+  }
+  return res.json();
 }

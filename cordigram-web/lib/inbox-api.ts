@@ -108,9 +108,13 @@ export async function fetchInboxForYou(): Promise<InboxForYouResponse> {
   return res.json();
 }
 
-/** Đánh dấu một mục (event hoặc server_invite) trong Dành cho Bạn là đã xem. */
+/** Đánh dấu một mục (Dành cho Bạn / đề cập kênh) là đã xem. */
 export async function markInboxSeen(
-  sourceType: "event" | "server_invite" | "server_notification",
+  sourceType:
+    | "event"
+    | "server_invite"
+    | "server_notification"
+    | "channel_mention",
   sourceId: string,
 ): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/inbox/seen`, {

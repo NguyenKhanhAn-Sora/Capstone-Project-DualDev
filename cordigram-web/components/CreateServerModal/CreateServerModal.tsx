@@ -6,6 +6,7 @@ import ServerTemplateSelector from "./ServerTemplateSelector";
 import ServerPurposeSelector from "./ServerPurposeSelector";
 import ServerCustomization from "./ServerCustomization";
 import { createServer, type ServerTemplate, type ServerPurpose } from "@/lib/servers-api";
+import { useLanguage } from "@/component/language-provider";
 
 interface CreateServerModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export default function CreateServerModal({
   onClose,
   onServerCreated,
 }: CreateServerModalProps) {
+  const { t, language } = useLanguage();
   const [currentStep, setCurrentStep] = useState<Step>("template");
   const [selectedTemplate, setSelectedTemplate] = useState<ServerTemplate | null>(null);
   const [selectedPurpose, setSelectedPurpose] = useState<ServerPurpose | null>(null);
@@ -56,7 +58,7 @@ export default function CreateServerModal({
 
   const handleCreateServer = async (name: string, avatarUrl?: string) => {
     if (!name.trim()) {
-      alert("Vui lòng nhập tên máy chủ");
+      alert(t("chat.createServer.errors.nameRequired"));
       return;
     }
 
@@ -67,7 +69,8 @@ export default function CreateServerModal({
         undefined,
         avatarUrl,
         selectedTemplate || "custom",
-        selectedPurpose || "me-and-friends"
+        selectedPurpose || "me-and-friends",
+        language as "vi" | "en" | "ja" | "zh"
       );
       
       if (onServerCreated) {
@@ -77,7 +80,7 @@ export default function CreateServerModal({
       handleClose();
     } catch (error) {
       console.error("Failed to create server:", error);
-      alert("Không thể tạo máy chủ. Vui lòng thử lại.");
+      alert(t("chat.createServer.errors.createFailed"));
     } finally {
       setIsCreating(false);
     }

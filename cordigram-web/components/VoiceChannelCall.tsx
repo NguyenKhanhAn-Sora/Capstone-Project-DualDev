@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -13,11 +13,13 @@ import styles from "./VoiceChannelCall.module.css";
 
 const MAX_PARTICIPANTS = 15;
 
-interface VoiceChannelCallProps {
+export interface VoiceChannelCallProps {
   token: string;
   serverUrl: string;
   participantName: string;
   onDisconnect: () => void;
+  micMuted?: boolean;
+  soundMuted?: boolean;
 }
 
 export default function VoiceChannelCall({
@@ -25,6 +27,8 @@ export default function VoiceChannelCall({
   serverUrl,
   participantName,
   onDisconnect,
+  micMuted,
+  soundMuted,
 }: VoiceChannelCallProps) {
   return (
     <div className={styles.embedContainer}>
@@ -37,14 +41,20 @@ export default function VoiceChannelCall({
         onDisconnected={onDisconnect}
         className={styles.liveKitRoom}
       >
-        <VoiceChannelGrid onDisconnect={onDisconnect} />
-        <RoomAudioRenderer />
+        <VoiceChannelGrid onDisconnect={onDisconnect} micMuted={micMuted} />
+        {!soundMuted ? <RoomAudioRenderer /> : null}
       </LiveKitRoom>
     </div>
   );
 }
 
-function VoiceChannelGrid({ onDisconnect }: { onDisconnect: () => void }) {
+function VoiceChannelGrid({
+  onDisconnect,
+  micMuted,
+}: {
+  onDisconnect: () => void;
+  micMuted?: boolean;
+}) {
   const cameraTracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
     { onlySubscribed: false },
@@ -137,24 +147,30 @@ function VoiceChannelGrid({ onDisconnect }: { onDisconnect: () => void }) {
           </div>
         )}
       </div>
-      <VoiceChannelControls onDisconnect={onDisconnect} />
+      <VoiceChannelControls onDisconnect={onDisconnect} micMuted={micMuted} />
     </div>
   );
 }
 
-function VoiceChannelControls({ onDisconnect }: { onDisconnect: () => void }) {
+function VoiceChannelControls({
+  onDisconnect,
+  micMuted,
+}: {
+  onDisconnect: () => void;
+  micMuted?: boolean;
+}) {
   const { localParticipant } = useLocalParticipant();
-  const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
-  const toggleMicrophone = async () => {
-    if (localParticipant) {
-      const enabled = localParticipant.isMicrophoneEnabled;
-      await localParticipant.setMicrophoneEnabled(!enabled);
-      setIsMuted(enabled);
+  useEffect(() => {
+    if (!localParticipant) return;
+    if (typeof micMuted !== "boolean") return;
+    const shouldEnableMic = !micMuted;
+    if (localParticipant.isMicrophoneEnabled !== shouldEnableMic) {
+      localParticipant.setMicrophoneEnabled(shouldEnableMic).catch(() => {});
     }
-  };
+  }, [localParticipant, micMuted]);
 
   const toggleVideo = async () => {
     if (localParticipant) {
@@ -174,19 +190,7 @@ function VoiceChannelControls({ onDisconnect }: { onDisconnect: () => void }) {
 
   return (
     <div className={styles.controls}>
-      <button
-        type="button"
-        onClick={toggleMicrophone}
-        className={`${styles.controlBtn} ${isMuted ? styles.controlBtnOff : ""}`}
-        title={isMuted ? "Bật mic" : "Tắt mic"}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-          <line x1="12" y1="19" x2="12" y2="23" />
-          <line x1="8" y1="23" x2="16" y2="23" />
-        </svg>
-      </button>
+      {/* Mic do thanh footer Messages điều khiển (đồng bộ với micMuted). */}
       <button
         type="button"
         onClick={toggleVideo}

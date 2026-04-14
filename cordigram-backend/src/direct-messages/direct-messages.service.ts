@@ -688,15 +688,45 @@ export class DirectMessagesService {
         .lean()
         .exec();
 
-      return profiles.map((profile) => ({
-        _id: profile.userId,
-        userId: profile.userId,
-        username: profile.username,
-        displayName: profile.displayName,
-        avatar: profile.avatarUrl,
-        avatarUrl: profile.avatarUrl,
-        bio: profile.bio,
-      }));
+      const presenceUsers = await this.userModel
+        .find({ _id: { $in: userObjectIds } })
+        .select('loginDevices')
+        .lean()
+        .exec();
+      const now = Date.now();
+      const devicePresenceAgo = now - 30 * 60 * 1000;
+      const onlineById = new Map<string, boolean>();
+      for (const u of presenceUsers as Array<{
+        _id: Types.ObjectId;
+        loginDevices?: Array<{ lastSeenAt?: Date }>;
+      }>) {
+        let last = 0;
+        for (const d of u.loginDevices ?? []) {
+          if (d?.lastSeenAt) {
+            last = Math.max(last, new Date(d.lastSeenAt).getTime());
+          }
+        }
+        onlineById.set(
+          u._id.toString(),
+          last > 0 && last >= devicePresenceAgo,
+        );
+      }
+
+      return profiles.map((profile) => {
+        const uid = profile.userId.toString();
+        const isOnline = onlineById.get(uid) ?? false;
+        return {
+          _id: profile.userId,
+          userId: profile.userId,
+          username: profile.username,
+          displayName: profile.displayName,
+          avatar: profile.avatarUrl,
+          avatarUrl: profile.avatarUrl,
+          bio: profile.bio,
+          email: isOnline ? 'Đang hoạt động' : 'Offline',
+          isOnline,
+        };
+      });
     } catch (error) {
       console.error('Error getting available users:', error);
       return [];

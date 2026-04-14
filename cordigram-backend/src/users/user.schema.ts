@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document } from 'mongoose';
 import {
   SUPPORTED_LANGUAGES,
   type SupportedLanguage,
@@ -23,7 +23,16 @@ export type RecentAccount = {
 
 export type UserSettings = {
   theme: 'light' | 'dark';
-  language: SupportedLanguage;
+  language: 'vi' | 'en' | 'ja' | 'zh';
+  /** Ai hiện trong danh sách DM (chỉ UI + lọc client; mặc định everyone). */
+  dmListFrom?: 'everyone' | 'followers_only';
+  dmCallFrom?: 'everyone' | 'followers_only';
+  /** Hiển thị ngày tham gia Cordigram trên hồ sơ công khai. */
+  showCordigramMemberSince?: boolean;
+  /** Chia sẻ trạng thái online/idle/offline với người khác. */
+  sharePresence?: boolean;
+  /** Âm thanh thông báo tin (client có thể đọc). */
+  chatSoundEnabled?: boolean;
   notifications?: {
     mutedUntil?: Date | null;
     mutedIndefinitely?: boolean;
@@ -98,10 +107,10 @@ export type TwoFactorTrustedDevice = {
 @Schema({ timestamps: true })
 export class User extends Document {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
-  email: string;
+  email!: string;
 
   @Prop({ type: String, default: null })
-  passwordHash: string | null;
+  passwordHash!: string | null;
 
   @Prop({
     type: [
@@ -113,13 +122,13 @@ export class User extends Document {
     ],
     default: [],
   })
-  oauthProviders: OAuthProvider[];
+  oauthProviders!: OAuthProvider[];
 
   @Prop({ type: [String], default: ['user'] })
-  roles: Role[];
+  roles!: Role[];
 
   @Prop({ type: String, default: 'pending' })
-  status: Status;
+  status!: Status;
 
   @Prop({ type: Date, default: null })
   interactionMutedUntil?: Date | null;
@@ -143,21 +152,34 @@ export class User extends Document {
   suspendedIndefinitely?: boolean;
 
   @Prop({ type: Boolean, default: false })
-  isVerified: boolean;
+  isVerified!: boolean;
 
   @Prop({ type: Boolean, default: false })
-  isCreatorVerified: boolean;
+  isCreatorVerified!: boolean;
 
   @Prop({ type: Date, default: null })
   creatorVerificationApprovedAt?: Date | null;
 
   @Prop({ type: String, default: 'otp_pending' })
-  signupStage: 'otp_pending' | 'info_pending' | 'completed';
+  signupStage!: 'otp_pending' | 'info_pending' | 'completed';
 
   @Prop({
     type: {
       theme: { type: String, enum: ['light', 'dark'], default: 'light' },
-      language: { type: String, enum: SUPPORTED_LANGUAGES, default: 'en' },
+      language: { type: String, enum: ['vi', 'en', 'ja', 'zh'], default: 'vi' },
+      dmListFrom: {
+        type: String,
+        enum: ['everyone', 'followers_only'],
+        default: 'everyone',
+      },
+      dmCallFrom: {
+        type: String,
+        enum: ['everyone', 'followers_only'],
+        default: 'everyone',
+      },
+      showCordigramMemberSince: { type: Boolean, default: true },
+      sharePresence: { type: Boolean, default: true },
+      chatSoundEnabled: { type: Boolean, default: true },
       notifications: {
         mutedUntil: { type: Date, default: null },
         mutedIndefinitely: { type: Boolean, default: false },
@@ -184,7 +206,12 @@ export class User extends Document {
     },
     default: {
       theme: 'light',
-      language: 'en',
+      language: 'vi',
+      dmListFrom: 'everyone',
+      dmCallFrom: 'everyone',
+      showCordigramMemberSince: true,
+      sharePresence: true,
+      chatSoundEnabled: true,
       notifications: {
         mutedUntil: null,
         mutedIndefinitely: false,
@@ -198,7 +225,7 @@ export class User extends Document {
       },
     },
   })
-  settings: UserSettings;
+  settings!: UserSettings;
 
   @Prop({
     type: [
@@ -212,10 +239,10 @@ export class User extends Document {
     ],
     default: [],
   })
-  recentAccounts: RecentAccount[];
+  recentAccounts!: RecentAccount[];
 
   @Prop({ type: [String], default: [] })
-  interests: string[];
+  interests!: string[];
 
   @Prop({
     type: {
@@ -318,10 +345,10 @@ export class User extends Document {
   passwordChangedAt?: Date | null;
 
   @Prop({ type: Number, default: 0 })
-  followerCount: number;
+  followerCount!: number;
 
   @Prop({ type: Number, default: 0 })
-  followingCount: number;
+  followingCount!: number;
 
   @Prop({ type: Number, default: 0 })
   strikeCount?: number;

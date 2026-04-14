@@ -21,6 +21,9 @@ import {
 import { Message, MessageSchema } from '../messages/message.schema';
 import { RolesModule } from '../roles/roles.module';
 import { MessagesModule } from '../messages/messages.module';
+import { ServerAccessModule } from '../access/access.module';
+import { AuditLogModule } from '../audit-log/audit-log.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -35,7 +38,10 @@ import { MessagesModule } from '../messages/messages.module';
       { name: Message.name, schema: MessageSchema },
     ]),
     forwardRef(() => RolesModule),
+    forwardRef(() => ServerAccessModule),
+    AuditLogModule,
     MessagesModule,
+    CloudinaryModule,
   ],
   providers: [ServersService],
   controllers: [ServersController],

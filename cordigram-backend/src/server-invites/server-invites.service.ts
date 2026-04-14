@@ -3,6 +3,8 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -13,6 +15,7 @@ import { ServersService } from '../servers/servers.service';
 export class ServerInvitesService {
   constructor(
     @InjectModel(ServerInvite.name) private inviteModel: Model<ServerInvite>,
+    @Inject(forwardRef(() => ServersService))
     private readonly serversService: ServersService,
   ) {}
 
@@ -74,11 +77,22 @@ export class ServerInvitesService {
     if (invite.status !== 'pending') {
       throw new BadRequestException('Lời mời đã được xử lý.');
     }
-    await this.serversService.addMemberToServer(
-      invite.serverId.toString(),
-      userId,
-      'member',
-    );
+    try {
+      await this.serversService.addMemberToServer(
+        invite.serverId.toString(),
+        userId,
+        'member',
+      );
+    } catch (e) {
+      if (
+        e instanceof BadRequestException &&
+        (e.message || '').includes('already')
+      ) {
+        // Already a member — just mark the invite as accepted
+      } else {
+        throw e;
+      }
+    }
     invite.status = 'accepted';
     invite.respondedAt = new Date();
     await invite.save();
@@ -93,8 +107,7 @@ export class ServerInvitesService {
       toUserId: toId,
       status: 'pending',
     });
-    if (!invite)
-      throw new NotFoundException('Không tìm thấy lời mời hoặc đã xử lý.');
+    if (!invite) return;
     await this.accept(invite._id.toString(), userId);
   }
 

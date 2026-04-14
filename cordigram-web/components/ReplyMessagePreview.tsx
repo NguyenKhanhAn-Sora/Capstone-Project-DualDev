@@ -9,7 +9,13 @@ interface ReplyMessagePreviewProps {
     text: string;
     senderDisplayName?: string;
     senderName?: string;
-    messageType?: "text" | "gif" | "sticker" | "voice";
+    messageType?:
+      | "text"
+      | "gif"
+      | "sticker"
+      | "voice"
+      | "system"
+      | "welcome";
   };
   headerText?: string;
   onClose: () => void;

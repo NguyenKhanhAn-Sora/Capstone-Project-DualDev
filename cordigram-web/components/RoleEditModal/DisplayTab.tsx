@@ -5,6 +5,7 @@ import styles from "./DisplayTab.module.css";
 import type { Role } from "@/lib/servers-api";
 import * as serversApi from "@/lib/servers-api";
 import ColorPicker from "@/components/ColorPicker/ColorPicker";
+import { useLanguage } from "@/component/language-provider";
 
 interface DisplayTabProps {
   serverId: string;
@@ -19,6 +20,7 @@ export default function DisplayTab({
   isOwner,
   onUpdate,
 }: DisplayTabProps) {
+  const { t } = useLanguage();
   const [name, setName] = useState(role.name);
   const [color, setColor] = useState(role.color);
   const [displaySeparately, setDisplaySeparately] = useState(role.displaySeparately);
@@ -43,11 +45,11 @@ export default function DisplayTab({
       });
       onUpdate(updated);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Không lưu được thay đổi");
+      alert(err instanceof Error ? err.message : t("chat.roleDisplay.saveFailed"));
     } finally {
       setSaving(false);
     }
-  }, [serverId, role, name, color, displaySeparately, mentionable, isOwner, hasChanges, onUpdate]);
+  }, [serverId, role, name, color, displaySeparately, mentionable, isOwner, hasChanges, onUpdate, t]);
 
   const handleReset = () => {
     setName(role.name);
@@ -68,7 +70,8 @@ export default function DisplayTab({
       {/* Role Name */}
       <div className={styles.section}>
         <label className={styles.label}>
-          Tên vai trò <span className={styles.required}>*</span>
+          {t("chat.roleDisplay.roleNameLabel")}{" "}
+          <span className={styles.required}>{t("chat.roleDisplay.required")}</span>
         </label>
         <input
           type="text"
@@ -77,13 +80,13 @@ export default function DisplayTab({
           onChange={(e) => setName(e.target.value)}
           disabled={!isOwner || role.isDefault}
           maxLength={100}
-          placeholder="Nhập tên vai trò"
+          placeholder={t("chat.roleDisplay.roleNamePlaceholder")}
         />
       </div>
 
       {/* Role Style Preview */}
       <div className={styles.section}>
-        <label className={styles.label}>Phong cách Vai trò</label>
+        <label className={styles.label}>{t("chat.roleDisplay.styleTitle")}</label>
         <div className={styles.stylePreview}>
           <div className={styles.previewCard} style={{ borderColor: color }}>
             <div className={styles.previewAvatar}>
@@ -94,11 +97,11 @@ export default function DisplayTab({
             </div>
             <div className={styles.previewInfo}>
               <span className={styles.previewName} style={{ color }}>
-                Wumpus
+                {t("chat.roleDisplay.previewName")}
               </span>
-              <span className={styles.previewRole}>Ủng bộ nhạc</span>
+              <span className={styles.previewRole}>{t("chat.roleDisplay.previewRole")}</span>
             </div>
-            <span className={styles.previewBadge}>Ổn định</span>
+            <span className={styles.previewBadge}>{t("chat.roleDisplay.previewBadge")}</span>
           </div>
         </div>
       </div>
@@ -106,20 +109,17 @@ export default function DisplayTab({
       {/* Role Color */}
       <div className={styles.section}>
         <label className={styles.label}>
-          Màu vai trò <span className={styles.required}>*</span>
+          {t("chat.roleDisplay.colorLabel")}{" "}
+          <span className={styles.required}>{t("chat.roleDisplay.required")}</span>
         </label>
-        <p className={styles.hint}>
-          Các thành viên sử dụng màu của vai trò cao nhất mà họ có trong danh sách vai trò.
-        </p>
+        <p className={styles.hint}>{t("chat.roleDisplay.colorHint")}</p>
         <ColorPicker value={color} onChange={setColor} disabled={!isOwner} />
       </div>
 
       {/* Display Separately Toggle */}
       <div className={styles.toggleSection}>
         <div className={styles.toggleInfo}>
-          <span className={styles.toggleLabel}>
-            Hiển thị vai trò thành viên riêng biệt với các thành viên trực tuyến
-          </span>
+          <span className={styles.toggleLabel}>{t("chat.roleDisplay.displaySeparateToggle")}</span>
         </div>
         <button
           type="button"
@@ -136,13 +136,8 @@ export default function DisplayTab({
       {/* Mentionable Toggle */}
       <div className={styles.toggleSection}>
         <div className={styles.toggleInfo}>
-          <span className={styles.toggleLabel}>
-            Cho phép mọi người @mention vai trò này
-          </span>
-          <span className={styles.toggleHint}>
-            Ghi chú: Thành viên có quyền sử dụng "Đề cập @everyone, @here và Tất Cả Vai Trò"
-            sẽ luôn có thể đề cập người có vai trò này.
-          </span>
+          <span className={styles.toggleLabel}>{t("chat.roleDisplay.mentionableToggle")}</span>
+          <span className={styles.toggleHint}>{t("chat.roleDisplay.mentionableHint")}</span>
         </div>
         <button
           type="button"
@@ -160,14 +155,11 @@ export default function DisplayTab({
       <div className={styles.section}>
         <div className={styles.viewAsRole}>
           <div className={styles.viewAsRoleInfo}>
-            <span className={styles.viewAsRoleTitle}>Xem Máy Chủ Theo Vai Trò</span>
-            <span className={styles.viewAsRoleDesc}>
-              Tính năng này cho phép bạn kiểm tra xem vai trò này có thể thực hiện những tác vụ
-              nào và truy cập những kênh nào. Chỉ dành cho Chủ Sở Hữu Máy Chủ và Quản Trị Viên.
-            </span>
+            <span className={styles.viewAsRoleTitle}>{t("chat.roleDisplay.viewAsRoleTitle")}</span>
+            <span className={styles.viewAsRoleDesc}>{t("chat.roleDisplay.viewAsRoleDesc")}</span>
           </div>
           <button className={styles.viewAsRoleBtn} disabled>
-            Xem Máy Chủ Theo Vai Trò
+            {t("chat.roleDisplay.viewAsRoleBtn")}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
             </svg>
@@ -178,21 +170,21 @@ export default function DisplayTab({
       {/* Save/Reset Bar */}
       {hasChanges && (
         <div className={styles.saveBar}>
-          <span className={styles.saveBarText}>Cẩn thận - bạn có thay đổi chưa lưu!</span>
+          <span className={styles.saveBarText}>{t("chat.roleDisplay.unsavedBar")}</span>
           <div className={styles.saveBarActions}>
             <button
               className={styles.resetBtn}
               onClick={handleReset}
               disabled={saving}
             >
-              Đặt lại
+              {t("chat.roleDisplay.reset")}
             </button>
             <button
               className={styles.saveBtn}
               onClick={handleSave}
               disabled={saving || !isOwner}
             >
-              {saving ? "Đang lưu..." : "Lưu thay đổi"}
+              {saving ? t("chat.roleDisplay.saving") : t("chat.roleDisplay.saveChanges")}
             </button>
           </div>
         </div>

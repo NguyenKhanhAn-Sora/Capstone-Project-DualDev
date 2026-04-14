@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import styles from "./CreateCategoryModal.module.css";
 import ChatEmojiPicker from "@/components/ChatEmojiPicker/ChatEmojiPicker";
+import { useLanguage } from "@/component/language-provider";
 
 interface CreateCategoryModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export default function CreateCategoryModal({
   onClose,
   onCreateCategory,
 }: CreateCategoryModalProps) {
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +47,7 @@ export default function CreateCategoryModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = name.trim() || "Danh Mục Mới";
+    const trimmed = name.trim() || t("chat.popups.createCategory.defaultName");
     setIsSubmitting(true);
     try {
       await onCreateCategory(trimmed, isPrivate);
@@ -62,14 +64,14 @@ export default function CreateCategoryModal({
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Đóng">
+        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label={t("chat.popups.closeAria")}>
           &times;
         </button>
         <form onSubmit={handleSubmit}>
-          <h2 className={styles.title}>Tạo Danh Mục</h2>
+          <h2 className={styles.title}>{t("chat.popups.createCategory.title")}</h2>
 
           <div className={styles.section}>
-            <label className={styles.label}>Tên Danh Mục</label>
+            <label className={styles.label}>{t("chat.popups.createCategory.nameLabel")}</label>
             <div className={styles.inputWrap}>
               <input
                 ref={inputRef}
@@ -77,7 +79,7 @@ export default function CreateCategoryModal({
                 className={styles.input}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Danh Mục Mới"
+                placeholder={t("chat.popups.createCategory.placeholder")}
                 maxLength={100}
                 autoFocus
               />
@@ -86,7 +88,7 @@ export default function CreateCategoryModal({
                   type="button"
                   className={styles.emojiBtn}
                   onClick={() => setShowEmojiPicker((p) => !p)}
-                  title="Thêm emoji / kaomoji"
+                  title={t("chat.popups.createChannel.emojiTitle")}
                 >
                   &#128522;
                 </button>
@@ -104,9 +106,9 @@ export default function CreateCategoryModal({
           <div className={styles.section}>
             <div className={styles.privateRow}>
               <div>
-                <span className={styles.privateLabel}>Danh Mục Riêng</span>
+                <span className={styles.privateLabel}>{t("chat.popups.createCategory.privateLabel")}</span>
                 <p className={styles.privateDesc}>
-                  Chỉ có thành viên và vai trò được chọn mới có thể xem danh mục này.
+                  {t("chat.popups.createCategory.privateDesc")}
                 </p>
               </div>
               <button
@@ -122,9 +124,9 @@ export default function CreateCategoryModal({
           </div>
 
           <div className={styles.footer}>
-            <button type="button" className={styles.cancelBtn} onClick={onClose}>Hủy bỏ</button>
+            <button type="button" className={styles.cancelBtn} onClick={onClose}>{t("chat.common.cancel")}</button>
             <button type="submit" className={styles.submitBtn} disabled={isSubmitting}>
-              {isSubmitting ? "Đang tạo..." : "Tạo Danh Mục"}
+              {isSubmitting ? t("chat.popups.createCategory.creating") : t("chat.popups.createCategory.createBtn")}
             </button>
           </div>
         </form>

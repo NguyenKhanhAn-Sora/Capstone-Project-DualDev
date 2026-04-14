@@ -1,0 +1,149 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: transparent;
+}
+
+.menu {
+  position: fixed;
+  background: var(--color-panel-context);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 6px 0;
+  min-width: 240px;
+  border: 1px solid var(--color-panel-border);
+  z-index: 9999;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  color: var(--color-panel-text);
+  font-size: 14px;
+  text-align: left;
+  font-weight: 500;
+  box-sizing: border-box;
+}
+
+.menuItem:hover {
+  background: var(--color-panel-hover);
+}
+
+.menuItemDanger {
+  color: var(--color-panel-danger) !important;
+}
+
+.menuItemDanger:hover {
+  background: rgba(242, 63, 66, 0.15);
+}
+
+.menuItemOpen {
+  background: var(--color-panel-hover) !important;
+}
+
+.menuItemWithSub .arrow {
+  margin-left: auto;
+  opacity: 0.8;
+}
+
+.subLabel {
+  display: block;
+  font-size: 12px;
+  color: var(--color-panel-text-muted);
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-panel-border);
+  margin: 4px 0;
+}
+
+.submenu {
+  position: fixed;
+  background: var(--color-panel-context);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 6px 0;
+  min-width: 220px;
+  border: 1px solid var(--color-panel-border);
+  z-index: 10000;
+}
+
+.submenuItem {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  color: var(--color-panel-text);
+  font-size: 14px;
+  text-align: left;
+  font-weight: 500;
+  box-sizing: border-box;
+}
+
+.submenuItem:hover {
+  background: var(--color-panel-hover);
+}
+
+.submenuItem.selected {
+  color: var(--color-panel-accent);
+}
+
+.radio {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-panel-text-faint);
+  border-radius: 50%;
+  background: transparent;
+  margin-right: 10px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.submenuItem.selected .radio {
+  border-color: var(--color-panel-accent);
+  background: var(--color-panel-accent);
+  box-shadow: inset 0 0 0 3px var(--color-panel-context);
+}
+
+.submenuStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.checkboxBlue {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid var(--color-panel-text-faint);
+  background: transparent;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #fff;
+}
+
+.checkboxBlue.checked {
+  background: var(--color-panel-accent);
+  border-color: var(--color-panel-accent);
+}

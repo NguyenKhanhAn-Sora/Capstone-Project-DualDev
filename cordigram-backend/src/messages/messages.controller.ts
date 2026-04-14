@@ -14,6 +14,7 @@ import { MessagesService } from './messages.service';
 import { ChannelMessagesGateway } from './channel-messages.gateway';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { MentionMuteService } from '../users/mention-mute.service';
 
 @Controller('channels/:channelId/messages')
 @UseGuards(JwtAuthGuard)
@@ -21,6 +22,7 @@ export class MessagesController {
   constructor(
     private readonly messagesService: MessagesService,
     private readonly channelMessagesGateway: ChannelMessagesGateway,
+    private readonly mentionMuteService: MentionMuteService,
   ) {}
 
   @Post('wave-sticker')
@@ -84,6 +86,15 @@ export class MessagesController {
 
       const mentionSet = new Set(ctx.mentionedUserIds);
 
+      const recipientPool = [
+        ...new Set([...ctx.memberUserIds, ...ctx.mentionedUserIds]),
+      ];
+      const mutedRecipients =
+        await this.mentionMuteService.recipientsWhoMutedSender(
+          senderId,
+          recipientPool,
+        );
+
       const payload = (userId: string) => ({
         type: 'channel_message' as const,
         serverId: ctx.serverId,
@@ -99,6 +110,9 @@ export class MessagesController {
 
       if (ctx.defaultNotificationLevel === 'all') {
         for (const uid of ctx.memberUserIds) {
+          if (mutedRecipients.has(uid) && mentionSet.has(uid)) {
+            continue;
+          }
           this.channelMessagesGateway.emitToUser(
             uid,
             'channel-notification',
@@ -108,6 +122,7 @@ export class MessagesController {
       } else {
         for (const uid of ctx.mentionedUserIds) {
           if (uid !== senderId) {
+            if (mutedRecipients.has(uid)) continue;
             this.channelMessagesGateway.emitToUser(
               uid,
               'channel-notification',

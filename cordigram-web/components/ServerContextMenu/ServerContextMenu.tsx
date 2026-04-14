@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./ServerContextMenu.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 export interface ServerContextMenuServer {
   _id: string;
@@ -32,15 +33,14 @@ export interface ServerContextMenuProps {
   onMarkAsRead: () => void;
   onInviteToServer: () => void;
   onMuteServer: (duration: "15m" | "1h" | "3h" | "8h" | "24h" | "until") => void;
-  onNotificationSettings: () => void;
+  onUnmuteServer?: () => void;
+  onSetNotificationLevel: (level: "all" | "mentions" | "none") => void;
   hideMutedChannels: boolean;
   onToggleHideMutedChannels: () => void;
   /** Chỉ khi không phải owner */
   showAllChannels?: boolean;
   onToggleShowAllChannels?: () => void;
   onServerSettings: () => void;
-  onSecuritySettings: () => void;
-  onEditServerProfile: () => void;
   onCreateChannel: () => void;
   onCreateCategory: () => void;
   onCreateEvent: () => void;
@@ -48,15 +48,17 @@ export interface ServerContextMenuProps {
   onLeaveServer?: () => void;
   /** Current notification level for display: "all" | "mentions" | "none" */
   notificationLevel?: "all" | "mentions" | "none";
+  /** Mute state for display */
+  serverMuted?: boolean;
 }
 
-const MUTE_OPTIONS: { key: "15m" | "1h" | "3h" | "8h" | "24h" | "until"; label: string }[] = [
-  { key: "15m", label: "Trong vòng 15 Phút" },
-  { key: "1h", label: "Trong vòng 1 Giờ" },
-  { key: "3h", label: "Trong vòng 3 Giờ" },
-  { key: "8h", label: "Trong vòng 8 Giờ" },
-  { key: "24h", label: "Trong vòng 24 Giờ" },
-  { key: "until", label: "Cho đến khi bật lại" },
+const MUTE_KEYS: Array<"15m" | "1h" | "3h" | "8h" | "24h" | "until"> = [
+  "15m",
+  "1h",
+  "3h",
+  "8h",
+  "24h",
+  "until",
 ];
 
 export default function ServerContextMenu({
@@ -69,21 +71,23 @@ export default function ServerContextMenu({
   onMarkAsRead,
   onInviteToServer,
   onMuteServer,
-  onNotificationSettings,
+  onUnmuteServer,
+  onSetNotificationLevel,
   hideMutedChannels,
   onToggleHideMutedChannels,
   showAllChannels = false,
   onToggleShowAllChannels,
   onServerSettings,
-  onSecuritySettings,
-  onEditServerProfile,
   onCreateChannel,
   onCreateCategory,
   onCreateEvent,
   onLeaveServer,
   notificationLevel = "all",
+  serverMuted = false,
 }: ServerContextMenuProps) {
+  const { t } = useLanguage();
   const menuRef = useRef<HTMLDivElement>(null);
+  const submenuRef = useRef<HTMLDivElement>(null);
   const [submenu, setSubmenu] = useState<"mute" | "notifications" | null>(null);
   const [submenuPos, setSubmenuPos] = useState({ top: 0, left: 0 });
 
@@ -109,21 +113,29 @@ export default function ServerContextMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!submenu || !menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
-    setSubmenuPos({
-      top: 0,
-      left: rect.width + 4,
-    });
-  }, [submenu]);
+    const gap = 4;
+    const subW = submenuRef.current?.offsetWidth ?? 220;
+    let left = rect.right + gap;
+    if (left + subW > window.innerWidth - 8) {
+      left = Math.max(8, rect.left - subW - gap);
+    }
+    const subH = submenuRef.current?.offsetHeight ?? 220;
+    let top = rect.top;
+    if (top + subH > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - 8 - subH);
+    }
+    setSubmenuPos({ top, left });
+  }, [submenu, x, y]);
 
   const notificationLabel =
     notificationLevel === "all"
-      ? "Tất cả các tin nhắn"
+      ? t("chat.serverContextMenu.notifAll")
       : notificationLevel === "mentions"
-        ? "Chỉ @mentions"
-        : "Không có";
+        ? t("chat.serverContextMenu.notifMentions")
+        : t("chat.serverContextMenu.notifNone");
 
   return (
     <>
@@ -133,11 +145,10 @@ export default function ServerContextMenu({
         className={styles.menu}
         style={{ left: x, top: y }}
         role="menu"
-        aria-label="Menu máy chủ"
+        aria-label={t("chat.serverContextMenu.aria")}
       >
-        {/* Đánh dấu đã đọc - hiển thị cho tất cả */}
         <button type="button" className={styles.menuItem} onClick={onMarkAsRead} role="menuitem">
-          Đánh Dấu Đã Đọc
+          {t("chat.serverContextMenu.markAsRead")}
         </button>
         <div className={styles.divider} />
 
@@ -145,37 +156,44 @@ export default function ServerContextMenu({
         {canCreateInvite && (
           <>
             <button type="button" className={styles.menuItem} onClick={onInviteToServer} role="menuitem">
-              Mời Vào Máy Chủ
+              {t("chat.serverContextMenu.inviteToServer")}
             </button>
             <div className={styles.divider} />
           </>
         )}
 
         {/* Tắt âm máy chủ - hiển thị cho tất cả */}
-        <div
-          className={`${styles.menuItem} ${styles.menuItemWithSub}`}
-          onMouseEnter={() => setSubmenu("mute")}
-          onMouseLeave={() => setSubmenu(null)}
+        <button
+          type="button"
+          className={`${styles.menuItem} ${styles.menuItemWithSub} ${submenu === "mute" ? styles.menuItemOpen : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSubmenu((s) => (s === "mute" ? null : "mute"));
+          }}
           role="menuitem"
+          aria-expanded={submenu === "mute"}
         >
-          <span>Tắt âm Máy chủ</span>
+          <span>{t("chat.serverContextMenu.muteServer")}</span>
           <span className={styles.arrow}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 18l6-6-6-6" />
             </svg>
           </span>
-        </div>
+        </button>
 
         {/* Cài đặt thông báo - hiển thị cho tất cả */}
-        <div
-          className={`${styles.menuItem} ${styles.menuItemWithSub}`}
-          onMouseEnter={() => setSubmenu("notifications")}
-          onMouseLeave={() => setSubmenu(null)}
-          onClick={onNotificationSettings}
+        <button
+          type="button"
+          className={`${styles.menuItem} ${styles.menuItemWithSub} ${submenu === "notifications" ? styles.menuItemOpen : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSubmenu((s) => (s === "notifications" ? null : "notifications"));
+          }}
           role="menuitem"
+          aria-expanded={submenu === "notifications"}
         >
           <div>
-            <span>Cài đặt thông báo</span>
+            <span>{t("chat.serverContextMenu.notificationSettings")}</span>
             <span className={styles.subLabel}>{notificationLabel}</span>
           </div>
           <span className={styles.arrow}>
@@ -183,7 +201,7 @@ export default function ServerContextMenu({
               <path d="M9 18l6-6-6-6" />
             </svg>
           </span>
-        </div>
+        </button>
 
         {/* Ẩn kênh bị tắt âm - hiển thị cho tất cả */}
         <button
@@ -193,7 +211,7 @@ export default function ServerContextMenu({
           role="menuitem"
         >
           <span className={styles.checkboxWrap}>
-            <span>Ẩn Các Kênh Bị Tắt Âm</span>
+            <span>{t("chat.serverContextMenu.hideVoiceChannels")}</span>
             <span className={`${styles.checkbox} ${hideMutedChannels ? styles.checked : ""}`} />
           </span>
         </button>
@@ -207,7 +225,7 @@ export default function ServerContextMenu({
             role="menuitem"
           >
             <span className={styles.checkboxWrap}>
-              <span>Hiện tất cả kênh</span>
+              <span>{t("chat.serverContextMenu.showAllChannels")}</span>
               <span className={`${styles.checkbox} ${showAllChannels ? styles.checked : ""}`} />
             </span>
           </button>
@@ -226,7 +244,7 @@ export default function ServerContextMenu({
                 onClick={onServerSettings}
                 role="menuitem"
               >
-                <span>Cài đặt máy chủ</span>
+                <span>{t("chat.serverContextMenu.serverSettings")}</span>
                 <span className={styles.arrow}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M9 18l6-6-6-6" />
@@ -237,16 +255,6 @@ export default function ServerContextMenu({
           </>
         )}
 
-        {/* Cài đặt bảo mật - hiển thị cho tất cả */}
-        <button type="button" className={styles.menuItem} onClick={onSecuritySettings} role="menuitem">
-          Cài Đặt Bảo Mật
-        </button>
-
-        {/* Chỉnh sửa hồ sơ theo máy chủ - hiển thị cho tất cả */}
-        <button type="button" className={styles.menuItem} onClick={onEditServerProfile} role="menuitem">
-          Chỉnh Sửa Hồ Sơ Theo Máy Chủ
-        </button>
-
         {/* === Phần tạo mới - hiển thị nếu có quyền === */}
         {(canManageChannels || canManageEvents) && (
           <>
@@ -255,21 +263,21 @@ export default function ServerContextMenu({
             {/* Tạo kênh - yêu cầu quyền manageChannels */}
             {canManageChannels && (
               <button type="button" className={styles.menuItem} onClick={onCreateChannel} role="menuitem">
-                Tạo kênh
+                {t("chat.serverContextMenu.createChannel")}
               </button>
             )}
 
             {/* Tạo danh mục - yêu cầu quyền manageChannels */}
             {canManageChannels && (
               <button type="button" className={styles.menuItem} onClick={onCreateCategory} role="menuitem">
-                Tạo Danh Mục
+                {t("chat.serverContextMenu.createCategory")}
               </button>
             )}
 
             {/* Tạo sự kiện - yêu cầu quyền manageEvents */}
             {canManageEvents && (
               <button type="button" className={styles.menuItem} onClick={onCreateEvent} role="menuitem">
-                Tạo Sự kiện
+                {t("chat.serverContextMenu.createEvent")}
               </button>
             )}
           </>
@@ -288,7 +296,7 @@ export default function ServerContextMenu({
               }}
               role="menuitem"
             >
-              Rời khỏi phòng
+              {t("chat.serverContextMenu.leaveServer")}
             </button>
           </>
         )}
@@ -297,39 +305,69 @@ export default function ServerContextMenu({
       {/* Submenu: Tắt âm */}
       {submenu === "mute" && menuRef.current && (
         <div
+          ref={submenuRef}
           data-server-context-submenu
           className={styles.submenu}
           style={{
-            left: x + menuRef.current.offsetWidth + 4,
-            top: y,
+            left: submenuPos.left,
+            top: submenuPos.top,
           }}
           role="menu"
         >
-          {MUTE_OPTIONS.map((opt) => (
+          {serverMuted && onUnmuteServer ? (
             <button
-              key={opt.key}
               type="button"
               className={styles.submenuItem}
               onClick={() => {
-                onMuteServer(opt.key);
+                onUnmuteServer();
                 onClose();
               }}
               role="menuitem"
             >
-              {opt.label}
+              {t("chat.serverContextMenu.unmuteServer")}
             </button>
-          ))}
+          ) : (
+            MUTE_KEYS.map((key) => {
+              const labelKey =
+                key === "15m"
+                  ? "muteFor15m"
+                  : key === "1h"
+                    ? "muteFor1h"
+                    : key === "3h"
+                      ? "muteFor3h"
+                      : key === "8h"
+                        ? "muteFor8h"
+                        : key === "24h"
+                          ? "muteFor24h"
+                          : "muteUntilReenable";
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={styles.submenuItem}
+                  onClick={() => {
+                    onMuteServer(key);
+                    onClose();
+                  }}
+                  role="menuitem"
+                >
+                  {t(`chat.serverContextMenu.${labelKey}`)}
+                </button>
+              );
+            })
+          )}
         </div>
       )}
 
       {/* Submenu: Thông báo */}
       {submenu === "notifications" && menuRef.current && (
         <div
+          ref={submenuRef}
           data-server-context-submenu
           className={styles.submenu}
           style={{
-            left: x + menuRef.current.offsetWidth + 4,
-            top: y,
+            left: submenuPos.left,
+            top: submenuPos.top,
           }}
           role="menu"
         >
@@ -337,58 +375,58 @@ export default function ServerContextMenu({
             type="button"
             className={`${styles.submenuItem} ${notificationLevel === "all" ? styles.selected : ""}`}
             onClick={() => {
-              onNotificationSettings();
+              onSetNotificationLevel("all");
               onClose();
             }}
             role="menuitem"
           >
             <span className={styles.radio} />
-            Tất cả các tin nhắn
+            {t("chat.serverContextMenu.notifAll")}
           </button>
           <button
             type="button"
             className={`${styles.submenuItem} ${notificationLevel === "mentions" ? styles.selected : ""}`}
             onClick={() => {
-              onNotificationSettings();
+              onSetNotificationLevel("mentions");
               onClose();
             }}
             role="menuitem"
           >
             <span className={styles.radio} />
-            Chỉ @mentions
+            {t("chat.serverContextMenu.notifMentions")}
           </button>
           <button
             type="button"
             className={`${styles.submenuItem} ${notificationLevel === "none" ? styles.selected : ""}`}
             onClick={() => {
-              onNotificationSettings();
+              onSetNotificationLevel("none");
               onClose();
             }}
             role="menuitem"
           >
             <span className={styles.radio} />
-            Không có
+            {t("chat.serverContextMenu.notifNone")}
           </button>
           <div className={styles.submenuDivider} />
           <label className={styles.submenuCheckbox}>
             <input type="checkbox" />
-            Cấm @everyone và @here
+            {t("chat.serverContextMenu.suppressEveryone")}
           </label>
           <label className={styles.submenuCheckbox}>
             <input type="checkbox" />
-            Bỏ Tất Cả Vai Trò @mentions
+            {t("chat.serverContextMenu.suppressRoles")}
           </label>
           <label className={styles.submenuCheckbox}>
             <input type="checkbox" />
-            Ẩn các tin tức nổi bật
+            {t("chat.serverContextMenu.hideHighlights")}
           </label>
           <label className={styles.submenuCheckbox}>
             <input type="checkbox" />
-            Tắt âm báo sự kiện mới
+            {t("chat.serverContextMenu.muteNewEvents")}
           </label>
           <label className={styles.submenuCheckbox}>
             <input type="checkbox" defaultChecked />
-            Thông báo nhắc nhở trên di động
+            {t("chat.serverContextMenu.mobileNotif")}
           </label>
         </div>
       )}

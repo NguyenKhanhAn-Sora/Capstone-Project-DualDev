@@ -30,8 +30,28 @@ export class Message extends Document {
   @Prop({ type: String, default: null })
   giphyId: string | null;
 
+  /** Sticker máy chủ (không phải Giphy): URL ảnh đã lưu trên server. */
+  @Prop({ type: String, default: null })
+  customStickerUrl: string | null;
+
+  @Prop({ type: Types.ObjectId, default: null })
+  serverStickerId: Types.ObjectId | null;
+
+  @Prop({ type: String, default: null })
+  voiceUrl: string | null;
+
+  @Prop({ type: Number, default: null })
+  voiceDuration: number | null;
+
   @Prop({ type: [String], default: [] })
   attachments: string[];
+
+  @Prop({
+    type: String,
+    enum: ['none', 'blurred', 'rejected'],
+    default: 'none',
+  })
+  contentModerationResult: string;
 
   @Prop({
     type: [

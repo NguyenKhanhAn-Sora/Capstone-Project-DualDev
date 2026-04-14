@@ -4,13 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAccessTokenStatus, isAccessTokenValid } from "@/lib/auth";
 
-export function useRequireAuth(): boolean {
+export function useRequireAuth(opts?: { skip?: boolean }): boolean {
+  const skip = opts?.skip ?? false;
   const router = useRouter();
   const [canRender, setCanRender] = useState(false);
   const lastTokenRef = useRef<string | null>(null);
   const skipRestoreKey = "skipSessionRestore";
 
   useEffect(() => {
+    if (skip) {
+      setCanRender(true);
+      return;
+    }
+
     const check = () => {
       const token =
         typeof window !== "undefined"
@@ -64,7 +70,7 @@ export function useRequireAuth(): boolean {
       window.removeEventListener("focus", check);
       clearInterval(interval);
     };
-  }, [router]);
+  }, [router, skip]);
   return canRender;
 }
 
