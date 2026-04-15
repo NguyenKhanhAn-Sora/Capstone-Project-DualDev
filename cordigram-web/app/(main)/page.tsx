@@ -49,10 +49,11 @@ import {
 import { DateSelect } from "@/ui/date-select/date-select";
 import { TimeSelect } from "@/ui/time-select/time-select";
 import PeopleYouMayKnow from "@/ui/people-you-may-know/people-you-may-know";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "@/lib/relative-time";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useScrollRestoration } from "@/hooks/use-scroll-restoration";
 import { useTranslations } from "next-intl";
+import { useLanguage } from "@/component/language-provider";
 import {
   getInteractionMutedMessage,
   INTERACTION_MUTED_FALLBACK_MESSAGE,
@@ -1980,6 +1981,7 @@ function FeedCard({
 }) {
   const t = useTranslations("home");
   const tCommon = useTranslations("common");
+  const { language } = useLanguage();
   const {
     id,
     authorId,
@@ -4027,7 +4029,7 @@ function FeedCard({
             >
               {sponsored && !isSponsoredRepost
                 ? `@${username || authorLine} • Sponsored`
-                : formatDistanceToNow(new Date(displayAt), { addSuffix: true })}
+                : formatRelativeTime(displayAt, language, { addSuffix: true })}
             </span>
           </div>
         </div>

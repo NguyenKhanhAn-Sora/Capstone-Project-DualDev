@@ -132,6 +132,41 @@
     "close": "閉じる",
     "hidePost": "投稿を非表示にする"
   },
+  "peopleSuggestions": {
+    "title": "知り合いかもしれない人",
+    "seeAll": "すべて見る",
+    "showLess": "表示を減らす",
+    "empty": "現在おすすめはありません。",
+    "follow": "フォロー",
+    "following": "フォロー中",
+    "loadError": "おすすめの読み込みに失敗しました",
+    "updateError": "フォロー状態の更新に失敗しました"
+  },
+  "commentUi": {
+    "commentsTitle": "Comments",
+    "reply": "Reply",
+    "editComment": "Edit comment",
+    "deleteComment": "Delete comment",
+    "reportComment": "Report comment",
+    "pinComment": "Pin comment",
+    "unpinComment": "Unpin comment",
+    "blockUser": "Block user",
+    "loading": "Loading...",
+    "hideReplies": "Hide replies",
+    "viewReplies": "View replies",
+    "loadMoreReplies": "Load more replies",
+    "loadingComments": "Loading comments...",
+    "noCommentsYet": "No comments yet.",
+    "loadMore": "Load more",
+    "commentsLocked": "The post owner has turned off comments.",
+    "editingComment": "Editing your comment",
+    "cancelEdit": "Cancel edit",
+    "replyingTo": "Replying to @{username}",
+    "commentFallback": "comment",
+    "cancelReply": "Cancel reply",
+    "commentsOffPlaceholder": "Comments are turned off",
+    "addCommentPlaceholder": "Add a comment..."
+  },
   "home": {
     "feed": {
       "signInToView": "フィードを表示するにはログインしてください",
@@ -340,7 +375,11 @@
       "unsave": "この投稿を保存解除する",
       "hidePost": "この投稿を非表示にする",
       "report": "レポート",
-      "blockAccount": "このアカウントをブロックする"
+      "blockAccount": "このアカウントをブロックする",
+      "turnOnNotification": "Turn on notification",
+      "downloadMedia": "Download this media",
+      "goToThisReel": "Go to this reel",
+      "goToThisProfile": "Go to this profile"
     },
     "follow": {
       "following": "以下",

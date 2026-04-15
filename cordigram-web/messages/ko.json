@@ -132,6 +132,41 @@
     "close": "닫기",
     "hidePost": "게시물 숨기기"
   },
+  "peopleSuggestions": {
+    "title": "알 수도 있는 사람들",
+    "seeAll": "모두 보기",
+    "showLess": "접기",
+    "empty": "지금은 추천이 없습니다.",
+    "follow": "팔로우",
+    "following": "팔로잉",
+    "loadError": "추천을 불러오지 못했습니다",
+    "updateError": "팔로우 상태를 업데이트하지 못했습니다"
+  },
+  "commentUi": {
+    "commentsTitle": "Comments",
+    "reply": "Reply",
+    "editComment": "Edit comment",
+    "deleteComment": "Delete comment",
+    "reportComment": "Report comment",
+    "pinComment": "Pin comment",
+    "unpinComment": "Unpin comment",
+    "blockUser": "Block user",
+    "loading": "Loading...",
+    "hideReplies": "Hide replies",
+    "viewReplies": "View replies",
+    "loadMoreReplies": "Load more replies",
+    "loadingComments": "Loading comments...",
+    "noCommentsYet": "No comments yet.",
+    "loadMore": "Load more",
+    "commentsLocked": "The post owner has turned off comments.",
+    "editingComment": "Editing your comment",
+    "cancelEdit": "Cancel edit",
+    "replyingTo": "Replying to @{username}",
+    "commentFallback": "comment",
+    "cancelReply": "Cancel reply",
+    "commentsOffPlaceholder": "Comments are turned off",
+    "addCommentPlaceholder": "Add a comment..."
+  },
   "home": {
     "feed": {
       "signInToView": "피드를 보려면 로그인하세요",
@@ -340,7 +375,11 @@
       "unsave": "이 게시물 저장 취소",
       "hidePost": "이 게시물 숨기기",
       "report": "보고서",
-      "blockAccount": "이 계정 차단하기"
+      "blockAccount": "이 계정 차단하기",
+      "turnOnNotification": "Turn on notification",
+      "downloadMedia": "Download this media",
+      "goToThisReel": "Go to this reel",
+      "goToThisProfile": "Go to this profile"
     },
     "follow": {
       "following": "다음",

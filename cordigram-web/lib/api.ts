@@ -274,7 +274,11 @@ export type CommentLinkPreview = {
   domain?: string | null;
   siteName?: string | null;
   title?: string | null;
+  caption?: string | null;
   description?: string | null;
+  provider?: string | null;
+  authorUsername?: string | null;
+  authorName?: string | null;
   image?: string | null;
   favicon?: string | null;
 };

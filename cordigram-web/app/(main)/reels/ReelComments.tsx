@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import type { JSX, MutableRefObject, CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { formatDistanceToNow } from "date-fns";
 import EmojiPicker from "emoji-picker-react";
+import { formatRelativeTime } from "@/lib/relative-time";
+import { useLanguage } from "@/component/language-provider";
 import {
   createComment,
   fetchComments,
@@ -35,10 +36,12 @@ import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 const COMMENT_POLL_INTERVAL = 4000;
 const COMMENT_PAGE_SIZE = 20;
 
-const formatCompactDistance = (value?: string | number | Date) => {
-  if (!value) return "Just now";
-  const raw = formatDistanceToNow(new Date(value), { addSuffix: true });
-  return raw.replace(/^about\s+/i, "").replace(/\s+ago$/i, "");
+const formatCompactDistance = (
+  value: string | number | Date | undefined,
+  language: string,
+) => {
+  if (!value) return formatRelativeTime(new Date(), language, { addSuffix: false });
+  return formatRelativeTime(value, language, { addSuffix: false });
 };
 
 type ReelCommentsProps = {
@@ -304,6 +307,7 @@ export default function ReelComments({
   onBlockedUser,
   style,
 }: ReelCommentsProps) {
+  const { language } = useLanguage();
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -1054,7 +1058,7 @@ export default function ReelComments({
 
     const fallbackLabel = comment.author?.username;
     const initials = fallbackLabel?.slice(0, 2).toUpperCase();
-    const timeAgo = formatCompactDistance(comment.createdAt);
+    const timeAgo = formatCompactDistance(comment.createdAt, language);
     const authorId = comment.author?.id || comment.authorId;
     const isCommentOwner = Boolean(
       viewerId && authorId && viewerId === authorId,

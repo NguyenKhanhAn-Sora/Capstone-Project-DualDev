@@ -132,7 +132,41 @@
     "close": "Cerrar",
     "hidePost": "Ocultar publicación"
   },
-  "home": {
+  "peopleSuggestions": {
+    "title": "Personas que quizá conozcas",
+    "seeAll": "Ver todo",
+    "showLess": "Mostrar menos",
+    "empty": "No hay sugerencias por ahora.",
+    "follow": "Seguir",
+    "following": "Siguiendo",
+    "loadError": "No se pudieron cargar las sugerencias",
+    "updateError": "No se pudo actualizar el seguimiento"
+  },
+    "commentUi": {
+    "commentsTitle": "Comments",
+    "reply": "Reply",
+    "editComment": "Edit comment",
+    "deleteComment": "Delete comment",
+    "reportComment": "Report comment",
+    "pinComment": "Pin comment",
+    "unpinComment": "Unpin comment",
+    "blockUser": "Block user",
+    "loading": "Loading...",
+    "hideReplies": "Hide replies",
+    "viewReplies": "View replies",
+    "loadMoreReplies": "Load more replies",
+    "loadingComments": "Loading comments...",
+    "noCommentsYet": "No comments yet.",
+    "loadMore": "Load more",
+    "commentsLocked": "The post owner has turned off comments.",
+    "editingComment": "Editing your comment",
+    "cancelEdit": "Cancel edit",
+    "replyingTo": "Replying to @{username}",
+    "commentFallback": "comment",
+    "cancelReply": "Cancel reply",
+    "commentsOffPlaceholder": "Comments are turned off",
+    "addCommentPlaceholder": "Add a comment..."
+  },  "home": {
     "feed": {
       "signInToView": "Inicia sesión para ver el feed",
       "unableToLoad": "No se puede cargar el feed",
@@ -340,7 +374,11 @@
       "unsave": "Quitar esta publicación de los favoritos",
       "hidePost": "Ocultar esta publicación",
       "report": "Informe",
-      "blockAccount": "Bloquear esta cuenta"
+      "blockAccount": "Bloquear esta cuenta", 
+      "turnOnNotification": "Turn on notification",   
+      "downloadMedia": "Download this media",     
+      "goToThisReel": "Go to this reel",     
+      "goToThisProfile": "Go to this profile"
     },
     "follow": {
       "following": "A continuación",

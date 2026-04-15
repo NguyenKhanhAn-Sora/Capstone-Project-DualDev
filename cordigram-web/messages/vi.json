@@ -78,6 +78,16 @@
     "close": "Đóng",
     "hidePost": "Ẩn bài viết"
   },
+  "peopleSuggestions": {
+    "title": "Gợi ý cho bạn",
+    "seeAll": "Xem tất cả",
+    "showLess": "Thu gọn",
+    "empty": "Hiện chưa có gợi ý.",
+    "follow": "Theo dõi",
+    "following": "Đang theo dõi",
+    "loadError": "Không thể tải gợi ý",
+    "updateError": "Không thể cập nhật theo dõi"
+  },
   "home": {
     "feed": {
       "signInToView": "Đăng nhập để xem bảng tin",

@@ -6,7 +6,8 @@ import Link from "next/link";
 import EmojiPicker from "emoji-picker-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "@/lib/relative-time";
+import { useLanguage } from "@/component/language-provider";
 import {
   fetchReelsFeed,
   fetchReelDetail,
@@ -84,11 +85,9 @@ const formatCount = (value?: number) => {
   return `${n}`;
 };
 
-const formatTimeAgo = (value?: string | null) => {
+const formatTimeAgo = (value: string | null | undefined, language: string) => {
   if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return formatDistanceToNow(date, { addSuffix: true });
+  return formatRelativeTime(value, language, { addSuffix: true });
 };
 
 const REEL_STATS_POLL_INTERVAL = 5000;
@@ -97,7 +96,10 @@ const VIEW_DWELL_MS = 2000;
 const VIEW_COOLDOWN_MS = 5 * 60 * 1000;
 const COMMENT_PANEL_WIDTH = "clamp(320px, 28vw, 420px)";
 
-type ReelItem = FeedItem & { durationSeconds?: number };
+type ReelItem = FeedItem & {
+  durationSeconds?: number;
+  createdAtFormatted?: string;
+};
 
 const isRepostOfReel = (item: FeedItem): boolean => {
   const duration = (item as any)?.durationSeconds as number | undefined;
@@ -426,6 +428,7 @@ function ReelVideo({
   viewerId,
   children,
 }: ReelVideoProps) {
+  const { language } = useLanguage();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -918,7 +921,7 @@ function ReelVideo({
 
                   {(item.createdAt || item.createdAtFormatted) ? (
                     <span className={styles.captionTimeAgo}>
-                      {formatTimeAgo(item.createdAt || item.createdAtFormatted)}
+                      {formatTimeAgo(item.createdAt || item.createdAtFormatted, language)}
                     </span>
                   ) : null}
                 </div>

@@ -2,7 +2,6 @@
 
 import type React from "react";
 import { JSX, useEffect, useMemo, useRef, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
 import { useParams, useRouter } from "next/navigation";
 import {
   blockUser,
@@ -47,6 +46,8 @@ import {
   getInteractionMutedMessage,
   INTERACTION_MUTED_FALLBACK_MESSAGE,
 } from "@/lib/interaction-mute";
+import { formatRelativeTime } from "@/lib/relative-time";
+import { useLanguage } from "@/component/language-provider";
 import VerifiedBadge from "@/ui/verified-badge/verified-badge";
 
 const REPORT_ANIMATION_MS = 200;
@@ -1419,6 +1420,7 @@ function HashtagPostCard({
   ) => void;
 }) {
   const router = useRouter();
+  const { language } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
@@ -1699,7 +1701,7 @@ function HashtagPostCard({
               </span>
             </a>
             <span className={feedStyles.authorSub}>
-              {formatDistanceToNow(new Date(item.createdAt), {
+              {formatRelativeTime(item.createdAt, language, {
                 addSuffix: true,
               })}
             </span>

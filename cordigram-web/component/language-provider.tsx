@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { fetchUserSettings, updateUserSettings } from "@/lib/api";
 
 import vi from "@/locales/vi.json";
@@ -8,7 +9,12 @@ import en from "@/locales/en.json";
 import ja from "@/locales/ja.json";
 import zh from "@/locales/zh.json";
 
-export type LanguageCode = "vi" | "en" | "ja" | "zh";
+export const SUPPORTED_LANGUAGE_CODES = ["vi", "en", "ja", "zh"] as const;
+export type LanguageCode = (typeof SUPPORTED_LANGUAGE_CODES)[number];
+
+function isLanguageCode(value: unknown): value is LanguageCode {
+  return value === "vi" || value === "en" || value === "ja" || value === "zh";
+}
 
 /** BCP 47 locale for `toLocaleString` / `toLocaleDateString` */
 export function localeTagForLanguage(code: LanguageCode): string {
@@ -74,9 +80,7 @@ const readCookieLocale = (): LanguageCode | null => {
     .find((part) => part.startsWith(`${COOKIE_NAME}=`));
   if (!match) return null;
   const value = decodeURIComponent(match.split("=")[1] || "");
-  return value === "vi" || value === "en" || value === "ja" || value === "zh"
-    ? value
-    : null;
+  return isLanguageCode(value) ? value : null;
 };
 
 const writeCookieLocale = (locale: LanguageCode) => {
@@ -89,6 +93,7 @@ const writeCookieLocale = (locale: LanguageCode) => {
 const pickInitialLocale = (): LanguageCode => readCookieLocale() ?? "vi";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [language, setLanguageState] = useState<LanguageCode>(() =>
     pickInitialLocale(),
   );
@@ -109,13 +114,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetchUserSettings({ token });
         if (cancelled) return;
-        const next =
-          res.language === "vi" ||
-          res.language === "en" ||
-          res.language === "ja" ||
-          res.language === "zh"
-            ? res.language
-            : null;
+        const next = isLanguageCode(res.language) ? res.language : null;
         if (!next) return;
         setLanguageState(next);
         writeCookieLocale(next);
@@ -131,7 +130,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setLanguage = (locale: LanguageCode) => {
-    if (locale === language) return;
+    if (!isLanguageCode(locale) || locale === language) return;
+
     setLanguageState(locale);
     writeCookieLocale(locale);
 
@@ -139,11 +139,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       typeof window !== "undefined"
         ? window.localStorage.getItem("accessToken")
         : null;
-    if (!token) return;
 
-    void updateUserSettings({ token, language: locale as any }).catch(
-      () => undefined,
-    );
+    if (token) {
+      void updateUserSettings({ token, language: locale }).catch(
+        () => undefined,
+      );
+    }
+
+    router.refresh();
   };
 
   const t = useMemo(() => {

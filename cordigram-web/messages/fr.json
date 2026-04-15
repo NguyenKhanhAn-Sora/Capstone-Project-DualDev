@@ -132,7 +132,41 @@
     "close": "Fermer",
     "hidePost": "Masquer la publication"
   },
-  "home": {
+  "peopleSuggestions": {
+    "title": "Personnes que vous pourriez connaître",
+    "seeAll": "Voir tout",
+    "showLess": "Afficher moins",
+    "empty": "Aucune suggestion pour le moment.",
+    "follow": "Suivre",
+    "following": "Abonné",
+    "loadError": "Impossible de charger les suggestions",
+    "updateError": "Impossible de mettre à jour le suivi"
+  },
+    "commentUi": {
+    "commentsTitle": "Comments",
+    "reply": "Reply",
+    "editComment": "Edit comment",
+    "deleteComment": "Delete comment",
+    "reportComment": "Report comment",
+    "pinComment": "Pin comment",
+    "unpinComment": "Unpin comment",
+    "blockUser": "Block user",
+    "loading": "Loading...",
+    "hideReplies": "Hide replies",
+    "viewReplies": "View replies",
+    "loadMoreReplies": "Load more replies",
+    "loadingComments": "Loading comments...",
+    "noCommentsYet": "No comments yet.",
+    "loadMore": "Load more",
+    "commentsLocked": "The post owner has turned off comments.",
+    "editingComment": "Editing your comment",
+    "cancelEdit": "Cancel edit",
+    "replyingTo": "Replying to @{username}",
+    "commentFallback": "comment",
+    "cancelReply": "Cancel reply",
+    "commentsOffPlaceholder": "Comments are turned off",
+    "addCommentPlaceholder": "Add a comment..."
+  },  "home": {
     "feed": {
       "signInToView": "Connectez-vous pour consulter le fil d'actualité",
       "unableToLoad": "Impossible de charger le flux",
@@ -340,7 +374,11 @@
       "unsave": "Supprimer ce message",
       "hidePost": "Masquer cet article",
       "report": "Rapport",
-      "blockAccount": "Bloquer ce compte"
+      "blockAccount": "Bloquer ce compte",  
+      "turnOnNotification": "Activer les notifications",  
+      "downloadMedia": "Télécharger ce média",
+      "goToThisReel": "Aller à cette bobine",   
+      "goToThisProfile": "Aller à ce profil"
     },
     "follow": {
       "following": "À la suite de",

@@ -5,9 +5,10 @@ import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
 import styles from "./post.module.css";
 import feedStyles from "../home-feed.module.css";
+import { formatRelativeTime } from "@/lib/relative-time";
+import { useLanguage } from "@/component/language-provider";
 import {
   createComment,
   fetchComments,
@@ -443,6 +444,7 @@ const IconClose = ({ size = 18 }: IconProps) => (
 
 export default function PostView({ postId, asModal }: PostViewProps) {
   const router = useRouter();
+  const { language } = useLanguage();
   const searchParams = useSearchParams();
   const fromProfile = searchParams?.get("fromProfile") === "1";
   const profileNavProfileId = (searchParams?.get("profileId") || "").trim();
@@ -2472,10 +2474,8 @@ export default function PostView({ postId, asModal }: PostViewProps) {
   }, [post?.status, post?.scheduledAt, post?.publishedAt, post?.createdAt]);
   const postDisplayTime = useMemo(() => {
     if (!postDisplayAt) return "";
-    const parsed = new Date(postDisplayAt);
-    if (Number.isNaN(parsed.getTime())) return "";
-    return formatDistanceToNow(parsed, { addSuffix: true });
-  }, [postDisplayAt]);
+    return formatRelativeTime(postDisplayAt, language, { addSuffix: true });
+  }, [postDisplayAt, language]);
 
   useEffect(() => {
     const el = captionRef.current;
@@ -3836,10 +3836,12 @@ export default function PostView({ postId, asModal }: PostViewProps) {
             <div className={styles.commentActions}>
               <div className={styles.commentMeta}>
                 {comment.createdAt
-                  ? formatDistanceToNow(new Date(comment.createdAt), {
-                      addSuffix: false,
-                    })
-                  : "just now"}
+                    ? formatRelativeTime(comment.createdAt, language, {
+                        addSuffix: false,
+                      })
+                    : formatRelativeTime(new Date(), language, {
+                        addSuffix: false,
+                      })}
               </div>
               {!commentsLocked ? (
                 <button

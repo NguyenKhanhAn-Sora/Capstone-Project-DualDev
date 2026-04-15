@@ -132,6 +132,41 @@
     "close": "关闭",
     "hidePost": "隐藏帖子"
   },
+  "peopleSuggestions": {
+    "title": "你可能认识的人",
+    "seeAll": "查看全部",
+    "showLess": "收起",
+    "empty": "暂无推荐。",
+    "follow": "关注",
+    "following": "已关注",
+    "loadError": "加载推荐失败",
+    "updateError": "更新关注状态失败"
+  },
+  "commentUi": {
+    "commentsTitle": "Comments",
+    "reply": "Reply",
+    "editComment": "Edit comment",
+    "deleteComment": "Delete comment",
+    "reportComment": "Report comment",
+    "pinComment": "Pin comment",
+    "unpinComment": "Unpin comment",
+    "blockUser": "Block user",
+    "loading": "Loading...",
+    "hideReplies": "Hide replies",
+    "viewReplies": "View replies",
+    "loadMoreReplies": "Load more replies",
+    "loadingComments": "Loading comments...",
+    "noCommentsYet": "No comments yet.",
+    "loadMore": "Load more",
+    "commentsLocked": "The post owner has turned off comments.",
+    "editingComment": "Editing your comment",
+    "cancelEdit": "Cancel edit",
+    "replyingTo": "Replying to @{username}",
+    "commentFallback": "comment",
+    "cancelReply": "Cancel reply",
+    "commentsOffPlaceholder": "Comments are turned off",
+    "addCommentPlaceholder": "Add a comment..."
+  },
   "home": {
     "feed": {
       "signInToView": "登录以查看动态",
@@ -340,7 +375,11 @@
       "unsave": "取消保存此帖子",
       "hidePost": "隐藏此帖子",
       "report": "报告",
-      "blockAccount": "屏蔽该账号"
+      "blockAccount": "屏蔽该账号",
+      "turnOnNotification": "Turn on notification",
+      "downloadMedia": "Download this media",
+      "goToThisReel": "Go to this reel",
+      "goToThisProfile": "Go to this profile"
     },
     "follow": {
       "following": "接下来",

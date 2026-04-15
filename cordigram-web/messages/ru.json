@@ -132,6 +132,41 @@
     "close": "Закрыть",
     "hidePost": "Скрыть сообщение"
   },
+  "peopleSuggestions": {
+    "title": "Люди, которых вы можете знать",
+    "seeAll": "Показать все",
+    "showLess": "Свернуть",
+    "empty": "Сейчас нет рекомендаций.",
+    "follow": "Подписаться",
+    "following": "Далее",
+    "loadError": "Не удалось загрузить рекомендации",
+    "updateError": "Не удалось обновить подписку"
+  },
+  "commentUi": {
+    "commentsTitle": "Comments",
+    "reply": "Reply",
+    "editComment": "Edit comment",
+    "deleteComment": "Delete comment",
+    "reportComment": "Report comment",
+    "pinComment": "Pin comment",
+    "unpinComment": "Unpin comment",
+    "blockUser": "Block user",
+    "loading": "Loading...",
+    "hideReplies": "Hide replies",
+    "viewReplies": "View replies",
+    "loadMoreReplies": "Load more replies",
+    "loadingComments": "Loading comments...",
+    "noCommentsYet": "No comments yet.",
+    "loadMore": "Load more",
+    "commentsLocked": "The post owner has turned off comments.",
+    "editingComment": "Editing your comment",
+    "cancelEdit": "Cancel edit",
+    "replyingTo": "Replying to @{username}",
+    "commentFallback": "comment",
+    "cancelReply": "Cancel reply",
+    "commentsOffPlaceholder": "Comments are turned off",
+    "addCommentPlaceholder": "Add a comment..."
+  },
   "home": {
     "feed": {
       "signInToView": "Войдите, чтобы просмотреть ленту",
@@ -340,7 +375,11 @@
       "unsave": "Отменить сохранение этого поста",
       "hidePost": "Скрыть эту публикацию",
       "report": "Отчет",
-      "blockAccount": "Заблокировать этот аккаунт"
+      "blockAccount": "Заблокировать этот аккаунт",
+      "turnOnNotification": "Turn on notification",
+      "downloadMedia": "Download this media",
+      "goToThisReel": "Go to this reel",
+      "goToThisProfile": "Go to this profile"
     },
     "follow": {
       "following": "Далее",

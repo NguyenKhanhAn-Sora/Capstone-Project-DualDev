@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import styles from "./people-you-may-know.module.css";
 import {
   fetchPeopleSuggestions,
@@ -19,6 +20,7 @@ export default function PeopleYouMayKnow({
   token: string | null;
   limit?: number;
 }) {
+  const t = useTranslations("peopleSuggestions");
   const expandedLimit = 20;
   const collapsedLimit = Math.min(limit, 8);
   const [items, setItems] = useState<PeopleSuggestionItem[]>([]);
@@ -53,13 +55,13 @@ export default function PeopleYouMayKnow({
         setItems(res.items || []);
       } catch (e) {
         const err = e as ApiError;
-        setError(err?.message || "Failed to load suggestions");
+        setError(err?.message || t("loadError"));
         setItems([]);
       } finally {
         setLoading(false);
       }
     },
-    [token, limit],
+    [token, limit, t],
   );
 
   useEffect(() => {
@@ -100,18 +102,18 @@ export default function PeopleYouMayKnow({
         }
       } catch (e) {
         const err = e as ApiError;
-        setError(err?.message || "Failed to update follow");
+        setError(err?.message || t("updateError"));
       }
     },
-    [token],
+    [token, t],
   );
 
   if (!token) return null;
 
   return (
-    <section className={styles.card} aria-label="People you may know">
+    <section className={styles.card} aria-label={t("title")}>
       <div className={styles.header}>
-        <div className={styles.title}>People you may know</div>
+        <div className={styles.title}>{t("title")}</div>
         <div className={styles.headerActions}>
           {mergedItems.length > 0 ? (
             <button
@@ -120,7 +122,7 @@ export default function PeopleYouMayKnow({
               onClick={onToggleExpanded}
               disabled={loading}
             >
-              {expanded ? "Show less" : "See all"}
+              {expanded ? t("showLess") : t("seeAll")}
             </button>
           ) : null}
         </div>
@@ -137,7 +139,7 @@ export default function PeopleYouMayKnow({
       ) : null}
 
       {!loading && !mergedItems.length ? (
-        <div className={styles.empty}>No suggestions right now.</div>
+        <div className={styles.empty}>{t("empty")}</div>
       ) : null}
 
       <div className={styles.list}>
@@ -175,7 +177,7 @@ export default function PeopleYouMayKnow({
               className={styles.followBtn}
               onClick={() => onToggleFollow(u.userId, Boolean(u.isFollowing))}
             >
-              {u.isFollowing ? "Following" : "Follow"}
+              {u.isFollowing ? t("following") : t("follow")}
             </button>
           </div>
         ))}

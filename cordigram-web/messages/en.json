@@ -78,6 +78,16 @@
     "close": "Close",
     "hidePost": "Hide post"
   },
+  "peopleSuggestions": {
+    "title": "People you may know",
+    "seeAll": "See all",
+    "showLess": "Show less",
+    "empty": "No suggestions right now.",
+    "follow": "Follow",
+    "following": "Following",
+    "loadError": "Failed to load suggestions",
+    "updateError": "Failed to update follow"
+  },
   "home": {
     "feed": {
       "signInToView": "Sign in to view the feed",

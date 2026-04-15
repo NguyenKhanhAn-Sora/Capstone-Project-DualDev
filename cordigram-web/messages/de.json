@@ -132,7 +132,41 @@
     "close": "Schließen",
     "hidePost": "Beitrag ausblenden"
   },
-  "home": {
+  "peopleSuggestions": {
+    "title": "Personen, die du vielleicht kennst",
+    "seeAll": "Alle anzeigen",
+    "showLess": "Weniger anzeigen",
+    "empty": "Derzeit keine Vorschläge.",
+    "follow": "Folgen",
+    "following": "Folge ich",
+    "loadError": "Vorschläge konnten nicht geladen werden",
+    "updateError": "Folgen konnte nicht aktualisiert werden"
+  },
+    "commentUi": {
+    "commentsTitle": "Comments",
+    "reply": "Reply",
+    "editComment": "Edit comment",
+    "deleteComment": "Delete comment",
+    "reportComment": "Report comment",
+    "pinComment": "Pin comment",
+    "unpinComment": "Unpin comment",
+    "blockUser": "Block user",
+    "loading": "Loading...",
+    "hideReplies": "Hide replies",
+    "viewReplies": "View replies",
+    "loadMoreReplies": "Load more replies",
+    "loadingComments": "Loading comments...",
+    "noCommentsYet": "No comments yet.",
+    "loadMore": "Load more",
+    "commentsLocked": "The post owner has turned off comments.",
+    "editingComment": "Editing your comment",
+    "cancelEdit": "Cancel edit",
+    "replyingTo": "Replying to @{username}",
+    "commentFallback": "comment",
+    "cancelReply": "Cancel reply",
+    "commentsOffPlaceholder": "Comments are turned off",
+    "addCommentPlaceholder": "Add a comment..."
+  },  "home": {
     "feed": {
       "signInToView": "Melden Sie sich an, um den Feed anzuzeigen",
       "unableToLoad": "Feed kann nicht geladen werden",
@@ -340,7 +374,11 @@
       "unsave": "Diesen Beitrag nicht speichern",
       "hidePost": "Diesen Beitrag ausblenden",
       "report": "Bericht",
-      "blockAccount": "Dieses Konto blockieren"
+      "blockAccount": "Dieses Konto blockieren",
+      "turnOnNotification": "Turn on notification",   
+      "downloadMedia": "Download this media",   
+      "goToThisReel": "Go to this reel",    
+      "goToThisProfile": "Go to this profile"
     },
     "follow": {
       "following": "Im Anschluss",

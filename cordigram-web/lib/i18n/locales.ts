@@ -1,4 +1,4 @@
-export const DEFAULT_LOCALE = "en";
+export const DEFAULT_LOCALE = "vi";
 
 export const SUPPORTED_LOCALES = [
   "en",
