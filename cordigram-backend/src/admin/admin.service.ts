@@ -20,6 +20,8 @@ import { Profile } from '../profiles/profile.schema';
 import { Comment } from '../comment/comment.schema';
 import { ModerationAction } from '../moderation/moderation-action.schema';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { DirectMessagesGateway } from '../direct-messages/direct-messages.gateway';
 import { InteractionMuteSchedulerService } from './interaction-mute-scheduler.service';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
@@ -74,6 +76,8 @@ export class AdminService implements OnModuleInit {
     @InjectModel(ReportProblem.name)
     private readonly reportProblemModel: Model<ReportProblem>,
     private readonly notificationsService: NotificationsService,
+    private readonly notificationsGateway: NotificationsGateway,
+    private readonly directMessagesGateway: DirectMessagesGateway,
     private readonly usersService: UsersService,
     private readonly mailService: MailService,
     private readonly commentsService: CommentsService,
@@ -2707,6 +2711,7 @@ export class AdminService implements OnModuleInit {
     storageUsedPct: number | null;
     realtimeRooms: number | null;
     realtimeParticipants: number | null;
+    onlineUsersRealtime: number;
     apiStatus: 'Operational' | 'Degraded' | 'Down';
     apiUptimeSeconds: number;
     openReportsCount: number;
@@ -2808,6 +2813,10 @@ export class AdminService implements OnModuleInit {
     const dbOperational = this.connection.readyState === 1;
     const apiStatus = dbOperational ? 'Operational' : 'Down';
     const apiUptimeSeconds = Math.floor(process.uptime());
+    const onlineUsersRealtime = new Set([
+      ...this.notificationsGateway.getConnectedUserIds(),
+      ...this.directMessagesGateway.getConnectedUsers(),
+    ]).size;
 
     return {
       totalUsers,
@@ -2823,6 +2832,7 @@ export class AdminService implements OnModuleInit {
       storageUsedPct,
       realtimeRooms: realtimeStats.rooms,
       realtimeParticipants: realtimeStats.participants,
+      onlineUsersRealtime,
       apiStatus,
       apiUptimeSeconds,
       openReportsCount: reportStats.openReportsCount,

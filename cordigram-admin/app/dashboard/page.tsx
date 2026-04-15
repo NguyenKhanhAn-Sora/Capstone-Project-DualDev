@@ -40,6 +40,7 @@ export default function AdminDashboardPage() {
     storageUsedPct: number | null;
     realtimeRooms: number | null;
     realtimeParticipants: number | null;
+    onlineUsersRealtime: number;
     apiStatus: "Operational" | "Degraded" | "Down";
     apiUptimeSeconds: number;
     openReportsCount: number;
@@ -116,6 +117,7 @@ export default function AdminDashboardPage() {
       try {
         const response = await fetch(`${getApiBaseUrl()}/admin/stats`, {
           method: "GET",
+          cache: "no-store",
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -138,6 +140,7 @@ export default function AdminDashboardPage() {
           storageUsedPct: number | null;
           realtimeRooms: number | null;
           realtimeParticipants: number | null;
+          onlineUsersRealtime: number;
           apiStatus: "Operational" | "Degraded" | "Down";
           apiUptimeSeconds: number;
           openReportsCount: number;
@@ -170,11 +173,13 @@ export default function AdminDashboardPage() {
         };
         setStats(payload);
       } catch (_err) {
-        setStats(null);
+        // Keep previous snapshot to avoid KPI flicker on transient failures.
       }
     };
 
     loadStats();
+    const intervalId = window.setInterval(loadStats, 10000);
+    return () => window.clearInterval(intervalId);
   }, [ready]);
 
   useEffect(() => {
@@ -574,6 +579,13 @@ export default function AdminDashboardPage() {
             >
               {formatDelta(stats?.postsCreatedDeltaPct)}
             </span>
+          </div>
+          <div className={styles.kpiCard}>
+            <span className={styles.kpiLabel}>Online Users (Realtime)</span>
+            <span className={styles.kpiValue}>
+              {formatNumber(stats?.onlineUsersRealtime)}
+            </span>
+            <span className={styles.kpiDelta}>Live sockets</span>
           </div>
           <div className={styles.kpiCard}>
             <span className={styles.kpiLabel}>Open Reports</span>

@@ -91,6 +91,10 @@ export class NotificationsGateway
     return this.connections.size;
   }
 
+  getConnectedUserIds(): string[] {
+    return Array.from(this.connections.keys());
+  }
+
   private extractToken(client: Socket): string | null {
     const authToken = client.handshake.auth?.token;
     if (typeof authToken === 'string' && authToken.trim()) {

@@ -37,6 +37,6 @@ import { Post, PostSchema } from '../posts/post.schema';
   ],
   controllers: [NotificationsController],
   providers: [NotificationsService, NotificationsGateway, FcmPushService],
-  exports: [NotificationsService],
+  exports: [NotificationsService, NotificationsGateway],
 })
 export class NotificationsModule {}
