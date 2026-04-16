@@ -33,6 +33,10 @@ import {
   ReportCommentSchema,
 } from '../reportcomment/reportcomment.schema';
 import { ReportUser, ReportUserSchema } from '../reportuser/reportuser.schema';
+import {
+  DirectMessage,
+  DirectMessageSchema,
+} from '../direct-messages/direct-message.schema';
 import { StrikeDecaySchedulerService } from './strike-decay-scheduler.service';
 
 @Module({
@@ -53,6 +57,7 @@ import { StrikeDecaySchedulerService } from './strike-decay-scheduler.service';
       { name: ReportPost.name, schema: ReportPostSchema },
       { name: ReportComment.name, schema: ReportCommentSchema },
       { name: ReportUser.name, schema: ReportUserSchema },
+      { name: DirectMessage.name, schema: DirectMessageSchema },
     ]),
     forwardRef(() => AuthModule),
     NotificationsModule,

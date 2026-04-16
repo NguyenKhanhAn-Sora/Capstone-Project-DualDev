@@ -1058,6 +1058,10 @@ export default function MessagesPage() {
   const adminReturnUrl = searchParams.get("returnUrl");
   const adminViewServerId = isAdminView ? searchParams.get("server") : null;
   const adminTokenFromUrl = isAdminView ? searchParams.get("adminToken") : null;
+  const dmUserIdFromUrl = searchParams.get("dm");
+  const dmDisplayNameFromUrl = searchParams.get("dmName") ?? "";
+  const dmUsernameFromUrl = searchParams.get("dmUsername") ?? "";
+  const dmAvatarFromUrl = searchParams.get("dmAvatar") ?? "";
 
   // Skip login redirect entirely for admin view
   const canRender = useRequireAuth({ skip: isAdminView });
@@ -1180,6 +1184,7 @@ export default function MessagesPage() {
   const [friends, setFriends] = useState<serversApi.Friend[]>([]);
   const [selectedDirectMessageFriend, setSelectedDirectMessageFriend] =
     useState<serversApi.Friend | null>(null);
+  const autoOpenedDmUserRef = useRef<string | null>(null);
   // Access Control (server rules approval modal)
   const [myServerAccessStatus, setMyServerAccessStatus] =
     useState<serversApi.MyServerAccessStatus | null>(null);
@@ -1997,13 +2002,40 @@ export default function MessagesPage() {
     }
   }, [token]);
 
+  const upsertFriendToDmList = useCallback((friend: serversApi.Friend | null | undefined) => {
+    if (!friend?._id) return;
+    setFriends((prev) => {
+      const idx = prev.findIndex((f) => f._id === friend._id);
+      if (idx < 0) {
+        return [friend, ...prev];
+      }
+
+      const current = prev[idx];
+      const merged: serversApi.Friend = {
+        ...current,
+        ...friend,
+        displayName: friend.displayName || current.displayName,
+        username: friend.username || current.username,
+        avatarUrl: friend.avatarUrl || current.avatarUrl,
+        email: friend.email || current.email,
+      };
+
+      const next = prev.slice();
+      next.splice(idx, 1);
+      next.unshift(merged);
+      return next;
+    });
+  }, []);
+
   const friendsForDmSidebar = useMemo(() => {
     let list = friends;
     if (dmSidebarPeersModeState === "online") {
       list = list.filter((f) => f.isOnline === true);
     }
     if (chatUserSettings?.dmListFrom === "followers_only") {
-      list = list.filter((f) => followingIds.has(f._id));
+      list = list.filter(
+        (f) => followingIds.has(f._id) || conversations.has(f._id),
+      );
     }
     return list;
   }, [
@@ -2011,6 +2043,7 @@ export default function MessagesPage() {
     dmSidebarPeersModeState,
     chatUserSettings?.dmListFrom,
     followingIds,
+    conversations,
   ]);
 
   useEffect(() => {
@@ -2032,6 +2065,58 @@ export default function MessagesPage() {
       window.removeEventListener("cordigram-chat-settings", onChat);
     };
   }, []);
+
+  useEffect(() => {
+    if (!dmUserIdFromUrl || !token) return;
+    if (autoOpenedDmUserRef.current === dmUserIdFromUrl) return;
+
+    const existing = friends.find((f) => f._id === dmUserIdFromUrl);
+    const normalizedUsername =
+      (dmUsernameFromUrl || existing?.username || "").trim() ||
+      dmUserIdFromUrl.slice(0, 8);
+    const normalizedDisplayName =
+      (dmDisplayNameFromUrl || existing?.displayName || normalizedUsername).trim() ||
+      normalizedUsername;
+
+    const friend: serversApi.Friend = existing ?? {
+      _id: dmUserIdFromUrl,
+      displayName: normalizedDisplayName,
+      username: normalizedUsername,
+      avatarUrl: dmAvatarFromUrl || "",
+      email: "",
+    };
+
+    if (!existing) {
+      setFriends((prev) =>
+        prev.some((f) => f._id === dmUserIdFromUrl) ? prev : [...prev, friend],
+      );
+    }
+
+    autoOpenedDmUserRef.current = dmUserIdFromUrl;
+    setSelectedDirectMessageFriend(friend);
+    setMessageText("");
+    setSelectedServer(null);
+    setSelectedChannel(null);
+    setDmUnreadCounts((prev) => ({ ...prev, [dmUserIdFromUrl]: 0 }));
+    shouldAutoScrollRef.current = true;
+
+    try {
+      markAllAsRead?.(dmUserIdFromUrl);
+      void markDmConversationRead({ token, userId: dmUserIdFromUrl });
+    } catch (_err) {
+      // ignore
+    }
+
+    void loadDirectMessages(dmUserIdFromUrl);
+  }, [
+    dmUserIdFromUrl,
+    dmDisplayNameFromUrl,
+    dmUsernameFromUrl,
+    dmAvatarFromUrl,
+    friends,
+    token,
+    markAllAsRead,
+  ]);
 
   useEffect(() => {
     if (!token) return;
@@ -3566,6 +3651,7 @@ export default function MessagesPage() {
 
     const messageContent = messageText.trim();
     const friendId = selectedDirectMessageFriend._id;
+    upsertFriendToDmList(selectedDirectMessageFriend);
     let optimisticMessage: UIMessage | null = null;
 
     try {

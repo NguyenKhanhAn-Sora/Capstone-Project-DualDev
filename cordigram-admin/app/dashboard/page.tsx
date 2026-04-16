@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { io } from "socket.io-client";
 import styles from "./dashboard.module.css";
 import { getApiBaseUrl } from "@/lib/api";
 
@@ -41,6 +42,7 @@ export default function AdminDashboardPage() {
     realtimeRooms: number | null;
     realtimeParticipants: number | null;
     onlineUsersRealtime: number;
+    onlineUsersPeakAllTime: number;
     apiStatus: "Operational" | "Degraded" | "Down";
     apiUptimeSeconds: number;
     openReportsCount: number;
@@ -141,6 +143,7 @@ export default function AdminDashboardPage() {
           realtimeRooms: number | null;
           realtimeParticipants: number | null;
           onlineUsersRealtime: number;
+          onlineUsersPeakAllTime: number;
           apiStatus: "Operational" | "Degraded" | "Down";
           apiUptimeSeconds: number;
           openReportsCount: number;
@@ -178,8 +181,48 @@ export default function AdminDashboardPage() {
     };
 
     loadStats();
-    const intervalId = window.setInterval(loadStats, 10000);
-    return () => window.clearInterval(intervalId);
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready || typeof window === "undefined") return;
+    const token = localStorage.getItem("adminAccessToken") || "";
+    if (!token) return;
+
+    const socket = io(`${getApiBaseUrl()}/notifications`, {
+      transports: ["websocket"],
+      auth: { token },
+    });
+
+    socket.on(
+      "system:online-stats",
+      (payload: {
+        onlineUsersRealtime?: number;
+        onlineUsersPeakAllTime?: number;
+      }) => {
+        setStats((prev) => {
+          if (!prev) return prev;
+
+          const nextOnlineRealtime =
+            typeof payload.onlineUsersRealtime === "number"
+              ? payload.onlineUsersRealtime
+              : prev.onlineUsersRealtime;
+          const nextOnlinePeak =
+            typeof payload.onlineUsersPeakAllTime === "number"
+              ? payload.onlineUsersPeakAllTime
+              : prev.onlineUsersPeakAllTime;
+
+          return {
+            ...prev,
+            onlineUsersRealtime: nextOnlineRealtime,
+            onlineUsersPeakAllTime: nextOnlinePeak,
+          };
+        });
+      },
+    );
+
+    return () => {
+      socket.disconnect();
+    };
   }, [ready]);
 
   useEffect(() => {
@@ -586,6 +629,13 @@ export default function AdminDashboardPage() {
               {formatNumber(stats?.onlineUsersRealtime)}
             </span>
             <span className={styles.kpiDelta}>Live sockets</span>
+          </div>
+          <div className={styles.kpiCard}>
+            <span className={styles.kpiLabel}>Peak Concurrent Online Users</span>
+            <span className={styles.kpiValue}>
+              {formatNumber(stats?.onlineUsersPeakAllTime)}
+            </span>
+            <span className={styles.kpiDelta}>All-time high</span>
           </div>
           <div className={styles.kpiCard}>
             <span className={styles.kpiLabel}>Open Reports</span>

@@ -29,6 +29,7 @@ import { Comment } from '../comment/comment.schema';
 import { ReportPost } from '../reportpost/reportpost.schema';
 import { ReportComment } from '../reportcomment/reportcomment.schema';
 import { ReportUser } from '../reportuser/reportuser.schema';
+import { DirectMessage } from '../direct-messages/direct-message.schema';
 import { type SupportedLanguage } from './language.constants';
 
 type NotificationCategoryKey =
@@ -93,6 +94,8 @@ export class UsersService {
     private readonly reportCommentModel: Model<ReportComment>,
     @InjectModel(ReportUser.name)
     private readonly reportUserModel: Model<ReportUser>,
+    @InjectModel(DirectMessage.name)
+    private readonly directMessageModel: Model<DirectMessage>,
     @InjectModel(UserTasteProfile.name)
     private readonly tasteProfileModel: Model<UserTasteProfile>,
     private readonly blocksService: BlocksService,
@@ -779,11 +782,81 @@ export class UsersService {
       });
     }
 
+    const dmCandidates: Array<{ userId: string; messageCount: number }> = (
+      (await this.directMessageModel
+        .aggregate([
+          {
+            $match: {
+              $or: [{ senderId: viewerId }, { receiverId: viewerId }],
+            },
+          },
+          {
+            $project: {
+              counterpartId: {
+                $cond: [
+                  { $eq: ['$senderId', viewerId] },
+                  '$receiverId',
+                  '$senderId',
+                ],
+              },
+              isViewerSender: {
+                $eq: ['$senderId', viewerId],
+              },
+              createdAt: 1,
+            },
+          },
+          {
+            $group: {
+              _id: '$counterpartId',
+              messageCount: { $sum: 1 },
+              sentByViewerCount: {
+                $sum: {
+                  $cond: [{ $eq: ['$isViewerSender', true] }, 1, 0],
+                },
+              },
+              sentToViewerCount: {
+                $sum: {
+                  $cond: [{ $eq: ['$isViewerSender', false] }, 1, 0],
+                },
+              },
+              lastMessageAt: { $max: '$createdAt' },
+            },
+          },
+          {
+            $match: {
+              sentByViewerCount: { $gt: 0 },
+              sentToViewerCount: { $gt: 0 },
+            },
+          },
+          { $sort: { messageCount: -1, lastMessageAt: -1 } },
+          { $limit: 200 },
+        ])
+        .exec()) as Array<{
+        _id: Types.ObjectId;
+        messageCount: number;
+      }>
+    )
+      .map((row) => ({
+        userId: row._id?.toString?.() ?? '',
+        messageCount: Number(row.messageCount ?? 0),
+      }))
+      .filter((row) => Boolean(row.userId) && row.messageCount > 0);
+
+    const dmMessageCountMap = new Map<string, number>();
+    dmCandidates.forEach((c) => {
+      dmMessageCountMap.set(c.userId, c.messageCount);
+    });
+
     const candidateSet = new Set<string>();
     for (const c of mutualCandidates) {
       if (!c.userId) continue;
       if (excluded.has(c.userId)) continue;
       if (c.mutualCount <= 0) continue;
+      candidateSet.add(c.userId);
+      if (candidateSet.size >= 250) break;
+    }
+    for (const c of dmCandidates) {
+      if (excluded.has(c.userId)) continue;
       candidateSet.add(c.userId);
       if (candidateSet.size >= 250) break;
     }
@@ -849,9 +922,11 @@ export class UsersService {
         const mutual = mutualMap.get(id) ?? 0;
         const sameCompany = sameCompanySet.has(id) ? 1 : 0;
         const tasteW = tasteWeightMap.get(id) ?? 0;
+        const messageCount = dmMessageCountMap.get(id) ?? 0;
         const popularity = followerCountByUserId.get(id) ?? 0;
         const score =
           mutual * 10 +
+          messageCount * 8 +
           sameCompany * 6 +
           tasteW * 2 +
           Math.log10(1 + popularity);
@@ -859,6 +934,7 @@ export class UsersService {
         let reason = 'Suggested for you';
         if (mutual >= 3) reason = `${mutual} mutual connections`;
         else if (mutual >= 1) reason = `${mutual} mutual connection`;
+        else if (messageCount > 0) reason = 'You chatted before';
         else if (sameCompany) reason = 'Same workplace';
         else if (tasteW > 0) reason = 'Based on your interests';
 

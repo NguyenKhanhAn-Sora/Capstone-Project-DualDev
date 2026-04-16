@@ -861,6 +861,17 @@ export default function ProfileLayout({
     router.push("/settings");
   };
 
+  const handleOpenDirectMessage = () => {
+    if (!profile) return;
+    const params = new URLSearchParams({
+      dm: profile.userId,
+      dmName: profile.displayName || "",
+      dmUsername: profile.username || "",
+      dmAvatar: profile.avatarUrl || "",
+    });
+    router.push(`/messages?${params.toString()}`);
+  };
+
   const showToast = (message: string) => {
     if (toastTimer.current) {
       clearTimeout(toastTimer.current);
@@ -1445,6 +1456,7 @@ export default function ProfileLayout({
                         <button
                           className={styles.secondaryButton}
                           type="button"
+                          onClick={handleOpenDirectMessage}
                         >
                           Message
                         </button>

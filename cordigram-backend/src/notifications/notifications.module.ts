@@ -16,6 +16,7 @@ import {
 import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { User, UserSchema } from '../users/user.schema';
 import { Post, PostSchema } from '../posts/post.schema';
+import { OnlineStats, OnlineStatsSchema } from './online-stats.schema';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { Post, PostSchema } from '../posts/post.schema';
       { name: Profile.name, schema: ProfileSchema },
       { name: User.name, schema: UserSchema },
       { name: Post.name, schema: PostSchema },
+      { name: OnlineStats.name, schema: OnlineStatsSchema },
     ]),
   ],
   controllers: [NotificationsController],

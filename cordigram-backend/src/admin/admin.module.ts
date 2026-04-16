@@ -25,7 +25,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { InteractionMuteSchedulerService } from './interaction-mute-scheduler.service';
 import { UsersModule } from '../users/users.module';
 import { CommentsModule } from '../comment/comments.module';
-import { DirectMessagesModule } from '../direct-messages/direct-messages.module';
 import {
   PaymentTransaction,
   PaymentTransactionSchema,
@@ -98,7 +97,6 @@ import {
     NotificationsModule,
     UsersModule,
     CommentsModule,
-    DirectMessagesModule,
   ],
   controllers: [AdminController],
   providers: [AdminService, InteractionMuteSchedulerService],

@@ -4,11 +4,15 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
+import { InjectModel } from '@nestjs/mongoose';
 import { JwtService } from '@nestjs/jwt';
+import { OnModuleInit } from '@nestjs/common';
+import type { Model } from 'mongoose';
 import type { Server, Socket } from 'socket.io';
 import { ConfigService } from '../config/config.service';
 import { FcmPushService } from './fcm-push.service';
 import type { NotificationRealtimePayload } from './notifications.service';
+import { OnlineStats } from './online-stats.schema';
 
 interface AccessTokenPayload {
   sub: string;
@@ -24,18 +28,48 @@ interface AccessTokenPayload {
   },
 })
 export class NotificationsGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit
 {
   @WebSocketServer()
   server: Server;
 
   private readonly connections = new Map<string, Set<string>>();
+  private readonly onlineStatsKey = 'global';
+  private peakOnlineUsers = 0;
 
   constructor(
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly fcmPushService: FcmPushService,
+    @InjectModel(OnlineStats.name)
+    private readonly onlineStatsModel: Model<OnlineStats>,
   ) {}
+
+  async onModuleInit() {
+    const existing = await this.onlineStatsModel
+      .findOne({ key: this.onlineStatsKey })
+      .select('peakOnlineUsers')
+      .lean()
+      .exec();
+
+    this.peakOnlineUsers = Number(existing?.peakOnlineUsers ?? 0);
+
+    if (!existing) {
+      await this.onlineStatsModel
+        .updateOne(
+          { key: this.onlineStatsKey },
+          {
+            $setOnInsert: {
+              key: this.onlineStatsKey,
+              peakOnlineUsers: 0,
+              lastOnlineUsers: 0,
+            },
+          },
+          { upsert: true },
+        )
+        .exec();
+    }
+  }
 
   handleConnection(client: Socket) {
     const token = this.extractToken(client);
@@ -56,6 +90,9 @@ export class NotificationsGateway
     const current = this.connections.get(userId) ?? new Set<string>();
     current.add(client.id);
     this.connections.set(userId, current);
+
+    client.emit('system:online-stats', this.getOnlineStatsSnapshot());
+    void this.publishOnlineStats();
   }
 
   handleDisconnect(client: Socket) {
@@ -67,6 +104,8 @@ export class NotificationsGateway
     if (!current.size) {
       this.connections.delete(userId);
     }
+
+    void this.publishOnlineStats();
   }
 
   emitToUser<T>(userId: string, event: string, payload: T): void {
@@ -93,6 +132,39 @@ export class NotificationsGateway
 
   getConnectedUserIds(): string[] {
     return Array.from(this.connections.keys());
+  }
+
+  getOnlineStatsSnapshot(): {
+    onlineUsersRealtime: number;
+    onlineUsersPeakAllTime: number;
+  } {
+    return {
+      onlineUsersRealtime: this.getConnectedUserCount(),
+      onlineUsersPeakAllTime: this.peakOnlineUsers,
+    };
+  }
+
+  private async publishOnlineStats() {
+    const currentOnlineUsers = this.getConnectedUserCount();
+
+    if (currentOnlineUsers > this.peakOnlineUsers) {
+      this.peakOnlineUsers = currentOnlineUsers;
+
+      await this.onlineStatsModel
+        .updateOne(
+          { key: this.onlineStatsKey },
+          {
+            $set: {
+              peakOnlineUsers: this.peakOnlineUsers,
+              lastOnlineUsers: currentOnlineUsers,
+            },
+          },
+          { upsert: true },
+        )
+        .exec();
+    }
+
+    this.emitToAll('system:online-stats', this.getOnlineStatsSnapshot());
   }
 
   private extractToken(client: Socket): string | null {
