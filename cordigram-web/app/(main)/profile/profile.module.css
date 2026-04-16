@@ -1489,14 +1489,14 @@
   font-weight: 700;
   font-size: 12px;
   letter-spacing: 0.01em;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.18);
+  /* backdrop-filter: blur(10px); */
+  /* box-shadow: 0 10px 20px rgba(0, 0, 0, 0.18); */
 }
 
 :global([data-theme="light"]) .viewBadge {
-  background: rgba(255, 255, 255, 0.85);
-  color: #0f172a;
-  box-shadow: 0 10px 24px rgba(15, 22, 41, 0.12);
+  background: transparent;
+  color: #fff;
+  /* box-shadow: 0 10px 24px rgba(15, 22, 41, 0.12); */
 }
 
 @keyframes shimmer {
