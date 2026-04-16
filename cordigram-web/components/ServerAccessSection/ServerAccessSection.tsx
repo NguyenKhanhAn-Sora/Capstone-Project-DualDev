@@ -18,23 +18,25 @@ type ServerAccessSettings = {
   joinApplicationForm?: { enabled: boolean; questions: JoinFormQuestion[] };
 };
 
-const RULE_TEMPLATES: string[] = [
-  "Lịch sự và văn minh",
-  "Không spam hoặc tự quảng bá bản thân (mời tham gia máy chủ, quảng cáo, v.v) khi chưa được sự cho phép của ban quản trị máy chủ. Bao gồm cả hành vi nhắn tin trực tiếp cho các thành viên trong máy chủ.",
-  "Không có hành động bạo lực hoặc nội dung phản cảm",
-  "Giúp đảm bảo môi trường lành mạnh",
-];
-
-const QUESTION_TEMPLATES: string[] = [
-  "Bạn có chơi trò chơi nào giống với chúng tôi không?",
-  "Bạn tìm thấy chúng tôi bằng cách nào?",
-  "Đâu là điểm độc nhất vô nhị của bạn?",
-];
 
 function uid(): string { return `q_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`; }
 
 export default function ServerAccessSection({ serverId, canManageSettings }: { serverId: string; canManageSettings: boolean }) {
   const { t } = useLanguage();
+
+  const ruleTemplates = useMemo<string[]>(() => [
+    t("chat.serverAccess.ruleTemplate1"),
+    t("chat.serverAccess.ruleTemplate2"),
+    t("chat.serverAccess.ruleTemplate3"),
+    t("chat.serverAccess.ruleTemplate4"),
+  ], [t]);
+
+  const questionTemplates = useMemo<string[]>(() => [
+    t("chat.serverAccess.questionTemplate1"),
+    t("chat.serverAccess.questionTemplate2"),
+    t("chat.serverAccess.questionTemplate3"),
+  ], [t]);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +115,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
 
   const ensureDefaultQuestion = async () => {
     if (!canEdit || joinFormQuestions.length > 0) return;
-    const q: JoinFormQuestion = { id: uid(), title: "Tại sao bạn muốn tham gia máy chủ của chúng tôi?", type: "short", required: true, options: [] };
+    const q: JoinFormQuestion = { id: uid(), title: t("chat.serverAccess.defaultQuestion"), type: "short", required: true, options: [] };
     setJoinFormQuestions([q]);
     try { await (serversApi as any).updateJoinApplicationForm(serverId, { enabled: true, questions: [q] }); await fetchSettings(); }
     catch (e) { setError(e instanceof Error ? e.message : t("chat.serverAccess.joinFormSaveError")); }
@@ -247,7 +249,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
             <button type="button" className={styles.btn} disabled={!canEdit || saving || !hasRules || !ruleContent.trim()} onClick={handleAddRule}>{t("chat.serverAccess.addRuleBtn")}</button>
           </div>
           <div className={styles.chipRow}>
-            {RULE_TEMPLATES.map((tmpl) => (
+            {ruleTemplates.map((tmpl) => (
               <button key={tmpl} type="button" className={styles.chip} disabled={!canEdit || saving || !hasRules} onClick={() => addRuleFromTemplate(tmpl)} title={t("chat.serverAccess.addRuleChipTitle")}>{tmpl}</button>
             ))}
           </div>
@@ -318,7 +320,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
                   {t("chat.serverAccess.addQuestionBtn")}
                 </button>
                 <div className={styles.chipRow}>
-                  {QUESTION_TEMPLATES.map((tmpl) => (
+                  {questionTemplates.map((tmpl) => (
                     <button key={tmpl} type="button" className={styles.chip} disabled={!canEdit || saving || remainingSlots <= 0} onClick={() => addQuestionFromTemplate(tmpl)} title={t("chat.serverAccess.addQuestionChipTitle")}>{tmpl}</button>
                   ))}
                 </div>

@@ -18,6 +18,7 @@ import { MailService } from '../mail/mail.service';
 import { ActivityLogService } from '../activity/activity.service';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '../config/config.service';
+import { BoostService } from '../boost/boost.service';
 import { parseDuration } from '../common/time.util';
 import { createHmac } from 'crypto';
 import { Session } from '../auth/session.schema';
@@ -29,6 +30,7 @@ import { Comment } from '../comment/comment.schema';
 import { ReportPost } from '../reportpost/reportpost.schema';
 import { ReportComment } from '../reportcomment/reportcomment.schema';
 import { ReportUser } from '../reportuser/reportuser.schema';
+import { Server } from '../servers/server.schema';
 
 type NotificationCategoryKey = 'follow' | 'comment' | 'like' | 'mentions';
 
@@ -88,14 +90,62 @@ export class UsersService {
     private readonly reportUserModel: Model<ReportUser>,
     @InjectModel(UserTasteProfile.name)
     private readonly tasteProfileModel: Model<UserTasteProfile>,
+    @InjectModel(Server.name) private readonly serverModel: Model<Server>,
     private readonly blocksService: BlocksService,
     private readonly notificationsService: NotificationsService,
     private readonly otpService: OtpService,
     private readonly mailService: MailService,
     private readonly activityLogService: ActivityLogService,
     private readonly config: ConfigService,
+    private readonly boostService: BoostService,
   ) {
     this.passwordChangeWindowMs = this.initPasswordChangeWindow();
+  }
+
+  async getBoostStatus(params: {
+    userId: string;
+    serverId?: string | null;
+  }): Promise<{
+    accountBoost: boolean;
+    serverBoost: boolean;
+    unlocked: boolean;
+    tier?: 'basic' | 'boost' | null;
+    active?: boolean;
+    expiresAt?: string | null;
+    limits?: any;
+  }> {
+    const user = await this.userModel
+      .findById(params.userId)
+      .select('settings.accountBoost')
+      .lean()
+      .exec();
+    const accountBoost = Boolean((user as any)?.settings?.accountBoost);
+
+    let serverBoost = false;
+    const serverId = String(params.serverId ?? '').trim();
+    if (serverId) {
+      const server = await this.serverModel
+        .findById(serverId)
+        .select('boostedByUserIds')
+        .lean()
+        .exec();
+      const arr = (server as any)?.boostedByUserIds;
+      serverBoost =
+        Array.isArray(arr) && arr.some((id: any) => String(id) === params.userId);
+    }
+
+    const ent = await this.boostService.getBoostStatus(params.userId);
+    const unlocked = accountBoost || serverBoost || ent.active;
+
+    return {
+      accountBoost,
+      serverBoost,
+      unlocked,
+      tier: ent.tier,
+      active: ent.active,
+      expiresAt: ent.expiresAt,
+      limits: ent.limits,
+    };
   }
 
   private readonly passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -1521,10 +1571,14 @@ export class UsersService {
   async getSettings(userId: string): Promise<{
     theme: 'light' | 'dark';
     language: 'vi' | 'en' | 'ja' | 'zh';
+    appearanceBackground: string | null;
+    appearancePreset: 'default' | 'graphite' | 'charcoal' | 'indigo';
+    appearanceSync: boolean;
     dmListFrom: 'everyone' | 'followers_only';
     dmCallFrom: 'everyone' | 'followers_only';
     showCordigramMemberSince: boolean;
     sharePresence: boolean;
+    accountBoost: boolean;
     chatSoundEnabled: boolean;
   }> {
     const user = await this.userModel
@@ -1537,6 +1591,19 @@ export class UsersService {
     return {
       theme: (s?.theme as 'light' | 'dark') ?? 'light',
       language: (s?.language as 'vi' | 'en' | 'ja' | 'zh') ?? 'vi',
+      appearanceBackground:
+        typeof s?.appearanceBackground === 'string' &&
+        /^#[0-9A-Fa-f]{6}$/.test(s.appearanceBackground)
+          ? (s.appearanceBackground as string)
+          : null,
+      appearancePreset:
+        (s?.appearancePreset as
+          | 'default'
+          | 'graphite'
+          | 'charcoal'
+          | 'indigo'
+          | undefined) ?? 'default',
+      appearanceSync: (s?.appearanceSync as boolean | undefined) === true,
       dmListFrom:
         (s?.dmListFrom as 'everyone' | 'followers_only') ?? 'everyone',
       dmCallFrom:
@@ -1544,8 +1611,8 @@ export class UsersService {
       showCordigramMemberSince:
         (s?.showCordigramMemberSince as boolean | undefined) !== false,
       sharePresence: (s?.sharePresence as boolean | undefined) !== false,
-      chatSoundEnabled:
-        (s?.chatSoundEnabled as boolean | undefined) !== false,
+      accountBoost: (s?.accountBoost as boolean | undefined) === true,
+      chatSoundEnabled: (s?.chatSoundEnabled as boolean | undefined) !== false,
     };
   }
 
@@ -2106,18 +2173,26 @@ export class UsersService {
     userId: string;
     theme?: 'light' | 'dark';
     language?: 'vi' | 'en' | 'ja' | 'zh';
+    appearanceBackground?: string | null;
+    appearancePreset?: 'default' | 'graphite' | 'charcoal' | 'indigo';
+    appearanceSync?: boolean;
     dmListFrom?: 'everyone' | 'followers_only';
     dmCallFrom?: 'everyone' | 'followers_only';
     showCordigramMemberSince?: boolean;
     sharePresence?: boolean;
+    accountBoost?: boolean;
     chatSoundEnabled?: boolean;
   }): Promise<{
     theme: 'light' | 'dark';
     language: 'vi' | 'en' | 'ja' | 'zh';
+    appearanceBackground: string | null;
+    appearancePreset: 'default' | 'graphite' | 'charcoal' | 'indigo';
+    appearanceSync: boolean;
     dmListFrom: 'everyone' | 'followers_only';
     dmCallFrom: 'everyone' | 'followers_only';
     showCordigramMemberSince: boolean;
     sharePresence: boolean;
+    accountBoost: boolean;
     chatSoundEnabled: boolean;
   }> {
     const update: Record<string, unknown> = {};
@@ -2126,6 +2201,16 @@ export class UsersService {
     }
     if (params.language) {
       update['settings.language'] = params.language;
+    }
+    if (params.appearanceBackground !== undefined) {
+      const nextBg = params.appearanceBackground?.trim() || null;
+      update['settings.appearanceBackground'] = nextBg;
+    }
+    if (params.appearancePreset) {
+      update['settings.appearancePreset'] = params.appearancePreset;
+    }
+    if (params.appearanceSync !== undefined) {
+      update['settings.appearanceSync'] = params.appearanceSync;
     }
     if (params.dmListFrom) {
       update['settings.dmListFrom'] = params.dmListFrom;
@@ -2139,6 +2224,9 @@ export class UsersService {
     }
     if (params.sharePresence !== undefined) {
       update['settings.sharePresence'] = params.sharePresence;
+    }
+    if (params.accountBoost !== undefined) {
+      update['settings.accountBoost'] = params.accountBoost;
     }
     if (params.chatSoundEnabled !== undefined) {
       update['settings.chatSoundEnabled'] = params.chatSoundEnabled;

@@ -92,10 +92,14 @@ export class AdminService implements OnModuleInit {
     try {
       const result = await this.migrateNotificationI18nKeys();
       if (result.updated > 0) {
-        this.logger.log(`Migrated ${result.updated} notification records to i18n keys`);
+        this.logger.log(
+          `Migrated ${result.updated} notification records to i18n keys`,
+        );
       }
     } catch (err) {
-      this.logger.warn(`Notification i18n migration skipped: ${err?.message ?? err}`);
+      this.logger.warn(
+        `Notification i18n migration skipped: ${err?.message ?? err}`,
+      );
     }
   }
 
@@ -7177,10 +7181,18 @@ export class AdminService implements OnModuleInit {
 
   async getCommunityDiscoveryServers(params?: {
     status?: 'all' | 'pending' | 'approved' | 'rejected' | 'removed';
+    q?: string;
+    sort?: string;
   }) {
     const status = params?.status ?? 'all';
+    const q = (params?.q ?? '').trim();
+    const sort = String(params?.sort ?? 'activated_desc');
     const statusFilter = (() => {
-      if (status === 'approved' || status === 'rejected' || status === 'removed') {
+      if (
+        status === 'approved' ||
+        status === 'rejected' ||
+        status === 'removed'
+      ) {
         return { communityDiscoveryStatus: status };
       }
       if (status === 'pending') {
@@ -7195,13 +7207,37 @@ export class AdminService implements OnModuleInit {
       }
       return {};
     })();
+
+    const qFilter = (() => {
+      if (!q) return {};
+      const isObjectId = Types.ObjectId.isValid(q);
+      if (isObjectId) {
+        return {
+          $or: [{ _id: new Types.ObjectId(q) }, { name: { $regex: q, $options: 'i' } }],
+        };
+      }
+      return { name: { $regex: q, $options: 'i' } };
+    })();
+
+    const sortSpec = (() => {
+      if (sort === 'created_asc') return { createdAt: 1 };
+      if (sort === 'created_desc') return { createdAt: -1 };
+      if (sort === 'activated_asc') return { 'communitySettings.activatedAt': 1, createdAt: 1 };
+      return { 'communitySettings.activatedAt': -1, createdAt: -1 };
+    })();
     const servers = await this.serverModel
-      .find({ 'communitySettings.enabled': true, ...statusFilter })
+      .find({
+        'communitySettings.enabled': true,
+        ...statusFilter,
+        ...qFilter,
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      })
       .select(
         'name description avatarUrl ownerId members memberCount channels ' +
           'safetySettings communitySettings accessMode createdAt communityDiscoveryStatus',
       )
       .populate('ownerId', 'displayName username email')
+      .sort(sortSpec as any)
       .lean()
       .exec();
 
@@ -7468,24 +7504,129 @@ export class AdminService implements OnModuleInit {
 
   async getCommunityDiscoveryHistory(params: {
     serverId?: string;
+    q?: string;
+    sort?: string;
     limit?: number;
     offset?: number;
   }) {
     const limit = Math.max(1, Math.min(200, params.limit ?? 50));
     const offset = Math.max(0, params.offset ?? 0);
-    const filter = params.serverId
+    const q = (params.q ?? '').trim();
+    const sort = String(params.sort ?? 'action_desc');
+    const filter: any = params.serverId
       ? { serverId: new Types.ObjectId(params.serverId) }
       : {};
+
+    if (q) {
+      if (Types.ObjectId.isValid(q)) {
+        filter.serverId = new Types.ObjectId(q);
+      } else {
+        filter['serverSnapshot.name'] = { $regex: q, $options: 'i' };
+      }
+    }
+
+    const sortSpec = (() => {
+      if (sort === 'action_asc') return { createdAt: 1 };
+      if (sort === 'activated_asc') return { 'serverSnapshot.communityActivatedAt': 1, createdAt: 1 };
+      if (sort === 'activated_desc') return { 'serverSnapshot.communityActivatedAt': -1, createdAt: -1 };
+      return { createdAt: -1 };
+    })();
+
     const items = await this.communityDiscoveryHistoryModel
       .find(filter)
-      .sort({ createdAt: -1 })
+      .sort(sortSpec as any)
       .skip(offset)
       .limit(limit)
       .lean()
       .exec();
     const total =
       await this.communityDiscoveryHistoryModel.countDocuments(filter);
-    return { items, total };
+
+    const serverIds = Array.from(
+      new Set(items.map((it: any) => String(it.serverId)).filter(Boolean)),
+    );
+    const servers =
+      serverIds.length === 0
+        ? []
+        : await this.serverModel
+            .find({ _id: { $in: serverIds.map((id) => new Types.ObjectId(id)) } })
+            .select('_id deletedAt deletedByUserId name ownerId members')
+            .populate('deletedByUserId', 'email')
+            .lean()
+            .exec();
+    const serverById = new Map(servers.map((s: any) => [String(s._id), s]));
+
+    const missingOwnerIds = Array.from(
+      new Set(
+        items
+          .filter((it: any) => !serverById.has(String(it.serverId)))
+          .map((it: any) => String(it?.serverSnapshot?.ownerId ?? ''))
+          .filter((id: string) => Types.ObjectId.isValid(id)),
+      ),
+    );
+    const missingOwners =
+      missingOwnerIds.length === 0
+        ? []
+        : await this.userModel
+            .find({ _id: { $in: missingOwnerIds.map((id) => new Types.ObjectId(id)) } })
+            .select('_id email')
+            .lean()
+            .exec();
+    const ownerById = new Map(missingOwners.map((u: any) => [String(u._id), u]));
+
+    const enriched = items.map((it: any) => {
+      const s = serverById.get(String(it.serverId));
+      const exists = Boolean(s?._id);
+      const deletedAt = s?.deletedAt ?? null;
+      const deletedBy = s?.deletedByUserId
+        ? {
+            id: String((s.deletedByUserId as any)?._id ?? s.deletedByUserId),
+            email: (s.deletedByUserId as any)?.email ?? null,
+          }
+        : null;
+
+      // If server document is missing (hard-deleted before soft-delete existed),
+      // treat it as deleted and attribute deletion to the owner (best-effort from snapshot).
+      const snapshotOwnerId = String(it?.serverSnapshot?.ownerId ?? '');
+      const hardDeletedBy =
+        !exists && Types.ObjectId.isValid(snapshotOwnerId)
+          ? {
+              id: snapshotOwnerId,
+              email: (ownerById.get(snapshotOwnerId) as any)?.email ?? null,
+            }
+          : null;
+      return {
+        ...it,
+        serverDeleted: Boolean(deletedAt) || !exists,
+        deletedAt: deletedAt ? new Date(deletedAt).toISOString?.() ?? deletedAt : null,
+        deletedBy: deletedBy ?? hardDeletedBy,
+        canRestoreServer: Boolean(deletedAt), // only soft-deleted can be restored
+      };
+    });
+
+    return { items: enriched, total };
+  }
+
+  async restoreDeletedServer(params: { serverId: string; adminId: string }) {
+    if (!Types.ObjectId.isValid(params.serverId)) {
+      throw new BadRequestException('Invalid serverId');
+    }
+    const server = await this.serverModel
+      .findById(params.serverId)
+      .select('_id deletedAt deletedByUserId')
+      .exec();
+    if (!server) {
+      throw new BadRequestException(
+        'Không thể khôi phục: server đã bị xóa vĩnh viễn (hard-delete) trước khi hệ thống hỗ trợ khôi phục.',
+      );
+    }
+    if (!(server as any).deletedAt) {
+      return { ok: true, restored: false };
+    }
+    (server as any).deletedAt = null;
+    (server as any).deletedByUserId = null;
+    await server.save();
+    return { ok: true, restored: true };
   }
 
   async adminGetServerView(serverId: string, adminUserId?: string) {
@@ -7509,8 +7650,8 @@ export class AdminService implements OnModuleInit {
     ]);
 
     // Send notification to server owner and members with manageServer permission
-    this.sendAdminViewNotification(serverId, server, adminUserId).catch(
-      (err) => console.error('Failed to send admin view notification:', err),
+    this.sendAdminViewNotification(serverId, server, adminUserId).catch((err) =>
+      console.error('Failed to send admin view notification:', err),
     );
 
     return { server, channels, categories };
@@ -7791,9 +7932,10 @@ export class AdminService implements OnModuleInit {
 
       if (doc.title === 'Quản trị viên hệ thống đang xem máy chủ') {
         updates['title'] = '__SYS:adminView';
-        const match = typeof doc.content === 'string'
-          ? doc.content.match(/máy chủ "(.+)" của bạn/)
-          : null;
+        const match =
+          typeof doc.content === 'string'
+            ? doc.content.match(/máy chủ "(.+)" của bạn/)
+            : null;
         if (match) {
           updates['content'] = `__SYS:adminViewContent:${match[1]}`;
         }
@@ -7801,9 +7943,10 @@ export class AdminService implements OnModuleInit {
 
       if (doc.title === '⚠️ Cảnh báo spam đề cập') {
         updates['title'] = '__SYS:mentionSpamTitle';
-        const match = typeof doc.content === 'string'
-          ? doc.content.match(/máy chủ "(.+)"\./)
-          : null;
+        const match =
+          typeof doc.content === 'string'
+            ? doc.content.match(/máy chủ "(.+)"\./)
+            : null;
         if (match) {
           updates['content'] = `__SYS:mentionSpamWarning:${match[1]}`;
         }
@@ -7834,7 +7977,8 @@ export class AdminService implements OnModuleInit {
       })
       .lean()
       .exec();
-    if (!channel) throw new NotFoundException('Channel not found in this server');
+    if (!channel)
+      throw new NotFoundException('Channel not found in this server');
 
     const messages = await this.messageModel
       .find({ channelId: new Types.ObjectId(channelId), isDeleted: false })
@@ -7852,9 +7996,7 @@ export class AdminService implements OnModuleInit {
     const enriched = await Promise.all(
       messages.map(async (msg: any) => {
         const rawId = msg.senderId?._id ?? msg.senderId;
-        const uid = rawId
-          ? new Types.ObjectId(rawId.toString())
-          : null;
+        const uid = rawId ? new Types.ObjectId(rawId.toString()) : null;
         const profile = uid
           ? await this.profileModel
               .findOne({ userId: uid })
@@ -7877,9 +8019,7 @@ export class AdminService implements OnModuleInit {
 
         if (msg.replyTo && typeof msg.replyTo === 'object') {
           const rtId = msg.replyTo.senderId?._id ?? msg.replyTo.senderId;
-          const rtUid = rtId
-            ? new Types.ObjectId(rtId.toString())
-            : null;
+          const rtUid = rtId ? new Types.ObjectId(rtId.toString()) : null;
           const rtProfile = rtUid
             ? await this.profileModel
                 .findOne({ userId: rtUid })

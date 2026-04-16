@@ -19,11 +19,18 @@ import {
   ServerInviteSchema,
 } from '../server-invites/server-invite.schema';
 import { Message, MessageSchema } from '../messages/message.schema';
+import {
+  ChannelReadState,
+  ChannelReadStateSchema,
+} from '../messages/channel-read-state.schema';
+import { UserServer, UserServerSchema } from '../access/user-server.schema';
 import { RolesModule } from '../roles/roles.module';
 import { MessagesModule } from '../messages/messages.module';
 import { ServerAccessModule } from '../access/access.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
+import { ServerBoostContextInterceptor } from './server-boost-context.interceptor';
+import { BoostModule } from '../boost/boost.module';
 
 @Module({
   imports: [
@@ -36,14 +43,17 @@ import { CloudinaryModule } from '../cloudinary/cloudinary.module';
       { name: ServerInvite.name, schema: ServerInviteSchema },
       { name: ServerNotification.name, schema: ServerNotificationSchema },
       { name: Message.name, schema: MessageSchema },
+      { name: ChannelReadState.name, schema: ChannelReadStateSchema },
+      { name: UserServer.name, schema: UserServerSchema },
     ]),
     forwardRef(() => RolesModule),
     forwardRef(() => ServerAccessModule),
     AuditLogModule,
-    MessagesModule,
+    forwardRef(() => MessagesModule),
     CloudinaryModule,
+    forwardRef(() => BoostModule),
   ],
-  providers: [ServersService],
+  providers: [ServersService, ServerBoostContextInterceptor],
   controllers: [ServersController],
   exports: [ServersService, MongooseModule],
 })

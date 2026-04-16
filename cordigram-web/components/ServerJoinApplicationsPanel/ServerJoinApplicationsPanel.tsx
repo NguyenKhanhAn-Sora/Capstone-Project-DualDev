@@ -3,35 +3,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
 import styles from "./ServerJoinApplicationsPanel.module.css";
+import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 
 type Tab = serversApi.JoinApplicationListStatus;
-
-function fmtRegistered(iso: string) {
-  try {
-    return new Date(iso).toLocaleString("vi-VN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
-
-function fmtDateOnly(iso: string | null) {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleDateString("vi-VN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return "—";
-  }
-}
 
 export default function ServerJoinApplicationsPanel({
   serverId,
@@ -54,6 +28,7 @@ export default function ServerJoinApplicationsPanel({
   onViewProfile?: (userId: string) => void;
   onSendMessage?: (userId: string) => void;
 }) {
+  const { t, language } = useLanguage();
   const [tab, setTab] = useState<Tab>("pending");
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
@@ -67,21 +42,55 @@ export default function ServerJoinApplicationsPanel({
 
   const [menu, setMenu] = useState<{ userId: string; x: number; y: number } | null>(null);
 
+  const localeTag = localeTagForLanguage(language);
+
+  const fmtRegistered = useCallback((iso: string) => {
+    try {
+      return new Date(iso).toLocaleString(localeTag, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return iso;
+    }
+  }, [localeTag]);
+
+  const fmtDateOnly = useCallback((iso: string | null) => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleDateString(localeTag, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return "—";
+    }
+  }, [localeTag]);
+
+  const normalizeUserId = useCallback((v: string | undefined) => String(v ?? "").trim(), []);
+
   const loadList = useCallback(async () => {
     setListLoading(true);
     setListError(null);
     try {
       const res = await serversApi.listJoinApplications(serverId, tab);
-      setItems(res.items);
-      // Defensive: nếu backend count bị lệch do dữ liệu ghost, ưu tiên count theo items khi đang xem tab pending.
-      setPendingCount(tab === "pending" ? res.items.length : res.pendingCount);
+      const ownerNorm = normalizeUserId(ownerId);
+      const rows = ownerNorm
+        ? res.items.filter((row) => normalizeUserId(row.userId) !== ownerNorm)
+        : res.items;
+      setItems(rows);
+      setPendingCount(tab === "pending" ? rows.length : res.pendingCount);
     } catch (e) {
-      setListError(e instanceof Error ? e.message : "Không tải được danh sách");
+      setListError(e instanceof Error ? e.message : t("chat.joinApplications.errorLoad"));
       setItems([]);
     } finally {
       setListLoading(false);
     }
-  }, [serverId, tab]);
+  }, [serverId, tab, t, ownerId, normalizeUserId]);
 
   useEffect(() => {
     void loadList();
@@ -131,7 +140,7 @@ export default function ServerJoinApplicationsPanel({
       setSelectedUserId(null);
       await refresh();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Không chấp thuận được");
+      alert(e instanceof Error ? e.message : t("chat.joinApplications.approveError"));
     } finally {
       setActionLoading(false);
     }
@@ -145,7 +154,7 @@ export default function ServerJoinApplicationsPanel({
       setSelectedUserId(null);
       await refresh();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Không từ chối được");
+      alert(e instanceof Error ? e.message : t("chat.joinApplications.rejectError"));
     } finally {
       setActionLoading(false);
     }
@@ -156,45 +165,45 @@ export default function ServerJoinApplicationsPanel({
     setMenu({ userId, x: e.clientX, y: e.clientY });
   };
 
-  const tabLabel = (t: Tab) => {
-    if (t === "all") return "Tất Cả Thành Viên";
-    if (t === "pending") return `Đang chờ xử lý${pendingCount > 0 ? ` (${pendingCount})` : ""}`;
-    if (t === "rejected") return "Bị từ chối";
-    return "Được chấp thuận";
+  const tabLabel = (tabKey: Tab) => {
+    if (tabKey === "all") return t("chat.joinApplications.tabAll");
+    if (tabKey === "pending") return `${t("chat.joinApplications.tabPending")}${pendingCount > 0 ? ` (${pendingCount})` : ""}`;
+    if (tabKey === "rejected") return t("chat.joinApplications.tabRejected");
+    return t("chat.joinApplications.tabApproved");
   };
 
   return (
     <div className={styles.root}>
       <div className={styles.main}>
-        <h2 className={styles.title}>Thành viên — {serverName}</h2>
+        <h2 className={styles.title}>{t("chat.joinApplications.title").replace("{serverName}", serverName)}</h2>
         <div className={styles.tabs}>
-          {(["all", "pending", "rejected", "approved"] as Tab[]).map((t) => (
+          {(["all", "pending", "rejected", "approved"] as Tab[]).map((tabKey) => (
             <button
-              key={t}
+              key={tabKey}
               type="button"
-              className={`${styles.tab} ${tab === t ? styles.tabActive : ""}`}
+              className={`${styles.tab} ${tab === tabKey ? styles.tabActive : ""}`}
               onClick={() => {
-                setTab(t);
+                setTab(tabKey);
                 setSelectedUserId(null);
               }}
             >
-              {tabLabel(t)}
+              {tabLabel(tabKey)}
             </button>
           ))}
         </div>
 
         {listError && <div className={styles.error}>{listError}</div>}
         {listLoading ? (
-          <div className={styles.loading}>Đang tải…</div>
+          <div className={styles.loading}>{t("chat.joinApplications.loading")}</div>
         ) : items.length === 0 ? (
-          <div className={styles.empty}>Không có mục nào.</div>
+          <div className={styles.empty}>{t("chat.joinApplications.empty")}</div>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th className={styles.th}>TÊN</th>
-                  <th className={styles.th}>ĐÃ ĐĂNG KÝ</th>
+                  <th className={styles.th}>{t("chat.joinApplications.colName")}</th>
+                  <th className={styles.th}>{t("chat.joinApplications.colRegistered")}</th>
                   <th className={styles.th} aria-hidden style={{ width: 48 }} />
                 </tr>
               </thead>
@@ -228,7 +237,7 @@ export default function ServerJoinApplicationsPanel({
                           <button
                             type="button"
                             className={styles.kebab}
-                            aria-label="Tùy chọn"
+                            aria-label={t("chat.joinApplications.optionsBtn")}
                             onClick={(e) => openKebab(e, row.userId)}
                           >
                             ⋮
@@ -249,7 +258,7 @@ export default function ServerJoinApplicationsPanel({
           <button
             type="button"
             className={styles.menuBackdrop}
-            aria-label="Đóng menu"
+            aria-label={t("chat.joinApplications.closeMenu")}
             onClick={() => setMenu(null)}
           />
           <div
@@ -265,7 +274,7 @@ export default function ServerJoinApplicationsPanel({
                 onViewProfile?.(uid);
               }}
             >
-              Hồ sơ
+              {t("chat.joinApplications.menuProfile")}
               <span>👤</span>
             </button>
             <button
@@ -277,7 +286,7 @@ export default function ServerJoinApplicationsPanel({
                 onSendMessage?.(uid);
               }}
             >
-              Nhắn tin
+              {t("chat.joinApplications.menuMessage")}
               <span>💬</span>
             </button>
 
@@ -291,20 +300,20 @@ export default function ServerJoinApplicationsPanel({
                     onClick={async () => {
                       const uid = menu.userId;
                       setMenu(null);
-                      const minsRaw = window.prompt("Hạn chế trong bao lâu (phút)?", "10");
+                      const minsRaw = window.prompt(t("chat.joinApplications.menuTimeoutPrompt"), "10");
                       if (!minsRaw) return;
                       const mins = Math.max(1, Math.min(60 * 24 * 7, Number(minsRaw)));
                       if (!Number.isFinite(mins)) return;
-                      const reason = window.prompt("Lý do (không bắt buộc):", "") || undefined;
+                      const reason = window.prompt(t("chat.joinApplications.menuReasonPrompt"), "") || undefined;
                       try {
                         await serversApi.timeoutMember(serverId, uid, mins * 60, reason);
                         await refresh();
                       } catch (e) {
-                        alert(e instanceof Error ? e.message : "Không hạn chế được");
+                        alert(e instanceof Error ? e.message : t("chat.joinApplications.menuTimeoutError"));
                       }
                     }}
                   >
-                    Hạn chế
+                    {t("chat.joinApplications.menuTimeout")}
                     <span>⏳</span>
                   </button>
                 )}
@@ -315,18 +324,18 @@ export default function ServerJoinApplicationsPanel({
                     onClick={async () => {
                       const uid = menu.userId;
                       setMenu(null);
-                      const ok = window.confirm("Bạn chắc chắn muốn đuổi người này khỏi máy chủ?");
+                      const ok = window.confirm(t("chat.joinApplications.menuKickConfirm"));
                       if (!ok) return;
-                      const reason = window.prompt("Lý do (không bắt buộc):", "") || undefined;
+                      const reason = window.prompt(t("chat.joinApplications.menuReasonPrompt"), "") || undefined;
                       try {
                         await serversApi.kickMember(serverId, uid, reason);
                         await refresh();
                       } catch (e) {
-                        alert(e instanceof Error ? e.message : "Không đuổi được");
+                        alert(e instanceof Error ? e.message : t("chat.joinApplications.menuKickError"));
                       }
                     }}
                   >
-                    Đuổi
+                    {t("chat.joinApplications.menuKick")}
                     <span>🚪</span>
                   </button>
                 )}
@@ -337,18 +346,18 @@ export default function ServerJoinApplicationsPanel({
                     onClick={async () => {
                       const uid = menu.userId;
                       setMenu(null);
-                      const ok = window.confirm("Bạn chắc chắn muốn cấm người này khỏi máy chủ?");
+                      const ok = window.confirm(t("chat.joinApplications.menuBanConfirm"));
                       if (!ok) return;
-                      const reason = window.prompt("Lý do (không bắt buộc):", "") || undefined;
+                      const reason = window.prompt(t("chat.joinApplications.menuReasonPrompt"), "") || undefined;
                       try {
                         await serversApi.banMember(serverId, uid, reason);
                         await refresh();
                       } catch (e) {
-                        alert(e instanceof Error ? e.message : "Không cấm được");
+                        alert(e instanceof Error ? e.message : t("chat.joinApplications.menuBanError"));
                       }
                     }}
                   >
-                    Cấm
+                    {t("chat.joinApplications.menuBan")}
                     <span>⛔</span>
                   </button>
                 )}
@@ -380,14 +389,14 @@ export default function ServerJoinApplicationsPanel({
             <button
               type="button"
               className={styles.closeBtn}
-              aria-label="Đóng"
+              aria-label={t("chat.joinApplications.close")}
               onClick={() => setSelectedUserId(null)}
             >
               ×
             </button>
           </div>
           <div className={styles.detailBody}>
-            {detailLoading && <div className={styles.loading}>Đang tải…</div>}
+            {detailLoading && <div className={styles.loading}>{t("chat.joinApplications.detailLoading")}</div>}
             {!detailLoading && detail && (
               <>
                 {detail.status === "pending" && (
@@ -395,7 +404,7 @@ export default function ServerJoinApplicationsPanel({
                     <button
                       type="button"
                       className={`${styles.circleBtn} ${styles.approveBtn}`}
-                      title="Chấp thuận"
+                      title={t("chat.joinApplications.approveTitle")}
                       disabled={actionLoading}
                       onClick={() => void handleApprove()}
                     >
@@ -404,7 +413,7 @@ export default function ServerJoinApplicationsPanel({
                     <button
                       type="button"
                       className={`${styles.circleBtn} ${styles.rejectBtn}`}
-                      title="Từ chối"
+                      title={t("chat.joinApplications.rejectTitle")}
                       disabled={actionLoading}
                       onClick={() => void handleReject()}
                     >
@@ -428,13 +437,13 @@ export default function ServerJoinApplicationsPanel({
                 })}
 
                 <div className={styles.accountBlock}>
-                  <div className={styles.qLabel}>Tài khoản</div>
+                  <div className={styles.qLabel}>{t("chat.joinApplications.accountLabel")}</div>
                   <div className={styles.accountRow}>
-                    <span>Ngày tham gia Cordigram</span>
+                    <span>{t("chat.joinApplications.joinedCordigram")}</span>
                     <span>{fmtDateOnly(detail.accountCreatedAt)}</span>
                   </div>
                   <div className={styles.accountRow}>
-                    <span>Ngày gửi đơn đăng ký</span>
+                    <span>{t("chat.joinApplications.submittedAt")}</span>
                     <span>{fmtDateOnly(detail.applicationSubmittedAt)}</span>
                   </div>
                 </div>

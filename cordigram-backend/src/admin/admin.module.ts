@@ -45,10 +45,7 @@ import {
 } from '../servers/server-notification.schema';
 import { Message, MessageSchema } from '../messages/message.schema';
 import { Role, RoleSchema } from '../roles/role.schema';
-import {
-  UserServer,
-  UserServerSchema,
-} from '../access/user-server.schema';
+import { UserServer, UserServerSchema } from '../access/user-server.schema';
 import {
   CommunityDiscoveryHistory,
   CommunityDiscoveryHistorySchema,

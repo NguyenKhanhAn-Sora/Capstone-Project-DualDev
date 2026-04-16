@@ -706,10 +706,7 @@ export class DirectMessagesService {
             last = Math.max(last, new Date(d.lastSeenAt).getTime());
           }
         }
-        onlineById.set(
-          u._id.toString(),
-          last > 0 && last >= devicePresenceAgo,
-        );
+        onlineById.set(u._id.toString(), last > 0 && last >= devicePresenceAgo);
       }
 
       return profiles.map((profile) => {

@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   NotFoundException,
   Patch,
@@ -27,6 +28,9 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../users/user.schema';
+import { Server } from '../servers/server.schema';
+import { ChannelMessagesGateway } from '../messages/channel-messages.gateway';
+import { BoostService } from '../boost/boost.service';
 
 type MulterFile = {
   buffer: Buffer;
@@ -35,12 +39,10 @@ type MulterFile = {
   size: number;
 };
 
-const MAX_AVATAR_BYTES = Number(
-  process.env.CLOUDINARY_MAX_FILE_SIZE ?? 15 * 1024 * 1024,
-);
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
 const avatarFileFilter = (
-  _req: unknown,
+  req: any,
   file: MulterFile,
   cb: (error: Error | null, acceptFile: boolean) => void,
 ) => {
@@ -60,6 +62,9 @@ export class ProfilesController {
     private readonly config: ConfigService,
     private readonly cloudinaryService: CloudinaryService,
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(Server.name) private readonly serverModel: Model<Server>,
+    private readonly channelMessagesGateway: ChannelMessagesGateway,
+    private readonly boostService: BoostService,
   ) {}
 
   @Get('check-username')
@@ -113,6 +118,10 @@ export class ProfilesController {
       displayName: profile.displayName,
       username: profile.username,
       avatarUrl: profile.avatarUrl,
+      displayNameFontId: (profile as any).displayNameFontId ?? null,
+      displayNameEffectId: (profile as any).displayNameEffectId ?? null,
+      displayNamePrimaryHex: (profile as any).displayNamePrimaryHex ?? null,
+      displayNameAccentHex: (profile as any).displayNameAccentHex ?? null,
       status: userDoc?.status ?? 'active',
       isCreatorVerified: Boolean(userDoc?.isCreatorVerified),
       signupStage: userDoc?.signupStage ?? 'completed',
@@ -172,12 +181,29 @@ export class ProfilesController {
       throw new BadRequestException('pronouns must be at most 80 characters');
     }
 
+    if (dto.coverUrl !== undefined) {
+      const trimmed = (dto.coverUrl ?? '').trim();
+      const isImageUrl = /^https?:\/\//i.test(trimmed);
+      const accountBoost = Boolean((user as any)?.settings?.accountBoost);
+      const ent = await this.boostService.getBoostStatus(user.userId);
+      const unlocked = accountBoost || Boolean(ent?.active);
+      if (isImageUrl && !unlocked) {
+        throw new ForbiddenException('Boost required for banner image');
+      }
+    }
+
     await this.profilesService.updateForUserId(user.userId, {
       displayName: dto.displayName,
       username: nextUsername,
       bio: dto.bio,
       pronouns: dto.pronouns,
       coverUrl: dto.coverUrl,
+      profileThemePrimaryHex: dto.profileThemePrimaryHex,
+      profileThemeAccentHex: dto.profileThemeAccentHex,
+      displayNameFontId: dto.displayNameFontId,
+      displayNameEffectId: dto.displayNameEffectId,
+      displayNamePrimaryHex: dto.displayNamePrimaryHex,
+      displayNameAccentHex: dto.displayNameAccentHex,
       location: dto.location,
       gender: dto.gender,
       birthdate: dto.birthdate,
@@ -193,6 +219,42 @@ export class ProfilesController {
       aboutVisibility: dto.aboutVisibility,
       profileVisibility: dto.profileVisibility,
     });
+
+    // Realtime: push to all members who share servers with this user (and to self).
+    try {
+      const uid = user.userId;
+      const servers = await this.serverModel
+        .find({ 'members.userId': uid })
+        .select('members.userId')
+        .lean()
+        .exec();
+      const memberIds = new Set<string>();
+      for (const s of servers as any[]) {
+        for (const m of s?.members ?? []) {
+          const id = (m?.userId?._id ?? m?.userId)?.toString?.();
+          if (id) memberIds.add(id);
+        }
+      }
+      memberIds.add(uid);
+
+      const payload = {
+        userId: uid,
+        coverUrl: dto.coverUrl,
+        profileThemePrimaryHex: dto.profileThemePrimaryHex,
+        profileThemeAccentHex: dto.profileThemeAccentHex,
+        displayNameFontId: dto.displayNameFontId,
+        displayNameEffectId: dto.displayNameEffectId,
+        displayNamePrimaryHex: dto.displayNamePrimaryHex,
+        displayNameAccentHex: dto.displayNameAccentHex,
+        updatedAt: new Date().toISOString(),
+      };
+
+      memberIds.forEach((id) => {
+        this.channelMessagesGateway.emitToUser(id, 'user-profile-style-updated', payload);
+      });
+    } catch {
+      // ignore realtime failures
+    }
 
     return this.profilesService.getProfileDetails({
       usernameOrId: user.userId,
@@ -274,8 +336,8 @@ export class ProfilesController {
 
     const originalFile = files?.original?.[0];
     const croppedFile = files?.cropped?.[0];
-    if (!originalFile || !croppedFile) {
-      throw new BadRequestException('Thiếu file original hoặc cropped');
+    if (!originalFile) {
+      throw new BadRequestException('Thiếu file original');
     }
 
     const folder = [
@@ -288,6 +350,38 @@ export class ProfilesController {
       .join('/');
 
     const suffix = uuid();
+    const isGif =
+      originalFile.mimetype === 'image/gif' ||
+      originalFile.originalname?.toLowerCase?.().endsWith?.('.gif');
+
+    if (isGif) {
+      const accountBoost = Boolean((user as any)?.settings?.accountBoost);
+      const ent = await this.boostService.getBoostStatus(user.userId);
+      const unlocked = accountBoost || Boolean(ent?.active);
+      if (!unlocked) {
+        throw new BadRequestException('Boost required for GIF avatar');
+      }
+    }
+
+    // Animated avatars (GIF): accept original only to preserve animation.
+    if (!croppedFile) {
+      if (!isGif) {
+        throw new BadRequestException('Thiếu file cropped');
+      }
+      const uploaded = await this.cloudinaryService.uploadBuffer({
+        buffer: originalFile.buffer,
+        folder,
+        publicId: `avatar-${suffix}`,
+      });
+      return this.profilesService.updateAvatarForUser({
+        userId: user.userId,
+        avatarUrl: uploaded.secureUrl,
+        avatarOriginalUrl: uploaded.secureUrl,
+        avatarPublicId: uploaded.publicId,
+        avatarOriginalPublicId: uploaded.publicId,
+      });
+    }
+
     const [original, cropped] = await Promise.all([
       this.cloudinaryService.uploadBuffer({
         buffer: originalFile.buffer,

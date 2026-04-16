@@ -34,6 +34,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { CreatorVerificationModule } from './creator-verification/creator-verification.module';
 import { RolesModule } from './roles/roles.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
+import { BoostModule } from './boost/boost.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { AuditLogModule } from './audit-log/audit-log.module';
     CreatorVerificationModule,
     RolesModule,
     AuditLogModule,
+    BoostModule,
   ],
   controllers: [AppController],
   providers: [AppService],

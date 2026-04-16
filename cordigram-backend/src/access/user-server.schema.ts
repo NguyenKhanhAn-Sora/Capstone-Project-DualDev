@@ -62,6 +62,39 @@ export class UserServer extends Document {
 
   @Prop({ type: String, default: null })
   nickname?: string | null;
+
+  /**
+   * Hồ sơ theo từng máy chủ (nếu user cài đặt).
+   * - serverAvatarUrl: avatar chỉ áp dụng trong server này
+   * - serverCoverUrl: cover/banner chỉ áp dụng trong server này (cùng format coverUrl của profile)
+   */
+  @Prop({ type: String, default: null })
+  serverAvatarUrl?: string | null;
+
+  @Prop({ type: String, default: null })
+  serverCoverUrl?: string | null;
+
+  // =========================
+  // Boost profile customization (per-server overrides)
+  // =========================
+
+  @Prop({ type: String, default: null })
+  serverProfileThemePrimaryHex?: string | null;
+
+  @Prop({ type: String, default: null })
+  serverProfileThemeAccentHex?: string | null;
+
+  @Prop({ type: String, default: null })
+  serverDisplayNameFontId?: string | null;
+
+  @Prop({ type: String, default: null })
+  serverDisplayNameEffectId?: string | null;
+
+  @Prop({ type: String, default: null })
+  serverDisplayNamePrimaryHex?: string | null;
+
+  @Prop({ type: String, default: null })
+  serverDisplayNameAccentHex?: string | null;
 }
 
 export const UserServerSchema = SchemaFactory.createForClass(UserServer);

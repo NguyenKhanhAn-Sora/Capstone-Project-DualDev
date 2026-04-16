@@ -32,6 +32,10 @@ import {
 import ProfileBannerColorPicker from "./ProfileBannerColorPicker";
 import ProfileImagePickerModal from "./ProfileImagePickerModal";
 import ProfileAvatarCropModal from "./ProfileAvatarCropModal";
+import ProfileBannerCropModal from "./ProfileBannerCropModal";
+import DisplayNameStyleModal, {
+  type DisplayNameStyleValue,
+} from "./DisplayNameStyleModal";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), {
   ssr: false,
@@ -41,6 +45,18 @@ const BIO_MAX = 300;
 const PRONOUNS_MAX = 80;
 const DEFAULT_AVATAR =
   "https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg";
+const DEFAULT_DISPLAY_NAME_STYLE: DisplayNameStyleValue = {
+  fontId: "default",
+  effectId: "solid",
+  primaryHex: "#f2f3f5",
+  accentHex: "#5865f2",
+};
+const DEMO_DISPLAY_NAME_STYLE: DisplayNameStyleValue = {
+  fontId: "rounded",
+  effectId: "gradient",
+  primaryHex: "#f2f3f5",
+  accentHex: "#5865f2",
+};
 
 type Props = {
   active: boolean;
@@ -49,6 +65,8 @@ type Props = {
   tab: "main" | "server";
   servers: Array<{ _id: string; name: string }>;
   onToast?: (message: string) => void;
+  /** Tạm thời: parent có thể truyền; nếu không sẽ mặc định locked. */
+  boostUnlocked?: boolean;
 };
 
 async function urlToImageFile(url: string): Promise<File> {
@@ -56,7 +74,7 @@ async function urlToImageFile(url: string): Promise<File> {
   if (!res.ok) throw new Error("Could not load image.");
   const blob = await res.blob();
   const type = blob.type && blob.type.startsWith("image/") ? blob.type : "image/jpeg";
-  const ext = type.includes("png") ? "png" : "jpg";
+  const ext = type.includes("gif") ? "gif" : type.includes("png") ? "png" : "jpg";
   return new File([blob], `avatar-recent.${ext}`, { type });
 }
 
@@ -67,6 +85,7 @@ export default function MessagesProfileEditor({
   tab,
   servers,
   onToast,
+  boostUnlocked = false,
 }: Props) {
   const { t } = useLanguage();
   /** Tránh vòng lặp: parent hay truyền `onToast` inline → không đưa vào deps của loadProfile. */
@@ -85,6 +104,21 @@ export default function MessagesProfileEditor({
   const [bannerImageUrl, setBannerImageUrl] = useState<string | null>(null);
   const [bannerSolidHex, setBannerSolidHex] = useState("#5865f2");
 
+  const [serverAvatarUrl, setServerAvatarUrl] = useState<string | null>(null);
+  const [serverBannerImageUrl, setServerBannerImageUrl] = useState<string | null>(null);
+  const [serverBannerSolidHex, setServerBannerSolidHex] = useState("#5865f2");
+  const [serverDisplayNameStyle, setServerDisplayNameStyle] = useState<DisplayNameStyleValue>({
+    ...DEFAULT_DISPLAY_NAME_STYLE,
+  });
+
+  const [displayNameStyle, setDisplayNameStyle] = useState<DisplayNameStyleValue>({
+    ...DEFAULT_DISPLAY_NAME_STYLE,
+  });
+  const [demoDisplayNameStyle, setDemoDisplayNameStyle] = useState<DisplayNameStyleValue>({
+    ...DEMO_DISPLAY_NAME_STYLE,
+  });
+  const [styleModalOpen, setStyleModalOpen] = useState(false);
+
   const [serverId, setServerId] = useState("");
   const [serverNickname, setServerNickname] = useState("");
   const [serverNickSaving, setServerNickSaving] = useState(false);
@@ -94,6 +128,9 @@ export default function MessagesProfileEditor({
   const [cropOpen, setCropOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [cropFile, setCropFile] = useState<File | null>(null);
+  const [bannerCropOpen, setBannerCropOpen] = useState(false);
+  const [bannerCropSrc, setBannerCropSrc] = useState<string | null>(null);
+  const [bannerCropFile, setBannerCropFile] = useState<File | null>(null);
   const [colorOpen, setColorOpen] = useState(false);
   const swatchRef = useRef<HTMLButtonElement>(null);
   const [swatchRect, setSwatchRect] = useState<DOMRect | null>(null);
@@ -103,6 +140,53 @@ export default function MessagesProfileEditor({
   const refreshRecent = useCallback(() => {
     setRecentList(getRecentProfileAvatars());
   }, []);
+
+  const mapProfileStyle = useCallback(
+    (source?: {
+      displayNameFontId?: string | null;
+      displayNameEffectId?: string | null;
+      displayNamePrimaryHex?: string | null;
+      displayNameAccentHex?: string | null;
+    }) => ({
+      fontId:
+        source?.displayNameFontId === "rounded" || source?.displayNameFontId === "mono"
+          ? source.displayNameFontId
+          : DEFAULT_DISPLAY_NAME_STYLE.fontId,
+      effectId:
+        source?.displayNameEffectId === "gradient" || source?.displayNameEffectId === "neon"
+          ? source.displayNameEffectId
+          : DEFAULT_DISPLAY_NAME_STYLE.effectId,
+      primaryHex:
+        /^#[0-9a-f]{6}$/i.test(String(source?.displayNamePrimaryHex || ""))
+          ? String(source?.displayNamePrimaryHex)
+          : DEFAULT_DISPLAY_NAME_STYLE.primaryHex,
+      accentHex:
+        /^#[0-9a-f]{6}$/i.test(String(source?.displayNameAccentHex || ""))
+          ? String(source?.displayNameAccentHex)
+          : DEFAULT_DISPLAY_NAME_STYLE.accentHex,
+    }),
+    [],
+  );
+
+  const emitDisplayNameStyleUpdated = useCallback(
+    (style: DisplayNameStyleValue) => {
+      if (typeof window === "undefined") return;
+      window.dispatchEvent(
+        new CustomEvent("cordigram-user-profile-style-updated", {
+          detail: {
+            userId: currentUserId,
+            displayName: displayName.trim() || username.trim() || undefined,
+            username: username.trim() || undefined,
+            displayNameFontId: style.fontId,
+            displayNameEffectId: style.effectId,
+            displayNamePrimaryHex: style.primaryHex,
+            displayNameAccentHex: style.accentHex,
+          },
+        }),
+      );
+    },
+    [currentUserId, displayName, username],
+  );
 
   useEffect(() => {
     if (!emojiOpen) return;
@@ -131,6 +215,7 @@ export default function MessagesProfileEditor({
       const parsed = parseUserCover(detail.coverUrl);
       setBannerImageUrl(parsed.bannerImageUrl);
       setBannerSolidHex(parsed.bannerSolidHex);
+      setDisplayNameStyle(mapProfileStyle(detail));
     } catch {
       try {
         const cur = await fetchCurrentProfile({ token });
@@ -142,13 +227,14 @@ export default function MessagesProfileEditor({
         const parsed = parseUserCover("");
         setBannerImageUrl(parsed.bannerImageUrl);
         setBannerSolidHex(parsed.bannerSolidHex);
+        setDisplayNameStyle(mapProfileStyle(cur));
       } catch {
         onToastRef.current?.(t("chat.profileEditor.errorLoadProfile"));
       }
     } finally {
       setLoading(false);
     }
-  }, [token, currentUserId]);
+  }, [token, currentUserId, mapProfileStyle]);
 
   useEffect(() => {
     if (!active) return;
@@ -159,6 +245,10 @@ export default function MessagesProfileEditor({
   useEffect(() => {
     if (!active || tab !== "server" || !serverId) {
       setServerNickname((prev) => (prev === "" ? prev : ""));
+      setServerAvatarUrl(null);
+      setServerBannerImageUrl(null);
+      setServerBannerSolidHex("#5865f2");
+      setServerDisplayNameStyle({ ...DEFAULT_DISPLAY_NAME_STYLE });
       return;
     }
     void (async () => {
@@ -171,6 +261,32 @@ export default function MessagesProfileEditor({
       }
     })();
   }, [active, tab, serverId, currentUserId]);
+
+  useEffect(() => {
+    if (!active || tab !== "server" || !serverId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await serversApi.getMyServerProfile(serverId);
+        if (cancelled) return;
+        setServerAvatarUrl(res.avatarUrl ?? null);
+        const parsed = parseUserCover(res.coverUrl || "");
+        setServerBannerImageUrl(parsed.bannerImageUrl);
+        setServerBannerSolidHex(parsed.bannerSolidHex);
+        setServerDisplayNameStyle(mapProfileStyle(res));
+      } catch {
+        if (cancelled) return;
+        setServerAvatarUrl(null);
+        const parsed = parseUserCover("");
+        setServerBannerImageUrl(parsed.bannerImageUrl);
+        setServerBannerSolidHex(parsed.bannerSolidHex);
+        setServerDisplayNameStyle({ ...DEFAULT_DISPLAY_NAME_STYLE });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [active, tab, serverId, mapProfileStyle]);
 
   const openColorPicker = () => {
     const r = swatchRef.current?.getBoundingClientRect() ?? null;
@@ -192,17 +308,57 @@ export default function MessagesProfileEditor({
     return `${u} • ${p}`;
   }, [username, pronouns]);
 
+  const effectiveAvatarUrl =
+    tab === "server" && serverId ? serverAvatarUrl || avatarUrl : avatarUrl;
+  const effectiveBannerImageUrl =
+    tab === "server" && serverId ? serverBannerImageUrl : bannerImageUrl;
+  const effectiveBannerSolidHex =
+    tab === "server" && serverId ? serverBannerSolidHex : bannerSolidHex;
+
+  const appliedDisplayNameStyle =
+    tab === "server" && serverId ? serverDisplayNameStyle : displayNameStyle;
+  const effectiveNameStyle = boostUnlocked ? appliedDisplayNameStyle : demoDisplayNameStyle;
+
   const bannerStyle = useMemo(() => {
-    if (bannerImageUrl) {
+    if (effectiveBannerImageUrl) {
       return {
-        backgroundImage: `url('${bannerImageUrl.replace(/'/g, "%27")}')`,
+        backgroundImage: `url('${effectiveBannerImageUrl.replace(/'/g, "%27")}')`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundColor: "#111214",
       } as React.CSSProperties;
     }
-    return { background: bannerSolidHex } as React.CSSProperties;
-  }, [bannerImageUrl, bannerSolidHex]);
+    return { background: effectiveBannerSolidHex } as React.CSSProperties;
+  }, [effectiveBannerImageUrl, effectiveBannerSolidHex]);
+
+  const displayNameTextStyle = useMemo(() => {
+    const v = effectiveNameStyle;
+    const primary = v.primaryHex;
+    const accent = v.accentHex;
+    const fontFamily =
+      v.fontId === "mono"
+        ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
+        : v.fontId === "rounded"
+          ? 'ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif'
+          : 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+    if (v.effectId === "gradient") {
+      return {
+        backgroundImage: `linear-gradient(0deg, ${primary}, ${accent})`,
+        WebkitBackgroundClip: "text",
+        backgroundClip: "text",
+        color: "transparent",
+        fontFamily,
+      } as React.CSSProperties;
+    }
+    if (v.effectId === "neon") {
+      return {
+        color: primary,
+        textShadow: `0 0 10px ${accent}, 0 0 18px ${accent}`,
+        fontFamily,
+      } as React.CSSProperties;
+    }
+    return { color: primary, fontFamily } as React.CSSProperties;
+  }, [effectiveNameStyle]);
 
   const saveMain = async () => {
     setSaving(true);
@@ -219,12 +375,49 @@ export default function MessagesProfileEditor({
           bio: bio.slice(0, BIO_MAX),
           pronouns: pronouns.trim().slice(0, PRONOUNS_MAX),
           coverUrl: coverUrl || undefined,
+          ...(boostUnlocked
+            ? ({
+                displayNameFontId: displayNameStyle.fontId,
+                displayNameEffectId: displayNameStyle.effectId,
+                displayNamePrimaryHex: displayNameStyle.primaryHex,
+                displayNameAccentHex: displayNameStyle.accentHex,
+              } as any)
+            : {}),
         },
       });
       onToast?.(t("chat.profileEditor.savedProfile"));
       await loadProfile();
     } catch (e) {
       onToast?.(e instanceof Error ? e.message : t("chat.profileEditor.errorSaveProfile"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveServerProfile = async () => {
+    if (!serverId) return;
+    setSaving(true);
+    try {
+      const coverUrl = buildUserCoverUrlForSave({
+        bannerImageUrl: serverBannerImageUrl,
+        bannerSolidHex: serverBannerSolidHex,
+      });
+      await serversApi.updateMyServerProfile(serverId, {
+        coverUrl: coverUrl || null,
+        ...(boostUnlocked
+          ? {
+              displayNameFontId: serverDisplayNameStyle.fontId,
+              displayNameEffectId: serverDisplayNameStyle.effectId,
+              displayNamePrimaryHex: serverDisplayNameStyle.primaryHex,
+              displayNameAccentHex: serverDisplayNameStyle.accentHex,
+            }
+          : {}),
+      });
+      onToast?.(t("chat.profileEditor.savedProfile"));
+    } catch (e) {
+      onToast?.(
+        e instanceof Error ? e.message : t("chat.profileEditor.errorSaveProfile"),
+      );
     } finally {
       setSaving(false);
     }
@@ -243,6 +436,47 @@ export default function MessagesProfileEditor({
     }
   };
 
+  const applyDisplayNameStyle = async (next: DisplayNameStyleValue) => {
+    if (!boostUnlocked) {
+      setDemoDisplayNameStyle(next);
+      return;
+    }
+
+    if (tab === "server" && serverId) {
+      setServerDisplayNameStyle(next);
+      try {
+        await serversApi.updateMyServerProfile(serverId, {
+          displayNameFontId: next.fontId,
+          displayNameEffectId: next.effectId,
+          displayNamePrimaryHex: next.primaryHex,
+          displayNameAccentHex: next.accentHex,
+        });
+        onToast?.("Đã áp dụng kiểu tên hiển thị.");
+      } catch (e) {
+        onToast?.(e instanceof Error ? e.message : t("chat.profileEditor.errorSaveProfile"));
+      }
+      return;
+    }
+
+    setDisplayNameStyle(next);
+    try {
+      await updateMyProfile({
+        token,
+        payload: {
+          displayNameFontId: next.fontId,
+          displayNameEffectId: next.effectId,
+          displayNamePrimaryHex: next.primaryHex,
+          displayNameAccentHex: next.accentHex,
+        },
+      });
+      emitDisplayNameStyleUpdated(next);
+      onToast?.("Đã áp dụng kiểu tên hiển thị.");
+      await loadProfile();
+    } catch (e) {
+      onToast?.(e instanceof Error ? e.message : t("chat.profileEditor.errorSaveProfile"));
+    }
+  };
+
   const startCropWithFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -258,6 +492,18 @@ export default function MessagesProfileEditor({
 
   const onAvatarFile = (file: File) => {
     setPickerOpen(false);
+    const isGif =
+      file.type === "image/gif" || file.name.toLowerCase().endsWith(".gif");
+    if (isGif) {
+      if (!boostUnlocked) {
+        onToast?.("Cần Boost để dùng avatar GIF.");
+        return;
+      }
+      const form = new FormData();
+      form.append("original", file, file.name);
+      void submitAvatarForm(form);
+      return;
+    }
     startCropWithFile(file);
   };
 
@@ -265,6 +511,18 @@ export default function MessagesProfileEditor({
     setPickerOpen(false);
     try {
       const f = await urlToImageFile(url);
+      const isGif =
+        f.type === "image/gif" || f.name.toLowerCase().endsWith(".gif");
+      if (isGif) {
+        if (!boostUnlocked) {
+          onToast?.("Cần Boost để dùng avatar GIF.");
+          return;
+        }
+        const form = new FormData();
+        form.append("original", f, f.name);
+        await submitAvatarForm(form);
+        return;
+      }
       startCropWithFile(f);
     } catch {
       onToast?.(t("chat.profileEditor.errorOpenRecent"));
@@ -273,19 +531,46 @@ export default function MessagesProfileEditor({
 
   const onBannerFile = async (file: File) => {
     setPickerOpen(false);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setBannerCropSrc(result);
+        setBannerCropFile(file);
+        setBannerCropOpen(true);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const submitBannerCrop = async (cropped: File) => {
     try {
-      const optimized = await optimizeBannerImageFile(file);
+      const optimized = await optimizeBannerImageFile(cropped);
       const up = await uploadMedia({ token, file: optimized });
       const url = up.secureUrl || up.url;
       if (!url) throw new Error(t("chat.profileEditor.errorGetUrl"));
-      setBannerImageUrl(url);
-      setBannerSolidHex(bannerSolidHex);
+      if (tab === "server" && serverId) {
+        setServerBannerImageUrl(url);
+        setServerBannerSolidHex(serverBannerSolidHex);
+      } else {
+        setBannerImageUrl(url);
+        setBannerSolidHex(bannerSolidHex);
+      }
+      onToast?.(t("chat.profileEditor.updatedBanner"));
     } catch (e) {
       onToast?.(e instanceof Error ? e.message : t("chat.profileEditor.errorLoadBanner"));
     }
   };
 
   const submitAvatarForm = async (form: FormData) => {
+    if (tab === "server" && serverId) {
+      const res = await serversApi.uploadMyServerAvatar({ serverId, form });
+      setServerAvatarUrl(res.avatarUrl || null);
+      if (res.avatarUrl) pushRecentProfileAvatar(res.avatarUrl);
+      refreshRecent();
+      onToast?.(t("chat.profileEditor.updatedAvatar"));
+      return;
+    }
     const res = await uploadProfileAvatar({ token, form });
     setAvatarUrl(res.avatarUrl || DEFAULT_AVATAR);
     if (res.avatarUrl) pushRecentProfileAvatar(res.avatarUrl);
@@ -306,6 +591,39 @@ export default function MessagesProfileEditor({
       ) : (
         <div className={styles.layout}>
           <div className={styles.left}>
+            <div className={styles.boostPromo}>
+              <div className={styles.boostPromoRow}>
+                <div>
+                  <div className={styles.boostPromoTitle}>
+                    {boostUnlocked ? "Dùng Boost ngay" : "Dùng thử Boost"}
+                    {!boostUnlocked ? (
+                      <span className={styles.lockedTag}>
+                        <span className={styles.lockedTagDot} aria-hidden />
+                        Locked
+                      </span>
+                    ) : (
+                      <span className={styles.lockedTag}>
+                        <span className={styles.lockedTagDot} aria-hidden />
+                        Unlock
+                      </span>
+                    )}
+                  </div>
+                  <div className={styles.boostPromoDesc}>
+                    {boostUnlocked
+                      ? "Mở Kiểu Tên Hiển Thị để chọn font, hiệu ứng và màu rồi dùng ngay trên hồ sơ của bạn."
+                      : "Bạn có thể thử tùy chỉnh kiểu tên hiển thị trong preview. Các thay đổi sẽ không được lưu nếu chưa mở khóa."}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={styles.btnGhost}
+                  onClick={() => setStyleModalOpen(true)}
+                >
+                  {boostUnlocked ? "Dùng ngay" : "Mở demo"}
+                </button>
+              </div>
+            </div>
+
             {tab === "server" ? (
               <>
                 <label className={styles.sectionTitle}>{t("chat.profileEditor.serverLabel")}</label>
@@ -379,10 +697,15 @@ export default function MessagesProfileEditor({
                 className={styles.btnMuted}
                 onClick={async () => {
                   try {
-                    const res = await resetProfileAvatar({ token });
-                    setAvatarUrl(res.avatarUrl || DEFAULT_AVATAR);
+                      if (tab === "server" && serverId) {
+                        await serversApi.resetMyServerAvatar(serverId);
+                        setServerAvatarUrl(null);
+                      } else {
+                        const res = await resetProfileAvatar({ token });
+                        setAvatarUrl(res.avatarUrl || DEFAULT_AVATAR);
+                        await loadProfile();
+                      }
                     onToast?.(t("chat.profileEditor.removeAvatarDone"));
-                    await loadProfile();
                   } catch {
                     onToast?.(t("chat.profileEditor.errorRemoveAvatar"));
                   }
@@ -434,13 +757,13 @@ export default function MessagesProfileEditor({
                 ref={swatchRef}
                 className={styles.colorSwatch}
                 style={
-                  bannerImageUrl
+                  effectiveBannerImageUrl
                     ? {
-                        backgroundImage: `url(${bannerImageUrl})`,
+                        backgroundImage: `url(${effectiveBannerImageUrl})`,
                         backgroundSize: "cover",
                         backgroundPosition: "center",
                       }
-                    : { background: bannerSolidHex }
+                    : { background: effectiveBannerSolidHex }
                 }
                 aria-label={t("chat.profileEditor.changeBannerColorAria")}
                 onClick={openColorPicker}
@@ -452,23 +775,42 @@ export default function MessagesProfileEditor({
               <button
                 type="button"
                 className={styles.btnPrimary}
+                disabled={!boostUnlocked}
                 onClick={() => {
+                  if (!boostUnlocked) {
+                    onToast?.("Cần Boost để upload banner.");
+                    return;
+                  }
                   setPickerMode("banner");
                   setPickerOpen(true);
                 }}
               >
                 {t("chat.profileEditor.uploadBanner")}
               </button>
-              {bannerImageUrl ? (
+              {effectiveBannerImageUrl ? (
                 <button
                   type="button"
                   className={styles.btnMuted}
-                  onClick={() => setBannerImageUrl(null)}
+                  onClick={() => {
+                    if (tab === "server" && serverId) setServerBannerImageUrl(null);
+                    else setBannerImageUrl(null);
+                  }}
                 >
                   {t("chat.profileEditor.removeBanner")}
                 </button>
               ) : null}
             </div>
+
+            <hr className={styles.divider} />
+
+            <label className={styles.sectionTitle}>Kiểu Tên Hiển Thị</label>
+            <button
+              type="button"
+              className={styles.btnPrimary}
+              onClick={() => setStyleModalOpen(true)}
+            >
+              {boostUnlocked ? "Chỉnh kiểu tên" : "Dùng thử (Boost)"}
+            </button>
 
             <hr className={styles.divider} />
 
@@ -511,10 +853,12 @@ export default function MessagesProfileEditor({
               <button
                 type="button"
                 className={styles.btnPrimary}
-                disabled={saving}
-                onClick={() => void saveMain()}
+                disabled={saving || (tab === "server" && !serverId)}
+                onClick={() => void (tab === "server" ? saveServerProfile() : saveMain())}
               >
-                {t("chat.profileEditor.saveMain")}
+                {tab === "server"
+                  ? t("chat.profileEditor.saveServerProfile")
+                  : t("chat.profileEditor.saveMain")}
               </button>
               {tab === "server" ? (
                 <button
@@ -536,10 +880,12 @@ export default function MessagesProfileEditor({
               <div className={styles.bodyCard}>
                 <div className={styles.avatar}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={avatarUrl || DEFAULT_AVATAR} alt="" />
+                  <img src={effectiveAvatarUrl || DEFAULT_AVATAR} alt="" />
                 </div>
                 <div className={styles.statusPill}>{t("chat.profileEditor.statusPlaceholder")}</div>
-                <h4 className={styles.displayName}>{previewDisplayName}</h4>
+                <h4 className={styles.displayName} style={displayNameTextStyle}>
+                  {previewDisplayName}
+                </h4>
                 <p className={styles.subLine}>{subLine}</p>
                 <p className={styles.bioPreview}>{bio.trim() || "\u00a0"}</p>
                 <button type="button" className={styles.exampleBtn}>
@@ -550,9 +896,11 @@ export default function MessagesProfileEditor({
             <div className={styles.nameplate}>
               <div className={styles.nameplateAv}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={avatarUrl || DEFAULT_AVATAR} alt="" />
+                <img src={effectiveAvatarUrl || DEFAULT_AVATAR} alt="" />
               </div>
-              <span className={styles.nameplateName}>{previewDisplayName}</span>
+              <span className={styles.nameplateName} style={displayNameTextStyle}>
+                {previewDisplayName}
+              </span>
             </div>
           </aside>
         </div>
@@ -582,15 +930,43 @@ export default function MessagesProfileEditor({
         onSubmit={submitAvatarForm}
       />
 
+      <ProfileBannerCropModal
+        open={bannerCropOpen}
+        imageSrc={bannerCropSrc}
+        sourceFile={bannerCropFile}
+        onClose={() => {
+          setBannerCropOpen(false);
+          setBannerCropSrc(null);
+          setBannerCropFile(null);
+        }}
+        onSubmit={submitBannerCrop}
+      />
+
       <ProfileBannerColorPicker
         open={colorOpen}
         anchorRect={swatchRect}
-        valueHex={bannerSolidHex}
+        valueHex={effectiveBannerSolidHex}
         onChange={(hex) => {
-          setBannerSolidHex(hex);
-          setBannerImageUrl(null);
+          if (tab === "server" && serverId) {
+            setServerBannerSolidHex(hex);
+            setServerBannerImageUrl(null);
+          } else {
+            setBannerSolidHex(hex);
+            setBannerImageUrl(null);
+          }
         }}
         onClose={() => setColorOpen(false)}
+      />
+
+      <DisplayNameStyleModal
+        open={styleModalOpen}
+        locked={!boostUnlocked}
+        value={boostUnlocked ? appliedDisplayNameStyle : demoDisplayNameStyle}
+        onToast={onToast}
+        onClose={() => setStyleModalOpen(false)}
+        onChange={(next) => {
+          void applyDisplayNameStyle(next);
+        }}
       />
     </div>
   );

@@ -55,6 +55,27 @@ export interface CallEvent {
   };
 }
 
+export interface UserProfileStyleUpdatedEvent {
+  userId: string;
+  avatarUrl?: string | null;
+  coverUrl?: string | null;
+  displayNameFontId?: string;
+  displayNameEffectId?: string;
+  displayNamePrimaryHex?: string;
+  displayNameAccentHex?: string;
+  updatedAt?: string;
+}
+
+export interface BoostEntitlementUpdatedEvent {
+  userId: string;
+  tier?: "basic" | "boost" | null;
+  active?: boolean;
+  expiresAt?: string | null;
+  limits?: any;
+}
+
+export type PresenceStatus = "online" | "idle" | "offline";
+
 export const useDirectMessages = ({
   userId,
   token,
@@ -77,9 +98,14 @@ export const useDirectMessages = ({
     reactions: any[];
   } | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [presenceByUserId, setPresenceByUserId] = useState<Record<string, PresenceStatus>>({});
   const [callEvent, setCallEvent] = useState<CallEvent | null>(null);
   const [callEnded, setCallEnded] = useState<{ from: string } | null>(null);
   const [messageDeleted, setMessageDeleted] = useState<{ messageId: string } | null>(null);
+  const [userProfileStyleUpdated, setUserProfileStyleUpdated] =
+    useState<UserProfileStyleUpdatedEvent | null>(null);
+  const [boostEntitlementUpdated, setBoostEntitlementUpdated] =
+    useState<BoostEntitlementUpdatedEvent | null>(null);
 
   useEffect(() => {
     if (!userId || !token) return;
@@ -133,6 +159,7 @@ export const useDirectMessages = ({
 
     socket.on("user-online", (data: { userId: string; status: string }) => {
       setOnlineUsers((prev) => new Set(prev).add(data.userId));
+      setPresenceByUserId((prev) => ({ ...prev, [data.userId]: "online" }));
     });
 
     socket.on("user-offline", (data: { userId: string; status: string }) => {
@@ -141,7 +168,42 @@ export const useDirectMessages = ({
         newSet.delete(data.userId);
         return newSet;
       });
+      setPresenceByUserId((prev) => ({ ...prev, [data.userId]: "offline" }));
     });
+
+    socket.on(
+      "presence-snapshot",
+      (data: { items: Array<{ userId: string; status: PresenceStatus }> }) => {
+        const items = Array.isArray(data?.items) ? data.items : [];
+        setPresenceByUserId((prev) => {
+          const next = { ...prev };
+          for (const it of items) next[it.userId] = it.status;
+          return next;
+        });
+        setOnlineUsers((prev) => {
+          const next = new Set(prev);
+          for (const it of items) {
+            if (it.status === "offline") next.delete(it.userId);
+            else next.add(it.userId);
+          }
+          return next;
+        });
+      },
+    );
+
+    socket.on(
+      "presence-updated",
+      (data: { userId: string; status: PresenceStatus }) => {
+        if (!data?.userId || !data?.status) return;
+        setPresenceByUserId((prev) => ({ ...prev, [data.userId]: data.status }));
+        setOnlineUsers((prev) => {
+          const next = new Set(prev);
+          if (data.status === "offline") next.delete(data.userId);
+          else next.add(data.userId);
+          return next;
+        });
+      },
+    );
 
     socket.on(
       "messages-read",
@@ -234,6 +296,32 @@ export const useDirectMessages = ({
       setTimeout(() => setMessageDeleted(null), 1000);
     });
 
+    socket.on("user-profile-style-updated", (data: UserProfileStyleUpdatedEvent) => {
+      if (!data?.userId) return;
+      setUserProfileStyleUpdated(data);
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-user-profile-style-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
+      setTimeout(() => setUserProfileStyleUpdated(null), 500);
+    });
+
+    socket.on("boost-entitlement-updated", (data: BoostEntitlementUpdatedEvent) => {
+      if (!data?.userId) return;
+      setBoostEntitlementUpdated(data);
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-boost-entitlement-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
+      setTimeout(() => setBoostEntitlementUpdated(null), 500);
+    });
+
     socket.on("error", (error: { message: string }) => {
       console.error("Socket error:", error);
     });
@@ -244,6 +332,37 @@ export const useDirectMessages = ({
       socket.disconnect();
     };
   }, [userId, token]);
+
+  // Presence: activity + ping (helps idle/online accuracy)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isConnected || !socketRef.current) return;
+    const socket = socketRef.current;
+    const ping = () => socket.emit("presence-ping");
+    const activity = () => socket.emit("presence-activity");
+    ping();
+    activity();
+    const id = window.setInterval(ping, 25_000);
+    window.addEventListener("focus", activity);
+    window.addEventListener("mousemove", activity, { passive: true });
+    window.addEventListener("keydown", activity);
+    window.addEventListener("click", activity);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("focus", activity);
+      window.removeEventListener("mousemove", activity as any);
+      window.removeEventListener("keydown", activity);
+      window.removeEventListener("click", activity);
+    };
+  }, [isConnected]);
+
+  const subscribePresence = useCallback((ids: string[]) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+    const userIds = Array.isArray(ids) ? ids.map(String).filter(Boolean) : [];
+    if (userIds.length === 0) return;
+    socket.emit("presence-subscribe", { userIds });
+  }, []);
 
   const sendMessage = useCallback(
     (receiverId: string, content: string, attachments?: string[]) => {
@@ -350,9 +469,13 @@ export const useDirectMessages = ({
     messagesRead,
     reactionUpdate,
     onlineUsers,
+    presenceByUserId,
+    subscribePresence,
     callEvent,
     callEnded,
     messageDeleted,
+    userProfileStyleUpdated,
+    boostEntitlementUpdated,
     sendMessage,
     notifyTyping,
     markAsRead,

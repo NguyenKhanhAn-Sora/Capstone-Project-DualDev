@@ -11,20 +11,20 @@ import React, {
 import { createPortal } from "react-dom";
 import styles from "./MessagesUserSettingsModal.module.css";
 import { useLanguage } from "@/component/language-provider";
-import { useTheme } from "@/component/theme-provider";
+import { applyAccentColor, useTheme } from "@/component/theme-provider";
 import {
   fetchUserSettings,
   updateUserSettings,
   fetchNotificationSettings,
   updateNotificationSettings,
   fetchBlockedUsers,
-  fetchIgnoredUserIds,
   unblockUser,
-  unignoreUser,
+  fetchBoostStatus,
   type UserSettingsResponse,
   type NotificationSettingsResponse,
 } from "@/lib/api";
 import MessagesProfileEditor from "./MessagesProfileEditor";
+import ThemePanel from "./ThemePanel";
 import {
   getDmSidebarPeersMode,
   setDmSidebarPeersMode,
@@ -48,6 +48,32 @@ type Props = {
   onToast?: (message: string) => void;
 };
 
+const CHAT_ACCENT_KEY = "chat-accent-color";
+
+function chatAccentKey(userId: string) {
+  const u = String(userId || "").trim();
+  return u ? `chat:${u}:${CHAT_ACCENT_KEY}` : CHAT_ACCENT_KEY;
+}
+
+function normalizeHex(color: string): string {
+  const raw = String(color || "").trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(raw)) return raw.toUpperCase();
+  return "#5865F2";
+}
+
+function getMessagesRoot(): HTMLElement | null {
+  if (typeof document === "undefined") return null;
+  return document.getElementById("cordigram-messages-root");
+}
+
+function applyChatTheme(color: string) {
+  const root = getMessagesRoot();
+  if (root) applyAccentColor(color, root);
+  if (typeof document !== "undefined") {
+    applyAccentColor(color, document.body);
+  }
+}
+
 function dispatchChatSettingsRefresh() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("cordigram-chat-settings"));
@@ -68,7 +94,9 @@ export default function MessagesUserSettingsModal({
   }, [onToast]);
 
   const { language, setLanguage, t } = useLanguage();
-  const { theme, setTheme } = useTheme();
+  const {
+    theme,
+  } = useTheme();
   const [section, setSection] = useState<Section>("general");
   const [profileSub, setProfileSub] = useState<"main" | "server">("main");
 
@@ -83,22 +111,73 @@ export default function MessagesUserSettingsModal({
   const [blocked, setBlocked] = useState<
     Array<{ userId: string; displayName?: string; username?: string }>
   >([]);
-  const [ignoredIds, setIgnoredIds] = useState<string[]>([]);
-  const [listOpen, setListOpen] = useState<"none" | "blocked" | "ignored">(
-    "none",
-  );
+  const [listOpen, setListOpen] = useState<"none" | "blocked">("none");
+  const [boostUnlocked, setBoostUnlocked] = useState(false);
 
   const isDark = theme === "dark";
+  const backgroundThemeOptions = useMemo(
+    () => [
+      { id: "default" as const, color: "#5865F2", label: "Mặc định" },
+      { id: "social-dark" as const, color: "#0C1220", label: "Tối (giống Social)" },
+      { id: "graphite" as const, color: "#3A3D49", label: "Graphite" },
+      { id: "charcoal" as const, color: "#24262E", label: "Charcoal" },
+      { id: "indigo" as const, color: "#111827", label: "Indigo" },
+    ],
+    [],
+  );
+  const accentOptions = useMemo(
+    () => [
+      { id: "blurple", color: "#5865F2", label: "Blurple" },
+      { id: "green", color: "#57F287", label: "Green" },
+      { id: "yellow", color: "#FEE75C", label: "Yellow" },
+      { id: "pink", color: "#EB459E", label: "Pink" },
+      { id: "red", color: "#ED4245", label: "Red" },
+      { id: "orange", color: "#F59E0B", label: "Orange" },
+      { id: "cyan", color: "#22D3EE", label: "Cyan" },
+      { id: "violet", color: "#8B5CF6", label: "Violet" },
+      { id: "neon-green", color: "#39FF14", label: "Neon Green" },
+      { id: "neon-pink", color: "#FF2BD6", label: "Neon Pink" },
+      { id: "neon-blue", color: "#00E5FF", label: "Neon Blue" },
+      { id: "gradient1", color: "#7C3AED", secondary: "#22D3EE", label: "Gradient 1" },
+      { id: "gradient2", color: "#2563EB", secondary: "#EC4899", label: "Gradient 2" },
+      { id: "gradient3", color: "#F97316", secondary: "#EF4444", label: "Gradient 3" },
+    ],
+    [],
+  );
+  const [chatAccentColor, setChatAccentColor] = useState<string>(() => {
+    if (typeof window === "undefined") return "#5865F2";
+    const raw = localStorage.getItem(chatAccentKey(currentUserId));
+    return normalizeHex(raw || "#5865F2");
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(chatAccentKey(currentUserId), normalizeHex(chatAccentColor));
+    applyChatTheme(chatAccentColor);
+  }, [chatAccentColor, currentUserId]);
+
+  useEffect(() => {
+    if (!open) return;
+    // Sync state from storage when opening (supports login/logout without reload).
+    if (typeof window !== "undefined") {
+      const storedAccent = localStorage.getItem(chatAccentKey(currentUserId));
+      if (storedAccent) setChatAccentColor(normalizeHex(storedAccent));
+    }
+    applyChatTheme(chatAccentColor);
+  }, [open, currentUserId]);
+
   const cardClass = `${styles.card} ${isDark ? styles.cardDark : ""}`;
 
   const loadCore = useCallback(async () => {
     try {
-      const [u, n] = await Promise.all([
+      const [u, n, b] = await Promise.all([
         fetchUserSettings({ token }),
         fetchNotificationSettings({ token }),
+        fetchBoostStatus({ token }).catch(() => null),
       ]);
       setUserSettings(u);
       setNotif(n);
+      setBoostUnlocked(Boolean(b?.active) || Boolean(b?.unlocked) || Boolean(b?.accountBoost));
     } catch {
       onToastRef.current?.(t("settings.failedToLoad"));
     }
@@ -131,14 +210,7 @@ export default function MessagesUserSettingsModal({
     }
   };
 
-  const loadIgnored = async () => {
-    try {
-      const res = await fetchIgnoredUserIds({ token });
-      setIgnoredIds(res.ignoredUserIds ?? []);
-    } catch {
-      onToast?.(t("settings.errorLoadIgnored"));
-    }
-  };
+  // Ignored users UI removed.
 
   const notifEnabled = Boolean(notif?.enabled && !notif?.mutedIndefinitely);
 
@@ -415,16 +487,6 @@ export default function MessagesUserSettingsModal({
                   >
                     {t("settings.messages.blockedList")}
                   </button>
-                  <button
-                    type="button"
-                    className={styles.linkRow}
-                    onClick={() => {
-                      setListOpen("ignored");
-                      void loadIgnored();
-                    }}
-                  >
-                    {t("settings.messages.ignoredList")}
-                  </button>
                 </div>
                 {listOpen === "blocked" ? (
                   <div className={styles.panel}>
@@ -472,84 +534,59 @@ export default function MessagesUserSettingsModal({
                     </ul>
                   </div>
                 ) : null}
-                {listOpen === "ignored" ? (
-                  <div className={styles.panel}>
-                    <div className={styles.row}>
-                      <strong>{t("settings.messages.ignoredHeading")}</strong>
-                      <button
-                        type="button"
-                        className={styles.smallBtnGhost}
-                        style={{ background: "#4e5058" }}
-                        onClick={() => setListOpen("none")}
-                      >
-                        {t("settings.close")}
-                      </button>
-                    </div>
-                    <ul className={styles.list}>
-                      {ignoredIds.length === 0 ? (
-                        <li>{t("settings.messages.empty")}</li>
-                      ) : (
-                        ignoredIds.map((id) => (
-                          <li key={id} className={styles.listItem}>
-                            <span>{id}</span>
-                            <button
-                              type="button"
-                              className={styles.smallBtn}
-                              onClick={async () => {
-                                try {
-                                  await unignoreUser({ token, userId: id });
-                                  await loadIgnored();
-                                  onToast?.(t("settings.unignoredToast"));
-                                } catch {
-                                  onToast?.(t("settings.errorUnignore"));
-                                }
-                              }}
-                            >
-                              {t("settings.messages.unignored")}
-                            </button>
-                          </li>
-                        ))
-                      )}
-                    </ul>
-                  </div>
-                ) : null}
               </>
             ) : null}
 
             {section === "appearance" ? (
               <>
-                <h3 className={styles.sectionTitle}>
-                  {t("settings.appearance.title")}
-                </h3>
-                <p className={styles.hint}>{t("settings.appearance.hint")}</p>
-                <div className={styles.themeGrid}>
-                  <button
-                    type="button"
-                    className={`${styles.themeCard} ${theme === "light" ? styles.themeCardActive : ""}`}
-                    onClick={() => {
-                      setTheme("light");
-                      void updateUserSettings({ token, theme: "light" }).catch(
-                        () => undefined,
-                      );
-                    }}
-                  >
-                    <div className={`${styles.themeSwatch} ${styles.swLight}`} />
-                    <span>{t("settings.appearance.light")}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.themeCard} ${theme === "dark" ? styles.themeCardActive : ""}`}
-                    onClick={() => {
-                      setTheme("dark");
-                      void updateUserSettings({ token, theme: "dark" }).catch(
-                        () => undefined,
-                      );
-                    }}
-                  >
-                    <div className={`${styles.themeSwatch} ${styles.swDark}`} />
-                    <span>{t("settings.appearance.dark")}</span>
-                  </button>
+                <div className={styles.appearanceBgSection}>
+                  <div className={styles.appearanceBgHeader}>
+                    <div>
+                      <div className={styles.appearanceBgTitle}>
+                        {t("settings.appearanceBg.title")}
+                      </div>
+                      <div className={styles.hint} style={{ margin: 0 }}>
+                        {t("settings.appearanceBg.hint")}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={styles.appearanceBgLockedWrap}>
+                    <div className={styles.appearanceBgRow}>
+                      <div className={styles.appearanceBgSwatches}>
+                        {backgroundThemeOptions.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            className={`${styles.appearanceBgSwatch} ${
+                              normalizeHex(chatAccentColor) === option.color.toUpperCase()
+                                ? styles.appearanceBgSwatchActive
+                                : ""
+                            }`}
+                            title={option.label}
+                            aria-label={t("settings.appearanceBg.pickPreset")}
+                            style={{
+                              background: option.color,
+                            }}
+                            onClick={() => {
+                              setChatAccentColor(option.color);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
+                <ThemePanel
+                  unlocked={boostUnlocked}
+                  accentColor={chatAccentColor}
+                  options={accentOptions}
+                  onSelectColor={setChatAccentColor}
+                  onPreview={() => applyChatTheme("#5865F2")}
+                  onUnlock={() => {
+                    onToast?.("Mở tab Boost để đăng ký gói.");
+                  }}
+                />
               </>
             ) : null}
 
@@ -626,6 +663,7 @@ export default function MessagesUserSettingsModal({
                   tab={profileSub}
                   servers={servers}
                   onToast={onToast}
+                  boostUnlocked={boostUnlocked}
                 />
               </>
             ) : null}

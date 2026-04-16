@@ -19,11 +19,14 @@ import { ServerInvite } from '../server-invites/server-invite.schema';
 import { RolesService } from '../roles/roles.service';
 import { ServerNotification } from './server-notification.schema';
 import { Message } from '../messages/message.schema';
+import { ChannelReadState } from '../messages/channel-read-state.schema';
+import { UserServer } from '../access/user-server.schema';
 import { ChannelMessagesGateway } from '../messages/channel-messages.gateway';
 import { ServerAccessService } from '../access/server-access.service';
 import { RolePermissions } from '../roles/role.schema';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { AddServerEmojiDto } from './dto/add-server-emoji.dto';
+import { BoostService } from '../boost/boost.service';
 
 /** Tổng số emoji tùy chỉnh (tĩnh + GIF) tối đa mỗi máy chủ. */
 const MAX_CUSTOM_EMOJIS_PER_SERVER = 30;
@@ -44,12 +47,17 @@ export class ServersService {
     @InjectModel(ServerNotification.name)
     private serverNotificationModel: Model<ServerNotification>,
     @InjectModel(Message.name) private messageModel: Model<Message>,
+    @InjectModel(ChannelReadState.name)
+    private channelReadStateModel: Model<ChannelReadState>,
+    @InjectModel(UserServer.name) private userServerModel: Model<UserServer>,
     @Inject(forwardRef(() => RolesService))
     private rolesService: RolesService,
     private readonly channelMessagesGateway: ChannelMessagesGateway,
     @Inject(forwardRef(() => ServerAccessService))
     private readonly serverAccessService: ServerAccessService,
     private readonly auditLogService: AuditLogService,
+    @Inject(forwardRef(() => BoostService))
+    private readonly boostService: BoostService,
   ) {}
 
   /** Internal helper: create notification for specific users (no permission checks). */
@@ -237,99 +245,190 @@ export class ServersService {
 
     // Localised names for system categories and channel slots
     const CATEGORY_NAMES: Record<string, Record<string, string>> = {
-      info:  { vi: 'Thông Tin',  en: 'Information',       ja: '情報',              zh: '信息'       },
-      text:  { vi: 'Kênh Chat',  en: 'Text Channels',     ja: 'テキストチャンネル', zh: '文字频道'   },
-      voice: { vi: 'Kênh Thoại', en: 'Voice Channels',    ja: 'ボイスチャンネル',  zh: '语音频道'   },
+      info: { vi: 'Thông Tin', en: 'Information', ja: '情報', zh: '信息' },
+      text: {
+        vi: 'Kênh Chat',
+        en: 'Text Channels',
+        ja: 'テキストチャンネル',
+        zh: '文字频道',
+      },
+      voice: {
+        vi: 'Kênh Thoại',
+        en: 'Voice Channels',
+        ja: 'ボイスチャンネル',
+        zh: '语音频道',
+      },
     };
 
     const CH: Record<string, Record<string, string>> = {
-      general:          { vi: 'chung',                          en: 'general',           ja: '一般',             zh: '综合'       },
-      generalVoice:     { vi: 'general',                        en: 'general',           ja: '一般',             zh: '综合'       },
-      highlights:       { vi: 'khoảnh-khắc-đỉnh-cao',          en: 'highlights',        ja: 'ハイライト',       zh: '精彩时刻'   },
-      lobby:            { vi: 'Sảnh',                           en: 'Lobby',             ja: 'ロビー',           zh: '大厅'       },
-      gaming:           { vi: 'trò-chơi',                       en: 'gaming',            ja: 'ゲーム',           zh: '游戏'       },
-      music:            { vi: 'âm-nhạc',                        en: 'music',             ja: '音楽',             zh: '音乐'       },
-      waitingRoom:      { vi: 'Phòng Chờ',                      en: 'Waiting Room',      ja: '待機室',           zh: '等待室'     },
-      streamingRoom:    { vi: 'Phòng Stream',                   en: 'Streaming',         ja: '配信',             zh: '直播'       },
-      welcomeAndRules:  { vi: 'chào-mừng-và-nội-quy',          en: 'welcome-and-rules', ja: 'ようこそ-ルール',   zh: '欢迎-规则'  },
-      notesResources:   { vi: 'ghi-chú-tài-nguyên',            en: 'notes-resources',   ja: 'ノート-リソース',   zh: '笔记-资源'  },
-      homeworkHelp:     { vi: 'trợ-giúp-làm-bài-tập-về-nhà',  en: 'homework-help',     ja: '宿題サポート',     zh: '作业帮助'   },
-      sessionPlanning:  { vi: 'lên-kế-hoạch-phiên',            en: 'session-planning',  ja: 'セッション計画',   zh: '学习计划'   },
-      offTopic:         { vi: 'lạc-đề',                         en: 'off-topic',         ja: '雑談',             zh: '闲聊'       },
-      studyRoom1:       { vi: 'Phòng Học 1',                    en: 'Study Room 1',      ja: '学習室-1',         zh: '学习室-1'   },
-      studyRoom2:       { vi: 'Phòng Học 2',                    en: 'Study Room 2',      ja: '学習室-2',         zh: '学习室-2'   },
-      announcements:    { vi: 'thông-báo',                      en: 'announcements',     ja: 'お知らせ',         zh: '公告'       },
-      resources:        { vi: 'tài-nguyên',                     en: 'resources',         ja: 'リソース',         zh: '资源'       },
-      meetingPlan:      { vi: 'kế-hoạch-buổi-họp',             en: 'meeting-plan',      ja: '会議計画',         zh: '会议计划'   },
-      meetingRoom1:     { vi: 'Phòng Họp 1',                    en: 'Meeting Room 1',    ja: '会議室-1',         zh: '会议室-1'   },
-      meetingRoom2:     { vi: 'Phòng Họp 2',                    en: 'Meeting Room 2',    ja: '会議室-2',         zh: '会议室-2'   },
-      events:           { vi: 'sự-kiện',                        en: 'events',            ja: 'イベント',         zh: '活动'       },
-      feedback:         { vi: 'ý-kiến-và-phản-hồi',            en: 'feedback',          ja: 'フィードバック',   zh: '反馈'       },
-      communityHub:     { vi: 'Nơi Tập Trung Cộng Đồng',       en: 'Community Hub',     ja: 'コミュニティハブ', zh: '社区中心'   },
+      general: { vi: 'chung', en: 'general', ja: '一般', zh: '综合' },
+      generalVoice: { vi: 'general', en: 'general', ja: '一般', zh: '综合' },
+      highlights: {
+        vi: 'khoảnh-khắc-đỉnh-cao',
+        en: 'highlights',
+        ja: 'ハイライト',
+        zh: '精彩时刻',
+      },
+      lobby: { vi: 'Sảnh', en: 'Lobby', ja: 'ロビー', zh: '大厅' },
+      gaming: { vi: 'trò-chơi', en: 'gaming', ja: 'ゲーム', zh: '游戏' },
+      music: { vi: 'âm-nhạc', en: 'music', ja: '音楽', zh: '音乐' },
+      waitingRoom: {
+        vi: 'Phòng Chờ',
+        en: 'Waiting Room',
+        ja: '待機室',
+        zh: '等待室',
+      },
+      streamingRoom: {
+        vi: 'Phòng Stream',
+        en: 'Streaming',
+        ja: '配信',
+        zh: '直播',
+      },
+      welcomeAndRules: {
+        vi: 'chào-mừng-và-nội-quy',
+        en: 'welcome-and-rules',
+        ja: 'ようこそ-ルール',
+        zh: '欢迎-规则',
+      },
+      notesResources: {
+        vi: 'ghi-chú-tài-nguyên',
+        en: 'notes-resources',
+        ja: 'ノート-リソース',
+        zh: '笔记-资源',
+      },
+      homeworkHelp: {
+        vi: 'trợ-giúp-làm-bài-tập-về-nhà',
+        en: 'homework-help',
+        ja: '宿題サポート',
+        zh: '作业帮助',
+      },
+      sessionPlanning: {
+        vi: 'lên-kế-hoạch-phiên',
+        en: 'session-planning',
+        ja: 'セッション計画',
+        zh: '学习计划',
+      },
+      offTopic: { vi: 'lạc-đề', en: 'off-topic', ja: '雑談', zh: '闲聊' },
+      studyRoom1: {
+        vi: 'Phòng Học 1',
+        en: 'Study Room 1',
+        ja: '学習室-1',
+        zh: '学习室-1',
+      },
+      studyRoom2: {
+        vi: 'Phòng Học 2',
+        en: 'Study Room 2',
+        ja: '学習室-2',
+        zh: '学习室-2',
+      },
+      announcements: {
+        vi: 'thông-báo',
+        en: 'announcements',
+        ja: 'お知らせ',
+        zh: '公告',
+      },
+      resources: {
+        vi: 'tài-nguyên',
+        en: 'resources',
+        ja: 'リソース',
+        zh: '资源',
+      },
+      meetingPlan: {
+        vi: 'kế-hoạch-buổi-họp',
+        en: 'meeting-plan',
+        ja: '会議計画',
+        zh: '会议计划',
+      },
+      meetingRoom1: {
+        vi: 'Phòng Họp 1',
+        en: 'Meeting Room 1',
+        ja: '会議室-1',
+        zh: '会议室-1',
+      },
+      meetingRoom2: {
+        vi: 'Phòng Họp 2',
+        en: 'Meeting Room 2',
+        ja: '会議室-2',
+        zh: '会议室-2',
+      },
+      events: { vi: 'sự-kiện', en: 'events', ja: 'イベント', zh: '活动' },
+      feedback: {
+        vi: 'ý-kiến-và-phản-hồi',
+        en: 'feedback',
+        ja: 'フィードバック',
+        zh: '反馈',
+      },
+      communityHub: {
+        vi: 'Nơi Tập Trung Cộng Đồng',
+        en: 'Community Hub',
+        ja: 'コミュニティハブ',
+        zh: '社区中心',
+      },
     };
 
-    const c = (key: string): string => CH[key]?.[lang] ?? CH[key]?.['vi'] ?? key;
+    const c = (key: string): string =>
+      CH[key]?.[lang] ?? CH[key]?.['vi'] ?? key;
 
     const templateChannels: Record<string, ChannelDef[]> = {
       custom: [
-        { name: c('general'),         type: 'text',  isDefault: true },
-        { name: c('generalVoice'),    type: 'voice', isDefault: true },
+        { name: c('general'), type: 'text', isDefault: true },
+        { name: c('generalVoice'), type: 'voice', isDefault: true },
       ],
       gaming: [
-        { name: c('general'),    type: 'text',  isDefault: true },
+        { name: c('general'), type: 'text', isDefault: true },
         { name: c('highlights'), type: 'text' },
-        { name: c('lobby'),      type: 'voice', isDefault: true },
-        { name: 'Gaming',        type: 'voice' },
+        { name: c('lobby'), type: 'voice', isDefault: true },
+        { name: 'Gaming', type: 'voice' },
       ],
       friends: [
-        { name: c('general'),       type: 'text',  isDefault: true },
-        { name: c('gaming'),        type: 'text' },
-        { name: c('music'),         type: 'text' },
-        { name: c('waitingRoom'),   type: 'voice', isDefault: true },
+        { name: c('general'), type: 'text', isDefault: true },
+        { name: c('gaming'), type: 'text' },
+        { name: c('music'), type: 'text' },
+        { name: c('waitingRoom'), type: 'voice', isDefault: true },
         { name: c('streamingRoom'), type: 'voice' },
       ],
       'study-group': [
-        { name: c('welcomeAndRules'),  type: 'text', category: 'info' },
-        { name: c('notesResources'),   type: 'text', category: 'info' },
-        { name: c('general'),          type: 'text', isDefault: true },
-        { name: c('homeworkHelp'),     type: 'text' },
+        { name: c('welcomeAndRules'), type: 'text', category: 'info' },
+        { name: c('notesResources'), type: 'text', category: 'info' },
+        { name: c('general'), type: 'text', isDefault: true },
+        { name: c('homeworkHelp'), type: 'text' },
         { name: c('sessionPlanning'), type: 'text' },
-        { name: c('offTopic'),         type: 'text' },
-        { name: c('waitingRoom'),      type: 'voice', isDefault: true },
-        { name: c('studyRoom1'),       type: 'voice' },
-        { name: c('studyRoom2'),       type: 'voice' },
+        { name: c('offTopic'), type: 'text' },
+        { name: c('waitingRoom'), type: 'voice', isDefault: true },
+        { name: c('studyRoom1'), type: 'voice' },
+        { name: c('studyRoom2'), type: 'voice' },
       ],
       'school-club': [
         { name: c('welcomeAndRules'), type: 'text', category: 'info' },
-        { name: c('announcements'),   type: 'text', category: 'info' },
-        { name: c('resources'),       type: 'text', category: 'info' },
-        { name: c('general'),         type: 'text', isDefault: true },
-        { name: c('meetingPlan'),     type: 'text' },
-        { name: c('offTopic'),        type: 'text' },
-        { name: c('waitingRoom'),     type: 'voice', isDefault: true },
-        { name: c('meetingRoom1'),    type: 'voice' },
-        { name: c('meetingRoom2'),    type: 'voice' },
+        { name: c('announcements'), type: 'text', category: 'info' },
+        { name: c('resources'), type: 'text', category: 'info' },
+        { name: c('general'), type: 'text', isDefault: true },
+        { name: c('meetingPlan'), type: 'text' },
+        { name: c('offTopic'), type: 'text' },
+        { name: c('waitingRoom'), type: 'voice', isDefault: true },
+        { name: c('meetingRoom1'), type: 'voice' },
+        { name: c('meetingRoom2'), type: 'voice' },
       ],
       'local-community': [
         { name: c('welcomeAndRules'), type: 'text', category: 'info' },
-        { name: c('announcements'),   type: 'text', category: 'info' },
-        { name: c('resources'),       type: 'text', category: 'info' },
-        { name: c('general'),         type: 'text', isDefault: true },
-        { name: c('meetingPlan'),     type: 'text' },
-        { name: c('offTopic'),        type: 'text' },
-        { name: c('waitingRoom'),     type: 'voice', isDefault: true },
-        { name: c('meetingRoom1'),    type: 'voice' },
-        { name: c('meetingRoom2'),    type: 'voice' },
+        { name: c('announcements'), type: 'text', category: 'info' },
+        { name: c('resources'), type: 'text', category: 'info' },
+        { name: c('general'), type: 'text', isDefault: true },
+        { name: c('meetingPlan'), type: 'text' },
+        { name: c('offTopic'), type: 'text' },
+        { name: c('waitingRoom'), type: 'voice', isDefault: true },
+        { name: c('meetingRoom1'), type: 'voice' },
+        { name: c('meetingRoom2'), type: 'voice' },
       ],
       'artists-creators': [
         { name: c('welcomeAndRules'), type: 'text', category: 'info' },
-        { name: c('announcements'),   type: 'text', category: 'info' },
-        { name: c('general'),         type: 'text', isDefault: true },
-        { name: c('events'),          type: 'text' },
-        { name: c('feedback'),        type: 'text' },
-        { name: c('waitingRoom'),     type: 'voice', isDefault: true },
-        { name: c('communityHub'),    type: 'voice' },
-        { name: c('streamingRoom'),   type: 'voice' },
+        { name: c('announcements'), type: 'text', category: 'info' },
+        { name: c('general'), type: 'text', isDefault: true },
+        { name: c('events'), type: 'text' },
+        { name: c('feedback'), type: 'text' },
+        { name: c('waitingRoom'), type: 'voice', isDefault: true },
+        { name: c('communityHub'), type: 'voice' },
+        { name: c('streamingRoom'), type: 'voice' },
       ],
     };
 
@@ -620,14 +719,20 @@ export class ServersService {
   async getServersByUserId(userId: string): Promise<Server[]> {
     const userObjectId = new Types.ObjectId(userId);
     return this.serverModel
-      .find({ 'members.userId': userObjectId })
+      .find({
+        'members.userId': userObjectId,
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      })
       .populate('channels')
       .exec();
   }
 
   async getServerById(serverId: string): Promise<Server> {
     const server = await this.serverModel
-      .findById(serverId)
+      .findOne({
+        _id: new Types.ObjectId(serverId),
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      })
       .populate({
         path: 'channels',
         populate: [{ path: 'createdBy', select: 'email' }],
@@ -647,7 +752,10 @@ export class ServersService {
     createdAt: Date;
   }> {
     const server = await this.serverModel
-      .findById(serverId)
+      .findOne({
+        _id: new Types.ObjectId(serverId),
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      })
       .select('members memberCount createdAt')
       .lean()
       .exec();
@@ -673,7 +781,10 @@ export class ServersService {
     updateServerDto: UpdateServerDto,
     userId: string,
   ): Promise<Server> {
-    const server = await this.serverModel.findById(serverId);
+    const server = await this.serverModel.findOne({
+      _id: new Types.ObjectId(serverId),
+      $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+    });
 
     if (!server) {
       throw new NotFoundException(`Server with id ${serverId} not found`);
@@ -702,7 +813,10 @@ export class ServersService {
     // Đồng bộ trường legacy: bannerUrl = ảnh hoặc màu (cho client cũ)
     const img = (server as any).bannerImageUrl;
     const col = (server as any).bannerColor;
-    if (updateServerDto.bannerImageUrl !== undefined || updateServerDto.bannerColor !== undefined) {
+    if (
+      updateServerDto.bannerImageUrl !== undefined ||
+      updateServerDto.bannerColor !== undefined
+    ) {
       (server as any).bannerUrl = img || col || (server as any).bannerUrl;
     }
     if (updateServerDto.profileTraits !== undefined) {
@@ -828,7 +942,10 @@ export class ServersService {
   }
 
   async deleteServer(serverId: string, userId: string): Promise<void> {
-    const server = await this.serverModel.findById(serverId);
+    const server = await this.serverModel.findOne({
+      _id: new Types.ObjectId(serverId),
+      $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+    });
 
     if (!server) {
       throw new NotFoundException(`Server with id ${serverId} not found`);
@@ -839,14 +956,41 @@ export class ServersService {
       throw new ForbiddenException('Only server owner can delete the server');
     }
 
-    // Delete all channels in server
-    await this.channelModel.deleteMany({ serverId });
+    const serverName = (server as any).name?.trim?.() || 'Server';
+    const ownerStr = server.ownerId.toString();
+    const recipientSet = new Set<string>([ownerStr]);
+    for (const m of server.members || []) {
+      const uid = (m as any).userId?.toString?.();
+      if (uid && Types.ObjectId.isValid(uid)) recipientSet.add(uid);
+    }
+    const recipientUserIds = Array.from(recipientSet);
 
-    // Delete all roles in server
-    await this.rolesService.deleteRolesByServer(serverId);
+    const encodedName = encodeURIComponent(serverName);
+    try {
+      await this.createUserNotification({
+        serverId,
+        actorId: userId,
+        recipientUserIds,
+        title: '__SYS:serverDeletedTitle',
+        content: `__SYS:serverDeletedContent:${encodedName}`,
+      });
+    } catch (err) {
+      console.error('[deleteServer] createUserNotification failed:', err);
+    }
 
-    // Delete server
-    await this.serverModel.findByIdAndDelete(serverId);
+    const socketPayload = { serverId, serverName };
+    for (const uid of recipientUserIds) {
+      this.channelMessagesGateway.emitToUser(
+        uid,
+        'server-deleted',
+        socketPayload,
+      );
+    }
+
+    // Soft delete so admin can restore later (keeps owner + members + data).
+    (server as any).deletedAt = new Date();
+    (server as any).deletedByUserId = new Types.ObjectId(userId);
+    await server.save();
   }
 
   async addMemberToServer(
@@ -1033,13 +1177,20 @@ export class ServersService {
       }>;
     },
   ): Promise<Server> {
-    const userServer = await this.serverAccessService.joinServer(userId, serverId, joinOpts);
+    const userServer = await this.serverAccessService.joinServer(
+      userId,
+      serverId,
+      joinOpts,
+    );
     const isPending = userServer?.status === 'pending';
 
     if (joinOpts?.nickname?.trim() && !isPending) {
       await this.serverModel
         .updateOne(
-          { _id: new Types.ObjectId(serverId), 'members.userId': new Types.ObjectId(userId) },
+          {
+            _id: new Types.ObjectId(serverId),
+            'members.userId': new Types.ObjectId(userId),
+          },
           { $set: { 'members.$.nickname': joinOpts.nickname.trim() } },
         )
         .exec();
@@ -1073,7 +1224,10 @@ export class ServersService {
     const trimmed = nickname.trim();
     await this.serverModel
       .updateOne(
-        { _id: new Types.ObjectId(serverId), 'members.userId': new Types.ObjectId(userId) },
+        {
+          _id: new Types.ObjectId(serverId),
+          'members.userId': new Types.ObjectId(userId),
+        },
         { $set: { 'members.$.nickname': trimmed === '' ? null : trimmed } },
       )
       .exec();
@@ -1085,7 +1239,13 @@ export class ServersService {
     userId: string,
     nickname: string,
   ): Promise<void> {
-    const server = await this.serverModel.findById(serverId).select('members').exec();
+    const server = await this.serverModel
+      .findOne({
+        _id: new Types.ObjectId(serverId),
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      })
+      .select('members')
+      .exec();
     if (!server) {
       throw new NotFoundException('Server not found');
     }
@@ -1096,6 +1256,256 @@ export class ServersService {
       throw new BadRequestException('nickname too long');
     }
     await this.setMemberNickname(serverId, userId, nickname);
+  }
+
+  private async ensureUserServerAcceptedDoc(params: {
+    serverId: string;
+    userId: string;
+  }): Promise<void> {
+    const { serverId, userId } = params;
+    const existing = await this.userServerModel
+      .findOne({
+        serverId: new Types.ObjectId(serverId),
+        userId: new Types.ObjectId(userId),
+      })
+      .select('_id status')
+      .lean()
+      .exec();
+    if (existing?._id) return;
+    await this.userServerModel
+      .create({
+        serverId: new Types.ObjectId(serverId),
+        userId: new Types.ObjectId(userId),
+        status: 'accepted',
+        acceptedAt: new Date(),
+      } as any)
+      .catch(() => {});
+  }
+
+  async getMyServerProfile(
+    serverId: string,
+    userId: string,
+  ): Promise<{
+    nickname: string | null;
+    avatarUrl: string | null;
+    coverUrl: string | null;
+    profileThemePrimaryHex?: string | null;
+    profileThemeAccentHex?: string | null;
+    displayNameFontId?: string | null;
+    displayNameEffectId?: string | null;
+    displayNamePrimaryHex?: string | null;
+    displayNameAccentHex?: string | null;
+  }> {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('members')
+      .lean()
+      .exec();
+    if (!server) throw new NotFoundException('Server not found');
+    if (!this.isMember(server as any, userId)) {
+      throw new ForbiddenException('Not a member of this server');
+    }
+    const me = (server as any).members?.find(
+      (m: any) => m?.userId?.toString?.() === userId,
+    );
+    const us = await this.userServerModel
+      .findOne({
+        serverId: new Types.ObjectId(serverId),
+        userId: new Types.ObjectId(userId),
+      })
+      .select(
+        'serverAvatarUrl serverCoverUrl serverProfileThemePrimaryHex serverProfileThemeAccentHex serverDisplayNameFontId serverDisplayNameEffectId serverDisplayNamePrimaryHex serverDisplayNameAccentHex',
+      )
+      .lean()
+      .exec();
+    return {
+      nickname: (me?.nickname ?? null) as string | null,
+      avatarUrl: (us as any)?.serverAvatarUrl ?? null,
+      coverUrl: (us as any)?.serverCoverUrl ?? null,
+      profileThemePrimaryHex: (us as any)?.serverProfileThemePrimaryHex ?? null,
+      profileThemeAccentHex: (us as any)?.serverProfileThemeAccentHex ?? null,
+      displayNameFontId: (us as any)?.serverDisplayNameFontId ?? null,
+      displayNameEffectId: (us as any)?.serverDisplayNameEffectId ?? null,
+      displayNamePrimaryHex: (us as any)?.serverDisplayNamePrimaryHex ?? null,
+      displayNameAccentHex: (us as any)?.serverDisplayNameAccentHex ?? null,
+    };
+  }
+
+  async updateMyServerProfile(
+    serverId: string,
+    userId: string,
+    patch: {
+      coverUrl?: string | null;
+      profileThemePrimaryHex?: string | null;
+      profileThemeAccentHex?: string | null;
+      displayNameFontId?: string | null;
+      displayNameEffectId?: string | null;
+      displayNamePrimaryHex?: string | null;
+      displayNameAccentHex?: string | null;
+    },
+  ): Promise<void> {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('members')
+      .lean()
+      .exec();
+    if (!server) throw new NotFoundException('Server not found');
+    if (!this.isMember(server as any, userId)) {
+      throw new ForbiddenException('Not a member of this server');
+    }
+    await this.ensureUserServerAcceptedDoc({ serverId, userId });
+    const nextCover =
+      patch.coverUrl == null ? null : String(patch.coverUrl).trim();
+    const update: Record<string, unknown> = {
+      serverCoverUrl: nextCover,
+    };
+    if (patch.profileThemePrimaryHex !== undefined) {
+      update.serverProfileThemePrimaryHex =
+        patch.profileThemePrimaryHex == null
+          ? null
+          : String(patch.profileThemePrimaryHex).trim();
+    }
+    if (patch.profileThemeAccentHex !== undefined) {
+      update.serverProfileThemeAccentHex =
+        patch.profileThemeAccentHex == null
+          ? null
+          : String(patch.profileThemeAccentHex).trim();
+    }
+    if (patch.displayNameFontId !== undefined) {
+      update.serverDisplayNameFontId =
+        patch.displayNameFontId == null
+          ? null
+          : String(patch.displayNameFontId).trim();
+    }
+    if (patch.displayNameEffectId !== undefined) {
+      update.serverDisplayNameEffectId =
+        patch.displayNameEffectId == null
+          ? null
+          : String(patch.displayNameEffectId).trim();
+    }
+    if (patch.displayNamePrimaryHex !== undefined) {
+      update.serverDisplayNamePrimaryHex =
+        patch.displayNamePrimaryHex == null
+          ? null
+          : String(patch.displayNamePrimaryHex).trim();
+    }
+    if (patch.displayNameAccentHex !== undefined) {
+      update.serverDisplayNameAccentHex =
+        patch.displayNameAccentHex == null
+          ? null
+          : String(patch.displayNameAccentHex).trim();
+    }
+    await this.userServerModel
+      .updateOne(
+        {
+          serverId: new Types.ObjectId(serverId),
+          userId: new Types.ObjectId(userId),
+        },
+        { $set: update },
+      )
+      .exec();
+
+    const memberIds = (server as any).members.map((m: any) =>
+      (m?.userId?._id ?? m?.userId).toString(),
+    );
+    memberIds.forEach((uid: string) => {
+      this.channelMessagesGateway.emitToUser(uid, 'server-member-profile-updated', {
+        serverId,
+        userId,
+        coverUrl: nextCover,
+        avatarUrl: undefined,
+        profileThemePrimaryHex: (update as any).serverProfileThemePrimaryHex,
+        profileThemeAccentHex: (update as any).serverProfileThemeAccentHex,
+        displayNameFontId: (update as any).serverDisplayNameFontId,
+        displayNameEffectId: (update as any).serverDisplayNameEffectId,
+        displayNamePrimaryHex: (update as any).serverDisplayNamePrimaryHex,
+        displayNameAccentHex: (update as any).serverDisplayNameAccentHex,
+        updatedAt: new Date().toISOString(),
+      });
+    });
+  }
+
+  async setMyServerAvatar(
+    serverId: string,
+    userId: string,
+    params: { avatarUrl: string },
+  ): Promise<{ avatarUrl: string }> {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('members')
+      .lean()
+      .exec();
+    if (!server) throw new NotFoundException('Server not found');
+    if (!this.isMember(server as any, userId)) {
+      throw new ForbiddenException('Not a member of this server');
+    }
+    await this.ensureUserServerAcceptedDoc({ serverId, userId });
+    const next = String(params.avatarUrl || '').trim();
+    if (!next) throw new BadRequestException('avatarUrl is required');
+    await this.userServerModel
+      .updateOne(
+        {
+          serverId: new Types.ObjectId(serverId),
+          userId: new Types.ObjectId(userId),
+        },
+        { $set: { serverAvatarUrl: next } },
+      )
+      .exec();
+
+    const memberIds = (server as any).members.map((m: any) =>
+      (m?.userId?._id ?? m?.userId).toString(),
+    );
+    memberIds.forEach((uid: string) => {
+      this.channelMessagesGateway.emitToUser(uid, 'server-member-profile-updated', {
+        serverId,
+        userId,
+        avatarUrl: next,
+        coverUrl: undefined,
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    return { avatarUrl: next };
+  }
+
+  async resetMyServerAvatar(
+    serverId: string,
+    userId: string,
+  ): Promise<{ avatarUrl: null }> {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('members')
+      .lean()
+      .exec();
+    if (!server) throw new NotFoundException('Server not found');
+    if (!this.isMember(server as any, userId)) {
+      throw new ForbiddenException('Not a member of this server');
+    }
+    await this.ensureUserServerAcceptedDoc({ serverId, userId });
+    await this.userServerModel
+      .updateOne(
+        {
+          serverId: new Types.ObjectId(serverId),
+          userId: new Types.ObjectId(userId),
+        },
+        { $set: { serverAvatarUrl: null } },
+      )
+      .exec();
+
+    const memberIds = (server as any).members.map((m: any) =>
+      (m?.userId?._id ?? m?.userId).toString(),
+    );
+    memberIds.forEach((uid: string) => {
+      this.channelMessagesGateway.emitToUser(uid, 'server-member-profile-updated', {
+        serverId,
+        userId,
+        avatarUrl: null,
+        coverUrl: undefined,
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    return { avatarUrl: null };
   }
 
   isMember(server: Server, userId: string): boolean {
@@ -1188,8 +1598,7 @@ export class ServersService {
     );
 
     let needsSave = false;
-    const created =
-      (server as { createdAt?: Date }).createdAt ?? new Date();
+    const created = (server as { createdAt?: Date }).createdAt ?? new Date();
 
     if (idx < 0) {
       server.members.push({
@@ -1953,7 +2362,7 @@ export class ServersService {
         type: 'server_notification' as const,
         _id: d._id.toString(),
         serverId: d.serverId.toString(),
-        serverName: server?.name ?? 'Máy chủ',
+        serverName: server?.name?.trim?.() ?? '',
         serverAvatarUrl: server?.avatarUrl ?? null,
         title: d.title ?? '',
         content: d.content ?? '',
@@ -2229,8 +2638,7 @@ export class ServersService {
         lastMsgMs > 0 && lastMsgMs >= recentMessageAgo.getTime();
       const sharePresence = u?.settings?.sharePresence !== false;
       const isOnline =
-        sharePresence &&
-        (deviceOnline || activeInServer || recentlyMessaged);
+        sharePresence && (deviceOnline || activeInServer || recentlyMessaged);
 
       let joinMethod: 'owner' | 'invited' | 'link' = 'link';
       let invitedBy: { id: string; username: string } | undefined;
@@ -2275,6 +2683,7 @@ export class ServersService {
       displayName: string;
       username: string;
       avatarUrl: string;
+      coverUrl?: string | null;
       joinedAt: Date;
       isOwner: boolean;
       serverMemberRole: 'owner' | 'moderator' | 'member';
@@ -2329,6 +2738,18 @@ export class ServersService {
       profiles.map((p: any) => [p.userId.toString(), p]),
     );
 
+    const userServerRows = await this.userServerModel
+      .find({
+        serverId: new Types.ObjectId(serverId),
+        userId: { $in: userIds },
+      })
+      .select('userId serverAvatarUrl serverCoverUrl')
+      .lean()
+      .exec();
+    const userServerByUserId = new Map(
+      (userServerRows as any[]).map((r) => [r.userId.toString(), r]),
+    );
+
     // Lấy thông tin role cho từng member
     const membersResult: Array<{
       userId: string;
@@ -2336,6 +2757,7 @@ export class ServersService {
       displayName: string;
       username: string;
       avatarUrl: string;
+      coverUrl?: string | null;
       joinedAt: Date;
       isOwner: boolean;
       serverMemberRole: 'owner' | 'moderator' | 'member';
@@ -2354,6 +2776,9 @@ export class ServersService {
       const profile = profileByUserId.get(uid) as
         | { displayName: string; username: string; avatarUrl: string }
         | undefined;
+      const us = userServerByUserId.get(uid) as
+        | { serverAvatarUrl?: string | null; serverCoverUrl?: string | null }
+        | undefined;
 
       // Lấy role info cho member này
       const roleInfo = await this.rolesService.getMemberRoleInfo(serverId, uid);
@@ -2363,7 +2788,8 @@ export class ServersService {
         nickname: (m as any)?.nickname ?? null,
         displayName: profile?.displayName ?? 'Người dùng',
         username: profile?.username ?? uid,
-        avatarUrl: profile?.avatarUrl ?? '',
+        avatarUrl: us?.serverAvatarUrl || profile?.avatarUrl || '',
+        coverUrl: us?.serverCoverUrl ?? null,
         joinedAt:
           m.joinedAt instanceof Date ? m.joinedAt : new Date(m.joinedAt),
         isOwner: server.ownerId.toString() === uid,
@@ -3003,9 +3429,7 @@ export class ServersService {
     );
     if (!restricted.length) return [];
 
-    const userIds = restricted.map(
-      (m: any) => new Types.ObjectId(m.userId),
-    );
+    const userIds = restricted.map((m: any) => new Types.ObjectId(m.userId));
     const profiles = await this.profileModel
       .find({ userId: { $in: userIds } })
       .select('userId displayName username avatarUrl')
@@ -3019,9 +3443,9 @@ export class ServersService {
       const p = profileMap.get(m.userId.toString()) || {};
       return {
         userId: m.userId.toString(),
-        displayName: (p as any).displayName || 'Người dùng',
-        username: (p as any).username || '',
-        avatarUrl: (p as any).avatarUrl || '',
+        displayName: p.displayName || 'Người dùng',
+        username: p.username || '',
+        avatarUrl: p.avatarUrl || '',
         mentionBlockedUntil: m.mentionBlockedUntil
           ? new Date(m.mentionBlockedUntil).toISOString()
           : null,
@@ -3109,9 +3533,7 @@ export class ServersService {
       },
       {
         id: 'age',
-        label: isOldEnough
-          ? 'Máy Chủ Đủ Tuổi'
-          : 'Máy Chủ "Quá Trẻ"',
+        label: isOldEnough ? 'Máy Chủ Đủ Tuổi' : 'Máy Chủ "Quá Trẻ"',
         description: isOldEnough
           ? 'Máy chủ đã đủ tuổi để lên Khám Phá.'
           : `Máy chủ trong Khám Phá cần có tuổi thọ ít nhất là ${minAgeMinutes} phút. Vui lòng kiểm tra lại sau.`,
@@ -3176,19 +3598,17 @@ export class ServersService {
     const isOwner = (server as any).ownerId?.toString() === userId;
     const canManage =
       isOwner ||
-      (await this.rolesService.hasPermission(
-        serverId,
-        userId,
-        'manageServer',
-      ));
+      (await this.rolesService.hasPermission(serverId, userId, 'manageServer'));
     if (!canManage)
       throw new ForbiddenException('Bạn không có quyền xem cài đặt cộng đồng');
-    return (server as any).communitySettings || {
-      enabled: false,
-      rulesChannelId: null,
-      updatesChannelId: null,
-      activatedAt: null,
-    };
+    return (
+      (server as any).communitySettings || {
+        enabled: false,
+        rulesChannelId: null,
+        updatesChannelId: null,
+        activatedAt: null,
+      }
+    );
   }
 
   async activateCommunity(
@@ -3213,25 +3633,27 @@ export class ServersService {
     let updatesChannelId = body.updatesChannelId || null;
     let updatesTargetCategoryId: Types.ObjectId | null = null;
 
-    const pickUpdatesTargetCategoryId = async (): Promise<Types.ObjectId | null> => {
-      const firstTextWithCategory = await this.channelModel
-        .findOne({
-          serverId: new Types.ObjectId(serverId),
-          type: 'text',
-          category: { $ne: 'info' },
-          categoryId: { $ne: null },
-        })
-        .sort({ position: 1 })
-        .select('categoryId')
-        .lean()
-        .exec();
-      const raw = (firstTextWithCategory as any)?.categoryId;
-      return raw ? new Types.ObjectId(raw) : null;
-    };
+    const pickUpdatesTargetCategoryId =
+      async (): Promise<Types.ObjectId | null> => {
+        const firstTextWithCategory = await this.channelModel
+          .findOne({
+            serverId: new Types.ObjectId(serverId),
+            type: 'text',
+            category: { $ne: 'info' },
+            categoryId: { $ne: null },
+          })
+          .sort({ position: 1 })
+          .select('categoryId')
+          .lean()
+          .exec();
+        const raw = (firstTextWithCategory as any)?.categoryId;
+        return raw ? new Types.ObjectId(raw) : null;
+      };
 
     if (body.createRulesChannel) {
       const ch = await this.channelModel.create({
-        name: 'luật-server',
+        // Canonical slug; UI localises via translateChannelName (system-names.ts)
+        name: 'server-rules',
         type: 'text',
         serverId: new Types.ObjectId(serverId),
         createdBy: new Types.ObjectId(userId),
@@ -3420,6 +3842,9 @@ export class ServersService {
       }>;
     }>;
   }> {
+    const boost = await this.boostService.getBoostStatus(userId);
+    const hasBoost = Boolean(boost?.active);
+
     const userObjectId = new Types.ObjectId(userId);
     const servers = await this.serverModel
       .find({ 'members.userId': userObjectId })
@@ -3474,7 +3899,9 @@ export class ServersService {
     for (const s of servers) {
       const stickersRaw = (s as any).customStickers || [];
       if (!Array.isArray(stickersRaw) || stickersRaw.length === 0) continue;
-      const locked = ctx ? String(s._id) !== ctx : true;
+      const locked = ctx
+        ? String(s._id) !== ctx && !hasBoost
+        : !hasBoost;
       const stickerOut = stickersRaw.map((st: any) => {
         const prof = profileByUserId.get(String(st.addedByUserId));
         return {
@@ -3587,6 +4014,9 @@ export class ServersService {
       }>;
     }>;
   }> {
+    const boost = await this.boostService.getBoostStatus(userId);
+    const hasBoost = Boolean(boost?.active);
+
     const userObjectId = new Types.ObjectId(userId);
     const servers = await this.serverModel
       .find({ 'members.userId': userObjectId })
@@ -3641,7 +4071,9 @@ export class ServersService {
     for (const s of servers) {
       const emojisRaw = (s as any).customEmojis || [];
       if (!Array.isArray(emojisRaw) || emojisRaw.length === 0) continue;
-      const locked = ctx ? String(s._id) !== ctx : true;
+      const locked = ctx
+        ? String(s._id) !== ctx && !hasBoost
+        : !hasBoost;
       const emojiOut = emojisRaw.map((em: any) => {
         const prof = profileByUserId.get(String(em.addedByUserId));
         return {
@@ -3720,9 +4152,7 @@ export class ServersService {
       });
     }
 
-    targets.sort((a, b) =>
-      (a.name || '').localeCompare(b.name || '', 'vi'),
-    );
+    targets.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));
 
     return { targets };
   }
@@ -3774,9 +4204,7 @@ export class ServersService {
       });
     }
 
-    targets.sort((a, b) =>
-      (a.name || '').localeCompare(b.name || '', 'vi'),
-    );
+    targets.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'));
 
     return { targets };
   }

@@ -77,13 +77,17 @@ export class ProfilesService {
       .lean()
       .exec();
     const other = otherUserId.toString();
-    const out: Array<{ serverId: string; name: string; avatarUrl: string | null }> =
-      [];
+    const out: Array<{
+      serverId: string;
+      name: string;
+      avatarUrl: string | null;
+    }> = [];
     for (const s of servers) {
       const sid = (s as { _id?: Types.ObjectId })._id;
       if (!sid) continue;
-      const members = (s as { members?: { userId?: Types.ObjectId | string }[] })
-        .members;
+      const members = (
+        s as { members?: { userId?: Types.ObjectId | string }[] }
+      ).members;
       if (!Array.isArray(members)) continue;
       const both = members.some((m) => {
         const id = m?.userId;
@@ -94,8 +98,7 @@ export class ProfilesService {
       });
       if (!both) continue;
       const name = (s as { name?: string }).name?.trim() || 'Máy chủ';
-      const avatarUrl =
-        (s as { avatarUrl?: string | null }).avatarUrl ?? null;
+      const avatarUrl = (s as { avatarUrl?: string | null }).avatarUrl ?? null;
       out.push({ serverId: sid.toString(), name, avatarUrl });
     }
     out.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
@@ -366,6 +369,12 @@ export class ProfilesService {
       bio?: string;
       pronouns?: string;
       coverUrl?: string;
+      profileThemePrimaryHex?: string;
+      profileThemeAccentHex?: string;
+      displayNameFontId?: string;
+      displayNameEffectId?: string;
+      displayNamePrimaryHex?: string;
+      displayNameAccentHex?: string;
       location?: string;
       gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
       birthdate?: string;
@@ -419,6 +428,25 @@ export class ProfilesService {
     if (data.coverUrl !== undefined) {
       const trimmed = data.coverUrl.trim();
       profile.coverUrl = trimmed;
+    }
+
+    if (data.profileThemePrimaryHex !== undefined) {
+      profile.profileThemePrimaryHex = data.profileThemePrimaryHex?.trim() || null;
+    }
+    if (data.profileThemeAccentHex !== undefined) {
+      profile.profileThemeAccentHex = data.profileThemeAccentHex?.trim() || null;
+    }
+    if (data.displayNameFontId !== undefined) {
+      profile.displayNameFontId = data.displayNameFontId?.trim() || null;
+    }
+    if (data.displayNameEffectId !== undefined) {
+      profile.displayNameEffectId = data.displayNameEffectId?.trim() || null;
+    }
+    if (data.displayNamePrimaryHex !== undefined) {
+      profile.displayNamePrimaryHex = data.displayNamePrimaryHex?.trim() || null;
+    }
+    if (data.displayNameAccentHex !== undefined) {
+      profile.displayNameAccentHex = data.displayNameAccentHex?.trim() || null;
     }
 
     if (data.location !== undefined) {
@@ -667,6 +695,12 @@ export class ProfilesService {
     avatarUrl: string;
     avatarOriginalUrl: string;
     coverUrl?: string;
+    profileThemePrimaryHex?: string | null;
+    profileThemeAccentHex?: string | null;
+    displayNameFontId?: string | null;
+    displayNameEffectId?: string | null;
+    displayNamePrimaryHex?: string | null;
+    displayNameAccentHex?: string | null;
     bio?: string;
     pronouns?: string;
     gender?: string;
@@ -824,14 +858,13 @@ export class ProfilesService {
       showMemberSince &&
       ownerUser &&
       (ownerUser as { createdAt?: Date }).createdAt
-        ? new Date((ownerUser as { createdAt: Date }).createdAt).toLocaleDateString(
-            'vi-VN',
-            {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            },
-          )
+        ? new Date(
+            (ownerUser as { createdAt: Date }).createdAt,
+          ).toLocaleDateString('vi-VN', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
         : undefined;
 
     return {
@@ -842,6 +875,12 @@ export class ProfilesService {
       avatarUrl: profile.avatarUrl || this.DEFAULT_AVATAR_URL,
       avatarOriginalUrl: profile.avatarOriginalUrl || this.DEFAULT_AVATAR_URL,
       coverUrl: profile.coverUrl || '',
+      profileThemePrimaryHex: (profile as any).profileThemePrimaryHex ?? null,
+      profileThemeAccentHex: (profile as any).profileThemeAccentHex ?? null,
+      displayNameFontId: (profile as any).displayNameFontId ?? null,
+      displayNameEffectId: (profile as any).displayNameEffectId ?? null,
+      displayNamePrimaryHex: (profile as any).displayNamePrimaryHex ?? null,
+      displayNameAccentHex: (profile as any).displayNameAccentHex ?? null,
       bio: canViewBio ? profile.bio || '' : '',
       pronouns: canViewProfile
         ? (profile as { pronouns?: string }).pronouns?.trim() || ''

@@ -263,6 +263,10 @@ export interface Friend {
   avatarUrl: string;
   email: string;
   bio?: string;
+  displayNameFontId?: string | null;
+  displayNameEffectId?: string | null;
+  displayNamePrimaryHex?: string | null;
+  displayNameAccentHex?: string | null;
   /** Trạng thái hoạt động (DM) — từ API available-users. */
   isOnline?: boolean;
 }
@@ -479,6 +483,9 @@ export async function getServer(serverId: string): Promise<Server> {
   });
 
   if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Máy chủ không tồn tại hoặc đã bị xóa");
+    }
     throw new Error("Không tải được thông tin máy chủ");
   }
 
@@ -489,7 +496,12 @@ export async function getServerProfileStats(serverId: string): Promise<ServerPro
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}/profile-stats`, {
     headers: getHeaders(),
   });
-  if (!response.ok) throw new Error("Không tải được thống kê máy chủ");
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Máy chủ không tồn tại hoặc đã bị xóa");
+    }
+    throw new Error("Không tải được thống kê máy chủ");
+  }
   return response.json();
 }
 
@@ -884,6 +896,8 @@ export interface MemberWithRoles {
   displayName: string;
   username: string;
   avatarUrl: string;
+  /** Cover/banner chỉ áp dụng trong server này (format như profile coverUrl). */
+  coverUrl?: string | null;
   joinedAt: string;
   isOwner: boolean;
   serverMemberRole: "owner" | "moderator" | "member";
@@ -1831,6 +1845,87 @@ export async function updateMyServerNickname(
   }
 }
 
+export type MyServerProfileResponse = {
+  nickname: string | null;
+  avatarUrl: string | null;
+  coverUrl: string | null;
+  displayNameFontId?: string | null;
+  displayNameEffectId?: string | null;
+  displayNamePrimaryHex?: string | null;
+  displayNameAccentHex?: string | null;
+};
+
+export async function getMyServerProfile(
+  serverId: string,
+): Promise<MyServerProfileResponse> {
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/me/profile`,
+    { headers: getHeaders() },
+  );
+  // Backward compatibility: some environments may not have the per-server profile
+  // endpoints deployed yet. Treat missing route as "no overrides".
+  if (res.status === 404) {
+    return { nickname: null, avatarUrl: null, coverUrl: null };
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được hồ sơ máy chủ");
+  }
+  return res.json();
+}
+
+export async function updateMyServerProfile(
+  serverId: string,
+  payload: {
+    coverUrl?: string | null;
+    displayNameFontId?: string | null;
+    displayNameEffectId?: string | null;
+    displayNamePrimaryHex?: string | null;
+    displayNameAccentHex?: string | null;
+  },
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/me/profile`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify(payload ?? {}),
+    },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không lưu được hồ sơ máy chủ");
+  }
+}
+
+export async function uploadMyServerAvatar(opts: {
+  serverId: string;
+  form: FormData;
+}): Promise<{ avatarUrl: string }> {
+  const { serverId, form } = opts;
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/me/avatar/upload`,
+    { method: "POST", headers: { Authorization: `Bearer ${getToken()}` }, body: form },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không cập nhật được avatar máy chủ");
+  }
+  return res.json();
+}
+
+export async function resetMyServerAvatar(serverId: string): Promise<{ avatarUrl: null }> {
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/me/avatar`,
+    { method: "DELETE", headers: getHeaders() },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không gỡ được avatar máy chủ");
+  }
+  return res.json();
+}
+
 export async function createServerEvent(
   serverId: string,
   payload: CreateEventPayload,
@@ -1882,7 +1977,11 @@ export async function createMessage(
   giphyId?: string,
   voiceUrl?: string,
   voiceDuration?: number,
-  stickerExtras?: { customStickerUrl?: string; serverStickerId?: string },
+  stickerExtras?: {
+    customStickerUrl?: string;
+    serverStickerId?: string;
+    serverStickerServerId?: string;
+  },
 ): Promise<Message> {
   const body: Record<string, unknown> = {
     content,
@@ -1898,6 +1997,9 @@ export async function createMessage(
       : {}),
     ...(stickerExtras?.serverStickerId
       ? { serverStickerId: stickerExtras.serverStickerId }
+      : {}),
+    ...(stickerExtras?.serverStickerServerId
+      ? { serverStickerServerId: stickerExtras.serverStickerServerId }
       : {}),
   };
   const response = await fetch(

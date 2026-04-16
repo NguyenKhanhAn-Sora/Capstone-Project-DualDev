@@ -73,6 +73,20 @@ export default function MessagesInbox({
         const server = raw.slice("__SYS:mentionSpamWarning:".length);
         return t("chat.popups.inbox.mentionSpamWarning").replace("{server}", server);
       }
+      if (raw === "__SYS:joinAppApprovedTitle") return t("chat.popups.inbox.joinAppApprovedTitle");
+      if (raw === "__SYS:joinAppApprovedContent") return t("chat.popups.inbox.joinAppApprovedContent");
+      if (raw === "__SYS:joinAppRejectedTitle") return t("chat.popups.inbox.joinAppRejectedTitle");
+      if (raw === "__SYS:joinAppRejectedContent") return t("chat.popups.inbox.joinAppRejectedContent");
+      if (raw === "__SYS:serverDeletedTitle") return t("chat.popups.inbox.serverDeletedTitle");
+      if (raw.startsWith("__SYS:serverDeletedContent:")) {
+        const enc = raw.slice("__SYS:serverDeletedContent:".length);
+        try {
+          const server = decodeURIComponent(enc);
+          return t("chat.popups.inbox.serverDeletedContent").replace("{server}", server);
+        } catch {
+          return t("chat.popups.inbox.serverDeletedContent").replace("{server}", enc);
+        }
+      }
 
       // Legacy Vietnamese strings stored in DB before migration
       if (raw === "Quản trị viên hệ thống đang xem máy chủ") {
@@ -89,8 +103,29 @@ export default function MessagesInbox({
       if (spamVi) {
         return t("chat.popups.inbox.mentionSpamWarning").replace("{server}", spamVi[1]);
       }
+      if (raw === "Đơn đăng ký đã được chấp thuận") {
+        return t("chat.popups.inbox.joinAppApprovedTitle");
+      }
+      if (raw === "Bạn đã được chấp thuận tham gia máy chủ.") {
+        return t("chat.popups.inbox.joinAppApprovedContent");
+      }
+      if (raw === "Đơn đăng ký đã bị từ chối") {
+        return t("chat.popups.inbox.joinAppRejectedTitle");
+      }
+      if (raw === "Đơn đăng ký tham gia máy chủ của bạn đã bị từ chối.") {
+        return t("chat.popups.inbox.joinAppRejectedContent");
+      }
 
       return raw;
+    },
+    [t],
+  );
+
+  /** Tên server từ API; khi server đã xóa / thiếu tên backend trả "" — hiển thị theo ngôn ngữ UI. */
+  const inboxServerLabel = useCallback(
+    (name: string | undefined | null) => {
+      const n = typeof name === "string" ? name.trim() : "";
+      return n || t("chat.popups.inbox.serverFallback");
     },
     [t],
   );
@@ -455,7 +490,8 @@ export default function MessagesInbox({
                               : undefined
                           }
                         >
-                          {!item.serverAvatarUrl && item.serverName.charAt(0).toUpperCase()}
+                          {!item.serverAvatarUrl &&
+                            inboxServerLabel(item.serverName).charAt(0).toUpperCase()}
                         </div>
                         {item.seen !== true && <span className={styles.eventItemUnreadDot} aria-hidden />}
                       </div>
@@ -467,7 +503,9 @@ export default function MessagesInbox({
                           )}
                         </p>
                         <p className={styles.eventMeta}>
-                          {t("chat.popups.inbox.eventStarted", { serverName: item.serverName })}
+                          {t("chat.popups.inbox.eventStarted", {
+                            serverName: inboxServerLabel(item.serverName),
+                          })}
                         </p>
                         <p className={styles.eventTime}>{formatTimeAgo(item.startAt)}</p>
                       </div>
@@ -488,14 +526,15 @@ export default function MessagesInbox({
                               : undefined
                           }
                         >
-                          {!item.serverAvatarUrl && item.serverName.charAt(0).toUpperCase()}
+                          {!item.serverAvatarUrl &&
+                            inboxServerLabel(item.serverName).charAt(0).toUpperCase()}
                         </div>
                         {item.seen !== true && <span className={styles.eventItemUnreadDot} aria-hidden />}
                       </div>
                       <div className={styles.eventBody}>
                         <p className={styles.eventTitle}>{resolveNotifText(item.title)}</p>
                         <p className={styles.eventMeta}>
-                          {item.serverName}
+                          {inboxServerLabel(item.serverName)}
                           {item.targetRoleName ? ` • ${item.targetRoleName}` : ""}
                         </p>
                         <p className={styles.unreadPreview}>
@@ -518,7 +557,8 @@ export default function MessagesInbox({
                               : undefined
                           }
                         >
-                          {!item.serverAvatarUrl && item.serverName.charAt(0).toUpperCase()}
+                          {!item.serverAvatarUrl &&
+                            inboxServerLabel(item.serverName).charAt(0).toUpperCase()}
                         </div>
                         {item.seen !== true && <span className={styles.eventItemUnreadDot} aria-hidden />}
                       </div>
@@ -529,7 +569,7 @@ export default function MessagesInbox({
                         <p className={styles.eventMeta}>
                           {t("chat.popups.inbox.inviteMeta", {
                             inviter: item.inviterDisplay,
-                            serverName: item.serverName,
+                            serverName: inboxServerLabel(item.serverName),
                           })}
                         </p>
                         <p className={styles.eventTime}>{formatTimeAgo(item.createdAt)}</p>
@@ -625,7 +665,7 @@ export default function MessagesInbox({
                     >
                       <div className={styles.eventItemAvatarWrap}>
                         <div className={styles.eventAvatar}>
-                          {item.serverName?.charAt(0)?.toUpperCase() ?? "#"}
+                          {inboxServerLabel(item.serverName).charAt(0).toUpperCase()}
                         </div>
                         {(item.unreadCount ?? 0) > 0 ? (
                           <span className={styles.eventItemUnreadDot} aria-hidden />
@@ -634,7 +674,7 @@ export default function MessagesInbox({
                       <div className={styles.eventBody}>
                         <div className={styles.unreadTopRow}>
                           <p className={styles.unreadTitle}>
-                            {item.serverName}, #{item.channelName}
+                            {inboxServerLabel(item.serverName)}, #{item.channelName}
                           </p>
                           <div className={styles.unreadRight}>
                             <span className={styles.unreadTime}>
@@ -680,7 +720,7 @@ export default function MessagesInbox({
                   >
                     <div className={styles.eventItemAvatarWrap}>
                       <div className={styles.eventAvatar}>
-                        {(item.serverName?.trim() || "#").charAt(0).toUpperCase()}
+                        {inboxServerLabel(item.serverName).charAt(0).toUpperCase()}
                       </div>
                       {item.seen !== true ? (
                         <span className={styles.eventItemUnreadDot} aria-hidden />
@@ -689,7 +729,7 @@ export default function MessagesInbox({
                     <div className={styles.eventBody}>
                       <div className={styles.unreadTopRow}>
                         <p className={styles.unreadTitle}>
-                          {item.serverName?.trim() || t("chat.popups.inbox.serverFallback")}, #{item.channelName}
+                          {inboxServerLabel(item.serverName)}, #{item.channelName}
                         </p>
                         <span className={styles.unreadTime}>
                           {formatTimeAgo(item.createdAt)}

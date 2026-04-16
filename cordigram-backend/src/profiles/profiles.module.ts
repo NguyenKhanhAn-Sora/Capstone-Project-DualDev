@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Profile, ProfileSchema } from './profile.schema';
 import { ProfilesService } from './profiles.service';
@@ -9,10 +9,14 @@ import { CompaniesModule } from '../companies/companies.module';
 import { User, UserSchema } from '../users/user.schema';
 import { Server, ServerSchema } from '../servers/server.schema';
 import { Block, BlockSchema } from '../users/block.schema';
+import { MessagesModule } from '../messages/messages.module';
+import { BoostModule } from '../boost/boost.module';
 
 @Module({
   imports: [
     CompaniesModule,
+    forwardRef(() => MessagesModule),
+    forwardRef(() => BoostModule),
     MongooseModule.forFeature([
       { name: Profile.name, schema: ProfileSchema },
       { name: Follow.name, schema: FollowSchema },

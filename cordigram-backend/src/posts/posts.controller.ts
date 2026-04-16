@@ -32,11 +32,15 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { UpdateVisibilityDto } from './dto/update-visibility.dto';
 import { UpdatePostNotificationMuteDto } from './dto/update-post-notification-mute.dto';
 import { PostsService } from './posts.service';
+import { BoostService } from '../boost/boost.service';
 
 @Controller('posts')
 @UseGuards(JwtAuthGuard)
 export class PostsController {
-  constructor(private readonly postsService: PostsService) {}
+  constructor(
+    private readonly postsService: PostsService,
+    private readonly boostService: BoostService,
+  ) {}
 
   @Post()
   async create(@Req() req: Request, @Body() dto: CreatePostDto) {
@@ -202,9 +206,8 @@ export class PostsController {
   @UseInterceptors(
     FileInterceptor('file', {
       limits: {
-        fileSize: Number(
-          process.env.CLOUDINARY_MAX_FILE_SIZE ?? 15 * 1024 * 1024,
-        ),
+        // allow up to Boost tier, enforce per-user below
+        fileSize: 600 * 1024 * 1024,
       },
     }),
   )
@@ -218,6 +221,11 @@ export class PostsController {
     }
     if (!file) {
       throw new BadRequestException('Missing file');
+    }
+    const status = await this.boostService.getBoostStatus(user.userId);
+    const maxBytes = status?.limits?.maxUploadBytes ?? 25 * 1024 * 1024;
+    if (typeof file.size === 'number' && file.size > maxBytes) {
+      throw new BadRequestException(`File too large (max ${maxBytes} bytes)`);
     }
     if (
       !file.mimetype.startsWith('image/') &&
@@ -235,9 +243,7 @@ export class PostsController {
   @UseInterceptors(
     FilesInterceptor('files', 10, {
       limits: {
-        fileSize: Number(
-          process.env.CLOUDINARY_MAX_FILE_SIZE ?? 15 * 1024 * 1024,
-        ),
+        fileSize: 600 * 1024 * 1024,
       },
     }),
   )
@@ -251,6 +257,12 @@ export class PostsController {
     }
     if (!files || !files.length) {
       throw new BadRequestException('Missing files');
+    }
+    const status = await this.boostService.getBoostStatus(user.userId);
+    const maxBytes = status?.limits?.maxUploadBytes ?? 25 * 1024 * 1024;
+    const tooLarge = files.find((f) => typeof f.size === 'number' && f.size > maxBytes);
+    if (tooLarge) {
+      throw new BadRequestException(`File too large (max ${maxBytes} bytes)`);
     }
 
     const invalid = files.find(

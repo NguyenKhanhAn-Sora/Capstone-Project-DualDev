@@ -10,6 +10,8 @@ import {
   UseGuards,
   Request,
   BadRequestException,
+  UploadedFiles,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ServersService } from './servers.service';
 import { ServerAccessService } from '../access/server-access.service';
@@ -18,6 +20,33 @@ import { UpdateServerDto } from './dto/update-server.dto';
 import { AddServerStickerDto } from './dto/add-server-sticker.dto';
 import { AddServerEmojiDto } from './dto/add-server-emoji.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { v4 as uuid } from 'uuid';
+import { ConfigService } from '../config/config.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { ForbiddenException } from '@nestjs/common';
+import { ServerBoostContextInterceptor } from './server-boost-context.interceptor';
+import { BoostService } from '../boost/boost.service';
+
+type MulterFile = {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+  size: number;
+};
+
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+
+const imageFileFilter = (
+  req: any,
+  file: MulterFile,
+  cb: (error: Error | null, acceptFile: boolean) => void,
+) => {
+  if (!file.mimetype.startsWith('image/')) {
+    return cb(new BadRequestException('Please choose an image file'), false);
+  }
+  cb(null, true);
+};
 
 @Controller('servers')
 @UseGuards(JwtAuthGuard)
@@ -25,7 +54,11 @@ export class ServersController {
   constructor(
     private readonly serversService: ServersService,
     private readonly serverAccessService: ServerAccessService,
+    private readonly config: ConfigService,
+    private readonly cloudinaryService: CloudinaryService,
+    private readonly boostService: BoostService,
   ) {}
+
 
   /**
    * Explore servers list (approved only)
@@ -111,7 +144,11 @@ export class ServersController {
     @Body() body: AddServerStickerDto,
     @Request() req: any,
   ) {
-    return this.serversService.addServerSticker(serverId, req.user.userId, body);
+    return this.serversService.addServerSticker(
+      serverId,
+      req.user.userId,
+      body,
+    );
   }
 
   /** Danh sách sticker tùy chỉnh (cài đặt máy chủ) — chỉ người có quyền quản lý. */
@@ -141,10 +178,7 @@ export class ServersController {
     @Param('id') serverId: string,
     @Request() req: any,
   ) {
-    return this.serversService.getServerEmojisManage(
-      serverId,
-      req.user.userId,
-    );
+    return this.serversService.getServerEmojisManage(serverId, req.user.userId);
   }
 
   /**
@@ -497,7 +531,11 @@ export class ServersController {
     },
     @Request() req: any,
   ) {
-    return this.serversService.joinServer(serverId, req.user.userId, body ?? {});
+    return this.serversService.joinServer(
+      serverId,
+      req.user.userId,
+      body ?? {},
+    );
   }
 
   // =====================================================
@@ -543,8 +581,14 @@ export class ServersController {
   }
 
   @Get(':id/access/join-form')
-  async getJoinApplicationForm(@Param('id') serverId: string, @Request() req: any) {
-    return this.serverAccessService.getJoinApplicationForm(serverId, req.user.userId);
+  async getJoinApplicationForm(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serverAccessService.getJoinApplicationForm(
+      serverId,
+      req.user.userId,
+    );
   }
 
   @Patch(':id/access/join-form')
@@ -631,8 +675,14 @@ export class ServersController {
   }
 
   @Post(':id/access/withdraw')
-  async withdrawMyJoinApplication(@Param('id') serverId: string, @Request() req: any) {
-    return this.serverAccessService.withdrawJoinApplication(serverId, req.user.userId);
+  async withdrawMyJoinApplication(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
+    return this.serverAccessService.withdrawJoinApplication(
+      serverId,
+      req.user.userId,
+    );
   }
 
   @Post(':id/access/accept-rules')
@@ -694,6 +744,148 @@ export class ServersController {
       body?.nickname ?? '',
     );
     return { ok: true };
+  }
+
+  /**
+   * Hồ sơ trong máy chủ (per-server): avatar + banner/cover (và nickname lấy từ member row).
+   */
+  @Get(':id/me/profile')
+  async getMyServerProfile(@Param('id') serverId: string, @Request() req: any) {
+    return this.serversService.getMyServerProfile(serverId, req.user.userId);
+  }
+
+  @Patch(':id/me/profile')
+  async updateMyServerProfile(
+    @Param('id') serverId: string,
+    @Body()
+    body: {
+      coverUrl?: string | null;
+      profileThemePrimaryHex?: string | null;
+      profileThemeAccentHex?: string | null;
+      displayNameFontId?: string | null;
+      displayNameEffectId?: string | null;
+      displayNamePrimaryHex?: string | null;
+      displayNameAccentHex?: string | null;
+    },
+    @Request() req: any,
+  ) {
+    const next = (body?.coverUrl ?? null) === null ? null : String(body?.coverUrl ?? '').trim();
+    const isImageUrl = Boolean(next && /^https?:\/\//i.test(next));
+    if (isImageUrl) {
+      const accountBoost = Boolean(req?.user?.settings?.accountBoost);
+      const server = await this.serversService.getServerById(serverId);
+      const boostedBy = Array.isArray((server as any)?.boostedByUserIds)
+        ? (server as any).boostedByUserIds
+        : [];
+      const serverBoost = boostedBy.some((x: any) => String(x) === String(req.user.userId));
+      const unlocked = accountBoost || serverBoost;
+      if (!unlocked) {
+        throw new ForbiddenException('Boost required for banner image');
+      }
+    }
+    await this.serversService.updateMyServerProfile(serverId, req.user.userId, {
+      coverUrl: body?.coverUrl ?? null,
+      profileThemePrimaryHex: body?.profileThemePrimaryHex ?? null,
+      profileThemeAccentHex: body?.profileThemeAccentHex ?? null,
+      displayNameFontId: body?.displayNameFontId ?? null,
+      displayNameEffectId: body?.displayNameEffectId ?? null,
+      displayNamePrimaryHex: body?.displayNamePrimaryHex ?? null,
+      displayNameAccentHex: body?.displayNameAccentHex ?? null,
+    });
+    return { ok: true };
+  }
+
+  @Post(':id/me/avatar/upload')
+  @UseInterceptors(
+    ServerBoostContextInterceptor,
+    FileFieldsInterceptor(
+      [
+        { name: 'original', maxCount: 1 },
+        { name: 'cropped', maxCount: 1 },
+      ],
+      { limits: { fileSize: MAX_AVATAR_BYTES }, fileFilter: imageFileFilter },
+    ),
+  )
+  async uploadMyServerAvatar(
+    @Param('id') serverId: string,
+    @UploadedFiles()
+    files: { original?: MulterFile[]; cropped?: MulterFile[] },
+    @Request() req: any,
+  ) {
+    const userId = req.user.userId as string;
+    const originalFile = files?.original?.[0];
+    const croppedFile = files?.cropped?.[0];
+    if (!originalFile) {
+      throw new BadRequestException('Thiếu file original');
+    }
+
+    const folder = [
+      this.config.cloudinaryFolder,
+      'servers',
+      serverId,
+      'members',
+      userId,
+      'avatars',
+    ]
+      .filter(Boolean)
+      .join('/');
+    const suffix = uuid();
+    const isGif =
+      originalFile.mimetype === 'image/gif' ||
+      originalFile.originalname?.toLowerCase?.().endsWith?.('.gif');
+
+    if (isGif) {
+      const accountBoost = Boolean(req?.user?.settings?.accountBoost);
+      const boostedBy = (req as any)?.serverBoostedByUserIds as
+        | string[]
+        | undefined;
+      const serverBoost =
+        Array.isArray(boostedBy) && userId
+          ? boostedBy.some((x) => String(x) === userId)
+          : false;
+      const ent = await this.boostService.getBoostStatus(userId);
+      const unlocked = accountBoost || serverBoost || Boolean(ent?.active);
+      if (!unlocked) {
+        throw new BadRequestException('Boost required for GIF avatar');
+      }
+    }
+
+    // GIF: accept original only to preserve animation.
+    if (!croppedFile) {
+      if (!isGif) {
+        throw new BadRequestException('Thiếu file cropped');
+      }
+      const uploaded = await this.cloudinaryService.uploadBuffer({
+        buffer: originalFile.buffer,
+        folder,
+        publicId: `avatar-${suffix}`,
+      });
+      return this.serversService.setMyServerAvatar(serverId, userId, {
+        avatarUrl: uploaded.secureUrl,
+      });
+    }
+
+    const [, cropped] = await Promise.all([
+      this.cloudinaryService.uploadBuffer({
+        buffer: originalFile.buffer,
+        folder,
+        publicId: `original-${suffix}`,
+      }),
+      this.cloudinaryService.uploadBuffer({
+        buffer: croppedFile.buffer,
+        folder,
+        publicId: `avatar-${suffix}`,
+      }),
+    ]);
+
+    return this.serversService.setMyServerAvatar(serverId, userId, {
+      avatarUrl: cropped.secureUrl,
+    });
+  }
+
+  @Delete(':id/me/avatar')
+  async resetMyServerAvatar(@Param('id') serverId: string, @Request() req: any) {
+    return this.serversService.resetMyServerAvatar(serverId, req.user.userId);
   }
 
   @Post(':id/members/:memberId')

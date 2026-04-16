@@ -83,6 +83,21 @@ export class UsersController {
     return this.usersService.getSettings(userId);
   }
 
+  @Get('boost-status')
+  async getBoostStatus(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Query('serverId') serverId?: string,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    return this.usersService.getBoostStatus({
+      userId,
+      serverId: serverId ?? null,
+    });
+  }
+
   @Get('notifications/settings')
   async getNotificationSettings(
     @Req() req: Request & { user?: AuthenticatedUser },
@@ -299,11 +314,15 @@ export class UsersController {
       userId,
       theme: dto.theme,
       language: dto.language,
+      appearancePreset: dto.appearancePreset,
+      appearanceSync: dto.appearanceSync,
       dmListFrom: dto.dmListFrom,
       dmCallFrom: dto.dmCallFrom,
       showCordigramMemberSince: dto.showCordigramMemberSince,
       sharePresence: dto.sharePresence,
+      accountBoost: dto.accountBoost,
       chatSoundEnabled: dto.chatSoundEnabled,
+      appearanceBackground: dto.appearanceBackground,
     });
   }
 
@@ -607,6 +626,16 @@ export class UsersController {
     }
     const set = await this.ignoredService.getIgnoredUserIds(userId);
     return { ignoredUserIds: Array.from(set) };
+  }
+
+  @Get('ignored')
+  async listIgnored(@Req() req: Request & { user?: AuthenticatedUser }) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    const items = await this.ignoredService.listIgnoredUsers(userId);
+    return { items };
   }
 
   @Get(':id/is-ignored')

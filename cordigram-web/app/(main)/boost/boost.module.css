@@ -1,0 +1,123 @@
+.page {
+  min-height: 100vh;
+  background: radial-gradient(900px 520px at 20% -10%, rgba(168, 85, 247, 0.18), transparent 55%),
+    radial-gradient(900px 520px at 80% 0%, rgba(56, 189, 248, 0.12), transparent 60%),
+    var(--color-bg-home);
+  padding: 26px 18px 40px;
+  color: var(--color-text);
+}
+
+.hero {
+  width: min(1060px, 100%);
+  margin: 0 auto;
+  border-radius: 18px;
+  border: 1px solid var(--color-border);
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.32), rgba(16, 18, 22, 0));
+  padding: 26px 22px;
+  display: grid;
+  gap: 14px;
+  box-shadow: 0 20px 60px rgba(2, 6, 23, 0.18);
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: 46px;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.heroTopNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tabs {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--color-text) 75%, #a78bfa 25%);
+}
+
+.tab {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.tabActive {
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.smallPill {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 900;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text);
+}
+
+.heroRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btnPrimary,
+.btnSecondary {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btnPrimary {
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed, #22d3ee);
+}
+
+.btnSecondary {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+}
+
+.section {
+  width: min(1060px, 100%);
+  margin: 20px auto 0;
+  display: grid;
+  gap: 12px;
+}
+
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  padding: 16px;
+}
+
+.cardTitle {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+

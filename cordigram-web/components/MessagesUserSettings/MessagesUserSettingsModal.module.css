@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -12,30 +12,31 @@
 .card {
   width: min(920px, 96vw);
   height: min(620px, 90vh);
-  background: #f5f7fb;
+  background: var(--color-panel-bg);
+  color: var(--color-panel-text);
   border-radius: 12px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-strong);
   display: flex;
   overflow: hidden;
   position: relative;
 }
 
 .cardDark {
-  background: #1e1f22;
-  color: #f2f3f5;
+  background: var(--color-panel-bg);
+  color: var(--color-panel-text);
 }
 
 .sidebar {
   width: 220px;
   flex-shrink: 0;
-  background: #e8eef8;
+  background: var(--color-panel-sidebar);
   padding: 16px 0;
-  border-right: 1px solid #d4dae6;
+  border-right: 1px solid var(--color-panel-sidebar-border);
 }
 
 .cardDark .sidebar {
-  background: #2b2d31;
-  border-right-color: #1e1f22;
+  background: var(--color-panel-sidebar);
+  border-right-color: var(--color-panel-sidebar-border);
 }
 
 .sidebarTitle {
@@ -53,7 +54,7 @@
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 600;
-  color: #1e1f22;
+  color: var(--color-panel-text);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -61,26 +62,26 @@
 }
 
 .cardDark .navBtn {
-  color: #dbdee1;
+  color: var(--color-panel-text);
 }
 
 .navBtn:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--color-panel-hover);
 }
 
 .cardDark .navBtn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-panel-hover);
 }
 
 .navActive {
-  background: #dbe8ff;
-  border-left: 3px solid #006edc;
+  background: var(--color-panel-active);
+  border-left: 3px solid var(--color-panel-accent);
   padding-left: 13px;
 }
 
 .cardDark .navActive {
-  background: #383a40;
-  border-left-color: #5865f2;
+  background: var(--color-panel-active);
+  border-left-color: var(--color-panel-accent);
 }
 
 .main {
@@ -88,11 +89,11 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: #fff;
+  background: var(--color-panel-bg);
 }
 
 .cardDark .main {
-  background: #313338;
+  background: var(--color-panel-bg);
 }
 
 .mainHeader {
@@ -100,11 +101,11 @@
   align-items: center;
   justify-content: flex-end;
   padding: 8px 12px;
-  border-bottom: 1px solid #e3e5e8;
+  border-bottom: 1px solid var(--color-panel-border);
 }
 
 .cardDark .mainHeader {
-  border-bottom-color: #2b2d31;
+  border-bottom-color: var(--color-panel-border);
 }
 
 .closeX {
@@ -113,12 +114,12 @@
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
-  color: #5c5f66;
+  color: var(--color-panel-text-muted);
   padding: 4px 8px;
 }
 
 .cardDark .closeX {
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .body {
@@ -131,35 +132,35 @@
   margin: 0 0 8px;
   font-size: 16px;
   font-weight: 800;
-  color: #1e1f22;
+  color: var(--color-panel-text);
 }
 
 .cardDark .sectionTitle {
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .hint {
   margin: 0 0 16px;
   font-size: 13px;
-  color: #5c5f66;
+  color: var(--color-panel-text-muted);
   line-height: 1.45;
 }
 
 .cardDark .hint {
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .panel {
-  border: 1px solid #e3e5e8;
+  border: 1px solid var(--color-panel-border);
   border-radius: 10px;
   padding: 14px 16px;
   margin-bottom: 16px;
-  background: #fff;
+  background: var(--color-panel-deep);
 }
 
 .cardDark .panel {
-  border-color: #2b2d31;
-  background: #2b2d31;
+  border-color: var(--color-panel-border);
+  background: var(--color-panel-deep);
 }
 
 .row {
@@ -173,11 +174,11 @@
 .rowLabel {
   font-size: 14px;
   font-weight: 600;
-  color: #1e1f22;
+  color: var(--color-panel-text);
 }
 
 .cardDark .rowLabel {
-  color: #f2f3f5;
+  color: var(--color-panel-text);
 }
 
 .radioGroup {
@@ -198,14 +199,16 @@
   min-width: 200px;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-panel-border);
+  background: var(--color-panel-bg);
+  color: var(--color-panel-text);
   font-size: 14px;
 }
 
 .cardDark .select {
-  background: #1e1f22;
-  border-color: #4e5058;
-  color: #f2f3f5;
+  background: var(--color-panel-bg);
+  border-color: var(--color-panel-border);
+  color: var(--color-panel-text);
 }
 
 .toggle {
@@ -219,11 +222,11 @@
 }
 
 .toggleOn {
-  background: #006edc;
+  background: var(--color-panel-accent);
 }
 
 .toggleOff {
-  background: #b5bac1;
+  background: var(--color-panel-neutral);
 }
 
 .linkRow {
@@ -237,44 +240,88 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  color: #006edc;
+  color: var(--color-panel-accent);
 }
 
 .cardDark .linkRow {
-  color: #00a8fc;
+  color: var(--color-panel-accent);
 }
 
-.themeGrid {
+.appearanceBgSection {
+  margin-top: 8px;
+}
+
+.cardDark .appearanceBgSection {
+  border-top-color: var(--color-panel-border);
+}
+
+.appearanceBgHeader {
   display: flex;
-  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.appearanceBgTitle {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-panel-text);
+  margin-bottom: 4px;
+}
+
+.cardDark .appearanceBgTitle {
+  color: var(--color-panel-text);
+}
+
+.appearanceBgLockedWrap {
+  display: grid;
+  gap: 12px;
+}
+
+.appearanceBgRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.appearanceBgSwatches {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
-.themeCard {
-  border: 2px solid transparent;
+.appearanceBgSwatch {
+  width: 40px;
+  height: 40px;
   border-radius: 10px;
-  padding: 8px;
-  cursor: pointer;
+  border: 1px solid var(--color-panel-border);
   background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
 }
 
-.themeCardActive {
-  border-color: #006edc;
+.appearanceBgSwatchActive {
+  border-width: 2px;
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-panel-accent) 22%, transparent);
 }
 
-.themeSwatch {
-  width: 100px;
-  height: 64px;
-  border-radius: 8px;
-  margin-bottom: 8px;
+.cardDark .appearanceBgSwatch {
+  border-color: var(--color-panel-border);
 }
 
-.swLight {
-  background: linear-gradient(135deg, #fff 50%, #e8eef8 50%);
+.cardDark .appearanceBgSwatchActive {
+  border-color: var(--color-panel-accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-panel-accent) 22%, transparent);
 }
 
-.swDark {
-  background: linear-gradient(135deg, #2b2d31 50%, #111214 50%);
+.appearanceBgCustomIcon {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .profileTabs {
@@ -287,19 +334,20 @@
   padding: 8px 14px;
   border-radius: 8px;
   border: none;
-  background: #e8eef8;
+  background: var(--color-panel-deep);
+  color: var(--color-panel-text);
   font-weight: 700;
   cursor: pointer;
   font-size: 13px;
 }
 
 .cardDark .profileTab {
-  background: #2b2d31;
-  color: #dbdee1;
+  background: var(--color-panel-deep);
+  color: var(--color-panel-text);
 }
 
 .profileTabActive {
-  background: #006edc;
+  background: var(--color-panel-accent);
   color: #fff;
 }
 
@@ -308,16 +356,18 @@
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-panel-border);
+  background: var(--color-panel-bg);
+  color: var(--color-panel-text);
   font-size: 14px;
   box-sizing: border-box;
 }
 
 .cardDark .input,
 .cardDark .textarea {
-  background: #1e1f22;
-  border-color: #4e5058;
-  color: #f2f3f5;
+  background: var(--color-panel-bg);
+  border-color: var(--color-panel-border);
+  color: var(--color-panel-text);
 }
 
 .textarea {
@@ -330,11 +380,11 @@
   font-size: 12px;
   font-weight: 700;
   margin-bottom: 6px;
-  color: #5c5f66;
+  color: var(--color-panel-text-muted);
 }
 
 .cardDark .fieldLabel {
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .saveBtn {
@@ -342,7 +392,7 @@
   padding: 10px 18px;
   border-radius: 8px;
   border: none;
-  background: #006edc;
+  background: var(--color-panel-accent);
   color: #fff;
   font-weight: 700;
   cursor: pointer;
@@ -360,7 +410,7 @@
 
 .lockHint {
   font-size: 12px;
-  color: #ed4245;
+  color: var(--color-panel-danger);
   margin-top: 4px;
 }
 
@@ -375,19 +425,19 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 0;
-  border-bottom: 1px solid #e3e5e8;
+  border-bottom: 1px solid var(--color-panel-border);
   font-size: 14px;
 }
 
 .cardDark .listItem {
-  border-bottom-color: #1e1f22;
+  border-bottom-color: var(--color-panel-border);
 }
 
 .smallBtn {
   padding: 6px 12px;
   border-radius: 6px;
   border: none;
-  background: #ed4245;
+  background: var(--color-panel-danger);
   color: #fff;
   font-weight: 600;
   font-size: 12px;
@@ -395,5 +445,5 @@
 }
 
 .smallBtnGhost {
-  background: #4e5058;
+  background: var(--color-panel-neutral);
 }

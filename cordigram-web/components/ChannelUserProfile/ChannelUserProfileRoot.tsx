@@ -7,6 +7,7 @@ import "discord-card-react/styles";
 import { useTheme } from "@/component/theme-provider";
 import styles from "./ChannelUserProfileRoot.module.css";
 import type { Friend } from "@/lib/servers-api";
+import { parseUserCover } from "@/lib/user-profile-cover";
 import {
   createServerInvite,
   followUser,
@@ -66,6 +67,44 @@ const BANNER_BLACK_SVG = `data:image/svg+xml,${encodeURIComponent(
 const AVATAR_FALLBACK = `data:image/svg+xml,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" fill="#4e5058"/></svg>',
 )}`;
+
+function getDisplayNameTextStyle(source?: {
+  displayNameFontId?: string | null;
+  displayNameEffectId?: string | null;
+  displayNamePrimaryHex?: string | null;
+  displayNameAccentHex?: string | null;
+}): React.CSSProperties | undefined {
+  if (!source) return undefined;
+  const primary = /^#[0-9a-f]{6}$/i.test(String(source.displayNamePrimaryHex || ""))
+    ? String(source.displayNamePrimaryHex)
+    : "#F2F3F5";
+  const accent = /^#[0-9a-f]{6}$/i.test(String(source.displayNameAccentHex || ""))
+    ? String(source.displayNameAccentHex)
+    : "#5865F2";
+  const fontFamily =
+    source.displayNameFontId === "mono"
+      ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
+      : source.displayNameFontId === "rounded"
+        ? 'ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif'
+        : undefined;
+  if (source.displayNameEffectId === "gradient") {
+    return {
+      backgroundImage: `linear-gradient(0deg, ${primary}, ${accent})`,
+      WebkitBackgroundClip: "text",
+      backgroundClip: "text",
+      color: "transparent",
+      fontFamily,
+    };
+  }
+  if (source.displayNameEffectId === "neon") {
+    return {
+      color: primary,
+      textShadow: `0 0 10px ${accent}, 0 0 18px ${accent}`,
+      fontFamily,
+    };
+  }
+  return { color: primary, fontFamily };
+}
 
 /**
  * Online + có tương tác gần đây → xanh; online nhưng không hoạt động → vàng;
@@ -143,6 +182,7 @@ export default function ChannelUserProfileRoot({
   const [view, setView] = useState<"mini" | "full">("mini");
   const [profile, setProfile] = useState<ProfileDetailResponse | null>(null);
   const [memberRow, setMemberRow] = useState<MemberWithRoles | null>(null);
+  const [serverCoverOverride, setServerCoverOverride] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [miniMessage, setMiniMessage] = useState("");
@@ -170,6 +210,7 @@ export default function ChannelUserProfileRoot({
     setLoadError(null);
     setProfile(null);
     setMemberRow(null);
+    setServerCoverOverride(null);
     let cancelled = false;
     setLoading(true);
     (async () => {
@@ -184,6 +225,7 @@ export default function ChannelUserProfileRoot({
           (m) => String(m.userId) === String(context.targetUserId),
         );
         setMemberRow(row ?? null);
+        setServerCoverOverride((row as any)?.coverUrl ?? null);
       } catch (e) {
         if (!cancelled) {
           setLoadError(
@@ -198,6 +240,65 @@ export default function ChannelUserProfileRoot({
       cancelled = true;
     };
   }, [open, context, token]);
+
+  useEffect(() => {
+    const onUpdated = (e: Event) => {
+      if (!open || !context) return;
+      const ce = e as CustomEvent;
+      const d = (ce?.detail ?? {}) as {
+        serverId?: string;
+        userId?: string;
+        avatarUrl?: string | null;
+        coverUrl?: string | null;
+      };
+      if (!d?.serverId || !d?.userId) return;
+      if (d.serverId !== context.serverId) return;
+      if (String(d.userId) !== String(context.targetUserId)) return;
+      if ("avatarUrl" in d) {
+        setMemberRow((prev) =>
+          prev ? ({ ...prev, avatarUrl: d.avatarUrl ?? prev.avatarUrl } as any) : prev,
+        );
+      }
+      if ("coverUrl" in d) {
+        setServerCoverOverride(d.coverUrl ?? null);
+      }
+    };
+    window.addEventListener("cordigram-server-member-profile-updated", onUpdated as any);
+    return () =>
+      window.removeEventListener("cordigram-server-member-profile-updated", onUpdated as any);
+  }, [open, context]);
+
+  useEffect(() => {
+    const onStyle = (e: Event) => {
+      if (!open || !context) return;
+      const ce = e as CustomEvent;
+      const d = (ce?.detail ?? {}) as {
+        userId?: string;
+        avatarUrl?: string | null;
+        displayName?: string;
+        username?: string;
+      };
+      if (!d?.userId) return;
+      if (String(d.userId) !== String(context.targetUserId)) return;
+      if ("avatarUrl" in d) {
+        setProfile((prev) =>
+          prev ? ({ ...prev, avatarUrl: d.avatarUrl ?? prev.avatarUrl } as any) : prev,
+        );
+        setMemberRow((prev) =>
+          prev ? ({ ...prev, avatarUrl: d.avatarUrl ?? prev.avatarUrl } as any) : prev,
+        );
+      }
+      if (d.displayName) {
+        setProfile((prev) => (prev ? ({ ...prev, displayName: d.displayName } as any) : prev));
+      }
+      if (d.username) {
+        setProfile((prev) => (prev ? ({ ...prev, username: d.username } as any) : prev));
+      }
+    };
+    window.addEventListener("cordigram-user-profile-style-updated", onStyle as any);
+    return () =>
+      window.removeEventListener("cordigram-user-profile-style-updated", onStyle as any);
+  }, [open, context]);
 
   useEffect(() => {
     if (!moreOpen && !fullMoreOpen && !inviteServerModalOpen) return;
@@ -242,17 +343,21 @@ export default function ChannelUserProfileRoot({
   const usernameLabel = profile?.username || context?.fallbackUsername || "";
 
   const bannerUrl = useMemo(() => {
-    const cover = profile?.coverUrl?.trim();
-    if (cover) return cover;
+    // Prefer per-server cover if user has set it.
+    const cover = serverCoverOverride ?? null;
+    const parsed = parseUserCover(cover || "");
+    if (parsed.bannerImageUrl) return parsed.bannerImageUrl;
+    // Fallback: use neutral banner (SVG) rather than main profile cover.
     return theme === "dark" ? BANNER_WHITE_SVG : BANNER_BLACK_SVG;
-  }, [profile?.coverUrl, theme]);
+  }, [theme, serverCoverOverride]);
 
   const avatarUrl = useMemo(
     () =>
+      memberRow?.avatarUrl ||
       profile?.avatarUrl ||
       context?.fallbackAvatarUrl ||
       AVATAR_FALLBACK,
-    [profile?.avatarUrl, context?.fallbackAvatarUrl],
+    [memberRow?.avatarUrl, profile?.avatarUrl, context?.fallbackAvatarUrl],
   );
 
   const cardSurface = theme === "dark" ? "#1e1f22" : "#ebedef";
@@ -499,7 +604,9 @@ export default function ChannelUserProfileRoot({
                 aria-hidden
               />
             </div>
-            <h2 className={styles.fullDisplayName}>{displayName}</h2>
+            <h2 className={styles.fullDisplayName} style={getDisplayNameTextStyle(profile)}>
+              {displayName}
+            </h2>
             <p className={styles.fullUsername}>@{usernameLabel}</p>
             <div className={styles.fullActionRow}>
               {profile.isFollowing ? (

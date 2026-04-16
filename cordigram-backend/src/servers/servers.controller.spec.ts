@@ -25,30 +25,51 @@ describe('ServersController safety/audit endpoints', () => {
   });
 
   it('should call getServerSafetySettings with serverId + userId', async () => {
-    serversServiceMock.getServerSafetySettings.mockResolvedValue({ spamProtection: {} });
+    serversServiceMock.getServerSafetySettings.mockResolvedValue({
+      spamProtection: {},
+    });
     const req = { user: { userId: 'u1' } };
     await controller.getSafetySettings('s1', req);
-    expect(serversServiceMock.getServerSafetySettings).toHaveBeenCalledWith('s1', 'u1');
+    expect(serversServiceMock.getServerSafetySettings).toHaveBeenCalledWith(
+      's1',
+      'u1',
+    );
   });
 
   it('should call updateServerSafetySettings with patch body', async () => {
-    serversServiceMock.updateServerSafetySettings.mockResolvedValue({ automod: {} });
+    serversServiceMock.updateServerSafetySettings.mockResolvedValue({
+      automod: {},
+    });
     const req = { user: { userId: 'u2' } };
     const body = { automod: { bannedWords: ['abc'] } };
     await controller.updateSafetySettings('s2', body, req);
-    expect(serversServiceMock.updateServerSafetySettings).toHaveBeenCalledWith('s2', 'u2', body);
+    expect(serversServiceMock.updateServerSafetySettings).toHaveBeenCalledWith(
+      's2',
+      'u2',
+      body,
+    );
   });
 
   it('should map audit query params correctly', async () => {
     serversServiceMock.getServerAuditLogs.mockResolvedValue([]);
     const req = { user: { userId: 'u3' } };
-    await controller.getServerAuditLogs('s3', req, 'channel.update', 'u1', '25', '2026-01-01T00:00:00.000Z');
-    expect(serversServiceMock.getServerAuditLogs).toHaveBeenCalledWith('s3', 'u3', {
-      action: 'channel.update',
-      actorUserId: 'u1',
-      limit: 25,
-      before: '2026-01-01T00:00:00.000Z',
-    });
+    await controller.getServerAuditLogs(
+      's3',
+      req,
+      'channel.update',
+      'u1',
+      '25',
+      '2026-01-01T00:00:00.000Z',
+    );
+    expect(serversServiceMock.getServerAuditLogs).toHaveBeenCalledWith(
+      's3',
+      'u3',
+      {
+        action: 'channel.update',
+        actorUserId: 'u1',
+        limit: 25,
+        before: '2026-01-01T00:00:00.000Z',
+      },
+    );
   });
 });
-

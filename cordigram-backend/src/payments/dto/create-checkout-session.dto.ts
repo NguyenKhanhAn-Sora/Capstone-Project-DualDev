@@ -6,6 +6,7 @@ import {
   IsString,
   Max,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateCheckoutSessionDto {
@@ -13,10 +14,26 @@ export class CreateCheckoutSessionDto {
   @IsString()
   actionType?: string;
 
+  /** For boost checkout flow */
+  @IsOptional()
+  @IsString()
+  boostTier?: string; // 'basic' | 'boost'
+
+  /** For boost checkout flow */
+  @IsOptional()
+  @IsString()
+  billingCycle?: string; // 'monthly' | 'yearly'
+
+  /** For boost gift flow */
+  @IsOptional()
+  @IsString()
+  recipientUserId?: string;
+
   @IsOptional()
   @IsString()
   targetCampaignId?: string;
 
+  @ValidateIf((o) => !['boost_subscribe', 'boost_gift'].includes(String(o.actionType)))
   @IsInt()
   @Min(1000)
   amount!: number;
@@ -41,10 +58,12 @@ export class CreateCheckoutSessionDto {
   @IsString()
   adFormat?: string;
 
+  @ValidateIf((o) => !['boost_subscribe', 'boost_gift'].includes(String(o.actionType)))
   @IsString()
   @IsNotEmpty()
   boostPackageId!: string;
 
+  @ValidateIf((o) => !['boost_subscribe', 'boost_gift'].includes(String(o.actionType)))
   @IsString()
   @IsNotEmpty()
   durationPackageId!: string;

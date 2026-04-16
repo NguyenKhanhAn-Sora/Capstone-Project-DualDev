@@ -611,6 +611,8 @@ export class AdminController {
   @Get('community-discovery')
   async getCommunityDiscoveryServers(
     @Query('status') statusRaw: string | undefined,
+    @Query('q') q: string | undefined,
+    @Query('sort') sort: string | undefined,
     @Req() req: Request & { user?: AuthenticatedUser },
   ) {
     const roles = req.user?.roles ?? [];
@@ -624,7 +626,11 @@ export class AdminController {
       statusRaw === 'removed'
         ? statusRaw
         : 'all';
-    return this.adminService.getCommunityDiscoveryServers({ status });
+    return this.adminService.getCommunityDiscoveryServers({
+      status,
+      q,
+      sort,
+    } as any);
   }
 
   @Post('community-discovery/:serverId/approve')
@@ -688,6 +694,8 @@ export class AdminController {
   @Get('community-discovery/history')
   async getCommunityDiscoveryHistory(
     @Query('serverId') serverId: string | undefined,
+    @Query('q') q: string | undefined,
+    @Query('sort') sort: string | undefined,
     @Query('limit') limitRaw: string | undefined,
     @Query('offset') offsetRaw: string | undefined,
     @Req() req: Request & { user?: AuthenticatedUser },
@@ -700,9 +708,24 @@ export class AdminController {
     const offset = Number.isFinite(Number(offsetRaw)) ? Number(offsetRaw) : 0;
     return this.adminService.getCommunityDiscoveryHistory({
       serverId,
+      q,
+      sort,
       limit,
       offset,
-    });
+    } as any);
+  }
+
+  @Post('community-discovery/:serverId/restore-server')
+  async restoreDeletedServer(
+    @Param('serverId') serverId: string,
+    @Req() req: Request & { user?: AuthenticatedUser },
+  ) {
+    const roles = req.user?.roles ?? [];
+    if (!roles.includes('admin')) {
+      throw new ForbiddenException('Admin access required');
+    }
+    const adminId = req.user?.userId ?? '';
+    return (this.adminService as any).restoreDeletedServer({ serverId, adminId });
   }
 
   @Get('community-discovery/:serverId/view')

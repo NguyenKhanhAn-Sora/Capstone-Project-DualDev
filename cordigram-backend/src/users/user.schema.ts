@@ -20,6 +20,9 @@ export type RecentAccount = {
 export type UserSettings = {
   theme: 'light' | 'dark';
   language: 'vi' | 'en' | 'ja' | 'zh';
+  appearanceBackground?: string | null;
+  appearancePreset?: 'default' | 'graphite' | 'charcoal' | 'indigo';
+  appearanceSync?: boolean;
   /** Ai hiện trong danh sách DM (chỉ UI + lọc client; mặc định everyone). */
   dmListFrom?: 'everyone' | 'followers_only';
   dmCallFrom?: 'everyone' | 'followers_only';
@@ -27,6 +30,8 @@ export type UserSettings = {
   showCordigramMemberSince?: boolean;
   /** Chia sẻ trạng thái online/idle/offline với người khác. */
   sharePresence?: boolean;
+  /** Nâng cấp Boost theo tài khoản (mở khóa tính năng cao cấp). */
+  accountBoost?: boolean;
   /** Âm thanh thông báo tin (client có thể đọc). */
   chatSoundEnabled?: boolean;
   notifications?: {
@@ -162,6 +167,13 @@ export class User extends Document {
     type: {
       theme: { type: String, enum: ['light', 'dark'], default: 'light' },
       language: { type: String, enum: ['vi', 'en', 'ja', 'zh'], default: 'vi' },
+      appearanceBackground: { type: String, default: null },
+      appearancePreset: {
+        type: String,
+        enum: ['default', 'graphite', 'charcoal', 'indigo'],
+        default: 'default',
+      },
+      appearanceSync: { type: Boolean, default: false },
       dmListFrom: {
         type: String,
         enum: ['everyone', 'followers_only'],
@@ -174,6 +186,7 @@ export class User extends Document {
       },
       showCordigramMemberSince: { type: Boolean, default: true },
       sharePresence: { type: Boolean, default: true },
+      accountBoost: { type: Boolean, default: false },
       chatSoundEnabled: { type: Boolean, default: true },
       notifications: {
         mutedUntil: { type: Date, default: null },
@@ -202,10 +215,14 @@ export class User extends Document {
     default: {
       theme: 'light',
       language: 'vi',
+      appearanceBackground: null,
+      appearancePreset: 'default',
+      appearanceSync: false,
       dmListFrom: 'everyone',
       dmCallFrom: 'everyone',
       showCordigramMemberSince: true,
       sharePresence: true,
+      accountBoost: false,
       chatSoundEnabled: true,
       notifications: {
         mutedUntil: null,

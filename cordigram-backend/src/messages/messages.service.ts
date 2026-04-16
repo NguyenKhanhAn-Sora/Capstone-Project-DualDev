@@ -28,6 +28,7 @@ import {
 import { MediaModerationService } from '../posts/media-moderation.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import type { ContentFilterLevel } from '../servers/server.schema';
+import { BoostService } from '../boost/boost.service';
 
 @Injectable()
 export class MessagesService {
@@ -47,6 +48,8 @@ export class MessagesService {
     private readonly rolesService: RolesService,
     private readonly mediaModerationService: MediaModerationService,
     private readonly cloudinaryService: CloudinaryService,
+    @Inject(forwardRef(() => BoostService))
+    private readonly boostService: BoostService,
   ) {}
 
   private async handleMentionSpamViolation(
@@ -97,9 +100,7 @@ export class MessagesService {
         const notifModel = this.serverModel.db.model('ServerNotification');
         await notifModel.create({
           serverId: new Types.ObjectId(serverId),
-          createdBy: new Types.ObjectId(
-            (server as any).ownerId?.toString() ?? serverId,
-          ),
+          createdBy: new Types.ObjectId(server.ownerId?.toString() ?? serverId),
           title: '__SYS:mentionSpamTitle',
           content: notifContent,
           targetType: 'role',
@@ -125,9 +126,7 @@ export class MessagesService {
           'Người dùng';
         const systemMsg = new this.messageModel({
           channelId: new Types.ObjectId(channelId),
-          senderId: new Types.ObjectId(
-            (server as any).ownerId?.toString() ?? userId,
-          ),
+          senderId: new Types.ObjectId(server.ownerId?.toString() ?? userId),
           content: `⚠️ @${displayName}: ${msf.customNotification}`,
           messageType: 'system',
           attachments: [],
@@ -182,9 +181,7 @@ export class MessagesService {
     return null;
   }
 
-  private async moderateAttachments(
-    attachments: string[],
-  ): Promise<string[]> {
+  private async moderateAttachments(attachments: string[]): Promise<string[]> {
     const result: string[] = [];
 
     for (const url of attachments) {
@@ -200,11 +197,10 @@ export class MessagesService {
           continue;
         }
         const buffer = Buffer.from(await resp.arrayBuffer());
-        const modResult =
-          await this.mediaModerationService.moderateImage({
-            buffer,
-            mimetype: resp.headers.get('content-type') || 'image/jpeg',
-          });
+        const modResult = await this.mediaModerationService.moderateImage({
+          buffer,
+          mimetype: resp.headers.get('content-type') || 'image/jpeg',
+        });
 
         if (modResult.decision === 'reject') {
           continue;
@@ -243,11 +239,10 @@ export class MessagesService {
         const resp = await fetch(m.url);
         if (!resp.ok) continue;
         const buffer = Buffer.from(await resp.arrayBuffer());
-        const modResult =
-          await this.mediaModerationService.moderateImage({
-            buffer,
-            mimetype: resp.headers.get('content-type') || 'image/jpeg',
-          });
+        const modResult = await this.mediaModerationService.moderateImage({
+          buffer,
+          mimetype: resp.headers.get('content-type') || 'image/jpeg',
+        });
 
         if (modResult.decision === 'reject') {
           result = result.replace(
@@ -270,7 +265,10 @@ export class MessagesService {
     return { content: result, decision };
   }
 
-  private async canAccessPrivateChannel(serverId: string, userId: string): Promise<boolean> {
+  private async canAccessPrivateChannel(
+    serverId: string,
+    userId: string,
+  ): Promise<boolean> {
     const allowedManageServer = await this.rolesService.hasPermission(
       serverId,
       userId,
@@ -320,7 +318,11 @@ export class MessagesService {
     );
 
     const [userRow, profileRow] = await Promise.all([
-      this.userModel.findById(userId).select('createdAt isVerified').lean().exec(),
+      this.userModel
+        .findById(userId)
+        .select('createdAt isVerified')
+        .lean()
+        .exec(),
       this.profileModel
         .findOne({ userId: new Types.ObjectId(userId) })
         .select('birthdate')
@@ -339,9 +341,7 @@ export class MessagesService {
       (server as any).safetySettings?.spamProtection?.verificationLevel,
     );
 
-    const isServerEmailVerified = Boolean(
-      (usDoc as any)?.serverEmailVerified,
-    );
+    const isServerEmailVerified = Boolean((usDoc as any)?.serverEmailVerified);
 
     return evaluateChannelChatGate({
       isAgeRestricted: Boolean((server as any).isAgeRestricted),
@@ -386,9 +386,10 @@ export class MessagesService {
     return gate.allowed;
   }
 
-  private assertChatGateOrThrow(
-    gate: { allowed: boolean; reason?: ChatGateBlockReason },
-  ): void {
+  private assertChatGateOrThrow(gate: {
+    allowed: boolean;
+    reason?: ChatGateBlockReason;
+  }): void {
     if (gate.allowed) return;
     const msg =
       gate.reason === 'age_under_18'
@@ -442,7 +443,9 @@ export class MessagesService {
         userId,
       );
       if (!canAccessPrivate) {
-        throw new ForbiddenException('Vai trò của bạn không được phép vào kênh riêng tư này');
+        throw new ForbiddenException(
+          'Vai trò của bạn không được phép vào kênh riêng tư này',
+        );
       }
     }
 
@@ -648,19 +651,57 @@ export class MessagesService {
           'Không gửi đồng thời sticker Giphy và sticker máy chủ',
         );
       }
+      const sourceServerIdRaw =
+        createMessageDto.serverStickerServerId?.trim() || '';
+      const sourceServerId =
+        sourceServerIdRaw && Types.ObjectId.isValid(sourceServerIdRaw)
+          ? sourceServerIdRaw
+          : channel.serverId?.toString?.() ?? String(channel.serverId);
+
+      const isCrossServerSticker =
+        String(sourceServerId) !==
+        (channel.serverId?.toString?.() ?? String(channel.serverId));
+
+      if (isCrossServerSticker) {
+        const boost = await this.boostService.getBoostStatus(userId);
+        if (!boost?.active) {
+          throw new ForbiddenException(
+            'Boost required to use server stickers across servers',
+          );
+        }
+      }
+
       const srvStickers = await this.serverModel
-        .findById(channel.serverId)
-        .select('customStickers')
+        .findById(sourceServerId)
+        .select('customStickers members ownerId')
         .lean()
         .exec();
+      if (!srvStickers) {
+        throw new BadRequestException('Server sticker source not found');
+      }
+      if (isCrossServerSticker) {
+        const isOwner =
+          String((srvStickers as any).ownerId) === String(userId) ||
+          String((srvStickers as any).ownerId?._id ?? '') === String(userId);
+        const isMember =
+          isOwner ||
+          (Array.isArray((srvStickers as any).members) &&
+            (srvStickers as any).members.some(
+              (m: any) =>
+                (m?.userId?._id ?? m?.userId)?.toString?.() === String(userId),
+            ));
+        if (!isMember) {
+          throw new ForbiddenException(
+            'Bạn phải tham gia máy chủ chứa sticker để dùng ở máy chủ khác',
+          );
+        }
+      }
       const sid = createMessageDto.serverStickerId.trim();
       const sticker = ((srvStickers as any)?.customStickers || []).find(
         (s: any) => s._id?.toString() === sid,
       );
       if (!sticker) {
-        throw new BadRequestException(
-          'Sticker không thuộc máy chủ của kênh này',
-        );
+        throw new BadRequestException('Sticker không thuộc máy chủ nguồn');
       }
       if (
         String(sticker.imageUrl).trim() !==
@@ -740,7 +781,9 @@ export class MessagesService {
         userId,
       );
       if (!canAccessPrivate) {
-        throw new ForbiddenException('Vai trò của bạn không được phép vào kênh riêng tư này');
+        throw new ForbiddenException(
+          'Vai trò của bạn không được phép vào kênh riêng tư này',
+        );
       }
     }
 
@@ -1099,7 +1142,9 @@ export class MessagesService {
           viewerId,
         );
         if (!canAccessPrivate) {
-          throw new ForbiddenException('Vai trò của bạn không được phép vào kênh riêng tư này');
+          throw new ForbiddenException(
+            'Vai trò của bạn không được phép vào kênh riêng tư này',
+          );
         }
       }
 

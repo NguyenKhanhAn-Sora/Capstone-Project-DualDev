@@ -84,6 +84,18 @@ export class PaymentTransaction extends Document {
   @Prop({ type: String, default: '' })
   durationPackageId?: string;
 
+  /** Boost store */
+  @Prop({ type: String, default: null, index: true })
+  boostTier?: string | null;
+
+  /** Boost store */
+  @Prop({ type: String, default: null })
+  billingCycle?: string | null;
+
+  /** Boost gift: recipient userId */
+  @Prop({ type: String, default: null, index: true })
+  recipientUserId?: string | null;
+
   @Prop({ type: Number, default: 0 })
   durationDays?: number;
 

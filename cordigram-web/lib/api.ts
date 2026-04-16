@@ -10,8 +10,20 @@ interface FetchOptions extends RequestInit {
 
 const DEFAULT_BASE_URL = "http://localhost:9999";
 
-const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? DEFAULT_BASE_URL;
+function normalizeApiBaseUrl(raw: string | undefined | null): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return DEFAULT_BASE_URL;
+  const trimmed = s.replace(/\/$/, "");
+  // Guard against malformed ":9999" or "http://:9999"
+  if (/^:\d+/.test(trimmed)) return `http://localhost${trimmed}`;
+  if (/^https?:\/\/:\d+/.test(trimmed)) {
+    const port = trimmed.match(/^https?:\/\/:(\d+)/)?.[1];
+    return `http://localhost:${port ?? "9999"}`;
+  }
+  return trimmed;
+}
+
+const apiBaseUrl = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE);
 
 async function toJson<T>(res: Response): Promise<T> {
   const text = await res.text();
@@ -1234,6 +1246,26 @@ export async function fetchIgnoredUserIds(opts: {
   });
 }
 
+export type IgnoredUserItem = {
+  userId: string;
+  username?: string;
+  displayName?: string;
+  avatarUrl?: string;
+};
+
+export async function fetchIgnoredUsers(opts: {
+  token: string;
+}): Promise<{ items: IgnoredUserItem[] }> {
+  const { token } = opts;
+  return apiFetch<{ items: IgnoredUserItem[] }>({
+    path: "/users/ignored",
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function fetchActivityLog(opts: {
   token: string;
   limit?: number;
@@ -1427,6 +1459,10 @@ export type CurrentProfileResponse = {
   displayName: string;
   username: string;
   avatarUrl: string;
+  displayNameFontId?: string | null;
+  displayNameEffectId?: string | null;
+  displayNamePrimaryHex?: string | null;
+  displayNameAccentHex?: string | null;
   isCreatorVerified?: boolean;
   status?: "active" | "pending" | "banned";
   signupStage?: "otp_pending" | "info_pending" | "completed";
@@ -1444,6 +1480,9 @@ export type UpdateAvatarResponse = {
 export type UserSettingsResponse = {
   theme: "light" | "dark";
   language?: "vi" | "en" | "ja" | "zh";
+  appearanceBackground?: string | null;
+  appearancePreset?: "default" | "graphite" | "charcoal" | "indigo";
+  appearanceSync?: boolean;
   dmListFrom?: "everyone" | "followers_only";
   dmCallFrom?: "everyone" | "followers_only";
   showCordigramMemberSince?: boolean;
@@ -1717,6 +1756,9 @@ export async function updateUserSettings(opts: {
   token: string;
   theme?: "light" | "dark";
   language?: "vi" | "en" | "ja" | "zh";
+  appearanceBackground?: string | null;
+  appearancePreset?: "default" | "graphite" | "charcoal" | "indigo";
+  appearanceSync?: boolean;
   dmListFrom?: "everyone" | "followers_only";
   dmCallFrom?: "everyone" | "followers_only";
   showCordigramMemberSince?: boolean;
@@ -1727,6 +1769,9 @@ export async function updateUserSettings(opts: {
     token,
     theme,
     language,
+    appearanceBackground,
+    appearancePreset,
+    appearanceSync,
     dmListFrom,
     dmCallFrom,
     showCordigramMemberSince,
@@ -1742,6 +1787,9 @@ export async function updateUserSettings(opts: {
     body: JSON.stringify({
       theme,
       language,
+      appearanceBackground,
+      appearancePreset,
+      appearanceSync,
       dmListFrom,
       dmCallFrom,
       showCordigramMemberSince,
@@ -2250,6 +2298,10 @@ export type ProfileDetailResponse = {
   avatarUrl: string;
   avatarOriginalUrl?: string;
   coverUrl?: string;
+  displayNameFontId?: string | null;
+  displayNameEffectId?: string | null;
+  displayNamePrimaryHex?: string | null;
+  displayNameAccentHex?: string | null;
   bio?: string;
   pronouns?: string;
   gender?: string;
@@ -2366,6 +2418,10 @@ export type UpdateMyProfilePayload = {
   bio?: string;
   pronouns?: string;
   coverUrl?: string;
+  displayNameFontId?: string;
+  displayNameEffectId?: string;
+  displayNamePrimaryHex?: string;
+  displayNameAccentHex?: string;
   location?: string;
   gender?: "male" | "female" | "other" | "prefer_not_to_say";
   birthdate?: string;
@@ -3181,6 +3237,32 @@ export async function getAvailableUsers(opts?: {
   });
 }
 
+export type BoostStatusResponse = {
+  tier?: "basic" | "boost" | null;
+  active?: boolean;
+  expiresAt?: string | null;
+  limits?: any;
+  // backwards compatible fields from older endpoint shape
+  accountBoost?: boolean;
+  serverBoost?: boolean;
+  unlocked?: boolean;
+};
+
+export async function fetchBoostStatus(opts: {
+  token: string;
+  serverId?: string | null;
+}): Promise<BoostStatusResponse> {
+  const { token, serverId } = opts;
+  const qs = serverId ? `?serverId=${encodeURIComponent(serverId)}` : "";
+  return apiFetch<BoostStatusResponse>({
+    path: `/users/boost-status${qs}`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 // Upload media response type
 export type UploadMediaResponse = {
   folder: string;
@@ -3506,16 +3588,19 @@ export async function getMyVote(opts: {
 }
 
 export type CreateStripeCheckoutSessionRequest = {
-  actionType?: "campaign_create" | "campaign_upgrade";
+  actionType?: "campaign_create" | "campaign_upgrade" | "boost_subscribe" | "boost_gift";
   targetCampaignId?: string;
-  amount: number;
+  amount?: number;
   currency?: string;
   campaignName?: string;
   description?: string;
   objective?: string;
   adFormat?: string;
-  boostPackageId: string;
-  durationPackageId: string;
+  boostPackageId?: string;
+  durationPackageId?: string;
+  boostTier?: "basic" | "boost";
+  billingCycle?: "monthly" | "yearly";
+  recipientUserId?: string;
   promotedPostId?: string;
   primaryText?: string;
   headline?: string;

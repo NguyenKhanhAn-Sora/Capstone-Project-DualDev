@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsOptional } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, Matches } from 'class-validator';
 
 export class UpdateSettingsDto {
   @IsOptional()
@@ -27,5 +27,22 @@ export class UpdateSettingsDto {
 
   @IsOptional()
   @IsBoolean()
+  accountBoost?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   chatSoundEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^#[0-9A-Fa-f]{6}$/)
+  appearanceBackground?: string;
+
+  @IsOptional()
+  @IsIn(['default', 'graphite', 'charcoal', 'indigo'])
+  appearancePreset?: 'default' | 'graphite' | 'charcoal' | 'indigo';
+
+  @IsOptional()
+  @IsBoolean()
+  appearanceSync?: boolean;
 }

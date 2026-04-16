@@ -334,10 +334,7 @@ export class RolesService {
     return this.roleModel
       .find({
         serverId: new Types.ObjectId(serverId),
-        $or: [
-          { memberIds: new Types.ObjectId(memberId) },
-          { isDefault: true },
-        ],
+        $or: [{ memberIds: new Types.ObjectId(memberId) }, { isDefault: true }],
       })
       .sort({ position: -1 })
       .exec();

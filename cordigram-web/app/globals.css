@@ -8,6 +8,10 @@
   --color-text: #0f1629;
   --color-text-muted: #5b6378;
   --color-overlay: rgba(10, 18, 40, 0.45);
+  --accent-color: #5865F2;
+  --accent-hover: #4752C4;
+  --accent-active: #3D46A5;
+  --accent-soft: rgba(88, 101, 242, 0.18);
   --color-primary: #4aa3e4;
   --color-primary-strong: #3470a2;
   --color-primary-accent: #22d3ee;
@@ -23,6 +27,7 @@
     ),
     radial-gradient(circle at 80% 0%, #ffffff14, transparent 32%),
     var(--color-bg);
+  --user-appearance-bg: linear-gradient(transparent, transparent);
   --color-scrollbar-thumb: #c5c5c5;
   --color-background-stat-reel: #5757570f;
 
@@ -83,6 +88,10 @@
   --color-text: #e5e7ef;
   --color-text-muted: #98a3c7;
   --color-overlay: rgba(5, 8, 16, 0.65);
+  --accent-color: #5865F2;
+  --accent-hover: #4752C4;
+  --accent-active: #3D46A5;
+  --accent-soft: rgba(88, 101, 242, 0.18);
   --color-button-x: #ffffff;
   --color-border-button-x: #434f65;
   --color-primary: #559ac2;
@@ -144,6 +153,156 @@
   --color-voice-received-text: #dde2f0;
 }
 
+[data-appearance="graphite"] {
+  --color-bg: #20232c;
+  --color-surface: #2a2e39;
+  --color-surface-muted: #323643;
+  --color-border: #3f4556;
+  --color-text: #f3f4f6;
+  --color-text-muted: #c1c7d4;
+  --color-bg-home: #20232c;
+  --color-panel-bg: #2b2f3a;
+  --color-panel-sidebar: #252933;
+  --color-panel-sidebar-border: #1d212b;
+  --color-panel-hover: #353946;
+  --color-panel-active: #404552;
+  --color-panel-text: #f3f4f6;
+  --color-panel-text-muted: #c1c7d4;
+  --color-panel-text-faint: #9aa3b2;
+  --color-panel-border: #414757;
+  --color-panel-deep: #20242d;
+  --color-panel-deep-border: #353b49;
+  --color-panel-context: #1a1d25;
+  --color-chat-received: #353946;
+  --color-chat-received-hover: #3b4050;
+  --color-chat-modal: #2a2e39;
+  --color-chat-modal-border: #414757;
+  --color-chat-input: #232732;
+  --color-chat-input-border: #414757;
+  --color-chat-hover: #353946;
+  --color-chat-text-strong: #f3f4f6;
+  --color-chat-text-secondary: #c1c7d4;
+}
+
+[data-appearance="charcoal"] {
+  --color-bg: #181a20;
+  --color-surface: #20232b;
+  --color-surface-muted: #262a34;
+  --color-border: #343945;
+  --color-text: #f3f4f6;
+  --color-text-muted: #bcc3d1;
+  --color-bg-home: #181a20;
+  --color-panel-bg: #1f222a;
+  --color-panel-sidebar: #1b1e25;
+  --color-panel-sidebar-border: #14171d;
+  --color-panel-hover: #2c303a;
+  --color-panel-active: #343945;
+  --color-panel-text: #f3f4f6;
+  --color-panel-text-muted: #bcc3d1;
+  --color-panel-text-faint: #919aad;
+  --color-panel-border: #343945;
+  --color-panel-deep: #15181f;
+  --color-panel-deep-border: #2d313c;
+  --color-panel-context: #101217;
+  --color-chat-received: #272b34;
+  --color-chat-received-hover: #2d313c;
+  --color-chat-modal: #20232b;
+  --color-chat-modal-border: #343945;
+  --color-chat-input: #181b22;
+  --color-chat-input-border: #343945;
+  --color-chat-hover: #2d313c;
+  --color-chat-text-strong: #f3f4f6;
+  --color-chat-text-secondary: #bcc3d1;
+}
+
+[data-appearance="indigo"] {
+  --color-bg: #111827;
+  --color-surface: #172033;
+  --color-surface-muted: #1d2840;
+  --color-border: #293754;
+  --color-text: #eff3ff;
+  --color-text-muted: #b5c0db;
+  --color-primary: #6d7cff;
+  --color-primary-strong: #5865f2;
+  --color-primary-accent: #7c3aed;
+  --color-bg-home: #111827;
+  --color-panel-bg: #172033;
+  --color-panel-sidebar: #141c2c;
+  --color-panel-sidebar-border: #0f1624;
+  --color-panel-hover: #212d46;
+  --color-panel-active: #2a3755;
+  --color-panel-text: #eff3ff;
+  --color-panel-text-muted: #b5c0db;
+  --color-panel-text-faint: #8997bb;
+  --color-panel-border: #2a3755;
+  --color-panel-deep: #101827;
+  --color-panel-deep-border: #23304b;
+  --color-panel-context: #0b1220;
+  --color-panel-accent: #7c83ff;
+  --color-panel-accent-hover: #6875f5;
+  --color-chat-received: #202b42;
+  --color-chat-received-hover: #25324c;
+  --color-chat-modal: #172033;
+  --color-chat-modal-border: #2a3755;
+  --color-chat-input: #111827;
+  --color-chat-input-border: #2a3755;
+  --color-chat-hover: #212d46;
+  --color-chat-text-strong: #eff3ff;
+  --color-chat-text-secondary: #b5c0db;
+  --color-chat-read: #7c83ff;
+}
+
+[data-appearance="social-dark"] {
+  --color-bg: #0c1220;
+  --color-surface: #0f172a;
+  --color-surface-muted: #131c31;
+  --color-border: #1f2a3d;
+  --color-text: #e5e7ef;
+  --color-text-muted: #98a3c7;
+  --color-title-primary: #e5e7ef;
+  --color-bg-home: #0c1220;
+  --color-scrollbar-thumb: #293653;
+  --gradient-surface: linear-gradient(135deg, #111b30, #0c1220);
+
+  /* Match social dark panel/chat tokens (subset) */
+  --color-panel-bg: #313338;
+  --color-panel-sidebar: #2b2d31;
+  --color-panel-sidebar-border: #1e1f22;
+  --color-panel-hover: #35373c;
+  --color-panel-active: #404249;
+  --color-panel-text: #f2f3f5;
+  --color-panel-text-muted: #b5bac1;
+  --color-panel-text-faint: #949ba4;
+  --color-panel-border: #3f4147;
+  --color-panel-deep: #1e1f22;
+  --color-panel-deep-border: #383a40;
+  --color-panel-context: #111214;
+
+  --color-chat-received: #182236;
+  --color-chat-received-hover: #1e2c44;
+  --color-chat-modal: #15203a;
+  --color-chat-modal-border: #243347;
+  --color-chat-input: #101828;
+  --color-chat-input-border: #243347;
+  --color-chat-hover: #1c2b42;
+  --color-chat-text-strong: #dde2f0;
+  --color-chat-text-secondary: #8799bf;
+  --color-chat-read: #4a9eff;
+}
+
+:root,
+[data-theme="dark"],
+[data-appearance] {
+  --color-primary: var(--accent-color);
+  --color-primary-strong: var(--accent-hover);
+  --color-primary-accent: var(--accent-active);
+  --color-panel-accent: var(--accent-color);
+  --color-panel-accent-hover: var(--accent-hover);
+  --color-chat-accent: var(--accent-color);
+  --color-voice-sent: var(--accent-color);
+  --color-voice-sent-hover: var(--accent-hover);
+}
+
 @theme inline {
   --color-background: var(--color-bg);
   --color-foreground: var(--color-text);
@@ -157,7 +316,7 @@ body {
 
 body {
   margin: 0;
-  background: var(--color-bg);
+  background: var(--user-appearance-bg), var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-roboto);
 }

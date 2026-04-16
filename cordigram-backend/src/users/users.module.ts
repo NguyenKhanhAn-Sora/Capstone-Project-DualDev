@@ -10,6 +10,7 @@ import {
   UserTasteProfile,
   UserTasteProfileSchema,
 } from '../explore/user-taste.schema';
+import { Server, ServerSchema } from '../servers/server.schema';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { BlocksService } from './blocks.service';
@@ -34,6 +35,7 @@ import {
 } from '../reportcomment/reportcomment.schema';
 import { ReportUser, ReportUserSchema } from '../reportuser/reportuser.schema';
 import { StrikeDecaySchedulerService } from './strike-decay-scheduler.service';
+import { BoostModule } from '../boost/boost.module';
 
 @Module({
   imports: [
@@ -45,6 +47,7 @@ import { StrikeDecaySchedulerService } from './strike-decay-scheduler.service';
       { name: MentionMute.name, schema: MentionMuteSchema },
       { name: Profile.name, schema: ProfileSchema },
       { name: UserTasteProfile.name, schema: UserTasteProfileSchema },
+      { name: Server.name, schema: ServerSchema },
       { name: Session.name, schema: SessionSchema },
       { name: ModerationAction.name, schema: ModerationActionSchema },
       { name: Post.name, schema: PostSchema },
@@ -58,6 +61,7 @@ import { StrikeDecaySchedulerService } from './strike-decay-scheduler.service';
     NotificationsModule,
     OtpModule,
     ActivityModule,
+    forwardRef(() => BoostModule),
   ],
   controllers: [UsersController],
   providers: [

@@ -95,6 +95,11 @@ export default function ServerProfileSection({
     let cancelled = false;
     (async () => {
       try {
+        // If serverId is invalid (or server was deleted), avoid noisy retries.
+        if (!/^[a-f0-9]{24}$/i.test(String(serverId || ""))) {
+          if (!cancelled) setProfileStats(null);
+          return;
+        }
         const stats = await serversApi.getServerProfileStats(serverId);
         if (!cancelled) setProfileStats(stats);
       } catch {

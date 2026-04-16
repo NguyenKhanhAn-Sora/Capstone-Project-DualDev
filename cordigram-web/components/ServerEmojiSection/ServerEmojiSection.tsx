@@ -96,7 +96,7 @@ export default function ServerEmojiSection({ serverId, token, canManage, onEmoji
                   {em.addedBy.avatarUrl ? (
                     <img src={em.addedBy.avatarUrl} alt="" className={styles.uploaderAvatar} />
                   ) : (
-                    <div className={styles.uploaderAvatar} style={{ background: "#5865f2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff" }}>
+                    <div className={styles.uploaderAvatar} style={{ background: "var(--color-panel-accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff" }}>
                       {(em.addedBy.username || "?").slice(0, 1).toUpperCase()}
                     </div>
                   )}
