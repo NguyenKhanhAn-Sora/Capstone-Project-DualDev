@@ -522,6 +522,27 @@
   border-color: var(--color-primary);
 }
 
+.searchButton {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: var(--font-roboto);
+  cursor: pointer;
+  text-align: center;
+}
+
+.searchButton:hover {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
 .searchIcon {
   position: absolute;
   left: 10px;

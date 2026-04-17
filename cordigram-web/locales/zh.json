@@ -374,6 +374,8 @@
       },
       "messageSearch": {
         "title": "搜索消息",
+        "heroPlaceholder": "你想去哪里？",
+        "heroPlaceholderDm": "在与 {name} 的对话中搜索",
         "placeholderDm": "在与 {name} 的对话中搜索",
         "placeholderServer": "搜索消息内容...",
         "allChannels": "所有频道",
@@ -393,7 +395,19 @@
         "loadingMore": "加载中...",
         "todayAt": "今天 {time}",
         "yesterday": "昨天",
-        "daysAgo": "{n} 天前"
+        "daysAgo": "{n} 天前",
+        "fuzzyLabel": "模糊搜索",
+        "advanced": "高级",
+        "recentChannels": "最近频道",
+        "suggestions": "建议",
+        "proTipLabel": "提示：",
+        "proTipBody": "请使用 @、#、!、* 开头。",
+        "learnMore": "了解更多",
+        "quickSwitchDmUsers": "搜索所有用户",
+        "quickSwitchTextChannels": "搜索文字频道",
+        "quickSwitchVoiceChannels": "搜索语音频道",
+        "quickSwitchServers": "搜索服务器",
+        "quickSwitchEmpty": "无结果"
       },
       "inbox": {
         "title": "收件箱",
@@ -830,6 +844,8 @@
       "inboxTitle": "收件箱",
       "inboxAria": "收件箱",
       "searchPlaceholder": "搜索或开始对话",
+      "searchButtonLabel": "搜索或开始对话",
+      "searchButtonAria": "打开消息搜索",
       "directMessages": "私信",
       "userFallback": "用户",
       "micOn": "取消静音",

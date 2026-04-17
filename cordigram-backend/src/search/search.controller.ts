@@ -15,10 +15,16 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import type { Request } from 'express';
 import { SearchService } from './search.service';
+import { MessagesService } from '../messages/messages.service';
+import { DirectMessagesService } from '../direct-messages/direct-messages.service';
 
 @Controller('search')
 export class SearchController {
-  constructor(private readonly searchService: SearchService) {}
+  constructor(
+    private readonly searchService: SearchService,
+    private readonly messagesService: MessagesService,
+    private readonly directMessagesService: DirectMessagesService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get('suggest')
@@ -39,6 +45,68 @@ export class SearchController {
     });
 
     return results;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('messages')
+  async searchChannelOrDmMessages(
+    @Req() req: Request & { user?: AuthenticatedUser },
+    @Query('q') q?: string,
+    @Query('serverId') serverId?: string,
+    @Query('channelId') channelId?: string,
+    @Query('senderId') senderId?: string,
+    @Query('before') before?: string,
+    @Query('after') after?: string,
+    @Query('hasFile') hasFile?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Query('fuzzy') fuzzy?: string,
+    @Query('parseQuery') parseQuery?: string,
+    @Query('dm') dm?: string,
+    @Query('partnerUserId') partnerUserId?: string,
+  ) {
+    const user = req.user;
+    if (!user) throw new UnauthorizedException('Unauthorized');
+
+    const isDm = dm === 'true' || dm === '1';
+    if (isDm) {
+      if (!q && !partnerUserId) {
+        throw new BadRequestException(
+          'For DM search, at least one of q or partnerUserId is required',
+        );
+      }
+      return this.directMessagesService.searchDirectMessages(user.userId, {
+        q,
+        otherUserId: partnerUserId,
+        before,
+        after,
+        hasFile: hasFile === 'true',
+        limit: limit ? parseInt(limit, 10) : 25,
+        offset: offset ? parseInt(offset, 10) : 0,
+        fuzzy: fuzzy === 'true' || fuzzy === '1',
+        parseQuery: parseQuery === 'false' || parseQuery === '0' ? false : true,
+      });
+    }
+
+    if (!q && !serverId && !channelId && !senderId) {
+      throw new BadRequestException(
+        'At least one of q, serverId, channelId, or senderId is required',
+      );
+    }
+
+    return this.messagesService.searchMessages({
+      q,
+      serverId,
+      channelId,
+      senderId,
+      before,
+      after,
+      hasFile: hasFile === 'true',
+      limit: limit ? parseInt(limit, 10) : 25,
+      offset: offset ? parseInt(offset, 10) : 0,
+      fuzzy: fuzzy === 'true' || fuzzy === '1',
+      parseQuery: parseQuery === 'false' || parseQuery === '0' ? false : true,
+    });
   }
 
   @UseGuards(JwtAuthGuard)

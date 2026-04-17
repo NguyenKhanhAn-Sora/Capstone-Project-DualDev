@@ -29,6 +29,10 @@ import { MediaModerationService } from '../posts/media-moderation.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import type { ContentFilterLevel } from '../servers/server.schema';
 import { BoostService } from '../boost/boost.service';
+import {
+  parseMessageSearchQuery,
+  type ParsedMessageSearch,
+} from './message-search-query.parser';
 
 @Injectable()
 export class MessagesService {
@@ -1431,6 +1435,73 @@ export class MessagesService {
     });
   }
 
+  private escapeRegexFragment(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private async resolveChannelForSearch(
+    serverId: string,
+    raw: string,
+  ): Promise<Types.ObjectId | undefined> {
+    const v = raw.trim();
+    if (Types.ObjectId.isValid(v) && v.length === 24) {
+      const ch = await this.channelModel
+        .findOne({
+          _id: new Types.ObjectId(v),
+          serverId: new Types.ObjectId(serverId),
+        })
+        .select('_id')
+        .lean()
+        .exec();
+      return ch?._id ? new Types.ObjectId(ch._id.toString()) : undefined;
+    }
+    const ch = await this.channelModel
+      .findOne({
+        serverId: new Types.ObjectId(serverId),
+        name: new RegExp(`^${this.escapeRegexFragment(v)}$`, 'i'),
+      })
+      .select('_id')
+      .lean()
+      .exec();
+    return ch?._id ? new Types.ObjectId(ch._id.toString()) : undefined;
+  }
+
+  private async resolveSenderForServer(
+    serverId: string,
+    raw: string,
+  ): Promise<Types.ObjectId | undefined> {
+    const v = raw.trim();
+    if (Types.ObjectId.isValid(v) && v.length === 24) {
+      const uid = new Types.ObjectId(v);
+      const m = await this.userServerModel
+        .findOne({
+          serverId: new Types.ObjectId(serverId),
+          userId: uid,
+        })
+        .select('userId')
+        .lean()
+        .exec();
+      return m ? uid : undefined;
+    }
+    const prof = await this.profileModel
+      .findOne({
+        username: new RegExp(`^${this.escapeRegexFragment(v)}$`, 'i'),
+      })
+      .select('userId')
+      .lean()
+      .exec();
+    if (!prof?.userId) return undefined;
+    const m = await this.userServerModel
+      .findOne({
+        serverId: new Types.ObjectId(serverId),
+        userId: prof.userId,
+      })
+      .select('userId')
+      .lean()
+      .exec();
+    return m ? new Types.ObjectId(prof.userId.toString()) : undefined;
+  }
+
   async searchMessages(params: {
     serverId?: string;
     channelId?: string;
@@ -1441,23 +1512,53 @@ export class MessagesService {
     hasFile?: boolean;
     limit?: number;
     offset?: number;
-  }): Promise<{ results: any[]; totalCount: number }> {
+    /** Broader match when no hits (regex across words) */
+    fuzzy?: boolean;
+    /** When false, treat q as literal (no from:/in:/has: parsing) */
+    parseQuery?: boolean;
+  }): Promise<{
+    results: any[];
+    totalCount: number;
+    parsed?: ParsedMessageSearch;
+  }> {
     const {
       serverId,
-      channelId,
+      channelId: channelIdParam,
       q,
-      senderId,
+      senderId: senderIdParam,
       before,
       after,
       hasFile,
       limit = 25,
       offset = 0,
+      fuzzy = false,
+      parseQuery = true,
     } = params;
+
+    const parsed: ParsedMessageSearch =
+      parseQuery && q
+        ? parseMessageSearchQuery(q)
+        : { text: (q || '').trim(), filters: {} };
 
     const match: any = { isDeleted: false };
 
-    if (channelId) {
-      match.channelId = new Types.ObjectId(channelId);
+    let resolvedChannelId: string | undefined = channelIdParam;
+    if (!resolvedChannelId && parsed.filters.in) {
+      if (!serverId) {
+        return { results: [], totalCount: 0, parsed };
+      }
+      const oid = await this.resolveChannelForSearch(
+        serverId,
+        parsed.filters.in,
+      );
+      if (!oid) {
+        return { results: [], totalCount: 0, parsed };
+      }
+      resolvedChannelId = oid.toString();
+    }
+
+    if (resolvedChannelId) {
+      match.channelId = new Types.ObjectId(resolvedChannelId);
     } else if (serverId) {
       const channels = await this.channelModel
         .find({ serverId: new Types.ObjectId(serverId) })
@@ -1465,17 +1566,27 @@ export class MessagesService {
         .lean()
         .exec();
       const channelIds = channels.map((c) => c._id);
-      if (channelIds.length === 0) return { results: [], totalCount: 0 };
+      if (channelIds.length === 0) return { results: [], totalCount: 0, parsed };
       match.channelId = { $in: channelIds };
     }
 
-    if (q && q.trim()) {
-      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      match.content = { $regex: escaped, $options: 'i' };
+    let resolvedSenderId = senderIdParam;
+    if (!resolvedSenderId && parsed.filters.from) {
+      if (!serverId) {
+        return { results: [], totalCount: 0, parsed };
+      }
+      const oid = await this.resolveSenderForServer(
+        serverId,
+        parsed.filters.from,
+      );
+      if (!oid) {
+        return { results: [], totalCount: 0, parsed };
+      }
+      resolvedSenderId = oid.toString();
     }
 
-    if (senderId) {
-      match.senderId = new Types.ObjectId(senderId);
+    if (resolvedSenderId) {
+      match.senderId = new Types.ObjectId(resolvedSenderId);
     }
 
     if (before) {
@@ -1485,22 +1596,91 @@ export class MessagesService {
       match.createdAt = { ...(match.createdAt || {}), $gt: new Date(after) };
     }
 
-    if (hasFile) {
+    const hasImageFilter = parsed.filters.has === 'image';
+    const hasFileFilter =
+      Boolean(hasFile) || parsed.filters.has === 'file';
+
+    if (hasImageFilter) {
+      match.$and = match.$and || [];
+      match.$and.push({
+        $or: [
+          { giphyId: { $ne: null } },
+          { customStickerUrl: { $ne: null } },
+          {
+            attachments: {
+              $elemMatch: {
+                $regex: /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i,
+              },
+            },
+          },
+        ],
+      });
+    } else if (hasFileFilter) {
       match['attachments.0'] = { $exists: true };
     }
 
-    const [totalCount, messages] = await Promise.all([
-      this.messageModel.countDocuments(match),
-      this.messageModel
-        .find(match)
-        .populate('senderId', 'email')
-        .populate('channelId', 'name type serverId')
-        .sort({ createdAt: -1 })
-        .skip(offset)
-        .limit(limit)
-        .lean()
-        .exec(),
-    ]);
+    const text = parsed.text.trim();
+
+    const runQuery = async (contentExtra: Record<string, unknown>) => {
+      const full = { ...match, ...contentExtra };
+      const [totalCount, messages] = await Promise.all([
+        this.messageModel.countDocuments(full),
+        this.messageModel
+          .find(full)
+          .populate('senderId', 'email')
+          .populate('channelId', 'name type serverId')
+          .sort(
+            text && '$text' in contentExtra
+              ? { score: { $meta: 'textScore' }, createdAt: -1 }
+              : { createdAt: -1 },
+          )
+          .skip(offset)
+          .limit(limit)
+          .lean()
+          .exec(),
+      ]);
+      return { totalCount, messages };
+    };
+
+    let contentExtra: Record<string, unknown> = {};
+    if (text) {
+      try {
+        await this.messageModel.countDocuments({
+          ...match,
+          $text: { $search: text },
+        });
+        contentExtra = { $text: { $search: text } };
+      } catch {
+        const escaped = this.escapeRegexFragment(text);
+        contentExtra = { content: { $regex: escaped, $options: 'i' } };
+      }
+    }
+
+    let { totalCount, messages } = await runQuery(contentExtra);
+
+    if (
+      fuzzy &&
+      totalCount === 0 &&
+      text &&
+      !('$text' in contentExtra)
+    ) {
+      const words = text.split(/\s+/).filter((w) => w.length > 0);
+      if (words.length > 1) {
+        const pattern = words.map((w) => this.escapeRegexFragment(w)).join('.*');
+        contentExtra = { content: { $regex: pattern, $options: 'i' } };
+        const retry = await runQuery(contentExtra);
+        totalCount = retry.totalCount;
+        messages = retry.messages;
+      }
+    }
+
+    if (fuzzy && totalCount === 0 && text && '$text' in contentExtra) {
+      const escaped = this.escapeRegexFragment(text);
+      contentExtra = { content: { $regex: escaped, $options: 'i' } };
+      const retry = await runQuery(contentExtra);
+      totalCount = retry.totalCount;
+      messages = retry.messages;
+    }
 
     const results = await Promise.all(
       messages.map(async (msg: any) => {
@@ -1529,6 +1709,6 @@ export class MessagesService {
       }),
     );
 
-    return { results, totalCount };
+    return { results, totalCount, parsed };
   }
 }

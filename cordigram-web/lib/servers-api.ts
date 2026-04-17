@@ -2174,6 +2174,14 @@ export interface SearchMessageResult {
 export interface SearchResponse {
   results: SearchMessageResult[];
   totalCount: number;
+  parsed?: {
+    text: string;
+    filters: {
+      from?: string;
+      in?: string;
+      has?: "image" | "file";
+    };
+  };
 }
 
 export async function searchMessages(params: {
@@ -2186,8 +2194,10 @@ export async function searchMessages(params: {
   hasFile?: boolean;
   limit?: number;
   offset?: number;
+  fuzzy?: boolean;
+  parseQuery?: boolean;
 }): Promise<SearchResponse> {
-  const url = new URL(`${API_BASE_URL}/messages/search`);
+  const url = new URL(`${API_BASE_URL}/search/messages`);
   if (params.q) url.searchParams.append("q", params.q);
   if (params.serverId) url.searchParams.append("serverId", params.serverId);
   if (params.channelId) url.searchParams.append("channelId", params.channelId);
@@ -2197,6 +2207,8 @@ export async function searchMessages(params: {
   if (params.hasFile) url.searchParams.append("hasFile", "true");
   if (params.limit) url.searchParams.append("limit", params.limit.toString());
   if (params.offset) url.searchParams.append("offset", params.offset.toString());
+  if (params.fuzzy) url.searchParams.append("fuzzy", "true");
+  if (params.parseQuery === false) url.searchParams.append("parseQuery", "false");
 
   const response = await fetch(url.toString(), { headers: getHeaders() });
   if (!response.ok) throw new Error("Không tìm kiếm được tin nhắn");

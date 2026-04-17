@@ -374,6 +374,8 @@
       },
       "messageSearch": {
         "title": "Tìm kiếm tin nhắn",
+        "heroPlaceholder": "Bạn muốn đi đâu?",
+        "heroPlaceholderDm": "Tìm trong cuộc trò chuyện với {name}",
         "placeholderDm": "Tìm trong cuộc trò chuyện với {name}",
         "placeholderServer": "Tìm nội dung tin nhắn...",
         "allChannels": "Tất cả kênh",
@@ -393,7 +395,19 @@
         "loadingMore": "Đang tải...",
         "todayAt": "Hôm nay lúc {time}",
         "yesterday": "Hôm qua",
-        "daysAgo": "{n} ngày trước"
+        "daysAgo": "{n} ngày trước",
+        "fuzzyLabel": "Tìm gần đúng (fuzzy)",
+        "advanced": "Nâng cao",
+        "recentChannels": "Kênh gần đây",
+        "suggestions": "Gợi ý",
+        "proTipLabel": "LỜI KHUYÊN:",
+        "proTipBody": "Bắt đầu với @, #, !, *.",
+        "learnMore": "Tìm hiểu thêm",
+        "quickSwitchDmUsers": "Tìm kiếm tất cả người dùng",
+        "quickSwitchTextChannels": "Tìm kiếm các kênh văn bản",
+        "quickSwitchVoiceChannels": "Tìm kiếm các kênh âm thanh",
+        "quickSwitchServers": "Tìm kiếm máy chủ",
+        "quickSwitchEmpty": "Không có kết quả"
       },
       "inbox": {
         "title": "Hộp thư đến",
@@ -830,6 +844,8 @@
       "inboxTitle": "Hộp thư đến",
       "inboxAria": "Hộp thư đến",
       "searchPlaceholder": "Tìm hoặc bắt đầu cuộc trò chuyện",
+      "searchButtonLabel": "Tìm hoặc bắt đầu cuộc trò chuyện",
+      "searchButtonAria": "Mở tìm kiếm tin nhắn",
       "directMessages": "TIN NHẮN TRỰC TIẾP",
       "userFallback": "Người dùng",
       "micOn": "Bật mic",

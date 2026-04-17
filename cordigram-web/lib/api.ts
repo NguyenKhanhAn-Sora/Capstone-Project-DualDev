@@ -3970,6 +3970,13 @@ export interface DmSearchResult {
 export interface DmSearchResponse {
   results: DmSearchResult[];
   totalCount: number;
+  parsed?: {
+    text: string;
+    filters: {
+      from?: string;
+      has?: "image" | "file";
+    };
+  };
 }
 
 export async function searchDirectMessages(opts: {
@@ -3981,6 +3988,8 @@ export async function searchDirectMessages(opts: {
   hasFile?: boolean;
   limit?: number;
   offset?: number;
+  fuzzy?: boolean;
+  parseQuery?: boolean;
 }): Promise<DmSearchResponse> {
   const params = new URLSearchParams();
   if (opts.q) params.append("q", opts.q);
@@ -3990,6 +3999,8 @@ export async function searchDirectMessages(opts: {
   if (opts.hasFile) params.append("hasFile", "true");
   if (opts.limit) params.append("limit", opts.limit.toString());
   if (opts.offset) params.append("offset", opts.offset.toString());
+  if (opts.fuzzy) params.append("fuzzy", "true");
+  if (opts.parseQuery === false) params.append("parseQuery", "false");
 
   return apiFetch<DmSearchResponse>({
     path: `/direct-messages/search?${params.toString()}`,

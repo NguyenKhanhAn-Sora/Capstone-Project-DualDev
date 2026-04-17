@@ -3386,7 +3386,10 @@ export default function MessagesPage() {
     }
   };
 
-  const loadChannels = async (serverId: string, opts?: { keepSelectedChannel?: boolean }) => {
+  const loadChannels = async (
+    serverId: string,
+    opts?: { keepSelectedChannel?: boolean; preferredChannelId?: string },
+  ) => {
     try {
       let channels: serversApi.Channel[];
       let cats: serversApi.ServerCategory[];
@@ -3414,6 +3417,13 @@ export default function MessagesPage() {
       setTextChannels(text);
       setVoiceChannels(voice);
       setServerCategories(cats);
+      if (opts?.preferredChannelId) {
+        const preferred = sorted.find((c) => c._id === opts.preferredChannelId);
+        if (preferred) {
+          setSelectedChannel(preferred._id);
+          return;
+        }
+      }
       if (opts?.keepSelectedChannel && selectedChannelRef.current) {
         const stillExists = sorted.some((c) => c._id === selectedChannelRef.current);
         if (stillExists) return;
@@ -6547,13 +6557,17 @@ export default function MessagesPage() {
               // Main Messages Page - No Server Selected
               <>
                 <div className={styles.conversationsScrollArea}>
-                {/* Search Bar */}
+                {/* Search: opens Discord-style message search modal */}
                 <div className={styles.searchInputWrapper}>
-                  <input
-                    type="text"
-                    className={styles.searchInput}
-                    placeholder={t("chat.messagesPage.searchPlaceholder")}
-                  />
+                  <button
+                    type="button"
+                    className={styles.searchButton}
+                    onClick={() => setShowMessageSearch(true)}
+                    title={t("chat.messagesPage.searchButtonAria")}
+                    aria-label={t("chat.messagesPage.searchButtonAria")}
+                  >
+                    {t("chat.messagesPage.searchButtonLabel")}
+                  </button>
                 </div>
 
                 {/* DM Sidebar: danh sách menu (Friends, Mission, ...) */}
@@ -8503,7 +8517,8 @@ export default function MessagesPage() {
                     )}
                     <button
                       className={styles.chatIconBtn}
-                      title="Tìm kiếm tin nhắn"
+                      title={t("chat.popups.messageSearch.title")}
+                      aria-label={t("chat.popups.messageSearch.title")}
                       onClick={() => setShowMessageSearch(true)}
                     >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -10019,8 +10034,37 @@ export default function MessagesPage() {
         onClose={() => setShowMessageSearch(false)}
         mode={selectedServer ? "server" : "dm"}
         serverId={selectedServer || undefined}
+        serverName={currentServer?.name}
         channelId={selectedChannel || undefined}
         channels={allChannels}
+        members={
+          currentServer?.members
+            ? currentServer.members.map((m) => ({
+                userId:
+                  typeof m.userId === "string"
+                    ? m.userId
+                    : String(
+                        (m.userId as { _id?: string })?._id ?? m.userId ?? "",
+                      ),
+                displayName: m.nickname || undefined,
+                username: undefined,
+              }))
+            : []
+        }
+        dmPeers={friends}
+        serversForQuickSwitch={servers.map((s) => ({
+          _id: s._id,
+          name: s.name || "",
+          textChannels:
+            s.textChannels?.length
+              ? s.textChannels
+              : (s.channels || []).filter(
+                  (c) => c.type === "text" && c.category !== "info",
+                ),
+          voiceChannels: s.voiceChannels?.length
+            ? s.voiceChannels
+            : (s.channels || []).filter((c) => c.type === "voice"),
+        }))}
         dmPartnerId={selectedDirectMessageFriend?._id}
         dmPartnerName={selectedDirectMessageFriend?.displayName || selectedDirectMessageFriend?.username}
         onResultClick={(messageId, channelId) => {
@@ -10028,6 +10072,23 @@ export default function MessagesPage() {
           if (channelId && selectedServer) {
             trySelectChannel(channelId);
           }
+        }}
+        onQuickSwitchDm={(userId) => {
+          setShowMessageSearch(false);
+          const friend = friends.find((f) => f._id === userId);
+          if (friend) void handleSelectDirectMessageFriend(friend);
+        }}
+        onQuickSwitchChannel={async (sid, cid) => {
+          setShowMessageSearch(false);
+          setSelectedDirectMessageFriend(null);
+          setSelectedServer(sid);
+          await loadChannels(sid, { preferredChannelId: cid });
+        }}
+        onQuickSwitchServer={async (sid) => {
+          setShowMessageSearch(false);
+          setSelectedDirectMessageFriend(null);
+          setSelectedServer(sid);
+          await loadChannels(sid);
         }}
       />
 

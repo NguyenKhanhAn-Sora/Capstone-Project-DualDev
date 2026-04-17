@@ -374,6 +374,8 @@
       },
       "messageSearch": {
         "title": "Search messages",
+        "heroPlaceholder": "Where do you want to go?",
+        "heroPlaceholderDm": "Search in conversation with {name}",
         "placeholderDm": "Search in conversation with {name}",
         "placeholderServer": "Search message content...",
         "allChannels": "All channels",
@@ -393,7 +395,19 @@
         "loadingMore": "Loading...",
         "todayAt": "Today at {time}",
         "yesterday": "Yesterday",
-        "daysAgo": "{n} days ago"
+        "daysAgo": "{n} days ago",
+        "fuzzyLabel": "Fuzzy search",
+        "advanced": "Advanced",
+        "recentChannels": "Recent channels",
+        "suggestions": "Suggestions",
+        "proTipLabel": "PRO TIP:",
+        "proTipBody": "Start with @, #, !, *.",
+        "learnMore": "Learn more",
+        "quickSwitchDmUsers": "Search all users",
+        "quickSwitchTextChannels": "Search text channels",
+        "quickSwitchVoiceChannels": "Search voice channels",
+        "quickSwitchServers": "Search servers",
+        "quickSwitchEmpty": "No results"
       },
       "inbox": {
         "title": "Inbox",
@@ -830,6 +844,8 @@
       "inboxTitle": "Inbox",
       "inboxAria": "Inbox",
       "searchPlaceholder": "Find or start a conversation",
+      "searchButtonLabel": "Find or start a conversation",
+      "searchButtonAria": "Open message search",
       "directMessages": "DIRECT MESSAGES",
       "userFallback": "User",
       "micOn": "Unmute mic",
