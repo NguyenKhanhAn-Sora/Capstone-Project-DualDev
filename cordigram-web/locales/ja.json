@@ -506,6 +506,69 @@
       "inVoiceChannel": "ボイスチャンネルに参加中",
       "goBackAdmin": "管理画面に戻る"
     },
+    "boostStore": {
+      "tabs": {
+        "store": "ストア",
+        "close": "閉じる"
+      },
+      "heroTitle": "BOOSTで特典をアンロック",
+      "expiresLabel": "有効期限",
+      "buttons": {
+        "gift": "Boostを贈る",
+        "renew": "更新",
+        "subscribe": "登録"
+      },
+      "modal": {
+        "giftTitle": "Boostを贈る",
+        "planTitle": "Boostプランを選択",
+        "billingTitle": "請求サイクルを選択"
+      },
+      "plans": {
+        "boost": {
+          "name": "Boost",
+          "priceMonthly": "113,000đ / 月",
+          "feature1": "最大600MBアップロード（アバター・画像・ファイル）",
+          "feature2": "HD画面共有",
+          "feature3": "サーバーブースト2枠",
+          "feature4": "サーバー間で絵文字・ステッカー使用"
+        },
+        "basic": {
+          "name": "ベーシックBoost",
+          "priceMonthly": "42,000đ / 月",
+          "feature1": "最大300MBアップロード",
+          "feature2": "サーバー間で絵文字使用"
+        }
+      },
+      "giftSearchPlaceholder": "名前で受取人を検索...",
+      "userFallback": "ユーザー",
+      "actions": {
+        "cancel": "キャンセル",
+        "continue": "続行",
+        "back": "戻る",
+        "abort": "中止"
+      },
+      "billing": {
+        "monthlyTitle": "月額",
+        "monthlySubtitle": "毎月支払い",
+        "yearlyTitle": "年額",
+        "yearlySubtitle": "年額でお得"
+      },
+      "checkout": {
+        "redirecting": "決済ページへ移動中...",
+        "cta": "プランを選択して支払う"
+      },
+      "warnings": {
+        "activeTitle": "まだ有効期間が残っています",
+        "activeBodyPrefix": "現在のプランは有効です",
+        "activeBodySuffix": "同じプランを更新する場合、残り期間に追加されます。",
+        "switchTitle": "Boostプランを変更",
+        "switchBodyPrefix": "現在のプランは",
+        "switchCurrentFallback": "Boostプラン",
+        "switchBodyMiddle": "ですが、選択したプランは",
+        "switchBodySuffix": "続行すると、新しいプランが支払い期間で適用され、現在の残り期間は",
+        "switchBodyStrong": "加算されません"
+      }
+    },
     "toasts": {
       "messageRemovedAll": "メッセージを全員から削除しました",
       "messageDeletedSelf": "メッセージを削除しました"

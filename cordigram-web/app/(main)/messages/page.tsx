@@ -7637,7 +7637,7 @@ export default function MessagesPage() {
                     minHeight: 0,
                     overflow: "auto",
                     background:
-                      "radial-gradient(900px 520px at 20% -10%, rgba(168, 85, 247, 0.18), transparent 55%), radial-gradient(900px 520px at 80% 0%, rgba(56, 189, 248, 0.12), transparent 60%), var(--color-bg-home)",
+                      "radial-gradient(900px 520px at 20% -10%, color-mix(in srgb, var(--color-primary) 20%, transparent), transparent 55%), radial-gradient(900px 520px at 80% 0%, color-mix(in srgb, var(--color-primary-strong, var(--color-primary)) 14%, transparent), transparent 60%), var(--color-bg-home)",
                     padding: 22,
                     color: "var(--color-text)",
                   }}
@@ -7649,7 +7649,7 @@ export default function MessagesPage() {
                       borderRadius: 18,
                       border: "1px solid var(--color-border)",
                       background:
-                        "linear-gradient(180deg, rgba(168, 85, 247, 0.32), rgba(16, 18, 22, 0))",
+                        "linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 30%, transparent), transparent)",
                       padding: "22px 18px",
                       boxShadow: "0 20px 60px rgba(2, 6, 23, 0.18)",
                       display: "grid",
@@ -7678,7 +7678,7 @@ export default function MessagesPage() {
                             fontWeight: 900,
                           }}
                         >
-                          Cửa hàng
+                          {t("chat.boostStore.tabs.store")}
                         </button>
                         <button
                           type="button"
@@ -7688,15 +7688,15 @@ export default function MessagesPage() {
                           style={{
                             border: "none",
                             background: "transparent",
-                            color: "color-mix(in srgb, var(--color-text) 75%, #a78bfa 25%)",
+                            color: "var(--color-text-muted)",
                             padding: "6px 10px",
                             borderRadius: 10,
                             cursor: "pointer",
                             fontWeight: 800,
                           }}
-                          title="Đóng"
+                          title={t("chat.boostStore.tabs.close")}
                         >
-                          Đóng
+                          {t("chat.boostStore.tabs.close")}
                         </button>
                       </div>
 
@@ -7705,20 +7705,20 @@ export default function MessagesPage() {
                           <div
                             style={{
                               fontSize: 12,
-                              color: "color-mix(in srgb, var(--color-text) 70%, #a78bfa 30%)",
+                              color: "var(--color-text-muted)",
                               fontWeight: 800,
                               padding: "6px 10px",
                               borderRadius: 999,
                               border: "1px solid rgba(255,255,255,0.10)",
                               background: "rgba(255,255,255,0.05)",
                             }}
-                            title="Thời hạn Boost"
+                            title={t("chat.boostStore.expiresLabel")}
                           >
-                            Hết hạn:{" "}
+                            {t("chat.boostStore.expiresLabel")}:{" "}
                             {(() => {
                               const d = new Date(boostStatus.expiresAt as string);
                               return Number.isFinite(d.getTime())
-                                ? d.toLocaleDateString("vi-VN")
+                                ? d.toLocaleDateString(localeTagForLanguage(language))
                                 : String(boostStatus.expiresAt);
                             })()}
                           </div>
@@ -7744,7 +7744,7 @@ export default function MessagesPage() {
                             cursor: "pointer",
                           }}
                         >
-                          Tặng Boost
+                          {t("chat.boostStore.buttons.gift")}
                         </button>
                       </div>
                     </div>
@@ -7758,7 +7758,7 @@ export default function MessagesPage() {
                         letterSpacing: "0.02em",
                       }}
                     >
-                      MỞ KHÓA VÔ VÀN ĐẶC QUYỀN CÙNG BOOST
+                      {t("chat.boostStore.heroTitle")}
                     </div>
 
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -7780,10 +7780,13 @@ export default function MessagesPage() {
                           fontWeight: 900,
                           cursor: "pointer",
                           color: "#fff",
-                          background: "linear-gradient(135deg, #7c3aed, #22d3ee)",
+                          background:
+                            "linear-gradient(135deg, var(--color-primary), var(--color-primary-strong, var(--color-primary)))",
                         }}
                       >
-                        {boostStatus?.active ? "Gia hạn" : "Đăng ký"}
+                        {boostStatus?.active
+                          ? t("chat.boostStore.buttons.renew")
+                          : t("chat.boostStore.buttons.subscribe")}
                       </button>
                       <button
                         type="button"
@@ -7806,7 +7809,7 @@ export default function MessagesPage() {
                           border: "1px solid var(--color-border)",
                         }}
                       >
-                        Tặng Boost
+                        {t("chat.boostStore.buttons.gift")}
                       </button>
                     </div>
                   </div>
@@ -7848,9 +7851,9 @@ export default function MessagesPage() {
                         <div style={{ fontWeight: 950 }}>
                           {boostModalStep === "plan"
                             ? boostMode === "gift"
-                              ? "Tặng Boost"
-                              : "Chọn gói Boost"
-                            : "Chọn chu kỳ thanh toán"}
+                              ? t("chat.boostStore.modal.giftTitle")
+                              : t("chat.boostStore.modal.planTitle")
+                            : t("chat.boostStore.modal.billingTitle")}
                         </div>
                         <button
                           type="button"
@@ -7892,16 +7895,16 @@ export default function MessagesPage() {
                               }}
                             >
                               <div style={{ fontSize: 30, fontWeight: 950, marginBottom: 6 }}>
-                                Boost
+                                {t("chat.boostStore.plans.boost.name")}
                               </div>
                               <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-                                113.000đ / tháng
+                                {t("chat.boostStore.plans.boost.priceMonthly")}
                               </div>
                               <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.45 }}>
-                                <li>Upload tối đa 600MB (avatar, ảnh, tệp chat)</li>
-                                <li>Chia sẻ màn hình HD</li>
-                                <li>Nâng cấp 2 máy chủ</li>
-                                <li>Dùng emoji + sticker cross-server</li>
+                                <li>{t("chat.boostStore.plans.boost.feature1")}</li>
+                                <li>{t("chat.boostStore.plans.boost.feature2")}</li>
+                                <li>{t("chat.boostStore.plans.boost.feature3")}</li>
+                                <li>{t("chat.boostStore.plans.boost.feature4")}</li>
                               </ul>
                             </button>
 
@@ -7922,14 +7925,14 @@ export default function MessagesPage() {
                               }}
                             >
                               <div style={{ fontSize: 26, fontWeight: 950, marginBottom: 6 }}>
-                                Boost cơ bản
+                                {t("chat.boostStore.plans.basic.name")}
                               </div>
                               <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-                                42.000đ / tháng
+                                {t("chat.boostStore.plans.basic.priceMonthly")}
                               </div>
                               <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.45 }}>
-                                <li>Upload tối đa 300MB</li>
-                                <li>Dùng emoji cross-server</li>
+                                <li>{t("chat.boostStore.plans.basic.feature1")}</li>
+                                <li>{t("chat.boostStore.plans.basic.feature2")}</li>
                               </ul>
                             </button>
                           </div>
@@ -7939,7 +7942,7 @@ export default function MessagesPage() {
                               <input
                                 value={boostUserQuery}
                                 onChange={(e) => setBoostUserQuery(e.target.value)}
-                                placeholder="Tìm người nhận theo tên..."
+                                placeholder={t("chat.boostStore.giftSearchPlaceholder")}
                                 style={{
                                   width: "100%",
                                   borderRadius: 12,
@@ -7970,7 +7973,10 @@ export default function MessagesPage() {
                                   .map((u) => {
                                     const id = String(u?.userId ?? u?._id ?? "");
                                     const active = id && id === boostRecipientUserId;
-                                    const display = u?.displayName || u?.username || "User";
+                                    const display =
+                                      u?.displayName ||
+                                      u?.username ||
+                                      t("chat.boostStore.userFallback");
                                     const sub = u?.username ? `@${u.username}` : id;
                                     return (
                                       <button
@@ -8024,7 +8030,7 @@ export default function MessagesPage() {
                                 border: "1px solid var(--color-border)",
                               }}
                             >
-                              Hủy
+                              {t("chat.boostStore.actions.cancel")}
                             </button>
                             <button
                               type="button"
@@ -8038,11 +8044,12 @@ export default function MessagesPage() {
                                 fontWeight: 900,
                                 cursor: "pointer",
                                 color: "#fff",
-                                background: "linear-gradient(135deg, var(--color-primary), #22d3ee)",
+                                background:
+                                  "linear-gradient(135deg, var(--color-primary), var(--color-primary-strong, var(--color-primary)))",
                                 opacity: boostMode === "gift" && !boostRecipientUserId ? 0.5 : 1,
                               }}
                             >
-                              Tiếp tục
+                              {t("chat.boostStore.actions.continue")}
                             </button>
                           </div>
                         </>
@@ -8066,10 +8073,10 @@ export default function MessagesPage() {
                               }}
                             >
                               <div style={{ fontSize: 22, fontWeight: 950, marginBottom: 6 }}>
-                                Theo tháng
+                                {t("chat.boostStore.billing.monthlyTitle")}
                               </div>
                               <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-                                Thanh toán mỗi tháng
+                                {t("chat.boostStore.billing.monthlySubtitle")}
                               </div>
                             </button>
                             <button
@@ -8089,10 +8096,10 @@ export default function MessagesPage() {
                               }}
                             >
                               <div style={{ fontSize: 22, fontWeight: 950, marginBottom: 6 }}>
-                                Theo năm
+                                {t("chat.boostStore.billing.yearlyTitle")}
                               </div>
                               <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-                                Tiết kiệm với gói năm
+                                {t("chat.boostStore.billing.yearlySubtitle")}
                               </div>
                             </button>
                           </div>
@@ -8112,7 +8119,7 @@ export default function MessagesPage() {
                                 border: "1px solid var(--color-border)",
                               }}
                             >
-                              Quay lại
+                              {t("chat.boostStore.actions.back")}
                             </button>
                             <button
                               type="button"
@@ -8126,13 +8133,14 @@ export default function MessagesPage() {
                                 fontWeight: 900,
                                 cursor: boostCheckoutBusy ? "wait" : "pointer",
                                 color: "#fff",
-                                background: "linear-gradient(135deg, var(--color-primary), #22d3ee)",
+                                background:
+                                  "linear-gradient(135deg, var(--color-primary), var(--color-primary-strong, var(--color-primary)))",
                                 opacity: boostCheckoutBusy ? 0.65 : 1,
                               }}
                             >
                               {boostCheckoutBusy
-                                ? "Đang chuyển tới thanh toán..."
-                                : "Chọn gói & Thanh toán"}
+                                ? t("chat.boostStore.checkout.redirecting")
+                                : t("chat.boostStore.checkout.cta")}
                             </button>
                           </div>
                         </>
@@ -8173,17 +8181,17 @@ export default function MessagesPage() {
                         }}
                       >
                         <div style={{ fontWeight: 950, fontSize: 16 }}>
-                          Bạn vẫn còn thời hạn gói
+                          {t("chat.boostStore.warnings.activeTitle")}
                         </div>
                         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: "var(--color-text-muted)" }}>
-                          Gói hiện tại còn hiệu lực
+                          {t("chat.boostStore.warnings.activeBodyPrefix")}
                           {boostStatus?.expiresAt
-                            ? ` đến ${new Date(boostStatus.expiresAt).toLocaleString("vi-VN", {
+                            ? ` đến ${new Date(boostStatus.expiresAt).toLocaleString(localeTagForLanguage(language), {
                                 dateStyle: "medium",
                                 timeStyle: "short",
                               })}`
                             : ""}
-                          . Bạn có thể gia hạn hoặc đổi chu kỳ; phần thời gian còn lại sẽ được cộng dồn nếu bạn gia hạn cùng gói.
+                          . {t("chat.boostStore.warnings.activeBodySuffix")}
                         </p>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
                           <button
@@ -8200,7 +8208,7 @@ export default function MessagesPage() {
                               border: "1px solid var(--color-border)",
                             }}
                           >
-                            Hủy bỏ
+                            {t("chat.boostStore.actions.abort")}
                           </button>
                           <button
                             type="button"
@@ -8216,10 +8224,11 @@ export default function MessagesPage() {
                               fontWeight: 900,
                               cursor: "pointer",
                               color: "#fff",
-                              background: "linear-gradient(135deg, var(--color-primary), #22d3ee)",
+                              background:
+                                "linear-gradient(135deg, var(--color-primary), var(--color-primary-strong, var(--color-primary)))",
                             }}
                           >
-                            Tiếp tục
+                            {t("chat.boostStore.actions.continue")}
                           </button>
                         </div>
                       </div>
@@ -8259,23 +8268,25 @@ export default function MessagesPage() {
                         }}
                       >
                         <div style={{ fontWeight: 950, fontSize: 16 }}>
-                          Đổi gói Boost
+                          {t("chat.boostStore.warnings.switchTitle")}
                         </div>
                         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "var(--color-text-muted)" }}>
-                          Bạn đang dùng{" "}
+                          {t("chat.boostStore.warnings.switchBodyPrefix")}{" "}
                           <strong style={{ color: "var(--color-text)" }}>
                             {boostStatus?.tier === "basic"
-                              ? "Boost cơ bản"
+                              ? t("chat.boostStore.plans.basic.name")
                               : boostStatus?.tier === "boost"
-                                ? "Boost"
-                                : "gói Boost"}
+                                ? t("chat.boostStore.plans.boost.name")
+                                : t("chat.boostStore.warnings.switchCurrentFallback")}
                           </strong>{" "}
-                          nhưng đã chọn{" "}
+                          {t("chat.boostStore.warnings.switchBodyMiddle")}{" "}
                           <strong style={{ color: "var(--color-text)" }}>
-                            {boostTier === "basic" ? "Boost cơ bản" : "Boost"}
+                            {boostTier === "basic"
+                              ? t("chat.boostStore.plans.basic.name")
+                              : t("chat.boostStore.plans.boost.name")}
                           </strong>
-                          . Nếu tiếp tục, hệ thống sẽ áp dụng gói mới theo thời hạn bạn thanh toán — thời gian còn lại của gói hiện tại{" "}
-                          <strong>sẽ không được cộng thêm</strong>.
+                          . {t("chat.boostStore.warnings.switchBodySuffix")}{" "}
+                          <strong>{t("chat.boostStore.warnings.switchBodyStrong")}</strong>.
                         </p>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
                           <button
@@ -8292,7 +8303,7 @@ export default function MessagesPage() {
                               border: "1px solid var(--color-border)",
                             }}
                           >
-                            Hủy bỏ
+                            {t("chat.boostStore.actions.abort")}
                           </button>
                           <button
                             type="button"
@@ -8310,13 +8321,14 @@ export default function MessagesPage() {
                               fontWeight: 900,
                               cursor: boostCheckoutBusy ? "wait" : "pointer",
                               color: "#fff",
-                              background: "linear-gradient(135deg, var(--color-primary), #22d3ee)",
+                              background:
+                                "linear-gradient(135deg, var(--color-primary), var(--color-primary-strong, var(--color-primary)))",
                               opacity: boostCheckoutBusy ? 0.65 : 1,
                             }}
                           >
                             {boostCheckoutBusy
-                              ? "Đang chuyển tới thanh toán..."
-                              : "Tiếp tục"}
+                              ? t("chat.boostStore.checkout.redirecting")
+                              : t("chat.boostStore.actions.continue")}
                           </button>
                         </div>
                       </div>

@@ -506,6 +506,69 @@
       "inVoiceChannel": "Đang trong kênh",
       "goBackAdmin": "Quay lại Admin"
     },
+    "boostStore": {
+      "tabs": {
+        "store": "Cửa hàng",
+        "close": "Đóng"
+      },
+      "heroTitle": "MỞ KHÓA VÔ VÀN ĐẶC QUYỀN CÙNG BOOST",
+      "expiresLabel": "Hết hạn",
+      "buttons": {
+        "gift": "Tặng Boost",
+        "renew": "Gia hạn",
+        "subscribe": "Đăng ký"
+      },
+      "modal": {
+        "giftTitle": "Tặng Boost",
+        "planTitle": "Chọn gói Boost",
+        "billingTitle": "Chọn chu kỳ thanh toán"
+      },
+      "plans": {
+        "boost": {
+          "name": "Boost",
+          "priceMonthly": "113.000đ / tháng",
+          "feature1": "Upload tối đa 600MB (avatar, ảnh, tệp chat)",
+          "feature2": "Chia sẻ màn hình HD",
+          "feature3": "Nâng cấp 2 máy chủ",
+          "feature4": "Dùng emoji + sticker cross-server"
+        },
+        "basic": {
+          "name": "Boost cơ bản",
+          "priceMonthly": "42.000đ / tháng",
+          "feature1": "Upload tối đa 300MB",
+          "feature2": "Dùng emoji cross-server"
+        }
+      },
+      "giftSearchPlaceholder": "Tìm người nhận theo tên...",
+      "userFallback": "Người dùng",
+      "actions": {
+        "cancel": "Hủy",
+        "continue": "Tiếp tục",
+        "back": "Quay lại",
+        "abort": "Hủy bỏ"
+      },
+      "billing": {
+        "monthlyTitle": "Theo tháng",
+        "monthlySubtitle": "Thanh toán mỗi tháng",
+        "yearlyTitle": "Theo năm",
+        "yearlySubtitle": "Tiết kiệm với gói năm"
+      },
+      "checkout": {
+        "redirecting": "Đang chuyển tới thanh toán...",
+        "cta": "Chọn gói & Thanh toán"
+      },
+      "warnings": {
+        "activeTitle": "Bạn vẫn còn thời hạn gói",
+        "activeBodyPrefix": "Gói hiện tại còn hiệu lực",
+        "activeBodySuffix": "Bạn có thể gia hạn hoặc đổi chu kỳ; phần thời gian còn lại sẽ được cộng dồn nếu bạn gia hạn cùng gói.",
+        "switchTitle": "Đổi gói Boost",
+        "switchBodyPrefix": "Bạn đang dùng",
+        "switchCurrentFallback": "gói Boost",
+        "switchBodyMiddle": "nhưng đã chọn",
+        "switchBodySuffix": "Nếu tiếp tục, hệ thống sẽ áp dụng gói mới theo thời hạn bạn thanh toán — thời gian còn lại của gói hiện tại",
+        "switchBodyStrong": "sẽ không được cộng thêm"
+      }
+    },
     "toasts": {
       "messageRemovedAll": "Đã xóa tin nhắn cho mọi người",
       "messageDeletedSelf": "Bạn đã xóa một tin nhắn"

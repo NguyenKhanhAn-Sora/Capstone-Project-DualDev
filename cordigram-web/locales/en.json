@@ -506,6 +506,69 @@
       "inVoiceChannel": "In voice channel",
       "goBackAdmin": "Back to Admin"
     },
+    "boostStore": {
+      "tabs": {
+        "store": "Store",
+        "close": "Close"
+      },
+      "heroTitle": "UNLOCK MORE PERKS WITH BOOST",
+      "expiresLabel": "Expires",
+      "buttons": {
+        "gift": "Gift Boost",
+        "renew": "Renew",
+        "subscribe": "Subscribe"
+      },
+      "modal": {
+        "giftTitle": "Gift Boost",
+        "planTitle": "Choose Boost plan",
+        "billingTitle": "Choose billing cycle"
+      },
+      "plans": {
+        "boost": {
+          "name": "Boost",
+          "priceMonthly": "113,000đ / month",
+          "feature1": "Upload up to 600MB (avatar, image, chat files)",
+          "feature2": "HD screen sharing",
+          "feature3": "2 server boosts",
+          "feature4": "Use cross-server emoji + stickers"
+        },
+        "basic": {
+          "name": "Basic Boost",
+          "priceMonthly": "42,000đ / month",
+          "feature1": "Upload up to 300MB",
+          "feature2": "Use cross-server emoji"
+        }
+      },
+      "giftSearchPlaceholder": "Search recipient by name...",
+      "userFallback": "User",
+      "actions": {
+        "cancel": "Cancel",
+        "continue": "Continue",
+        "back": "Back",
+        "abort": "Abort"
+      },
+      "billing": {
+        "monthlyTitle": "Monthly",
+        "monthlySubtitle": "Pay every month",
+        "yearlyTitle": "Yearly",
+        "yearlySubtitle": "Save with annual billing"
+      },
+      "checkout": {
+        "redirecting": "Redirecting to checkout...",
+        "cta": "Choose plan & checkout"
+      },
+      "warnings": {
+        "activeTitle": "You still have active time",
+        "activeBodyPrefix": "Your current plan remains active",
+        "activeBodySuffix": "You can renew or change billing cycle; remaining time is stacked when renewing the same plan.",
+        "switchTitle": "Switch Boost plan",
+        "switchBodyPrefix": "You are currently on",
+        "switchCurrentFallback": "a Boost plan",
+        "switchBodyMiddle": "but selected",
+        "switchBodySuffix": "If you continue, the new plan will apply for the period you pay for, and your current remaining time",
+        "switchBodyStrong": "will not be added"
+      }
+    },
     "toasts": {
       "messageRemovedAll": "Message removed for everyone",
       "messageDeletedSelf": "You deleted a message"

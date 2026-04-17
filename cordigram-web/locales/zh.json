@@ -506,6 +506,69 @@
       "inVoiceChannel": "在语音频道中",
       "goBackAdmin": "返回管理员"
     },
+    "boostStore": {
+      "tabs": {
+        "store": "商店",
+        "close": "关闭"
+      },
+      "heroTitle": "使用 BOOST 解锁更多特权",
+      "expiresLabel": "到期",
+      "buttons": {
+        "gift": "赠送 Boost",
+        "renew": "续费",
+        "subscribe": "订阅"
+      },
+      "modal": {
+        "giftTitle": "赠送 Boost",
+        "planTitle": "选择 Boost 套餐",
+        "billingTitle": "选择计费周期"
+      },
+      "plans": {
+        "boost": {
+          "name": "Boost",
+          "priceMonthly": "113,000đ / 月",
+          "feature1": "最多上传 600MB（头像、图片、聊天文件）",
+          "feature2": "高清屏幕共享",
+          "feature3": "2 个服务器助力位",
+          "feature4": "跨服务器使用表情和贴纸"
+        },
+        "basic": {
+          "name": "基础 Boost",
+          "priceMonthly": "42,000đ / 月",
+          "feature1": "最多上传 300MB",
+          "feature2": "跨服务器使用表情"
+        }
+      },
+      "giftSearchPlaceholder": "按名称搜索接收者...",
+      "userFallback": "用户",
+      "actions": {
+        "cancel": "取消",
+        "continue": "继续",
+        "back": "返回",
+        "abort": "中止"
+      },
+      "billing": {
+        "monthlyTitle": "按月",
+        "monthlySubtitle": "每月支付",
+        "yearlyTitle": "按年",
+        "yearlySubtitle": "年付更优惠"
+      },
+      "checkout": {
+        "redirecting": "正在跳转到支付...",
+        "cta": "选择套餐并支付"
+      },
+      "warnings": {
+        "activeTitle": "你的套餐仍在有效期内",
+        "activeBodyPrefix": "当前套餐有效",
+        "activeBodySuffix": "你可以续费或更换计费周期；续同套餐会叠加剩余时长。",
+        "switchTitle": "更换 Boost 套餐",
+        "switchBodyPrefix": "你当前使用的是",
+        "switchCurrentFallback": "Boost 套餐",
+        "switchBodyMiddle": "但你选择了",
+        "switchBodySuffix": "继续后，系统会按你支付的周期应用新套餐，当前剩余时长",
+        "switchBodyStrong": "不会叠加"
+      }
+    },
     "toasts": {
       "messageRemovedAll": "已为所有人删除消息",
       "messageDeletedSelf": "你已删除一条消息"
