@@ -6,9 +6,10 @@ import * as serversApi from "@/lib/servers-api";
 import { fetchBoostStatus } from "@/lib/api";
 import AddServerEmojiModal from "@/components/AddServerEmojiModal/AddServerEmojiModal";
 import { useLanguage } from "@/component/language-provider";
+import { DEFAULT_FREE_MAX_UPLOAD_BYTES } from "@/lib/upload-limits";
 
 const ACCEPT = "image/png,image/jpeg,image/jpg,image/gif,image/webp,image/x-png";
-const DEFAULT_USER_UPLOAD_BYTES = 25 * 1024 * 1024;
+const DEFAULT_USER_UPLOAD_BYTES = DEFAULT_FREE_MAX_UPLOAD_BYTES;
 
 function isAllowedFile(file: File): boolean {
   if (ACCEPT.split(",").some((t) => file.type === t.trim())) return true;

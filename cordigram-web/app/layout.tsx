@@ -23,7 +23,12 @@ export default async function MainLayout({
   const cookieStore = await cookies();
   const storedLocale = cookieStore.get("NEXT_LOCALE")?.value;
   const locale =
-    storedLocale === "vi" || storedLocale === "en" ? storedLocale : "en";
+    storedLocale === "vi" ||
+    storedLocale === "en" ||
+    storedLocale === "ja" ||
+    storedLocale === "zh"
+      ? storedLocale
+      : "en";
   const messages = (await import(`../messages/${locale}.json`)).default;
   return (
     <html lang={locale} suppressHydrationWarning>

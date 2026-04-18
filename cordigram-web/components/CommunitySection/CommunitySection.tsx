@@ -434,7 +434,7 @@ export default function CommunitySection({
                     {dangerousPerms.map((p) => (
                       <div key={p} className={styles.infoBlockItem}>• {p}</div>
                     ))}
-                    <p style={{ color: "#b5bac1", fontSize: 12, marginTop: 8 }}>
+                    <p className={styles.infoBlockNote}>
                       {t("chat.community.dangerPermsNote")}
                     </p>
                   </div>

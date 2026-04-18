@@ -257,9 +257,15 @@
       "expireNote": "招待リンクは 7 日後に期限切れになります。招待リンクを編集してください。"
     },
     "inviteVoice": {
-      "title": "{serverName} に友だちを招待",
+      "title": "{serverName} のメンバーを招待",
       "sub": "受信者は {channelName} に移動します",
-      "expireNote": "このリンクはこのボイスチャンネルに直接移動します。未参加の場合は先に参加ページが表示されます。"
+      "expireNote": "このリンクはこのボイスチャンネルに直接移動します。未参加の場合は先に参加ページが表示されます。",
+      "searchPlaceholder": "メンバーを検索",
+      "sectionLabel": "サーバーメンバー",
+      "empty": {
+        "noMembers": "他に招待できるメンバーがいないか、一覧を読み込み中です。",
+        "notFound": "該当するメンバーがいません。"
+      }
     },
     "serverProfile": {
       "saved": "サーバープロフィールを保存しました。",
@@ -624,13 +630,15 @@
           "feature1": "最大600MBアップロード（アバター・画像・ファイル）",
           "feature2": "HD画面共有",
           "feature3": "サーバーブースト2枠",
-          "feature4": "サーバー間で絵文字・ステッカー使用"
+          "feature4": "サーバー間で絵文字・ステッカー使用",
+          "feature5": "カスタム外観（テーマカラー）のロック解除"
         },
         "basic": {
           "name": "ベーシックBoost",
           "priceMonthly": "42,000đ / 月",
           "feature1": "最大300MBアップロード",
-          "feature2": "サーバー間で絵文字使用"
+          "feature2": "サーバー間で絵文字使用",
+          "feature3": "カスタム外観（テーマカラー）のロック解除"
         }
       },
       "giftSearchPlaceholder": "名前で受取人を検索...",
@@ -1032,7 +1040,9 @@
       "sectionVoice": "ボイスチャンネル",
       "createChannelSectionLabelDefault": "テキストチャンネル",
       "reportDone": "メッセージを報告しました。ありがとうございます！",
-      "voiceMessageLabel": "ボイスメッセージ"
+      "voiceMessageLabel": "ボイスメッセージ",
+      "boostUpgrade": "Boost をアップグレード",
+      "uploadingVoice": "アップロード中..."
     },
     "channels": {
       "catInfo": "情報",

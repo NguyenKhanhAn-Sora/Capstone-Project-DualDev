@@ -257,9 +257,15 @@
       "expireNote": "Link mời của bạn sẽ hết hạn sau 7 ngày. Chỉnh sửa link mời."
     },
     "inviteVoice": {
-      "title": "Mời bạn bè vào {serverName}",
+      "title": "Mời thành viên vào {serverName}",
       "sub": "Người nhận sẽ đến {channelName}",
-      "expireNote": "Link mời dẫn thẳng vào kênh thoại này. Người chưa vào máy chủ sẽ thấy trang mời tham gia trước."
+      "expireNote": "Link mời dẫn thẳng vào kênh thoại này. Người chưa vào máy chủ sẽ thấy trang mời tham gia trước.",
+      "searchPlaceholder": "Tìm thành viên",
+      "sectionLabel": "Thành viên máy chủ",
+      "empty": {
+        "noMembers": "Chưa có thành viên nào khác để mời hoặc danh sách đang tải.",
+        "notFound": "Không tìm thấy thành viên nào."
+      }
     },
     "serverProfile": {
       "saved": "Đã lưu hồ sơ máy chủ.",
@@ -624,13 +630,15 @@
           "feature1": "Upload tối đa 600MB (avatar, ảnh, tệp chat)",
           "feature2": "Chia sẻ màn hình HD",
           "feature3": "Nâng cấp 2 máy chủ",
-          "feature4": "Dùng emoji + sticker cross-server"
+          "feature4": "Dùng emoji + sticker cross-server",
+          "feature5": "Mở khóa giao diện tùy chỉnh"
         },
         "basic": {
           "name": "Boost cơ bản",
           "priceMonthly": "42.000đ / tháng",
           "feature1": "Upload tối đa 300MB",
-          "feature2": "Dùng emoji cross-server"
+          "feature2": "Dùng emoji cross-server",
+          "feature3": "Mở khóa giao diện tùy chỉnh"
         }
       },
       "giftSearchPlaceholder": "Tìm người nhận theo tên...",
@@ -1032,7 +1040,9 @@
       "sectionVoice": "Kênh Thoại",
       "createChannelSectionLabelDefault": "Kênh Chat",
       "reportDone": "Tin nhắn đã được báo cáo. Cảm ơn bạn!",
-      "voiceMessageLabel": "Tin nhắn thoại"
+      "voiceMessageLabel": "Tin nhắn thoại",
+      "boostUpgrade": "Nâng cấp Boost",
+      "uploadingVoice": "Đang tải lên..."
     },
     "channels": {
       "catInfo": "Thông Tin",

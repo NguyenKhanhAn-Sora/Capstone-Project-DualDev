@@ -257,9 +257,15 @@
       "expireNote": "Your invite link expires in 7 days. Edit invite link."
     },
     "inviteVoice": {
-      "title": "Invite friends to {serverName}",
+      "title": "Invite members to {serverName}",
       "sub": "Recipients will land in {channelName}",
-      "expireNote": "This link opens this voice channel. If they're not in the server yet, they'll see the join page first."
+      "expireNote": "This link opens this voice channel. If they're not in the server yet, they'll see the join page first.",
+      "searchPlaceholder": "Search members",
+      "sectionLabel": "Server members",
+      "empty": {
+        "noMembers": "No other members to invite yet, or the list is still loading.",
+        "notFound": "No members match your search."
+      }
     },
     "serverProfile": {
       "saved": "Server profile saved.",
@@ -624,13 +630,15 @@
           "feature1": "Upload up to 600MB (avatar, image, chat files)",
           "feature2": "HD screen sharing",
           "feature3": "2 server boosts",
-          "feature4": "Use cross-server emoji + stickers"
+          "feature4": "Use cross-server emoji + stickers",
+          "feature5": "Unlock custom interface (theme colors)"
         },
         "basic": {
           "name": "Basic Boost",
           "priceMonthly": "42,000đ / month",
           "feature1": "Upload up to 300MB",
-          "feature2": "Use cross-server emoji"
+          "feature2": "Use cross-server emoji",
+          "feature3": "Unlock custom interface (theme colors)"
         }
       },
       "giftSearchPlaceholder": "Search recipient by name...",
@@ -1032,7 +1040,9 @@
       "sectionVoice": "Voice channels",
       "createChannelSectionLabelDefault": "Text channels",
       "reportDone": "Message reported. Thank you!",
-      "voiceMessageLabel": "Voice message"
+      "voiceMessageLabel": "Voice message",
+      "boostUpgrade": "Upgrade Boost",
+      "uploadingVoice": "Uploading..."
     },
     "channels": {
       "catInfo": "Information",

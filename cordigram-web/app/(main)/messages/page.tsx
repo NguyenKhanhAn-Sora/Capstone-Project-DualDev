@@ -15,6 +15,8 @@ import {
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
 import { translateCategoryName, translateChannelName } from "@/lib/system-names";
+import { DEFAULT_FREE_MAX_UPLOAD_BYTES } from "@/lib/upload-limits";
+import { shouldPlayChannelMessageNotificationSound } from "@/lib/channel-notification-sound";
 import { playMessageNotificationSound } from "@/lib/message-notification-sound";
 import {
   sendDirectMessage,
@@ -75,7 +77,6 @@ import CreateEventWizard from "@/components/ServerEvents/CreateEventWizard";
 import EventImageEditor from "@/components/ServerEvents/EventImageEditor";
 import ShareEventPopup from "@/components/ServerEvents/ShareEventPopup";
 import EventCreatedDetailPopup from "@/components/ServerEvents/EventCreatedDetailPopup";
-import InviteToVoiceChannelPopup from "@/components/InviteToVoiceChannelPopup/InviteToVoiceChannelPopup";
 import InviteToServerPopup from "@/components/InviteToServerPopup/InviteToServerPopup";
 import MessagesInbox from "@/components/MessagesInbox/MessagesInbox";
 import ServerContextMenu from "@/components/ServerContextMenu/ServerContextMenu";
@@ -1234,9 +1235,10 @@ export default function MessagesPage() {
   const serverSettingsTargetRef = useRef(serverSettingsTarget);
   serverSettingsTargetRef.current = serverSettingsTarget;
   const [communityEnabled, setCommunityEnabled] = useState(false);
-  const [hideMutedChannels, setHideMutedChannels] = useState(false);
   const [showAllChannels, setShowAllChannels] = useState(false);
   const [serverNotificationLevel, setServerNotificationLevel] = useState<"all" | "mentions" | "none">("all");
+  /** Tên vai trò (không phải default) để áp dụng «Bỏ vai trò @mention» khi phát âm thanh tin nhắn kênh. */
+  const [notificationRoleNames, setNotificationRoleNames] = useState<string[]>([]);
   const [currentServerPermissions, setCurrentServerPermissions] =
     useState<serversApi.CurrentUserServerPermissions | null>(null);
   const [sidebarPrefsTick, setSidebarPrefsTick] = useState(0);
@@ -1339,13 +1341,6 @@ export default function MessagesPage() {
   const [dmProfileSidebarOpen, setDmProfileSidebarOpen] = useState(true);
   const [dmProfilePopupUserId, setDmProfilePopupUserId] = useState<string | null>(null);
   const [dmProfileDetail, setDmProfileDetail] = useState<ProfileDetailResponse | null>(null);
-  const [voiceInviteDismissed, setVoiceInviteDismissed] = useState<Set<string>>(new Set());
-  const [inviteToVoiceTarget, setInviteToVoiceTarget] = useState<{
-    serverId: string;
-    serverName: string;
-    channelId: string;
-    channelName: string;
-  } | null>(null);
   const [inviteToServerTarget, setInviteToServerTarget] = useState<{
     serverId: string;
     serverName: string;
@@ -1369,9 +1364,8 @@ export default function MessagesPage() {
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [chatUserSettings, setChatUserSettings] =
     useState<UserSettingsResponse | null>(null);
-  const DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
   const [maxUploadBytes, setMaxUploadBytes] = useState<number>(
-    DEFAULT_MAX_UPLOAD_BYTES,
+    DEFAULT_FREE_MAX_UPLOAD_BYTES,
   );
   const [boostStatus, setBoostStatus] = useState<BoostStatusResponse | null>(null);
 
@@ -1796,8 +1790,30 @@ export default function MessagesPage() {
     if (channelId !== selectedChannel) return;
     const senderId = typeof msg.senderId === "string" ? msg.senderId : msg.senderId?._id;
     if (senderId === currentUserId) return;
-    playMessageNotificationSound();
+
     const srvId = selectedServerRef.current;
+    const rawMentions = (msg as any).mentions ?? [];
+    const mentionIds = Array.isArray(rawMentions)
+      ? rawMentions.map((m: any) => (typeof m === "string" ? m : m?._id ?? m)).filter(Boolean)
+      : [];
+    const chMeta = allChannels.find((c) => c._id === channelId);
+    const categoryId = chMeta?.categoryId ?? null;
+    if (
+      srvId &&
+      currentUserId &&
+      shouldPlayChannelMessageNotificationSound({
+        content: String((msg as any).content ?? ""),
+        mentionIds,
+        currentUserId,
+        currentUsername: currentUserProfile?.username,
+        prefs: sidebarPrefs.getServerPrefs(currentUserId, srvId),
+        channelId,
+        categoryId,
+        roleNames: notificationRoleNames,
+      })
+    ) {
+      playMessageNotificationSound();
+    }
     const senderNickname = srvId
       ? serversRef.current
           .find((s) => s._id === srvId)
@@ -1839,6 +1855,9 @@ export default function MessagesPage() {
     currentUserId,
     clearNewMessageChannel,
     myServerAccessStatus?.chatViewBlocked,
+    allChannels,
+    notificationRoleNames,
+    currentUserProfile?.username,
   ]);
 
   // Cleanup typing timeout on unmount or friend change
@@ -2552,12 +2571,12 @@ export default function MessagesPage() {
         if (typeof v === "number" && Number.isFinite(v) && v > 0) {
           setMaxUploadBytes(v);
         } else {
-          setMaxUploadBytes(DEFAULT_MAX_UPLOAD_BYTES);
+          setMaxUploadBytes(DEFAULT_FREE_MAX_UPLOAD_BYTES);
         }
       })
       .catch(() => {
         setBoostStatus(null);
-        setMaxUploadBytes(DEFAULT_MAX_UPLOAD_BYTES);
+        setMaxUploadBytes(DEFAULT_FREE_MAX_UPLOAD_BYTES);
       });
     void serversApi
       .getFollowing()
@@ -5146,6 +5165,29 @@ export default function MessagesPage() {
     [allChannels],
   );
 
+  /** Theo menu máy chủ «Ẩn các kênh bị tắt âm» — lưu prefs theo server. */
+  const hideMutedChannelsEffective = useMemo(() => {
+    if (!currentUserId || !selectedServer) return false;
+    return sidebarPrefs.getServerPrefs(currentUserId, selectedServer).hideMutedChannels === true;
+  }, [currentUserId, selectedServer, sidebarPrefsTick]);
+
+  const isChannelMutedInSidebarPrefs = useCallback(
+    (channelId: string) => {
+      if (!currentUserId || !selectedServer) return false;
+      const sp = sidebarPrefs.getServerPrefs(currentUserId, selectedServer);
+      return sidebarPrefs.isChannelMuted(sp.channels[channelId]);
+    },
+    [currentUserId, selectedServer, sidebarPrefsTick],
+  );
+
+  const visibleChannelsIfHideMuted = useCallback(
+    <T extends { _id: string }>(list: T[]) => {
+      if (!hideMutedChannelsEffective) return list;
+      return list.filter((ch) => !isChannelMutedInSidebarPrefs(ch._id));
+    },
+    [hideMutedChannelsEffective, isChannelMutedInSidebarPrefs],
+  );
+
   const resetDragState = useCallback(() => {
     setDragType(null);
     setDragId(null);
@@ -6180,6 +6222,31 @@ export default function MessagesPage() {
     if (sp.serverNotify) setServerNotificationLevel(sp.serverNotify);
   }, [currentUserId, selectedServer, sidebarPrefsTick]);
 
+  useEffect(() => {
+    if (!selectedServer || !token) {
+      setNotificationRoleNames([]);
+      return;
+    }
+    const isAdminViewedServer = Boolean(isAdminView && adminViewServerId && selectedServer === adminViewServerId);
+    if (isAdminViewedServer) {
+      setNotificationRoleNames([]);
+      return;
+    }
+    let cancelled = false;
+    serversApi
+      .getRoles(selectedServer)
+      .then((roles) => {
+        if (cancelled) return;
+        setNotificationRoleNames(roles.filter((r) => !r.isDefault).map((r) => r.name));
+      })
+      .catch(() => {
+        if (!cancelled) setNotificationRoleNames([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedServer, token, isAdminView, adminViewServerId]);
+
   const selectedServerEntity = useMemo(
     () => servers.find((s) => s._id === selectedServer),
     [servers, selectedServer],
@@ -6715,7 +6782,7 @@ export default function MessagesPage() {
                     >
                       <path d="M12 2l2.2 6.8H21l-5.5 4 2.1 7.2L12 16.9 6.4 20l2.1-7.2L3 8.8h6.8L12 2z" />
                     </svg>
-                    <span>Nâng cấp Boost</span>
+                    <span>{t("chat.messagesPage.boostUpgrade")}</span>
                   </button>
                 </div>
 
@@ -7058,11 +7125,12 @@ export default function MessagesPage() {
                   </button>
                 )}
                 {/* Thông Tin section - only shown when info channels exist */}
-                {infoChannels.length > 0 && (() => {
+                {visibleChannelsIfHideMuted(infoChannels).length > 0 && (() => {
                   const infoCatId = infoChannels.find(c => c.categoryId)?.categoryId;
                   const infoCat = infoCatId ? serverCategories.find(c => c._id === infoCatId) : null;
                   const infoCollapse = infoCat ? getCategoryCollapseState(infoCat._id) : { enabled: false, collapsed: false };
                   const hideInfoChannels = infoCollapse.enabled && infoCollapse.collapsed;
+                  const infoChannelsVisible = visibleChannelsIfHideMuted(infoChannels);
                   return (
                   <div className={styles.section}>
                     <div
@@ -7114,7 +7182,7 @@ export default function MessagesPage() {
                         <h3 className={styles.sectionTitle} style={{ flex: 1, margin: 0 }}>{infoCat?.name ?? t("chat.sidebar.infoFallback")}</h3>
                       )}
                     </div>
-                    {!hideInfoChannels && infoChannels.map((channel) => (
+                    {!hideInfoChannels && infoChannelsVisible.map((channel) => (
                       <div
                         key={channel._id}
                         className={`${styles.conversationItem} ${
@@ -7150,7 +7218,7 @@ export default function MessagesPage() {
                   return visibleCategories.length > 0 ? (
                   <>
                   {visibleCategories.map((cat) => {
-                    const channelsInCat = getChannelsForCategory(cat._id);
+                    const channelsInCat = visibleChannelsIfHideMuted(getChannelsForCategory(cat._id));
                     const isVoiceCategory = cat.type === "voice";
                     const isCatDragging = dragType === "category" && dragId === cat._id;
                     const isCatDropTarget = dragType === "category" && dragOverId === cat._id && dragId !== cat._id;
@@ -7258,11 +7326,6 @@ export default function MessagesPage() {
                             const isChDragging = dragType === "channel" && dragId === channel._id;
                             const isChDropTarget = dragType === "channel" && dragOverId === channel._id && dragId !== channel._id;
                             if (isVoice) {
-                              const canInviteToVoice = currentServer && (currentServer.ownerId === currentUserId || currentServer.isPublic);
-                              const showInviteBar =
-                                (selectedChannel === channel._id || joinedVoiceChannelId === channel._id) &&
-                                canInviteToVoice &&
-                                !voiceInviteDismissed.has(channel._id);
                               const participantsInChannel = voiceChannelParticipants[channel._id] ?? [];
                               return (
                                 <div
@@ -7295,29 +7358,7 @@ export default function MessagesPage() {
                                       </span>
                                       <span>{translateChannelName(channel.name, language)}</span>
                                     </div>
-                                    {isSelected && (
-                                      <div className={styles.voiceChannelActions}>
-                                        <button type="button" className={styles.voiceChannelActionIcon} title="Chat">
-                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-                                        </button>
-                                        <button type="button" className={styles.voiceChannelActionIcon} title="Mời">
-                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" /></svg>
-                                        </button>
-                                        <button type="button" className={styles.voiceChannelActionIcon} title="Cài đặt">
-                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6m-16.78 7.78l4.24-4.24m3.08-3.08l4.24-4.24" /></svg>
-                                        </button>
-                                      </div>
-                                    )}
                                   </div>
-                                  {showInviteBar && (
-                                    <div className={styles.voiceInviteBar}>
-                                      <button type="button" className={styles.voiceInviteBarClickable} onClick={(e) => { e.stopPropagation(); if (currentServer && canInviteToVoice) setInviteToVoiceTarget({ serverId: currentServer._id, serverName: currentServer.name || t("chat.sidebar.serverFallback"), channelId: channel._id, channelName: channel.name }); }}>
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" /></svg>
-                                        <span>{t("chat.sidebar.inviteVoice")}</span>
-                                      </button>
-                                      <button type="button" className={styles.voiceInviteDismiss} onClick={(e) => { e.stopPropagation(); setVoiceInviteDismissed((prev) => new Set(prev).add(channel._id)); }} aria-label={t("chat.sidebar.closeAria")}>×</button>
-                                    </div>
-                                  )}
                                   {participantsInChannel.length > 0 && (
                                     <div className={styles.voiceChannelParticipants} aria-label="Người đang trong kênh thoại">
                                       <div className={styles.voiceChannelParticipantsLabel}>Đang trong kênh</div>
@@ -7389,7 +7430,7 @@ export default function MessagesPage() {
                       </div>
                     );
                   })}
-                  {getUncategorizedChannels().length > 0 && (
+                  {visibleChannelsIfHideMuted(getUncategorizedChannels()).length > 0 && (
                     <div className={styles.section}>
                       <div
                         className={styles.sectionHeader}
@@ -7408,7 +7449,7 @@ export default function MessagesPage() {
                       >
                         <h3 className={styles.sectionTitle}>{t("chat.sidebar.otherChannels")}</h3>
                       </div>
-                      {getUncategorizedChannels().map((channel) => (
+                      {visibleChannelsIfHideMuted(getUncategorizedChannels()).map((channel) => (
                         <div
                           key={channel._id}
                           className={`${styles.channelDragItem} ${dragType === "channel" && dragId === channel._id ? styles.dragging : ""}`}
@@ -7466,7 +7507,7 @@ export default function MessagesPage() {
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
                         </button>
                       </div>
-                      {textChannels.length > 0 ? textChannels.map((channel) => (
+                      {visibleChannelsIfHideMuted(textChannels).length > 0 ? visibleChannelsIfHideMuted(textChannels).map((channel) => (
                         <div
                           key={channel._id}
                           className={`${styles.conversationItem} ${selectedChannel === channel._id ? styles.active : ""}`}
@@ -7491,7 +7532,7 @@ export default function MessagesPage() {
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
                         </button>
                       </div>
-                      {voiceChannels.length > 0 ? voiceChannels.map((channel) => (
+                      {visibleChannelsIfHideMuted(voiceChannels).length > 0 ? visibleChannelsIfHideMuted(voiceChannels).map((channel) => (
                         <div
                           key={channel._id}
                           className={`${styles.conversationItem} ${selectedChannel === channel._id || joinedVoiceChannelId === channel._id ? styles.active : ""}`}
@@ -7998,6 +8039,7 @@ export default function MessagesPage() {
                                 <li>{t("chat.boostStore.plans.boost.feature2")}</li>
                                 <li>{t("chat.boostStore.plans.boost.feature3")}</li>
                                 <li>{t("chat.boostStore.plans.boost.feature4")}</li>
+                                <li>{t("chat.boostStore.plans.boost.feature5")}</li>
                               </ul>
                             </button>
 
@@ -8026,6 +8068,7 @@ export default function MessagesPage() {
                               <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.45 }}>
                                 <li>{t("chat.boostStore.plans.basic.feature1")}</li>
                                 <li>{t("chat.boostStore.plans.basic.feature2")}</li>
+                                <li>{t("chat.boostStore.plans.basic.feature3")}</li>
                               </ul>
                             </button>
                           </div>
@@ -9222,7 +9265,7 @@ export default function MessagesPage() {
                   {isUploadingVoice && (
                     <div className={styles.uploadingVoice}>
                       <div className={styles.spinner}></div>
-                      <span>Uploading...</span>
+                      <span>{t("chat.messagesPage.uploadingVoice")}</span>
                     </div>
                   )}
 
@@ -10194,18 +10237,6 @@ export default function MessagesPage() {
         onOpenCreateWizard={openCreateEventWizard}
       />
 
-      {inviteToVoiceTarget && (
-        <InviteToVoiceChannelPopup
-          isOpen
-          onClose={() => setInviteToVoiceTarget(null)}
-          serverId={inviteToVoiceTarget.serverId}
-          serverName={inviteToVoiceTarget.serverName}
-          channelId={inviteToVoiceTarget.channelId}
-          channelName={inviteToVoiceTarget.channelName}
-          friends={friends}
-        />
-      )}
-
       {inviteToServerTarget && (
         <InviteToServerPopup
           isOpen
@@ -10318,13 +10349,23 @@ export default function MessagesPage() {
           onSetNotificationLevel={(level) => {
             if (!currentUserId) return;
             sidebarPrefs.setServerNotify(currentUserId, serverContextMenu.server._id, level);
-            setServerNotificationLevel(level);
+            if (serverContextMenu.server._id === selectedServer) {
+              setServerNotificationLevel(level);
+            }
             bumpSidebarPrefs();
             setServerContextMenu(null);
           }}
-          hideMutedChannels={hideMutedChannels}
+          hideMutedChannels={
+            !!currentUserId &&
+            !!serverContextMenu &&
+            sidebarPrefs.getServerPrefs(currentUserId, serverContextMenu.server._id).hideMutedChannels === true
+          }
           onToggleHideMutedChannels={() => {
-            setHideMutedChannels((v) => !v);
+            if (!currentUserId || !serverContextMenu) return;
+            const sid = serverContextMenu.server._id;
+            const cur = sidebarPrefs.getServerPrefs(currentUserId, sid).hideMutedChannels === true;
+            sidebarPrefs.setServerHideMutedChannels(currentUserId, sid, !cur);
+            bumpSidebarPrefs();
           }}
           showAllChannels={showAllChannels}
           onToggleShowAllChannels={() => setShowAllChannels((v) => !v)}
@@ -10374,7 +10415,33 @@ export default function MessagesPage() {
               alert((err as Error)?.message ?? "Không thể rời máy chủ");
             }
           }}
-          notificationLevel={serverNotificationLevel}
+          notificationLevel={
+            currentUserId
+              ? sidebarPrefs.getServerPrefs(currentUserId, serverContextMenu.server._id).serverNotify ?? "all"
+              : "all"
+          }
+          suppressEveryoneHere={
+            !!currentUserId &&
+            !!sidebarPrefs.getServerPrefs(currentUserId, serverContextMenu.server._id).suppressEveryoneHere
+          }
+          suppressRoleMentions={
+            !!currentUserId &&
+            !!sidebarPrefs.getServerPrefs(currentUserId, serverContextMenu.server._id).suppressRoleMentions
+          }
+          onSetSuppressEveryoneHere={(v) => {
+            if (!currentUserId) return;
+            sidebarPrefs.setServerSuppressFlags(currentUserId, serverContextMenu.server._id, {
+              suppressEveryoneHere: v,
+            });
+            bumpSidebarPrefs();
+          }}
+          onSetSuppressRoleMentions={(v) => {
+            if (!currentUserId) return;
+            sidebarPrefs.setServerSuppressFlags(currentUserId, serverContextMenu.server._id, {
+              suppressRoleMentions: v,
+            });
+            bumpSidebarPrefs();
+          }}
           serverMuted={
             !!(currentUserId
               ? sidebarPrefs.isServerMuted(
@@ -10756,9 +10823,13 @@ export default function MessagesPage() {
           }
           if (section === "community-onboarding" && serverSettingsTarget?.serverId) {
             return (
-              <div style={{ padding: 24, color: "#dcddde" }}>
-                <h2 style={{ color: "#fff", marginBottom: 8 }}>{t("chat.chatPage.communityOnboardingTitle")}</h2>
-                <p>{t("chat.chatPage.communityOnboardingDesc")}</p>
+              <div style={{ padding: 24, color: "var(--color-panel-text)" }}>
+                <h2 style={{ color: "var(--color-panel-text)", marginBottom: 8 }}>
+                  {t("chat.chatPage.communityOnboardingTitle")}
+                </h2>
+                <p style={{ margin: 0, color: "var(--color-panel-text-muted)", lineHeight: 1.5 }}>
+                  {t("chat.chatPage.communityOnboardingDesc")}
+                </p>
               </div>
             );
           }

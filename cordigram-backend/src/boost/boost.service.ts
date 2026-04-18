@@ -40,8 +40,8 @@ const BOOST_LIMITS: BoostLimits = {
   crossServerStickers: true,
 };
 
-/** Giới hạn upload mặc định (không Boost) — dùng cho Social / request không kèm context Messages. */
-export const FREE_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+/** Giới hạn upload mặc định (không gói Boost): 100MB — DM, máy chủ, avatar/banner, v.v. */
+export const FREE_MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
 const FREE_LIMITS: BoostLimits = {
   maxUploadBytes: FREE_MAX_UPLOAD_BYTES,

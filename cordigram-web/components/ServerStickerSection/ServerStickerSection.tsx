@@ -6,10 +6,11 @@ import * as serversApi from "@/lib/servers-api";
 import { fetchBoostStatus } from "@/lib/api";
 import AddServerStickerModal from "@/components/AddServerStickerModal/AddServerStickerModal";
 import { useLanguage } from "@/component/language-provider";
+import { DEFAULT_FREE_MAX_UPLOAD_BYTES } from "@/lib/upload-limits";
 
 const ACCEPT = "image/png,image/jpeg,image/jpg,image/gif,image/webp,image/x-png";
 /** Đồng bộ với backend FREE_MAX_UPLOAD_BYTES khi chưa tải được boost-status. */
-const DEFAULT_USER_UPLOAD_BYTES = 25 * 1024 * 1024;
+const DEFAULT_USER_UPLOAD_BYTES = DEFAULT_FREE_MAX_UPLOAD_BYTES;
 const FREE_BASE_SLOTS = 5;
 
 function isAllowedFile(file: File): boolean {

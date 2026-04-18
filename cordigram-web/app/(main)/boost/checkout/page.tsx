@@ -67,6 +67,7 @@ export default function BoostCheckoutPage() {
               <li>Chia sẻ màn hình HD</li>
               <li>Nâng cấp 2 máy chủ</li>
               <li>Dùng emoji + sticker cross-server</li>
+              <li>Mở khóa giao diện tùy chỉnh</li>
             </ul>
           </button>
 
@@ -80,6 +81,7 @@ export default function BoostCheckoutPage() {
             <ul className={styles.list}>
               <li>Upload tối đa 300MB</li>
               <li>Dùng emoji cross-server</li>
+              <li>Mở khóa giao diện tùy chỉnh</li>
             </ul>
           </button>
         </div>

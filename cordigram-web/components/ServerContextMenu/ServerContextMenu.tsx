@@ -50,6 +50,10 @@ export interface ServerContextMenuProps {
   notificationLevel?: "all" | "mentions" | "none";
   /** Mute state for display */
   serverMuted?: boolean;
+  suppressEveryoneHere?: boolean;
+  suppressRoleMentions?: boolean;
+  onSetSuppressEveryoneHere?: (value: boolean) => void;
+  onSetSuppressRoleMentions?: (value: boolean) => void;
 }
 
 const MUTE_KEYS: Array<"15m" | "1h" | "3h" | "8h" | "24h" | "until"> = [
@@ -84,6 +88,10 @@ export default function ServerContextMenu({
   onLeaveServer,
   notificationLevel = "all",
   serverMuted = false,
+  suppressEveryoneHere = false,
+  suppressRoleMentions = false,
+  onSetSuppressEveryoneHere,
+  onSetSuppressRoleMentions,
 }: ServerContextMenuProps) {
   const { t } = useLanguage();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -408,25 +416,37 @@ export default function ServerContextMenu({
             {t("chat.serverContextMenu.notifNone")}
           </button>
           <div className={styles.submenuDivider} />
-          <label className={styles.submenuCheckbox}>
-            <input type="checkbox" />
+          <label
+            className={styles.submenuCheckbox}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={suppressEveryoneHere}
+              onChange={(e) => onSetSuppressEveryoneHere?.(e.target.checked)}
+            />
             {t("chat.serverContextMenu.suppressEveryone")}
           </label>
-          <label className={styles.submenuCheckbox}>
-            <input type="checkbox" />
+          <label
+            className={styles.submenuCheckbox}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={suppressRoleMentions}
+              onChange={(e) => onSetSuppressRoleMentions?.(e.target.checked)}
+            />
             {t("chat.serverContextMenu.suppressRoles")}
           </label>
-          <label className={styles.submenuCheckbox}>
-            <input type="checkbox" />
-            {t("chat.serverContextMenu.hideHighlights")}
-          </label>
-          <label className={styles.submenuCheckbox}>
+          <label
+            className={styles.submenuCheckbox}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             <input type="checkbox" />
             {t("chat.serverContextMenu.muteNewEvents")}
-          </label>
-          <label className={styles.submenuCheckbox}>
-            <input type="checkbox" defaultChecked />
-            {t("chat.serverContextMenu.mobileNotif")}
           </label>
         </div>
       )}

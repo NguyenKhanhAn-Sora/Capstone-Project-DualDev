@@ -1,0 +1,386 @@
+{
+  "settings": {
+    "system": {
+      "title": "System",
+      "description": "Choose your language and theme preferences.",
+      "language": {
+        "title": "Language",
+        "description": "Select your preferred display language.",
+        "options": {
+          "en": "English",
+          "vi": "Vietnamese"
+        }
+      },
+      "theme": {
+        "title": "Theme",
+        "description": "Switch between light and dark mode.",
+        "options": {
+          "light": "Light",
+          "dark": "Dark"
+        }
+      }
+    }
+  },
+  "sidebar": {
+    "nav": {
+      "home": "Home",
+      "search": "Search",
+      "message": "Message",
+      "following": "Following",
+      "explore": "Explore",
+      "notification": "Notification",
+      "ads": "Ads",
+      "create": "Create",
+      "reels": "Reels"
+    },
+    "menu": {
+      "profile": "Profile",
+      "settings": "Settings",
+      "saved": "Saved",
+      "switchToLight": "Switch to light",
+      "switchToDark": "Switch to dark",
+      "reportProblem": "Report a problem",
+      "switchAccount": "Switch account",
+      "logout": "Log out"
+    },
+    "switchAccount": {
+      "title": "Sign in to continue",
+      "email": {
+        "label": "Email address",
+        "placeholder": "Enter email"
+      },
+      "password": {
+        "label": "Password",
+        "placeholder": "Enter password",
+        "show": "Show password",
+        "hide": "Hide password"
+      },
+      "submit": {
+        "label": "Log in",
+        "loading": "Switching..."
+      },
+      "google": "Continue with Google",
+      "errors": {
+        "invalidEmail": "Email format is invalid",
+        "loginFailed": "Login failed. Please try again."
+      }
+    }
+  },
+  "common": {
+    "close": "Close",
+    "hidePost": "Hide post"
+  },
+  "home": {
+    "feed": {
+      "signInToView": "Sign in to view the feed",
+      "unableToLoad": "Unable to load feed",
+      "followingEmpty": "You are not following anyone yet, or the people you follow have not posted anything.",
+      "loadMore": "Load more",
+      "suggestionsAria": "Suggestions"
+    },
+    "toast": {
+      "signInToRepost": "Sign in to repost",
+      "reposted": "Reposted",
+      "repostedWithQuote": "Reposted with quote",
+      "commentsOn": "Comments turned on",
+      "commentsOff": "Comments turned off",
+      "commentsUpdateFailed": "Failed to update comments",
+      "likeCountHidden": "Like count hidden",
+      "likeCountVisible": "Like count visible",
+      "likeCountUpdateFailed": "Failed to update like count visibility",
+      "linkCopied": "Link copied to clipboard",
+      "linkCopyFailed": "Failed to copy link",
+      "signInToDelete": "Please sign in to delete posts",
+      "deletedPost": "Deleted post",
+      "deleteFailed": "Failed to delete post",
+      "reportSubmitted": "Report submitted",
+      "reportSubmitFailed": "Could not submit report",
+      "actionFailed": "Action failed",
+      "blockFailed": "Block failed"
+    },
+    "delete": {
+      "title": "Delete this post?",
+      "body": "{name}'s post will be removed for everyone. This action cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Delete",
+      "deleting": "Deleting..."
+    },
+    "block": {
+      "title": "Block this account?",
+      "body": "You are about to block {name}. They will no longer be able to interact with you.",
+      "cancel": "Cancel",
+      "confirm": "Block",
+      "blocking": "Blocking...",
+      "thisUser": "this user"
+    },
+    "report": {
+      "title": "Report this post",
+      "description": "Reporting @{name} post. Please pick the most accurate reason.",
+      "selectReason": "Select a specific reason",
+      "pickCategory": "Pick a category first.",
+      "cancel": "Cancel",
+      "submit": "Submit report",
+      "submitting": "Submitting...",
+      "notes": {
+        "label": "Additional notes (optional)",
+        "placeholder": "Add brief context if needed..."
+      },
+      "groups": {
+        "abuse": {
+          "label": "Harassment / Hate speech",
+          "reasons": {
+            "harassment": "Targets an individual to harass",
+            "hateSpeech": "Hate speech or discrimination",
+            "offensiveDiscrimination": "Attacks vulnerable groups"
+          }
+        },
+        "violence": {
+          "label": "Violence / Threats",
+          "reasons": {
+            "violenceThreats": "Threatens or promotes violence",
+            "graphicViolence": "Graphic violent imagery",
+            "extremism": "Extremism or terrorism",
+            "selfHarm": "Self-harm or suicide"
+          }
+        },
+        "sensitive": {
+          "label": "Sensitive content",
+          "reasons": {
+            "nudity": "Nudity or adult content",
+            "minorNudity": "Minor safety risk",
+            "sexualSolicitation": "Sexual solicitation"
+          }
+        },
+        "misinfo": {
+          "label": "Impersonation / Misinformation",
+          "reasons": {
+            "fakeNews": "False or misleading information",
+            "impersonation": "Impersonation of a person or org"
+          }
+        },
+        "spam": {
+          "label": "Spam / Scam",
+          "reasons": {
+            "spam": "Spam or irrelevant content",
+            "financialScam": "Financial scam",
+            "unsolicitedAds": "Unwanted advertising"
+          }
+        },
+        "ip": {
+          "label": "Intellectual property",
+          "reasons": {
+            "copyright": "Copyright infringement",
+            "trademark": "Trademark violation",
+            "brandImpersonation": "Brand impersonation"
+          }
+        },
+        "illegal": {
+          "label": "Illegal activity",
+          "reasons": {
+            "contraband": "Contraband",
+            "illegalTransaction": "Illegal transaction"
+          }
+        },
+        "privacy": {
+          "label": "Privacy violation",
+          "reasons": {
+            "doxxing": "Doxxing private information",
+            "nonconsensualIntimate": "Non-consensual intimate content"
+          }
+        },
+        "other": {
+          "label": "Other",
+          "reasons": {
+            "other": "Other reason"
+          }
+        }
+      }
+    },
+    "visibility": {
+      "title": "Edit visibility",
+      "description": "Choose who can see this post.",
+      "cancel": "Cancel",
+      "update": "Update visibility",
+      "updating": "Updating...",
+      "signIn": "Please sign in",
+      "updateFailed": "Failed to update visibility",
+      "options": {
+        "public": {
+          "title": "Public",
+          "description": "Anyone can view this post"
+        },
+        "followers": {
+          "title": "Friends / Following",
+          "description": "Only followers can view this post"
+        },
+        "private": {
+          "title": "Private",
+          "description": "Only you can view this post"
+        }
+      }
+    },
+    "edit": {
+      "title": "Edit post",
+      "caption": "Caption",
+      "addEmoji": "Add emoji",
+      "emojiIcon": "Emoji icon",
+      "placeholder": "Write something...",
+      "searching": "Searching...",
+      "noMatches": "No matches",
+      "hashtags": "Hashtags",
+      "addHashtag": "Add hashtag",
+      "removeHashtag": "Remove {tag}",
+      "location": {
+        "label": "Location",
+        "placeholder": "Add a place",
+        "noSuggestions": "No suggestions",
+        "noSuggestionsError": "No suggestions found, try different keywords."
+      },
+      "allowComments": {
+        "title": "Allow comments",
+        "hint": "Enable to receive feedback from everyone"
+      },
+      "allowDownloads": {
+        "title": "Allow downloads",
+        "hint": "Share the original file with people you trust",
+        "inheritedLoading": "Inherited from original post (loading…)",
+        "inheritedLocked": "Inherited from the original post (can’t be changed)"
+      },
+      "hideLike": {
+        "title": "Hide like",
+        "hint": "Viewers won’t see the number of likes on this post"
+      },
+      "cancel": "Cancel",
+      "saveChanges": "Save changes",
+      "saving": "Saving...",
+      "signInToEdit": "Please sign in to edit posts",
+      "updated": "Post updated",
+      "updateFailed": "Failed to update post"
+    },
+    "mention": {
+      "signIn": "Sign in to mention users",
+      "userNotFound": "User not found"
+    },
+    "menu": {
+      "editPost": "Edit post",
+      "editVisibility": "Edit visibility",
+      "muteNotifications": "Mute notifications",
+      "turnOffComments": "Turn off comments",
+      "turnOnComments": "Turn on comments",
+      "showLike": "Show like",
+      "hideLike": "Hide like",
+      "goToPost": "Go to post",
+      "copyLink": "Copy link",
+      "deletePost": "Delete post",
+      "unfollow": "Unfollow",
+      "follow": "Follow",
+      "save": "Save this post",
+      "unsave": "Unsave this post",
+      "hidePost": "Hide this post",
+      "report": "Report",
+      "blockAccount": "Block this account"
+    },
+    "follow": {
+      "following": "Following",
+      "follow": "Follow",
+      "unfollow": "Unfollow"
+    },
+    "repost": {
+      "banner": "Reposted from",
+      "original": "original post"
+    },
+    "content": {
+      "seeMore": "See more",
+      "collapse": "Collapse"
+    },
+    "media": {
+      "tapForSound": "Tap for sound",
+      "previous": "Previous media",
+      "next": "Next media",
+      "alt": "Media",
+      "overlayAlt": "Post media"
+    },
+    "actions": {
+      "liked": "Liked",
+      "like": "Like",
+      "comment": "Comment",
+      "saved": "Saved",
+      "save": "Save",
+      "repost": "Repost"
+    },
+    "repostOverlay": {
+      "visibility": {
+        "public": {
+          "title": "Public",
+          "description": "Anyone can view this repost"
+        },
+        "followers": {
+          "title": "Followers",
+          "description": "Only followers can view this repost"
+        },
+        "private": {
+          "title": "Private",
+          "description": "Only you can view this repost"
+        },
+        "label": "Visibility"
+      },
+      "errors": {
+        "couldNotRepost": "Could not repost"
+      },
+      "quote": {
+        "title": "Quote",
+        "subtitle": "Quoting @{name}'s {kind}",
+        "caption": "Caption",
+        "addEmoji": "Add emoji",
+        "emojiIcon": "Emoji icon",
+        "placeholder": "Add your thoughts..."
+      },
+      "hashtags": {
+        "label": "Hashtags #",
+        "remove": "Remove hashtag {tag}",
+        "add": "Add hashtag",
+        "example": "Example: travel"
+      },
+      "location": {
+        "label": "Location",
+        "placeholder": "Add a place",
+        "searching": "Searching...",
+        "noSuggestions": "No suggestions",
+        "noMatch": "No suitable locations found."
+      },
+      "switch": {
+        "allowComments": {
+          "title": "Allow comments",
+          "hint": "People can reply to your quote"
+        },
+        "allowDownloads": {
+          "title": "Allow downloads",
+          "hint": "Inherited from the original post (can’t be changed)"
+        },
+        "hideLike": {
+          "title": "Hide like",
+          "hint": "Only you will see like counts on this quote"
+        }
+      },
+      "actions": {
+        "cancel": "Cancel",
+        "sharing": "Sharing...",
+        "shareQuote": "Share quote"
+      },
+      "sheet": {
+        "title": "Repost",
+        "reposting": "Reposting...",
+        "repost": "Repost",
+        "quote": "Quote"
+      },
+      "kinds": {
+        "post": "post",
+        "reel": "reel"
+      }
+    },
+    "imageViewer": {
+      "close": "Close image",
+      "alt": "Image"
+    }
+  }
+}

@@ -257,9 +257,15 @@
       "expireNote": "你的邀请链接将在 7 天后过期。编辑邀请链接。"
     },
     "inviteVoice": {
-      "title": "邀请好友加入 {serverName}",
+      "title": "邀请成员加入 {serverName}",
       "sub": "对方将进入 {channelName}",
-      "expireNote": "此链接会直接进入该语音频道。若对方尚未加入服务器，会先看到加入页面。"
+      "expireNote": "此链接会直接进入该语音频道。若对方尚未加入服务器，会先看到加入页面。",
+      "searchPlaceholder": "搜索成员",
+      "sectionLabel": "服务器成员",
+      "empty": {
+        "noMembers": "暂无其他可邀请成员，或列表仍在加载。",
+        "notFound": "没有匹配的成员。"
+      }
     },
     "serverProfile": {
       "saved": "服务器资料已保存。",
@@ -624,13 +630,15 @@
           "feature1": "最多上传 600MB（头像、图片、聊天文件）",
           "feature2": "高清屏幕共享",
           "feature3": "2 个服务器助力位",
-          "feature4": "跨服务器使用表情和贴纸"
+          "feature4": "跨服务器使用表情和贴纸",
+          "feature5": "解锁自定义界面（主题色）"
         },
         "basic": {
           "name": "基础 Boost",
           "priceMonthly": "42,000đ / 月",
           "feature1": "最多上传 300MB",
-          "feature2": "跨服务器使用表情"
+          "feature2": "跨服务器使用表情",
+          "feature3": "解锁自定义界面（主题色）"
         }
       },
       "giftSearchPlaceholder": "按名称搜索接收者...",
@@ -1032,7 +1040,9 @@
       "sectionVoice": "语音频道",
       "createChannelSectionLabelDefault": "文字频道",
       "reportDone": "消息已举报，谢谢！",
-      "voiceMessageLabel": "语音消息"
+      "voiceMessageLabel": "语音消息",
+      "boostUpgrade": "升级 Boost",
+      "uploadingVoice": "上传中..."
     },
     "channels": {
       "catInfo": "信息",
