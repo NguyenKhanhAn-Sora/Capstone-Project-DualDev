@@ -8340,17 +8340,12 @@ export class AdminService implements OnModuleInit {
       { _id: sid },
       { $pull: { members: { userId: uid } } },
     );
-    console.log(
-      `[AdminLeave] Removed from server.members: serverId=${serverId}, userId=${adminUserId}, modified=${memberResult.modifiedCount}`,
-    );
+
 
     const userServerResult = await this.userServerModel.deleteMany({
       userId: uid,
       serverId: sid,
     });
-    console.log(
-      `[AdminLeave] Removed UserServer records: deleted=${userServerResult.deletedCount}`,
-    );
 
     // Also decrement memberCount if the member was actually removed
     if (memberResult.modifiedCount > 0) {

@@ -213,7 +213,6 @@ export default function CommunityDiscoveryPage() {
   const updateApproval = async (srv: CommunityServer, status: "approved" | "rejected") => {
     const token = localStorage.getItem("adminAccessToken") || "";
     if (!token) return;
-    console.log("[CommunityDiscovery] updateApproval", { serverId: srv.id, status });
     try {
       setApprovalLoadingId(srv.id);
       const res = await fetch(

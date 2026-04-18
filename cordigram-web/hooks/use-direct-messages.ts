@@ -249,23 +249,19 @@ export const useDirectMessages = ({
         } else {
           console.error("❌ [SOCKET] callerInfo is UNDEFINED or NULL!");
         }
-        console.log("📞 [SOCKET] ========================================");
         setCallEvent({ ...data, callSignal: "incoming" });
       },
     );
 
     socket.on("call-answer", (data: { from: string; sdpOffer: any }) => {
-      console.log("📞 [SOCKET] Call answered event received:", data);
       setCallEvent({ ...data, callSignal: "answer" });
     });
 
     socket.on("call-rejected", (data: { from: string }) => {
-      console.log("📞 [SOCKET] Call rejected event received:", data);
       setCallEvent({ from: data.from, callSignal: "rejected" });
     });
 
     socket.on("ice-candidate", (data: { from: string; candidate: any }) => {
-      console.log("ICE candidate:", data);
       setCallEvent({
         from: data.from,
         candidate: data.candidate,

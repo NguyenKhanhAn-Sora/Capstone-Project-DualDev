@@ -29,7 +29,6 @@ export class FollowsController {
     }
 
     const userId = new Types.ObjectId(req.user.userId);
-    console.log('Getting following for userId:', userId.toString());
 
     const followingIds = await this.followsService.getFollowing(userId);
 

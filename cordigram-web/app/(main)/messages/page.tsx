@@ -2047,7 +2047,6 @@ export default function MessagesPage() {
         currentUserIdRef.current &&
         String(ev.from) === String(currentUserIdRef.current)
       ) {
-        console.log("📞 [INCOMING] Skip: caller id is self (sanity check)");
         return;
       }
 
@@ -2057,9 +2056,7 @@ export default function MessagesPage() {
         oc.status === "calling" &&
         String(oc.to) === String(ev.from)
       ) {
-        console.log(
-          "📞 [INCOMING] Skip: already calling this peer — avoid incoming popup on caller side (glare / race)",
-        );
+
         return;
       }
 
@@ -2067,17 +2064,10 @@ export default function MessagesPage() {
       setOutgoingCall(null);
       setIncomingCall((prev) => {
         if (prev && prev.from === ev.from) {
-          console.log(
-            "📞 [INCOMING] Refresh ring from same caller:",
-            ev.callerInfo!.displayName,
-          );
+
         } else {
-          console.log(
-            "📞 [INCOMING] Received call from:",
-            ev.callerInfo!.displayName,
-          );
+
         }
-        console.log("📞 [INCOMING-DEBUG] CallerInfo data:", ev.callerInfo);
         return {
           from: ev.from,
           type: ev.type || "audio",
@@ -2090,7 +2080,6 @@ export default function MessagesPage() {
 
     // Call answered - open tab for caller
     if (isCallAnswerEvent(callEvent) && outgoingCall && callEvent.sdpOffer) {
-      console.log("📞 [ANSWER] Call was answered, opening call window...");
       openCallTab();
       return;
     }
@@ -2135,7 +2124,6 @@ export default function MessagesPage() {
     if (isIceCandidateEvent(callEvent)) return;
 
     if (isCallRejectedEvent(callEvent)) {
-      console.log("📞 [REJECTED] Call was rejected");
 
       // ✅ Use callback to avoid dependency on outgoingCall state
       setOutgoingCall((prev) => {
@@ -2282,7 +2270,6 @@ export default function MessagesPage() {
         const payload = JSON.parse(atob(authToken.split(".")[1]));
         const userId = payload.userId || payload.sub;
         setCurrentUserId(userId);
-        console.log("Current User ID:", userId);
         setError(null);
         if (!isAdminView) {
           loadServers();
@@ -3172,20 +3159,6 @@ export default function MessagesPage() {
       const friendId =
         typeof rawSender === "string" ? rawSender : rawSender?._id; // For incoming messages, friend is usually the sender
       if (!friendId) return;
-      console.log("📨 [RECEIVE] Friend ID (sender):", friendId);
-      console.log("📨 [RECEIVE] Current user ID:", currentUserId);
-      console.log(
-        "📨 [RECEIVE] Message from current user?",
-        friendId === currentUserId,
-      );
-      console.log(
-        "📨 [RECEIVE] Currently viewing friend?",
-        selectedDirectMessageFriend?._id,
-      );
-      console.log(
-        "📨 [RECEIVE] Is viewing this conversation?",
-        selectedDirectMessageFriend?._id === friendId,
-      );
 
       const uiMessage: UIMessage = {
         id: msg._id,
@@ -3237,7 +3210,6 @@ export default function MessagesPage() {
         // Check for duplicates
         const isDuplicate = currentMessages.some((m) => m.id === msg._id);
         if (!isDuplicate) {
-          console.log("✅ [RECEIVE] Adding new incoming message");
           playMessageNotificationSound();
           const updated = [...currentMessages, uiMessage];
           newMap.set(friendId, updated);
@@ -4695,20 +4667,11 @@ export default function MessagesPage() {
         setIsUploadingVoice(false);
         return;
       }
-      console.log("🎤 [VOICE-UPLOAD] Audio file created:", {
-        name: audioFile.name,
-        type: audioFile.type,
-        size: audioFile.size,
-      });
-
-      console.log("🎤 [VOICE-UPLOAD] Uploading to Cloudinary...");
       const uploadResponse = await uploadMedia({
         token,
         file: audioFile,
         cordigramUploadContext: "messages",
       });
-      console.log("🎤 [VOICE-UPLOAD] Upload response:", uploadResponse);
-
       if (!uploadResponse || (!uploadResponse.secureUrl && !uploadResponse.url)) {
         throw new Error("Failed to upload voice message");
       }
@@ -7518,7 +7481,6 @@ export default function MessagesPage() {
                     className={styles.adminReturnBtn}
                     onClick={async () => {
                       const t = localStorage.getItem("accessToken") || "";
-                      console.log("[AdminReturn] Leaving server:", adminViewServerId, "token exists:", !!t);
                       if (adminViewServerId && t) {
                         await serversApi.adminLeaveServer(adminViewServerId, t);
                       }
@@ -10236,7 +10198,6 @@ export default function MessagesPage() {
               onClick={async () => {
                 setAdminServerContextMenu(null);
                 const t = localStorage.getItem("accessToken") || "";
-                console.log("[AdminContextMenu] Leaving server:", adminViewServerId, "token exists:", !!t);
                 if (adminViewServerId && t) {
                   await serversApi.adminLeaveServer(adminViewServerId, t);
                 }

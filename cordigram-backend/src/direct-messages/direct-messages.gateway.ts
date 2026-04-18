@@ -362,7 +362,6 @@ export class DirectMessagesGateway
       // Send to receiver
       const receiverSocket = this.connectedUsers.get(data.receiverId);
       if (receiverSocket && receiverSocket.size) {
-        console.log('Sending message to receiver socket:', receiverSocket);
         for (const sid of receiverSocket) {
           this.server.to(sid).emit('new-message', {
             message: populatedMessage,

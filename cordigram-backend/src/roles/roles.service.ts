@@ -49,7 +49,7 @@ export class RolesService {
   async getRolesByServer(serverId: string): Promise<Role[]> {
     return this.roleModel
       .find({ serverId: new Types.ObjectId(serverId) })
-      .sort({ position: -1 }) // Roles có position cao hơn hiển thị trước
+      .sort({ position: -1 }) 
       .exec();
   }
 
@@ -99,10 +99,10 @@ export class RolesService {
     userId: string,
     createRoleDto: CreateRoleDto,
   ): Promise<Role> {
-    // Kiểm tra quyền (chỉ owner mới được tạo role)
+    
     await this.checkOwnerPermission(serverId, userId);
 
-    // Lấy position cao nhất hiện tại
+    
     const highestRole = await this.roleModel
       .findOne({ serverId: new Types.ObjectId(serverId) })
       .sort({ position: -1 })
@@ -151,7 +151,7 @@ export class RolesService {
 
     const role = await this.getRoleById(serverId, roleId);
 
-    // Không cho phép đổi tên role @everyone
+    
     if (
       role.isDefault &&
       updateRoleDto.name &&
@@ -160,7 +160,7 @@ export class RolesService {
       throw new BadRequestException('Cannot rename the @everyone role');
     }
 
-    // Cập nhật các fields
+    
     if (updateRoleDto.name !== undefined && !role.isDefault) {
       role.name = updateRoleDto.name;
     }
@@ -207,7 +207,7 @@ export class RolesService {
 
     const role = await this.getRoleById(serverId, roleId);
 
-    // Không cho phép xóa role @everyone
+    
     if (role.isDefault) {
       throw new BadRequestException('Cannot delete the @everyone role');
     }
@@ -227,13 +227,13 @@ export class RolesService {
 
     const { roleIds } = reorderDto;
 
-    // Cập nhật position cho từng role (index 0 = highest position)
+    
     const bulkOps = roleIds.map((roleId, index) => ({
       updateOne: {
         filter: {
           _id: new Types.ObjectId(roleId),
           serverId: new Types.ObjectId(serverId),
-          isDefault: false, // Không cho phép thay đổi position của @everyone
+          isDefault: false, 
         },
         update: { $set: { position: roleIds.length - index } },
       },
@@ -269,7 +269,7 @@ export class RolesService {
     const role = await this.getRoleById(serverId, roleId);
     const memberObjectId = new Types.ObjectId(memberId);
 
-    // Kiểm tra member có trong server không
+    
     const server = await this.serverModel
       .findOne({
         _id: new Types.ObjectId(serverId),
@@ -281,7 +281,7 @@ export class RolesService {
       throw new BadRequestException('Member is not part of this server');
     }
 
-    // Kiểm tra member đã có role này chưa
+    
     if (role.memberIds.some((id) => id.equals(memberObjectId))) {
       throw new BadRequestException('Member already has this role');
     }
@@ -289,7 +289,7 @@ export class RolesService {
     role.memberIds.push(memberObjectId);
     const saved = await role.save();
 
-    // Ghi audit log
+    
     await this.auditLogService.logRoleChange({
       serverId,
       targetUserId: memberId,
@@ -315,7 +315,7 @@ export class RolesService {
 
     const role = await this.getRoleById(serverId, roleId);
 
-    // Không cho phép xóa member khỏi role @everyone
+    
     if (role.isDefault) {
       throw new BadRequestException(
         'Cannot remove members from @everyone role',
@@ -326,7 +326,7 @@ export class RolesService {
     role.memberIds = role.memberIds.filter((id) => !id.equals(memberObjectId));
     const saved = await role.save();
 
-    // Ghi audit log
+    
     await this.auditLogService.logRoleChange({
       serverId,
       targetUserId: memberId,
@@ -370,14 +370,14 @@ export class RolesService {
   ): Promise<RolePermissions> {
     const roles = await this.getMemberRoles(serverId, memberId);
 
-    // Bắt đầu với tất cả false
+    
     const result: RolePermissions = {
-      // Quyền Quản Lý Máy Chủ
+      
       manageServer: false,
       manageChannels: false,
       manageEvents: false,
       manageExpressions: false,
-      // Quyền Thành Viên
+      
       createInvite: false,
       changeNickname: false,
       manageNicknames: false,
@@ -404,7 +404,7 @@ export class RolesService {
       setVoiceChannelStatus: false,
     };
 
-    // OR tất cả permissions từ các roles
+    
     for (const role of roles) {
       for (const key of Object.keys(result) as (keyof RolePermissions)[]) {
         if (role.permissions[key]) {
@@ -425,9 +425,9 @@ export class RolesService {
       .exec();
   }
 
-  // =====================================================
-  // ROLE HIERARCHY & PERMISSION UTILITIES
-  // =====================================================
+  
+  
+  
 
   /**
    * Lấy role cao nhất (position lớn nhất) của một member
@@ -439,7 +439,7 @@ export class RolesService {
   ): Promise<Role | null> {
     const roles = await this.getMemberRoles(serverId, memberId);
     if (roles.length === 0) return null;
-    // Roles đã được sort theo position DESC, nên role đầu tiên là cao nhất
+    
     return roles[0];
   }
 
@@ -467,7 +467,7 @@ export class RolesService {
     memberId: string,
     permission: keyof RolePermissions,
   ): Promise<boolean> {
-    // Owner luôn có tất cả quyền
+    
     const server = await this.serverModel.findById(serverId).exec();
     if (server && server.ownerId.toString() === memberId) {
       return true;
@@ -497,20 +497,20 @@ export class RolesService {
     const server = await this.serverModel.findById(serverId).exec();
     if (!server) return false;
 
-    // Không thể tự tác động chính mình
+    
     if (actorId === targetId) return false;
 
-    // Không thể tác động đến owner
+    
     if (server.ownerId.toString() === targetId) return false;
 
-    // Owner có thể tác động đến bất kỳ ai (trừ chính mình)
+    
     if (server.ownerId.toString() === actorId) return true;
 
-    // So sánh position của role cao nhất
+    
     const actorPosition = await this.getHighestPosition(serverId, actorId);
     const targetPosition = await this.getHighestPosition(serverId, targetId);
 
-    // Chỉ có thể tác động nếu position cao hơn STRICTLY
+    
     return actorPosition > targetPosition;
   }
 
@@ -538,19 +538,8 @@ export class RolesService {
   }> {
     const roles = await this.getMemberRoles(serverId, memberId);
 
-    // DEBUG: Log roles tìm được
-    console.log(
-      `[getMemberRoleInfo] memberId=${memberId}, found roles:`,
-      roles.map((r) => ({
-        name: r.name,
-        color: r.color,
-        isDefault: r.isDefault,
-        position: r.position,
-      })),
-    );
-
     const roleInfos = roles
-      .filter((r) => !r.isDefault) // Không hiển thị @everyone trong danh sách badges
+      .filter((r) => !r.isDefault) 
       .map((r) => ({
         _id: r._id.toString(),
         name: r.name,
@@ -558,7 +547,7 @@ export class RolesService {
         position: r.position,
       }));
 
-    // Role cao nhất (không tính @everyone)
+    
     const highestNonDefaultRole = roles.find((r) => !r.isDefault);
     const highestRole = highestNonDefaultRole
       ? {
@@ -569,15 +558,10 @@ export class RolesService {
         }
       : null;
 
-    // Màu hiển thị: lấy từ role cao nhất có màu khác default
-    // Nếu không có role nào thì dùng màu mặc định
+    
+    
     const displayColor = highestRole?.color || '#99AAB5';
 
-    // DEBUG: Log kết quả
-    console.log(
-      `[getMemberRoleInfo] memberId=${memberId}, displayColor=${displayColor}, highestRole:`,
-      highestRole,
-    );
 
     return {
       roles: roleInfos,
@@ -600,7 +584,7 @@ export class RolesService {
     targetId: string,
     requiredPermission: keyof RolePermissions,
   ): Promise<void> {
-    // Kiểm tra có quyền không
+    
     const hasPermissionResult = await this.hasPermission(
       serverId,
       actorId,
@@ -613,7 +597,7 @@ export class RolesService {
       );
     }
 
-    // Kiểm tra role hierarchy
+    
     const canAffect = await this.canAffectUser(serverId, actorId, targetId);
     if (!canAffect) {
       throw new ForbiddenException(
