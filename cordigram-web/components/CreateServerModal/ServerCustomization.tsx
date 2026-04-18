@@ -52,7 +52,11 @@ export default function ServerCustomization({
     setUploading(true);
     try {
       // Fix: Pass token and file as object
-      const result = await uploadMedia({ token, file });
+      const result = await uploadMedia({
+        token,
+        file,
+        cordigramUploadContext: "messages",
+      });
       setAvatarUrl(result.url);
     } catch (error) {
       console.error("Failed to upload image:", error);

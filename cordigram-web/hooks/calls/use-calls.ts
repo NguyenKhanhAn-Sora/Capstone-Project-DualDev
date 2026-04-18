@@ -16,6 +16,7 @@ import {
   MEDIA_CONSTRAINTS,
 } from "@/lib/calls/webrtc-config";
 import { useDirectMessages } from "../use-direct-messages";
+import { isIncomingRingEvent } from "@/lib/call-event-guards";
 
 type UseDirectMessagesReturn = ReturnType<typeof useDirectMessages>;
 
@@ -55,20 +56,19 @@ export const useCalls = ({ userId, token }: UseCallsOptions) => {
     }
   }, [callEvent]);
 
-  // Handle incoming call
+  // Handle incoming call (ignore ICE / reject / answer noise on shared callEvent)
   useEffect(() => {
-    if (callEvent?.from && !callState) {
-      setIncomingCall({
-        callId: `call-${Date.now()}`,
-        type: callEvent.type === "video" ? CallType.VIDEO : CallType.AUDIO,
-        from: {
-          userId: callEvent.from,
-          username: callEvent.from,
-        },
-        to: userId,
-        timestamp: Date.now(),
-      });
-    }
+    if (!callEvent || !isIncomingRingEvent(callEvent) || callState) return;
+    setIncomingCall({
+      callId: `call-${Date.now()}`,
+      type: callEvent.type === "video" ? CallType.VIDEO : CallType.AUDIO,
+      from: {
+        userId: callEvent.from,
+        username: callEvent.from,
+      },
+      to: userId,
+      timestamp: Date.now(),
+    });
   }, [callEvent, callState, userId]);
 
   // Handle call ended

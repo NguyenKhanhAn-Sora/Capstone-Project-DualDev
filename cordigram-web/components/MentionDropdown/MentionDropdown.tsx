@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useEffect, useRef, useCallback, useMemo } from "react";
 import styles from "./MentionDropdown.module.css";
 import type { MentionSuggestion } from "@/lib/servers-api";
+import { useLanguage } from "@/component/language-provider";
 
 interface MentionDropdownProps {
   suggestions: MentionSuggestion[];
@@ -51,18 +52,6 @@ function SpecialMentionIcon({ id }: { id: string }) {
   );
 }
 
-function sectionLabelFor(
-  item: MentionSuggestion,
-  prev: MentionSuggestion | undefined,
-): string | null {
-  if (!prev || prev.type !== item.type) {
-    if (item.type === "special") return "Đề cập nhanh";
-    if (item.type === "user") return "Thành viên";
-    if (item.type === "role") return "Vai trò";
-  }
-  return null;
-}
-
 export default function MentionDropdown({
   suggestions,
   activeIndex,
@@ -70,8 +59,48 @@ export default function MentionDropdown({
   onSelect,
   onActiveIndexChange,
 }: MentionDropdownProps) {
+  const { t } = useLanguage();
   const listRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
+
+  const sectionLabelFor = useMemo(
+    () =>
+      (item: MentionSuggestion, prev: MentionSuggestion | undefined): string | null => {
+        if (!prev || prev.type !== item.type) {
+          if (item.type === "special") return t("chat.mention.sectionQuick");
+          if (item.type === "user") return t("chat.mention.sectionMembers");
+          if (item.type === "role") return t("chat.mention.sectionRoles");
+        }
+        return null;
+      },
+    [t],
+  );
+
+  const displayPrimary = useCallback(
+    (item: MentionSuggestion) => {
+      if (item.type === "special" && item.id === "special_everyone") {
+        return t("chat.mention.everyoneTitle");
+      }
+      if (item.type === "special" && item.id === "special_here") {
+        return t("chat.mention.hereTitle");
+      }
+      return item.name;
+    },
+    [t],
+  );
+
+  const displayDescription = useCallback(
+    (item: MentionSuggestion) => {
+      if (item.type === "special" && item.id === "special_everyone") {
+        return t("chat.mention.everyoneDesc");
+      }
+      if (item.type === "special" && item.id === "special_here") {
+        return t("chat.mention.hereDesc");
+      }
+      return item.description;
+    },
+    [t],
+  );
 
   useEffect(() => {
     activeRef.current?.scrollIntoView({ block: "nearest" });
@@ -80,6 +109,8 @@ export default function MentionDropdown({
   const renderItem = useCallback(
     (item: MentionSuggestion, globalIndex: number) => {
       const isActive = globalIndex === activeIndex;
+      const primary = displayPrimary(item);
+      const desc = displayDescription(item);
       return (
         <button
           key={`${item.id}-${globalIndex}`}
@@ -118,20 +149,20 @@ export default function MentionDropdown({
               className={`${styles.name} ${item.type === "role" ? styles.nameRole : ""}`}
               style={item.type === "role" && item.color ? { color: item.color } : undefined}
             >
-              {highlightMatch(item.name, keyword)}
+              {highlightMatch(primary, keyword)}
             </span>
-            <span className={styles.description}>{item.description}</span>
+            <span className={styles.description}>{desc}</span>
           </div>
         </button>
       );
     },
-    [activeIndex, keyword, onActiveIndexChange, onSelect],
+    [activeIndex, keyword, onActiveIndexChange, onSelect, displayPrimary, displayDescription],
   );
 
   if (suggestions.length === 0) {
     return (
       <div className={styles.container}>
-        <div className={styles.empty}>Không tìm thấy kết quả</div>
+        <div className={styles.empty}>{t("chat.mention.empty")}</div>
       </div>
     );
   }

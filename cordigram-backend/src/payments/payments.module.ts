@@ -17,9 +17,11 @@ import {
   PostInteractionSchema,
 } from '../posts/post-interaction.schema';
 import { Comment, CommentSchema } from '../comment/comment.schema';
+import { BoostModule } from '../boost/boost.module';
 
 @Module({
   imports: [
+    BoostModule,
     MongooseModule.forFeature([
       { name: PaymentTransaction.name, schema: PaymentTransactionSchema },
       { name: Post.name, schema: PostSchema },

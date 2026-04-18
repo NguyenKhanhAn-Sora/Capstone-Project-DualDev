@@ -50,7 +50,11 @@ export default function EventImageEditor({
     if (file) {
       setUploading(true);
       try {
-        const result = await uploadMedia({ token, file });
+        const result = await uploadMedia({
+          token,
+          file,
+          cordigramUploadContext: "messages",
+        });
         onConfirm(result.url);
         onClose();
       } catch (err) {

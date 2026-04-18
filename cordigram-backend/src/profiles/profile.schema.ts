@@ -43,6 +43,28 @@ export class Profile extends Document {
   @Prop({ default: '' })
   coverUrl: string;
 
+  // =========================
+  // Boost profile customization
+  // =========================
+
+  @Prop({ type: String, default: null })
+  profileThemePrimaryHex?: string | null;
+
+  @Prop({ type: String, default: null })
+  profileThemeAccentHex?: string | null;
+
+  @Prop({ type: String, default: null })
+  displayNameFontId?: string | null;
+
+  @Prop({ type: String, default: null })
+  displayNameEffectId?: string | null;
+
+  @Prop({ type: String, default: null })
+  displayNamePrimaryHex?: string | null;
+
+  @Prop({ type: String, default: null })
+  displayNameAccentHex?: string | null;
+
   @Prop({ default: '' })
   bio: string;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -9,8 +9,39 @@ import {
   useLocalParticipant,
   VideoTrack,
 } from "@livekit/components-react";
-import { Track } from "livekit-client";
+import { Track, RoomEvent } from "livekit-client";
 import styles from "./CallRoom.module.css";
+
+/** In a 1:1 call, when the remote participant leaves, end this session too */
+function EndCallWhenRemoteDisconnects({
+  onRemoteLeft,
+}: {
+  onRemoteLeft: () => void;
+}) {
+  const room = useRoomContext();
+  const finishedRef = useRef(false);
+
+  useEffect(() => {
+    if (!room) return;
+
+    const finish = () => {
+      if (finishedRef.current) return;
+      finishedRef.current = true;
+      onRemoteLeft();
+    };
+
+    const onParticipantDisconnected = () => {
+      finish();
+    };
+
+    room.on(RoomEvent.ParticipantDisconnected, onParticipantDisconnected);
+    return () => {
+      room.off(RoomEvent.ParticipantDisconnected, onParticipantDisconnected);
+    };
+  }, [room, onRemoteLeft]);
+
+  return null;
+}
 
 interface CallRoomProps {
   token: string;
@@ -46,6 +77,7 @@ export default function CallRoom({
         }}
         className={styles.liveKitRoom}
       >
+        <EndCallWhenRemoteDisconnects onRemoteLeft={onDisconnect} />
         {isAudioOnly ? (
           <AudioOnlyView
             participantName={participantName}

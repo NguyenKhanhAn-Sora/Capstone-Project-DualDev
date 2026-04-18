@@ -45,4 +45,3 @@ export const CommunityDiscoveryHistorySchema = SchemaFactory.createForClass(
 
 CommunityDiscoveryHistorySchema.index({ serverId: 1, createdAt: -1 });
 CommunityDiscoveryHistorySchema.index({ createdAt: -1 });
-

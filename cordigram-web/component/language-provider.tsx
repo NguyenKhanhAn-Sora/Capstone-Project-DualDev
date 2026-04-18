@@ -42,6 +42,8 @@ const LanguageContext = createContext<LanguageContextValue | undefined>(
 
 const COOKIE_NAME = "NEXT_LOCALE";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+/** Đồng bộ với cài đặt tài khoản khi cookie NEXT_LOCALE lệch hoặc thiếu (ví dụ mở tab mới). */
+const STORAGE_KEY_LANGUAGE = "cordigram-language";
 
 type Dict = Record<string, unknown>;
 
@@ -90,7 +92,30 @@ const writeCookieLocale = (locale: LanguageCode) => {
   )}; path=/; max-age=${COOKIE_MAX_AGE}`;
 };
 
-const pickInitialLocale = (): LanguageCode => readCookieLocale() ?? "vi";
+const readStoredLocale = (): LanguageCode | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = window.localStorage.getItem(STORAGE_KEY_LANGUAGE);
+    if (v === "vi" || v === "en" || v === "ja" || v === "zh") return v;
+  } catch {
+    /* ignore */
+  }
+  return null;
+};
+
+const persistLocaleEverywhere = (locale: LanguageCode) => {
+  writeCookieLocale(locale);
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY_LANGUAGE, locale);
+  } catch {
+    /* ignore */
+  }
+};
+
+/** Cookie (SSR) ưu tiên; localStorage là bản sao khi đổi ngôn ngữ trong cài đặt. */
+const pickInitialLocale = (): LanguageCode =>
+  readCookieLocale() ?? readStoredLocale() ?? "vi";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -99,7 +124,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    writeCookieLocale(language);
+    persistLocaleEverywhere(language);
   }, [language]);
 
   useEffect(() => {
@@ -116,8 +141,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         const next = isLanguageCode(res.language) ? res.language : null;
         if (!next) return;
-        setLanguageState(next);
-        writeCookieLocale(next);
+        setLanguageState((prev) => {
+          if (prev === next) return prev;
+          persistLocaleEverywhere(next);
+          queueMicrotask(() => router.refresh());
+          return next;
+        });
       } catch (_err) {
         // ignore
       }
@@ -127,13 +156,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   const setLanguage = (locale: LanguageCode) => {
     if (!isLanguageCode(locale) || locale === language) return;
 
     setLanguageState(locale);
-    writeCookieLocale(locale);
+    persistLocaleEverywhere(locale);
+    router.refresh();
 
     const token =
       typeof window !== "undefined"

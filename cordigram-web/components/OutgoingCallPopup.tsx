@@ -30,9 +30,9 @@ export default function OutgoingCallPopup({
       case "calling":
         return t("chat.popups.outgoingCall.calling");
       case "rejected":
-        return t("chat.popups.outgoingCall.rejected");
+        return t("chat.popups.outgoingCall.rejected", { name: receiverName });
       case "no-answer":
-        return t("chat.popups.outgoingCall.noAnswer");
+        return t("chat.popups.outgoingCall.noAnswer", { name: receiverName });
       default:
         return t("chat.popups.outgoingCall.calling");
     }
@@ -45,6 +45,7 @@ export default function OutgoingCallPopup({
   return (
     <div className={styles.overlay}>
       <div className={styles.popup}>
+        <div className={styles.cardAccent} aria-hidden />
         {/* Avatar */}
         <div className={styles.avatarWrapper}>
           {receiverAvatar ? (
@@ -72,12 +73,17 @@ export default function OutgoingCallPopup({
 
         {/* Receiver info */}
         <h2 className={styles.receiverName}>{receiverName}</h2>
-        <p className={styles.callType}>
+        <span className={styles.kindPill}>
           {callType === "video"
             ? t("chat.popups.outgoingCall.videoCall")
             : t("chat.popups.outgoingCall.voiceCall")}
-        </p>
-        <p className={styles.statusText} style={{ color: getStatusColor() }}>
+        </span>
+        <p
+          className={
+            status === "calling" ? styles.statusCalling : styles.statusEnded
+          }
+          style={{ color: getStatusColor() }}
+        >
           {getStatusText()}
         </p>
 

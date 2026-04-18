@@ -1,4 +1,8 @@
 import { decodeJwt } from "./auth";
+import {
+  withCordigramUploadContext,
+  type CordigramUploadContext,
+} from "./cordigram-upload-context";
 
 export const API_BASE_URL = "http://localhost:9999";
 
@@ -263,6 +267,10 @@ export interface Friend {
   avatarUrl: string;
   email: string;
   bio?: string;
+  displayNameFontId?: string | null;
+  displayNameEffectId?: string | null;
+  displayNamePrimaryHex?: string | null;
+  displayNameAccentHex?: string | null;
   /** Trạng thái hoạt động (DM) — từ API available-users. */
   isOnline?: boolean;
 }
@@ -422,6 +430,11 @@ export interface ServerStickerManageRow {
 export async function getServerStickersManage(serverId: string): Promise<{
   max: number;
   count: number;
+  boostActive: boolean;
+  boostTier: "basic" | "boost" | null;
+  stickerBoostTierOnServer?: "basic" | "boost" | null;
+  ownerStickerBoostSlotsUsed?: number;
+  ownerStickerBoostSlotsMax?: number;
   stickers: ServerStickerManageRow[];
 }> {
   const response = await fetch(
@@ -432,6 +445,35 @@ export async function getServerStickersManage(serverId: string): Promise<{
     const err = await response.json().catch(() => ({}));
     throw new Error(
       (err as { message?: string }).message || "Không tải được danh sách sticker",
+    );
+  }
+  return response.json();
+}
+
+/** Chủ máy chủ: gán / gỡ mức mở rộng ô sticker (tối đa 2 máy chủ). */
+export async function setServerStickerBoostTier(
+  serverId: string,
+  body: { tier: "basic" | "boost" | null },
+): Promise<{
+  stickerBoostTier: "basic" | "boost" | null;
+  maxStickerSlots: number;
+  assignedStickerBoostServerCount: number;
+  boostActive: boolean;
+  boostTier: "basic" | "boost" | null;
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/sticker-boost/${serverId}`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify(body),
+    },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message ||
+        "Không cập nhật được gán Boost sticker",
     );
   }
   return response.json();
@@ -479,17 +521,63 @@ export async function getServer(serverId: string): Promise<Server> {
   });
 
   if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Máy chủ không tồn tại hoặc đã bị xóa");
+    }
     throw new Error("Không tải được thông tin máy chủ");
   }
 
   return response.json();
 }
 
+export type ServerEmbedPreviewPayload = {
+  name: string;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
+  bannerImageUrl?: string | null;
+  bannerColor?: string | null;
+  memberCount: number;
+  onlineCount: number;
+  createdAt: string;
+};
+
+const serverEmbedPreviewCache = new Map<
+  string,
+  { server: ServerEmbedPreviewPayload | null }
+>();
+
+/**
+ * Preview cho thẻ invite trong DM: HTTP 200 + `server: null` nếu máy chủ không còn (tránh 404 trong console).
+ */
+export async function getServerEmbedPreview(
+  serverId: string,
+): Promise<{ server: ServerEmbedPreviewPayload | null }> {
+  const id = String(serverId || "").trim();
+  if (!id) return { server: null };
+  const cached = serverEmbedPreviewCache.get(id);
+  if (cached) return cached;
+
+  const response = await fetch(
+    `${API_BASE_URL}/servers/embed-preview?id=${encodeURIComponent(id)}`,
+    { headers: getHeaders() },
+  );
+  const data = response.ok
+    ? ((await response.json()) as { server: ServerEmbedPreviewPayload | null })
+    : { server: null };
+  serverEmbedPreviewCache.set(id, data);
+  return data;
+}
+
 export async function getServerProfileStats(serverId: string): Promise<ServerProfileStats> {
   const response = await fetch(`${API_BASE_URL}/servers/${serverId}/profile-stats`, {
     headers: getHeaders(),
   });
-  if (!response.ok) throw new Error("Không tải được thống kê máy chủ");
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Máy chủ không tồn tại hoặc đã bị xóa");
+    }
+    throw new Error("Không tải được thống kê máy chủ");
+  }
   return response.json();
 }
 
@@ -643,6 +731,7 @@ export interface RolePermissions {
   manageServer: boolean;
   manageChannels: boolean;
   manageEvents: boolean;
+  manageExpressions: boolean;
 
   // Quyền Thành Viên
   createInvite: boolean;
@@ -656,8 +745,6 @@ export interface RolePermissions {
   mentionEveryone: boolean;
   sendMessages: boolean;
   sendMessagesInThreads: boolean;
-  createPublicThreads: boolean;
-  createPrivateThreads: boolean;
   embedLinks: boolean;
   attachFiles: boolean;
   addReactions: boolean;
@@ -884,6 +971,8 @@ export interface MemberWithRoles {
   displayName: string;
   username: string;
   avatarUrl: string;
+  /** Cover/banner chỉ áp dụng trong server này (format như profile coverUrl). */
+  coverUrl?: string | null;
   joinedAt: string;
   isOwner: boolean;
   serverMemberRole: "owner" | "moderator" | "member";
@@ -1094,6 +1183,7 @@ export interface CurrentUserServerPermissions {
   canManageServer: boolean;
   canManageChannels: boolean;
   canManageEvents: boolean;
+  canManageExpressions: boolean;
   canCreateInvite: boolean;
   /** Được dùng đề cập (@) — không ảnh hưởng việc nhận tin khi người khác @ bạn. */
   mentionEveryone?: boolean;
@@ -1131,6 +1221,7 @@ export async function getCurrentUserPermissions(
         canManageServer: membersResponse.currentUserPermissions.isOwner,
         canManageChannels: membersResponse.currentUserPermissions.isOwner,
         canManageEvents: membersResponse.currentUserPermissions.isOwner,
+        canManageExpressions: membersResponse.currentUserPermissions.isOwner,
         canCreateInvite: true,
         mentionEveryone: membersResponse.currentUserPermissions.isOwner,
       };
@@ -1144,6 +1235,7 @@ export async function getCurrentUserPermissions(
         canManageServer: false,
         canManageChannels: false,
         canManageEvents: false,
+        canManageExpressions: false,
         canCreateInvite: true,
         mentionEveryone: false,
       };
@@ -1831,6 +1923,95 @@ export async function updateMyServerNickname(
   }
 }
 
+export type MyServerProfileResponse = {
+  nickname: string | null;
+  avatarUrl: string | null;
+  coverUrl: string | null;
+  displayNameFontId?: string | null;
+  displayNameEffectId?: string | null;
+  displayNamePrimaryHex?: string | null;
+  displayNameAccentHex?: string | null;
+};
+
+export async function getMyServerProfile(
+  serverId: string,
+): Promise<MyServerProfileResponse> {
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/me/profile`,
+    { headers: getHeaders() },
+  );
+  // Backward compatibility: some environments may not have the per-server profile
+  // endpoints deployed yet. Treat missing route as "no overrides".
+  if (res.status === 404) {
+    return { nickname: null, avatarUrl: null, coverUrl: null };
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không tải được hồ sơ máy chủ");
+  }
+  return res.json();
+}
+
+export async function updateMyServerProfile(
+  serverId: string,
+  payload: {
+    coverUrl?: string | null;
+    displayNameFontId?: string | null;
+    displayNameEffectId?: string | null;
+    displayNamePrimaryHex?: string | null;
+    displayNameAccentHex?: string | null;
+  },
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/me/profile`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify(payload ?? {}),
+    },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không lưu được hồ sơ máy chủ");
+  }
+}
+
+export async function uploadMyServerAvatar(opts: {
+  serverId: string;
+  form: FormData;
+  cordigramUploadContext?: CordigramUploadContext;
+}): Promise<{ avatarUrl: string }> {
+  const { serverId, form, cordigramUploadContext } = opts;
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/me/avatar/upload`,
+    {
+      method: "POST",
+      headers: withCordigramUploadContext(
+        { Authorization: `Bearer ${getToken()}` },
+        cordigramUploadContext,
+      ),
+      body: form,
+    },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không cập nhật được avatar máy chủ");
+  }
+  return res.json();
+}
+
+export async function resetMyServerAvatar(serverId: string): Promise<{ avatarUrl: null }> {
+  const res = await fetch(
+    `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/me/avatar`,
+    { method: "DELETE", headers: getHeaders() },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "Không gỡ được avatar máy chủ");
+  }
+  return res.json();
+}
+
 export async function createServerEvent(
   serverId: string,
   payload: CreateEventPayload,
@@ -1882,7 +2063,11 @@ export async function createMessage(
   giphyId?: string,
   voiceUrl?: string,
   voiceDuration?: number,
-  stickerExtras?: { customStickerUrl?: string; serverStickerId?: string },
+  stickerExtras?: {
+    customStickerUrl?: string;
+    serverStickerId?: string;
+    serverStickerServerId?: string;
+  },
 ): Promise<Message> {
   const body: Record<string, unknown> = {
     content,
@@ -1898,6 +2083,9 @@ export async function createMessage(
       : {}),
     ...(stickerExtras?.serverStickerId
       ? { serverStickerId: stickerExtras.serverStickerId }
+      : {}),
+    ...(stickerExtras?.serverStickerServerId
+      ? { serverStickerServerId: stickerExtras.serverStickerServerId }
       : {}),
   };
   const response = await fetch(
@@ -2072,6 +2260,14 @@ export interface SearchMessageResult {
 export interface SearchResponse {
   results: SearchMessageResult[];
   totalCount: number;
+  parsed?: {
+    text: string;
+    filters: {
+      from?: string;
+      in?: string;
+      has?: "image" | "file";
+    };
+  };
 }
 
 export async function searchMessages(params: {
@@ -2084,8 +2280,10 @@ export async function searchMessages(params: {
   hasFile?: boolean;
   limit?: number;
   offset?: number;
+  fuzzy?: boolean;
+  parseQuery?: boolean;
 }): Promise<SearchResponse> {
-  const url = new URL(`${API_BASE_URL}/messages/search`);
+  const url = new URL(`${API_BASE_URL}/search/messages`);
   if (params.q) url.searchParams.append("q", params.q);
   if (params.serverId) url.searchParams.append("serverId", params.serverId);
   if (params.channelId) url.searchParams.append("channelId", params.channelId);
@@ -2095,6 +2293,8 @@ export async function searchMessages(params: {
   if (params.hasFile) url.searchParams.append("hasFile", "true");
   if (params.limit) url.searchParams.append("limit", params.limit.toString());
   if (params.offset) url.searchParams.append("offset", params.offset.toString());
+  if (params.fuzzy) url.searchParams.append("fuzzy", "true");
+  if (params.parseQuery === false) url.searchParams.append("parseQuery", "false");
 
   const response = await fetch(url.toString(), { headers: getHeaders() });
   if (!response.ok) throw new Error("Không tìm kiếm được tin nhắn");

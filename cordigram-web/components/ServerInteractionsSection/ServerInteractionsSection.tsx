@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
 import { useLanguage } from "@/component/language-provider";
+import { translateChannelName } from "@/lib/system-names";
 
 interface ServerInteractionsSectionProps {
   serverId: string;
@@ -15,7 +16,7 @@ export default function ServerInteractionsSection({
   canManageSettings,
   textChannels,
 }: ServerInteractionsSectionProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
@@ -170,7 +171,9 @@ export default function ServerInteractionsSection({
             >
               <option value="">{t("chat.serverInteractions.noChannel")}</option>
               {textChannels.map((ch) => (
-                <option key={ch._id} value={ch._id}>#{ch.name}</option>
+                <option key={ch._id} value={ch._id}>
+                  #{translateChannelName(ch.name, language)}
+                </option>
               ))}
             </select>
           </label>

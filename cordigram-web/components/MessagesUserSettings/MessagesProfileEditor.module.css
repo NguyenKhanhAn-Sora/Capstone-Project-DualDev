@@ -35,12 +35,12 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .divider {
   height: 1px;
-  background: #3f4147;
+  background: var(--color-panel-border);
   margin: 14px 0;
   border: none;
 }
@@ -50,11 +50,11 @@
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #1e1f22;
+  border: 1px solid var(--color-panel-border);
   font-size: 14px;
   box-sizing: border-box;
-  background: #1e1f22;
-  color: #f2f3f5;
+  background: var(--color-panel-bg);
+  color: var(--color-panel-text);
 }
 
 .input:disabled {
@@ -79,7 +79,7 @@
   padding: 8px 14px;
   border-radius: 6px;
   border: none;
-  background: #5865f2;
+  background: var(--color-panel-accent);
   color: #fff;
   font-weight: 700;
   font-size: 13px;
@@ -95,8 +95,8 @@
   padding: 8px 14px;
   border-radius: 6px;
   border: none;
-  background: #4e5058;
-  color: #f2f3f5;
+  background: var(--color-panel-neutral);
+  color: var(--color-panel-text);
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
@@ -118,7 +118,7 @@
   width: 48px;
   height: 48px;
   border-radius: 8px;
-  border: 2px solid #1e1f22;
+  border: 2px solid var(--color-panel-border);
   cursor: pointer;
   padding: 0;
   position: relative;
@@ -162,7 +162,7 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
   cursor: pointer;
   font-size: 18px;
 }
@@ -170,7 +170,7 @@
 .bioCount {
   text-align: right;
   font-size: 11px;
-  color: #949ba4;
+  color: var(--color-panel-text-muted);
   margin-top: 4px;
 }
 
@@ -187,7 +187,7 @@
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
-  color: #b5bac1;
+  color: var(--color-panel-text-muted);
 }
 
 .previewCard {
@@ -310,7 +310,72 @@
   gap: 10px;
   margin-top: 20px;
   padding-top: 16px;
-  border-top: 1px solid #3f4147;
+  border-top: 1px solid var(--color-panel-border);
+}
+
+.boostPromo {
+  border: 1px solid color-mix(in oklab, var(--color-panel-accent) 45%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--color-panel-accent) 18%, transparent),
+    color-mix(in oklab, var(--color-panel-accent) 8%, transparent)
+  );
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.boostPromoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.boostPromoTitle {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--color-panel-text);
+  margin-bottom: 2px;
+}
+
+.boostPromoDesc {
+  font-size: 12px;
+  color: var(--color-panel-text-muted);
+  line-height: 1.35;
+}
+
+.btnGhost {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-panel-border);
+  background: var(--color-panel-deep);
+  color: var(--color-panel-text);
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btnGhost:hover {
+  background: var(--color-panel-hover);
+}
+
+.lockedTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-panel-text-muted);
+  margin-left: 8px;
+}
+
+.lockedTagDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-panel-warning);
 }
 
 .serverSelect {

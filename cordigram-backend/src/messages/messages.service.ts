@@ -28,6 +28,11 @@ import {
 import { MediaModerationService } from '../posts/media-moderation.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import type { ContentFilterLevel } from '../servers/server.schema';
+import { BoostService } from '../boost/boost.service';
+import {
+  parseMessageSearchQuery,
+  type ParsedMessageSearch,
+} from './message-search-query.parser';
 
 @Injectable()
 export class MessagesService {
@@ -47,6 +52,8 @@ export class MessagesService {
     private readonly rolesService: RolesService,
     private readonly mediaModerationService: MediaModerationService,
     private readonly cloudinaryService: CloudinaryService,
+    @Inject(forwardRef(() => BoostService))
+    private readonly boostService: BoostService,
   ) {}
 
   private async handleMentionSpamViolation(
@@ -97,9 +104,7 @@ export class MessagesService {
         const notifModel = this.serverModel.db.model('ServerNotification');
         await notifModel.create({
           serverId: new Types.ObjectId(serverId),
-          createdBy: new Types.ObjectId(
-            (server as any).ownerId?.toString() ?? serverId,
-          ),
+          createdBy: new Types.ObjectId(server.ownerId?.toString() ?? serverId),
           title: '__SYS:mentionSpamTitle',
           content: notifContent,
           targetType: 'role',
@@ -125,9 +130,7 @@ export class MessagesService {
           'Người dùng';
         const systemMsg = new this.messageModel({
           channelId: new Types.ObjectId(channelId),
-          senderId: new Types.ObjectId(
-            (server as any).ownerId?.toString() ?? userId,
-          ),
+          senderId: new Types.ObjectId(server.ownerId?.toString() ?? userId),
           content: `⚠️ @${displayName}: ${msf.customNotification}`,
           messageType: 'system',
           attachments: [],
@@ -182,9 +185,7 @@ export class MessagesService {
     return null;
   }
 
-  private async moderateAttachments(
-    attachments: string[],
-  ): Promise<string[]> {
+  private async moderateAttachments(attachments: string[]): Promise<string[]> {
     const result: string[] = [];
 
     for (const url of attachments) {
@@ -200,11 +201,10 @@ export class MessagesService {
           continue;
         }
         const buffer = Buffer.from(await resp.arrayBuffer());
-        const modResult =
-          await this.mediaModerationService.moderateImage({
-            buffer,
-            mimetype: resp.headers.get('content-type') || 'image/jpeg',
-          });
+        const modResult = await this.mediaModerationService.moderateImage({
+          buffer,
+          mimetype: resp.headers.get('content-type') || 'image/jpeg',
+        });
 
         if (modResult.decision === 'reject') {
           continue;
@@ -243,11 +243,10 @@ export class MessagesService {
         const resp = await fetch(m.url);
         if (!resp.ok) continue;
         const buffer = Buffer.from(await resp.arrayBuffer());
-        const modResult =
-          await this.mediaModerationService.moderateImage({
-            buffer,
-            mimetype: resp.headers.get('content-type') || 'image/jpeg',
-          });
+        const modResult = await this.mediaModerationService.moderateImage({
+          buffer,
+          mimetype: resp.headers.get('content-type') || 'image/jpeg',
+        });
 
         if (modResult.decision === 'reject') {
           result = result.replace(
@@ -270,7 +269,10 @@ export class MessagesService {
     return { content: result, decision };
   }
 
-  private async canAccessPrivateChannel(serverId: string, userId: string): Promise<boolean> {
+  private async canAccessPrivateChannel(
+    serverId: string,
+    userId: string,
+  ): Promise<boolean> {
     const allowedManageServer = await this.rolesService.hasPermission(
       serverId,
       userId,
@@ -292,7 +294,7 @@ export class MessagesService {
       serverLean ||
       ((await this.serverModel
         .findById(serverId)
-        .select('ownerId members safetySettings isAgeRestricted')
+        .select('ownerId members safetySettings isAgeRestricted isPublic accessMode')
         .lean()
         .exec()) as Record<string, unknown> | null);
     if (!server) return { allowed: false, reason: 'verification' };
@@ -315,12 +317,12 @@ export class MessagesService {
       .lean()
       .exec();
 
-    const ageRestrictedAcknowledged = Boolean(
-      (usDoc as any)?.ageRestrictedAcknowledged,
-    );
-
     const [userRow, profileRow] = await Promise.all([
-      this.userModel.findById(userId).select('createdAt isVerified').lean().exec(),
+      this.userModel
+        .findById(userId)
+        .select('createdAt isVerified')
+        .lean()
+        .exec(),
       this.profileModel
         .findOne({ userId: new Types.ObjectId(userId) })
         .select('birthdate')
@@ -331,21 +333,28 @@ export class MessagesService {
     const memberRow = ((server as any).members || []).find(
       (m: any) => (m?.userId?._id ?? m?.userId)?.toString() === userId,
     );
-    const memberJoinedAt = memberRow?.joinedAt
+    const rawMemberJoinedAt = memberRow?.joinedAt
       ? new Date(memberRow.joinedAt)
       : null;
+
+    const legacyMemberNoUserServerRow =
+      !usDoc && rawMemberJoinedAt != null;
+    const ageAckForGate =
+      isBypass ||
+      Boolean((usDoc as any)?.ageRestrictedAcknowledged) ||
+      legacyMemberNoUserServerRow;
+
+    const memberJoinedAt = rawMemberJoinedAt;
 
     const verificationLevel = normalizeServerVerificationLevel(
       (server as any).safetySettings?.spamProtection?.verificationLevel,
     );
 
-    const isServerEmailVerified = Boolean(
-      (usDoc as any)?.serverEmailVerified,
-    );
+    const isServerEmailVerified = Boolean((usDoc as any)?.serverEmailVerified);
 
-    return evaluateChannelChatGate({
+    const gate = evaluateChannelChatGate({
       isAgeRestricted: Boolean((server as any).isAgeRestricted),
-      ageRestrictedAcknowledged,
+      ageRestrictedAcknowledged: ageAckForGate,
       birthdate: (profileRow as any)?.birthdate ?? null,
       verificationLevel,
       isVerified: isServerEmailVerified,
@@ -353,6 +362,23 @@ export class MessagesService {
       memberJoinedAt,
       isBypass,
     });
+
+    const accessModeRaw = (server as any)?.accessMode as
+      | 'discoverable'
+      | 'invite_only'
+      | 'apply'
+      | undefined;
+    const accessMode = accessModeRaw
+      ? accessModeRaw
+      : (server as any)?.isPublic
+        ? 'discoverable'
+        : 'invite_only';
+    const applyAccepted =
+      accessMode === 'apply' && (usDoc as any)?.status === 'accepted';
+    if (!gate.allowed && gate.reason === 'verification' && applyAccepted) {
+      return { allowed: true };
+    }
+    return gate;
   }
 
   /** Cho WebSocket: chỉ join room khi được phép xem tin kênh. */
@@ -386,9 +412,10 @@ export class MessagesService {
     return gate.allowed;
   }
 
-  private assertChatGateOrThrow(
-    gate: { allowed: boolean; reason?: ChatGateBlockReason },
-  ): void {
+  private assertChatGateOrThrow(gate: {
+    allowed: boolean;
+    reason?: ChatGateBlockReason;
+  }): void {
     if (gate.allowed) return;
     const msg =
       gate.reason === 'age_under_18'
@@ -442,7 +469,9 @@ export class MessagesService {
         userId,
       );
       if (!canAccessPrivate) {
-        throw new ForbiddenException('Vai trò của bạn không được phép vào kênh riêng tư này');
+        throw new ForbiddenException(
+          'Vai trò của bạn không được phép vào kênh riêng tư này',
+        );
       }
     }
 
@@ -648,19 +677,57 @@ export class MessagesService {
           'Không gửi đồng thời sticker Giphy và sticker máy chủ',
         );
       }
+      const sourceServerIdRaw =
+        createMessageDto.serverStickerServerId?.trim() || '';
+      const sourceServerId =
+        sourceServerIdRaw && Types.ObjectId.isValid(sourceServerIdRaw)
+          ? sourceServerIdRaw
+          : channel.serverId?.toString?.() ?? String(channel.serverId);
+
+      const isCrossServerSticker =
+        String(sourceServerId) !==
+        (channel.serverId?.toString?.() ?? String(channel.serverId));
+
+      if (isCrossServerSticker) {
+        const boost = await this.boostService.getBoostStatus(userId);
+        if (!boost?.active) {
+          throw new ForbiddenException(
+            'Boost required to use server stickers across servers',
+          );
+        }
+      }
+
       const srvStickers = await this.serverModel
-        .findById(channel.serverId)
-        .select('customStickers')
+        .findById(sourceServerId)
+        .select('customStickers members ownerId')
         .lean()
         .exec();
+      if (!srvStickers) {
+        throw new BadRequestException('Server sticker source not found');
+      }
+      if (isCrossServerSticker) {
+        const isOwner =
+          String((srvStickers as any).ownerId) === String(userId) ||
+          String((srvStickers as any).ownerId?._id ?? '') === String(userId);
+        const isMember =
+          isOwner ||
+          (Array.isArray((srvStickers as any).members) &&
+            (srvStickers as any).members.some(
+              (m: any) =>
+                (m?.userId?._id ?? m?.userId)?.toString?.() === String(userId),
+            ));
+        if (!isMember) {
+          throw new ForbiddenException(
+            'Bạn phải tham gia máy chủ chứa sticker để dùng ở máy chủ khác',
+          );
+        }
+      }
       const sid = createMessageDto.serverStickerId.trim();
       const sticker = ((srvStickers as any)?.customStickers || []).find(
         (s: any) => s._id?.toString() === sid,
       );
       if (!sticker) {
-        throw new BadRequestException(
-          'Sticker không thuộc máy chủ của kênh này',
-        );
+        throw new BadRequestException('Sticker không thuộc máy chủ nguồn');
       }
       if (
         String(sticker.imageUrl).trim() !==
@@ -740,7 +807,9 @@ export class MessagesService {
         userId,
       );
       if (!canAccessPrivate) {
-        throw new ForbiddenException('Vai trò của bạn không được phép vào kênh riêng tư này');
+        throw new ForbiddenException(
+          'Vai trò của bạn không được phép vào kênh riêng tư này',
+        );
       }
     }
 
@@ -1099,13 +1168,15 @@ export class MessagesService {
           viewerId,
         );
         if (!canAccessPrivate) {
-          throw new ForbiddenException('Vai trò của bạn không được phép vào kênh riêng tư này');
+          throw new ForbiddenException(
+            'Vai trò của bạn không được phép vào kênh riêng tư này',
+          );
         }
       }
 
       const serverForGate = await this.serverModel
         .findById(channel.serverId)
-        .select('ownerId members safetySettings isAgeRestricted')
+        .select('ownerId members safetySettings isAgeRestricted isPublic accessMode')
         .lean()
         .exec();
       const gate = await this.resolveChannelChatGate(
@@ -1386,6 +1457,73 @@ export class MessagesService {
     });
   }
 
+  private escapeRegexFragment(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private async resolveChannelForSearch(
+    serverId: string,
+    raw: string,
+  ): Promise<Types.ObjectId | undefined> {
+    const v = raw.trim();
+    if (Types.ObjectId.isValid(v) && v.length === 24) {
+      const ch = await this.channelModel
+        .findOne({
+          _id: new Types.ObjectId(v),
+          serverId: new Types.ObjectId(serverId),
+        })
+        .select('_id')
+        .lean()
+        .exec();
+      return ch?._id ? new Types.ObjectId(ch._id.toString()) : undefined;
+    }
+    const ch = await this.channelModel
+      .findOne({
+        serverId: new Types.ObjectId(serverId),
+        name: new RegExp(`^${this.escapeRegexFragment(v)}$`, 'i'),
+      })
+      .select('_id')
+      .lean()
+      .exec();
+    return ch?._id ? new Types.ObjectId(ch._id.toString()) : undefined;
+  }
+
+  private async resolveSenderForServer(
+    serverId: string,
+    raw: string,
+  ): Promise<Types.ObjectId | undefined> {
+    const v = raw.trim();
+    if (Types.ObjectId.isValid(v) && v.length === 24) {
+      const uid = new Types.ObjectId(v);
+      const m = await this.userServerModel
+        .findOne({
+          serverId: new Types.ObjectId(serverId),
+          userId: uid,
+        })
+        .select('userId')
+        .lean()
+        .exec();
+      return m ? uid : undefined;
+    }
+    const prof = await this.profileModel
+      .findOne({
+        username: new RegExp(`^${this.escapeRegexFragment(v)}$`, 'i'),
+      })
+      .select('userId')
+      .lean()
+      .exec();
+    if (!prof?.userId) return undefined;
+    const m = await this.userServerModel
+      .findOne({
+        serverId: new Types.ObjectId(serverId),
+        userId: prof.userId,
+      })
+      .select('userId')
+      .lean()
+      .exec();
+    return m ? new Types.ObjectId(prof.userId.toString()) : undefined;
+  }
+
   async searchMessages(params: {
     serverId?: string;
     channelId?: string;
@@ -1396,23 +1534,53 @@ export class MessagesService {
     hasFile?: boolean;
     limit?: number;
     offset?: number;
-  }): Promise<{ results: any[]; totalCount: number }> {
+    /** Broader match when no hits (regex across words) */
+    fuzzy?: boolean;
+    /** When false, treat q as literal (no from:/in:/has: parsing) */
+    parseQuery?: boolean;
+  }): Promise<{
+    results: any[];
+    totalCount: number;
+    parsed?: ParsedMessageSearch;
+  }> {
     const {
       serverId,
-      channelId,
+      channelId: channelIdParam,
       q,
-      senderId,
+      senderId: senderIdParam,
       before,
       after,
       hasFile,
       limit = 25,
       offset = 0,
+      fuzzy = false,
+      parseQuery = true,
     } = params;
+
+    const parsed: ParsedMessageSearch =
+      parseQuery && q
+        ? parseMessageSearchQuery(q)
+        : { text: (q || '').trim(), filters: {} };
 
     const match: any = { isDeleted: false };
 
-    if (channelId) {
-      match.channelId = new Types.ObjectId(channelId);
+    let resolvedChannelId: string | undefined = channelIdParam;
+    if (!resolvedChannelId && parsed.filters.in) {
+      if (!serverId) {
+        return { results: [], totalCount: 0, parsed };
+      }
+      const oid = await this.resolveChannelForSearch(
+        serverId,
+        parsed.filters.in,
+      );
+      if (!oid) {
+        return { results: [], totalCount: 0, parsed };
+      }
+      resolvedChannelId = oid.toString();
+    }
+
+    if (resolvedChannelId) {
+      match.channelId = new Types.ObjectId(resolvedChannelId);
     } else if (serverId) {
       const channels = await this.channelModel
         .find({ serverId: new Types.ObjectId(serverId) })
@@ -1420,17 +1588,27 @@ export class MessagesService {
         .lean()
         .exec();
       const channelIds = channels.map((c) => c._id);
-      if (channelIds.length === 0) return { results: [], totalCount: 0 };
+      if (channelIds.length === 0) return { results: [], totalCount: 0, parsed };
       match.channelId = { $in: channelIds };
     }
 
-    if (q && q.trim()) {
-      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      match.content = { $regex: escaped, $options: 'i' };
+    let resolvedSenderId = senderIdParam;
+    if (!resolvedSenderId && parsed.filters.from) {
+      if (!serverId) {
+        return { results: [], totalCount: 0, parsed };
+      }
+      const oid = await this.resolveSenderForServer(
+        serverId,
+        parsed.filters.from,
+      );
+      if (!oid) {
+        return { results: [], totalCount: 0, parsed };
+      }
+      resolvedSenderId = oid.toString();
     }
 
-    if (senderId) {
-      match.senderId = new Types.ObjectId(senderId);
+    if (resolvedSenderId) {
+      match.senderId = new Types.ObjectId(resolvedSenderId);
     }
 
     if (before) {
@@ -1440,22 +1618,91 @@ export class MessagesService {
       match.createdAt = { ...(match.createdAt || {}), $gt: new Date(after) };
     }
 
-    if (hasFile) {
+    const hasImageFilter = parsed.filters.has === 'image';
+    const hasFileFilter =
+      Boolean(hasFile) || parsed.filters.has === 'file';
+
+    if (hasImageFilter) {
+      match.$and = match.$and || [];
+      match.$and.push({
+        $or: [
+          { giphyId: { $ne: null } },
+          { customStickerUrl: { $ne: null } },
+          {
+            attachments: {
+              $elemMatch: {
+                $regex: /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i,
+              },
+            },
+          },
+        ],
+      });
+    } else if (hasFileFilter) {
       match['attachments.0'] = { $exists: true };
     }
 
-    const [totalCount, messages] = await Promise.all([
-      this.messageModel.countDocuments(match),
-      this.messageModel
-        .find(match)
-        .populate('senderId', 'email')
-        .populate('channelId', 'name type serverId')
-        .sort({ createdAt: -1 })
-        .skip(offset)
-        .limit(limit)
-        .lean()
-        .exec(),
-    ]);
+    const text = parsed.text.trim();
+
+    const runQuery = async (contentExtra: Record<string, unknown>) => {
+      const full = { ...match, ...contentExtra };
+      const [totalCount, messages] = await Promise.all([
+        this.messageModel.countDocuments(full),
+        this.messageModel
+          .find(full)
+          .populate('senderId', 'email')
+          .populate('channelId', 'name type serverId')
+          .sort(
+            text && '$text' in contentExtra
+              ? { score: { $meta: 'textScore' }, createdAt: -1 }
+              : { createdAt: -1 },
+          )
+          .skip(offset)
+          .limit(limit)
+          .lean()
+          .exec(),
+      ]);
+      return { totalCount, messages };
+    };
+
+    let contentExtra: Record<string, unknown> = {};
+    if (text) {
+      try {
+        await this.messageModel.countDocuments({
+          ...match,
+          $text: { $search: text },
+        });
+        contentExtra = { $text: { $search: text } };
+      } catch {
+        const escaped = this.escapeRegexFragment(text);
+        contentExtra = { content: { $regex: escaped, $options: 'i' } };
+      }
+    }
+
+    let { totalCount, messages } = await runQuery(contentExtra);
+
+    if (
+      fuzzy &&
+      totalCount === 0 &&
+      text &&
+      !('$text' in contentExtra)
+    ) {
+      const words = text.split(/\s+/).filter((w) => w.length > 0);
+      if (words.length > 1) {
+        const pattern = words.map((w) => this.escapeRegexFragment(w)).join('.*');
+        contentExtra = { content: { $regex: pattern, $options: 'i' } };
+        const retry = await runQuery(contentExtra);
+        totalCount = retry.totalCount;
+        messages = retry.messages;
+      }
+    }
+
+    if (fuzzy && totalCount === 0 && text && '$text' in contentExtra) {
+      const escaped = this.escapeRegexFragment(text);
+      contentExtra = { content: { $regex: escaped, $options: 'i' } };
+      const retry = await runQuery(contentExtra);
+      totalCount = retry.totalCount;
+      messages = retry.messages;
+    }
 
     const results = await Promise.all(
       messages.map(async (msg: any) => {
@@ -1484,6 +1731,6 @@ export class MessagesService {
       }),
     );
 
-    return { results, totalCount };
+    return { results, totalCount, parsed };
   }
 }

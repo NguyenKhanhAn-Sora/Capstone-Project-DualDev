@@ -144,7 +144,54 @@
 
 .rowActions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 8px;
+}
+
+.quickRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quickBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.quickBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.quickApprove {
+  background: var(--color-panel-success, #23a55a);
+  color: #fff;
+}
+
+.quickApprove:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.quickReject {
+  background: var(--color-panel-danger, #f23f43);
+  color: #fff;
+}
+
+.quickReject:hover:not(:disabled) {
+  filter: brightness(1.08);
 }
 
 .kebab {

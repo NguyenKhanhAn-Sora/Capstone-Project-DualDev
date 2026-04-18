@@ -49,6 +49,24 @@ type CommunityServer = {
   createdAt: string;
 };
 
+type HistoryItem = {
+  _id: string;
+  serverId: string;
+  action: "approve" | "reject" | "remove" | "restore";
+  note?: string | null;
+  createdAt: string;
+  serverSnapshot?: {
+    name?: string;
+    memberCount?: number;
+    accessMode?: string;
+    communityActivatedAt?: string | null;
+  };
+  serverDeleted?: boolean;
+  deletedAt?: string | null;
+  deletedBy?: { id: string; email?: string | null } | null;
+  canRestoreServer?: boolean;
+};
+
 const decodeJwt = (token: string): AdminPayload | null => {
   try {
     const payload = token.split(".")[1];
@@ -80,17 +98,20 @@ export default function CommunityDiscoveryPage() {
   const [servers, setServers] = useState<CommunityServer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<"activated_desc" | "activated_asc" | "created_desc" | "created_asc">("activated_desc");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [joinConfirm, setJoinConfirm] = useState<CommunityServer | null>(null);
   const [approvalLoadingId, setApprovalLoadingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [historyItems, setHistoryItems] = useState<any[]>([]);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyActionFilter, setHistoryActionFilter] = useState<
     "all" | "approve" | "reject" | "remove" | "restore"
   >("all");
   const [historySearch, setHistorySearch] = useState("");
+  const [historySort, setHistorySort] = useState<"action_desc" | "action_asc" | "activated_desc" | "activated_asc">("action_desc");
   const [historyDetail, setHistoryDetail] = useState<{
     serverId: string;
     serverName: string;
@@ -126,7 +147,7 @@ export default function CommunityDiscoveryPage() {
     const status = tab === "review" ? "pending" : tab === "remove" ? "approved" : "all";
     const t = setInterval(() => {
       if (tab === "history") return;
-      void loadServers(token, status as any);
+      void loadServers(token, status);
     }, 12000);
     return () => clearInterval(t);
   }, [tab]);
@@ -138,8 +159,12 @@ export default function CommunityDiscoveryPage() {
     setLoading(true);
     setError(null);
     try {
+      const url = new URL(`${getApiBaseUrl()}/admin/community-discovery`);
+      url.searchParams.set("status", status);
+      if (search.trim()) url.searchParams.set("q", search.trim());
+      if (sort) url.searchParams.set("sort", sort);
       const res = await fetch(
-        `${getApiBaseUrl()}/admin/community-discovery?status=${encodeURIComponent(status)}`,
+        url.toString(),
         { headers: { Authorization: `Bearer ${token}` } },
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -160,6 +185,8 @@ export default function CommunityDiscoveryPage() {
     try {
       const url = new URL(`${getApiBaseUrl()}/admin/community-discovery/history`);
       if (opts?.serverId) url.searchParams.set("serverId", opts.serverId);
+      if (historySearch.trim()) url.searchParams.set("q", historySearch.trim());
+      if (historySort) url.searchParams.set("sort", historySort);
       const res = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -186,7 +213,6 @@ export default function CommunityDiscoveryPage() {
   const updateApproval = async (srv: CommunityServer, status: "approved" | "rejected") => {
     const token = localStorage.getItem("adminAccessToken") || "";
     if (!token) return;
-    console.log("[CommunityDiscovery] updateApproval", { serverId: srv.id, status });
     try {
       setApprovalLoadingId(srv.id);
       const res = await fetch(
@@ -389,6 +415,54 @@ export default function CommunityDiscoveryPage() {
         {error && <p className={styles.error}>{error}</p>}
 
         <div className={styles.panel}>
+          {(tab === "review" || tab === "remove") && (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Tìm theo tên hoặc ID server..."
+                style={{
+                  flex: "1 1 260px",
+                  minWidth: 220,
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                  background: "var(--color-surface)",
+                  color: "var(--color-text)",
+                  fontSize: 13,
+                }}
+              />
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as typeof sort)}
+                style={{
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                  background: "var(--color-surface)",
+                  color: "var(--color-text)",
+                  fontSize: 13,
+                }}
+                title="Sắp xếp theo thời gian"
+              >
+                <option value="activated_desc">Kích hoạt: Mới nhất</option>
+                <option value="activated_asc">Kích hoạt: Cũ nhất</option>
+                <option value="created_desc">Tạo server: Mới nhất</option>
+                <option value="created_asc">Tạo server: Cũ nhất</option>
+              </select>
+              <button
+                type="button"
+                className={styles.expandBtn}
+                onClick={() => {
+                  const token = localStorage.getItem("adminAccessToken") || "";
+                  const status = tab === "review" ? "pending" : "approved";
+                  if (token) void loadServers(token, status);
+                }}
+              >
+                Tìm
+              </button>
+            </div>
+          )}
           {loading ? (
             <div className={styles.emptyState}>Loading...</div>
           ) : servers.length === 0 ? (
@@ -436,6 +510,7 @@ export default function CommunityDiscoveryPage() {
                               <p className={styles.sub}>
                                 Owner: {srv.owner.displayName || srv.owner.username || "N/A"}
                               </p>
+                              <p className={styles.sub}>Server ID: {srv.id}</p>
                               <p className={styles.sub}>
                                 Mode: {srv.accessMode}
                               </p>
@@ -637,7 +712,7 @@ export default function CommunityDiscoveryPage() {
               <input
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
-                placeholder="Tìm theo tên server..."
+                placeholder="Tìm theo tên hoặc ID server..."
                 style={{
                   flex: "1 1 260px",
                   minWidth: 220,
@@ -651,7 +726,11 @@ export default function CommunityDiscoveryPage() {
               />
               <select
                 value={historyActionFilter}
-                onChange={(e) => setHistoryActionFilter(e.target.value as any)}
+                onChange={(e) =>
+                  setHistoryActionFilter(
+                    e.target.value as typeof historyActionFilter
+                  )
+                }
                 style={{
                   border: "1px solid var(--color-border)",
                   borderRadius: 10,
@@ -668,6 +747,31 @@ export default function CommunityDiscoveryPage() {
                 <option value="remove">Gỡ khỏi discovery</option>
                 <option value="restore">Khôi phục</option>
               </select>
+              <select
+                value={historySort}
+                onChange={(e) => setHistorySort(e.target.value as typeof historySort)}
+                style={{
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                  background: "var(--color-surface)",
+                  color: "var(--color-text)",
+                  fontSize: 13,
+                }}
+                title="Sắp xếp theo thời gian"
+              >
+                <option value="action_desc">Hành động: Mới nhất</option>
+                <option value="action_asc">Hành động: Cũ nhất</option>
+                <option value="activated_desc">Kích hoạt: Mới nhất</option>
+                <option value="activated_asc">Kích hoạt: Cũ nhất</option>
+              </select>
+              <button
+                type="button"
+                className={styles.expandBtn}
+                onClick={() => void loadHistory()}
+              >
+                Tìm
+              </button>
             </div>
 
             {historyLoading ? (
@@ -689,29 +793,82 @@ export default function CommunityDiscoveryPage() {
                   </thead>
                   <tbody>
                     {historyItems
-                      .filter((it: any) => {
+                      .filter((it: HistoryItem) => {
                         if (historyActionFilter !== "all" && it.action !== historyActionFilter) return false;
                         const name = String(it.serverSnapshot?.name || "").toLowerCase();
+                        const id = String(it.serverId || "").toLowerCase();
                         const q = historySearch.trim().toLowerCase();
                         if (!q) return true;
-                        return name.includes(q);
+                        return name.includes(q) || id.includes(q);
                       })
-                      .map((it: any) => (
+                      .map((it: HistoryItem) => (
                       <tr key={it._id}>
                         <td>
                           <p className={styles.main}>{it.serverSnapshot?.name || it.serverId}</p>
                           <p className={styles.sub}>Server ID: {it.serverId}</p>
                         </td>
                         <td>
-                          <span className={styles.badgeOk} style={{ background: "rgba(99,102,241,0.12)", color: "#3730a3" }}>
-                            {it.action === "approve"
-                              ? "Chấp thuận"
-                              : it.action === "reject"
-                                ? "Từ chối"
-                                : it.action === "remove"
-                                  ? "Gỡ khỏi discovery"
-                                  : "Khôi phục"}
-                          </span>
+                          {it.serverDeleted ? (
+                            <div style={{ display: "grid", gap: 6 }}>
+                              <span className={styles.badgeDanger}>
+                                Server đã xóa
+                              </span>
+                              <span className={styles.sub}>
+                                Xóa bởi: {it.deletedBy?.email || it.deletedBy?.id || "--"}
+                              </span>
+                              <button
+                                type="button"
+                                className={styles.expandBtn}
+                                onClick={async () => {
+                                  const token = localStorage.getItem("adminAccessToken") || "";
+                                  if (!token) return;
+                                  try {
+                                    setApprovalLoadingId(String(it.serverId));
+                                    const res = await fetch(
+                                      `${getApiBaseUrl()}/admin/community-discovery/${encodeURIComponent(
+                                        String(it.serverId),
+                                      )}/restore-server`,
+                                      {
+                                        method: "POST",
+                                        headers: { Authorization: `Bearer ${token}` },
+                                      },
+                                    );
+                                    if (!res.ok) {
+                                      const text = await res.text().catch(() => "");
+                                      throw new Error(text || `HTTP ${res.status}`);
+                                    }
+                                    setToast({ type: "success", message: "Đã khôi phục server." });
+                                    await loadHistory();
+                                  } catch (e) {
+                                    const err = e as { message?: string } | null;
+                                    setToast({ type: "error", message: err?.message || "Không khôi phục được" });
+                                  } finally {
+                                    setApprovalLoadingId((cur) =>
+                                      cur === String(it.serverId) ? null : cur,
+                                    );
+                                  }
+                                }}
+                                disabled={approvalLoadingId === String(it.serverId) || it.canRestoreServer === false}
+                                title={
+                                  it.canRestoreServer === false
+                                    ? "Server đã bị xóa vĩnh viễn (hard-delete) nên không thể khôi phục."
+                                    : undefined
+                                }
+                              >
+                                {approvalLoadingId === String(it.serverId) ? "Đang xử lý..." : "Khôi phục server"}
+                              </button>
+                            </div>
+                          ) : (
+                            <span className={styles.badgeOk} style={{ background: "rgba(99,102,241,0.12)", color: "#3730a3" }}>
+                              {it.action === "approve"
+                                ? "Chấp thuận"
+                                : it.action === "reject"
+                                  ? "Từ chối"
+                                  : it.action === "remove"
+                                    ? "Gỡ khỏi discovery"
+                                    : "Khôi phục"}
+                            </span>
+                          )}
                         </td>
                         <td className={styles.sub}>{formatDate(it.createdAt)}</td>
                         <td>
@@ -777,7 +934,7 @@ export default function CommunityDiscoveryPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {historyItems.map((it: any) => (
+                    {historyItems.map((it: HistoryItem) => (
                       <tr key={it._id}>
                         <td className={styles.main}>
                           {it.action === "approve"

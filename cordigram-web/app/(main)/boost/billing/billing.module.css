@@ -1,0 +1,111 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(900px 520px at 20% -10%, rgba(168, 85, 247, 0.18), transparent 55%),
+    radial-gradient(900px 520px at 80% 0%, rgba(56, 189, 248, 0.12), transparent 60%),
+    var(--color-bg-home);
+}
+
+.card {
+  width: min(620px, 100%);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  padding: 18px;
+  box-shadow: 0 20px 60px rgba(2, 6, 23, 0.22);
+  display: grid;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.sub {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.option {
+  text-align: left;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.08));
+  padding: 16px;
+  cursor: pointer;
+}
+
+.optionActive {
+  border-color: color-mix(in srgb, var(--color-primary) 60%, var(--color-border) 40%);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.18);
+}
+
+.optTitle {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.optPrice {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.btnPrimary,
+.btnSecondary {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btnPrimary {
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary), #22d3ee);
+}
+
+.btnSecondary {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+}
+
+.error {
+  margin: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(254, 226, 226, 0.55);
+  color: #991b1b;
+  padding: 9px 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+

@@ -18,6 +18,10 @@ import { Profile } from '../profiles/profile.schema';
 import { Follow } from '../users/follow.schema';
 import { MessageReport } from './message-report.schema';
 import { IgnoredService } from '../users/ignored.service';
+import {
+  parseMessageSearchQueryForDm,
+  type ParsedMessageSearch,
+} from '../messages/message-search-query.parser';
 
 @Injectable()
 export class DirectMessagesService {
@@ -706,10 +710,7 @@ export class DirectMessagesService {
             last = Math.max(last, new Date(d.lastSeenAt).getTime());
           }
         }
-        onlineById.set(
-          u._id.toString(),
-          last > 0 && last >= devicePresenceAgo,
-        );
+        onlineById.set(u._id.toString(), last > 0 && last >= devicePresenceAgo);
       }
 
       return profiles.map((profile) => {
@@ -874,6 +875,38 @@ export class DirectMessagesService {
     }
   }
 
+  private escapeRegexFragment(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private async resolveSenderForDm(
+    currentUserId: string,
+    otherUserId: string | undefined,
+    raw: string,
+  ): Promise<Types.ObjectId | undefined> {
+    const v = raw.trim();
+    let uid: Types.ObjectId | undefined;
+    if (Types.ObjectId.isValid(v) && v.length === 24) {
+      uid = new Types.ObjectId(v);
+    } else {
+      const prof = await this.profileModel
+        .findOne({
+          username: new RegExp(`^${this.escapeRegexFragment(v)}$`, 'i'),
+        })
+        .select('userId')
+        .lean()
+        .exec();
+      if (!prof?.userId) return undefined;
+      uid = new Types.ObjectId(prof.userId.toString());
+    }
+    const cur = new Types.ObjectId(currentUserId);
+    if (otherUserId) {
+      const other = new Types.ObjectId(otherUserId);
+      if (!uid.equals(cur) && !uid.equals(other)) return undefined;
+    }
+    return uid;
+  }
+
   async searchDirectMessages(
     currentUserId: string,
     params: {
@@ -884,8 +917,10 @@ export class DirectMessagesService {
       hasFile?: boolean;
       limit?: number;
       offset?: number;
+      fuzzy?: boolean;
+      parseQuery?: boolean;
     },
-  ): Promise<{ results: any[]; totalCount: number }> {
+  ): Promise<{ results: any[]; totalCount: number; parsed?: ParsedMessageSearch }> {
     const {
       q,
       otherUserId,
@@ -894,8 +929,15 @@ export class DirectMessagesService {
       hasFile,
       limit = 25,
       offset = 0,
+      fuzzy = false,
+      parseQuery = true,
     } = params;
     const uid = new Types.ObjectId(currentUserId);
+
+    const parsed: ParsedMessageSearch =
+      parseQuery && q
+        ? parseMessageSearchQueryForDm(q)
+        : { text: (q || '').trim(), filters: {} };
 
     const match: any = {
       isDeleted: false,
@@ -910,9 +952,41 @@ export class DirectMessagesService {
       ];
     }
 
-    if (q && q.trim()) {
-      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      match.content = { $regex: escaped, $options: 'i' };
+    if (parsed.filters.from) {
+      const sid = await this.resolveSenderForDm(
+        currentUserId,
+        otherUserId,
+        parsed.filters.from,
+      );
+      if (!sid) {
+        return { results: [], totalCount: 0, parsed };
+      }
+      const baseOr = match.$or;
+      match.$and = [{ $or: baseOr }, { senderId: sid }];
+      delete match.$or;
+    }
+
+    const text = parsed.text.trim();
+
+    const hasImageFilter = parsed.filters.has === 'image';
+    const hasFileFilter = Boolean(hasFile) || parsed.filters.has === 'file';
+
+    if (hasImageFilter) {
+      match.$and = match.$and || [];
+      match.$and.push({
+        $or: [
+          { giphyId: { $ne: null } },
+          {
+            attachments: {
+              $elemMatch: {
+                $regex: /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i,
+              },
+            },
+          },
+        ],
+      });
+    } else if (hasFileFilter) {
+      match['attachments.0'] = { $exists: true };
     }
 
     if (before) {
@@ -922,22 +996,61 @@ export class DirectMessagesService {
       match.createdAt = { ...(match.createdAt || {}), $gt: new Date(after) };
     }
 
-    if (hasFile) {
-      match['attachments.0'] = { $exists: true };
+    const runQuery = async (contentExtra: Record<string, unknown>) => {
+      const full = { ...match, ...contentExtra };
+      const [totalCount, messages] = await Promise.all([
+        this.directMessageModel.countDocuments(full),
+        this.directMessageModel
+          .find(full)
+          .populate('senderId', 'email')
+          .populate('receiverId', 'email')
+          .sort(
+            text && '$text' in contentExtra
+              ? { score: { $meta: 'textScore' }, createdAt: -1 }
+              : { createdAt: -1 },
+          )
+          .skip(offset)
+          .limit(limit)
+          .lean()
+          .exec(),
+      ]);
+      return { totalCount, messages };
+    };
+
+    let contentExtra: Record<string, unknown> = {};
+    if (text) {
+      try {
+        await this.directMessageModel.countDocuments({
+          ...match,
+          $text: { $search: text },
+        });
+        contentExtra = { $text: { $search: text } };
+      } catch {
+        const escaped = this.escapeRegexFragment(text);
+        contentExtra = { content: { $regex: escaped, $options: 'i' } };
+      }
     }
 
-    const [totalCount, messages] = await Promise.all([
-      this.directMessageModel.countDocuments(match),
-      this.directMessageModel
-        .find(match)
-        .populate('senderId', 'email')
-        .populate('receiverId', 'email')
-        .sort({ createdAt: -1 })
-        .skip(offset)
-        .limit(limit)
-        .lean()
-        .exec(),
-    ]);
+    let { totalCount, messages } = await runQuery(contentExtra);
+
+    if (fuzzy && totalCount === 0 && text && !('$text' in contentExtra)) {
+      const words = text.split(/\s+/).filter((w) => w.length > 0);
+      if (words.length > 1) {
+        const pattern = words.map((w) => this.escapeRegexFragment(w)).join('.*');
+        contentExtra = { content: { $regex: pattern, $options: 'i' } };
+        const retry = await runQuery(contentExtra);
+        totalCount = retry.totalCount;
+        messages = retry.messages;
+      }
+    }
+
+    if (fuzzy && totalCount === 0 && text && '$text' in contentExtra) {
+      const escaped = this.escapeRegexFragment(text);
+      contentExtra = { content: { $regex: escaped, $options: 'i' } };
+      const retry = await runQuery(contentExtra);
+      totalCount = retry.totalCount;
+      messages = retry.messages;
+    }
 
     const results = await Promise.all(
       messages.map(async (msg: any) => {
@@ -983,6 +1096,6 @@ export class DirectMessagesService {
       }),
     );
 
-    return { results, totalCount };
+    return { results, totalCount, parsed };
   }
 }

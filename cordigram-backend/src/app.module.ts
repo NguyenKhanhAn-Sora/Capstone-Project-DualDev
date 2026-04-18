@@ -35,6 +35,7 @@ import { CreatorVerificationModule } from './creator-verification/creator-verifi
 import { RolesModule } from './roles/roles.module';
 import { LivestreamModule } from './livestream/livestream.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
+import { BoostModule } from './boost/boost.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { AuditLogModule } from './audit-log/audit-log.module';
     RolesModule,
     LivestreamModule,
     AuditLogModule,
+    BoostModule,
   ],
   controllers: [AppController],
   providers: [AppService],

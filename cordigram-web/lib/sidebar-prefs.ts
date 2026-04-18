@@ -28,6 +28,12 @@ export type ServerSidebarPrefs = {
   serverNotify?: NotifyLevel;
   serverMutedUntil?: string | null;
   serverMutedForever?: boolean;
+  /** Bỏ qua thông báo (âm thanh) khi tin chỉ gắn @everyone / @here — lưu localStorage. */
+  suppressEveryoneHere?: boolean;
+  /** Bỏ qua thông báo khi chỉ bị gắn theo @vai trò — lưu localStorage. */
+  suppressRoleMentions?: boolean;
+  /** Ẩn các kênh đang tắt âm trên sidebar — lưu localStorage theo máy chủ. */
+  hideMutedChannels?: boolean;
   channels: Record<string, ChannelPref>;
   categories: Record<string, CategoryPref>;
   /** Đã bật chế độ thu gọn cho mọi danh mục (menu "Thu gọn tất cả") */
@@ -71,6 +77,44 @@ export function getServerPrefs(userId: string, serverId: string): ServerSidebarP
 
 export function setServerNotify(userId: string, serverId: string, level: NotifyLevel) {
   updateServerPrefs(userId, serverId, (s) => ({ ...s, serverNotify: level }));
+}
+
+export function setServerSuppressFlags(
+  userId: string,
+  serverId: string,
+  patch: { suppressEveryoneHere?: boolean; suppressRoleMentions?: boolean },
+) {
+  updateServerPrefs(userId, serverId, (s) => ({ ...s, ...patch }));
+}
+
+export function setServerHideMutedChannels(userId: string, serverId: string, hide: boolean) {
+  updateServerPrefs(userId, serverId, (s) => ({ ...s, hideMutedChannels: hide }));
+}
+
+/** Mức thông báo hiệu lực cho một kênh (kế thừa category → server). */
+export function getEffectiveNotifyLevel(
+  sp: ServerSidebarPrefs,
+  channelId: string,
+  categoryId: string | null | undefined,
+): NotifyLevel {
+  const ch = sp.channels[channelId];
+  const cn = ch?.notify;
+  if (cn && cn !== "inherit_category") return cn;
+  const cat = categoryId ? sp.categories[categoryId] : undefined;
+  const catn = cat?.notify;
+  if (catn && catn !== "inherit_server") return catn;
+  return sp.serverNotify ?? "all";
+}
+
+/** Kênh hoặc danh mục chứa kênh đang tắt âm. */
+export function isChannelOrCategoryMuted(
+  sp: ServerSidebarPrefs,
+  channelId: string,
+  categoryId: string | null | undefined,
+): boolean {
+  if (isChannelMuted(sp.channels[channelId])) return true;
+  if (categoryId && isCategoryMuted(sp.categories[categoryId])) return true;
+  return false;
 }
 
 export function setServerMute(

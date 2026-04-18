@@ -14,6 +14,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Profile } from '../profiles/profile.schema';
+import { User } from '../users/user.schema';
 
 @WebSocketGateway({
   namespace: '/direct-messages',
@@ -25,13 +26,26 @@ import { Profile } from '../profiles/profile.schema';
 export class DirectMessagesGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
-  @WebSocketServer() server: Server;
+  @WebSocketServer() server!: Server;
 
-  private connectedUsers = new Map<string, string>(); // userId -> socketId
+  private connectedUsers = new Map<string, Set<string>>(); // userId -> socketIds
+  private dmPresenceSubs = new Map<string, Set<string>>(); // watcherUserId -> targetUserIds
+
+  private presence = new Map<
+    string,
+    {
+      status: 'online' | 'idle' | 'offline';
+      lastActiveAt: number;
+      idleTimer?: NodeJS.Timeout;
+      sharePresence: boolean;
+    }
+  >();
+
+  private readonly IDLE_AFTER_MS = 60_000;
 
   private async emitDmUnreadCount(toUserId: string, fromUserId?: string) {
-    const socketId = this.connectedUsers.get(toUserId);
-    if (!socketId) return;
+    const sockets = this.connectedUsers.get(toUserId);
+    if (!sockets || sockets.size === 0) return;
     try {
       const [totalUnread, conversationUnread] = await Promise.all([
         this.directMessagesService.getUnreadCount(toUserId),
@@ -42,14 +56,118 @@ export class DirectMessagesGateway
             )
           : Promise.resolve(undefined),
       ]);
-      this.server.to(socketId).emit('dm-unread-count', {
-        totalUnread,
-        fromUserId: fromUserId ?? null,
-        conversationUnread:
-          typeof conversationUnread === 'number' ? conversationUnread : null,
-      });
+      for (const socketId of sockets) {
+        this.server.to(socketId).emit('dm-unread-count', {
+          totalUnread,
+          fromUserId: fromUserId ?? null,
+          conversationUnread:
+            typeof conversationUnread === 'number' ? conversationUnread : null,
+        });
+      }
     } catch (_err) {
       // ignore
+    }
+  }
+
+  private getSocketIdsByUserId(userId: string): string[] {
+    const set = this.connectedUsers.get(userId);
+    return set ? Array.from(set) : [];
+  }
+
+  private async getSharePresence(userId: string): Promise<boolean> {
+    try {
+      const u = await this.userModel
+        .findById(userId)
+        .select('settings.sharePresence')
+        .lean()
+        .exec();
+      const v = (u as any)?.settings?.sharePresence;
+      return v !== false;
+    } catch {
+      return true;
+    }
+  }
+
+  private effectiveStatusForViewer(
+    targetUserId: string,
+  ): 'online' | 'idle' | 'offline' {
+    const rec = this.presence.get(targetUserId);
+    if (!rec) return 'offline';
+    if (rec.sharePresence === false) return 'offline';
+    return rec.status;
+  }
+
+  private notifyPresenceToSubscribers(
+    targetUserId: string,
+    status: 'online' | 'idle' | 'offline',
+  ) {
+    for (const [watcherId, targets] of this.dmPresenceSubs.entries()) {
+      if (!targets?.has(targetUserId)) continue;
+      const watcherSockets = this.connectedUsers.get(watcherId);
+      if (!watcherSockets || watcherSockets.size === 0) continue;
+      for (const sid of watcherSockets) {
+        this.server.to(sid).emit('presence-updated', {
+          userId: targetUserId,
+          status,
+        });
+      }
+    }
+  }
+
+  private setPresence(
+    userId: string,
+    next: 'online' | 'idle' | 'offline',
+    opts?: { bumpActivity?: boolean },
+  ) {
+    const now = Date.now();
+    const prev =
+      this.presence.get(userId) ?? {
+        status: 'offline' as const,
+        lastActiveAt: now,
+        idleTimer: undefined as NodeJS.Timeout | undefined,
+        sharePresence: true,
+      };
+
+    const sharePresence = prev.sharePresence;
+    const lastActiveAt = opts?.bumpActivity ? now : prev.lastActiveAt;
+
+    if (prev.idleTimer) clearTimeout(prev.idleTimer);
+    const nextRec: any = {
+      status: next,
+      lastActiveAt,
+      sharePresence,
+      idleTimer: undefined as NodeJS.Timeout | undefined,
+    };
+
+    // Schedule idle if user is connected + online
+    if (next !== 'offline') {
+      nextRec.idleTimer = setTimeout(() => {
+        const sockets = this.connectedUsers.get(userId);
+        if (!sockets || sockets.size === 0) return;
+        // Only idle if no activity within window
+        const cur = this.presence.get(userId);
+        if (!cur) return;
+        const delta = Date.now() - cur.lastActiveAt;
+        if (delta >= this.IDLE_AFTER_MS) {
+          this.setPresence(userId, 'idle');
+        }
+      }, this.IDLE_AFTER_MS + 250);
+    }
+
+    const changed = prev.status !== next;
+    this.presence.set(userId, nextRec);
+
+    if (changed && sharePresence !== false) {
+      // Back-compat events
+      if (next === 'online') {
+        this.server.emit('user-online', { userId, status: 'online' });
+      } else if (next === 'offline') {
+        this.server.emit('user-offline', { userId, status: 'offline' });
+      }
+      // New event for online/idle/offline
+      this.notifyPresenceToSubscribers(userId, next);
+      // Keep legacy behavior (global broadcast) so older UI still works
+      this.server.emit('presence-updated', { userId, status: next });
     }
   }
 
@@ -70,19 +188,23 @@ export class DirectMessagesGateway
     });
 
     const receiverSocket = this.connectedUsers.get(payload.receiverId);
-    if (receiverSocket) {
-      this.server.to(receiverSocket).emit('reaction-added', {
-        messageId: payload.messageId,
-        reactions: payload.reactions,
-      });
+    if (receiverSocket && receiverSocket.size) {
+      for (const sid of receiverSocket) {
+        this.server.to(sid).emit('reaction-added', {
+          messageId: payload.messageId,
+          reactions: payload.reactions,
+        });
+      }
     }
 
     const senderSocket = this.connectedUsers.get(payload.senderId);
-    if (senderSocket) {
-      this.server.to(senderSocket).emit('reaction-updated', {
-        messageId: payload.messageId,
-        reactions: payload.reactions,
-      });
+    if (senderSocket && senderSocket.size) {
+      for (const sid of senderSocket) {
+        this.server.to(sid).emit('reaction-updated', {
+          messageId: payload.messageId,
+          reactions: payload.reactions,
+        });
+      }
     }
   }
 
@@ -92,14 +214,16 @@ export class DirectMessagesGateway
     message: any;
   }) {
     const receiverSocket = this.connectedUsers.get(payload.receiverId);
-    if (receiverSocket) {
-      this.server.to(receiverSocket).emit('new-message', {
-        message: payload.message,
-        fromUser: {
-          userId: payload.senderId,
-          username: payload.message?.senderId?.username,
-        },
-      });
+    if (receiverSocket && receiverSocket.size) {
+      for (const sid of receiverSocket) {
+        this.server.to(sid).emit('new-message', {
+          message: payload.message,
+          fromUser: {
+            userId: payload.senderId,
+            username: payload.message?.senderId?.username,
+          },
+        });
+      }
     }
     // Also push unread count update (if receiver is online)
     this.emitDmUnreadCount(payload.receiverId, payload.senderId);
@@ -109,6 +233,7 @@ export class DirectMessagesGateway
     private readonly directMessagesService: DirectMessagesService,
     private readonly jwtService: JwtService,
     @InjectModel(Profile.name) private profileModel: Model<Profile>,
+    @InjectModel(User.name) private userModel: Model<User>,
   ) {}
 
   async handleConnection(socket: Socket) {
@@ -125,16 +250,25 @@ export class DirectMessagesGateway
 
       const userId = payload.userId || payload.sub;
       socket.data.userId = userId;
-      this.connectedUsers.set(userId, socket.id);
+      const set = this.connectedUsers.get(userId) ?? new Set<string>();
+      set.add(socket.id);
+      this.connectedUsers.set(userId, set);
+
+      // cache sharePresence once per connection (default true)
+      const sharePresence = await this.getSharePresence(userId);
+      const prev = this.presence.get(userId);
+      this.presence.set(userId, {
+        status: prev?.status ?? 'offline',
+        lastActiveAt: prev?.lastActiveAt ?? Date.now(),
+        idleTimer: prev?.idleTimer,
+        sharePresence,
+      });
 
       // Send initial unread count to the user (badge can render immediately)
       await this.emitDmUnreadCount(userId);
 
-      // Notify others that user is online
-      this.server.emit('user-online', {
-        userId,
-        status: 'online',
-      });
+      // Mark as online (or keep offline for others if sharePresence=false)
+      this.setPresence(userId, 'online', { bumpActivity: true });
 
     } catch (error) {
       console.error('Connection error:', error);
@@ -145,15 +279,60 @@ export class DirectMessagesGateway
   async handleDisconnect(socket: Socket) {
     const userId = socket.data.userId;
     if (userId) {
-      this.connectedUsers.delete(userId);
-
-      // Notify others that user is offline
-      this.server.emit('user-offline', {
-        userId,
-        status: 'offline',
-      });
+      const set = this.connectedUsers.get(userId);
+      if (set) {
+        set.delete(socket.id);
+        if (set.size === 0) this.connectedUsers.delete(userId);
+      }
+      // If no active sockets remain -> offline
+      const stillOnline =
+        this.connectedUsers.get(userId) &&
+        this.connectedUsers.get(userId)!.size > 0;
+      if (!stillOnline) {
+        this.setPresence(userId, 'offline');
+        this.dmPresenceSubs.delete(userId);
+      }
 
     }
+  }
+
+  @SubscribeMessage('presence-subscribe')
+  async handlePresenceSubscribe(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() data: { userIds: string[] },
+  ) {
+    const watcherId = socket.data.userId;
+    if (!watcherId) return;
+    const ids = Array.isArray(data?.userIds)
+      ? data.userIds.map((x) => String(x)).filter(Boolean)
+      : [];
+    const set = this.dmPresenceSubs.get(watcherId) ?? new Set<string>();
+    for (const id of ids) set.add(id);
+    this.dmPresenceSubs.set(watcherId, set);
+
+    const snapshot = ids.map((targetId) => ({
+      userId: targetId,
+      status: this.effectiveStatusForViewer(targetId),
+    }));
+    socket.emit('presence-snapshot', { items: snapshot });
+  }
+
+  @SubscribeMessage('presence-activity')
+  handlePresenceActivity(@ConnectedSocket() socket: Socket) {
+    const userId = socket.data.userId;
+    if (!userId) return;
+    const sockets = this.connectedUsers.get(userId);
+    if (!sockets || sockets.size === 0) return;
+    this.setPresence(userId, 'online', { bumpActivity: true });
+  }
+
+  @SubscribeMessage('presence-ping')
+  handlePresencePing(@ConnectedSocket() socket: Socket) {
+    const userId = socket.data.userId;
+    if (!userId) return;
+    const sockets = this.connectedUsers.get(userId);
+    if (!sockets || sockets.size === 0) return;
+    this.setPresence(userId, 'online', { bumpActivity: true });
   }
 
   @SubscribeMessage('send-message')
@@ -182,14 +361,16 @@ export class DirectMessagesGateway
 
       // Send to receiver
       const receiverSocket = this.connectedUsers.get(data.receiverId);
-      if (receiverSocket) {
-        this.server.to(receiverSocket).emit('new-message', {
-          message: populatedMessage,
-          fromUser: {
-            userId: senderId,
-            username: populatedMessage.senderId['username'],
-          },
-        });
+      if (receiverSocket && receiverSocket.size) {
+        for (const sid of receiverSocket) {
+          this.server.to(sid).emit('new-message', {
+            message: populatedMessage,
+            fromUser: {
+              userId: senderId,
+              username: populatedMessage.senderId['username'],
+            },
+          });
+        }
         // Push unread count update to receiver (badge)
         await this.emitDmUnreadCount(data.receiverId, senderId);
       } else {
@@ -216,7 +397,7 @@ export class DirectMessagesGateway
       const userId = socket.data.userId;
       const receiverSocket = this.connectedUsers.get(data.receiverId);
 
-      if (receiverSocket) {
+      if (receiverSocket && receiverSocket.size) {
         // ✅ Debug: Log userId
 
         // ✅ Import Types from mongoose and convert userId to ObjectId
@@ -235,11 +416,13 @@ export class DirectMessagesGateway
           senderProfile?.username || senderProfile?.displayName || 'Unknown';
 
 
-        this.server.to(receiverSocket).emit('user-typing', {
-          fromUserId: userId,
-          username,
-          isTyping: data.isTyping,
-        });
+        for (const sid of receiverSocket) {
+          this.server.to(sid).emit('user-typing', {
+            fromUserId: userId,
+            username,
+            isTyping: data.isTyping,
+          });
+        }
       }
     } catch (error) {
       console.error('❌ Error handling typing:', error);
@@ -260,11 +443,13 @@ export class DirectMessagesGateway
 
       // Notify sender that messages are read
       const senderSocket = this.connectedUsers.get(data.senderId);
-      if (senderSocket) {
-        this.server.to(senderSocket).emit('messages-read', {
-          byUserId: userId,
-          messageIds: data.messageIds,
-        });
+      if (senderSocket && senderSocket.size) {
+        for (const sid of senderSocket) {
+          this.server.to(sid).emit('messages-read', {
+            byUserId: userId,
+            messageIds: data.messageIds,
+          });
+        }
       }
     } catch (error) {
       console.error('Error marking as read:', error);
@@ -289,12 +474,14 @@ export class DirectMessagesGateway
 
       // Notify sender UI (optional)
       const senderSocket = this.connectedUsers.get(data.senderId);
-      if (senderSocket) {
-        this.server.to(senderSocket).emit('messages-read', {
-          byUserId: userId,
-          messageIds: [],
-          all: true,
-        });
+      if (senderSocket && senderSocket.size) {
+        for (const sid of senderSocket) {
+          this.server.to(sid).emit('messages-read', {
+            byUserId: userId,
+            messageIds: [],
+            all: true,
+          });
+        }
       }
     } catch (error) {
       console.error('Error marking conversation as read:', error);
@@ -317,13 +504,15 @@ export class DirectMessagesGateway
 
       // Notify receiver
       const receiverSocket = this.connectedUsers.get(data.receiverId);
-      if (receiverSocket) {
-        this.server.to(receiverSocket).emit('reaction-added', {
-          messageId: data.messageId,
-          emoji: data.emoji,
-          userId,
-          reactions: message.reactions,
-        });
+      if (receiverSocket && receiverSocket.size) {
+        for (const sid of receiverSocket) {
+          this.server.to(sid).emit('reaction-added', {
+            messageId: data.messageId,
+            emoji: data.emoji,
+            userId,
+            reactions: message.reactions,
+          });
+        }
       }
     } catch (error) {
       console.error('Error adding reaction:', error);
@@ -338,6 +527,10 @@ export class DirectMessagesGateway
   ) {
     try {
       const senderId = socket.data.userId;
+      if (data.receiverId === senderId) {
+        console.warn('📞 [CALL] Ignoring call-initiate to self');
+        return;
+      }
       const receiverSocket = this.connectedUsers.get(data.receiverId);
 
       // Get sender's profile for username and avatar
@@ -360,7 +553,7 @@ export class DirectMessagesGateway
       };
 
 
-      if (receiverSocket) {
+      if (receiverSocket && receiverSocket.size) {
         const payload = {
           from: senderId,
           type: data.type,
@@ -368,7 +561,9 @@ export class DirectMessagesGateway
         };
 
 
-        this.server.to(receiverSocket).emit('call-incoming', payload);
+        for (const sid of receiverSocket) {
+          this.server.to(sid).emit('call-incoming', payload);
+        }
 
       } else {
       }
@@ -385,11 +580,13 @@ export class DirectMessagesGateway
     const userId = socket.data.userId;
     const callerSocket = this.connectedUsers.get(data.callerId);
 
-    if (callerSocket) {
-      this.server.to(callerSocket).emit('call-answer', {
-        from: userId,
-        sdpOffer: data.sdpOffer,
-      });
+    if (callerSocket && callerSocket.size) {
+      for (const sid of callerSocket) {
+        this.server.to(sid).emit('call-answer', {
+          from: userId,
+          sdpOffer: data.sdpOffer,
+        });
+      }
     }
   }
 
@@ -401,10 +598,12 @@ export class DirectMessagesGateway
     const userId = socket.data.userId;
     const callerSocket = this.connectedUsers.get(data.callerId);
 
-    if (callerSocket) {
-      this.server.to(callerSocket).emit('call-rejected', {
-        from: userId,
-      });
+    if (callerSocket && callerSocket.size) {
+      for (const sid of callerSocket) {
+        this.server.to(sid).emit('call-rejected', {
+          from: userId,
+        });
+      }
     }
   }
 
@@ -416,11 +615,13 @@ export class DirectMessagesGateway
     const userId = socket.data.userId;
     const peerSocket = this.connectedUsers.get(data.peerId);
 
-    if (peerSocket) {
-      this.server.to(peerSocket).emit('ice-candidate', {
-        from: userId,
-        candidate: data.candidate,
-      });
+    if (peerSocket && peerSocket.size) {
+      for (const sid of peerSocket) {
+        this.server.to(sid).emit('ice-candidate', {
+          from: userId,
+          candidate: data.candidate,
+        });
+      }
     }
   }
 
@@ -433,10 +634,12 @@ export class DirectMessagesGateway
     const peerSocket = this.connectedUsers.get(data.peerId);
 
 
-    if (peerSocket) {
-      this.server.to(peerSocket).emit('call-ended', {
-        from: userId,
-      });
+    if (peerSocket && peerSocket.size) {
+      for (const sid of peerSocket) {
+        this.server.to(sid).emit('call-ended', {
+          from: userId,
+        });
+      }
     } else {
     }
   }
@@ -446,6 +649,14 @@ export class DirectMessagesGateway
   }
 
   getSocketIdByUserId(userId: string) {
-    return this.connectedUsers.get(userId);
+    return this.getSocketIdsByUserId(userId)[0];
+  }
+
+  emitToUser(userId: string, event: string, payload: any): void {
+    const sockets = this.connectedUsers.get(userId);
+    if (!sockets || sockets.size === 0) return;
+    for (const socketId of sockets) {
+      this.server.to(socketId).emit(event, payload);
+    }
   }
 }

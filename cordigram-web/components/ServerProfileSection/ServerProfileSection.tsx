@@ -95,6 +95,11 @@ export default function ServerProfileSection({
     let cancelled = false;
     (async () => {
       try {
+        // If serverId is invalid (or server was deleted), avoid noisy retries.
+        if (!/^[a-f0-9]{24}$/i.test(String(serverId || ""))) {
+          if (!cancelled) setProfileStats(null);
+          return;
+        }
         const stats = await serversApi.getServerProfileStats(serverId);
         if (!cancelled) setProfileStats(stats);
       } catch {
@@ -121,7 +126,11 @@ export default function ServerProfileSection({
     if (!file || !token) return;
     try {
       setError(null);
-      const up = await uploadMedia({ token, file });
+      const up = await uploadMedia({
+        token,
+        file,
+        cordigramUploadContext: "messages",
+      });
       const url = up.secureUrl || up.url;
       if (!url) throw new Error(t("chat.serverProfile.errors.fileUrlMissing"));
       setAvatarUrl(url);
@@ -137,7 +146,11 @@ export default function ServerProfileSection({
     try {
       setError(null);
       const optimized = await optimizeBannerImageFile(file);
-      const up = await uploadMedia({ token, file: optimized });
+      const up = await uploadMedia({
+        token,
+        file: optimized,
+        cordigramUploadContext: "messages",
+      });
       const url = up.secureUrl || up.url;
       if (!url) throw new Error(t("chat.serverProfile.errors.bannerUrlMissing"));
       setBannerImageUrl(url);

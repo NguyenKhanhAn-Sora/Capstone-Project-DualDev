@@ -27,6 +27,7 @@ import {
   type ChatGateBlockReason,
   type ServerVerificationLevel,
 } from '../messages/channel-chat-gate.util';
+import { ChannelMessagesGateway } from '../messages/channel-messages.gateway';
 
 function defaultStatusForAccessMode(
   accessMode: ServerAccessMode,
@@ -38,6 +39,29 @@ function defaultStatusForAccessMode(
     return { status: 'pending', acceptedRules: false };
   // discoverable hoặc invite_only: vào thẳng accepted nhưng acceptedRules tùy hasRules
   return { status: 'accepted', acceptedRules };
+}
+
+/** Chuẩn hóa userId từ ObjectId, ref populate, hoặc chuỗi. */
+function stringMongoUserId(value: unknown): string {
+  if (value == null || value === '') return '';
+  if (typeof value === 'object' && (value as { _id?: unknown })._id != null) {
+    return String((value as { _id: unknown })._id);
+  }
+  return String(value);
+}
+
+/** So sánh hai userId (24-byte hex hoặc đã chuẩn hóa). */
+function sameMongoUserId(a: unknown, b: unknown): boolean {
+  const sa = stringMongoUserId(a);
+  const sb = stringMongoUserId(b);
+  if (!sa || !sb) return false;
+  if (sa === sb) return true;
+  if (!Types.ObjectId.isValid(sa) || !Types.ObjectId.isValid(sb)) return false;
+  try {
+    return new Types.ObjectId(sa).equals(new Types.ObjectId(sb));
+  } catch {
+    return false;
+  }
 }
 
 @Injectable()
@@ -54,7 +78,33 @@ export class ServerAccessService {
     @InjectModel(Rule.name) private ruleModel: Model<Rule>,
     @InjectModel(UserServer.name) private userServerModel: Model<UserServer>,
     @InjectModel(User.name) private userModel: Model<User>,
+    private readonly channelMessagesGateway: ChannelMessagesGateway,
   ) {}
+
+  private notifyJoinApplicationUpdated(
+    server: unknown,
+    serverId: string,
+    applicantUserId: string,
+    status: 'accepted' | 'rejected' | 'withdrawn',
+  ): void {
+    try {
+      const ids = new Set<string>();
+      const owner = stringMongoUserId((server as any)?.ownerId);
+      if (owner) ids.add(owner);
+      for (const m of (server as any)?.members || []) {
+        const uid = stringMongoUserId(m?.userId);
+        if (uid) ids.add(uid);
+      }
+      ids.add(String(applicantUserId));
+      this.channelMessagesGateway.emitJoinApplicationUpdated([...ids], {
+        serverId,
+        userId: String(applicantUserId),
+        status,
+      });
+    } catch {
+      // ignore socket failures
+    }
+  }
 
   private getEffectiveAccessMode(server: Server): ServerAccessMode {
     const fromField = (server as any).accessMode as
@@ -98,7 +148,9 @@ export class ServerAccessService {
       })),
       joinApplicationForm: {
         enabled: Boolean((server as any)?.joinApplicationForm?.enabled),
-        questions: Array.isArray((server as any)?.joinApplicationForm?.questions)
+        questions: Array.isArray(
+          (server as any)?.joinApplicationForm?.questions,
+        )
           ? (server as any).joinApplicationForm.questions
           : [],
       },
@@ -141,10 +193,11 @@ export class ServerAccessService {
       );
     }
 
-    const enabled = payload.enabled ?? Boolean((server as any)?.joinApplicationForm?.enabled);
+    const enabled =
+      payload.enabled ?? Boolean((server as any)?.joinApplicationForm?.enabled);
     const rawQuestions = Array.isArray(payload.questions)
       ? payload.questions
-      : (server as any)?.joinApplicationForm?.questions ?? [];
+      : ((server as any)?.joinApplicationForm?.questions ?? []);
 
     const normalized = (rawQuestions as any[])
       .map((q) => ({
@@ -158,17 +211,24 @@ export class ServerAccessService {
               : 'short',
         required: q.required !== false,
         options: Array.isArray(q.options)
-          ? q.options.map((x: any) => String(x || '').trim()).filter(Boolean).slice(0, 25)
+          ? q.options
+              .map((x: any) => String(x || '').trim())
+              .filter(Boolean)
+              .slice(0, 25)
           : [],
       }))
       .filter((q) => q.id && q.title);
 
     if (normalized.length > 5) {
-      throw new BadRequestException('Tối đa 5 câu hỏi trong đơn đăng ký tham gia');
+      throw new BadRequestException(
+        'Tối đa 5 câu hỏi trong đơn đăng ký tham gia',
+      );
     }
     for (const q of normalized) {
       if (q.type === 'multiple_choice' && (q.options?.length ?? 0) < 1) {
-        throw new BadRequestException('Câu hỏi nhiều lựa chọn phải có ít nhất 1 tùy chọn');
+        throw new BadRequestException(
+          'Câu hỏi nhiều lựa chọn phải có ít nhất 1 tùy chọn',
+        );
       }
     }
 
@@ -224,11 +284,14 @@ export class ServerAccessService {
   ): Promise<void> {
     const server = await this.serversService.getServerById(serverId);
     const isOwner = String(server.ownerId) === String(requesterUserId);
-    const canManageServer = await this.rolesService.hasPermission(
+    // IMPORTANT: use the same permission calculation as the UI permissions endpoint.
+    // `hasPermission()` and `calculateMemberPermissions()` must remain consistent, but
+    // historically they could diverge; join-applications should follow calculated perms.
+    const perms = await this.rolesService.calculateMemberPermissions(
       serverId,
       requesterUserId,
-      'manageServer',
     );
+    const canManageServer = Boolean((perms as any)?.manageServer);
     if (!isOwner && !canManageServer) {
       throw new ForbiddenException(
         'Chỉ chủ máy chủ hoặc thành viên có quyền Quản Lý Máy Chủ mới xem được đơn đăng ký',
@@ -248,7 +311,11 @@ export class ServerAccessService {
     },
   ): void {
     const form = (server as any).joinApplicationForm;
-    if (!form?.enabled || !Array.isArray(form.questions) || form.questions.length === 0) {
+    if (
+      !form?.enabled ||
+      !Array.isArray(form.questions) ||
+      form.questions.length === 0
+    ) {
       return;
     }
     // Client cũ gửi POST /join không body: không chặn; client mới gửi `applicationAnswers` thì validate đủ.
@@ -258,9 +325,7 @@ export class ServerAccessService {
     const answers = opts.applicationAnswers ?? [];
     for (const q of form.questions as any[]) {
       const qid = String(q.id ?? '');
-      const a = answers.find(
-        (x) => x && String(x.questionId) === qid,
-      );
+      const a = answers.find((x) => x && String(x.questionId) === qid);
       const required = q.required !== false;
       if (!required) continue;
       if (q.type === 'multiple_choice') {
@@ -292,7 +357,11 @@ export class ServerAccessService {
     },
   ): Array<{ questionId: string; text?: string; selectedOption?: string }> {
     const form = (server as any).joinApplicationForm;
-    if (!form?.enabled || !Array.isArray(form.questions) || form.questions.length === 0) {
+    if (
+      !form?.enabled ||
+      !Array.isArray(form.questions) ||
+      form.questions.length === 0
+    ) {
       return [];
     }
     const raw = opts?.applicationAnswers ?? [];
@@ -339,6 +408,8 @@ export class ServerAccessService {
         ? statusRaw
         : 'pending';
 
+    const ownerIdStr = stringMongoUserId((server as any).ownerId);
+
     const members = ((server as any).members || []) as Array<{
       userId: Types.ObjectId | { _id?: Types.ObjectId };
       joinedAt?: Date;
@@ -348,27 +419,33 @@ export class ServerAccessService {
       .filter(Boolean);
     const oidList = memberIds.map((id) => new Types.ObjectId(id));
 
-    // Chỉ đếm pending trong số user vẫn còn trong server.members (tránh ghost sau khi rời mà chưa xóa UserServer)
+    const memberIdsNoOwner = memberIds.filter(
+      (id) => id && !sameMongoUserId(id, ownerIdStr),
+    );
+    const oidListNoOwner = memberIdsNoOwner.map((id) => new Types.ObjectId(id));
+
+    // Chỉ đếm pending trong số user vẫn còn trong server.members (tránh ghost sau khi rời mà chưa xóa UserServer).
+    // Chủ server không có "đơn đăng ký" — không đếm vào pending.
     const pendingCount =
-      oidList.length === 0
+      oidListNoOwner.length === 0
         ? 0
         : await this.userServerModel.countDocuments({
             serverId: new Types.ObjectId(serverId),
             status: 'pending',
-            userId: { $in: oidList },
+            userId: { $in: oidListNoOwner },
           });
 
     const [profiles, users, userServers] = await Promise.all([
-      oidList.length
+      oidListNoOwner.length
         ? this.profileModel
-            .find({ userId: { $in: oidList } })
+            .find({ userId: { $in: oidListNoOwner } })
             .select('userId displayName username avatarUrl')
             .lean()
             .exec()
         : [],
-      oidList.length
+      oidListNoOwner.length
         ? this.userModel
-            .find({ _id: { $in: oidList } })
+            .find({ _id: { $in: oidListNoOwner } })
             .select('_id username createdAt')
             .lean()
             .exec()
@@ -384,7 +461,7 @@ export class ServerAccessService {
     );
     const userById = new Map((users as any[]).map((u) => [String(u._id), u]));
     const usByUser = new Map(
-      (userServers as any[]).map((u) => [String(u.userId), u]),
+      (userServers as any[]).map((u) => [stringMongoUserId(u.userId), u]),
     );
 
     type Row = {
@@ -397,14 +474,23 @@ export class ServerAccessService {
       acceptedRules: boolean;
     };
 
+    const hasJoinApplicationRecord = (us: any): boolean => {
+      if (!us) return false;
+      if (us.applicationSubmittedAt) return true;
+      const ans = us.joinApplicationAnswers;
+      return Array.isArray(ans) && ans.length > 0;
+    };
+
     const rows: Row[] = [];
     for (const m of members) {
-      const uid = String(m.userId?._id ?? m.userId);
+      const uid = stringMongoUserId(m.userId?._id ?? m.userId);
       if (!uid) continue;
+      if (ownerIdStr && sameMongoUserId(uid, ownerIdStr)) continue;
       const prof = profileByUser.get(uid);
       const urow = userById.get(uid);
-      const us = usByUser.get(uid) as any;
-      const st: UserServerStatus = (us?.status as UserServerStatus) ?? 'accepted';
+      const us = usByUser.get(uid);
+      const st: UserServerStatus =
+        (us?.status as UserServerStatus) ?? 'accepted';
       const acceptedRules = Boolean(us?.acceptedRules);
       const registeredAt = us?.applicationSubmittedAt
         ? new Date(us.applicationSubmittedAt)
@@ -432,14 +518,22 @@ export class ServerAccessService {
     else if (status === 'rejected')
       filtered = rows.filter((r) => r.status === 'rejected');
     else if (status === 'approved')
-      filtered = rows.filter((r) => r.status === 'accepted');
+      filtered = rows.filter((r) => {
+        if (r.status !== 'accepted') return false;
+        const us = usByUser.get(r.userId);
+        return hasJoinApplicationRecord(us);
+      });
 
     filtered.sort(
       (a, b) =>
         new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime(),
     );
 
-    return { pendingCount, items: filtered };
+    const withoutOwner = ownerIdStr
+      ? filtered.filter((r) => !sameMongoUserId(r.userId, ownerIdStr))
+      : filtered;
+
+    return { pendingCount, items: withoutOwner };
   }
 
   async getJoinApplicationDetail(
@@ -465,6 +559,14 @@ export class ServerAccessService {
   }> {
     await this.assertCanReviewJoinApplications(serverId, requesterUserId);
     const server = await this.serversService.getServerById(serverId);
+    if (
+      String((server as any).ownerId?._id ?? (server as any).ownerId) ===
+      String(applicantUserId)
+    ) {
+      throw new BadRequestException(
+        'Chủ máy chủ không có đơn đăng ký tham gia',
+      );
+    }
     if (!this.serversService.isMember(server as any, applicantUserId)) {
       throw new NotFoundException('Người dùng không thuộc máy chủ');
     }
@@ -489,7 +591,9 @@ export class ServerAccessService {
         .exec(),
     ]);
 
-    const formQs = Array.isArray((server as any)?.joinApplicationForm?.questions)
+    const formQs = Array.isArray(
+      (server as any)?.joinApplicationForm?.questions,
+    )
       ? ((server as any).joinApplicationForm.questions as any[])
       : [];
     const answers = (us as any)?.joinApplicationAnswers as
@@ -520,7 +624,9 @@ export class ServerAccessService {
       displayName: String(
         (prof as any)?.displayName || (urow as any)?.username || 'User',
       ),
-      username: String((prof as any)?.username || (urow as any)?.username || ''),
+      username: String(
+        (prof as any)?.username || (urow as any)?.username || '',
+      ),
       avatarUrl: (prof as any)?.avatarUrl
         ? String((prof as any).avatarUrl)
         : undefined,
@@ -554,6 +660,10 @@ export class ServerAccessService {
       throw new ForbiddenException('Bạn không có quyền từ chối đơn đăng ký');
     }
 
+    if (String((server as any).ownerId) === String(targetUserId)) {
+      throw new BadRequestException('Không thể từ chối chủ máy chủ');
+    }
+
     const target = await this.userServerModel
       .findOne({
         userId: new Types.ObjectId(targetUserId),
@@ -584,10 +694,12 @@ export class ServerAccessService {
         serverId,
         actorId: requesterUserId,
         recipientUserIds: [targetUserId],
-        title: 'Đơn đăng ký đã bị từ chối',
-        content: 'Đơn đăng ký tham gia máy chủ của bạn đã bị từ chối.',
+        title: '__SYS:joinAppRejectedTitle',
+        content: '__SYS:joinAppRejectedContent',
       })
       .catch(() => {});
+
+    this.notifyJoinApplicationUpdated(server, serverId, targetUserId, 'rejected');
 
     return updated as any;
   }
@@ -596,7 +708,10 @@ export class ServerAccessService {
   /**
    * Xóa bản ghi UserServer khi member không còn trong máy chủ (rời/kick/ban/dọn dữ liệu).
    */
-  async deleteUserServerRecord(serverId: string, userId: string): Promise<void> {
+  async deleteUserServerRecord(
+    serverId: string,
+    userId: string,
+  ): Promise<void> {
     await this.userServerModel
       .deleteOne({
         userId: new Types.ObjectId(userId),
@@ -640,6 +755,8 @@ export class ServerAccessService {
 
     await this.deleteUserServerRecord(serverId, userId);
 
+    this.notifyJoinApplicationUpdated(server, serverId, userId, 'withdrawn');
+
     return { ok: true };
   }
 
@@ -670,6 +787,7 @@ export class ServerAccessService {
     }
 
     const prevHasRules = Boolean((server as any).hasRules);
+    const prevAgeRestricted = Boolean((server as any).isAgeRestricted);
 
     if (patch.accessMode) (server as any).accessMode = patch.accessMode;
     if (patch.isAgeRestricted !== undefined)
@@ -682,26 +800,40 @@ export class ServerAccessService {
     (server as any).isPublic = effectiveMode === 'discoverable';
 
     const nextHasRules = Boolean((server as any).hasRules);
+    const nextAgeRestricted = Boolean((server as any).isAgeRestricted);
+    const ownerOid = new Types.ObjectId(String((server as any).ownerId));
+    const serverOid = new Types.ObjectId(serverId);
+
     if (prevHasRules !== nextHasRules) {
       if (nextHasRules) {
+        // Thành viên đã trong máy chủ: không bắt chấp nhận lại khi chủ bật quy định sau này.
+        // Người gia nhập sau vẫn phải chấp nhận qua joinServer / UI.
         await this.userServerModel.updateMany(
-          { serverId: new Types.ObjectId(serverId), status: 'accepted' },
-          { $set: { acceptedRules: false } },
+          { serverId: serverOid },
+          { $set: { acceptedRules: true } },
         );
       } else {
         await this.userServerModel.updateMany(
-          { serverId: new Types.ObjectId(serverId) },
+          { serverId: serverOid },
           { $set: { acceptedRules: true } },
         );
       }
+    }
+
+    // Bật giới hạn độ tuổi: thành viên hiện tại không phải bấm "Tiếp tục" lại; chỉ user mới vào sau mới ACK.
+    if (!prevAgeRestricted && nextAgeRestricted) {
+      await this.userServerModel.updateMany(
+        { serverId: serverOid },
+        { $set: { ageRestrictedAcknowledged: true } },
+      );
     }
 
     await server.save();
 
     return {
       accessMode: this.getEffectiveAccessMode(server),
-      isAgeRestricted: Boolean((server as any).isAgeRestricted),
-      hasRules: Boolean((server as any).hasRules),
+      isAgeRestricted: nextAgeRestricted,
+      hasRules: nextHasRules,
     };
   }
 
@@ -783,10 +915,6 @@ export class ServerAccessService {
       .lean()
       .exec();
 
-    const ageRestrictedAcknowledged = Boolean(
-      (doc as any)?.ageRestrictedAcknowledged,
-    );
-
     const [userRow, profileRow] = await Promise.all([
       this.userModel
         .findById(userId)
@@ -826,8 +954,14 @@ export class ServerAccessService {
     );
     const isBypass = isOwner || canManageServer;
 
+    /** Thành viên trong members nhưng chưa có UserServer (dữ liệu cũ) — không áp dụng ngược gate tuổi/quy định. */
+    const legacyMemberNoUserServerRow =
+      !doc && rawMemberJoinedAt != null;
+
     const birthdate = (profileRow as any)?.birthdate ?? null;
-    const accountCreatedAt = new Date((userRow as any)?.createdAt || Date.now());
+    const accountCreatedAt = new Date(
+      (userRow as any)?.createdAt || Date.now(),
+    );
     const isServerEmailVerified = Boolean((doc as any)?.serverEmailVerified);
     const verificationChecks = computeVerificationChecks({
       isVerified: isServerEmailVerified,
@@ -840,9 +974,14 @@ export class ServerAccessService {
       accountCreatedAt,
       memberJoinedAt,
     });
+    const ageAckForGate =
+      isBypass ||
+      Boolean((doc as any)?.ageRestrictedAcknowledged) ||
+      legacyMemberNoUserServerRow;
+
     const gate = evaluateChannelChatGate({
       isAgeRestricted,
-      ageRestrictedAcknowledged,
+      ageRestrictedAcknowledged: ageAckForGate,
       birthdate,
       verificationLevel,
       isVerified: isServerEmailVerified,
@@ -851,14 +990,24 @@ export class ServerAccessService {
       isBypass,
     });
 
+    const applyJoinAccepted =
+      accessMode === 'apply' && (doc as any)?.status === 'accepted';
+    const chatViewBlocked =
+      !gate.allowed &&
+      !(
+        applyJoinAccepted &&
+        gate.reason === 'verification'
+      );
+    const chatBlockReason = chatViewBlocked ? gate.reason ?? null : null;
+
     const ageYears = calcAgeFromBirthdate(birthdate);
 
     // Thành viên đã có trong server trước khi bật "apply": không áp dụng ngược.
-    // Nếu chưa có bản ghi UserServer (dữ liệu cũ), coi như đã được chấp thuận.
+    // Nếu chưa có bản ghi UserServer (dữ liệu cũ), coi như đã chấp nhận quy định / không bắt ACK tuổi lại.
     const base = !doc
       ? {
           status: 'accepted' as UserServerStatus,
-          acceptedRules: !hasRules,
+          acceptedRules: true,
         }
       : {
           status: doc.status ?? null,
@@ -875,15 +1024,18 @@ export class ServerAccessService {
       hasRules,
       accessMode,
       isAgeRestricted,
-      ageRestrictedAcknowledged: isBypass ? true : ageRestrictedAcknowledged,
+      ageRestrictedAcknowledged: isBypass ? true : ageAckForGate,
       ageYears,
       verificationLevel,
       verificationChecks,
       verificationWait,
-      chatViewBlocked: !gate.allowed,
-      chatBlockReason: gate.allowed ? null : (gate.reason ?? null),
+      chatViewBlocked,
+      chatBlockReason,
       showAgeRestrictedChannelNotice:
-        isAgeRestricted && gate.allowed && !isBypass && (ageYears ?? 0) >= 18,
+        isAgeRestricted &&
+        !chatViewBlocked &&
+        !isBypass &&
+        (ageYears ?? 0) >= 18,
     };
   }
 
@@ -1070,7 +1222,11 @@ export class ServerAccessService {
       : defaultStatusForAccessMode(accessMode, serverHasRules);
 
     let acceptedRulesFinal = acceptedRules;
-    if (!statusOverride && accessMode === 'apply' && opts?.rulesAccepted === true) {
+    if (
+      !statusOverride &&
+      accessMode === 'apply' &&
+      opts?.rulesAccepted === true
+    ) {
       acceptedRulesFinal = true;
     }
 
@@ -1086,8 +1242,10 @@ export class ServerAccessService {
     if (!statusOverride && accessMode === 'apply') {
       setPayload.applicationSubmittedAt = new Date();
       if (opts?.applicationAnswers !== undefined) {
-        setPayload.joinApplicationAnswers =
-          this.normalizeJoinAnswersForStorage(server, opts);
+        setPayload.joinApplicationAnswers = this.normalizeJoinAnswersForStorage(
+          server,
+          opts,
+        );
       }
     }
 
@@ -1127,6 +1285,10 @@ export class ServerAccessService {
       throw new ForbiddenException(
         'Chỉ chủ máy chủ hoặc người có quyền Quản Lý Máy Chủ mới duyệt được',
       );
+    }
+
+    if (String((server as any).ownerId) === String(targetUserId)) {
+      throw new BadRequestException('Không thể duyệt chủ máy chủ');
     }
 
     const target = await this.userServerModel
@@ -1178,10 +1340,12 @@ export class ServerAccessService {
         serverId,
         actorId: requesterUserId,
         recipientUserIds: [targetUserId],
-        title: 'Đơn đăng ký đã được chấp thuận',
-        content: 'Bạn đã được chấp thuận tham gia máy chủ.',
+        title: '__SYS:joinAppApprovedTitle',
+        content: '__SYS:joinAppApprovedContent',
       })
       .catch(() => {});
+
+    this.notifyJoinApplicationUpdated(server, serverId, targetUserId, 'accepted');
 
     return updated as any;
   }

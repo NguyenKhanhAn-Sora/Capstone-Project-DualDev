@@ -19,6 +19,8 @@ import { PostInteraction } from '../posts/post-interaction.schema';
 import { Comment } from '../comment/comment.schema';
 import { CampaignExpirySchedulerService } from './campaign-expiry-scheduler.service';
 import { MailService } from '../mail/mail.service';
+import { BoostService } from '../boost/boost.service';
+import type { BoostBillingCycle, BoostTier } from '../boost/boost-entitlement.schema';
 
 @Injectable()
 export class PaymentsService {
@@ -85,6 +87,32 @@ export class PaymentsService {
     }
 
     return trimmed;
+  }
+  private readonly boostStoreMonthlyPriceByTier: Record<string, number> = {
+    basic: 42000,
+    boost: 113000,
+  };
+
+  private computeBoostStoreAmountTotal(params: {
+    tier: string;
+    billingCycle: string;
+  }): number {
+    const tier = params.tier === 'boost' ? 'boost' : params.tier === 'basic' ? 'basic' : '';
+    const monthly = this.boostStoreMonthlyPriceByTier[tier] ?? 0;
+    if (monthly <= 0) {
+      throw new BadRequestException('Invalid boostTier');
+    }
+    const cycle = params.billingCycle === 'yearly' ? 'yearly' : 'monthly';
+    if (cycle === 'monthly') return monthly;
+    // yearly = 12 months with 16% discount
+    return Math.round(monthly * 12 * (1 - 0.16));
+  }
+
+  private computeBoostStoreExpiry(params: { startsAt: Date; billingCycle: string }): Date {
+    const start = params.startsAt;
+    const cycle = params.billingCycle === 'yearly' ? 'yearly' : 'monthly';
+    const days = cycle === 'yearly' ? 365 : 30;
+    return new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
   }
 
   private getCampaignStatus(
@@ -308,6 +336,7 @@ export class PaymentsService {
     private readonly commentModel: Model<Comment>,
     private readonly campaignExpiryScheduler: CampaignExpirySchedulerService,
     private readonly mailService: MailService,
+    private readonly boostService: BoostService,
   ) {
     this.stripe = new Stripe(this.config.stripeSecretKey);
   }
@@ -971,10 +1000,15 @@ export class PaymentsService {
     dto: CreateCheckoutSessionDto;
   }) {
     const { userId, email, dto } = opts;
+    const rawAction = String(dto.actionType ?? '');
     const actionType =
-      dto.actionType === 'campaign_upgrade'
+      rawAction === 'campaign_upgrade'
         ? 'campaign_upgrade'
-        : 'campaign_create';
+        : rawAction === 'boost_subscribe'
+          ? 'boost_subscribe'
+          : rawAction === 'boost_gift'
+            ? 'boost_gift'
+            : 'campaign_create';
     const durationDays = this.getDurationDays(dto.durationPackageId);
     const boostWeight = this.getBoostWeight(dto.boostPackageId);
     const currency = (dto.currency ?? 'vnd').toLowerCase();
@@ -987,6 +1021,31 @@ export class PaymentsService {
       'Payment for promoted campaign in Cordigram Home Feed.';
     const successUrl = this.buildCheckoutSuccessUrl(dto.successUrl);
     const cancelUrl = this.buildCheckoutCancelUrl(dto.cancelUrl);
+
+    let boostTier: BoostTier | null = null;
+    let billingCycle: BoostBillingCycle | null = null;
+    let recipientUserId: string | null = null;
+
+    if (actionType === 'boost_subscribe' || actionType === 'boost_gift') {
+      boostTier = (dto.boostTier === 'boost' ? 'boost' : 'basic') as BoostTier;
+      billingCycle =
+        (dto.billingCycle === 'yearly' ? 'yearly' : 'monthly') as BoostBillingCycle;
+      recipientUserId =
+        actionType === 'boost_gift' ? String(dto.recipientUserId ?? '').trim() || null : null;
+      if (actionType === 'boost_gift' && !recipientUserId) {
+        throw new BadRequestException('Missing recipientUserId');
+      }
+
+      amountTotal = this.computeBoostStoreAmountTotal({
+        tier: boostTier,
+        billingCycle,
+      });
+      campaignName = boostTier === 'boost' ? 'Boost' : 'Boost Basic';
+      description =
+        billingCycle === 'yearly'
+          ? `${campaignName} yearly plan`
+          : `${campaignName} monthly plan`;
+    }
 
     if (actionType === 'campaign_upgrade') {
       if (
@@ -1055,8 +1114,14 @@ export class PaymentsService {
           },
         },
       ],
-      success_url: successUrl,
-      cancel_url: cancelUrl,
+      success_url:
+        actionType === 'boost_subscribe' || actionType === 'boost_gift'
+          ? `${this.config.frontendUrl}/boost/payment/success?session_id={CHECKOUT_SESSION_ID}`
+          : `${this.config.frontendUrl}/ads/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:
+        actionType === 'boost_subscribe' || actionType === 'boost_gift'
+          ? `${this.config.frontendUrl}/boost/payment/cancel`
+          : `${this.config.frontendUrl}/ads/payment/cancel`,
       metadata: {
         userId,
         actionType,
@@ -1066,6 +1131,9 @@ export class PaymentsService {
         adFormat: dto.adFormat ?? '',
         boostPackageId: dto.boostPackageId,
         durationPackageId: dto.durationPackageId,
+        boostTier: boostTier ?? '',
+        billingCycle: billingCycle ?? '',
+        recipientUserId: recipientUserId ?? '',
         promotedPostId:
           actionType === 'campaign_upgrade' ? '' : (dto.promotedPostId ?? ''),
         durationDays: String(durationDays),
@@ -1108,6 +1176,9 @@ export class PaymentsService {
         mediaUrls: dto.mediaUrls ?? [],
         boostPackageId: dto.boostPackageId,
         durationPackageId: dto.durationPackageId,
+        boostTier,
+        billingCycle,
+        recipientUserId,
         promotedPostId:
           actionType === 'campaign_upgrade'
             ? null
@@ -1134,7 +1205,11 @@ export class PaymentsService {
     const actionType =
       session.metadata?.actionType === 'campaign_upgrade'
         ? 'campaign_upgrade'
-        : 'campaign_create';
+        : session.metadata?.actionType === 'boost_subscribe'
+          ? 'boost_subscribe'
+          : session.metadata?.actionType === 'boost_gift'
+            ? 'boost_gift'
+            : 'campaign_create';
     const durationDays = this.getDurationDays(
       session.metadata?.durationPackageId,
     );
@@ -1193,21 +1268,48 @@ export class PaymentsService {
           amountTotal: session.amount_total ?? 0,
         });
       } else {
-        await this.upsertAdLifecycleForSession({
-          sessionId: session.id,
-          userId: session.metadata?.userId ?? userId ?? null,
-          boostPackageId: session.metadata?.boostPackageId ?? null,
-          durationPackageId: session.metadata?.durationPackageId ?? null,
-          promotedPostId: session.metadata?.promotedPostId ?? null,
-          paidAt: paidAt ?? new Date(),
-        });
-        await this.publishPromotedPostIfEligible({
-          promotedPostId: session.metadata?.promotedPostId ?? null,
-          userId: session.metadata?.userId ?? userId ?? null,
-        });
+        if (actionType === 'boost_subscribe' || actionType === 'boost_gift') {
+          const buyerId = session.metadata?.userId ?? userId ?? null;
+          const recipient =
+            actionType === 'boost_gift'
+              ? (session.metadata?.recipientUserId ?? null)
+              : buyerId;
+          const tier =
+            session.metadata?.boostTier === 'boost' ? 'boost' : 'basic';
+          const cycle =
+            session.metadata?.billingCycle === 'yearly' ? 'yearly' : 'monthly';
+          const paidAtDate = paidAt ?? new Date();
+          if (recipient) {
+            await this.boostService.finalizeBoostPurchaseAfterPayment({
+              userId: recipient,
+              tier: tier as any,
+              billingCycle: cycle as any,
+              paidAt: paidAtDate,
+              latestSessionId: session.id,
+              latestPaymentIntentId: paymentIntentId,
+              source: actionType === 'boost_gift' ? 'gift' : 'purchase',
+              giftedByUserId: actionType === 'boost_gift' ? buyerId : null,
+            });
+          }
+        } else {
+          await this.upsertAdLifecycleForSession({
+            sessionId: session.id,
+            userId: session.metadata?.userId ?? userId ?? null,
+            boostPackageId: session.metadata?.boostPackageId ?? null,
+            durationPackageId: session.metadata?.durationPackageId ?? null,
+            promotedPostId: session.metadata?.promotedPostId ?? null,
+            paidAt: paidAt ?? new Date(),
+          });
+          await this.publishPromotedPostIfEligible({
+            promotedPostId: session.metadata?.promotedPostId ?? null,
+            userId: session.metadata?.userId ?? userId ?? null,
+          });
+        }
       }
 
-      await this.sendAdsPaymentSuccessEmailIfNeeded(session.id);
+      if (actionType !== 'boost_subscribe' && actionType !== 'boost_gift') {
+        await this.sendAdsPaymentSuccessEmailIfNeeded(session.id);
+      }
     }
 
     return {
@@ -1232,7 +1334,11 @@ export class PaymentsService {
     const actionType =
       metadata.actionType === 'campaign_upgrade'
         ? 'campaign_upgrade'
-        : 'campaign_create';
+        : metadata.actionType === 'boost_subscribe'
+          ? 'boost_subscribe'
+          : metadata.actionType === 'boost_gift'
+            ? 'boost_gift'
+            : 'campaign_create';
     const durationDays = this.getDurationDays(
       metadata.durationPackageId ?? null,
     );
@@ -1261,6 +1367,9 @@ export class PaymentsService {
         adFormat: metadata.adFormat ?? '',
         boostPackageId: metadata.boostPackageId ?? '',
         durationPackageId: metadata.durationPackageId ?? '',
+        boostTier: metadata.boostTier ?? null,
+        billingCycle: metadata.billingCycle ?? null,
+        recipientUserId: metadata.recipientUserId ?? null,
         promotedPostId:
           actionType === 'campaign_upgrade'
             ? null
@@ -1288,21 +1397,46 @@ export class PaymentsService {
           amountTotal: session.amount_total ?? 0,
         });
       } else {
-        await this.upsertAdLifecycleForSession({
-          sessionId: session.id,
-          userId: metadata.userId ?? null,
-          boostPackageId: metadata.boostPackageId ?? null,
-          durationPackageId: metadata.durationPackageId ?? null,
-          promotedPostId: metadata.promotedPostId ?? null,
-          paidAt: paidAt ?? new Date(),
-        });
-        await this.publishPromotedPostIfEligible({
-          promotedPostId: metadata.promotedPostId ?? null,
-          userId: metadata.userId ?? null,
-        });
+        if (actionType === 'boost_subscribe' || actionType === 'boost_gift') {
+          const buyerId = metadata.userId ?? null;
+          const recipient =
+            actionType === 'boost_gift'
+              ? (metadata.recipientUserId ?? null)
+              : buyerId;
+          const tier = metadata.boostTier === 'boost' ? 'boost' : 'basic';
+          const cycle = metadata.billingCycle === 'yearly' ? 'yearly' : 'monthly';
+          const paidAtDate = paidAt ?? new Date();
+          if (recipient) {
+            await this.boostService.finalizeBoostPurchaseAfterPayment({
+              userId: recipient,
+              tier: tier as any,
+              billingCycle: cycle as any,
+              paidAt: paidAtDate,
+              latestSessionId: session.id,
+              latestPaymentIntentId: paymentIntentId,
+              source: actionType === 'boost_gift' ? 'gift' : 'purchase',
+              giftedByUserId: actionType === 'boost_gift' ? buyerId : null,
+            });
+          }
+        } else {
+          await this.upsertAdLifecycleForSession({
+            sessionId: session.id,
+            userId: metadata.userId ?? null,
+            boostPackageId: metadata.boostPackageId ?? null,
+            durationPackageId: metadata.durationPackageId ?? null,
+            promotedPostId: metadata.promotedPostId ?? null,
+            paidAt: paidAt ?? new Date(),
+          });
+          await this.publishPromotedPostIfEligible({
+            promotedPostId: metadata.promotedPostId ?? null,
+            userId: metadata.userId ?? null,
+          });
+        }
       }
 
-      await this.sendAdsPaymentSuccessEmailIfNeeded(session.id);
+      if (actionType !== 'boost_subscribe' && actionType !== 'boost_gift') {
+        await this.sendAdsPaymentSuccessEmailIfNeeded(session.id);
+      }
     }
   }
 

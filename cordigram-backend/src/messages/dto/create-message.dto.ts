@@ -44,6 +44,14 @@ export class CreateMessageDto {
   @IsString()
   serverStickerId?: string;
 
+  /**
+   * Server ID chứa sticker (khi dùng sticker cross-server).
+   * Nếu không truyền thì mặc định là server của kênh hiện tại.
+   */
+  @IsOptional()
+  @IsString()
+  serverStickerServerId?: string;
+
   @IsOptional()
   @IsString()
   voiceUrl?: string;

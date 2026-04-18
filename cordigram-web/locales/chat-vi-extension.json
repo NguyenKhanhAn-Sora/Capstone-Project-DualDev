@@ -153,14 +153,6 @@
         "label": "Gửi tin nhắn trong chủ đề và bài đăng",
         "description": "Cho phép các thành viên gửi tin nhắn trong chủ đề và trong bài đăng trên các kênh diễn đàn."
       },
-      "createPublicThreads": {
-        "label": "Tạo Chủ Đề Công Khai",
-        "description": "Cho phép thành viên được tạo chủ đề mà mọi người trong kênh đều có thể xem."
-      },
-      "createPrivateThreads": {
-        "label": "Tạo Các Chủ Đề Riêng Tư",
-        "description": "Cho phép thành viên được tạo chủ đề theo chỉ được mời."
-      },
       "embedLinks": {
         "label": "Nhúng liên kết",
         "description": "Cho phép hiển thị nội dung nhúng của liên kết do thành viên chia sẻ trong các kênh chat."

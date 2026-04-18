@@ -153,14 +153,6 @@
         "label": "スレッドと投稿でメッセージ送信",
         "description": "スレッドとフォーラム投稿内でのメッセージ送信を許可します。"
       },
-      "createPublicThreads": {
-        "label": "公開スレッドを作成",
-        "description": "チャンネル内の全員が見られるスレッドを作成することを許可します。"
-      },
-      "createPrivateThreads": {
-        "label": "プライベートスレッドを作成",
-        "description": "招待制のスレッドを作成することを許可します。"
-      },
       "embedLinks": {
         "label": "リンクを埋め込む",
         "description": "共有されたリンクのリッチ埋め込みを表示することを許可します。"

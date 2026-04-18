@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Categories, Theme } from "emoji-picker-react";
+import { useLanguage } from "@/component/language-provider";
 import styles from "./GiphyPicker.module.css";
 import {
   searchGifs,
@@ -22,11 +23,16 @@ import {
   type EmojiPickerEmoji,
 } from "@/lib/servers-api";
 
+function EmojiPickerMartLoading() {
+  const { t } = useLanguage();
+  return (
+    <div className={styles.emojiPickerLoading}>{t("chat.mediaPicker.emojiMartLoading")}</div>
+  );
+}
+
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), {
   ssr: false,
-  loading: () => (
-    <div className={styles.emojiPickerLoading}>Đang tải emoji…</div>
-  ),
+  loading: EmojiPickerMartLoading,
 });
 
 const STICKER_FREQ_KEY = "cordigram_sticker_freq_v1";
@@ -104,38 +110,6 @@ type EmojiFreqStored = {
 };
 
 type GifFreqStored = { n: number; id: string; title: string; thumb: string };
-
-const KAOMOJI_CATEGORIES = [
-  {
-    label: "Vui / Phấn khích",
-    items: ["(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧", "(*^▽^*)", "(≧◡≦)", "ヽ(•‿•)ﾉ", "(*≧▽≦)"],
-  },
-  {
-    label: "Yêu thương",
-    items: ["(♡˙︶˙♡)", "(ˆ ³ˆ)♥", "( ˘ ³˘)♥", "(｡♥‿♥｡)", "(づ｡◕‿‿◕｡)づ"],
-  },
-  {
-    label: "Buồn / Khóc",
-    items: ["(╥_╥)", "(T_T)", "ಥ_ಥ", "(｡•́︿•̀｡)", "(╯︵╰,)"],
-  },
-  {
-    label: "Hài hước",
-    items: ["( ͡° ͜ʖ ͡°)", "¯\\_(ツ)_/¯", "ʕ•ᴥ•ʔ", "(งʼ̀-ʼ́)ง"],
-  },
-  {
-    label: "Chào / Vẫy",
-    items: ["( ´ ▽ ` )ﾉ", "(*ﾟ▽ﾟ*)/", "ヾ(^∇^)", "o(^▽^)o"],
-  },
-];
-
-const GIF_TILES: { token: string; label: string; hint?: string }[] = [
-  { token: "favorites", label: "Ưa thích", hint: "Của bạn" },
-  { token: "trending", label: "Xu hướng", hint: "GIF hot" },
-  { token: "love", label: "yêu", hint: "" },
-  { token: "happy", label: "hạnh phúc", hint: "" },
-  { token: "cry", label: "khóc", hint: "" },
-  { token: "thumbs up", label: "đồng ý", hint: "" },
-];
 
 function readJsonMap<T>(key: string): Record<string, T> {
   if (typeof window === "undefined") return {};
@@ -227,16 +201,6 @@ export type OwnedServerSummary = {
   avatarUrl?: string | null;
 };
 
-const EMOJI_RAIL_CATEGORIES: { category: Categories; icon: string; title: string }[] = [
-  { category: Categories.SMILEYS_PEOPLE, icon: "😀", title: "Mọi người" },
-  { category: Categories.ANIMALS_NATURE, icon: "🐻", title: "Thiên nhiên" },
-  { category: Categories.FOOD_DRINK, icon: "🍕", title: "Đồ ăn" },
-  { category: Categories.ACTIVITIES, icon: "⚽", title: "Hoạt động" },
-  { category: Categories.TRAVEL_PLACES, icon: "🚗", title: "Du lịch" },
-  { category: Categories.OBJECTS, icon: "💡", title: "Đồ vật" },
-  { category: Categories.SYMBOLS, icon: "❤️", title: "Ký hiệu" },
-];
-
 interface GiphyPickerProps {
   onSelect: (selection: GiphyPickerSelection) => void;
   onClose: () => void;
@@ -270,8 +234,129 @@ export default function GiphyPicker({
   enableServerMedia,
   adminMediaPicker = false,
 }: GiphyPickerProps) {
+  const { t } = useLanguage();
   const serverMediaOn =
     enableServerMedia ?? enableServerStickers ?? true;
+
+  const gifTiles = useMemo(
+    () =>
+      [
+        {
+          token: "favorites",
+          label: t("chat.mediaPicker.gifCatFavorites"),
+          hint: t("chat.mediaPicker.gifCatFavoritesHint"),
+        },
+        {
+          token: "trending",
+          label: t("chat.mediaPicker.gifCatTrending"),
+          hint: t("chat.mediaPicker.gifCatTrendingHint"),
+        },
+        { token: "love", label: t("chat.mediaPicker.gifCatLove"), hint: "" },
+        { token: "happy", label: t("chat.mediaPicker.gifCatHappy"), hint: "" },
+        { token: "cry", label: t("chat.mediaPicker.gifCatCry"), hint: "" },
+        {
+          token: "thumbs up",
+          label: t("chat.mediaPicker.gifCatThumbs"),
+          hint: "",
+        },
+      ] as { token: string; label: string; hint: string }[],
+    [t],
+  );
+
+  const kaomojiCategories = useMemo(
+    () => [
+      {
+        label: t("chat.mediaPicker.kaomojiHappy"),
+        items: ["(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧", "(*^▽^*)", "(≧◡≦)", "ヽ(•‿•)ﾉ", "(*≧▽≦)"],
+      },
+      {
+        label: t("chat.mediaPicker.kaomojiLove"),
+        items: ["(♡˙︶˙♡)", "(ˆ ³ˆ)♥", "( ˘ ³˘)♥", "(｡♥‿♥｡)", "(づ｡◕‿‿◕｡)づ"],
+      },
+      {
+        label: t("chat.mediaPicker.kaomojiSad"),
+        items: ["(╥_╥)", "(T_T)", "ಥ_ಥ", "(｡•́︿•̀｡)", "(╯︵╰,)"],
+      },
+      {
+        label: t("chat.mediaPicker.kaomojiFunny"),
+        items: ["( ͡° ͜ʖ ͡°)", "¯\\_(ツ)_/¯", "ʕ•ᴥ•ʔ", "(งʼ̀-ʼ́)ง"],
+      },
+      {
+        label: t("chat.mediaPicker.kaomojiGreet"),
+        items: ["( ´ ▽ ` )ﾉ", "(*ﾟ▽ﾟ*)/", "ヾ(^∇^)", "o(^▽^)o"],
+      },
+    ],
+    [t],
+  );
+
+  const emojiRailCategories = useMemo(
+    () =>
+      [
+        {
+          category: Categories.SMILEYS_PEOPLE,
+          icon: "😀",
+          title: t("chat.mediaPicker.railSmileys"),
+        },
+        {
+          category: Categories.ANIMALS_NATURE,
+          icon: "🐻",
+          title: t("chat.mediaPicker.railNature"),
+        },
+        {
+          category: Categories.FOOD_DRINK,
+          icon: "🍕",
+          title: t("chat.mediaPicker.railFood"),
+        },
+        {
+          category: Categories.ACTIVITIES,
+          icon: "⚽",
+          title: t("chat.mediaPicker.railActivities"),
+        },
+        {
+          category: Categories.TRAVEL_PLACES,
+          icon: "🚗",
+          title: t("chat.mediaPicker.railTravel"),
+        },
+        {
+          category: Categories.OBJECTS,
+          icon: "💡",
+          title: t("chat.mediaPicker.railObjects"),
+        },
+        {
+          category: Categories.SYMBOLS,
+          icon: "❤️",
+          title: t("chat.mediaPicker.railSymbols"),
+        },
+      ] as { category: Categories; icon: string; title: string }[],
+    [t],
+  );
+
+  const emojiMartCategoryNames = useMemo(
+    () => [
+      { category: Categories.SUGGESTED, name: t("chat.mediaPicker.eprSuggested") },
+      {
+        category: Categories.SMILEYS_PEOPLE,
+        name: t("chat.mediaPicker.railSmileys"),
+      },
+      {
+        category: Categories.ANIMALS_NATURE,
+        name: t("chat.mediaPicker.railNature"),
+      },
+      { category: Categories.FOOD_DRINK, name: t("chat.mediaPicker.railFood") },
+      {
+        category: Categories.ACTIVITIES,
+        name: t("chat.mediaPicker.railActivities"),
+      },
+      {
+        category: Categories.TRAVEL_PLACES,
+        name: t("chat.mediaPicker.railTravel"),
+      },
+      { category: Categories.OBJECTS, name: t("chat.mediaPicker.railObjects") },
+      { category: Categories.SYMBOLS, name: t("chat.mediaPicker.railSymbols") },
+      { category: Categories.FLAGS, name: t("chat.mediaPicker.railFlags") },
+    ],
+    [t],
+  );
 
   const [activeTab, setActiveTab] = useState<MediaPickerTab>(initialTab);
   const [searchQuery, setSearchQuery] = useState("");
@@ -379,11 +464,11 @@ export default function GiphyPicker({
       setGifs(r.data);
     } catch (err) {
       console.error(err);
-      setError("Unable to load trending stickers");
+      setError(t("chat.mediaPicker.errTrendingStickers"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (activeTab !== "sticker") return;
@@ -415,7 +500,7 @@ export default function GiphyPicker({
       })
       .catch((e) => {
         console.error(e);
-        if (!c) setStickerPickerError("Không tải được sticker máy chủ");
+        if (!c) setStickerPickerError(t("chat.mediaPicker.errServerStickers"));
       })
       .finally(() => {
         if (!c) setStickerPickerLoading(false);
@@ -423,7 +508,7 @@ export default function GiphyPicker({
     return () => {
       c = true;
     };
-  }, [activeTab, serverMediaOn, contextServerId, adminMediaPicker]);
+  }, [activeTab, serverMediaOn, contextServerId, adminMediaPicker, t]);
 
   useEffect(() => {
     if (activeTab !== "emoji" || !serverMediaOn) {
@@ -449,7 +534,7 @@ export default function GiphyPicker({
       })
       .catch((e) => {
         console.error(e);
-        if (!c) setEmojiPickerError("Không tải được emoji máy chủ");
+        if (!c) setEmojiPickerError(t("chat.mediaPicker.errServerEmoji"));
       })
       .finally(() => {
         if (!c) setEmojiPickerLoading(false);
@@ -457,7 +542,7 @@ export default function GiphyPicker({
     return () => {
       c = true;
     };
-  }, [activeTab, serverMediaOn, contextServerId, adminMediaPicker]);
+  }, [activeTab, serverMediaOn, contextServerId, adminMediaPicker, t]);
 
   useEffect(() => {
     if (activeTab !== "gif") return;
@@ -485,7 +570,7 @@ export default function GiphyPicker({
         if (!c) setGifs(data);
       } catch (err) {
         console.error(err);
-        if (!c) setError("Không tải được GIF");
+        if (!c) setError(t("chat.mediaPicker.errLoadGif"));
       } finally {
         if (!c) setLoading(false);
       }
@@ -493,10 +578,10 @@ export default function GiphyPicker({
     return () => {
       c = true;
     };
-  }, [activeTab, searching, gifSubView, gifBrowseToken]);
+  }, [activeTab, searching, gifSubView, gifBrowseToken, t]);
 
   useEffect(() => {
-    const t = setTimeout(() => {
+    const debounceTimer = setTimeout(() => {
       if (activeTab === "gif") {
         if (!searchQuery.trim()) {
           setGifSubView("categories");
@@ -511,7 +596,7 @@ export default function GiphyPicker({
         setError(null);
         searchGifs(searchQuery.trim(), 30)
           .then((r) => setGifs(r.data))
-          .catch(() => setError("Unable to search"))
+          .catch(() => setError(t("chat.mediaPicker.errSearch")))
           .finally(() => setLoading(false));
         return;
       }
@@ -524,12 +609,12 @@ export default function GiphyPicker({
         setError(null);
         searchStickers(searchQuery.trim(), 30)
           .then((r) => setGifs(r.data))
-          .catch(() => setError("Unable to search"))
+          .catch(() => setError(t("chat.mediaPicker.errSearch")))
           .finally(() => setLoading(false));
       }
     }, 500);
-    return () => clearTimeout(t);
-  }, [searchQuery, activeTab, loadStickerTrending]);
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery, activeTab, loadStickerTrending, t]);
 
   useEffect(() => {
     searchInputRef.current?.focus();
@@ -734,7 +819,7 @@ export default function GiphyPicker({
                 addedByDisplayName:
                   st.addedBy.displayName ||
                   st.addedBy.username ||
-                  "Thành viên",
+                  t("chat.mediaPicker.memberFallback"),
                 addedByAvatarUrl: st.addedBy.avatarUrl || "",
               })
             }
@@ -808,7 +893,7 @@ export default function GiphyPicker({
               serverName: group.serverName,
               serverAvatarUrl: group.serverAvatarUrl,
               addedByDisplayName:
-                em.addedBy.displayName || em.addedBy.username || "Thành viên",
+                em.addedBy.displayName || em.addedBy.username || t("chat.mediaPicker.memberFallback"),
               addedByAvatarUrl: em.addedBy.avatarUrl || "",
             })
           }
@@ -826,11 +911,11 @@ export default function GiphyPicker({
     ownedStickerRows.length > 0 || otherStickerGroups.length > 0;
 
   const stickerRail = activeTab === "sticker" && !searching && serverMediaOn && (
-    <aside className={styles.rail} aria-label="Danh mục sticker">
+    <aside className={styles.rail} aria-label={t("chat.mediaPicker.railStickerAria")}>
       <button
         type="button"
         className={`${styles.railBtn} ${activeRailId === "sticker-section-freq" ? styles.railBtnActive : ""}`}
-        title="Thường dùng"
+        title={t("chat.mediaPicker.railFreqTitle")}
         onClick={() => scrollToSection("sticker-section-freq")}
       >
         🕐
@@ -885,7 +970,7 @@ export default function GiphyPicker({
       <button
         type="button"
         className={`${styles.railBtn} ${activeRailId === "sticker-section-default" ? styles.railBtnActive : ""}`}
-        title="Sticker Giphy"
+        title={t("chat.mediaPicker.railGiphyStickers")}
         onClick={() => scrollToSection("sticker-section-default")}
       >
         ✨
@@ -898,12 +983,12 @@ export default function GiphyPicker({
     (ownedEmojiRows.length > 0 || otherEmojiGroups.length > 0);
 
   const emojiRail = activeTab === "emoji" && !searching && (
-    <aside className={styles.rail} aria-label="Danh mục emoji">
+    <aside className={styles.rail} aria-label={t("chat.mediaPicker.railEmojiAria")}>
       {freqEmojiList.length > 0 ? (
         <button
           type="button"
           className={`${styles.railBtn} ${activeRailId === "emoji-section-freq" ? styles.railBtnActive : ""}`}
-          title="Thường dùng"
+          title={t("chat.mediaPicker.railFreqTitle")}
           onClick={() => scrollToSection("emoji-section-freq")}
         >
           🕐
@@ -959,12 +1044,12 @@ export default function GiphyPicker({
       <button
         type="button"
         className={`${styles.railBtn} ${activeRailId === "emoji-section-default" ? styles.railBtnActive : ""}`}
-        title="Emoji mặc định"
+        title={t("chat.mediaPicker.railDefaultEmoji")}
         onClick={() => scrollToSection("emoji-section-default")}
       >
         😀
       </button>
-      {EMOJI_RAIL_CATEGORIES.map((c) => (
+      {emojiRailCategories.map((c) => (
         <button
           key={c.category}
           type="button"
@@ -993,10 +1078,10 @@ export default function GiphyPicker({
           <div className={styles.tabs}>
             {(
               [
-                ["gif", "Ảnh động"],
-                ["sticker", "Sticker"],
-                ["emoji", "Emoji"],
-                ["kaomoji", "^▽^"],
+                ["gif", t("chat.mediaPicker.tabGif")] as const,
+                ["sticker", t("chat.mediaPicker.tabSticker")] as const,
+                ["emoji", t("chat.mediaPicker.tabEmoji")] as const,
+                ["kaomoji", t("chat.mediaPicker.tabKaomoji")] as const,
               ] as const
             ).map(([id, label]) => (
               <button
@@ -1029,7 +1114,7 @@ export default function GiphyPicker({
                     setGifs([]);
                   }}
                 >
-                  ← Danh mục
+                  {t("chat.mediaPicker.backToCategories")}
                 </button>
               )}
             <div
@@ -1045,10 +1130,10 @@ export default function GiphyPicker({
                 className={styles.searchInput}
                 placeholder={
                   activeTab === "gif"
-                    ? "Tìm GIF trên Giphy…"
+                    ? t("chat.mediaPicker.searchGifPlaceholder")
                     : activeTab === "sticker"
-                      ? "Tìm sticker phù hợp nhất…"
-                      : "Tìm emoji hợp lý nhất…"
+                      ? t("chat.mediaPicker.searchStickerPlaceholder")
+                      : t("chat.mediaPicker.searchEmojiPlaceholder")
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -1062,7 +1147,7 @@ export default function GiphyPicker({
                     onClose();
                   }}
                 >
-                  Thêm emoji
+                  {t("chat.mediaPicker.addEmoji")}
                 </button>
               ) : null}
             </div>
@@ -1085,7 +1170,7 @@ export default function GiphyPicker({
                 !searching &&
                 gifSubView === "categories" && (
                   <div className={styles.gifCatGrid}>
-                    {GIF_TILES.map((tile) => (
+                    {gifTiles.map((tile) => (
                       <button
                         key={tile.token}
                         type="button"
@@ -1114,7 +1199,7 @@ export default function GiphyPicker({
                 !searching &&
                 serverMediaOn &&
                 stickerPickerLoading && (
-                  <p className={styles.inlineHint}>Đang tải sticker máy chủ…</p>
+                  <p className={styles.inlineHint}>{t("chat.mediaPicker.loadingServerStickers")}</p>
                 )}
               {activeTab === "sticker" &&
                 !searching &&
@@ -1129,7 +1214,7 @@ export default function GiphyPicker({
                   id="sticker-section-freq"
                   key={`sf-${freqTick}`}
                 >
-                  <h3 className={styles.sectionTitle}>Thường dùng</h3>
+                  <h3 className={styles.sectionTitle}>{t("chat.mediaPicker.sectionFreq")}</h3>
                   <div className={styles.freqGrid}>
                     {freqStickerList.map((row) => renderFreqStickerTile(row))}
                   </div>
@@ -1160,7 +1245,7 @@ export default function GiphyPicker({
                             </div>
                           )}
                           <span className={styles.serverSectionName}>
-                            Máy chủ của {displayName}
+                            {t("chat.mediaPicker.serverPossessive", { name: displayName })}
                           </span>
                         </div>
                         <div className={styles.ownerMediaEmpty}>
@@ -1168,7 +1253,7 @@ export default function GiphyPicker({
                             🏷️
                           </div>
                           <p className={styles.ownerMediaEmptyText}>
-                            Máy chủ của bạn đang chờ bạn tải sticker lên!
+                            {t("chat.mediaPicker.serverStickerEmpty")}
                           </p>
                           {onManageServerStickers ? (
                             <button
@@ -1179,7 +1264,7 @@ export default function GiphyPicker({
                                 onClose();
                               }}
                             >
-                              Quản lý sticker
+                              {t("chat.mediaPicker.manageStickers")}
                             </button>
                           ) : null}
                         </div>
@@ -1202,12 +1287,12 @@ export default function GiphyPicker({
                           </div>
                         )}
                         <span className={styles.serverSectionName}>
-                          Máy chủ của {displayName}
+                          {t("chat.mediaPicker.serverPossessive", { name: displayName })}
                         </span>
                         {group.locked ? (
                           <span
                             className={styles.serverSectionBadge}
-                            title="Chỉ dùng trong server này"
+                            title={t("chat.mediaPicker.onlyThisServer")}
                           >
                             🔒
                           </span>
@@ -1239,7 +1324,7 @@ export default function GiphyPicker({
                                   addedByDisplayName:
                                     st.addedBy.displayName ||
                                     st.addedBy.username ||
-                                    "Thành viên",
+                                    t("chat.mediaPicker.memberFallback"),
                                   addedByAvatarUrl: st.addedBy.avatarUrl || "",
                                 })
                               }
@@ -1281,7 +1366,7 @@ export default function GiphyPicker({
                       {group.locked ? (
                         <span
                           className={styles.serverSectionBadge}
-                          title="Chỉ dùng trong server này"
+                          title={t("chat.mediaPicker.onlyThisServer")}
                         >
                           🔒
                         </span>
@@ -1313,7 +1398,7 @@ export default function GiphyPicker({
                                 addedByDisplayName:
                                   st.addedBy.displayName ||
                                   st.addedBy.username ||
-                                  "Thành viên",
+                                  t("chat.mediaPicker.memberFallback"),
                                 addedByAvatarUrl: st.addedBy.avatarUrl || "",
                               })
                             }
@@ -1329,7 +1414,7 @@ export default function GiphyPicker({
 
               {activeTab === "sticker" && !searching && (
                 <section id="sticker-section-default">
-                  <h3 className={styles.sectionTitleGiphy}>Sticker mặc định</h3>
+                  <h3 className={styles.sectionTitleGiphy}>{t("chat.mediaPicker.defaultStickers")}</h3>
                 </section>
               )}
 
@@ -1337,7 +1422,7 @@ export default function GiphyPicker({
                 !searching &&
                 serverMediaOn &&
                 emojiPickerLoading && (
-                  <p className={styles.inlineHint}>Đang tải emoji máy chủ…</p>
+                  <p className={styles.inlineHint}>{t("chat.mediaPicker.loadingServerEmoji")}</p>
                 )}
               {activeTab === "emoji" &&
                 !searching &&
@@ -1352,7 +1437,7 @@ export default function GiphyPicker({
                   id="emoji-section-freq"
                   key={`ef-${freqTick}`}
                 >
-                  <h3 className={styles.sectionTitle}>Thường dùng</h3>
+                  <h3 className={styles.sectionTitle}>{t("chat.mediaPicker.sectionFreq")}</h3>
                   <div className={styles.emojiFreqGrid}>
                     {freqEmojiList.map((row) => renderFreqEmojiTile(row))}
                   </div>
@@ -1383,7 +1468,7 @@ export default function GiphyPicker({
                             </div>
                           )}
                           <span className={styles.serverSectionName}>
-                            Máy chủ của {displayName}
+                            {t("chat.mediaPicker.serverPossessive", { name: displayName })}
                           </span>
                         </div>
                         <div className={styles.ownerMediaEmpty}>
@@ -1391,7 +1476,7 @@ export default function GiphyPicker({
                             😀
                           </div>
                           <p className={styles.ownerMediaEmptyText}>
-                            Máy chủ của bạn đang chờ bạn tải emoji lên!
+                            {t("chat.mediaPicker.serverEmojiEmpty")}
                           </p>
                           {onManageServerEmojis ? (
                             <button
@@ -1402,7 +1487,7 @@ export default function GiphyPicker({
                                 onClose();
                               }}
                             >
-                              Quản lý emoji
+                              {t("chat.mediaPicker.manageEmojis")}
                             </button>
                           ) : null}
                         </div>
@@ -1425,10 +1510,10 @@ export default function GiphyPicker({
                           </div>
                         )}
                         <span className={styles.serverSectionName}>
-                          Máy chủ của {displayName}
+                          {t("chat.mediaPicker.serverPossessive", { name: displayName })}
                         </span>
                         {group.locked ? (
-                          <span className={styles.serverSectionBadge} title="Khóa ngoài server này">
+                          <span className={styles.serverSectionBadge} title={t("chat.mediaPicker.lockedOtherServer")}>
                             🔒
                           </span>
                         ) : null}
@@ -1461,7 +1546,7 @@ export default function GiphyPicker({
                                   addedByDisplayName:
                                     em.addedBy.displayName ||
                                     em.addedBy.username ||
-                                    "Thành viên",
+                                    t("chat.mediaPicker.memberFallback"),
                                   addedByAvatarUrl: em.addedBy.avatarUrl || "",
                                 })
                               }
@@ -1501,7 +1586,7 @@ export default function GiphyPicker({
                         {group.serverName}
                       </span>
                       {group.locked ? (
-                        <span className={styles.serverSectionBadge} title="Khóa ngoài server này">
+                        <span className={styles.serverSectionBadge} title={t("chat.mediaPicker.lockedOtherServer")}>
                           🔒
                         </span>
                       ) : null}
@@ -1534,7 +1619,7 @@ export default function GiphyPicker({
                                 addedByDisplayName:
                                   em.addedBy.displayName ||
                                   em.addedBy.username ||
-                                  "Thành viên",
+                                  t("chat.mediaPicker.memberFallback"),
                                 addedByAvatarUrl: em.addedBy.avatarUrl || "",
                               })
                             }
@@ -1551,7 +1636,7 @@ export default function GiphyPicker({
               {activeTab === "emoji" && !searching && (
                 <section className={styles.emojiDefaultSection} id="emoji-section-default">
                   <div className={styles.emoji} ref={emojiMartHostRef}>
-                    <h3 className={styles.emojiDefaultHeading}>Emoji mặc định</h3>
+                    <h3 className={styles.emojiDefaultHeading}>{t("chat.mediaPicker.defaultEmoji")}</h3>
                     <div className={styles.emojiPickerSlot}>
                       <EmojiPicker
                         className="cordigram-default-emoji-epr"
@@ -1571,6 +1656,7 @@ export default function GiphyPicker({
                           onClose();
                         }}
                         theme={Theme.DARK}
+                        categories={emojiMartCategoryNames}
                         autoFocusSearch={false}
                         lazyLoadEmojis
                         searchDisabled
@@ -1586,7 +1672,7 @@ export default function GiphyPicker({
 
               {activeTab === "kaomoji" && (
                 <div className={styles.kaomojiPanel}>
-                  {KAOMOJI_CATEGORIES.map((cat) => (
+                  {kaomojiCategories.map((cat) => (
                     <div key={cat.label} className={styles.kaoCategory}>
                       <div className={styles.kaoCategoryLabel}>{cat.label}</div>
                       <div className={styles.kaoGrid}>
@@ -1617,7 +1703,7 @@ export default function GiphyPicker({
                   {loading && (
                     <div className={styles.loading}>
                       <div className={styles.spinner} />
-                      <p>Đang tải…</p>
+                      <p>{t("chat.mediaPicker.loading")}</p>
                     </div>
                   )}
                   {error && (
@@ -1627,18 +1713,18 @@ export default function GiphyPicker({
                         type="button"
                         onClick={() => setSearchQuery("")}
                       >
-                        Thử lại
+                        {t("chat.mediaPicker.retry")}
                       </button>
                     </div>
                   )}
                   {!loading && !error && gifs.length === 0 && activeTab === "gif" && gifSubView === "results" && gifBrowseToken === "favorites" && (
                     <div className={styles.empty}>
-                      <p>Chưa có GIF ưa thích — hãy chọn vài GIF trước.</p>
+                      <p>{t("chat.mediaPicker.emptyFavoriteGifs")}</p>
                     </div>
                   )}
                   {!loading && !error && gifs.length === 0 && (activeTab === "sticker" || (activeTab === "gif" && (searching || gifSubView === "results")) && !(gifBrowseToken === "favorites")) && (
                     <div className={styles.empty}>
-                      <p>Không có kết quả</p>
+                      <p>{t("chat.mediaPicker.emptyNoResults")}</p>
                     </div>
                   )}
                   {!loading && !error && gifs.length > 0 && (
@@ -1693,7 +1779,9 @@ export default function GiphyPicker({
                     {hoverFooter!.addedByDisplayName}
                   </span>
                   <span className={styles.stickerMetaFrom}>
-                    · từ {hoverFooter!.serverName}
+                    {t("chat.mediaPicker.hoverFrom", {
+                      server: hoverFooter!.serverName,
+                    })}
                   </span>
                 </div>
               </div>
@@ -1722,7 +1810,7 @@ export default function GiphyPicker({
             </div>
           ) : showGiphyFooter ? (
             <>
-              <span>Powered by</span>
+              <span>{t("chat.mediaPicker.poweredBy")}</span>
               <img
                 src="https://developers.giphy.com/branch/master/static/attribution-mark-1a9925c1.png"
                 alt="Giphy"
@@ -1731,7 +1819,9 @@ export default function GiphyPicker({
             </>
           ) : (
             <span className={styles.footerMuted}>
-              {activeTab === "kaomoji" ? "Kaomoji" : "Emoji"}
+              {activeTab === "kaomoji"
+                ? t("chat.mediaPicker.footerKaomoji")
+                : t("chat.mediaPicker.footerEmoji")}
             </span>
           )}
         </div>

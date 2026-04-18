@@ -30,6 +30,17 @@ export interface MemberListFilters {
 
 const MS_DAY = 24 * 60 * 60 * 1000;
 
+/** Chuẩn hóa chuỗi để tìm kiếm: thường hóa, bỏ dấu kết hợp (NFD), đ→d, gộp khoảng trắng. */
+function foldMemberSearchText(raw: string): string {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\u0111/g, "d")
+    .replace(/\s+/g, " ");
+}
+
 function joinedWithinDays(joinedAt: string, days: number): boolean {
   const t = new Date(joinedAt).getTime();
   return Number.isFinite(t) && Date.now() - t < days * MS_DAY;
@@ -41,17 +52,21 @@ function lastMessageWithinDays(lastMessageAt: string | null | undefined, days: n
   return Number.isFinite(t) && Date.now() - t < days * MS_DAY;
 }
 
-/** Tìm theo username và userId, không phân biệt hoa thường (realtime trên client). */
-export function filterMembersBySearch<T extends { username: string; userId: string }>(
-  members: T[],
-  rawQuery: string,
-): T[] {
-  const q = rawQuery.trim().toLowerCase();
-  if (!q) return members;
+/**
+ * Tìm theo displayName, nickname, username, userId (realtime trên client).
+ * Gõ không dấu / thiếu dấu vẫn khớp tên tiếng Việt (ví dụ "Ho" → "Hồ").
+ */
+export function filterMembersBySearch<
+  T extends { username: string; userId: string; displayName?: string; nickname?: string | null },
+>(members: T[], rawQuery: string): T[] {
+  const qFold = foldMemberSearchText(rawQuery);
+  if (!qFold) return members;
   return members.filter((m) => {
-    const u = m.username.toLowerCase();
-    const id = m.userId.toLowerCase();
-    return u.includes(q) || id.includes(q);
+    const u = foldMemberSearchText(m.username);
+    const id = foldMemberSearchText(m.userId);
+    const dn = foldMemberSearchText(m.displayName ?? "");
+    const nick = foldMemberSearchText(m.nickname ?? "");
+    return u.includes(qFold) || id.includes(qFold) || dn.includes(qFold) || nick.includes(qFold);
   });
 }
 

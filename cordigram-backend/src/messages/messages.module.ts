@@ -19,11 +19,13 @@ import { InboxSeen, InboxSeenSchema } from '../inbox/inbox-seen.schema';
 import { UserServer, UserServerSchema } from '../access/user-server.schema';
 import { User, UserSchema } from '../users/user.schema';
 import { MediaModerationService } from '../posts/media-moderation.service';
+import { BoostModule } from '../boost/boost.module';
 
 @Module({
   imports: [
-    UsersModule,
+    forwardRef(() => UsersModule),
     forwardRef(() => RolesModule),
+    forwardRef(() => BoostModule),
     MongooseModule.forFeature([
       { name: Message.name, schema: MessageSchema },
       { name: ChannelReadState.name, schema: ChannelReadStateSchema },

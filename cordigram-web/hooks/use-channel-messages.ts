@@ -41,6 +41,44 @@ export interface ChannelNotificationEvent {
   createdAt?: string;
 }
 
+export interface ServerDeletedEvent {
+  serverId: string;
+  serverName?: string;
+}
+
+export interface ServerMemberProfileUpdatedEvent {
+  serverId: string;
+  userId: string;
+  avatarUrl?: string | null;
+  coverUrl?: string | null;
+  updatedAt?: string;
+}
+
+export interface UserProfileStyleUpdatedEvent {
+  userId: string;
+  avatarUrl?: string | null;
+  coverUrl?: string | null;
+  displayNameFontId?: string;
+  displayNameEffectId?: string;
+  displayNamePrimaryHex?: string;
+  displayNameAccentHex?: string;
+  updatedAt?: string;
+}
+
+export interface BoostEntitlementUpdatedEvent {
+  userId: string;
+  tier?: "basic" | "boost" | null;
+  active?: boolean;
+  expiresAt?: string | null;
+  limits?: any;
+}
+
+export interface JoinApplicationUpdatedEvent {
+  serverId: string;
+  userId: string;
+  status: "accepted" | "rejected" | "withdrawn";
+}
+
 interface UseChannelMessagesOptions {
   token: string | null;
 }
@@ -51,6 +89,13 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
   const [newMessageChannel, setNewMessageChannel] = useState<ChannelNewMessageEvent | null>(null);
   const [reactionUpdateChannel, setReactionUpdateChannel] = useState<ChannelReactionUpdateEvent | null>(null);
   const [channelNotification, setChannelNotification] = useState<ChannelNotificationEvent | null>(null);
+  const [serverDeleted, setServerDeleted] = useState<ServerDeletedEvent | null>(null);
+  const [serverMemberProfileUpdated, setServerMemberProfileUpdated] =
+    useState<ServerMemberProfileUpdatedEvent | null>(null);
+  const [userProfileStyleUpdated, setUserProfileStyleUpdated] =
+    useState<UserProfileStyleUpdatedEvent | null>(null);
+  const [boostEntitlementUpdated, setBoostEntitlementUpdated] =
+    useState<BoostEntitlementUpdatedEvent | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -83,6 +128,60 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
       if (data) setChannelNotification(data);
     });
 
+    socket.on("server-deleted", (data: ServerDeletedEvent) => {
+      if (data?.serverId) setServerDeleted({ serverId: data.serverId, serverName: data.serverName });
+    });
+
+    socket.on("server-member-profile-updated", (data: ServerMemberProfileUpdatedEvent) => {
+      if (!data?.serverId || !data?.userId) return;
+      setServerMemberProfileUpdated(data);
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-server-member-profile-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
+      setTimeout(() => setServerMemberProfileUpdated(null), 500);
+    });
+
+    socket.on("user-profile-style-updated", (data: UserProfileStyleUpdatedEvent) => {
+      if (!data?.userId) return;
+      setUserProfileStyleUpdated(data);
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-user-profile-style-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
+      setTimeout(() => setUserProfileStyleUpdated(null), 500);
+    });
+
+    socket.on("boost-entitlement-updated", (data: BoostEntitlementUpdatedEvent) => {
+      if (!data?.userId) return;
+      setBoostEntitlementUpdated(data);
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-boost-entitlement-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
+      setTimeout(() => setBoostEntitlementUpdated(null), 500);
+    });
+
+    socket.on("join-application-updated", (data: JoinApplicationUpdatedEvent) => {
+      if (!data?.serverId || !data?.userId) return;
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-join-application-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
@@ -103,15 +202,21 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
 
   const clearNewMessageChannel = useCallback(() => setNewMessageChannel(null), []);
   const clearChannelNotification = useCallback(() => setChannelNotification(null), []);
+  const clearServerDeleted = useCallback(() => setServerDeleted(null), []);
 
   return {
     isConnected,
     newMessageChannel,
     reactionUpdateChannel,
     channelNotification,
+    serverDeleted,
+    serverMemberProfileUpdated,
+    userProfileStyleUpdated,
+    boostEntitlementUpdated,
     joinChannel,
     leaveChannel,
     clearNewMessageChannel,
     clearChannelNotification,
+    clearServerDeleted,
   };
 }
