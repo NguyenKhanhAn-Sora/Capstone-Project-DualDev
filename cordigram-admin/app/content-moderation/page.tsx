@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getApiBaseUrl } from "@/lib/api";
 import { openAdminProfilePreview } from "@/lib/admin-profile-preview";
@@ -537,7 +537,7 @@ function CustomSelect(props: {
   );
 }
 
-export default function ContentModerationPage() {
+function ContentModerationPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const listEndRef = useRef<HTMLDivElement | null>(null);
@@ -2279,5 +2279,13 @@ export default function ContentModerationPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function ContentModerationPage() {
+  return (
+    <Suspense fallback={null}>
+      <ContentModerationPageClient />
+    </Suspense>
   );
 }
