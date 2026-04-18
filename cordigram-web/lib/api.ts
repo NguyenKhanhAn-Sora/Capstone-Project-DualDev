@@ -13,17 +13,17 @@ interface FetchOptions extends RequestInit {
   path: string;
 }
 
-const DEFAULT_BASE_URL = "https://cordigram-api.onrender.com";
+const DEFAULT_BASE_URL = "http://localhost:9999";
 
 function normalizeApiBaseUrl(raw: string | undefined | null): string {
   const s = String(raw ?? "").trim();
   if (!s) return DEFAULT_BASE_URL;
   const trimmed = s.replace(/\/$/, "");
   // Guard against malformed ":9999" or "http://:9999"
-  if (/^:\d+/.test(trimmed)) return `https://cordigram-api.onrender.com`;
+  if (/^:\d+/.test(trimmed)) return `http://localhost:9999`;
   if (/^https?:\/\/:\d+/.test(trimmed)) {
     const port = trimmed.match(/^https?:\/\/:(\d+)/)?.[1];
-    return `https://cordigram-api.onrender.com`;
+    return `http://localhost:9999`;
   }
   return trimmed;
 }

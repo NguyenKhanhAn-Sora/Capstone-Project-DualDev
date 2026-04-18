@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import io, { Socket } from "socket.io-client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "https://cordigram-api.onrender.com";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "http://localhost:9999";
 
 export interface ChannelMessagePayload {
   _id: string;

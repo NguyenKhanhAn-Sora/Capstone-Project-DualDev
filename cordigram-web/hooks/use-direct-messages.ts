@@ -120,7 +120,7 @@ export const useDirectMessages = ({
     if (!userId || !token) return;
 
     const socket = io(
-      `${process.env.NEXT_PUBLIC_API_BASE || "https://cordigram-api.onrender.com"}/direct-messages`,
+      `${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:9999"}/direct-messages`,
       {
         auth: {
           token,

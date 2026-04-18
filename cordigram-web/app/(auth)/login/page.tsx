@@ -217,8 +217,9 @@ export default function LoginPage() {
   }, [overlayOpen]);
 
   const handleGoogleLogin = () => {
+    let deviceId: string | null = null;
     if (typeof document !== "undefined") {
-      const deviceId =
+      deviceId =
         window.localStorage.getItem("cordigramDeviceId") ??
         ("randomUUID" in crypto
           ? crypto.randomUUID()
@@ -226,7 +227,11 @@ export default function LoginPage() {
       window.localStorage.setItem("cordigramDeviceId", deviceId);
       document.cookie = `device_id=${deviceId}; path=/; max-age=31536000; samesite=lax`;
     }
-    window.location.href = `${getApiBaseUrl()}/auth/google`;
+    const url = new URL(`${getApiBaseUrl()}/auth/google`);
+    if (deviceId) {
+      url.searchParams.set("deviceId", deviceId);
+    }
+    window.location.href = url.toString();
   };
 
   const handleVerifyTwoFactor = async (event?: FormEvent<HTMLFormElement>) => {
@@ -464,13 +469,19 @@ export default function LoginPage() {
         return;
       }
 
-      setStoredAccessToken(result.accessToken);
+      if (!("accessToken" in result)) {
+        setModalError("Login failed. Please try again.");
+        return;
+      }
+      const accessToken = result.accessToken;
 
-      await syncThemeFromServer(result.accessToken);
+      setStoredAccessToken(accessToken);
+
+      await syncThemeFromServer(accessToken);
 
       try {
         const profile = await fetchCurrentProfile({
-          token: result.accessToken,
+          token: accessToken,
         });
         upsertRecentAccount({
           email: trimmedEmail,
@@ -483,7 +494,7 @@ export default function LoginPage() {
         upsertRecentAccount({ email: trimmedEmail, lastUsed: Date.now() });
       }
 
-      routeAfterAuth(result.accessToken);
+      routeAfterAuth(accessToken);
     } catch (err) {
       const apiErr = err as ApiError | undefined;
       setModalError(apiErr?.message || "Login failed. Please try again.");
@@ -556,15 +567,21 @@ export default function LoginPage() {
         return;
       }
 
-      if (typeof window !== "undefined") {
-        setStoredAccessToken(result.accessToken);
+      if (!("accessToken" in result)) {
+        setError("Login failed. Please try again.");
+        return;
+      }
+      const accessToken = result.accessToken;
 
-        await syncThemeFromServer(result.accessToken);
+      if (typeof window !== "undefined") {
+        setStoredAccessToken(accessToken);
+
+        await syncThemeFromServer(accessToken);
       }
 
       try {
         const profile = await fetchCurrentProfile({
-          token: result.accessToken,
+          token: accessToken,
         });
         upsertRecentAccount({
           email: trimmedEmail,
@@ -580,7 +597,7 @@ export default function LoginPage() {
         });
       }
 
-      if (getAccessTokenStatus(result.accessToken) === "banned") {
+      if (getAccessTokenStatus(accessToken) === "banned") {
         router.replace("/banned");
       } else {
         router.push("/");

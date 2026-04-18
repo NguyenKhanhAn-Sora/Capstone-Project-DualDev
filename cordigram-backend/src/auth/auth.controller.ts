@@ -79,6 +79,23 @@ class MobileGoogleGuard extends AuthGuard('google') {
   }
 }
 
+/**
+ * Guard used by GET /auth/google (web).
+ * Encodes web deviceId into OAuth state so callback can persist the same
+ * login device and avoid immediate "Device session revoked" on next API call.
+ * State format: "web:<urlencoded-deviceId>"
+ */
+@Injectable()
+class WebGoogleGuard extends AuthGuard('google') {
+  override getAuthenticateOptions(context: ExecutionContext) {
+    const req = context
+      .switchToHttp()
+      .getRequest<{ query: Record<string, string> }>();
+    const deviceId = encodeURIComponent(req.query?.deviceId ?? '');
+    return { state: `web:${deviceId}` };
+  }
+}
+
 @Controller('auth')
 export class AuthController {
   private static readonly USER_REFRESH_COOKIE = 'refresh_token';
@@ -352,7 +369,7 @@ export class AuthController {
   mobileGoogleAuth() {}
 
   @Get('google')
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(WebGoogleGuard)
   async googleAuth() {}
 
   @Get('google/callback')
@@ -364,13 +381,15 @@ export class AuthController {
       '';
 
     // Decode platform + deviceId from the OAuth state param.
-    // Format: "mobile:<urlencoded-deviceId>" for mobile, absent or other for web.
+    // Format: "mobile:<urlencoded-deviceId>" or "web:<urlencoded-deviceId>".
     const rawState = (req.query as Record<string, string>)?.state;
     let isMobile = false;
     let stateDeviceId = '';
     if (rawState?.startsWith('mobile:')) {
       isMobile = true;
       stateDeviceId = decodeURIComponent(rawState.slice(7));
+    } else if (rawState?.startsWith('web:')) {
+      stateDeviceId = decodeURIComponent(rawState.slice(4));
     }
 
     const deviceId =
