@@ -35,6 +35,40 @@ export class UpdateProfileDto {
   @MaxLength(4096)
   coverUrl?: string;
 
+  // =========================
+  // Boost profile customization
+  // =========================
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^#?[0-9a-fA-F]{6}$/)
+  profileThemePrimaryHex?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^#?[0-9a-fA-F]{6}$/)
+  profileThemeAccentHex?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  displayNameFontId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  displayNameEffectId?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^#?[0-9a-fA-F]{6}$/)
+  displayNamePrimaryHex?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^#?[0-9a-fA-F]{6}$/)
+  displayNameAccentHex?: string;
+
   @IsOptional()
   @IsString()
   location?: string;

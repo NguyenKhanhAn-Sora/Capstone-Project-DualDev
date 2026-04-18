@@ -2,19 +2,28 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef, memo, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import styles from "./messages.module.css";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { useLanguage } from "@/component/language-provider";
+import { useLanguage, localeTagForLanguage } from "@/component/language-provider";
 import {
   useDirectMessages,
   type DirectMessage,
 } from "@/hooks/use-direct-messages";
+import {
+  isCallAnswerEvent,
+  isCallRejectedEvent,
+  isIceCandidateEvent,
+  isIncomingRingEvent,
+} from "@/lib/call-event-guards";
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
 import { translateCategoryName, translateChannelName } from "@/lib/system-names";
+import { DEFAULT_FREE_MAX_UPLOAD_BYTES } from "@/lib/upload-limits";
+import { shouldPlayChannelMessageNotificationSound } from "@/lib/channel-notification-sound";
+import { playMessageNotificationSound } from "@/lib/message-notification-sound";
 import {
   sendDirectMessage,
   getDirectMessages,
@@ -38,7 +47,13 @@ import {
   deleteDirectMessage,
   markDmConversationRead,
   fetchUserSettings,
+  fetchBoostStatus,
+  type BoostStatusResponse,
+  fetchProfileDetail,
+  type ProfileDetailResponse,
   type UserSettingsResponse,
+  createStripeCheckoutSession,
+  type CreateStripeCheckoutSessionRequest,
 } from "@/lib/api";
 import { getLiveKitToken, getDMRoomName, getVoiceChannelParticipants } from "@/lib/livekit-api";
 import IncomingCallPopup from "@/components/IncomingCallPopup";
@@ -68,7 +83,6 @@ import CreateEventWizard from "@/components/ServerEvents/CreateEventWizard";
 import EventImageEditor from "@/components/ServerEvents/EventImageEditor";
 import ShareEventPopup from "@/components/ServerEvents/ShareEventPopup";
 import EventCreatedDetailPopup from "@/components/ServerEvents/EventCreatedDetailPopup";
-import InviteToVoiceChannelPopup from "@/components/InviteToVoiceChannelPopup/InviteToVoiceChannelPopup";
 import InviteToServerPopup from "@/components/InviteToServerPopup/InviteToServerPopup";
 import MessagesInbox from "@/components/MessagesInbox/MessagesInbox";
 import ServerContextMenu from "@/components/ServerContextMenu/ServerContextMenu";
@@ -103,7 +117,17 @@ import ChannelUserProfileRoot, {
   type ChannelProfileAnchorContext,
 } from "@/components/ChannelUserProfile/ChannelUserProfileRoot";
 import MessagesUserSettingsModal from "@/components/MessagesUserSettings/MessagesUserSettingsModal";
+import { applyAccentColor, ensureReadableForeground } from "@/component/theme-provider";
+import {
+  applyMessagesRootChromeFromStorage,
+  migrateMessagesChromeStorageOnce,
+} from "@/lib/messages-appearance-chrome";
+import {
+  getMessagesShellTheme,
+  type MessagesShellTheme,
+} from "@/lib/messages-shell-theme";
 import { getDmSidebarPeersMode } from "@/lib/messages-dm-sidebar-prefs";
+import UserProfilePopup from "@/components/UserProfilePopup/UserProfilePopup";
 
 // Dynamic import CallRoom / VoiceChannelCall to avoid SSR issues with LiveKit
 const CallRoom = dynamic(() => import("@/components/CallRoom"), { ssr: false });
@@ -112,6 +136,55 @@ const VoiceChannelCall = dynamic<VoiceChannelCallProps>(
   { ssr: false },
 );
 const UNCATEGORIZED_CATEGORY_ID = "__uncategorized__";
+
+function getDisplayNameTextStyle(
+  source?: {
+    displayNameFontId?: string | null;
+    displayNameEffectId?: string | null;
+    displayNamePrimaryHex?: string | null;
+    displayNameAccentHex?: string | null;
+  },
+  messagesShellTheme: MessagesShellTheme = "dark",
+): React.CSSProperties | undefined {
+  if (!source) return undefined;
+  const defaultPrimary = messagesShellTheme === "light" ? "#0F1629" : "#F2F3F5";
+  let primary = /^#[0-9a-f]{6}$/i.test(String(source.displayNamePrimaryHex || ""))
+    ? String(source.displayNamePrimaryHex)
+    : defaultPrimary;
+  let accent = /^#[0-9a-f]{6}$/i.test(String(source.displayNameAccentHex || ""))
+    ? String(source.displayNameAccentHex)
+    : "#5865F2";
+  if (messagesShellTheme === "light") {
+    primary = ensureReadableForeground(primary, { maxLuminance: 0.58 });
+    accent = ensureReadableForeground(accent, { maxLuminance: 0.58 });
+  }
+  const fontFamily =
+    source.displayNameFontId === "mono"
+      ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
+      : source.displayNameFontId === "rounded"
+        ? 'ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif'
+        : undefined;
+  if (source.displayNameEffectId === "gradient") {
+    return {
+      backgroundImage: `linear-gradient(0deg, ${primary}, ${accent})`,
+      WebkitBackgroundClip: "text",
+      backgroundClip: "text",
+      color: "transparent",
+      fontFamily,
+    };
+  }
+  if (source.displayNameEffectId === "neon") {
+    return {
+      color: primary,
+      textShadow: `0 0 10px ${accent}, 0 0 18px ${accent}`,
+      fontFamily,
+    };
+  }
+  return {
+    color: primary,
+    fontFamily,
+  };
+}
 
 interface BackendServer extends serversApi.Server {
   infoChannels?: serversApi.Channel[];
@@ -160,6 +233,10 @@ interface UIMessage {
   } | null;
   /** Biệt danh trong máy chủ (nếu có) — mở card hồ sơ từ kênh. */
   serverNickname?: string;
+  senderDisplayNameFontId?: string | null;
+  senderDisplayNameEffectId?: string | null;
+  senderDisplayNamePrimaryHex?: string | null;
+  senderDisplayNameAccentHex?: string | null;
 }
 
 // GiphyMessage component for rendering GIF/Sticker
@@ -449,6 +526,8 @@ function areMessagesEqual(
     renderMessageContent: (message: UIMessage) => React.ReactNode;
     onVisible?: (messageId: string, isVisible: boolean) => void;
     senderColor?: string;
+    senderNameStyle?: React.CSSProperties;
+    messagesShellTheme?: MessagesShellTheme;
     onChannelUserProfileOpen?: (
       message: UIMessage,
       anchorRect: DOMRect,
@@ -459,13 +538,17 @@ function areMessagesEqual(
     renderMessageContent: (message: UIMessage) => React.ReactNode;
     onVisible?: (messageId: string, isVisible: boolean) => void;
     senderColor?: string;
+    senderNameStyle?: React.CSSProperties;
+    messagesShellTheme?: MessagesShellTheme;
     onChannelUserProfileOpen?: (
       message: UIMessage,
       anchorRect: DOMRect,
     ) => void;
   },
 ) {
+  if (prevProps.messagesShellTheme !== nextProps.messagesShellTheme) return false;
   if (prevProps.senderColor !== nextProps.senderColor) return false;
+  if (prevProps.senderNameStyle !== nextProps.senderNameStyle) return false;
   if (prevProps.onChannelUserProfileOpen !== nextProps.onChannelUserProfileOpen)
     return false;
   if (prevProps.message.id !== nextProps.message.id) return false;
@@ -517,6 +600,8 @@ const MessageItem = memo(
     scrollContainerRef,
     dmPartnerDisplayName,
     senderColor,
+    senderNameStyle,
+    messagesShellTheme = "dark",
     onChannelUserProfileOpen,
   }: {
     message: UIMessage;
@@ -531,12 +616,20 @@ const MessageItem = memo(
     scrollContainerRef?: React.RefObject<HTMLElement | null>;
     dmPartnerDisplayName?: string;
     senderColor?: string; // Màu hiển thị từ role cao nhất
+    senderNameStyle?: React.CSSProperties;
+    messagesShellTheme?: MessagesShellTheme;
     onChannelUserProfileOpen?: (
       message: UIMessage,
       anchorRect: DOMRect,
     ) => void;
   }) => {
     const { t } = useLanguage();
+    const safeSenderColor = useMemo(() => {
+      const c = senderColor?.trim();
+      if (!c) return undefined;
+      if (messagesShellTheme !== "light") return senderColor;
+      return ensureReadableForeground(c, { maxLuminance: 0.58 });
+    }, [senderColor, messagesShellTheme]);
     const messageRef = useRef<HTMLDivElement>(null);
     const [isHovered, setIsHovered] = useState(false);
     const [showQuickReactions, setShowQuickReactions] = useState(false);
@@ -680,7 +773,13 @@ const MessageItem = memo(
           <div className={styles.messageHeader}>
             <span 
               className={styles.messageSenderName}
-              style={senderColor ? { color: senderColor } : undefined}
+              style={
+                senderNameStyle
+                  ? senderNameStyle
+                  : safeSenderColor
+                    ? { color: safeSenderColor }
+                    : undefined
+              }
             >
               {message.senderDisplayName ||
                 message.senderName ||
@@ -733,13 +832,13 @@ const MessageItem = memo(
                 </div>
                 <div className={styles.replyContextText}>
                   {message.replyToMessage.messageType === "gif"
-                    ? "GIF"
+                    ? t("chat.composer.replyGif")
                     : message.replyToMessage.messageType === "sticker"
-                      ? "Sticker"
+                      ? t("chat.composer.replySticker")
                       : message.replyToMessage.messageType === "voice"
-                        ? "Tin nhắn thoại"
+                        ? t("chat.composer.replyVoice")
                         : message.replyToMessage.messageType === "welcome"
-                          ? (message.replyToMessage.text || "Lời chào mừng")
+                          ? (message.replyToMessage.text || t("chat.composer.replyWelcomeFallback"))
                         : message.replyToMessage.text}
                 </div>
               </div>
@@ -1052,6 +1151,7 @@ function mapReplyToMessage(raw: any): UIMessage["replyToMessage"] {
 
 export default function MessagesPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { t, language } = useLanguage();
 
   const isAdminView = searchParams.get("from") === "admin";
@@ -1065,6 +1165,19 @@ export default function MessagesPage() {
 
   // Skip login redirect entirely for admin view
   const canRender = useRequireAuth({ skip: isAdminView });
+
+  const [messagesShellTheme, setMessagesShellTheme] = useState<MessagesShellTheme>("dark");
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    setMessagesShellTheme(getMessagesShellTheme());
+  }, []);
+
+  useEffect(() => {
+    const fn = () => setMessagesShellTheme(getMessagesShellTheme());
+    window.addEventListener("cordigram-messages-shell-theme", fn);
+    return () => window.removeEventListener("cordigram-messages-shell-theme", fn);
+  }, []);
 
   const [servers, setServers] = useState<BackendServer[]>([]);
   const [selectedServer, setSelectedServer] = useState<string | null>(null);
@@ -1094,6 +1207,10 @@ export default function MessagesPage() {
   const [serverInteractionSettings, setServerInteractionSettings] = useState<serversApi.ServerInteractionSettings | null>(null);
   // Map userId -> displayColor (màu role cao nhất) cho server hiện tại
   const [memberRoleColors, setMemberRoleColors] = useState<Record<string, string>>({});
+  /** Thành viên đủ username/displayName (getServerMembersWithRoles) cho gợi ý `from:` trong tìm tin nhắn server */
+  const [membersForMessageSearch, setMembersForMessageSearch] = useState<
+    Array<{ userId: string; displayName?: string; username?: string; avatarUrl?: string }>
+  >([]);
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [messageText, setMessageText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -1134,10 +1251,13 @@ export default function MessagesPage() {
     serverName: string;
     initialSection?: ServerSettingsSection;
   } | null>(null);
+  const serverSettingsTargetRef = useRef(serverSettingsTarget);
+  serverSettingsTargetRef.current = serverSettingsTarget;
   const [communityEnabled, setCommunityEnabled] = useState(false);
-  const [hideMutedChannels, setHideMutedChannels] = useState(false);
   const [showAllChannels, setShowAllChannels] = useState(false);
   const [serverNotificationLevel, setServerNotificationLevel] = useState<"all" | "mentions" | "none">("all");
+  /** Tên vai trò (không phải default) để áp dụng «Bỏ vai trò @mention» khi phát âm thanh tin nhắn kênh. */
+  const [notificationRoleNames, setNotificationRoleNames] = useState<string[]>([]);
   const [currentServerPermissions, setCurrentServerPermissions] =
     useState<serversApi.CurrentUserServerPermissions | null>(null);
   const [sidebarPrefsTick, setSidebarPrefsTick] = useState(0);
@@ -1161,6 +1281,8 @@ export default function MessagesPage() {
   const [showShareEventPopup, setShowShareEventPopup] = useState(false);
   const [showMessagesInbox, setShowMessagesInbox] = useState(false);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
+  /** true = popup tìm tin từ header DM: chỉ nội dung, không @/#/!/*. */
+  const [messageSearchDmConversationOnly, setMessageSearchDmConversationOnly] = useState(false);
   /** Có lời mời hoặc nội dung mới trong Hộp thư (Dành cho Bạn) → hiển thị chấm đỏ trên nút hộp thư. */
   const [hasInboxNotification, setHasInboxNotification] = useState(false);
   const [createdEventDetail, setCreatedEventDetail] = useState<serversApi.ServerEvent | null>(null);
@@ -1169,17 +1291,47 @@ export default function MessagesPage() {
   const [serverEventsTotalCount, setServerEventsTotalCount] = useState(0);
   const [showJoinApplicationsView, setShowJoinApplicationsView] = useState(false);
   const [showExploreView, setShowExploreView] = useState(false);
+  const [showBoostUpgradeView, setShowBoostUpgradeView] = useState(false);
   const [joinApplicationsRefreshTick, setJoinApplicationsRefreshTick] = useState(0);
   const [joinAppPendingCount, setJoinAppPendingCount] = useState(0);
   const [selectedEventDetail, setSelectedEventDetail] = useState<serversApi.ServerEvent | null>(null);
   const [eventDetailInterested, setEventDetailInterested] = useState(false);
 
+  const [boostModalOpen, setBoostModalOpen] = useState(false);
+  const [boostModalStep, setBoostModalStep] = useState<"plan" | "billing">("plan");
+  const [boostMode, setBoostMode] = useState<"subscribe" | "gift">("subscribe");
+  const [boostTier, setBoostTier] = useState<"basic" | "boost">("boost");
+  const [boostBillingCycle, setBoostBillingCycle] = useState<"monthly" | "yearly">("monthly");
+  const [boostRecipientUserId, setBoostRecipientUserId] = useState<string | null>(null);
+  const [boostUserQuery, setBoostUserQuery] = useState("");
+  const [boostUsers, setBoostUsers] = useState<any[]>([]);
+  const [boostActivePeriodWarnOpen, setBoostActivePeriodWarnOpen] =
+    useState(false);
+  const [boostTierSwitchWarnOpen, setBoostTierSwitchWarnOpen] =
+    useState(false);
+  const [boostCheckoutBusy, setBoostCheckoutBusy] = useState(false);
+
   useEffect(() => {
     if (selectedEventDetail) setEventDetailInterested(false);
   }, [selectedEventDetail?._id]);
+
+  useEffect(() => {
+    if (!boostModalOpen) return;
+    if (boostMode !== "gift") return;
+    getAvailableUsers()
+      .then((res) => setBoostUsers(Array.isArray(res) ? res : []))
+      .catch(() => setBoostUsers([]));
+  }, [boostModalOpen, boostMode]);
+
+  useEffect(() => {
+    if (!boostModalOpen) {
+      setBoostActivePeriodWarnOpen(false);
+      setBoostTierSwitchWarnOpen(false);
+      setBoostCheckoutBusy(false);
+    }
+  }, [boostModalOpen]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const processedCallsRef = useRef<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [friends, setFriends] = useState<serversApi.Friend[]>([]);
   const [selectedDirectMessageFriend, setSelectedDirectMessageFriend] =
@@ -1206,13 +1358,8 @@ export default function MessagesPage() {
   const [emailOtpError, setEmailOtpError] = useState<string | null>(null);
   const [emailOtpCooldown, setEmailOtpCooldown] = useState(0);
   const [dmProfileSidebarOpen, setDmProfileSidebarOpen] = useState(true);
-  const [voiceInviteDismissed, setVoiceInviteDismissed] = useState<Set<string>>(new Set());
-  const [inviteToVoiceTarget, setInviteToVoiceTarget] = useState<{
-    serverId: string;
-    serverName: string;
-    channelId: string;
-    channelName: string;
-  } | null>(null);
+  const [dmProfilePopupUserId, setDmProfilePopupUserId] = useState<string | null>(null);
+  const [dmProfileDetail, setDmProfileDetail] = useState<ProfileDetailResponse | null>(null);
   const [inviteToServerTarget, setInviteToServerTarget] = useState<{
     serverId: string;
     serverName: string;
@@ -1236,12 +1383,117 @@ export default function MessagesPage() {
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [chatUserSettings, setChatUserSettings] =
     useState<UserSettingsResponse | null>(null);
+  const [maxUploadBytes, setMaxUploadBytes] = useState<number>(
+    DEFAULT_FREE_MAX_UPLOAD_BYTES,
+  );
+  const [boostStatus, setBoostStatus] = useState<BoostStatusResponse | null>(null);
+
+  const submitMessagesBoostCheckout = useCallback(
+    async (opts?: { skipTierChangeConfirm?: boolean }) => {
+      if (
+        !opts?.skipTierChangeConfirm &&
+        boostMode === "subscribe" &&
+        boostStatus?.active &&
+        boostStatus.tier &&
+        boostTier !== boostStatus.tier
+      ) {
+        setBoostTierSwitchWarnOpen(true);
+        return;
+      }
+      if (!token) {
+        alert("Bạn cần đăng nhập để thanh toán.");
+        return;
+      }
+      try {
+        setBoostCheckoutBusy(true);
+        const actionType =
+          boostMode === "gift" ? "boost_gift" : "boost_subscribe";
+        const payload: CreateStripeCheckoutSessionRequest = {
+          actionType,
+          boostTier,
+          billingCycle: boostBillingCycle,
+          currency: "vnd",
+        };
+        if (boostMode === "gift" && boostRecipientUserId) {
+          payload.recipientUserId = boostRecipientUserId;
+        }
+        const session = await createStripeCheckoutSession({
+          token,
+          payload,
+        });
+        if (session?.url) {
+          window.location.href = session.url;
+          return;
+        }
+        alert("Không thể mở trang thanh toán.");
+      } catch (e: unknown) {
+        const err = e as { message?: string };
+        alert(err?.message || "Thanh toán thất bại.");
+      } finally {
+        setBoostCheckoutBusy(false);
+      }
+    },
+    [
+      token,
+      boostMode,
+      boostTier,
+      boostBillingCycle,
+      boostRecipientUserId,
+      boostStatus,
+    ],
+  );
+
+  const goToBoostBillingStep = useCallback(() => {
+    if (
+      boostMode === "subscribe" &&
+      boostStatus?.active &&
+      boostStatus.expiresAt
+    ) {
+      setBoostActivePeriodWarnOpen(true);
+      return;
+    }
+    setBoostModalStep("billing");
+  }, [boostMode, boostStatus]);
+
   const [dmSidebarPeersModeState, setDmSidebarPeersModeState] = useState<
     "all" | "online"
   >(() =>
     typeof window !== "undefined" ? getDmSidebarPeersMode() : "all",
   );
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
+  const resolveMessageSenderStyle = useCallback(
+    (message: UIMessage): React.CSSProperties | undefined => {
+      const directFriend =
+        selectedDirectMessageFriend &&
+        String(selectedDirectMessageFriend._id) === String(message.senderId)
+          ? selectedDirectMessageFriend
+          : null;
+      const directProfile =
+        dmProfileDetail &&
+        String(dmProfileDetail.userId) === String(message.senderId)
+          ? dmProfileDetail
+          : null;
+      const sidebarFriend = friends.find((f) => String(f._id) === String(message.senderId));
+      const source =
+        (message.isFromCurrentUser ? currentUserProfile : null) ||
+        directProfile ||
+        directFriend ||
+        sidebarFriend || {
+          displayNameFontId: message.senderDisplayNameFontId,
+          displayNameEffectId: message.senderDisplayNameEffectId,
+          displayNamePrimaryHex: message.senderDisplayNamePrimaryHex,
+          displayNameAccentHex: message.senderDisplayNameAccentHex,
+        };
+      return getDisplayNameTextStyle(source, messagesShellTheme);
+    },
+    [
+      currentUserProfile,
+      dmProfileDetail,
+      selectedDirectMessageFriend,
+      friends,
+      messagesShellTheme,
+    ],
+  );
   const [passkeyRequired, setPasskeyRequired] = useState(false);
   const [passkeyChecking, setPasskeyChecking] = useState(false);
   const [deviceId, setDeviceId] = useState("");
@@ -1325,6 +1577,16 @@ export default function MessagesPage() {
     roomName?: string;
   } | null>(null);
 
+  /** Refs for call socket effect — avoid wrong incoming UI / stale deps (glare, self) */
+  const outgoingCallRef = useRef(outgoingCall);
+  const currentUserIdRef = useRef(currentUserId);
+  useEffect(() => {
+    outgoingCallRef.current = outgoingCall;
+  }, [outgoingCall]);
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
   // Typing indicator
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isTypingRef = useRef(false); // ✅ Track typing state
@@ -1337,6 +1599,8 @@ export default function MessagesPage() {
     messageSent,
     sendMessage: emitSendMessage,
     onlineUsers,
+    presenceByUserId,
+    subscribePresence,
     userTyping,
     notifyTyping,
     messagesRead,
@@ -1356,6 +1620,14 @@ export default function MessagesPage() {
     token,
   });
 
+  // DM presence subscriptions (only peers we render in DM list)
+  useEffect(() => {
+    if (!selectedServer && typeof subscribePresence === "function") {
+      const ids = Array.isArray(friends) ? friends.map((f) => f._id).filter(Boolean) : [];
+      subscribePresence(ids);
+    }
+  }, [friends, selectedServer, subscribePresence]);
+
   const prevChannelRef = useRef<string | null>(null);
   /** Luôn là kênh đang chọn (tránh closure cũ sau await trong loadMessages). */
   const selectedChannelRef = useRef<string | null>(null);
@@ -1363,15 +1635,37 @@ export default function MessagesPage() {
     selectedChannelRef.current = selectedChannel;
   }, [selectedChannel]);
 
+  // DM sidebar: fetch full main profile (member since + mutual servers).
+  useEffect(() => {
+    let cancelled = false;
+    const uid = selectedDirectMessageFriend?._id;
+    if (!uid || !token) {
+      setDmProfileDetail(null);
+      return;
+    }
+    fetchProfileDetail({ token, id: uid })
+      .then((d) => {
+        if (!cancelled) setDmProfileDetail(d);
+      })
+      .catch(() => {
+        if (!cancelled) setDmProfileDetail(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDirectMessageFriend?._id, token]);
+
   const {
     isConnected: isChannelSocketConnected,
     newMessageChannel,
     reactionUpdateChannel,
     channelNotification,
+    serverDeleted,
     joinChannel,
     leaveChannel,
     clearNewMessageChannel,
     clearChannelNotification,
+    clearServerDeleted,
   } = useChannelMessages({ token });
 
   const inboxRefetchTimerRef = useRef<number | null>(null);
@@ -1397,6 +1691,51 @@ export default function MessagesPage() {
     scheduleInboxDotRefresh();
     clearChannelNotification();
   }, [channelNotification, clearChannelNotification, scheduleInboxDotRefresh]);
+
+  // Realtime: server removed — drop from sidebar, clear open server/channel/voice, inbox + toast.
+  useEffect(() => {
+    if (!serverDeleted) return;
+    const sid = serverDeleted.serverId;
+    const label =
+      (serverDeleted.serverName && String(serverDeleted.serverName).trim()) ||
+      serversRef.current.find((s) => s._id === sid)?.name ||
+      t("chat.popups.inbox.serverFallback");
+
+    if (selectedServerRef.current === sid && selectedChannelRef.current) {
+      leaveChannel(selectedChannelRef.current);
+    }
+
+    setServers((prev) => prev.filter((s) => s._id !== sid));
+
+    if (selectedServerRef.current === sid) {
+      setSelectedServer(null);
+      setSelectedChannel(null);
+      setInfoChannels([]);
+      setTextChannels([]);
+      setVoiceChannels([]);
+      setAllChannels([]);
+      setServerCategories([]);
+      setMessages([]);
+      setJoinedVoiceChannelId(null);
+      setVoiceChannelCallToken(null);
+      setVoiceChannelCallServerUrl("");
+      setVoiceChannelCallError(null);
+      setVoiceChannelParticipants({});
+      setServerInteractionSettings(null);
+      setMemberRoleColors({});
+    }
+
+    if (serverSettingsTargetRef.current?.serverId === sid) {
+      setShowServerSettingsPanel(false);
+      setServerSettingsTarget(null);
+    }
+
+    setHasInboxNotification(true);
+    scheduleInboxDotRefresh();
+    setToastMessage(t("chat.popups.inbox.serverDeletedToast", { server: label }));
+    window.setTimeout(() => setToastMessage(null), 4000);
+    clearServerDeleted();
+  }, [serverDeleted, leaveChannel, scheduleInboxDotRefresh, clearServerDeleted, t]);
 
   // Fallback: cover non-socket cases (server_invite / for-you items) without requiring reload.
   useEffect(() => {
@@ -1471,7 +1810,10 @@ export default function MessagesPage() {
   // ✅ New message in channel from WebSocket (thành viên khác gửi → hiện ngay không cần reload)
   useEffect(() => {
     if (!newMessageChannel?.message || !selectedChannel) return;
-    if (myServerAccessStatus?.chatViewBlocked) {
+    const skipBlockForApplyAccepted =
+      myServerAccessStatus?.accessMode === "apply" &&
+      myServerAccessStatus.status === "accepted";
+    if (myServerAccessStatus?.chatViewBlocked && !skipBlockForApplyAccepted) {
       clearNewMessageChannel();
       return;
     }
@@ -1480,7 +1822,30 @@ export default function MessagesPage() {
     if (channelId !== selectedChannel) return;
     const senderId = typeof msg.senderId === "string" ? msg.senderId : msg.senderId?._id;
     if (senderId === currentUserId) return;
+
     const srvId = selectedServerRef.current;
+    const rawMentions = (msg as any).mentions ?? [];
+    const mentionIds = Array.isArray(rawMentions)
+      ? rawMentions.map((m: any) => (typeof m === "string" ? m : m?._id ?? m)).filter(Boolean)
+      : [];
+    const chMeta = allChannels.find((c) => c._id === channelId);
+    const categoryId = chMeta?.categoryId ?? null;
+    if (
+      srvId &&
+      currentUserId &&
+      shouldPlayChannelMessageNotificationSound({
+        content: String((msg as any).content ?? ""),
+        mentionIds,
+        currentUserId,
+        currentUsername: currentUserProfile?.username,
+        prefs: sidebarPrefs.getServerPrefs(currentUserId, srvId),
+        channelId,
+        categoryId,
+        roleNames: notificationRoleNames,
+      })
+    ) {
+      playMessageNotificationSound();
+    }
     const senderNickname = srvId
       ? serversRef.current
           .find((s) => s._id === srvId)
@@ -1522,6 +1887,11 @@ export default function MessagesPage() {
     currentUserId,
     clearNewMessageChannel,
     myServerAccessStatus?.chatViewBlocked,
+    myServerAccessStatus?.accessMode,
+    myServerAccessStatus?.status,
+    allChannels,
+    notificationRoleNames,
+    currentUserProfile?.username,
   ]);
 
   // Cleanup typing timeout on unmount or friend change
@@ -1551,6 +1921,9 @@ export default function MessagesPage() {
           selectedDirectMessageFriend._id,
           token,
         );
+
+        // Drop any stale incoming UI (e.g. peer called you earlier and you never cleared)
+        setIncomingCall(null);
 
         // Show outgoing call popup
         setOutgoingCall({
@@ -1596,9 +1969,6 @@ export default function MessagesPage() {
 
     try {
 
-      // Mark this call as processed
-      processedCallsRef.current.add(incomingCall.from);
-
       // Get room name
       const { roomName } = await getDMRoomName(incomingCall.from, token);
 
@@ -1615,34 +1985,20 @@ export default function MessagesPage() {
 
       // Close popup
       setIncomingCall(null);
-
-      // Clear processed call after 10 seconds to allow new calls from same user
-      setTimeout(() => {
-        processedCallsRef.current.delete(incomingCall.from);
-      }, 10000);
     } catch (error) {
       console.error("❌ [ACCEPT] Failed to accept call:", error);
       setError("Không thể chấp nhận cuộc gọi");
-      // Remove from processed on error
-      processedCallsRef.current.delete(incomingCall.from);
     }
   }, [incomingCall, token, currentUserProfile, answerCall]);
 
-  // ✅ Reject incoming call
+  // ✅ Reject incoming call — clear UI + ringtone first, then notify caller
   const handleRejectCall = useCallback(() => {
     if (!incomingCall) return;
 
 
-    // Mark this call as processed
-    processedCallsRef.current.add(incomingCall.from);
-
-    rejectCall(incomingCall.from);
+    const peerId = incomingCall.from;
     setIncomingCall(null);
-
-    // Clear processed call after 5 seconds
-    setTimeout(() => {
-      processedCallsRef.current.delete(incomingCall.from);
-    }, 5000);
+    rejectCall(peerId);
   }, [incomingCall, rejectCall]);
 
   // ✅ Cancel outgoing call
@@ -1680,36 +2036,66 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!callEvent) return;
 
-    // Incoming call notification
-    if (callEvent.from && callEvent.callerInfo) {
-      // Create unique call ID
-      const callId = `${callEvent.from}-${callEvent.type}-${Date.now()}`;
+    // WebRTC ICE must not trigger incoming UI or "rejected" heuristics
+    if (isIceCandidateEvent(callEvent)) return;
 
-      // Check if this call was already processed (accepted/rejected)
-      if (processedCallsRef.current.has(callEvent.from)) {
+    // Incoming call notification (or repeat ring from same caller)
+    if (isIncomingRingEvent(callEvent) && callEvent.callerInfo) {
+      const ev = callEvent;
+
+      if (
+        currentUserIdRef.current &&
+        String(ev.from) === String(currentUserIdRef.current)
+      ) {
+        console.log("📞 [INCOMING] Skip: caller id is self (sanity check)");
         return;
       }
 
-      // Check if we already have an incoming call from this user
-      if (incomingCall && incomingCall.from === callEvent.from) {
+      const oc = outgoingCallRef.current;
+      if (
+        oc &&
+        oc.status === "calling" &&
+        String(oc.to) === String(ev.from)
+      ) {
+        console.log(
+          "📞 [INCOMING] Skip: already calling this peer — avoid incoming popup on caller side (glare / race)",
+        );
         return;
       }
 
-      setIncomingCall({
-        from: callEvent.from,
-        type: callEvent.type || "audio",
-        callerInfo: callEvent.callerInfo,
-        status: "incoming",
+      // You are now the callee — clear any stale outgoing (calling / no-answer / rejected UI)
+      setOutgoingCall(null);
+      setIncomingCall((prev) => {
+        if (prev && prev.from === ev.from) {
+          console.log(
+            "📞 [INCOMING] Refresh ring from same caller:",
+            ev.callerInfo!.displayName,
+          );
+        } else {
+          console.log(
+            "📞 [INCOMING] Received call from:",
+            ev.callerInfo!.displayName,
+          );
+        }
+        console.log("📞 [INCOMING-DEBUG] CallerInfo data:", ev.callerInfo);
+        return {
+          from: ev.from,
+          type: ev.type || "audio",
+          callerInfo: ev.callerInfo!,
+          status: "incoming" as const,
+        };
       });
       return;
     }
 
     // Call answered - open tab for caller
-    if (callEvent.sdpOffer && outgoingCall) {
+    if (isCallAnswerEvent(callEvent) && outgoingCall && callEvent.sdpOffer) {
+      console.log("📞 [ANSWER] Call was answered, opening call window...");
       openCallTab();
       return;
     }
-  }, [callEvent, outgoingCall, openCallTab, incomingCall]);
+    // Do NOT list incomingCall in deps — setIncomingCall updates it and would retrigger this effect forever.
+  }, [callEvent, outgoingCall, openCallTab]);
 
   // ✅ Handle call-ended event (when caller cancels while receiver has incoming popup)
   useEffect(() => {
@@ -1746,12 +2132,10 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!callEvent) return;
 
-    // Check if this is a call-rejected event
-    if (
-      callEvent.type === undefined &&
-      callEvent.sdpOffer === undefined &&
-      callEvent.callerInfo === undefined
-    ) {
+    if (isIceCandidateEvent(callEvent)) return;
+
+    if (isCallRejectedEvent(callEvent)) {
+      console.log("📞 [REJECTED] Call was rejected");
 
       // ✅ Use callback to avoid dependency on outgoingCall state
       setOutgoingCall((prev) => {
@@ -2028,7 +2412,13 @@ export default function MessagesPage() {
   }, []);
 
   const friendsForDmSidebar = useMemo(() => {
-    let list = friends;
+    // Apply realtime presence overrides when available
+    let list = friends.map((f) => {
+      const st = (presenceByUserId as any)?.[f._id] as string | undefined;
+      if (st === "online" || st === "idle") return { ...f, isOnline: true };
+      if (st === "offline") return { ...f, isOnline: false };
+      return f;
+    });
     if (dmSidebarPeersModeState === "online") {
       list = list.filter((f) => f.isOnline === true);
     }
@@ -2040,6 +2430,7 @@ export default function MessagesPage() {
     return list;
   }, [
     friends,
+    presenceByUserId,
     dmSidebarPeersModeState,
     chatUserSettings?.dmListFrom,
     followingIds,
@@ -2064,6 +2455,106 @@ export default function MessagesPage() {
       window.removeEventListener("cordigram-dm-sidebar-prefs", onDm);
       window.removeEventListener("cordigram-chat-settings", onChat);
     };
+  }, []);
+
+  // Realtime: reflect profile style/avatar updates in DM sidebar + open DM profile panel.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onStyle = (e: Event) => {
+      const ce = e as CustomEvent;
+      const d = (ce?.detail ?? {}) as {
+        userId?: string;
+        avatarUrl?: string | null;
+        displayName?: string;
+        username?: string;
+        displayNameFontId?: string | null;
+        displayNameEffectId?: string | null;
+        displayNamePrimaryHex?: string | null;
+        displayNameAccentHex?: string | null;
+      };
+      const uid = d?.userId ? String(d.userId) : "";
+      if (!uid) return;
+
+      if ("avatarUrl" in d || "displayName" in d || "username" in d) {
+        setFriends((prev) =>
+          prev.map((f) =>
+            String(f._id) !== uid
+              ? f
+              : ({
+                  ...f,
+                  avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? f.avatarUrl) : f.avatarUrl,
+                  displayName: d.displayName ?? f.displayName,
+                  username: d.username ?? f.username,
+                  displayNameFontId:
+                    "displayNameFontId" in d ? (d.displayNameFontId ?? f.displayNameFontId) : f.displayNameFontId,
+                  displayNameEffectId:
+                    "displayNameEffectId" in d ? (d.displayNameEffectId ?? f.displayNameEffectId) : f.displayNameEffectId,
+                  displayNamePrimaryHex:
+                    "displayNamePrimaryHex" in d ? (d.displayNamePrimaryHex ?? f.displayNamePrimaryHex) : f.displayNamePrimaryHex,
+                  displayNameAccentHex:
+                    "displayNameAccentHex" in d ? (d.displayNameAccentHex ?? f.displayNameAccentHex) : f.displayNameAccentHex,
+                } as any),
+          ),
+        );
+      }
+
+      setSelectedDirectMessageFriend((prev) => {
+        if (!prev || String(prev._id) !== uid) return prev;
+        return {
+          ...prev,
+          avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? prev.avatarUrl) : prev.avatarUrl,
+          displayName: d.displayName ?? prev.displayName,
+          username: d.username ?? prev.username,
+          displayNameFontId:
+            "displayNameFontId" in d ? (d.displayNameFontId ?? prev.displayNameFontId) : prev.displayNameFontId,
+          displayNameEffectId:
+            "displayNameEffectId" in d ? (d.displayNameEffectId ?? prev.displayNameEffectId) : prev.displayNameEffectId,
+          displayNamePrimaryHex:
+            "displayNamePrimaryHex" in d ? (d.displayNamePrimaryHex ?? prev.displayNamePrimaryHex) : prev.displayNamePrimaryHex,
+          displayNameAccentHex:
+            "displayNameAccentHex" in d ? (d.displayNameAccentHex ?? prev.displayNameAccentHex) : prev.displayNameAccentHex,
+        } as any;
+      });
+
+      setDmProfileDetail((prev) => {
+        if (!prev || String((prev as any).userId) !== uid) return prev;
+        return {
+          ...(prev as any),
+          avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? (prev as any).avatarUrl) : (prev as any).avatarUrl,
+          displayName: d.displayName ?? (prev as any).displayName,
+          username: d.username ?? (prev as any).username,
+          displayNameFontId:
+            "displayNameFontId" in d ? (d.displayNameFontId ?? (prev as any).displayNameFontId) : (prev as any).displayNameFontId,
+          displayNameEffectId:
+            "displayNameEffectId" in d ? (d.displayNameEffectId ?? (prev as any).displayNameEffectId) : (prev as any).displayNameEffectId,
+          displayNamePrimaryHex:
+            "displayNamePrimaryHex" in d ? (d.displayNamePrimaryHex ?? (prev as any).displayNamePrimaryHex) : (prev as any).displayNamePrimaryHex,
+          displayNameAccentHex:
+            "displayNameAccentHex" in d ? (d.displayNameAccentHex ?? (prev as any).displayNameAccentHex) : (prev as any).displayNameAccentHex,
+        } as any;
+      });
+
+      setCurrentUserProfile((prev: any) => {
+        if (!prev || String(prev.userId ?? prev.id ?? "") !== uid) return prev;
+        return {
+          ...prev,
+          avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? prev.avatarUrl) : prev.avatarUrl,
+          displayName: d.displayName ?? prev.displayName,
+          username: d.username ?? prev.username,
+          displayNameFontId:
+            "displayNameFontId" in d ? (d.displayNameFontId ?? prev.displayNameFontId) : prev.displayNameFontId,
+          displayNameEffectId:
+            "displayNameEffectId" in d ? (d.displayNameEffectId ?? prev.displayNameEffectId) : prev.displayNameEffectId,
+          displayNamePrimaryHex:
+            "displayNamePrimaryHex" in d ? (d.displayNamePrimaryHex ?? prev.displayNamePrimaryHex) : prev.displayNamePrimaryHex,
+          displayNameAccentHex:
+            "displayNameAccentHex" in d ? (d.displayNameAccentHex ?? prev.displayNameAccentHex) : prev.displayNameAccentHex,
+        };
+      });
+    };
+
+    window.addEventListener("cordigram-user-profile-style-updated", onStyle as any);
+    return () => window.removeEventListener("cordigram-user-profile-style-updated", onStyle as any);
   }, []);
 
   useEffect(() => {
@@ -2123,11 +2614,51 @@ export default function MessagesPage() {
     void fetchUserSettings({ token })
       .then(setChatUserSettings)
       .catch(() => {});
+    void fetchBoostStatus({ token })
+      .then((b) => {
+        setBoostStatus(b);
+        const v = (b as any)?.limits?.maxUploadBytes;
+        if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+          setMaxUploadBytes(v);
+        } else {
+          setMaxUploadBytes(DEFAULT_FREE_MAX_UPLOAD_BYTES);
+        }
+      })
+      .catch(() => {
+        setBoostStatus(null);
+        setMaxUploadBytes(DEFAULT_FREE_MAX_UPLOAD_BYTES);
+      });
     void serversApi
       .getFollowing()
       .then((list) => setFollowingIds(new Set(list.map((f) => f._id))))
       .catch(() => setFollowingIds(new Set()));
   }, [token]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onBoost = (e: Event) => {
+      const detail = (e as CustomEvent<any>).detail;
+      if (detail && typeof detail === "object") {
+        setBoostStatus((prev) => ({
+          ...(prev ?? {}),
+          tier: detail?.tier ?? (prev as any)?.tier,
+          active: typeof detail?.active === "boolean" ? detail.active : (prev as any)?.active,
+          expiresAt: "expiresAt" in detail ? detail?.expiresAt : (prev as any)?.expiresAt,
+          limits: detail?.limits ?? (prev as any)?.limits,
+        }));
+      }
+      const v = detail?.limits?.maxUploadBytes;
+      if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+        setMaxUploadBytes(v);
+      }
+    };
+    window.addEventListener("cordigram-boost-entitlement-updated", onBoost as any);
+    return () =>
+      window.removeEventListener(
+        "cordigram-boost-entitlement-updated",
+        onBoost as any,
+      );
+  }, []);
 
   // Debug: Log current user profile when it changes
   useEffect(() => {
@@ -2152,6 +2683,7 @@ export default function MessagesPage() {
       loadChannels(selectedServer);
       loadActiveEvents(selectedServer);
       setSelectedDirectMessageFriend(null); // Clear selected DM friend when selecting server
+      setShowBoostUpgradeView(false);
       
       const isAdminViewedServer = Boolean(isAdminView && adminViewServerId && selectedServer === adminViewServerId);
       if (!isAdminViewedServer) {
@@ -2165,10 +2697,19 @@ export default function MessagesPage() {
               }
             });
             setMemberRoleColors(colorMap);
+            setMembersForMessageSearch(
+              response.members.map((m) => ({
+                userId: m.userId,
+                displayName: m.displayName,
+                username: m.username,
+                avatarUrl: m.avatarUrl,
+              })),
+            );
           })
           .catch((err) => {
             console.error("[MessagesPage] Failed to fetch member role colors:", err);
             setMemberRoleColors({});
+            setMembersForMessageSearch([]);
           });
         // Fetch permissions to determine if user can drag channels
         serversApi.getCurrentUserPermissions(selectedServer)
@@ -2187,6 +2728,7 @@ export default function MessagesPage() {
       } else {
         // Admin view: do not call member-only endpoints (will 403).
         setMemberRoleColors({});
+        setMembersForMessageSearch([]);
         setCanDragChannels(false);
         setCanUseMentions(false);
         setServerInteractionSettings(null);
@@ -2201,11 +2743,23 @@ export default function MessagesPage() {
       setActiveServerEvents([]);
       setServerEventsTotalCount(0);
       setMemberRoleColors({});
+      setMembersForMessageSearch([]);
       setCanDragChannels(false);
       setCanUseMentions(false);
       setServerInteractionSettings(null);
     }
   }, [selectedServer, loadActiveEvents]);
+
+  // If selectedServer no longer exists (deleted/left), stop requesting it.
+  useEffect(() => {
+    if (!selectedServer) return;
+    if (servers.some((s) => s._id === selectedServer)) return;
+    setSelectedServer(null);
+    setSelectedChannel(null);
+    setShowServerSettingsPanel(false);
+    setServerSettingsTarget(null);
+    setServerSettingsPermissions(null);
+  }, [selectedServer, servers]);
 
   // Fetch "my access status" để biết có cần chấp nhận quy định hay không.
   useEffect(() => {
@@ -2241,8 +2795,11 @@ export default function MessagesPage() {
         const status = await serversApi.getMyServerAccessStatus(selectedServer);
         if (cancelled) return;
         setMyServerAccessStatus(status);
-        const needsRules = status.hasRules && !status.acceptedRules && !status.chatViewBlocked;
-        if (needsRules) {
+        const needsRules =
+          status.hasRules && !status.acceptedRules && !status.chatViewBlocked;
+        const applyAccepted =
+          status.accessMode === "apply" && status.status === "accepted";
+        if (needsRules && !applyAccepted) {
           try {
             const s = await serversApi.getServerAccessSettings(selectedServer);
             if (cancelled) return;
@@ -2276,7 +2833,12 @@ export default function MessagesPage() {
       try {
         const status = await serversApi.getMyServerAccessStatus(selectedServer);
         setMyServerAccessStatus(status);
-        if (status.hasRules && !status.acceptedRules && !status.chatViewBlocked) {
+        if (
+          status.hasRules &&
+          !status.acceptedRules &&
+          !status.chatViewBlocked &&
+          !(status.accessMode === "apply" && status.status === "accepted")
+        ) {
           const s = await serversApi.getServerAccessSettings(selectedServer);
           setVerificationAccessSettings(s);
           setVerificationRulesAgreed(false);
@@ -2300,7 +2862,11 @@ export default function MessagesPage() {
       try {
         const s = await serversApi.getMyServerAccessStatus(selectedServer);
         setMyServerAccessStatus(s);
-        const stillBlocked = s.chatViewBlocked || (s.hasRules && !s.acceptedRules);
+        const applyAccepted =
+          s.accessMode === "apply" && s.status === "accepted";
+        const stillBlocked = applyAccepted
+          ? false
+          : s.chatViewBlocked || (s.hasRules && !s.acceptedRules);
         if (!stillBlocked) {
           setVerificationRulesOpen(false);
           setShowAcceptRulesModal(false);
@@ -2597,16 +3163,42 @@ export default function MessagesPage() {
   useEffect(() => {
     if (newMessage) {
       const msg = newMessage.message as any;
-      const friendId = msg.senderId._id; // For incoming messages, friend is always the sender
+      const rawSender = msg.senderId;
+      const senderIdStr =
+        typeof rawSender === "string" ? rawSender : rawSender?._id ?? "";
+      if (senderIdStr && senderIdStr === currentUserId) {
+        return;
+      }
+      const friendId =
+        typeof rawSender === "string" ? rawSender : rawSender?._id; // For incoming messages, friend is usually the sender
+      if (!friendId) return;
+      console.log("📨 [RECEIVE] Friend ID (sender):", friendId);
+      console.log("📨 [RECEIVE] Current user ID:", currentUserId);
+      console.log(
+        "📨 [RECEIVE] Message from current user?",
+        friendId === currentUserId,
+      );
+      console.log(
+        "📨 [RECEIVE] Currently viewing friend?",
+        selectedDirectMessageFriend?._id,
+      );
+      console.log(
+        "📨 [RECEIVE] Is viewing this conversation?",
+        selectedDirectMessageFriend?._id === friendId,
+      );
 
       const uiMessage: UIMessage = {
         id: msg._id,
         text: msg.content,
-        senderId: msg.senderId._id,
-        senderEmail: msg.senderId.email,
-        senderDisplayName: msg.senderId.displayName || undefined,
-        senderName: msg.senderId.username || msg.senderId.email,
-        senderAvatar: msg.senderId.avatar,
+        senderId: friendId,
+        senderEmail: typeof rawSender === "object" ? rawSender.email ?? "" : "",
+        senderDisplayName:
+          typeof rawSender === "object" ? rawSender.displayName || undefined : undefined,
+        senderName:
+          typeof rawSender === "object"
+            ? rawSender.username || rawSender.email || ""
+            : "",
+        senderAvatar: typeof rawSender === "object" ? rawSender.avatar : undefined,
         timestamp: new Date(msg.createdAt),
         isFromCurrentUser: false, // Always false for incoming messages
         type: "direct",
@@ -2645,6 +3237,8 @@ export default function MessagesPage() {
         // Check for duplicates
         const isDuplicate = currentMessages.some((m) => m.id === msg._id);
         if (!isDuplicate) {
+          console.log("✅ [RECEIVE] Adding new incoming message");
+          playMessageNotificationSound();
           const updated = [...currentMessages, uiMessage];
           newMap.set(friendId, updated);
         } else {
@@ -2887,7 +3481,10 @@ export default function MessagesPage() {
     }
   };
 
-  const loadChannels = async (serverId: string, opts?: { keepSelectedChannel?: boolean }) => {
+  const loadChannels = async (
+    serverId: string,
+    opts?: { keepSelectedChannel?: boolean; preferredChannelId?: string },
+  ) => {
     try {
       let channels: serversApi.Channel[];
       let cats: serversApi.ServerCategory[];
@@ -2915,6 +3512,13 @@ export default function MessagesPage() {
       setTextChannels(text);
       setVoiceChannels(voice);
       setServerCategories(cats);
+      if (opts?.preferredChannelId) {
+        const preferred = sorted.find((c) => c._id === opts.preferredChannelId);
+        if (preferred) {
+          setSelectedChannel(preferred._id);
+          return;
+        }
+      }
       if (opts?.keepSelectedChannel && selectedChannelRef.current) {
         const stillExists = sorted.some((c) => c._id === selectedChannelRef.current);
         if (stillExists) return;
@@ -3383,9 +3987,18 @@ export default function MessagesPage() {
     setReplyingTo(message);
   };
 
+  /**
+   * Apply-to-join: sau khi chủ server duyệt (accepted), user đã là thành viên — không hiện
+   * màn xác minh/quy định dạng "trước khi chat" (chỉ dành cho người chưa được vào server / chờ duyệt).
+   */
+  const isApplyModeAcceptedMember =
+    myServerAccessStatus?.accessMode === "apply" &&
+    myServerAccessStatus.status === "accepted";
+
   const shouldBlockServerChatInput = Boolean(
     selectedServer &&
       !selectedDirectMessageFriend &&
+      !isApplyModeAcceptedMember &&
       (myServerAccessStatus?.chatViewBlocked === true ||
         (myServerAccessStatus?.hasRules === true &&
           !myServerAccessStatus?.acceptedRules)),
@@ -3397,6 +4010,12 @@ export default function MessagesPage() {
     setShowPlusMenu(false);
     setShowGiphyPicker(false);
   }, [shouldBlockServerChatInput]);
+
+  useEffect(() => {
+    if (!isApplyModeAcceptedMember) return;
+    setVerificationRulesOpen(false);
+    setShowAcceptRulesModal(false);
+  }, [isApplyModeAcceptedMember]);
 
   const handleSendMessage = async () => {
     if (shouldBlockServerChatInput) {
@@ -3604,9 +4223,11 @@ export default function MessagesPage() {
       }
       const status = await serversApi.getMyServerAccessStatus(selectedServer);
       setMyServerAccessStatus(status);
-      const stillBlocked =
-        status.chatViewBlocked ||
-        (status.hasRules && !status.acceptedRules);
+      const applyAccepted =
+        status.accessMode === "apply" && status.status === "accepted";
+      const stillBlocked = applyAccepted
+        ? false
+        : status.chatViewBlocked || (status.hasRules && !status.acceptedRules);
       if (!stillBlocked) {
         setVerificationRulesOpen(false);
         setVerificationAccessSettings(null);
@@ -3629,7 +4250,12 @@ export default function MessagesPage() {
       await serversApi.acknowledgeServerAgeRestriction(selectedServer);
       const status = await serversApi.getMyServerAccessStatus(selectedServer);
       setMyServerAccessStatus(status);
-      if (status.hasRules && !status.acceptedRules && !status.chatViewBlocked) {
+      if (
+        status.hasRules &&
+        !status.acceptedRules &&
+        !status.chatViewBlocked &&
+        !(status.accessMode === "apply" && status.status === "accepted")
+      ) {
         try {
           const s = await serversApi.getServerAccessSettings(selectedServer);
           setVerificationAccessSettings(s);
@@ -3875,10 +4501,6 @@ export default function MessagesPage() {
       setError("Sticker máy chủ chỉ dùng trong kênh máy chủ.");
       return;
     }
-    if (String(sel.serverId) !== String(selectedServer)) {
-      setError("Sticker này không dùng được ở máy chủ hiện tại.");
-      return;
-    }
     try {
       shouldAutoScrollRef.current = true;
       const label = sel.name?.trim() ? `:${sel.name}:` : "Sticker máy chủ";
@@ -3895,6 +4517,7 @@ export default function MessagesPage() {
         {
           customStickerUrl: sel.imageUrl,
           serverStickerId: sel.stickerId,
+          serverStickerServerId: sel.serverId,
         },
       );
       const rawStickerId = (newMsg as serversApi.Message).serverStickerId;
@@ -3989,7 +4612,19 @@ export default function MessagesPage() {
         const mimeType = metadata?.mimeType || "audio/mp4";
         const audioFile = new File([audioBlob], fileName, { type: mimeType });
 
-        const uploadResponse = await uploadMedia({ token, file: audioFile });
+        if (audioFile.size > maxUploadBytes) {
+          setError(
+            `File quá lớn. Tối đa ${(maxUploadBytes / 1024 / 1024).toFixed(0)}MB`,
+          );
+          setIsUploadingVoice(false);
+          return;
+        }
+
+        const uploadResponse = await uploadMedia({
+          token,
+          file: audioFile,
+          cordigramUploadContext: "messages",
+        });
         if (!uploadResponse || (!uploadResponse.secureUrl && !uploadResponse.url)) {
           throw new Error("Failed to upload voice message");
         }
@@ -4053,7 +4688,26 @@ export default function MessagesPage() {
         type: mimeType,
       });
 
-      const uploadResponse = await uploadMedia({ token, file: audioFile });
+      if (audioFile.size > maxUploadBytes) {
+        setError(
+          `File quá lớn. Tối đa ${(maxUploadBytes / 1024 / 1024).toFixed(0)}MB`,
+        );
+        setIsUploadingVoice(false);
+        return;
+      }
+      console.log("🎤 [VOICE-UPLOAD] Audio file created:", {
+        name: audioFile.name,
+        type: audioFile.type,
+        size: audioFile.size,
+      });
+
+      console.log("🎤 [VOICE-UPLOAD] Uploading to Cloudinary...");
+      const uploadResponse = await uploadMedia({
+        token,
+        file: audioFile,
+        cordigramUploadContext: "messages",
+      });
+      console.log("🎤 [VOICE-UPLOAD] Upload response:", uploadResponse);
 
       if (!uploadResponse || (!uploadResponse.secureUrl && !uploadResponse.url)) {
         throw new Error("Failed to upload voice message");
@@ -4369,6 +5023,13 @@ export default function MessagesPage() {
       let insertText: string;
       if (suggestion.type === "user") {
         insertText = `@${suggestion.description || suggestion.name}`;
+      } else if (suggestion.type === "special") {
+        insertText =
+          suggestion.id === "special_here"
+            ? "@here"
+            : suggestion.id === "special_everyone"
+              ? "@everyone"
+              : suggestion.name;
       } else {
         insertText = suggestion.name;
       }
@@ -4449,6 +5110,29 @@ export default function MessagesPage() {
         })
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
     [allChannels],
+  );
+
+  /** Theo menu máy chủ «Ẩn các kênh bị tắt âm» — lưu prefs theo server. */
+  const hideMutedChannelsEffective = useMemo(() => {
+    if (!currentUserId || !selectedServer) return false;
+    return sidebarPrefs.getServerPrefs(currentUserId, selectedServer).hideMutedChannels === true;
+  }, [currentUserId, selectedServer, sidebarPrefsTick]);
+
+  const isChannelMutedInSidebarPrefs = useCallback(
+    (channelId: string) => {
+      if (!currentUserId || !selectedServer) return false;
+      const sp = sidebarPrefs.getServerPrefs(currentUserId, selectedServer);
+      return sidebarPrefs.isChannelMuted(sp.channels[channelId]);
+    },
+    [currentUserId, selectedServer, sidebarPrefsTick],
+  );
+
+  const visibleChannelsIfHideMuted = useCallback(
+    <T extends { _id: string }>(list: T[]) => {
+      if (!hideMutedChannelsEffective) return list;
+      return list.filter((ch) => !isChannelMutedInSidebarPrefs(ch._id));
+    },
+    [hideMutedChannelsEffective, isChannelMutedInSidebarPrefs],
   );
 
   const resetDragState = useCallback(() => {
@@ -5139,6 +5823,14 @@ export default function MessagesPage() {
       setShowPlusMenu(false);
 
       try {
+        const tooLarge = files.find((f) => f.size > maxUploadBytes);
+        if (tooLarge) {
+          setError(
+            `File quá lớn. Tối đa ${(maxUploadBytes / 1024 / 1024).toFixed(0)}MB`,
+          );
+          return;
+        }
+
         // Validate video duration (max 3 minutes = 180 seconds)
         for (const file of files) {
           if (file.type.startsWith("video/")) {
@@ -5203,10 +5895,18 @@ export default function MessagesPage() {
         // ✅ FIX: Upload files in background
         let uploadResults;
         if (files.length === 1) {
-          const result = await uploadMedia({ token, file: files[0] });
+          const result = await uploadMedia({
+            token,
+            file: files[0],
+            cordigramUploadContext: "messages",
+          });
           uploadResults = [result];
         } else {
-          uploadResults = await uploadMediaBatch({ token, files });
+          uploadResults = await uploadMediaBatch({
+            token,
+            files,
+            cordigramUploadContext: "messages",
+          });
         }
 
         // ✅ FIX: Send each media and update UI
@@ -5467,6 +6167,31 @@ export default function MessagesPage() {
     if (sp.serverNotify) setServerNotificationLevel(sp.serverNotify);
   }, [currentUserId, selectedServer, sidebarPrefsTick]);
 
+  useEffect(() => {
+    if (!selectedServer || !token) {
+      setNotificationRoleNames([]);
+      return;
+    }
+    const isAdminViewedServer = Boolean(isAdminView && adminViewServerId && selectedServer === adminViewServerId);
+    if (isAdminViewedServer) {
+      setNotificationRoleNames([]);
+      return;
+    }
+    let cancelled = false;
+    serversApi
+      .getRoles(selectedServer)
+      .then((roles) => {
+        if (cancelled) return;
+        setNotificationRoleNames(roles.filter((r) => !r.isDefault).map((r) => r.name));
+      })
+      .catch(() => {
+        if (!cancelled) setNotificationRoleNames([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedServer, token, isAdminView, adminViewServerId]);
+
   const selectedServerEntity = useMemo(
     () => servers.find((s) => s._id === selectedServer),
     [servers, selectedServer],
@@ -5475,30 +6200,21 @@ export default function MessagesPage() {
   /** Chủ server hoặc (quản lý máy chủ và quản lý kênh) — chỉnh sửa/xóa kênh & danh mục */
   const canManageChannelsStructure = useMemo(() => {
     if (!currentUserId || !selectedServerEntity) return false;
-    const ownerId = String(
-      (selectedServerEntity as any).ownerId?._id ?? (selectedServerEntity as any).ownerId ?? "",
-    );
-    if (ownerId === currentUserId) return true;
     const p = currentServerPermissions;
+    if (p?.isOwner) return true;
     return !!(p?.canManageServer && p?.canManageChannels);
   }, [currentUserId, selectedServerEntity, currentServerPermissions]);
 
   const canAccessPrivateChannel = useMemo(() => {
     if (!currentUserId || !selectedServerEntity) return false;
-    const ownerId = String(
-      (selectedServerEntity as any).ownerId?._id ?? (selectedServerEntity as any).ownerId ?? "",
-    );
-    if (ownerId === currentUserId) return true;
     const p = currentServerPermissions;
+    if (p?.isOwner) return true;
     return !!(p?.canManageServer || p?.canManageChannels);
   }, [currentUserId, selectedServerEntity, currentServerPermissions]);
 
   const canManageJoinApplications = useMemo(() => {
     if (!currentUserId || !selectedServerEntity) return false;
-    const ownerId = String(
-      (selectedServerEntity as any).ownerId?._id ?? (selectedServerEntity as any).ownerId ?? "",
-    );
-    if (ownerId === currentUserId) return true;
+    if (currentServerPermissions?.isOwner) return true;
     return Boolean(currentServerPermissions?.canManageServer);
   }, [currentUserId, selectedServerEntity, currentServerPermissions]);
 
@@ -5546,6 +6262,31 @@ export default function MessagesPage() {
   useEffect(() => {
     setShowJoinApplicationsView(false);
   }, [selectedServer]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (ev: Event) => {
+      const d = (ev as CustomEvent<{ serverId: string }>).detail;
+      if (!d?.serverId || d.serverId !== selectedServer || !canManageJoinApplications) return;
+      setJoinApplicationsRefreshTick((x) => x + 1);
+    };
+    window.addEventListener("cordigram-join-application-updated", handler as EventListener);
+    return () => window.removeEventListener("cordigram-join-application-updated", handler as EventListener);
+  }, [selectedServer, canManageJoinApplications]);
+
+  // Applicant: duyệt / từ chối / rút đơn — cập nhật trạng thái truy cập không cần reload trang.
+  useEffect(() => {
+    if (typeof window === "undefined" || !selectedServer || !currentUserId) return;
+    if (isAdminView && selectedServer === adminViewServerId) return;
+    const handler = (ev: Event) => {
+      const d = (ev as CustomEvent<{ serverId: string; userId: string; status: string }>).detail;
+      if (!d || d.serverId !== selectedServer || d.userId !== currentUserId) return;
+      if (d.status !== "accepted" && d.status !== "rejected" && d.status !== "withdrawn") return;
+      void serversApi.getMyServerAccessStatus(selectedServer).then(setMyServerAccessStatus).catch(() => undefined);
+    };
+    window.addEventListener("cordigram-join-application-updated", handler as EventListener);
+    return () => window.removeEventListener("cordigram-join-application-updated", handler as EventListener);
+  }, [selectedServer, currentUserId, isAdminView, adminViewServerId]);
 
   useEffect(() => {
     if (!selectedServer || !canManageJoinApplications) {
@@ -5650,6 +6391,33 @@ export default function MessagesPage() {
     [currentUserId, selectedServer, sidebarPrefsTick],
   );
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!canRender) return;
+    if (!currentUserId) return;
+    const root = document.getElementById("cordigram-messages-root");
+    if (!root) return;
+
+    const apply = () => {
+      migrateMessagesChromeStorageOnce(currentUserId);
+      applyMessagesRootChromeFromStorage(root, currentUserId, getMessagesShellTheme());
+    };
+    apply();
+
+    const onChrome = () => apply();
+    const onShell = () => apply();
+    window.addEventListener("cordigram-messages-chrome", onChrome);
+    window.addEventListener("cordigram-messages-shell-theme", onShell);
+    window.addEventListener("cordigram-chat-settings", onChrome);
+
+    return () => {
+      window.removeEventListener("cordigram-messages-chrome", onChrome);
+      window.removeEventListener("cordigram-messages-shell-theme", onShell);
+      window.removeEventListener("cordigram-chat-settings", onChrome);
+      applyAccentColor("#5865F2", root);
+    };
+  }, [canRender, currentUserId]);
+
   if (!canRender) {
     return null;
   }
@@ -5664,7 +6432,11 @@ export default function MessagesPage() {
   )?.nickname;
 
   return (
-    <div className={styles.container}>
+    <div
+      id="cordigram-messages-root"
+      className={styles.container}
+      data-messages-theme={messagesShellTheme}
+    >
       {passkeyRequired ? (
         <div className={styles.passkeyOverlay} role="dialog" aria-modal>
           <div className={styles.passkeyCard}>
@@ -5725,10 +6497,24 @@ export default function MessagesPage() {
             setSelectedServer(null);
             setSelectedChannel(null);
             setShowExploreView(false);
+              setShowBoostUpgradeView(false);
             setShowJoinApplicationsView(false);
           }}
           style={{ cursor: "pointer" }}
         />
+
+        <button
+          type="button"
+          className={styles.socialHomeBtn}
+          title={t("chat.messagesPage.socialHomeTitle")}
+          aria-label={t("chat.messagesPage.socialHomeTitle")}
+          onClick={() => router.push("/")}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+        </button>
 
         {!isAdminView ? (
           <button
@@ -5758,6 +6544,7 @@ export default function MessagesPage() {
                 const next = !prev;
                 if (next) {
                   setShowJoinApplicationsView(false);
+                  setShowBoostUpgradeView(false);
                   setSelectedDirectMessageFriend(null);
                   setSelectedServer(null);
                   setSelectedChannel(null);
@@ -5793,6 +6580,8 @@ export default function MessagesPage() {
                 className={styles.navBtn}
                 onClick={() => {
                   setShowExploreView(false);
+                  setShowBoostUpgradeView(false);
+                  setShowJoinApplicationsView(false);
                   setSelectedServer(server._id);
                 }}
                 onContextMenu={async (e) => {
@@ -5816,6 +6605,7 @@ export default function MessagesPage() {
                       canManageServer: isOwner,
                       canManageChannels: isOwner,
                       canManageEvents: isOwner,
+                      canManageExpressions: isOwner,
                       canCreateInvite: true,
                       mentionEveryone: isOwner,
                     };
@@ -5865,13 +6655,9 @@ export default function MessagesPage() {
             aria-label={t("chat.messagesPage.settingsTitle")}
             onClick={() => setShowMessagesUserSettings(true)}
           >
-            <img
-              src="/Windows_Settings_app_icon.png"
-              alt=""
-              width={28}
-              height={28}
-              className={styles.settingsBtnImg}
-            />
+            <span className={styles.settingsBtnIcon} aria-hidden>
+              ⚙
+            </span>
           </button>
         </div>
       </div>
@@ -5915,18 +6701,35 @@ export default function MessagesPage() {
               // Main Messages Page - No Server Selected
               <>
                 <div className={styles.conversationsScrollArea}>
-                {/* Search Bar */}
+                {/* Search: opens Discord-style message search modal */}
                 <div className={styles.searchInputWrapper}>
-                  <input
-                    type="text"
-                    className={styles.searchInput}
-                    placeholder={t("chat.messagesPage.searchPlaceholder")}
-                  />
+                  <button
+                    type="button"
+                    className={styles.searchButton}
+                    onClick={() => {
+                      setMessageSearchDmConversationOnly(false);
+                      setShowMessageSearch(true);
+                    }}
+                    title={t("chat.messagesPage.searchButtonAria")}
+                    aria-label={t("chat.messagesPage.searchButtonAria")}
+                  >
+                    {t("chat.messagesPage.searchButtonLabel")}
+                  </button>
                 </div>
 
-                {/* DM Sidebar: danh sách menu (Friends, Mission, ...) */}
                 <div className={styles.dmSidebarMenuList}>
-                  <button type="button" className={styles.dmSidebarMenuEntry}>
+                  <button
+                    type="button"
+                    className={styles.dmSidebarMenuEntry}
+                    onClick={() => {
+                      setShowBoostUpgradeView(true);
+                      setShowExploreView(false);
+                      setShowJoinApplicationsView(false);
+                      setSelectedDirectMessageFriend(null);
+                      setSelectedServer(null);
+                      setSelectedChannel(null);
+                    }}
+                  >
                     <svg
                       width="16"
                       height="16"
@@ -5935,40 +6738,9 @@ export default function MessagesPage() {
                       stroke="currentColor"
                       strokeWidth="2"
                     >
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                      <circle cx="9" cy="7" r="4"></circle>
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                      <path d="M12 2l2.2 6.8H21l-5.5 4 2.1 7.2L12 16.9 6.4 20l2.1-7.2L3 8.8h6.8L12 2z" />
                     </svg>
-                    <span>Friends</span>
-                  </button>
-                  <button type="button" className={styles.dmSidebarMenuEntry}>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M9 11H7.82a2 2 0 0 0-1.82 1.18l-2 5A2 2 0 0 0 3 19h4m0 0a6 6 0 0 0 12 0m4-7h-1.17a2 2 0 0 1-1.82-1.18l-2-5A2 2 0 0 0 13 5h-4"></path>
-                    </svg>
-                    <span>Mission</span>
-                  </button>
-                  <button type="button" className={styles.dmSidebarMenuEntry}>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <circle cx="9" cy="21" r="1"></circle>
-                      <circle cx="20" cy="21" r="1"></circle>
-                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                    </svg>
-                    <span>Store</span>
+                    <span>{t("chat.messagesPage.boostUpgrade")}</span>
                   </button>
                 </div>
 
@@ -6015,11 +6787,19 @@ export default function MessagesPage() {
                               )}
                             </div>
                             <div className={styles.friendInfo}>
-                              <p className={styles.friendName}>
+                              <p
+                                className={styles.friendName}
+                                style={getDisplayNameTextStyle(friend, messagesShellTheme)}
+                              >
                                 {friend.displayName || friend.username}
                               </p>
                               <p className={styles.friendStatus}>
-                                {friend.email}
+                                {(() => {
+                                  const st = (presenceByUserId as any)?.[friend._id] as string | undefined;
+                                  if (st === "online") return t("chat.presence.online");
+                                  if (st === "idle") return t("chat.presence.idle");
+                                  return t("chat.presence.offline");
+                                })()}
                               </p>
                             </div>
                             {(dmUnreadCounts[friend._id] ?? 0) > 0 && (
@@ -6077,7 +6857,10 @@ export default function MessagesPage() {
                       <div className={styles.onlineStatus}></div>
                     </div>
                     <div className={styles.userTextInfo}>
-                      <div className={styles.userDisplayName}>
+                      <div
+                        className={styles.userDisplayName}
+                        style={getDisplayNameTextStyle(currentUserProfile, messagesShellTheme)}
+                      >
                         {currentUserProfile?.displayName ||
                           currentUserProfile?.username ||
                           t("chat.messagesPage.userFallback")}
@@ -6179,12 +6962,12 @@ export default function MessagesPage() {
                   <button
                     type="button"
                     className={styles.inviteServerBtn}
-                    title="Mời tham gia máy chủ"
+                    title={t("chat.sidebar.inviteServer")}
                     onClick={() => {
                       if (currentServer)
                         setInviteToServerTarget({
                           serverId: currentServer._id,
-                          serverName: currentServer.name || "Máy chủ",
+                          serverName: currentServer.name || t("chat.sidebar.serverFallback"),
                         });
                     }}
                   >
@@ -6300,11 +7083,12 @@ export default function MessagesPage() {
                   </button>
                 )}
                 {/* Thông Tin section - only shown when info channels exist */}
-                {infoChannels.length > 0 && (() => {
+                {visibleChannelsIfHideMuted(infoChannels).length > 0 && (() => {
                   const infoCatId = infoChannels.find(c => c.categoryId)?.categoryId;
                   const infoCat = infoCatId ? serverCategories.find(c => c._id === infoCatId) : null;
                   const infoCollapse = infoCat ? getCategoryCollapseState(infoCat._id) : { enabled: false, collapsed: false };
                   const hideInfoChannels = infoCollapse.enabled && infoCollapse.collapsed;
+                  const infoChannelsVisible = visibleChannelsIfHideMuted(infoChannels);
                   return (
                   <div className={styles.section}>
                     <div
@@ -6319,8 +7103,8 @@ export default function MessagesPage() {
                       {infoCat && infoCollapse.enabled && currentUserId && selectedServer && (
                         <button
                           type="button"
-                          title={infoCollapse.collapsed ? "Mở rộng danh mục" : "Thu gọn danh mục"}
-                          aria-label={infoCollapse.collapsed ? "Mở rộng" : "Thu gọn"}
+                          title={infoCollapse.collapsed ? t("chat.sidebar.expandCategory") : t("chat.sidebar.collapseCategory")}
+                          aria-label={infoCollapse.collapsed ? t("chat.sidebar.expand") : t("chat.sidebar.collapse")}
                           className={styles.addChannelBtn}
                           style={{ flexShrink: 0 }}
                           onClick={(e) => {
@@ -6353,10 +7137,10 @@ export default function MessagesPage() {
                           onBlur={() => { if (renameCancelledRef.current) { renameCancelledRef.current = false; return; } handleRenameCategory(infoCat._id, renamingCategoryName); }}
                         />
                       ) : (
-                        <h3 className={styles.sectionTitle} style={{ flex: 1, margin: 0 }}>{infoCat?.name ?? "Thông Tin"}</h3>
+                        <h3 className={styles.sectionTitle} style={{ flex: 1, margin: 0 }}>{infoCat?.name ?? t("chat.sidebar.infoFallback")}</h3>
                       )}
                     </div>
-                    {!hideInfoChannels && infoChannels.map((channel) => (
+                    {!hideInfoChannels && infoChannelsVisible.map((channel) => (
                       <div
                         key={channel._id}
                         className={`${styles.conversationItem} ${
@@ -6370,7 +7154,7 @@ export default function MessagesPage() {
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
                           {channel.isRulesChannel ? (
-                            <span title="Kênh quy định" style={{ fontSize: "16px", flexShrink: 0 }}>
+                            <span title={t("chat.sidebar.rulesChannel")} style={{ fontSize: "16px", flexShrink: 0 }}>
                               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}>
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2v6h2v-6zm0-4h-2v2h2V7z" />
                               </svg>
@@ -6392,7 +7176,7 @@ export default function MessagesPage() {
                   return visibleCategories.length > 0 ? (
                   <>
                   {visibleCategories.map((cat) => {
-                    const channelsInCat = getChannelsForCategory(cat._id);
+                    const channelsInCat = visibleChannelsIfHideMuted(getChannelsForCategory(cat._id));
                     const isVoiceCategory = cat.type === "voice";
                     const isCatDragging = dragType === "category" && dragId === cat._id;
                     const isCatDropTarget = dragType === "category" && dragOverId === cat._id && dragId !== cat._id;
@@ -6475,7 +7259,7 @@ export default function MessagesPage() {
                           <button
                             type="button"
                             className={styles.addChannelBtn}
-                            title={isVoiceCategory ? "Tạo kênh đàm thoại" : "Tạo kênh chat"}
+                            title={isVoiceCategory ? t("chat.sidebar.createVoiceChannel") : t("chat.sidebar.createTextChannel")}
                             onClick={() => openCreateChannelModal(isVoiceCategory ? "voice" : "text", cat.name, cat._id)}
                           >
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -6500,11 +7284,6 @@ export default function MessagesPage() {
                             const isChDragging = dragType === "channel" && dragId === channel._id;
                             const isChDropTarget = dragType === "channel" && dragOverId === channel._id && dragId !== channel._id;
                             if (isVoice) {
-                              const canInviteToVoice = currentServer && (currentServer.ownerId === currentUserId || currentServer.isPublic);
-                              const showInviteBar =
-                                (selectedChannel === channel._id || joinedVoiceChannelId === channel._id) &&
-                                canInviteToVoice &&
-                                !voiceInviteDismissed.has(channel._id);
                               const participantsInChannel = voiceChannelParticipants[channel._id] ?? [];
                               return (
                                 <div
@@ -6537,29 +7316,7 @@ export default function MessagesPage() {
                                       </span>
                                       <span>{translateChannelName(channel.name, language)}</span>
                                     </div>
-                                    {isSelected && (
-                                      <div className={styles.voiceChannelActions}>
-                                        <button type="button" className={styles.voiceChannelActionIcon} title="Chat">
-                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-                                        </button>
-                                        <button type="button" className={styles.voiceChannelActionIcon} title="Mời">
-                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" /></svg>
-                                        </button>
-                                        <button type="button" className={styles.voiceChannelActionIcon} title="Cài đặt">
-                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6m-16.78 7.78l4.24-4.24m3.08-3.08l4.24-4.24" /></svg>
-                                        </button>
-                                      </div>
-                                    )}
                                   </div>
-                                  {showInviteBar && (
-                                    <div className={styles.voiceInviteBar}>
-                                      <button type="button" className={styles.voiceInviteBarClickable} onClick={(e) => { e.stopPropagation(); if (currentServer && canInviteToVoice) setInviteToVoiceTarget({ serverId: currentServer._id, serverName: currentServer.name || "Máy chủ", channelId: channel._id, channelName: channel.name }); }}>
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" /></svg>
-                                        <span>Mời vào Kênh thoại</span>
-                                      </button>
-                                      <button type="button" className={styles.voiceInviteDismiss} onClick={(e) => { e.stopPropagation(); setVoiceInviteDismissed((prev) => new Set(prev).add(channel._id)); }} aria-label="Đóng" />
-                                    </div>
-                                  )}
                                   {participantsInChannel.length > 0 && (
                                     <div className={styles.voiceChannelParticipants} aria-label="Người đang trong kênh thoại">
                                       <div className={styles.voiceChannelParticipantsLabel}>Đang trong kênh</div>
@@ -6604,7 +7361,7 @@ export default function MessagesPage() {
                                 >
                                   <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
                                     {channel.isRulesChannel ? (
-                                      <span title="Kênh quy định" style={{ fontSize: "16px", flexShrink: 0 }}>
+                                      <span title={t("chat.sidebar.rulesChannel")} style={{ fontSize: "16px", flexShrink: 0 }}>
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}>
                                           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2v6h2v-6zm0-4h-2v2h2V7z" />
                                         </svg>
@@ -6631,7 +7388,7 @@ export default function MessagesPage() {
                       </div>
                     );
                   })}
-                  {getUncategorizedChannels().length > 0 && (
+                  {visibleChannelsIfHideMuted(getUncategorizedChannels()).length > 0 && (
                     <div className={styles.section}>
                       <div
                         className={styles.sectionHeader}
@@ -6643,14 +7400,14 @@ export default function MessagesPage() {
                             y: e.clientY,
                             category: {
                               _id: UNCATEGORIZED_CATEGORY_ID,
-                              name: "Kênh khác",
+                              name: t("chat.sidebar.otherChannels"),
                             },
                           });
                         }}
                       >
-                        <h3 className={styles.sectionTitle}>Kênh khác</h3>
+                        <h3 className={styles.sectionTitle}>{t("chat.sidebar.otherChannels")}</h3>
                       </div>
-                      {getUncategorizedChannels().map((channel) => (
+                      {visibleChannelsIfHideMuted(getUncategorizedChannels()).map((channel) => (
                         <div
                           key={channel._id}
                           className={`${styles.channelDragItem} ${dragType === "channel" && dragId === channel._id ? styles.dragging : ""}`}
@@ -6683,7 +7440,7 @@ export default function MessagesPage() {
                                   <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                                 </svg>
                               ) : channel.isRulesChannel ? (
-                                <span title="Kênh quy định" style={{ fontSize: "16px", flexShrink: 0 }}>
+                                <span title={t("chat.sidebar.rulesChannel")} style={{ fontSize: "16px", flexShrink: 0 }}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}>
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2v6h2v-6zm0-4h-2v2h2V7z" />
                                   </svg>
@@ -6704,11 +7461,11 @@ export default function MessagesPage() {
                     <div className={styles.section}>
                       <div className={styles.sectionHeader}>
                         <h3 className={styles.sectionTitle}>{t("chat.messagesPage.sectionChat")}</h3>
-                        <button type="button" className={styles.addChannelBtn} title="Tạo kênh chat" onClick={() => openCreateChannelModal("text")}>
+                        <button type="button" className={styles.addChannelBtn} title={t("chat.sidebar.createTextChannel")} onClick={() => openCreateChannelModal("text")}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
                         </button>
                       </div>
-                      {textChannels.length > 0 ? textChannels.map((channel) => (
+                      {visibleChannelsIfHideMuted(textChannels).length > 0 ? visibleChannelsIfHideMuted(textChannels).map((channel) => (
                         <div
                           key={channel._id}
                           className={`${styles.conversationItem} ${selectedChannel === channel._id ? styles.active : ""}`}
@@ -6733,7 +7490,7 @@ export default function MessagesPage() {
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
                         </button>
                       </div>
-                      {voiceChannels.length > 0 ? voiceChannels.map((channel) => (
+                      {visibleChannelsIfHideMuted(voiceChannels).length > 0 ? visibleChannelsIfHideMuted(voiceChannels).map((channel) => (
                         <div
                           key={channel._id}
                           className={`${styles.conversationItem} ${selectedChannel === channel._id || joinedVoiceChannelId === channel._id ? styles.active : ""}`}
@@ -6773,7 +7530,7 @@ export default function MessagesPage() {
                       <path d="M19 12H5" />
                       <path d="M12 19l-7-7 7-7" />
                     </svg>
-                    Quay lại Admin
+                    {t("chat.sidebar.goBackAdmin")}
                   </button>
                 )}
                 </div>{/* end conversationsScrollArea */}
@@ -6807,11 +7564,14 @@ export default function MessagesPage() {
                       <div className={styles.onlineStatus}></div>
                     </div>
                     <div className={styles.userTextInfo}>
-                      <div className={styles.userDisplayName}>
+                      <div
+                        className={styles.userDisplayName}
+                        style={getDisplayNameTextStyle(currentUserProfile, messagesShellTheme)}
+                      >
                         {currentServerNickname ||
                           currentUserProfile?.displayName ||
                           currentUserProfile?.username ||
-                          "Người dùng"}
+                          t("chat.sidebar.userFallback")}
                       </div>
                       <div className={styles.userUsername}>
                         {currentUserProfile?.username || ""}
@@ -6961,6 +7721,716 @@ export default function MessagesPage() {
                   }
                 }}
               />
+            ) : showBoostUpgradeView && !selectedDirectMessageFriend ? (
+              <div style={{ flex: 1, display: "flex", minHeight: 0, minWidth: 0 }}>
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: 0,
+                    overflow: "auto",
+                    background:
+                      "radial-gradient(900px 520px at 20% -10%, color-mix(in srgb, var(--color-primary) 20%, transparent), transparent 55%), radial-gradient(900px 520px at 80% 0%, color-mix(in srgb, var(--color-primary-strong, var(--color-primary)) 14%, transparent), transparent 60%), var(--color-bg-home)",
+                    padding: 22,
+                    color: "var(--color-text)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "min(1060px, 100%)",
+                      margin: "0 auto",
+                      borderRadius: 18,
+                      border: "1px solid var(--color-border)",
+                      background:
+                        "linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 30%, transparent), transparent)",
+                      padding: "22px 18px",
+                      boxShadow: "0 20px 60px rgba(2, 6, 23, 0.18)",
+                      display: "grid",
+                      gap: 14,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                      }}
+                    >
+                      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontWeight: 800 }}>
+                        <button
+                          type="button"
+                          onClick={() => undefined}
+                          style={{
+                            border: "1px solid rgba(255,255,255,0.12)",
+                            background: "rgba(255,255,255,0.08)",
+                            color: "var(--color-text)",
+                            padding: "6px 10px",
+                            borderRadius: 10,
+                            cursor: "pointer",
+                            fontWeight: 900,
+                          }}
+                        >
+                          {t("chat.boostStore.tabs.store")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowBoostUpgradeView(false);
+                          }}
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            color: "var(--color-text-muted)",
+                            padding: "6px 10px",
+                            borderRadius: 10,
+                            cursor: "pointer",
+                            fontWeight: 800,
+                          }}
+                          title={t("chat.boostStore.tabs.close")}
+                        >
+                          {t("chat.boostStore.tabs.close")}
+                        </button>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                        {boostStatus?.active && boostStatus?.expiresAt ? (
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "var(--color-text-muted)",
+                              fontWeight: 800,
+                              padding: "6px 10px",
+                              borderRadius: 999,
+                              border: "1px solid rgba(255,255,255,0.10)",
+                              background: "rgba(255,255,255,0.05)",
+                            }}
+                            title={t("chat.boostStore.expiresLabel")}
+                          >
+                            {t("chat.boostStore.expiresLabel")}:{" "}
+                            {(() => {
+                              const d = new Date(boostStatus.expiresAt as string);
+                              return Number.isFinite(d.getTime())
+                                ? d.toLocaleDateString(localeTagForLanguage(language))
+                                : String(boostStatus.expiresAt);
+                            })()}
+                          </div>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBoostMode("gift");
+                            setBoostModalStep("plan");
+                            setBoostTier("boost");
+                            setBoostBillingCycle("monthly");
+                            setBoostRecipientUserId(null);
+                            setBoostModalOpen(true);
+                          }}
+                          style={{
+                            borderRadius: 999,
+                            padding: "8px 12px",
+                            fontSize: 12,
+                            fontWeight: 900,
+                            border: "1px solid rgba(255,255,255,0.16)",
+                            background: "rgba(255,255,255,0.08)",
+                            color: "var(--color-text)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {t("chat.boostStore.buttons.gift")}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: 44,
+                        fontWeight: 950,
+                        textTransform: "uppercase",
+                        lineHeight: 1.05,
+                        letterSpacing: "0.02em",
+                      }}
+                    >
+                      {t("chat.boostStore.heroTitle")}
+                    </div>
+
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBoostMode("subscribe");
+                          setBoostModalStep("plan");
+                          setBoostTier((boostStatus?.tier as any) === "basic" ? "basic" : "boost");
+                          setBoostBillingCycle("monthly");
+                          setBoostRecipientUserId(null);
+                          setBoostModalOpen(true);
+                        }}
+                        style={{
+                          border: "none",
+                          borderRadius: 12,
+                          padding: "10px 14px",
+                          fontSize: 14,
+                          fontWeight: 900,
+                          cursor: "pointer",
+                          color: "#fff",
+                          background:
+                            "linear-gradient(135deg, var(--color-primary), var(--color-primary-strong, var(--color-primary)))",
+                        }}
+                      >
+                        {boostStatus?.active
+                          ? t("chat.boostStore.buttons.renew")
+                          : t("chat.boostStore.buttons.subscribe")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBoostMode("gift");
+                          setBoostModalStep("plan");
+                          setBoostTier("boost");
+                          setBoostBillingCycle("monthly");
+                          setBoostRecipientUserId(null);
+                          setBoostModalOpen(true);
+                        }}
+                        style={{
+                          borderRadius: 12,
+                          padding: "10px 14px",
+                          fontSize: 14,
+                          fontWeight: 900,
+                          cursor: "pointer",
+                          color: "var(--color-text)",
+                          background: "var(--color-surface-muted)",
+                          border: "1px solid var(--color-border)",
+                        }}
+                      >
+                        {t("chat.boostStore.buttons.gift")}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {boostModalOpen ? (
+                  <>
+                  <div
+                    role="dialog"
+                    aria-modal="true"
+                    onMouseDown={(e) => {
+                      if (e.target === e.currentTarget) setBoostModalOpen(false);
+                    }}
+                    style={{
+                      position: "fixed",
+                      inset: 0,
+                      background: "rgba(0,0,0,0.55)",
+                      display: "grid",
+                      placeItems: "center",
+                      padding: 24,
+                      zIndex: 80,
+                    }}
+                  >
+                    <div
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{
+                        width: "min(780px, 96vw)",
+                        borderRadius: 16,
+                        border: "1px solid var(--color-border)",
+                        background: "var(--color-surface)",
+                        padding: 16,
+                        boxShadow: "0 20px 60px rgba(2,6,23,0.35)",
+                        color: "var(--color-text)",
+                        display: "grid",
+                        gap: 12,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <div style={{ fontWeight: 950 }}>
+                          {boostModalStep === "plan"
+                            ? boostMode === "gift"
+                              ? t("chat.boostStore.modal.giftTitle")
+                              : t("chat.boostStore.modal.planTitle")
+                            : t("chat.boostStore.modal.billingTitle")}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setBoostModalOpen(false)}
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            border: "1px solid var(--color-border)",
+                            background: "var(--color-surface-muted)",
+                            cursor: "pointer",
+                            fontSize: 20,
+                            lineHeight: 1,
+                            color: "var(--color-text)",
+                          }}
+                          aria-label="Close"
+                        >
+                          ×
+                        </button>
+                      </div>
+
+                      {boostModalStep === "plan" ? (
+                        <>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                            <button
+                              type="button"
+                              onClick={() => setBoostTier("boost")}
+                              style={{
+                                textAlign: "left",
+                                borderRadius: 16,
+                                padding: 14,
+                                cursor: "pointer",
+                                border:
+                                  boostTier === "boost"
+                                    ? "1px solid color-mix(in srgb, var(--color-primary) 60%, var(--color-border) 40%)"
+                                    : "1px solid var(--color-border)",
+                                background:
+                                  "linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.08))",
+                              }}
+                            >
+                              <div style={{ fontSize: 30, fontWeight: 950, marginBottom: 6 }}>
+                                {t("chat.boostStore.plans.boost.name")}
+                              </div>
+                              <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                                {t("chat.boostStore.plans.boost.priceMonthly")}
+                              </div>
+                              <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.45 }}>
+                                <li>{t("chat.boostStore.plans.boost.feature1")}</li>
+                                <li>{t("chat.boostStore.plans.boost.feature2")}</li>
+                                <li>{t("chat.boostStore.plans.boost.feature3")}</li>
+                                <li>{t("chat.boostStore.plans.boost.feature4")}</li>
+                                <li>{t("chat.boostStore.plans.boost.feature5")}</li>
+                              </ul>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setBoostTier("basic")}
+                              style={{
+                                textAlign: "left",
+                                borderRadius: 16,
+                                padding: 14,
+                                cursor: "pointer",
+                                border:
+                                  boostTier === "basic"
+                                    ? "1px solid color-mix(in srgb, var(--color-primary) 60%, var(--color-border) 40%)"
+                                    : "1px solid var(--color-border)",
+                                background:
+                                  "linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.08))",
+                              }}
+                            >
+                              <div style={{ fontSize: 26, fontWeight: 950, marginBottom: 6 }}>
+                                {t("chat.boostStore.plans.basic.name")}
+                              </div>
+                              <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                                {t("chat.boostStore.plans.basic.priceMonthly")}
+                              </div>
+                              <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.45 }}>
+                                <li>{t("chat.boostStore.plans.basic.feature1")}</li>
+                                <li>{t("chat.boostStore.plans.basic.feature2")}</li>
+                                <li>{t("chat.boostStore.plans.basic.feature3")}</li>
+                              </ul>
+                            </button>
+                          </div>
+
+                          {boostMode === "gift" ? (
+                            <div style={{ display: "grid", gap: 10 }}>
+                              <input
+                                value={boostUserQuery}
+                                onChange={(e) => setBoostUserQuery(e.target.value)}
+                                placeholder={t("chat.boostStore.giftSearchPlaceholder")}
+                                style={{
+                                  width: "100%",
+                                  borderRadius: 12,
+                                  border: "1px solid var(--color-border)",
+                                  background: "var(--color-surface)",
+                                  padding: "10px 12px",
+                                  fontSize: 14,
+                                  color: "var(--color-text)",
+                                }}
+                              />
+
+                              <div
+                                style={{
+                                  maxHeight: 240,
+                                  overflow: "auto",
+                                  display: "grid",
+                                  gap: 8,
+                                }}
+                              >
+                                {(boostUsers || [])
+                                  .filter((u) => {
+                                    const q = boostUserQuery.trim().toLowerCase();
+                                    if (!q) return true;
+                                    const a = String(u?.username ?? "").toLowerCase();
+                                    const b = String(u?.displayName ?? "").toLowerCase();
+                                    return a.includes(q) || b.includes(q);
+                                  })
+                                  .map((u) => {
+                                    const id = String(u?.userId ?? u?._id ?? "");
+                                    const active = id && id === boostRecipientUserId;
+                                    const display =
+                                      u?.displayName ||
+                                      u?.username ||
+                                      t("chat.boostStore.userFallback");
+                                    const sub = u?.username ? `@${u.username}` : id;
+                                    return (
+                                      <button
+                                        key={id || sub}
+                                        type="button"
+                                        onClick={() => setBoostRecipientUserId(id || null)}
+                                        style={{
+                                          width: "100%",
+                                          textAlign: "left",
+                                          borderRadius: 12,
+                                          padding: "10px 12px",
+                                          cursor: "pointer",
+                                          border: active
+                                            ? "1px solid color-mix(in srgb, var(--color-primary) 60%, var(--color-border) 40%)"
+                                            : "1px solid var(--color-border)",
+                                          background: "var(--color-surface)",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "space-between",
+                                          gap: 10,
+                                        }}
+                                      >
+                                        <span style={{ display: "grid", gap: 2, minWidth: 0 }}>
+                                          <span style={{ fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {display}
+                                          </span>
+                                          <span style={{ fontSize: 12, color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {sub}
+                                          </span>
+                                        </span>
+                                        <span>{active ? "✓" : ""}</span>
+                                      </button>
+                                    );
+                                  })}
+                              </div>
+                            </div>
+                          ) : null}
+
+                          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                            <button
+                              type="button"
+                              onClick={() => setBoostModalOpen(false)}
+                              style={{
+                                borderRadius: 12,
+                                padding: "10px 14px",
+                                fontSize: 14,
+                                fontWeight: 900,
+                                cursor: "pointer",
+                                color: "var(--color-text)",
+                                background: "var(--color-surface-muted)",
+                                border: "1px solid var(--color-border)",
+                              }}
+                            >
+                              {t("chat.boostStore.actions.cancel")}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={boostMode === "gift" && !boostRecipientUserId}
+                              onClick={goToBoostBillingStep}
+                              style={{
+                                border: "none",
+                                borderRadius: 12,
+                                padding: "10px 14px",
+                                fontSize: 14,
+                                fontWeight: 900,
+                                cursor: "pointer",
+                                color: "#fff",
+                                background:
+                                  "linear-gradient(135deg, var(--color-primary), var(--color-primary-strong, var(--color-primary)))",
+                                opacity: boostMode === "gift" && !boostRecipientUserId ? 0.5 : 1,
+                              }}
+                            >
+                              {t("chat.boostStore.actions.continue")}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                            <button
+                              type="button"
+                              onClick={() => setBoostBillingCycle("monthly")}
+                              style={{
+                                textAlign: "left",
+                                borderRadius: 16,
+                                padding: 14,
+                                cursor: "pointer",
+                                border:
+                                  boostBillingCycle === "monthly"
+                                    ? "1px solid color-mix(in srgb, var(--color-primary) 60%, var(--color-border) 40%)"
+                                    : "1px solid var(--color-border)",
+                                background:
+                                  "linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.08))",
+                              }}
+                            >
+                              <div style={{ fontSize: 22, fontWeight: 950, marginBottom: 6 }}>
+                                {t("chat.boostStore.billing.monthlyTitle")}
+                              </div>
+                              <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                                {t("chat.boostStore.billing.monthlySubtitle")}
+                              </div>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setBoostBillingCycle("yearly")}
+                              style={{
+                                textAlign: "left",
+                                borderRadius: 16,
+                                padding: 14,
+                                cursor: "pointer",
+                                border:
+                                  boostBillingCycle === "yearly"
+                                    ? "1px solid color-mix(in srgb, var(--color-primary) 60%, var(--color-border) 40%)"
+                                    : "1px solid var(--color-border)",
+                                background:
+                                  "linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.08))",
+                              }}
+                            >
+                              <div style={{ fontSize: 22, fontWeight: 950, marginBottom: 6 }}>
+                                {t("chat.boostStore.billing.yearlyTitle")}
+                              </div>
+                              <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                                {t("chat.boostStore.billing.yearlySubtitle")}
+                              </div>
+                            </button>
+                          </div>
+
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                            <button
+                              type="button"
+                              onClick={() => setBoostModalStep("plan")}
+                              style={{
+                                borderRadius: 12,
+                                padding: "10px 14px",
+                                fontSize: 14,
+                                fontWeight: 900,
+                                cursor: "pointer",
+                                color: "var(--color-text)",
+                                background: "var(--color-surface-muted)",
+                                border: "1px solid var(--color-border)",
+                              }}
+                            >
+                              {t("chat.boostStore.actions.back")}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={boostCheckoutBusy}
+                              onClick={() => void submitMessagesBoostCheckout()}
+                              style={{
+                                border: "none",
+                                borderRadius: 12,
+                                padding: "10px 14px",
+                                fontSize: 14,
+                                fontWeight: 900,
+                                cursor: boostCheckoutBusy ? "wait" : "pointer",
+                                color: "#fff",
+                                background:
+                                  "linear-gradient(135deg, var(--color-primary), var(--color-primary-strong, var(--color-primary)))",
+                                opacity: boostCheckoutBusy ? 0.65 : 1,
+                              }}
+                            >
+                              {boostCheckoutBusy
+                                ? t("chat.boostStore.checkout.redirecting")
+                                : t("chat.boostStore.checkout.cta")}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {boostActivePeriodWarnOpen ? (
+                    <div
+                      role="dialog"
+                      aria-modal="true"
+                      onMouseDown={(e) => {
+                        if (e.target === e.currentTarget)
+                          setBoostActivePeriodWarnOpen(false);
+                      }}
+                      style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(0,0,0,0.45)",
+                        display: "grid",
+                        placeItems: "center",
+                        padding: 24,
+                        zIndex: 90,
+                      }}
+                    >
+                      <div
+                        onMouseDown={(e) => e.stopPropagation()}
+                        style={{
+                          width: "min(440px, 92vw)",
+                          borderRadius: 14,
+                          border: "1px solid var(--color-border)",
+                          background: "var(--color-surface)",
+                          padding: 16,
+                          boxShadow: "0 16px 48px rgba(2,6,23,0.4)",
+                          display: "grid",
+                          gap: 12,
+                          color: "var(--color-text)",
+                        }}
+                      >
+                        <div style={{ fontWeight: 950, fontSize: 16 }}>
+                          {t("chat.boostStore.warnings.activeTitle")}
+                        </div>
+                        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: "var(--color-text-muted)" }}>
+                          {t("chat.boostStore.warnings.activeBodyPrefix")}
+                          {boostStatus?.expiresAt
+                            ? ` đến ${new Date(boostStatus.expiresAt).toLocaleString(localeTagForLanguage(language), {
+                                dateStyle: "medium",
+                                timeStyle: "short",
+                              })}`
+                            : ""}
+                          . {t("chat.boostStore.warnings.activeBodySuffix")}
+                        </p>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                          <button
+                            type="button"
+                            onClick={() => setBoostActivePeriodWarnOpen(false)}
+                            style={{
+                              borderRadius: 12,
+                              padding: "10px 14px",
+                              fontSize: 14,
+                              fontWeight: 900,
+                              cursor: "pointer",
+                              color: "var(--color-text)",
+                              background: "var(--color-surface-muted)",
+                              border: "1px solid var(--color-border)",
+                            }}
+                          >
+                            {t("chat.boostStore.actions.abort")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBoostActivePeriodWarnOpen(false);
+                              setBoostModalStep("billing");
+                            }}
+                            style={{
+                              border: "none",
+                              borderRadius: 12,
+                              padding: "10px 14px",
+                              fontSize: 14,
+                              fontWeight: 900,
+                              cursor: "pointer",
+                              color: "#fff",
+                              background:
+                                "linear-gradient(135deg, var(--color-primary), var(--color-primary-strong, var(--color-primary)))",
+                            }}
+                          >
+                            {t("chat.boostStore.actions.continue")}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {boostTierSwitchWarnOpen ? (
+                    <div
+                      role="dialog"
+                      aria-modal="true"
+                      onMouseDown={(e) => {
+                        if (e.target === e.currentTarget)
+                          setBoostTierSwitchWarnOpen(false);
+                      }}
+                      style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(0,0,0,0.45)",
+                        display: "grid",
+                        placeItems: "center",
+                        padding: 24,
+                        zIndex: 91,
+                      }}
+                    >
+                      <div
+                        onMouseDown={(e) => e.stopPropagation()}
+                        style={{
+                          width: "min(460px, 92vw)",
+                          borderRadius: 14,
+                          border: "1px solid var(--color-border)",
+                          background: "var(--color-surface)",
+                          padding: 16,
+                          boxShadow: "0 16px 48px rgba(2,6,23,0.4)",
+                          display: "grid",
+                          gap: 12,
+                          color: "var(--color-text)",
+                        }}
+                      >
+                        <div style={{ fontWeight: 950, fontSize: 16 }}>
+                          {t("chat.boostStore.warnings.switchTitle")}
+                        </div>
+                        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "var(--color-text-muted)" }}>
+                          {t("chat.boostStore.warnings.switchBodyPrefix")}{" "}
+                          <strong style={{ color: "var(--color-text)" }}>
+                            {boostStatus?.tier === "basic"
+                              ? t("chat.boostStore.plans.basic.name")
+                              : boostStatus?.tier === "boost"
+                                ? t("chat.boostStore.plans.boost.name")
+                                : t("chat.boostStore.warnings.switchCurrentFallback")}
+                          </strong>{" "}
+                          {t("chat.boostStore.warnings.switchBodyMiddle")}{" "}
+                          <strong style={{ color: "var(--color-text)" }}>
+                            {boostTier === "basic"
+                              ? t("chat.boostStore.plans.basic.name")
+                              : t("chat.boostStore.plans.boost.name")}
+                          </strong>
+                          . {t("chat.boostStore.warnings.switchBodySuffix")}{" "}
+                          <strong>{t("chat.boostStore.warnings.switchBodyStrong")}</strong>.
+                        </p>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                          <button
+                            type="button"
+                            onClick={() => setBoostTierSwitchWarnOpen(false)}
+                            style={{
+                              borderRadius: 12,
+                              padding: "10px 14px",
+                              fontSize: 14,
+                              fontWeight: 900,
+                              cursor: "pointer",
+                              color: "var(--color-text)",
+                              background: "var(--color-surface-muted)",
+                              border: "1px solid var(--color-border)",
+                            }}
+                          >
+                            {t("chat.boostStore.actions.abort")}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={boostCheckoutBusy}
+                            onClick={() =>
+                              void submitMessagesBoostCheckout({
+                                skipTierChangeConfirm: true,
+                              })
+                            }
+                            style={{
+                              border: "none",
+                              borderRadius: 12,
+                              padding: "10px 14px",
+                              fontSize: 14,
+                              fontWeight: 900,
+                              cursor: boostCheckoutBusy ? "wait" : "pointer",
+                              color: "#fff",
+                              background:
+                                "linear-gradient(135deg, var(--color-primary), var(--color-primary-strong, var(--color-primary)))",
+                              opacity: boostCheckoutBusy ? 0.65 : 1,
+                            }}
+                          >
+                            {boostCheckoutBusy
+                              ? t("chat.boostStore.checkout.redirecting")
+                              : t("chat.boostStore.actions.continue")}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                  </>
+                ) : null}
+              </div>
             ) : showJoinApplicationsView && currentServer && !selectedDirectMessageFriend ? (
               <div style={{ flex: 1, display: "flex", minHeight: 0, minWidth: 0 }}>
                 <ServerJoinApplicationsPanel
@@ -7010,7 +8480,7 @@ export default function MessagesPage() {
                   <>
                     {viewingVoiceChannel && (
                   <div className={styles.chatHeader}>
-                    <div className={styles.chatHeaderLeft}>
+                    <div className={styles.channelHeaderStart}>
                       <span className={styles.voiceChannelIcon}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
@@ -7024,14 +8494,9 @@ export default function MessagesPage() {
                       </h2>
                     </div>
                     <div className={styles.chatHeaderActions}>
-                      <button className={styles.chatIconBtn} title="Chat">
+                      <button type="button" title={t("chat.composer.voiceHeaderChat")}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        </svg>
-                      </button>
-                      <button className={styles.chatIconBtn} title="Tùy chọn khác">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                          <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
                         </svg>
                       </button>
                     </div>
@@ -7051,7 +8516,7 @@ export default function MessagesPage() {
                             className={styles.voiceCallErrorBtn}
                             onClick={leaveVoiceChannel}
                           >
-                            Rời kênh
+                            {t("chat.voice.leaveChannel")}
                           </button>
                         </div>
                       ) : voiceChannelCallToken && voiceChannelCallServerUrl ? (
@@ -7063,14 +8528,14 @@ export default function MessagesPage() {
                           participantName={
                             currentUserProfile?.displayName ||
                             currentUserProfile?.username ||
-                            "Người dùng"
+                            t("chat.sidebar.userFallback")
                           }
                           onDisconnect={leaveVoiceChannel}
                         />
                       ) : (
                         <div className={styles.voiceCallConnecting}>
                           <div className={styles.voiceCallSpinner} />
-                          <p>Đang kết nối...</p>
+                          <p>{t("chat.voice.connecting")}</p>
                         </div>
                       )}
                     </div>
@@ -7083,24 +8548,25 @@ export default function MessagesPage() {
                 {joinedVoiceChannelId && connectedVoiceChannel && !viewingVoiceChannel && (
                   <div className={styles.voiceChatBanner}>
                     <span className={styles.voiceChatBannerLabel}>
-                      Đang trong kênh thoại: {translateChannelName(connectedVoiceChannel.name, language)}
+                      {t("chat.voice.inVoiceChannelBanner")} {translateChannelName(connectedVoiceChannel.name, language)}
                     </span>
                     <button type="button" className={styles.voiceChatBannerLeave} onClick={leaveVoiceChannel}>
-                      Rời kênh
+                      {t("chat.voice.leaveChannel")}
                     </button>
                   </div>
                 )}
                 {/* Chat Header (DM or text channel) */}
                 <div className={styles.chatHeader}>
-                  <div className={styles.chatHeaderLeft}>
+                  <div className={styles.channelHeaderStart}>
                     <h2 className={styles.chatHeaderTitle}>
                       {selectedDirectMessageFriend
                         ? selectedDirectMessageFriend.displayName ||
                           selectedDirectMessageFriend.username
-                        : "#" +
-                          (allChannels.find((c) => c._id === selectedChannel)
-                            ?.name ||
-                            "channel")}
+                        : `#${translateChannelName(
+                            allChannels.find((c) => c._id === selectedChannel)?.name ??
+                              "channel",
+                            language,
+                          )}`}
                     </h2>
                   </div>
                   <div className={styles.chatHeaderActions}>
@@ -7108,8 +8574,8 @@ export default function MessagesPage() {
                     {selectedDirectMessageFriend && (
                       <>
                         <button
-                          className={styles.chatIconBtn}
-                          title="Voice Call"
+                          type="button"
+                          title={t("chat.composer.voiceCall")}
                           onClick={() => handleStartCall(false)}
                           disabled={isInCall}
                         >
@@ -7125,8 +8591,8 @@ export default function MessagesPage() {
                           </svg>
                         </button>
                         <button
-                          className={styles.chatIconBtn}
-                          title="Video Call"
+                          type="button"
+                          title={t("chat.composer.videoCall")}
                           onClick={() => handleStartCall(true)}
                           disabled={isInCall}
                         >
@@ -7152,25 +8618,17 @@ export default function MessagesPage() {
                       </>
                     )}
                     <button
-                      className={styles.chatIconBtn}
-                      title="Tìm kiếm tin nhắn"
-                      onClick={() => setShowMessageSearch(true)}
+                      type="button"
+                      title={t("chat.popups.messageSearch.title")}
+                      aria-label={t("chat.popups.messageSearch.title")}
+                      onClick={() => {
+                        setMessageSearchDmConversationOnly(Boolean(selectedDirectMessageFriend));
+                        setShowMessageSearch(true);
+                      }}
                     >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <circle cx="11" cy="11" r="8" />
                         <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                      </svg>
-                    </button>
-                    <button className={styles.chatIconBtn} title="Tùy chọn khác">
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <circle cx="12" cy="5" r="2"></circle>
-                        <circle cx="12" cy="12" r="2"></circle>
-                        <circle cx="12" cy="19" r="2"></circle>
                       </svg>
                     </button>
                   </div>
@@ -7190,7 +8648,7 @@ export default function MessagesPage() {
                         borderBottom: "1px solid rgba(250, 166, 26, 0.25)",
                       }}
                     >
-                      Máy chủ này có nội dung được gắn nhãn giới hạn độ tuổi (18+). Hãy cư xử phù hợp.
+                      {t("chat.ageRestrict.bannerNotice")}
                     </div>
                   )}
                 {/* Sticky reaction bar (DM): hiện reaction của tin nhắn khi kéo lên gần header */}
@@ -7236,7 +8694,7 @@ export default function MessagesPage() {
                           }}
                         >
                           <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>
-                            Máy chủ giới hạn độ tuổi
+                            {t("chat.ageRestrict.title")}
                           </h3>
                           <p
                             style={{
@@ -7246,8 +8704,7 @@ export default function MessagesPage() {
                               lineHeight: 1.5,
                             }}
                           >
-                            Máy chủ này yêu cầu từ đủ 18 tuổi. Tài khoản của bạn chưa đủ điều kiện hoặc
-                            chưa có ngày sinh trên hồ sơ, nên không thể xem tin nhắn trong các kênh.
+                            {t("chat.ageRestrict.under18Body")}
                           </p>
                           <button
                             type="button"
@@ -7263,7 +8720,7 @@ export default function MessagesPage() {
                               color: "#fff",
                             }}
                           >
-                            Quay lại
+                            {t("chat.ageRestrict.goBack")}
                           </button>
                         </div>
                       </div>
@@ -7295,7 +8752,7 @@ export default function MessagesPage() {
                           }}
                         >
                           <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>
-                            Máy chủ giới hạn độ tuổi
+                            {t("chat.ageRestrict.title")}
                           </h3>
                           <p
                             style={{
@@ -7305,8 +8762,7 @@ export default function MessagesPage() {
                               lineHeight: 1.5,
                             }}
                           >
-                            Máy chủ này có chứa nội dung nhạy cảm dán nhãn giới hạn độ tuổi. Bạn có muốn
-                            tiếp tục không?
+                            {t("chat.ageRestrict.ackBody")}
                           </p>
                           <div
                             style={{
@@ -7331,7 +8787,7 @@ export default function MessagesPage() {
                                 color: "var(--color-text)",
                               }}
                             >
-                              Quay lại
+                              {t("chat.ageRestrict.goBack")}
                             </button>
                             <button
                               type="button"
@@ -7347,7 +8803,7 @@ export default function MessagesPage() {
                                 color: "#fff",
                               }}
                             >
-                              {ageAcknowledgeLoading ? "Đang xử lý..." : "Tiếp tục"}
+                              {ageAcknowledgeLoading ? t("chat.ageRestrict.processing") : t("chat.ageRestrict.continue")}
                             </button>
                           </div>
                         </div>
@@ -7401,6 +8857,7 @@ export default function MessagesPage() {
                             onDelete={(msgId) => setShowDeleteDialog(msgId)}
                             scrollContainerRef={messagesContainerRef}
                             dmPartnerDisplayName={selectedDirectMessageFriend.displayName || selectedDirectMessageFriend.username}
+                            messagesShellTheme={messagesShellTheme}
                           />
                         </div>
                       ))
@@ -7454,7 +8911,12 @@ export default function MessagesPage() {
                           }}>
                             {t("chat.welcome.channelBegin")}{" "}
                             <strong style={{ color: "var(--color-text)" }}>
-                              #{allChannels.find((c) => c._id === selectedChannel)?.name || "chung"}
+                              #
+                              {translateChannelName(
+                                allChannels.find((c) => c._id === selectedChannel)?.name ??
+                                  "chung",
+                                language,
+                              )}
                             </strong>
                             {t("chat.welcome.startTalking")}
                           </p>
@@ -7524,6 +8986,8 @@ export default function MessagesPage() {
                             onDelete={(msgId) => setShowDeleteDialog(msgId)}
                             scrollContainerRef={messagesContainerRef}
                             senderColor={memberRoleColors[message.senderId]}
+                            senderNameStyle={resolveMessageSenderStyle(message)}
+                            messagesShellTheme={messagesShellTheme}
                             onChannelUserProfileOpen={handleOpenChannelUserProfile}
                           />
                         </div>
@@ -7660,7 +9124,7 @@ export default function MessagesPage() {
                   <div style={{ position: "relative" }}>
                     <button
                       className={styles.plusButton}
-                      title="Tùy chọn khác"
+                      title={t("chat.ageRestrict.moreOptions")}
                       onClick={() => setShowPlusMenu(!showPlusMenu)}
                     >
                       <svg
@@ -7694,7 +9158,7 @@ export default function MessagesPage() {
                             <polyline points="17 8 12 3 7 8"></polyline>
                             <line x1="12" y1="3" x2="12" y2="15"></line>
                           </svg>
-                          <span>Upload file</span>
+                          <span>{t("chat.composer.plusUploadFile")}</span>
                         </button>
                         <button
                           className={styles.plusMenuItem}
@@ -7714,28 +9178,7 @@ export default function MessagesPage() {
                             <line x1="16" y1="17" x2="8" y2="17"></line>
                             <polyline points="10 9 9 9 8 9"></polyline>
                           </svg>
-                          <span>Tạo khảo sát</span>
-                        </button>
-                        <button
-                          className={styles.plusMenuItem}
-                          onClick={() => {
-                            setShowPlusMenu(false);
-                          }}
-                        >
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                          </svg>
-                          <span>Use apps</span>
+                          <span>{t("chat.composer.plusCreatePoll")}</span>
                         </button>
                       </div>
                     )}
@@ -7782,7 +9225,7 @@ export default function MessagesPage() {
                   {isUploadingVoice && (
                     <div className={styles.uploadingVoice}>
                       <div className={styles.spinner}></div>
-                      <span>Uploading...</span>
+                      <span>{t("chat.messagesPage.uploadingVoice")}</span>
                     </div>
                   )}
 
@@ -7807,7 +9250,7 @@ export default function MessagesPage() {
                           ref={messageInputRef}
                           type="text"
                           className={styles.messageInput}
-                          placeholder="Nhập tin nhắn..."
+                          placeholder={t("chat.composer.messagePlaceholder")}
                           disabled={shouldBlockServerChatInput}
                           value={messageText}
                           onChange={(e) => {
@@ -7909,8 +9352,10 @@ export default function MessagesPage() {
                       <div className={styles.mediaButtons}>
                         {/* Voice Recording Button */}
                         <button
+                          type="button"
                           className={styles.mediaButton}
-                          title="Gửi tin nhắn thoại"
+                          title={t("chat.composer.voiceMessage")}
+                          aria-label={t("chat.composer.voiceMessage")}
                           onClick={() => setIsRecordingVoice(true)}
                           disabled={isRecordingVoice || isUploadingVoice}
                         >
@@ -7931,8 +9376,10 @@ export default function MessagesPage() {
 
                         {/* GIF Button */}
                         <button
+                          type="button"
                           className={styles.mediaButton}
-                          title="Send GIF"
+                          title={t("chat.composer.sendGif")}
+                          aria-label={t("chat.composer.sendGif")}
                           onClick={() => {
                             setMediaPickerTab("gif");
                             setShowGiphyPicker(true);
@@ -7941,14 +9388,16 @@ export default function MessagesPage() {
                           <span
                             style={{ fontSize: "14px", fontWeight: "bold" }}
                           >
-                            GIF
+                            {t("chat.mediaPicker.tabGif")}
                           </span>
                         </button>
 
                         {/* Sticker Button */}
                         <button
+                          type="button"
                           className={styles.mediaButton}
-                          title="Gửi nhãn dán"
+                          title={t("chat.composer.sendSticker")}
+                          aria-label={t("chat.composer.sendSticker")}
                           onClick={() => {
                             setMediaPickerTab("sticker");
                             setShowGiphyPicker(true);
@@ -7994,8 +9443,10 @@ export default function MessagesPage() {
 
                         {/* Emoji Picker */}
                         <button
+                          type="button"
                           className={styles.mediaButton}
-                          title="Emoji & kaomoji"
+                          title={t("chat.composer.openEmojiPicker")}
+                          aria-label={t("chat.composer.openEmojiPicker")}
                           onClick={() => {
                             setMediaPickerTab("emoji");
                             setShowGiphyPicker(true);
@@ -8018,6 +9469,7 @@ export default function MessagesPage() {
                       </div>
 
                       <button
+                        type="button"
                         className={styles.sendButton}
                         onClick={
                           selectedDirectMessageFriend
@@ -8025,7 +9477,8 @@ export default function MessagesPage() {
                             : handleSendMessage
                         }
                         disabled={!messageText.trim() || (!selectedDirectMessageFriend && shouldBlockServerChatInput)}
-                        title="Gửi tin nhắn"
+                        title={t("chat.composer.sendMessage")}
+                        aria-label={t("chat.composer.sendMessage")}
                       >
                         <svg
                           width="18"
@@ -8050,8 +9503,8 @@ export default function MessagesPage() {
                 <div className={styles.emptyIcon}>💬</div>
                 <p className={styles.emptyText}>
                   {loading
-                    ? "Đang tải..."
-                    : "Chọn máy chủ và kênh để bắt đầu nhắn tin"}
+                    ? t("chat.chatPage.loadingSelectServer")
+                    : t("chat.chatPage.selectServerPrompt")}
                 </p>
               </div>
             )}
@@ -8062,13 +9515,13 @@ export default function MessagesPage() {
             dmProfileSidebarOpen ? (
               <div className={styles.activeNowSidebar}>
                 <div className={styles.activeNowHeader}>
-                  <h3 className={styles.activeNowTitle}>Hồ sơ</h3>
+                  <h3 className={styles.activeNowTitle}>{t("chat.profile.title")}</h3>
                   <button
                     type="button"
                     className={styles.activeNowCloseBtn}
                     onClick={() => setDmProfileSidebarOpen(false)}
-                    title="Đóng"
-                    aria-label="Đóng"
+                    title={t("chat.profile.close")}
+                    aria-label={t("chat.profile.close")}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="18" y1="6" x2="6" y2="18" />
@@ -8117,18 +9570,41 @@ export default function MessagesPage() {
                       </p>
                     )}
 
+                    {dmProfileDetail?.cordigramMemberSince ? (
+                      <div className={styles.dmProfileMetaCard}>
+                        <div className={styles.dmProfileMetaLabel}>
+                          {t("chat.popups.userProfile.memberSinceLabel")}
+                        </div>
+                        <div className={styles.dmProfileMetaValue}>
+                          {dmProfileDetail.cordigramMemberSince}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className={styles.dmProfileMetaCard}>
+                      <div className={styles.dmProfileMetaLabel}>
+                        {t("chat.popups.userProfile.mutualServersLabel")}
+                      </div>
+                      <div className={styles.dmProfileMetaValue}>
+                        {dmProfileDetail?.mutualServerCount ?? 0}
+                      </div>
+                    </div>
+
                     {selectedDirectMessageFriend.bio && (
                       <div className={styles.dmProfileBio}>
                         {selectedDirectMessageFriend.bio}
                       </div>
                     )}
 
-                    <Link
-                      href={`/profile/${selectedDirectMessageFriend._id}`}
+                    <button
+                      type="button"
                       className={styles.dmProfileViewFull}
+                      onClick={() =>
+                        setDmProfilePopupUserId(selectedDirectMessageFriend._id)
+                      }
                     >
-                      Xem hồ sơ đầy đủ
-                    </Link>
+                      {t("chat.profile.viewFull")}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -8137,13 +9613,13 @@ export default function MessagesPage() {
                 type="button"
                 className={styles.dmProfileSidebarToggle}
                 onClick={() => setDmProfileSidebarOpen(true)}
-                title="Mở hồ sơ"
+                title={t("chat.profile.title")}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
-                <span>Hồ sơ</span>
+                <span>{t("chat.profile.title")}</span>
               </button>
             )
           )}
@@ -8151,7 +9627,21 @@ export default function MessagesPage() {
       </div>
 
       {/* Popup quy định (tab Truy cập) — mở từ nút Hoàn thành khi chưa đủ xác minh */}
-      {(verificationRulesOpen || showAcceptRulesModal) && selectedServer && !selectedDirectMessageFriend && (() => {
+      {dmProfilePopupUserId && selectedDirectMessageFriend && (
+        <UserProfilePopup
+          userId={dmProfilePopupUserId}
+          token={token}
+          currentUserId={currentUserId}
+          onClose={() => setDmProfilePopupUserId(null)}
+          onMessage={() => setDmProfilePopupUserId(null)}
+        />
+      )}
+
+      {(verificationRulesOpen || showAcceptRulesModal) &&
+        selectedServer &&
+        !selectedDirectMessageFriend &&
+        !isApplyModeAcceptedMember &&
+        (() => {
         const srv = currentServer;
         const hasRulesContent = (verificationAccessSettings?.rules?.length ?? 0) > 0;
         const rulesAccepted = myServerAccessStatus?.acceptedRules !== false;
@@ -8195,7 +9685,7 @@ export default function MessagesPage() {
           <div
             role="dialog"
             aria-modal
-            aria-label="Trước khi bạn bắt đầu trò chuyện"
+            aria-label={t("chat.verify.dialogLabel")}
             style={{
               position: "fixed",
               inset: 0,
@@ -8251,16 +9741,16 @@ export default function MessagesPage() {
                   {!srv?.avatarUrl && (srv?.name?.charAt(0)?.toUpperCase() ?? "S")}
                 </div>
                 <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: "#f2f3f5", textAlign: "center" }}>
-                  {srv?.name ?? "Máy chủ"}
+                  {srv?.name ?? t("chat.chatPage.serverFallback")}
                 </p>
                 <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#b5bac1", marginTop: 4 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3ba55d", display: "inline-block" }} />
-                    {srv?.members?.filter(() => true).length ?? 0} thành viên
+                    {t("chat.chatPage.memberCount").replace("{count}", String(srv?.members?.filter(() => true).length ?? 0))}
                   </span>
                 </div>
                 <p style={{ margin: "4px 0 0", fontSize: 11, color: "#949ba4" }}>
-                  Thành lập từ tháng {srv?.createdAt ? new Date(srv.createdAt).toLocaleDateString("vi-VN", { month: "numeric", year: "numeric" }) : ""}
+                  {t("chat.chatPage.foundedMonth").replace("{date}", srv?.createdAt ? new Date(srv.createdAt).toLocaleDateString(localeTagForLanguage(language), { month: "numeric", year: "numeric" }) : "")}
                 </p>
               </div>
 
@@ -8278,15 +9768,15 @@ export default function MessagesPage() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
                     <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#f2f3f5" }}>
-                      Trước khi bạn bắt đầu trò chuyện ở đây...
+                      {t("chat.verify.title")}
                     </h3>
                     <p style={{ margin: "6px 0 0", fontSize: 14, color: "#b5bac1", lineHeight: 1.45 }}>
-                      Bạn sẽ phải hoàn thành các bước dưới đây.
+                      {t("chat.verify.subtitle")}
                     </p>
                   </div>
                   <button
                     type="button"
-                    aria-label="Đóng"
+                    aria-label={t("chat.profile.close")}
                     onClick={() => {
                       setVerificationRulesOpen(false);
                       setShowAcceptRulesModal(false);
@@ -8311,7 +9801,7 @@ export default function MessagesPage() {
                 {hasRulesContent && (
                   <div style={{ marginTop: 20 }}>
                     <p style={{ margin: "0 0 10px", fontWeight: 800, fontSize: 12, textTransform: "uppercase", color: "#b5bac1", letterSpacing: "0.02em", display: "flex", alignItems: "center", gap: 8 }}>
-                      Đồng ý với quy định
+                      {t("chat.verify.agreeRules")}
                       {rulesAccepted && <span style={{ color: "#3ba55d", fontSize: 14 }}>✓</span>}
                     </p>
                     <div
@@ -8352,7 +9842,7 @@ export default function MessagesPage() {
                           onChange={(e) => setVerificationRulesAgreed(e.target.checked)}
                           style={{ width: 18, height: 18, accentColor: "#5865f2", flexShrink: 0 }}
                         />
-                        <span>Tôi đã đọc và đồng ý với các quy định</span>
+                        <span>{t("chat.verify.agreeCheckbox")}</span>
                       </label>
                     )}
                   </div>
@@ -8362,8 +9852,7 @@ export default function MessagesPage() {
                 {needsVerificationStep && rulesAccepted && (
                   <div style={{ marginTop: 20 }}>
                     <p style={{ margin: "0 0 10px", fontWeight: 800, fontSize: 12, textTransform: "uppercase", color: "#b5bac1", letterSpacing: "0.02em" }}>
-                      Xác minh máy chủ — Mức{" "}
-                      {lvl === "low" ? "Thấp" : lvl === "medium" ? "Trung bình" : lvl === "high" ? "Cao" : ""}
+                      {t("chat.verify.verificationLevel").replace("{level}", lvl === "low" ? t("chat.verify.levelLow") : lvl === "medium" ? t("chat.verify.levelMedium") : lvl === "high" ? t("chat.verify.levelHigh") : "")}
                     </p>
                     <div
                       style={{
@@ -8381,7 +9870,7 @@ export default function MessagesPage() {
                           <li style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8, color: chk.emailVerified ? "#3ba55d" : "#dbdee1" }}>
                             <span style={{ flexShrink: 0 }}>{chk.emailVerified ? "✓" : "○"}</span>
                             <div style={{ flex: 1 }}>
-                              <span>Xác minh email đăng ký</span>
+                              <span>{t("chat.verify.emailVerify")}</span>
                               {!chk.emailVerified && (
                                 <div style={{ marginTop: 8 }}>
                                   {!emailOtpSent ? (
@@ -8397,10 +9886,10 @@ export default function MessagesPage() {
                                             setEmailOtpCooldown(60);
                                           } else if (res.retryAfterSec) {
                                             setEmailOtpCooldown(res.retryAfterSec);
-                                            setEmailOtpError(`Vui lòng đợi ${res.retryAfterSec}s`);
+                                            setEmailOtpError(t("chat.verify.waitRetry").replace("{sec}", String(res.retryAfterSec)));
                                           }
                                         } catch (e: any) {
-                                          setEmailOtpError(e?.message || "Không thể gửi mã");
+                                          setEmailOtpError(e?.message || t("chat.verify.otpError"));
                                         } finally {
                                           setEmailOtpSending(false);
                                         }
@@ -8417,14 +9906,14 @@ export default function MessagesPage() {
                                         cursor: emailOtpSending || emailOtpCooldown > 0 ? "not-allowed" : "pointer",
                                       }}
                                     >
-                                      {emailOtpSending ? "Đang gửi..." : emailOtpCooldown > 0 ? `Gửi lại (${emailOtpCooldown}s)` : "Gửi mã xác minh"}
+                                      {emailOtpSending ? t("chat.verify.sendOtpSending") : emailOtpCooldown > 0 ? t("chat.verify.sendOtpCooldown").replace("{sec}", String(emailOtpCooldown)) : t("chat.verify.sendOtpBtn")}
                                     </button>
                                   ) : (
                                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                                       <input
                                         type="text"
                                         maxLength={6}
-                                        placeholder="Nhập mã OTP"
+                                        placeholder={t("chat.verify.otpPlaceholder")}
                                         value={emailOtpCode}
                                         onChange={(e) => { setEmailOtpCode(e.target.value.replace(/\D/g, "")); setEmailOtpError(null); }}
                                         style={{
@@ -8451,7 +9940,7 @@ export default function MessagesPage() {
                                             setEmailOtpCode("");
                                             setEmailOtpSent(false);
                                           } catch (e: any) {
-                                            setEmailOtpError(e?.message || "Mã không hợp lệ");
+                                            setEmailOtpError(e?.message || t("chat.verify.otpInvalid"));
                                           } finally {
                                             setEmailOtpVerifying(false);
                                           }
@@ -8468,7 +9957,7 @@ export default function MessagesPage() {
                                           cursor: emailOtpVerifying || emailOtpCode.length < 4 ? "not-allowed" : "pointer",
                                         }}
                                       >
-                                        {emailOtpVerifying ? "Đang xác minh..." : "Xác minh"}
+                                        {emailOtpVerifying ? t("chat.verify.verifyOtpSending") : t("chat.verify.verifyOtpBtn")}
                                       </button>
                                       {emailOtpCooldown <= 0 && (
                                         <button
@@ -8484,7 +9973,7 @@ export default function MessagesPage() {
                                                 setEmailOtpCooldown(res.retryAfterSec);
                                               }
                                             } catch (e: any) {
-                                              setEmailOtpError(e?.message || "Không thể gửi lại");
+                                              setEmailOtpError(e?.message || t("chat.verify.resendError"));
                                             } finally {
                                               setEmailOtpSending(false);
                                             }
@@ -8501,11 +9990,11 @@ export default function MessagesPage() {
                                             cursor: emailOtpSending ? "not-allowed" : "pointer",
                                           }}
                                         >
-                                          Gửi lại mã
+                                          {t("chat.verify.resendOtp")}
                                         </button>
                                       )}
                                       {emailOtpCooldown > 0 && (
-                                        <span style={{ fontSize: 12, color: "#949ba4" }}>Gửi lại sau {emailOtpCooldown}s</span>
+                                        <span style={{ fontSize: 12, color: "#949ba4" }}>{t("chat.verify.resendAfter").replace("{sec}", String(emailOtpCooldown))}</span>
                                       )}
                                     </div>
                                   )}
@@ -8521,10 +10010,10 @@ export default function MessagesPage() {
                           <li style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 8, color: chk.accountOver5Min ? "#3ba55d" : "#dbdee1" }}>
                             <span style={{ flexShrink: 0 }}>{chk.accountOver5Min ? "✓" : "○"}</span>
                             <span>
-                              Tài khoản đã đăng ký Cordigram trên 5 phút
+                              {t("chat.verify.account5min")}
                               {!chk.accountOver5Min && wait.waitAccountSec != null && wait.waitAccountSec > 0 && (
                                 <span style={{ color: "#949ba4", marginLeft: 6 }}>
-                                  Còn khoảng {fmt(wait.waitAccountSec)}
+                                  {t("chat.verify.waitApprox").replace("{time}", fmt(wait.waitAccountSec) ?? "")}
                                 </span>
                               )}
                             </span>
@@ -8534,10 +10023,10 @@ export default function MessagesPage() {
                           <li style={{ display: "flex", gap: 8, alignItems: "flex-start", color: chk.memberOver10Min ? "#3ba55d" : "#dbdee1" }}>
                             <span style={{ flexShrink: 0 }}>{chk.memberOver10Min ? "✓" : "○"}</span>
                             <span>
-                              Đã là thành viên máy chủ trên 10 phút
+                              {t("chat.verify.member10min")}
                               {!chk.memberOver10Min && wait.waitMemberSec != null && wait.waitMemberSec > 0 && (
                                 <span style={{ color: "#949ba4", marginLeft: 6 }}>
-                                  Còn khoảng {fmt(wait.waitMemberSec)}
+                                  {t("chat.verify.waitApprox").replace("{time}", fmt(wait.waitMemberSec) ?? "")}
                                 </span>
                               )}
                             </span>
@@ -8564,7 +10053,7 @@ export default function MessagesPage() {
                       fontSize: 14,
                     }}
                   >
-                    {verificationRulesSubmitting ? "Đang gửi…" : "Gửi"}
+                    {verificationRulesSubmitting ? t("chat.verify.submitting") : t("chat.verify.submitBtn")}
                   </button>
                 </div>
               </div>
@@ -8634,18 +10123,61 @@ export default function MessagesPage() {
 
       <MessageSearchPanel
         isOpen={showMessageSearch}
-        onClose={() => setShowMessageSearch(false)}
+        onClose={() => {
+          setShowMessageSearch(false);
+          setMessageSearchDmConversationOnly(false);
+        }}
         mode={selectedServer ? "server" : "dm"}
+        dmConversationOnlySearch={messageSearchDmConversationOnly}
         serverId={selectedServer || undefined}
-        channelId={selectedChannel || undefined}
+        serverName={currentServer?.name}
+        channelId={selectedServer ? undefined : selectedChannel || undefined}
         channels={allChannels}
+        members={selectedServer ? membersForMessageSearch : []}
+        dmPeers={friends}
+        serversForQuickSwitch={(selectedServer ? servers.filter((s) => s._id === selectedServer) : servers).map(
+          (s) => ({
+            _id: s._id,
+            name: s.name || "",
+            textChannels:
+              s.textChannels?.length
+                ? s.textChannels
+                : (s.channels || []).filter(
+                    (c) => c.type === "text" && c.category !== "info",
+                  ),
+            voiceChannels: s.voiceChannels?.length
+              ? s.voiceChannels
+              : (s.channels || []).filter((c) => c.type === "voice"),
+          }),
+        )}
         dmPartnerId={selectedDirectMessageFriend?._id}
         dmPartnerName={selectedDirectMessageFriend?.displayName || selectedDirectMessageFriend?.username}
         onResultClick={(messageId, channelId) => {
           setShowMessageSearch(false);
+          setMessageSearchDmConversationOnly(false);
           if (channelId && selectedServer) {
             trySelectChannel(channelId);
           }
+        }}
+        onQuickSwitchDm={(userId) => {
+          setShowMessageSearch(false);
+          setMessageSearchDmConversationOnly(false);
+          const friend = friends.find((f) => f._id === userId);
+          if (friend) void handleSelectDirectMessageFriend(friend);
+        }}
+        onQuickSwitchChannel={async (sid, cid) => {
+          setShowMessageSearch(false);
+          setMessageSearchDmConversationOnly(false);
+          setSelectedDirectMessageFriend(null);
+          setSelectedServer(sid);
+          await loadChannels(sid, { preferredChannelId: cid });
+        }}
+        onQuickSwitchServer={async (sid) => {
+          setShowMessageSearch(false);
+          setMessageSearchDmConversationOnly(false);
+          setSelectedDirectMessageFriend(null);
+          setSelectedServer(sid);
+          await loadChannels(sid);
         }}
       />
 
@@ -8668,18 +10200,6 @@ export default function MessagesPage() {
         serverId={selectedServer}
         onOpenCreateWizard={openCreateEventWizard}
       />
-
-      {inviteToVoiceTarget && (
-        <InviteToVoiceChannelPopup
-          isOpen
-          onClose={() => setInviteToVoiceTarget(null)}
-          serverId={inviteToVoiceTarget.serverId}
-          serverName={inviteToVoiceTarget.serverName}
-          channelId={inviteToVoiceTarget.channelId}
-          channelName={inviteToVoiceTarget.channelName}
-          friends={friends}
-        />
-      )}
 
       {inviteToServerTarget && (
         <InviteToServerPopup
@@ -8764,6 +10284,8 @@ export default function MessagesPage() {
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
             canManageEvents: currentUserId !== "" &&
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
+            canManageExpressions: currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
             canCreateInvite: true,
           }}
           onClose={() => setServerContextMenu(null)}
@@ -8791,13 +10313,23 @@ export default function MessagesPage() {
           onSetNotificationLevel={(level) => {
             if (!currentUserId) return;
             sidebarPrefs.setServerNotify(currentUserId, serverContextMenu.server._id, level);
-            setServerNotificationLevel(level);
+            if (serverContextMenu.server._id === selectedServer) {
+              setServerNotificationLevel(level);
+            }
             bumpSidebarPrefs();
             setServerContextMenu(null);
           }}
-          hideMutedChannels={hideMutedChannels}
+          hideMutedChannels={
+            !!currentUserId &&
+            !!serverContextMenu &&
+            sidebarPrefs.getServerPrefs(currentUserId, serverContextMenu.server._id).hideMutedChannels === true
+          }
           onToggleHideMutedChannels={() => {
-            setHideMutedChannels((v) => !v);
+            if (!currentUserId || !serverContextMenu) return;
+            const sid = serverContextMenu.server._id;
+            const cur = sidebarPrefs.getServerPrefs(currentUserId, sid).hideMutedChannels === true;
+            sidebarPrefs.setServerHideMutedChannels(currentUserId, sid, !cur);
+            bumpSidebarPrefs();
           }}
           showAllChannels={showAllChannels}
           onToggleShowAllChannels={() => setShowAllChannels((v) => !v)}
@@ -8847,7 +10379,33 @@ export default function MessagesPage() {
               alert((err as Error)?.message ?? "Không thể rời máy chủ");
             }
           }}
-          notificationLevel={serverNotificationLevel}
+          notificationLevel={
+            currentUserId
+              ? sidebarPrefs.getServerPrefs(currentUserId, serverContextMenu.server._id).serverNotify ?? "all"
+              : "all"
+          }
+          suppressEveryoneHere={
+            !!currentUserId &&
+            !!sidebarPrefs.getServerPrefs(currentUserId, serverContextMenu.server._id).suppressEveryoneHere
+          }
+          suppressRoleMentions={
+            !!currentUserId &&
+            !!sidebarPrefs.getServerPrefs(currentUserId, serverContextMenu.server._id).suppressRoleMentions
+          }
+          onSetSuppressEveryoneHere={(v) => {
+            if (!currentUserId) return;
+            sidebarPrefs.setServerSuppressFlags(currentUserId, serverContextMenu.server._id, {
+              suppressEveryoneHere: v,
+            });
+            bumpSidebarPrefs();
+          }}
+          onSetSuppressRoleMentions={(v) => {
+            if (!currentUserId) return;
+            sidebarPrefs.setServerSuppressFlags(currentUserId, serverContextMenu.server._id, {
+              suppressRoleMentions: v,
+            });
+            bumpSidebarPrefs();
+          }}
           serverMuted={
             !!(currentUserId
               ? sidebarPrefs.isServerMuted(
@@ -9176,7 +10734,7 @@ export default function MessagesPage() {
               />
             );
           }
-          if ((section === "safety" || section === "privileges") && serverSettingsTarget?.serverId) {
+          if (section === "safety" && serverSettingsTarget?.serverId) {
             const initialTab = mapSectionToSafetyTab(section);
             return (
               <ServerSafetySection
@@ -9229,16 +10787,21 @@ export default function MessagesPage() {
           }
           if (section === "community-onboarding" && serverSettingsTarget?.serverId) {
             return (
-              <div style={{ padding: 24, color: "#dcddde" }}>
-                <h2 style={{ color: "#fff", marginBottom: 8 }}>Hướng Dẫn Làm Quen</h2>
-                <p>Thiết lập trải nghiệm chào mừng cho thành viên mới tham gia cộng đồng của bạn.</p>
+              <div style={{ padding: 24, color: "var(--color-panel-text)" }}>
+                <h2 style={{ color: "var(--color-panel-text)", marginBottom: 8 }}>
+                  {t("chat.chatPage.communityOnboardingTitle")}
+                </h2>
+                <p style={{ margin: 0, color: "var(--color-panel-text-muted)", lineHeight: 1.5 }}>
+                  {t("chat.chatPage.communityOnboardingDesc")}
+                </p>
               </div>
             );
           }
           if (section === "emoji" && serverSettingsTarget?.serverId && token) {
             const canManageEmoji =
               Boolean(serverSettingsPermissions?.isOwner) ||
-              Boolean(serverSettingsPermissions?.canManageServer);
+              Boolean(serverSettingsPermissions?.canManageServer) ||
+              Boolean(serverSettingsPermissions?.canManageExpressions);
             return (
               <ServerEmojiSection
                 serverId={serverSettingsTarget.serverId}
@@ -9255,12 +10818,26 @@ export default function MessagesPage() {
           if (section === "sticker" && serverSettingsTarget?.serverId && token) {
             const canManageSticker =
               Boolean(serverSettingsPermissions?.isOwner) ||
-              Boolean(serverSettingsPermissions?.canManageServer);
+              Boolean(serverSettingsPermissions?.canManageServer) ||
+              Boolean(serverSettingsPermissions?.canManageExpressions);
             return (
               <ServerStickerSection
                 serverId={serverSettingsTarget.serverId}
                 token={token}
                 canManage={canManageSticker}
+                isServerOwner={Boolean(serverSettingsPermissions?.isOwner)}
+                onOpenBoostSubscribe={() => {
+                  setShowServerSettingsPanel(false);
+                  setServerSettingsTarget(null);
+                  setServerSettingsPermissions(null);
+                  setShowExploreView(false);
+                  setShowJoinApplicationsView(false);
+                  setSelectedDirectMessageFriend(null);
+                  setShowBoostUpgradeView(true);
+                  setBoostModalOpen(false);
+                  setBoostModalStep("plan");
+                  setBoostMode("subscribe");
+                }}
               />
             );
           }
@@ -9365,7 +10942,7 @@ export default function MessagesPage() {
                   setSelectedEventDetail(null);
                   if (selectedServer) loadActiveEvents(selectedServer);
                 }}
-                aria-label="Đóng"
+                aria-label={t("chat.profile.close")}
               >
                 ×
               </button>
@@ -9911,7 +11488,7 @@ function CommunityOverviewSection({
   initialServer: (serversApi.Server & { primaryLanguage?: "vi" | "en" }) | null;
   onUpdated?: (patch: Partial<serversApi.Server>) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [channels, setChannels] = useState<serversApi.Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -9973,7 +11550,7 @@ function CommunityOverviewSection({
                 {t("chat.communityOverview.rulesChannelLabel")}
               </div>
               <div style={{ color: "var(--color-text-muted)", fontSize: 13, marginBottom: 10, lineHeight: 1.5 }}>
-                {t("chat.communityOverview.rulesChannelHint")}<code>#chào-mừng-và-nội-quy</code>).
+                {t("chat.communityOverview.rulesChannelHint")}
               </div>
               <select
                 value={rulesChannelId ?? ""}
@@ -9991,7 +11568,7 @@ function CommunityOverviewSection({
                 <option value="">{t("chat.communityOverview.noChannel")}</option>
                 {textChannels.map((ch) => (
                   <option key={ch._id} value={ch._id}>
-                    #{ch.name}
+                    #{translateChannelName(ch.name, language)}
                   </option>
                 ))}
               </select>

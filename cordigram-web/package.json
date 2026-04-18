@@ -7,7 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+<<<<<<< HEAD
     "i18n:deepl": "node scripts/deepl-sync-locales.mjs",
+=======
+    "test": "vitest run",
+    "test:watch": "vitest",
+>>>>>>> origin/new-feature-chat
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -27,6 +32,7 @@
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.2.0",
     "@playwright/test": "^1.54.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -35,6 +41,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.8",
+    "jsdom": "^25.0.1"
   }
 }

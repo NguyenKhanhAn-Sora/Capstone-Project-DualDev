@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import * as serversApi from "@/lib/servers-api";
 import styles from "./CommunitySection.module.css";
+import { useLanguage } from "@/component/language-provider";
+import { translateChannelName } from "@/lib/system-names";
 
 interface Props {
   serverId: string;
@@ -17,6 +19,7 @@ export default function CommunitySection({
   canManageSettings,
   onCommunityActivated,
 }: Props) {
+  const { t, language } = useLanguage();
   const [community, setCommunity] = useState<serversApi.CommunitySettings | null>(null);
   const [channels, setChannels] = useState<serversApi.Channel[]>([]);
   const [roles, setRoles] = useState<serversApi.Role[]>([]);
@@ -26,7 +29,6 @@ export default function CommunitySection({
   const [showWizard, setShowWizard] = useState(false);
   const [step, setStep] = useState(1);
   const [discoveryEligible, setDiscoveryEligible] = useState<boolean | null>(null);
-  const [eligibilityChecking, setEligibilityChecking] = useState(false);
 
   const [rulesChannelId, setRulesChannelId] = useState<string>(CREATE_FOR_ME);
   const [updatesChannelId, setUpdatesChannelId] = useState<string>(CREATE_FOR_ME);
@@ -67,20 +69,18 @@ export default function CommunitySection({
     if (!everyoneRole) return [];
     const p = everyoneRole.permissions;
     const disabled: string[] = [];
-    if (!p.manageEvents) disabled.push("Tạo sự kiện");
-    if (!p.mentionEveryone) disabled.push("Đề cập @everyone");
-    if (!p.addReactions) disabled.push("Thêm biểu cảm");
-    if (!p.createPolls) disabled.push("Tạo khảo sát");
+    if (!p.manageEvents) disabled.push(t("chat.community.permCreateEvent"));
+    if (!p.mentionEveryone) disabled.push(t("chat.community.permMentionEveryone"));
+    if (!p.addReactions) disabled.push(t("chat.community.permAddReactions"));
+    if (!p.createPolls) disabled.push(t("chat.community.permCreatePolls"));
     return disabled;
-  }, [everyoneRole]);
+  }, [everyoneRole, t]);
 
-  const dangerousPerms = useMemo(() => {
-    const list: string[] = [];
-    list.push("Tạo emoji");
-    list.push("Tạo sự kiện");
-    list.push("Đề cập @everyone, @here");
-    return list;
-  }, []);
+  const dangerousPerms = useMemo(() => [
+    t("chat.community.permCreateEmoji"),
+    t("chat.community.permCreateEvent"),
+    t("chat.community.permMentionEveryoneHere"),
+  ], [t]);
 
   const handleActivate = async () => {
     setActivating(true);
@@ -101,12 +101,11 @@ export default function CommunitySection({
       setShowWizard(false);
       onCommunityActivated?.();
     } catch {
-      alert("Không kích hoạt được cộng đồng. Vui lòng thử lại.");
+      alert(t("chat.community.activateError"));
     } finally {
       setActivating(false);
     }
   };
-
 
   const textChannels = useMemo(
     () => channels.filter((c) => c.type !== "voice"),
@@ -115,14 +114,14 @@ export default function CommunitySection({
 
   const getChannelLabel = useCallback(
     (id: string) => {
-      if (id === CREATE_FOR_ME) return "Tạo cho tôi";
+      if (id === CREATE_FOR_ME) return t("chat.community.createForMe");
       const ch = channels.find((c) => c._id === id);
-      return ch ? `#${ch.name}` : id;
+      return ch ? `#${translateChannelName(ch.name, language)}` : id;
     },
-    [channels],
+    [channels, t, language],
   );
 
-  if (loading) return <div className={styles.container}>Đang tải...</div>;
+  if (loading) return <div className={styles.container}>{t("chat.community.loading")}</div>;
 
   if (community?.enabled) {
     return (
@@ -130,10 +129,10 @@ export default function CommunitySection({
         <div className={styles.activatedBanner}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
           <h2 className={styles.activatedTitle}>
-            Máy Chủ Cộng Đồng đã được kích hoạt!
+            {t("chat.community.activatedTitle")}
           </h2>
           <p className={styles.activatedDesc}>
-            Cộng đồng của bạn đã sẵn sàng. Bạn có thể quản lý tổng quan cộng đồng và hướng dẫn làm quen trong các tab bên trái.
+            {t("chat.community.activatedDesc")}
           </p>
         </div>
       </div>
@@ -145,13 +144,11 @@ export default function CommunitySection({
       {/* Pre-activation banner */}
       <div className={styles.banner}>
         <h1 className={styles.bannerTitle}>
-          Bạn đang xây dựng Cộng Đồng của mình?
+          {t("chat.community.bannerTitle")}
         </h1>
         <p className={styles.bannerDesc}>
-          Hãy chuyển đổi sang Máy Chủ Cộng Đồng để có thể sử dụng các công cụ
-          quản trị bổ sung có thể giúp bạn quản lý, điều hành và phát triển máy
-          chủ của mình.{" "}
-          <span className={styles.bannerLink}>Tìm hiểu thêm.</span>
+          {t("chat.community.bannerDesc")}{" "}
+          <span className={styles.bannerLink}>{t("chat.community.bannerLearnMore")}</span>
         </p>
         <button
           className={styles.activateBtn}
@@ -164,49 +161,48 @@ export default function CommunitySection({
             setShowWizard(true);
           }}
         >
-          Kích Hoạt Cộng Đồng
+          {t("chat.community.activateBtn")}
         </button>
         {discoveryEligible === false && (
           <p style={{ color: "var(--color-panel-danger)", fontSize: 13, marginTop: 8 }}>
-            Máy chủ chưa đạt đủ điều kiện Khám Phá. Vui lòng kiểm tra điều kiện trong phần Truy cập.
+            {t("chat.community.notEligible")}
           </p>
         )}
 
         <hr className={styles.bannerDivider} />
 
         <p className={styles.bannerSubDesc}>
-          Máy Chủ Cộng Đồng là các không gian rộng lớn, nơi tụ tập của những
-          người có cùng chung sở thích. Kích hoạt chế độ Cộng Đồng không đồng
-          nghĩa với việc máy chủ của bạn sẽ hiện trên Khám Phá Máy Chủ.{" "}
-          <span className={styles.bannerLink}>Tìm hiểu thêm tại đây.</span>
+          {t("chat.community.subDesc")}{" "}
+          <span className={styles.bannerLink}>{t("chat.community.subDescLink")}</span>
         </p>
 
         <div className={styles.featureCards}>
           <div className={styles.featureCard}>
             <div className={`${styles.featureCardIcon} ${styles.green}`}>📈</div>
-            <h3 className={styles.featureCardTitle}>Phát triển cộng đồng</h3>
+            <h3 className={styles.featureCardTitle}>{t("chat.community.feature1Title")}</h3>
             <p className={styles.featureCardDesc}>
-              Hãy đăng ký <strong>Khám Phá Máy Chủ</strong> để nhiều người có
-              thể trực tiếp tìm máy chủ của bạn trên Cordigram.
+              {t("chat.community.feature1Desc").split(t("chat.community.feature1Highlight")).map((part, i, arr) =>
+                i < arr.length - 1
+                  ? <React.Fragment key={i}>{part}<strong>{t("chat.community.feature1Highlight")}</strong></React.Fragment>
+                  : <React.Fragment key={i}>{part}</React.Fragment>
+              )}
             </p>
           </div>
           <div className={styles.featureCard}>
             <div className={`${styles.featureCardIcon} ${styles.blue}`}>📊</div>
-            <h3 className={styles.featureCardTitle}>
-              Duy trì mức độ tương tác của thành viên
-            </h3>
+            <h3 className={styles.featureCardTitle}>{t("chat.community.feature2Title")}</h3>
             <p className={styles.featureCardDesc}>
-              Có quyền sử dụng các công cụ như <strong>Thống Kê Máy Chủ</strong>{" "}
-              để quản lý và duy trì sức hút của máy chủ tốt hơn.
+              {t("chat.community.feature2Desc").split(t("chat.community.feature2Highlight")).map((part, i, arr) =>
+                i < arr.length - 1
+                  ? <React.Fragment key={i}>{part}<strong>{t("chat.community.feature2Highlight")}</strong></React.Fragment>
+                  : <React.Fragment key={i}>{part}</React.Fragment>
+              )}
             </p>
           </div>
           <div className={styles.featureCard}>
             <div className={`${styles.featureCardIcon} ${styles.red}`}>ℹ️</div>
-            <h3 className={styles.featureCardTitle}>Liên tục cập nhật</h3>
-            <p className={styles.featureCardDesc}>
-              Nhận trực tiếp các cập nhật từ Cordigram về các tính năng mới dành
-              cho cộng đồng.
-            </p>
+            <h3 className={styles.featureCardTitle}>{t("chat.community.feature3Title")}</h3>
+            <p className={styles.featureCardDesc}>{t("chat.community.feature3Desc")}</p>
           </div>
         </div>
       </div>
@@ -226,20 +222,20 @@ export default function CommunitySection({
             <div className={styles.wizardSidebar}>
               <div>
                 <h2 className={styles.wizardSidebarTitle}>
-                  Hãy thiết lập Máy Chủ Cộng Đồng của bạn.
+                  {t("chat.community.wizardTitle")}
                 </h2>
                 <div className={styles.wizardSteps}>
                   <div className={`${styles.wizardStep} ${step === 1 ? styles.active : step > 1 ? styles.done : ""}`}>
                     <span className={styles.stepNumber}>1</span>
-                    Kiểm tra tính an toàn
+                    {t("chat.community.step1Label")}
                   </div>
                   <div className={`${styles.wizardStep} ${step === 2 ? styles.active : step > 2 ? styles.done : ""}`}>
                     <span className={styles.stepNumber}>2</span>
-                    Thiết lập các cài đặt cơ bản
+                    {t("chat.community.step2Label")}
                   </div>
                   <div className={`${styles.wizardStep} ${step === 3 ? styles.active : ""}`}>
                     <span className={styles.stepNumber}>3</span>
-                    Hoàn thiện
+                    {t("chat.community.step3Label")}
                   </div>
                 </div>
               </div>
@@ -251,21 +247,20 @@ export default function CommunitySection({
               {/* ── STEP 1 ── */}
               {step === 1 && (
                 <>
-                  <div className={styles.wizardContentIcon}>🛡️</div>
+                  <div className={styles.wizardContentIcon}>{t("chat.community.step1Icon")}</div>
                   <h3 className={styles.wizardContentTitle}>
-                    Giữ gìn sự an toàn của cộng đồng
+                    {t("chat.community.step1Title")}
                   </h3>
                   <p className={styles.wizardContentDesc}>
-                    Để đảm bảo an toàn cho người dùng, các Máy Chủ Cộng Đồng bắt
-                    buộc phải bật những cài đặt kiểm duyệt sau.
+                    {t("chat.community.step1Desc")}
                   </p>
 
                   <div className={styles.checkSection}>
                     <h4 className={styles.checkSectionTitle}>
-                      Cần phải xác thực email.
+                      {t("chat.community.check1Title")}
                     </h4>
                     <p className={styles.checkSectionDesc}>
-                      Máy chủ của bạn đã đáp ứng hoặc vượt quá yêu cầu về mức xác minh.
+                      {t("chat.community.check1Desc")}
                     </p>
                     <div
                       className={styles.checkItem}
@@ -276,19 +271,17 @@ export default function CommunitySection({
                         {checkEmail ? "✓" : ""}
                       </div>
                       <span className={styles.checkLabel}>
-                        Cần phải xác thực email.
+                        {t("chat.community.check1Label")}
                       </span>
                     </div>
                   </div>
 
                   <div className={styles.checkSection}>
                     <h4 className={styles.checkSectionTitle}>
-                      Bộ Lọc Nội Dung Đa Phương Tiện Không Phù Hợp
+                      {t("chat.community.check2Title")}
                     </h4>
                     <p className={styles.checkSectionDesc}>
-                      Cordigram sẽ tự động quét và xóa các tập tin đa phương tiện
-                      có chứa nội dung độc hại được gửi đi trong máy chủ này (trừ
-                      các kênh giới hạn độ tuổi).
+                      {t("chat.community.check2Desc")}
                     </p>
                     <div
                       className={styles.checkItem}
@@ -299,7 +292,7 @@ export default function CommunitySection({
                         {checkContentFilter ? "✓" : ""}
                       </div>
                       <span className={styles.checkLabel}>
-                        Quét nội dung đa phương tiện của tất cả các thành viên.
+                        {t("chat.community.check2Label")}
                       </span>
                     </div>
                   </div>
@@ -311,7 +304,7 @@ export default function CommunitySection({
                       disabled={!step1Ready}
                       onClick={() => setStep(2)}
                     >
-                      Tiếp theo
+                      {t("chat.community.nextBtn")}
                     </button>
                   </div>
                 </>
@@ -322,22 +315,19 @@ export default function CommunitySection({
                 <>
                   <div className={styles.wizardContentIcon}>🔧</div>
                   <h3 className={styles.wizardContentTitle}>
-                    Thiết lập các cài đặt cơ bản
+                    {t("chat.community.step2Title")}
                   </h3>
                   <p className={styles.wizardContentDesc}>
-                    Hãy cho chúng tôi biết kênh có áp dụng các quy tắc máy chủ
-                    của bạn và kênh để nhận thông báo của chúng tôi!
+                    {t("chat.community.step2Desc")}
                   </p>
 
                   {/* Rules channel */}
                   <div className={styles.fieldGroup}>
                     <h4 className={styles.fieldLabel}>
-                      Kênh Quy Tắc Hoặc Hướng Dẫn
+                      {t("chat.community.rulesChannelLabel")}
                     </h4>
                     <p className={styles.fieldDesc}>
-                      Máy Chủ Cộng Đồng phải có bài đăng quy định máy chủ
-                      và/hoặc nguyên tắc rõ ràng dành cho các thành viên. Hãy
-                      chọn kênh để đăng tải nội dung này.
+                      {t("chat.community.rulesChannelDesc")}
                     </p>
                     <div className={styles.selectWrapper}>
                       <button
@@ -356,7 +346,7 @@ export default function CommunitySection({
                             className={`${styles.selectOption} ${rulesChannelId === CREATE_FOR_ME ? styles.selected : ""}`}
                             onClick={() => { setRulesChannelId(CREATE_FOR_ME); setRulesDropdownOpen(false); }}
                           >
-                            Tạo cho tôi
+                            {t("chat.community.createForMe")}
                             {rulesChannelId === CREATE_FOR_ME && <span className={styles.selectOptionCheck}>✓</span>}
                           </div>
                           {textChannels.map((ch) => (
@@ -365,7 +355,7 @@ export default function CommunitySection({
                               className={`${styles.selectOption} ${rulesChannelId === ch._id ? styles.selected : ""}`}
                               onClick={() => { setRulesChannelId(ch._id); setRulesDropdownOpen(false); }}
                             >
-                              #{ch.name}
+                              #{translateChannelName(ch.name, language)}
                               {rulesChannelId === ch._id && <span className={styles.selectOptionCheck}>✓</span>}
                             </div>
                           ))}
@@ -377,13 +367,10 @@ export default function CommunitySection({
                   {/* Updates channel */}
                   <div className={styles.fieldGroup}>
                     <h4 className={styles.fieldLabel}>
-                      Kênh Cập Nhật Cộng Đồng
+                      {t("chat.community.updatesChannelLabel")}
                     </h4>
                     <p className={styles.fieldDesc}>
-                      Cordigram sẽ gửi các cập nhật có liên quan cho quản trị
-                      viên và điều phối viên của máy chủ Cộng Đồng vào kênh này.
-                      Vì một số thông tin có thể sẽ nhạy cảm nên chúng tôi
-                      khuyến nghị bạn nên chọn một kênh có giới hạn vai trò.
+                      {t("chat.community.updatesChannelDesc")}
                     </p>
                     <div className={styles.selectWrapper}>
                       <button
@@ -402,7 +389,7 @@ export default function CommunitySection({
                             className={`${styles.selectOption} ${updatesChannelId === CREATE_FOR_ME ? styles.selected : ""}`}
                             onClick={() => { setUpdatesChannelId(CREATE_FOR_ME); setUpdatesDropdownOpen(false); }}
                           >
-                            Tạo cho tôi
+                            {t("chat.community.createForMe")}
                             {updatesChannelId === CREATE_FOR_ME && <span className={styles.selectOptionCheck}>✓</span>}
                           </div>
                           {textChannels.map((ch) => (
@@ -411,7 +398,7 @@ export default function CommunitySection({
                               className={`${styles.selectOption} ${updatesChannelId === ch._id ? styles.selected : ""}`}
                               onClick={() => { setUpdatesChannelId(ch._id); setUpdatesDropdownOpen(false); }}
                             >
-                              #{ch.name}
+                              #{translateChannelName(ch.name, language)}
                               {updatesChannelId === ch._id && <span className={styles.selectOptionCheck}>✓</span>}
                             </div>
                           ))}
@@ -422,10 +409,10 @@ export default function CommunitySection({
 
                   <div className={styles.wizardFooter}>
                     <button className={styles.backBtn} onClick={() => setStep(1)}>
-                      Trở lại
+                      {t("chat.community.backBtn")}
                     </button>
                     <button className={styles.nextBtn} onClick={() => setStep(3)}>
-                      Tiếp theo
+                      {t("chat.community.nextBtn")}
                     </button>
                   </div>
                 </>
@@ -435,38 +422,34 @@ export default function CommunitySection({
               {step === 3 && (
                 <>
                   <div className={styles.wizardContentIcon}>📋</div>
-                  <h3 className={styles.wizardContentTitle}>Hoàn thiện</h3>
+                  <h3 className={styles.wizardContentTitle}>{t("chat.community.step3Title")}</h3>
                   <p className={styles.wizardContentDesc}>
-                    Xem lại các thay đổi sẽ được áp dụng cho máy chủ của bạn.
+                    {t("chat.community.step3Desc")}
                   </p>
 
                   <div className={styles.infoBlock}>
                     <h4 className={styles.infoBlockTitle}>
-                      Đang vô hiệu các quyền hạn nguy hiểm
+                      {t("chat.community.dangerPermsTitle")}
                     </h4>
                     {dangerousPerms.map((p) => (
-                      <div key={p} className={styles.infoBlockItem}>
-                        • {p}
-                      </div>
+                      <div key={p} className={styles.infoBlockItem}>• {p}</div>
                     ))}
-                    <p style={{ color: "#b5bac1", fontSize: 12, marginTop: 8 }}>
-                      Chủ server có thể tự thiết lập lại trong tab Quyền hạn.
+                    <p className={styles.infoBlockNote}>
+                      {t("chat.community.dangerPermsNote")}
                     </p>
                   </div>
 
                   <div className={styles.infoBlock}>
                     <h4 className={styles.infoBlockTitle}>
-                      Hiện đang tắt ở @everyone
+                      {t("chat.community.disabledPermsTitle")}
                     </h4>
                     {disabledPerms.length > 0 ? (
                       disabledPerms.map((p) => (
-                        <div key={p} className={styles.infoBlockItem}>
-                          • {p}
-                        </div>
+                        <div key={p} className={styles.infoBlockItem}>• {p}</div>
                       ))
                     ) : (
                       <div className={styles.infoBlockItem}>
-                        Tất cả quyền hạn @everyone đều đã bật.
+                        {t("chat.community.allPermsEnabled")}
                       </div>
                     )}
                   </div>
@@ -479,21 +462,20 @@ export default function CommunitySection({
                       {agreed && <div className={styles.radioBoxInner} />}
                     </div>
                     <span className={styles.agreeLabel}>
-                      Tôi hiểu và đồng ý với các thay đổi trên. Tôi xác nhận
-                      muốn kích hoạt chế độ Cộng Đồng cho máy chủ này.
+                      {t("chat.community.agreeLabel")}
                     </span>
                   </div>
 
                   <div className={styles.wizardFooter}>
                     <button className={styles.backBtn} onClick={() => setStep(2)}>
-                      Trở lại
+                      {t("chat.community.backBtn")}
                     </button>
                     <button
                       className={styles.nextBtn}
                       disabled={!agreed || activating}
                       onClick={handleActivate}
                     >
-                      {activating ? "Đang thiết lập..." : "Thiết lập hoàn thành"}
+                      {activating ? t("chat.community.activating") : t("chat.community.setupDone")}
                     </button>
                   </div>
                 </>

@@ -117,4 +117,22 @@ export class ChannelMessagesGateway
       this.server.to(socketId).emit(event, payload);
     });
   }
+
+  /** Join applications: notify connected owner/members/applicant without page reload. */
+  emitJoinApplicationUpdated(
+    recipientUserIds: string[],
+    payload: {
+      serverId: string;
+      userId: string;
+      status: 'accepted' | 'rejected' | 'withdrawn';
+    },
+  ): void {
+    const seen = new Set<string>();
+    for (const raw of recipientUserIds) {
+      const uid = String(raw ?? '').trim();
+      if (!uid || seen.has(uid)) continue;
+      seen.add(uid);
+      this.emitToUser(uid, 'join-application-updated', payload);
+    }
+  }
 }

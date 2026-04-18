@@ -2,7 +2,7 @@
   display: flex;
   width: 100%;
   height: 100%;
-  background: var(--color-bg);
+  background: var(--user-appearance-bg), var(--color-bg);
   overflow: hidden;
 }
 
@@ -43,13 +43,36 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--color-on-accent, #fff);
   transition: all 0.2s ease;
 }
 
 .createBtn:hover {
   background: var(--color-primary-strong);
   transform: scale(1.05);
+}
+
+/* Trang chủ Social (bảng tin) — rời Messages */
+.socialHomeBtn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.socialHomeBtn:hover {
+  transform: scale(1.05);
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .exploreBtn {
@@ -276,11 +299,12 @@
   color: var(--color-text);
 }
 
-.settingsBtnImg {
-  display: block;
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
+.settingsBtnIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  line-height: 1;
   pointer-events: none;
 }
 
@@ -520,6 +544,27 @@
 .searchInput:focus {
   background: var(--color-surface);
   border-color: var(--color-primary);
+}
+
+.searchButton {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: var(--font-roboto);
+  cursor: pointer;
+  text-align: center;
+}
+
+.searchButton:hover {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  color: var(--color-text);
 }
 
 .searchIcon {
@@ -1045,19 +1090,21 @@
   cursor: pointer;
   transition: background-color 0.2s ease;
   position: relative;
+  color: var(--color-text);
 }
 
 .conversationItem:hover {
-  background-color: var(--color-surface-muted);
+  background-color: var(--color-panel-hover);
 }
 
 .conversationItem.active {
   background-color: var(--color-primary);
+  color: var(--color-on-accent, #fff);
 }
 
 .conversationItem.active .userName,
 .conversationItem.active .userStatus {
-  color: white;
+  color: var(--color-on-accent, #fff);
 }
 
 .avatar {
@@ -1070,7 +1117,7 @@
   justify-content: center;
   flex-shrink: 0;
   font-weight: 600;
-  color: white;
+  color: var(--color-on-accent, #fff);
   font-size: 16px;
   position: relative;
 }
@@ -1116,7 +1163,7 @@
   height: 20px;
   border-radius: 50%;
   background: var(--color-primary);
-  color: white;
+  color: var(--color-on-accent, #fff);
   font-size: 11px;
   font-weight: 600;
   display: flex;
@@ -1152,7 +1199,7 @@
   flex-shrink: 0;
 }
 
-.chatHeaderLeft {
+.channelHeaderStart {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1170,7 +1217,7 @@
   gap: 8px;
 }
 
-.chatIconBtn {
+.chatHeaderActions > button {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1184,7 +1231,7 @@
   transition: all 0.2s ease;
 }
 
-.chatIconBtn:hover {
+.chatHeaderActions > button:hover {
   background: var(--color-surface-muted);
   color: var(--color-text);
 }
@@ -1277,6 +1324,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--color-on-accent, #fff);
 }
 
 .messageAvatar img {
@@ -1671,6 +1719,7 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  position: relative;
 }
 
 .dmProfileAvatar {
@@ -1716,6 +1765,33 @@
   line-height: 1.4;
   width: 100%;
   box-sizing: border-box;
+}
+
+.dmProfileMetaCard {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dmProfileMetaLabel {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dmProfileMetaValue {
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 900;
 }
 
 .dmProfileViewFull {
@@ -1968,83 +2044,7 @@
   color: var(--color-panel-success);
 }
 
-.voiceChannelActions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-}
-
-.voiceChannelActionIcon {
-  padding: 4px;
-  border: none;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.voiceChannelActionIcon:hover {
-  color: var(--color-text);
-  background: var(--color-bg);
-}
-
-.voiceInviteBar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  margin: 4px 8px 0;
-  background: var(--color-panel-sidebar);
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--color-text-muted);
-}
-
-.voiceInviteBar svg {
-  flex-shrink: 0;
-}
-
-.voiceInviteBar span {
-  flex: 1;
-}
-
-.voiceInviteBarClickable {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font-size: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.voiceInviteBarClickable:hover {
-  color: var(--color-text);
-}
-
-.voiceInviteDismiss {
-  padding: 0 4px;
-  border: none;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.voiceInviteDismiss:hover {
-  color: var(--color-text);
-}
-
-/* Khung người trong kênh thoại — bên dưới voiceInviteBar, mọi người đều thấy; label + avatar + tên */
+/* Khung người trong kênh thoại — label + avatar + tên */
 .voiceChannelParticipants {
   margin: 4px 8px 12px;
   padding: 8px 10px;

@@ -115,6 +115,13 @@ export class Server extends Document {
   @Prop({ required: true, trim: true })
   name: string;
 
+  /**
+   * Boost theo server (MVP entitlement). Nếu userId nằm trong danh sách này
+   * thì các tính năng Boost theo server sẽ được mở khóa khi user đang ở server đó.
+   */
+  @Prop({ type: [String], default: [] })
+  boostedByUserIds?: string[];
+
   @Prop({ type: String, default: null })
   description: string | null;
 
@@ -174,6 +181,17 @@ export class Server extends Document {
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   ownerId: Types.ObjectId;
+
+  /**
+   * Soft delete (for admin restore + history).
+   * When set, the server is treated as deleted and hidden from normal user flows.
+   */
+  @Prop({ type: Date, default: null, index: true })
+  deletedAt?: Date | null;
+
+  /** User who deleted the server (owner). */
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null, index: true })
+  deletedByUserId?: Types.ObjectId | null;
 
   @Prop({
     type: [
@@ -421,6 +439,13 @@ export class Server extends Document {
     default: 'pending',
   })
   communityDiscoveryStatus: CommunityDiscoveryStatus;
+
+  /**
+   * Mức mở rộng ô sticker do chủ máy chủ gán cho server này (theo gói Boost trên tài khoản chủ).
+   * Một chủ tối đa gán đồng thời cho 2 máy chủ.
+   */
+  @Prop({ type: String, default: null })
+  stickerBoostTier: 'basic' | 'boost' | null;
 
   /** Sticker tùy chỉnh do máy chủ quản lý (hiển thị trong picker; chỉ dùng được trong kênh cùng server). */
   @Prop({

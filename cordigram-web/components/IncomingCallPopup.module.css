@@ -5,13 +5,13 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(12px);
+  background: radial-gradient(ellipse 120% 80% at 50% 40%, rgba(88, 101, 242, 0.12) 0%, rgba(0, 0, 0, 0.88) 55%, #000 100%);
+  backdrop-filter: blur(16px) saturate(1.15);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10000;
-  animation: fadeIn 0.3s ease-out;
+  animation: fadeIn 0.35s ease-out;
 }
 
 @keyframes fadeIn {
@@ -25,17 +25,33 @@
 
 /* Popup card */
 .popup {
-  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-  border-radius: 24px;
-  padding: 48px 40px;
+  position: relative;
+  background: linear-gradient(155deg, rgba(32, 34, 40, 0.98) 0%, rgba(18, 19, 24, 0.99) 48%, rgba(24, 26, 33, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  padding: 44px 36px 40px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  gap: 12px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 0 80px rgba(88, 101, 242, 0.12);
+  animation: slideUp 0.45s cubic-bezier(0.34, 1.45, 0.64, 1);
   max-width: 400px;
   width: 90%;
+  overflow: hidden;
+}
+
+.cardAccent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #5865f2, #9b59d9, #43b581);
+  opacity: 0.95;
 }
 
 @keyframes slideUp {
@@ -52,7 +68,8 @@
 /* Avatar */
 .avatarWrapper {
   position: relative;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.45));
 }
 
 .avatar {
@@ -92,22 +109,27 @@
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  border: 3px solid var(--color-panel-accent);
-  animation: pulse 2s ease-out infinite;
+  border: 2px solid rgba(155, 89, 217, 0.55);
+  animation: pulse 2.1s ease-out infinite;
   z-index: 1;
+}
+
+.pulseRing:nth-of-type(2) {
+  border-color: rgba(67, 181, 129, 0.35);
+  animation-duration: 2.4s;
 }
 
 @keyframes pulse {
   0% {
     transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
+    opacity: 0.85;
   }
   50% {
-    transform: translate(-50%, -50%) scale(1.3);
-    opacity: 0.5;
+    transform: translate(-50%, -50%) scale(1.28);
+    opacity: 0.35;
   }
   100% {
-    transform: translate(-50%, -50%) scale(1.6);
+    transform: translate(-50%, -50%) scale(1.58);
     opacity: 0;
   }
 }
@@ -121,27 +143,41 @@
   text-align: center;
 }
 
-.callType {
-  font-size: 16px;
-  color: #b9bbbe;
-  margin: 0;
-  font-weight: 500;
+.kindPill {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: #b5bac1;
+  margin: 4px 0 0;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  font-weight: 600;
 }
 
-.callTypeDetail {
-  font-size: 14px;
-  color: #8e9297;
-  margin: 0;
-  padding: 6px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
+.statusLive {
+  font-size: 15px;
+  color: #dcddde;
+  margin: 8px 0 0;
+  font-weight: 500;
+  text-align: center;
+}
+
+.statusCancelled {
+  font-size: 15px;
+  color: #ed4245;
+  margin: 8px 0 0;
+  font-weight: 600;
+  text-align: center;
 }
 
 /* Action buttons */
 .actions {
   display: flex;
-  gap: 20px;
-  margin-top: 24px;
+  gap: 16px;
+  margin-top: 28px;
+  width: 100%;
+  justify-content: center;
 }
 
 .button {

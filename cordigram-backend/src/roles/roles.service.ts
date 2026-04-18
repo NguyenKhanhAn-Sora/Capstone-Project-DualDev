@@ -111,9 +111,15 @@ export class RolesService {
     const newPosition =
       createRoleDto.position ?? (highestRole ? highestRole.position + 1 : 1);
 
+    const incoming = { ...(createRoleDto.permissions || {}) } as Record<
+      string,
+      unknown
+    >;
+    delete incoming.createPublicThreads;
+    delete incoming.createPrivateThreads;
     const permissions: RolePermissions = {
       ...DEFAULT_NEW_ROLE_PERMISSIONS,
-      ...(createRoleDto.permissions || {}),
+      ...(incoming as Partial<RolePermissions>),
     };
 
     const role = new this.roleModel({
@@ -174,9 +180,15 @@ export class RolesService {
       role.mentionable = updateRoleDto.mentionable;
     }
     if (updateRoleDto.permissions !== undefined) {
+      const incoming = { ...updateRoleDto.permissions } as Record<
+        string,
+        unknown
+      >;
+      delete incoming.createPublicThreads;
+      delete incoming.createPrivateThreads;
       role.permissions = {
         ...role.permissions,
-        ...updateRoleDto.permissions,
+        ...(incoming as Partial<RolePermissions>),
       };
     }
 
@@ -334,10 +346,7 @@ export class RolesService {
     return this.roleModel
       .find({
         serverId: new Types.ObjectId(serverId),
-        $or: [
-          { memberIds: new Types.ObjectId(memberId) },
-          { isDefault: true },
-        ],
+        $or: [{ memberIds: new Types.ObjectId(memberId) }, { isDefault: true }],
       })
       .sort({ position: -1 })
       .exec();
@@ -367,6 +376,7 @@ export class RolesService {
       manageServer: false,
       manageChannels: false,
       manageEvents: false,
+      manageExpressions: false,
       // Quyền Thành Viên
       createInvite: false,
       changeNickname: false,
@@ -377,8 +387,6 @@ export class RolesService {
       mentionEveryone: false,
       sendMessages: false,
       sendMessagesInThreads: false,
-      createPublicThreads: false,
-      createPrivateThreads: false,
       embedLinks: false,
       attachFiles: false,
       addReactions: false,

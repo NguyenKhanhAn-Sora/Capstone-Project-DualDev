@@ -10,6 +10,71 @@ type RuleRow = { id: string; content: string };
 type JoinFormQuestionType = "short" | "paragraph" | "multiple_choice";
 type JoinFormQuestion = { id: string; title: string; type: JoinFormQuestionType; required: boolean; options?: string[] };
 
+/** Must match `servers.service` discovery thresholds. */
+const DISCOVERY_MIN_EVALUATE = 2;
+const DISCOVERY_MIN_MEMBERS = 1000;
+const DISCOVERY_MIN_AGE_WEEKS = 8;
+
+function localizedDiscoveryCheck(
+  check: serversApi.DiscoveryCheck,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): { label: string; description: string } {
+  switch (check.id) {
+    case "evaluate":
+      if (check.passed) {
+        return {
+          label: t("chat.serverAccess.discoveryCheckEvaluatePassTitle"),
+          description: t("chat.serverAccess.discoveryCheckEvaluatePassDesc"),
+        };
+      }
+      return {
+        label: t("chat.serverAccess.discoveryCheckEvaluateWaitTitle"),
+        description: t("chat.serverAccess.discoveryCheckEvaluateWaitDesc", {
+          minEvaluate: DISCOVERY_MIN_EVALUATE,
+        }),
+      };
+    case "members":
+      if (check.passed) {
+        return {
+          label: t("chat.serverAccess.discoveryCheckMembersPassTitle", { minMembers: DISCOVERY_MIN_MEMBERS }),
+          description: t("chat.serverAccess.discoveryCheckMembersDesc", { minMembers: DISCOVERY_MIN_MEMBERS }),
+        };
+      }
+      return {
+        label: t("chat.serverAccess.discoveryCheckMembersFailTitle", { minMembers: DISCOVERY_MIN_MEMBERS }),
+        description: t("chat.serverAccess.discoveryCheckMembersDesc", { minMembers: DISCOVERY_MIN_MEMBERS }),
+      };
+    case "age":
+      if (check.passed) {
+        return {
+          label: t("chat.serverAccess.discoveryCheckAgePassTitle"),
+          description: t("chat.serverAccess.discoveryCheckAgePassDesc", {
+            minAgeWeeks: DISCOVERY_MIN_AGE_WEEKS,
+          }),
+        };
+      }
+      return {
+        label: t("chat.serverAccess.discoveryCheckAgeFailTitle"),
+        description: t("chat.serverAccess.discoveryCheckAgeFailDesc", {
+          minAgeWeeks: DISCOVERY_MIN_AGE_WEEKS,
+        }),
+      };
+    case "content":
+      if (check.passed) {
+        return {
+          label: t("chat.serverAccess.discoveryCheckContentPassTitle"),
+          description: t("chat.serverAccess.discoveryCheckContentPassDesc"),
+        };
+      }
+      return {
+        label: t("chat.serverAccess.discoveryCheckContentFailTitle"),
+        description: t("chat.serverAccess.discoveryCheckContentFailDesc"),
+      };
+    default:
+      return { label: check.label, description: check.description };
+  }
+}
+
 type ServerAccessSettings = {
   accessMode: AccessMode;
   isAgeRestricted: boolean;
@@ -18,23 +83,25 @@ type ServerAccessSettings = {
   joinApplicationForm?: { enabled: boolean; questions: JoinFormQuestion[] };
 };
 
-const RULE_TEMPLATES: string[] = [
-  "Lịch sự và văn minh",
-  "Không spam hoặc tự quảng bá bản thân (mời tham gia máy chủ, quảng cáo, v.v) khi chưa được sự cho phép của ban quản trị máy chủ. Bao gồm cả hành vi nhắn tin trực tiếp cho các thành viên trong máy chủ.",
-  "Không có hành động bạo lực hoặc nội dung phản cảm",
-  "Giúp đảm bảo môi trường lành mạnh",
-];
-
-const QUESTION_TEMPLATES: string[] = [
-  "Bạn có chơi trò chơi nào giống với chúng tôi không?",
-  "Bạn tìm thấy chúng tôi bằng cách nào?",
-  "Đâu là điểm độc nhất vô nhị của bạn?",
-];
 
 function uid(): string { return `q_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`; }
 
 export default function ServerAccessSection({ serverId, canManageSettings }: { serverId: string; canManageSettings: boolean }) {
   const { t } = useLanguage();
+
+  const ruleTemplates = useMemo<string[]>(() => [
+    t("chat.serverAccess.ruleTemplate1"),
+    t("chat.serverAccess.ruleTemplate2"),
+    t("chat.serverAccess.ruleTemplate3"),
+    t("chat.serverAccess.ruleTemplate4"),
+  ], [t]);
+
+  const questionTemplates = useMemo<string[]>(() => [
+    t("chat.serverAccess.questionTemplate1"),
+    t("chat.serverAccess.questionTemplate2"),
+    t("chat.serverAccess.questionTemplate3"),
+  ], [t]);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +180,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
 
   const ensureDefaultQuestion = async () => {
     if (!canEdit || joinFormQuestions.length > 0) return;
-    const q: JoinFormQuestion = { id: uid(), title: "Tại sao bạn muốn tham gia máy chủ của chúng tôi?", type: "short", required: true, options: [] };
+    const q: JoinFormQuestion = { id: uid(), title: t("chat.serverAccess.defaultQuestion"), type: "short", required: true, options: [] };
     setJoinFormQuestions([q]);
     try { await (serversApi as any).updateJoinApplicationForm(serverId, { enabled: true, questions: [q] }); await fetchSettings(); }
     catch (e) { setError(e instanceof Error ? e.message : t("chat.serverAccess.joinFormSaveError")); }
@@ -191,15 +258,16 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
               <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-panel-text)" }}>
                 {discoveryEligible
                   ? t("chat.serverAccess.discoveryMet")
-                  : <>{t("chat.serverAccess.discoveryNotMet").replace("không", "").trim().split(" não")[0]}<strong style={{ color: "var(--color-panel-danger)" }}>không</strong>{t("chat.serverAccess.discoveryNotMet").split("không")[1]}</>
-                }
+                  : t("chat.serverAccess.discoveryNotMet")}
               </div>
             </div>
           </div>
           {discoveryLoading && <div style={{ textAlign: "center", padding: 16, color: "var(--color-panel-text-muted)" }}>{t("chat.serverAccess.checkingDiscovery")}</div>}
           {!discoveryLoading && discoveryChecks.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-              {discoveryChecks.map((check) => (
+              {discoveryChecks.map((check) => {
+                const row = localizedDiscoveryCheck(check, t);
+                return (
                 <div key={check.id} style={{ display: "flex", gap: 14, alignItems: "flex-start", padding: "14px 0", borderTop: "1px solid var(--color-panel-border)" }}>
                   <div style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800,
                     background: check.passed ? "rgba(35,165,90,0.15)" : check.warning ? "rgba(254,231,92,0.15)" : "rgba(242,63,67,0.15)",
@@ -207,11 +275,12 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
                     {check.passed ? "✓" : check.warning ? "!" : "✕"}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--color-panel-text)" }}>{check.label}</div>
-                    <div style={{ fontSize: 13, color: "var(--color-panel-text-muted)", marginTop: 2, lineHeight: 1.45 }}>{check.description}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--color-panel-text)" }}>{row.label}</div>
+                    <div style={{ fontSize: 13, color: "var(--color-panel-text-muted)", marginTop: 2, lineHeight: 1.45 }}>{row.description}</div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -247,7 +316,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
             <button type="button" className={styles.btn} disabled={!canEdit || saving || !hasRules || !ruleContent.trim()} onClick={handleAddRule}>{t("chat.serverAccess.addRuleBtn")}</button>
           </div>
           <div className={styles.chipRow}>
-            {RULE_TEMPLATES.map((tmpl) => (
+            {ruleTemplates.map((tmpl) => (
               <button key={tmpl} type="button" className={styles.chip} disabled={!canEdit || saving || !hasRules} onClick={() => addRuleFromTemplate(tmpl)} title={t("chat.serverAccess.addRuleChipTitle")}>{tmpl}</button>
             ))}
           </div>
@@ -318,7 +387,7 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
                   {t("chat.serverAccess.addQuestionBtn")}
                 </button>
                 <div className={styles.chipRow}>
-                  {QUESTION_TEMPLATES.map((tmpl) => (
+                  {questionTemplates.map((tmpl) => (
                     <button key={tmpl} type="button" className={styles.chip} disabled={!canEdit || saving || remainingSlots <= 0} onClick={() => addQuestionFromTemplate(tmpl)} title={t("chat.serverAccess.addQuestionChipTitle")}>{tmpl}</button>
                   ))}
                 </div>

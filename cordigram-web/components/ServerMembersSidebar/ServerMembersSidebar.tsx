@@ -138,6 +138,18 @@ export default function ServerMembersSidebar({
     fetchMembers();
   }, [fetchMembers]);
 
+  useEffect(() => {
+    const onUpdated = (e: Event) => {
+      const ce = e as CustomEvent;
+      const d = (ce?.detail ?? {}) as { serverId?: string };
+      if (!d?.serverId || d.serverId !== serverId) return;
+      void fetchMembers();
+    };
+    window.addEventListener("cordigram-server-member-profile-updated", onUpdated as any);
+    return () =>
+      window.removeEventListener("cordigram-server-member-profile-updated", onUpdated as any);
+  }, [fetchMembers, serverId]);
+
   // =====================================================
   // GROUP MEMBERS BY ROLE
   // Nhóm members theo role (giống Discord)

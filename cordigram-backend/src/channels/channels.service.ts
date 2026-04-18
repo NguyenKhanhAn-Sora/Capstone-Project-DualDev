@@ -32,7 +32,10 @@ export class ChannelsService {
     createChannelDto: CreateChannelDto,
     userId: string,
   ): Promise<Channel> {
-    const server = await this.serverModel.findById(serverId);
+    const server = await this.serverModel.findOne({
+      _id: new Types.ObjectId(serverId),
+      $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+    });
 
     if (!server) {
       throw new NotFoundException(`Server with id ${serverId} not found`);

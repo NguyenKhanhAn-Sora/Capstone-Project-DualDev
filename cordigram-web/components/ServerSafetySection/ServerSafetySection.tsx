@@ -8,7 +8,7 @@ import { useLanguage } from "@/component/language-provider";
 interface Props {
   serverId: string;
   canManageSettings: boolean;
-  initialTab?: "spam" | "automod" | "privileges";
+  initialTab?: "spam" | "automod";
 }
 
 export default function ServerSafetySection({ serverId, canManageSettings }: Props) {

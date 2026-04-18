@@ -4,13 +4,13 @@ This folder contains audio files for call notifications.
 
 ## Files:
 
-1. **incoming-call.mp3** - Ringtone played when receiving a call (receiver side)
+1. **universfield-ringtone-090-496416.mp3** - Ringtone played when receiving a call (receiver side; wired in `useCallSound`)
 2. **outgoing-call.mp3** - Dialing tone played when initiating a call (caller side)
 
 ## Usage:
 
 These sounds are automatically played by the `useCallSound` hook:
-- `incoming-call.mp3`: Played in `IncomingCallPopup` component
+- `universfield-ringtone-090-496416.mp3`: Played in `IncomingCallPopup` component (incoming ringtone)
 - `outgoing-call.mp3`: Played in `OutgoingCallPopup` component
 
 ## Sound Sources:
@@ -32,7 +32,7 @@ Since we don't have actual audio files yet, you can:
 
 ### Option 1: Use Free Online Sounds
 Download free ringtones and place them in this folder:
-- incoming-call.mp3
+- universfield-ringtone-090-496416.mp3 (incoming)
 - outgoing-call.mp3
 
 ### Option 2: Use Browser Beep (Temporary)

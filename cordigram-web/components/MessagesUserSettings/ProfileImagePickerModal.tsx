@@ -26,7 +26,6 @@ export default function ProfileImagePickerModal({
 }: Props) {
   const { t } = useLanguage();
   const uploadRef = useRef<HTMLInputElement>(null);
-  const gifRef = useRef<HTMLInputElement>(null);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -72,18 +71,7 @@ export default function ProfileImagePickerModal({
             e.target.value = "";
           }}
         />
-        <input
-          ref={gifRef}
-          type="file"
-          accept="image/gif,image/*"
-          className={styles.hiddenInput}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) onPickFile(f);
-            e.target.value = "";
-          }}
-        />
-        <div className={styles.grid2}>
+        <div className={styles.grid}>
           <button
             type="button"
             className={styles.pickCard}
@@ -93,17 +81,6 @@ export default function ProfileImagePickerModal({
               🖼+
             </span>
             {t("chat.profileImagePicker.uploadImage")}
-          </button>
-          <button
-            type="button"
-            className={`${styles.pickCard} ${styles.gifPreview}`}
-            onClick={() => gifRef.current?.click()}
-          >
-            <span className={styles.gifBadge}>GIF</span>
-            <span className={styles.pickIcon} aria-hidden>
-              🎬
-            </span>
-            {t("chat.profileImagePicker.pickGif")}
           </button>
         </div>
         {mode === "avatar" ? (

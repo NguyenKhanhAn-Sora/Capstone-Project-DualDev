@@ -127,7 +127,7 @@ export class InboxService {
             (server?._id ?? inv.serverId)?.toString?.() ??
             inv.serverId?.toString?.() ??
             '',
-          serverName: server?.name ?? 'Máy chủ',
+          serverName: server?.name?.trim?.() ?? '',
           serverAvatarUrl: server?.avatarUrl ?? null,
           inviterId:
             (from?._id ?? inv.fromUserId)?.toString?.() ??
@@ -269,7 +269,8 @@ export class InboxService {
           channelId,
           channelName,
           serverId,
-          serverName: (server as any).name ?? 'Máy chủ',
+          serverName:
+            ((server as any).name as string | undefined)?.trim?.() ?? '',
           lastMessage: lastMsg.content ?? '',
           lastMessageAt:
             lastMsg.createdAt?.toISOString?.() ?? new Date().toISOString(),

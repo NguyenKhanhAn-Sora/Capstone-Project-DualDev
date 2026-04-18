@@ -52,10 +52,17 @@ export default function PermissionsTab({
     }));
   }, [t]);
 
-  const mergeRolePermissions = (r: Role): RolePermissions => ({
-    ...r.permissions,
-    mentionEveryone: r.permissions.mentionEveryone ?? false,
-  });
+  const mergeRolePermissions = (r: Role): RolePermissions => {
+    const raw = { ...r.permissions } as Record<string, unknown>;
+    delete raw.createPublicThreads;
+    delete raw.createPrivateThreads;
+    const p = raw as RolePermissions;
+    return {
+      ...p,
+      mentionEveryone: p.mentionEveryone ?? false,
+      manageExpressions: p.manageExpressions ?? false,
+    };
+  };
 
   const [permissions, setPermissions] = useState<RolePermissions>(mergeRolePermissions(role));
   const [searchQuery, setSearchQuery] = useState("");

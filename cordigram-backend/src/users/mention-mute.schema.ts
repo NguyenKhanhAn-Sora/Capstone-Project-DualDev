@@ -28,7 +28,4 @@ export class MentionMute extends Document {
 }
 
 export const MentionMuteSchema = SchemaFactory.createForClass(MentionMute);
-MentionMuteSchema.index(
-  { ownerUserId: 1, mutedSenderId: 1 },
-  { unique: true },
-);
+MentionMuteSchema.index({ ownerUserId: 1, mutedSenderId: 1 }, { unique: true });

@@ -10,6 +10,8 @@ export interface RolePermissions {
   manageServer: boolean; // Quản lý cài đặt máy chủ
   manageChannels: boolean; // Quản lý kênh (tạo, sửa, xóa)
   manageEvents: boolean; // Quản lý sự kiện
+  /** Emoji / sticker tùy chỉnh máy chủ (khi chủ đã mở khóa ô theo Boost). */
+  manageExpressions: boolean;
 
   // === Quyền Thành Viên ===
   createInvite: boolean; // Tạo lời mời
@@ -23,8 +25,6 @@ export interface RolePermissions {
   mentionEveryone: boolean; // Đề cập @everyone, @here và Tất Cả Vai Trò
   sendMessages: boolean; // Gửi tin nhắn và tạo bài đăng
   sendMessagesInThreads: boolean; // Gửi tin nhắn trong chủ đề và bài đăng
-  createPublicThreads: boolean; // Tạo chủ đề công khai
-  createPrivateThreads: boolean; // Tạo các chủ đề riêng tư
   embedLinks: boolean; // Nhúng liên kết
   attachFiles: boolean; // Đính kèm tập tin
   addReactions: boolean; // Thêm biểu cảm
@@ -52,6 +52,7 @@ export const DEFAULT_EVERYONE_PERMISSIONS: RolePermissions = {
   manageServer: false,
   manageChannels: false,
   manageEvents: false,
+  manageExpressions: false,
 
   // Quyền Thành Viên
   createInvite: false,
@@ -65,8 +66,6 @@ export const DEFAULT_EVERYONE_PERMISSIONS: RolePermissions = {
   mentionEveryone: false,
   sendMessages: true,
   sendMessagesInThreads: true,
-  createPublicThreads: false,
-  createPrivateThreads: false,
   embedLinks: true,
   attachFiles: true,
   addReactions: true,
@@ -94,6 +93,7 @@ export const DEFAULT_NEW_ROLE_PERMISSIONS: RolePermissions = {
   manageServer: false,
   manageChannels: false,
   manageEvents: false,
+  manageExpressions: false,
 
   // Quyền Thành Viên - tất cả false
   createInvite: false,
@@ -107,8 +107,6 @@ export const DEFAULT_NEW_ROLE_PERMISSIONS: RolePermissions = {
   mentionEveryone: false,
   sendMessages: true,
   sendMessagesInThreads: true,
-  createPublicThreads: false,
-  createPrivateThreads: false,
   embedLinks: true,
   attachFiles: true,
   addReactions: true,
@@ -160,6 +158,7 @@ export class Role extends Document {
       manageServer: { type: Boolean, default: false },
       manageChannels: { type: Boolean, default: false },
       manageEvents: { type: Boolean, default: false },
+      manageExpressions: { type: Boolean, default: false },
 
       // Quyền Thành Viên
       createInvite: { type: Boolean, default: false },
@@ -173,8 +172,6 @@ export class Role extends Document {
       mentionEveryone: { type: Boolean, default: false },
       sendMessages: { type: Boolean, default: true },
       sendMessagesInThreads: { type: Boolean, default: true },
-      createPublicThreads: { type: Boolean, default: false },
-      createPrivateThreads: { type: Boolean, default: false },
       embedLinks: { type: Boolean, default: true },
       attachFiles: { type: Boolean, default: true },
       addReactions: { type: Boolean, default: true },

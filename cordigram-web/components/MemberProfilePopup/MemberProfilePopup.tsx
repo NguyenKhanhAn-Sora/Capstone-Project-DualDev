@@ -82,6 +82,9 @@ export default function MemberProfilePopup({
   };
 
   const displayName = member.displayName || member.username;
+  const avatarUrl =
+    member.avatarUrl ||
+    "https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg";
   const joinDate = serverJoinDate
     ? new Date(serverJoinDate).toLocaleDateString(localeTagForLanguage(language), {
         day: "numeric",
@@ -92,7 +95,8 @@ export default function MemberProfilePopup({
 
   return (
     <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal aria-label={t("chat.popups.memberProfile.aria")}>
-      <div className={styles.popup} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.popup}>
+      <div onClick={(e) => e.stopPropagation()}>
         <button type="button" className={styles.closeBtn} onClick={onClose} aria-label={t("chat.popups.closeAria")}>
           ×
         </button>
@@ -100,15 +104,7 @@ export default function MemberProfilePopup({
         <div className={styles.banner} />
 
         <div className={styles.avatarWrap}>
-          <div
-            className={styles.avatar}
-            style={{
-              backgroundImage: member.avatarUrl ? `url(${member.avatarUrl})` : undefined,
-              backgroundColor: !member.avatarUrl ? "#5865f2" : undefined,
-            }}
-          >
-            {!member.avatarUrl && <span>{(displayName || "?").charAt(0).toUpperCase()}</span>}
-          </div>
+          <img className={styles.avatar} src={avatarUrl} alt="" />
         </div>
 
         {/* Tên hiển thị với màu theo role cao nhất */}
@@ -239,6 +235,7 @@ export default function MemberProfilePopup({
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

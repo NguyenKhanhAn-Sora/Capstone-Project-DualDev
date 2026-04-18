@@ -15,6 +15,8 @@ import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { SearchHistory, SearchHistorySchema } from './search-history.schema';
 import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
+import { MessagesModule } from '../messages/messages.module';
+import { DirectMessagesModule } from '../direct-messages/direct-messages.module';
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { SearchService } from './search.service';
     ProfilesModule,
     HashtagsModule,
     PostsModule,
+    MessagesModule,
+    DirectMessagesModule,
     MongooseModule.forFeature([
       { name: SearchHistory.name, schema: SearchHistorySchema },
       { name: Post.name, schema: PostSchema },

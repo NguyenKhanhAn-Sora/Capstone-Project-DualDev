@@ -116,6 +116,13 @@ const CHANNEL_MAP: Record<string, Record<string, string>> = {
   "Community Hub":                { vi: "Nơi Tập Trung Cộng Đồng",     en: "Community Hub",     ja: "コミュニティハブ", zh: "社区中心" },
   "コミュニティハブ":              { vi: "Nơi Tập Trung Cộng Đồng",     en: "Community Hub",     ja: "コミュニティハブ", zh: "社区中心" },
   "社区中心":                      { vi: "Nơi Tập Trung Cộng Đồng",     en: "Community Hub",     ja: "コミュニティハブ", zh: "社区中心" },
+  /** Community activation — rules channel (legacy vi slug + canonical) */
+  "luật-server":                 { vi: "quy-tắc-máy-chủ",              en: "server-rules",      ja: "サーバー-ルール",   zh: "服务器规则" },
+  "server-rules":                { vi: "quy-tắc-máy-chủ",              en: "server-rules",      ja: "サーバー-ルール",   zh: "服务器规则" },
+  /** Community activation — Cordigram updates channel */
+  "community-updates":           { vi: "cập-nhật-cộng-đồng",         en: "community-updates", ja: "コミュニティ更新", zh: "社区更新" },
+  "コミュニティ更新":             { vi: "cập-nhật-cộng-đồng",         en: "community-updates", ja: "コミュニティ更新", zh: "社区更新" },
+  "社区更新":                      { vi: "cập-nhật-cộng-đồng",         en: "community-updates", ja: "コミュニティ更新", zh: "社区更新" },
 };
 
 type Lang = "vi" | "en" | "ja" | "zh";

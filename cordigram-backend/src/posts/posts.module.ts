@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
+import { BoostModule } from '../boost/boost.module';
 import { UsersModule } from '../users/users.module';
 import { Post, PostSchema } from './post.schema';
 import { PostsService } from './posts.service';
@@ -46,6 +47,7 @@ import {
   imports: [
     AuthModule,
     CloudinaryModule,
+    BoostModule,
     UsersModule,
     NotificationsModule,
     ActivityModule,

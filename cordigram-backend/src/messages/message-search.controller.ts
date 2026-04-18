@@ -1,4 +1,4 @@
-﻿import {
+import {
   Controller,
   Get,
   Query,
@@ -24,6 +24,8 @@ export class MessageSearchController {
     @Query('hasFile') hasFile?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('fuzzy') fuzzy?: string,
+    @Query('parseQuery') parseQuery?: string,
   ) {
     if (!q && !serverId && !channelId && !senderId) {
       throw new BadRequestException(
@@ -41,6 +43,8 @@ export class MessageSearchController {
       hasFile: hasFile === 'true',
       limit: limit ? parseInt(limit, 10) : 25,
       offset: offset ? parseInt(offset, 10) : 0,
+      fuzzy: fuzzy === 'true' || fuzzy === '1',
+      parseQuery: parseQuery === 'false' || parseQuery === '0' ? false : true,
     });
   }
 }

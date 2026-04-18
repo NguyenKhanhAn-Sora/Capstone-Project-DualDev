@@ -36,6 +36,8 @@ export class DirectMessagesController {
     @Query('hasFile') hasFile?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('fuzzy') fuzzy?: string,
+    @Query('parseQuery') parseQuery?: string,
   ) {
     return this.directMessagesService.searchDirectMessages(user.userId, {
       q,
@@ -45,6 +47,8 @@ export class DirectMessagesController {
       hasFile: hasFile === 'true',
       limit: limit ? parseInt(limit, 10) : 25,
       offset: offset ? parseInt(offset, 10) : 0,
+      fuzzy: fuzzy === 'true' || fuzzy === '1',
+      parseQuery: parseQuery === 'false' || parseQuery === '0' ? false : true,
     });
   }
 

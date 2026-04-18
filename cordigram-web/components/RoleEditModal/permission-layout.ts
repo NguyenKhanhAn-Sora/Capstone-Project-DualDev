@@ -16,6 +16,7 @@ export const PERMISSION_LAYOUT: PermissionLayoutSection[] = [
       { key: "manageServer", hasWarning: true },
       { key: "manageChannels", hasWarning: true },
       { key: "manageEvents" },
+      { key: "manageExpressions" },
     ],
   },
   {
@@ -35,8 +36,6 @@ export const PERMISSION_LAYOUT: PermissionLayoutSection[] = [
       { key: "mentionEveryone", hasWarning: true },
       { key: "sendMessages" },
       { key: "sendMessagesInThreads" },
-      { key: "createPublicThreads" },
-      { key: "createPrivateThreads" },
       { key: "embedLinks" },
       { key: "attachFiles" },
       { key: "addReactions" },

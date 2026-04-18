@@ -30,7 +30,10 @@ export class EventsService {
     dto: CreateEventDto,
     userId: string,
   ): Promise<ServerEvent> {
-    const server = await this.serverModel.findById(serverId);
+    const server = await this.serverModel.findOne({
+      _id: new Types.ObjectId(serverId),
+      $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+    });
     if (!server) {
       throw new NotFoundException('Server not found');
     }

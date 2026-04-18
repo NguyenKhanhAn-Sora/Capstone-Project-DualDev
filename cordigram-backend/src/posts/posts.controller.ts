@@ -34,6 +34,8 @@ import { UpdatePostNotificationMuteDto } from './dto/update-post-notification-mu
 import { PostsService } from './posts.service';
 import { ConfigService } from '../config/config.service';
 import { JwtService } from '@nestjs/jwt';
+import { BoostService, FREE_MAX_UPLOAD_BYTES } from '../boost/boost.service';
+import { isCordigramMessagesUpload } from '../common/cordigram-upload-context';
 
 @Controller('posts')
 @UseGuards(JwtAuthGuard)
@@ -43,6 +45,8 @@ export class PostsController {
   constructor(
     private readonly postsService: PostsService,
     private readonly config: ConfigService,
+    private readonly boostService: BoostService,
+
   ) {}
 
   private resolveAdminPreviewViewerId(
@@ -248,9 +252,8 @@ export class PostsController {
   @UseInterceptors(
     FileInterceptor('file', {
       limits: {
-        fileSize: Number(
-          process.env.CLOUDINARY_MAX_FILE_SIZE ?? 15 * 1024 * 1024,
-        ),
+        // allow up to Boost tier, enforce per-user below
+        fileSize: 600 * 1024 * 1024,
       },
     }),
   )
@@ -264,6 +267,13 @@ export class PostsController {
     }
     if (!file) {
       throw new BadRequestException('Missing file');
+    }
+    const status = await this.boostService.getBoostStatus(user.userId);
+    const maxBytes = isCordigramMessagesUpload(req)
+      ? status.limits.maxUploadBytes
+      : FREE_MAX_UPLOAD_BYTES;
+    if (typeof file.size === 'number' && file.size > maxBytes) {
+      throw new BadRequestException(`File too large (max ${maxBytes} bytes)`);
     }
     if (
       !file.mimetype.startsWith('image/') &&
@@ -281,9 +291,7 @@ export class PostsController {
   @UseInterceptors(
     FilesInterceptor('files', 10, {
       limits: {
-        fileSize: Number(
-          process.env.CLOUDINARY_MAX_FILE_SIZE ?? 15 * 1024 * 1024,
-        ),
+        fileSize: 600 * 1024 * 1024,
       },
     }),
   )
@@ -297,6 +305,14 @@ export class PostsController {
     }
     if (!files || !files.length) {
       throw new BadRequestException('Missing files');
+    }
+    const status = await this.boostService.getBoostStatus(user.userId);
+    const maxBytes = isCordigramMessagesUpload(req)
+      ? status.limits.maxUploadBytes
+      : FREE_MAX_UPLOAD_BYTES;
+    const tooLarge = files.find((f) => typeof f.size === 'number' && f.size > maxBytes);
+    if (tooLarge) {
+      throw new BadRequestException(`File too large (max ${maxBytes} bytes)`);
     }
 
     const invalid = files.find(
