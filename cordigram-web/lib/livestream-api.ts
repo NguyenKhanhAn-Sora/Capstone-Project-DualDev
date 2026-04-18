@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:9999";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://cordigram-api.onrender.com";
 
 export type LivestreamLatencyMode = "adaptive" | "balanced" | "low";
 

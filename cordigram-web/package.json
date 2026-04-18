@@ -7,12 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-<<<<<<< HEAD
     "i18n:deepl": "node scripts/deepl-sync-locales.mjs",
-=======
     "test": "vitest run",
     "test:watch": "vitest",
->>>>>>> origin/new-feature-chat
     "test:e2e": "playwright test"
   },
   "dependencies": {
