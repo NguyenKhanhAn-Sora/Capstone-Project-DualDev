@@ -31,6 +31,7 @@ export default function IncomingCallPopup({
   return (
     <div className={styles.overlay}>
       <div className={styles.popup}>
+        <div className={styles.cardAccent} aria-hidden />
         {/* Avatar */}
         <div className={styles.avatarWrapper}>
           {callerAvatar ? (
@@ -59,17 +60,17 @@ export default function IncomingCallPopup({
         {/* Caller info */}
         <h2 className={styles.callerName}>{callerName}</h2>
         {isCancelled ? (
-          <p className={styles.callType} style={{ color: "#ed4245" }}>
+          <p className={styles.statusCancelled}>
             {t("chat.popups.incomingCall.canceled")}
           </p>
         ) : (
           <>
-            <p className={styles.callType}>{t("chat.popups.incomingCall.incoming")}</p>
-            <p className={styles.callTypeDetail}>
+            <span className={styles.kindPill}>
               {callType === "video"
                 ? t("chat.popups.incomingCall.videoCall")
                 : t("chat.popups.incomingCall.voiceCall")}
-            </p>
+            </span>
+            <p className={styles.statusLive}>{t("chat.popups.incomingCall.incoming")}</p>
           </>
         )}
 

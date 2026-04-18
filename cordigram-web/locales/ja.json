@@ -408,8 +408,8 @@
       },
       "outgoingCall": {
         "calling": "呼び出し中...",
-        "rejected": "相手が利用できません",
-        "noAnswer": "応答なし",
+        "rejected": "{name} は出ませんでした",
+        "noAnswer": "{name} は出ませんでした",
         "videoCall": "ビデオ通話",
         "voiceCall": "音声通話",
         "cancelCall": "通話をキャンセル",

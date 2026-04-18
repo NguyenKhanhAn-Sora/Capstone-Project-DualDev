@@ -43,10 +43,19 @@ export interface DirectMessageEvent {
   };
 }
 
+/** Normalized socket discrimination so ICE / reject don’t share the same shape. */
+export type CallEventSignal =
+  | "incoming"
+  | "answer"
+  | "rejected"
+  | "ice";
+
 export interface CallEvent {
   from: string;
+  callSignal?: CallEventSignal;
   type?: "audio" | "video";
   sdpOffer?: any;
+  candidate?: any;
   callerInfo?: {
     userId: string;
     username: string;
@@ -266,23 +275,27 @@ export const useDirectMessages = ({
           console.error("❌ [SOCKET] callerInfo is UNDEFINED or NULL!");
         }
         console.log("📞 [SOCKET] ========================================");
-        setCallEvent(data);
+        setCallEvent({ ...data, callSignal: "incoming" });
       },
     );
 
     socket.on("call-answer", (data: { from: string; sdpOffer: any }) => {
       console.log("📞 [SOCKET] Call answered event received:", data);
-      setCallEvent(data);
+      setCallEvent({ ...data, callSignal: "answer" });
     });
 
     socket.on("call-rejected", (data: { from: string }) => {
       console.log("📞 [SOCKET] Call rejected event received:", data);
-      setCallEvent({ from: data.from } as any); // Trigger rejection handling
+      setCallEvent({ from: data.from, callSignal: "rejected" });
     });
 
     socket.on("ice-candidate", (data: { from: string; candidate: any }) => {
       console.log("ICE candidate:", data);
-      setCallEvent(data);
+      setCallEvent({
+        from: data.from,
+        candidate: data.candidate,
+        callSignal: "ice",
+      });
     });
 
     socket.on("call-ended", (data: { from: string }) => {

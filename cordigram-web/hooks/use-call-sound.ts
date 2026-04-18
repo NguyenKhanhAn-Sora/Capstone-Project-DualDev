@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 /**
  * Hook to manage call sounds (ringtone/dialing tone)
@@ -11,19 +11,23 @@ export function useCallSound(
   shouldPlay: boolean,
 ) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [audioError, setAudioError] = useState<boolean>(false);
+  const prevShouldPlay = useRef(false);
+  /** Missing file / decode error — skip until the next ring/dial session */
+  const fileMissingRef = useRef(false);
 
   useEffect(() => {
-    // If audio failed to load, don't try again
-    if (audioError) return;
+    if (shouldPlay && !prevShouldPlay.current) {
+      fileMissingRef.current = false;
+    }
+    prevShouldPlay.current = shouldPlay;
 
-    // Create audio element on mount
+    if (fileMissingRef.current) return;
+
     if (!audioRef.current) {
       audioRef.current = new Audio();
       audioRef.current.loop = true;
       audioRef.current.volume = 0.5;
 
-      // Set src immediately
       const audioSrc =
         soundType === "incoming"
           ? "/sounds/universfield-ringtone-090-496416.mp3"
@@ -31,54 +35,46 @@ export function useCallSound(
 
       audioRef.current.src = audioSrc;
 
-      // Handle errors gracefully
       audioRef.current.onerror = () => {
         console.warn(`⚠️ [Sound] ${soundType} audio file not found`);
-        setAudioError(true);
+        fileMissingRef.current = true;
       };
     }
 
     const audio = audioRef.current;
 
-    // Play/pause control
-    if (shouldPlay && !audioError) {
+    if (shouldPlay) {
       const playPromise = audio.play();
 
       if (playPromise !== undefined) {
-        playPromise.catch((error) => {
-          // Silently handle autoplay and abort errors (normal behavior)
+        playPromise.catch((error: DOMException) => {
           if (error.name === "NotAllowedError" || error.name === "AbortError") {
-            // Autoplay blocked or interrupted - ignore
-          } else {
-            // Real error
-            console.warn(`⚠️ [Sound] ${soundType} playback error:`, error.name);
-            setAudioError(true);
+            return;
           }
+          console.warn(`⚠️ [Sound] ${soundType} playback error:`, error.name);
         });
       }
-    } else if (!shouldPlay) {
+    } else {
       try {
         audio.pause();
         audio.currentTime = 0;
-      } catch (e) {
-        // Ignore pause errors
+      } catch {
+        // ignore
       }
     }
 
-    // Cleanup
     return () => {
       if (!shouldPlay && audioRef.current) {
         try {
           audioRef.current.pause();
           audioRef.current.currentTime = 0;
-        } catch (e) {
-          // Ignore cleanup errors
+        } catch {
+          // ignore
         }
       }
     };
-  }, [soundType, shouldPlay, audioError]);
+  }, [soundType, shouldPlay]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -86,8 +82,8 @@ export function useCallSound(
           audioRef.current.pause();
           audioRef.current.src = "";
           audioRef.current = null;
-        } catch (e) {
-          // Ignore cleanup errors
+        } catch {
+          // ignore
         }
       }
     };

@@ -408,8 +408,8 @@
       },
       "outgoingCall": {
         "calling": "正在呼叫...",
-        "rejected": "对方不可用",
-        "noAnswer": "无人接听",
+        "rejected": "{name} 未接听",
+        "noAnswer": "{name} 未接听",
         "videoCall": "视频通话",
         "voiceCall": "语音通话",
         "cancelCall": "取消通话",

@@ -408,8 +408,8 @@
       },
       "outgoingCall": {
         "calling": "Calling...",
-        "rejected": "Recipient is unavailable",
-        "noAnswer": "No answer",
+        "rejected": "{name} didn’t answer",
+        "noAnswer": "{name} didn’t answer",
         "videoCall": "Video call",
         "voiceCall": "Voice call",
         "cancelCall": "Cancel call",

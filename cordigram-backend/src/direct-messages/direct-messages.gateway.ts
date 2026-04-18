@@ -541,6 +541,10 @@ export class DirectMessagesGateway
   ) {
     try {
       const senderId = socket.data.userId;
+      if (data.receiverId === senderId) {
+        console.warn('📞 [CALL] Ignoring call-initiate to self');
+        return;
+      }
       const receiverSocket = this.connectedUsers.get(data.receiverId);
 
       // Get sender's profile for username and avatar

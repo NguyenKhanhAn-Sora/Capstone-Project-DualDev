@@ -30,5 +30,11 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "tests/**/*.spec.ts",
+    "__tests__/use-call-sound.test.ts",
+    "__tests__/call-sound-integration.test.tsx",
+    "__tests__/safety-tab-map.test.ts"
+  ]
 }

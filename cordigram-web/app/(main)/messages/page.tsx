@@ -12,6 +12,12 @@ import {
   useDirectMessages,
   type DirectMessage,
 } from "@/hooks/use-direct-messages";
+import {
+  isCallAnswerEvent,
+  isCallRejectedEvent,
+  isIceCandidateEvent,
+  isIncomingRingEvent,
+} from "@/lib/call-event-guards";
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
 import { translateCategoryName, translateChannelName } from "@/lib/system-names";
@@ -1329,7 +1335,6 @@ export default function MessagesPage() {
   }, [boostModalOpen]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const processedCallsRef = useRef<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [friends, setFriends] = useState<serversApi.Friend[]>([]);
   const [selectedDirectMessageFriend, setSelectedDirectMessageFriend] =
@@ -1573,6 +1578,16 @@ export default function MessagesPage() {
     status: "calling" | "rejected" | "no-answer";
     roomName?: string;
   } | null>(null);
+
+  /** Refs for call socket effect — avoid wrong incoming UI / stale deps (glare, self) */
+  const outgoingCallRef = useRef(outgoingCall);
+  const currentUserIdRef = useRef(currentUserId);
+  useEffect(() => {
+    outgoingCallRef.current = outgoingCall;
+  }, [outgoingCall]);
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
 
   // Typing indicator
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1916,6 +1931,9 @@ export default function MessagesPage() {
         );
         console.log("📞 [CALL] Room name:", roomName);
 
+        // Drop any stale incoming UI (e.g. peer called you earlier and you never cleared)
+        setIncomingCall(null);
+
         // Show outgoing call popup
         setOutgoingCall({
           to: selectedDirectMessageFriend._id,
@@ -1966,10 +1984,6 @@ export default function MessagesPage() {
         incomingCall.callerInfo.displayName,
       );
 
-      // Mark this call as processed
-      processedCallsRef.current.add(incomingCall.from);
-      console.log("✅ [ACCEPT] Marked call as processed");
-
       // Get room name
       const { roomName } = await getDMRoomName(incomingCall.from, token);
       console.log("📞 [ACCEPT] Room name:", roomName);
@@ -1989,21 +2003,13 @@ export default function MessagesPage() {
 
       // Close popup
       setIncomingCall(null);
-
-      // Clear processed call after 10 seconds to allow new calls from same user
-      setTimeout(() => {
-        processedCallsRef.current.delete(incomingCall.from);
-        console.log("🔄 [CLEANUP] Cleared processed call from", incomingCall.from);
-      }, 10000);
     } catch (error) {
       console.error("❌ [ACCEPT] Failed to accept call:", error);
       setError("Không thể chấp nhận cuộc gọi");
-      // Remove from processed on error
-      processedCallsRef.current.delete(incomingCall.from);
     }
   }, [incomingCall, token, currentUserProfile, answerCall]);
 
-  // ✅ Reject incoming call
+  // ✅ Reject incoming call — clear UI + ringtone first, then notify caller
   const handleRejectCall = useCallback(() => {
     if (!incomingCall) return;
 
@@ -2012,18 +2018,9 @@ export default function MessagesPage() {
       incomingCall.callerInfo.displayName,
     );
 
-    // Mark this call as processed
-    processedCallsRef.current.add(incomingCall.from);
-    console.log("✅ [REJECT] Marked call as processed");
-
-    rejectCall(incomingCall.from);
+    const peerId = incomingCall.from;
     setIncomingCall(null);
-
-    // Clear processed call after 5 seconds
-    setTimeout(() => {
-      processedCallsRef.current.delete(incomingCall.from);
-      console.log("🔄 [CLEANUP] Cleared processed call from", incomingCall.from);
-    }, 5000);
+    rejectCall(peerId);
   }, [incomingCall, rejectCall]);
 
   // ✅ Cancel outgoing call
@@ -2066,51 +2063,66 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!callEvent) return;
 
-    // Incoming call notification
-    if (callEvent.from && callEvent.callerInfo) {
-      // Create unique call ID
-      const callId = `${callEvent.from}-${callEvent.type}-${Date.now()}`;
+    // WebRTC ICE must not trigger incoming UI or "rejected" heuristics
+    if (isIceCandidateEvent(callEvent)) return;
 
-      // Check if this call was already processed (accepted/rejected)
-      if (processedCallsRef.current.has(callEvent.from)) {
+    // Incoming call notification (or repeat ring from same caller)
+    if (isIncomingRingEvent(callEvent) && callEvent.callerInfo) {
+      const ev = callEvent;
+
+      if (
+        currentUserIdRef.current &&
+        String(ev.from) === String(currentUserIdRef.current)
+      ) {
+        console.log("📞 [INCOMING] Skip: caller id is self (sanity check)");
+        return;
+      }
+
+      const oc = outgoingCallRef.current;
+      if (
+        oc &&
+        oc.status === "calling" &&
+        String(oc.to) === String(ev.from)
+      ) {
         console.log(
-          "📞 [SKIP] Call from",
-          callEvent.callerInfo.displayName,
-          "already processed",
+          "📞 [INCOMING] Skip: already calling this peer — avoid incoming popup on caller side (glare / race)",
         );
         return;
       }
 
-      // Check if we already have an incoming call from this user
-      if (incomingCall && incomingCall.from === callEvent.from) {
-        console.log(
-          "📞 [SKIP] Already have incoming call from",
-          callEvent.callerInfo.displayName,
-        );
-        return;
-      }
-
-      console.log(
-        "📞 [INCOMING] Received call from:",
-        callEvent.callerInfo.displayName,
-      );
-      console.log("📞 [INCOMING-DEBUG] CallerInfo data:", callEvent.callerInfo);
-      setIncomingCall({
-        from: callEvent.from,
-        type: callEvent.type || "audio",
-        callerInfo: callEvent.callerInfo,
-        status: "incoming",
+      // You are now the callee — clear any stale outgoing (calling / no-answer / rejected UI)
+      setOutgoingCall(null);
+      setIncomingCall((prev) => {
+        if (prev && prev.from === ev.from) {
+          console.log(
+            "📞 [INCOMING] Refresh ring from same caller:",
+            ev.callerInfo!.displayName,
+          );
+        } else {
+          console.log(
+            "📞 [INCOMING] Received call from:",
+            ev.callerInfo!.displayName,
+          );
+        }
+        console.log("📞 [INCOMING-DEBUG] CallerInfo data:", ev.callerInfo);
+        return {
+          from: ev.from,
+          type: ev.type || "audio",
+          callerInfo: ev.callerInfo!,
+          status: "incoming" as const,
+        };
       });
       return;
     }
 
     // Call answered - open tab for caller
-    if (callEvent.sdpOffer && outgoingCall) {
+    if (isCallAnswerEvent(callEvent) && outgoingCall && callEvent.sdpOffer) {
       console.log("📞 [ANSWER] Call was answered, opening call window...");
       openCallTab();
       return;
     }
-  }, [callEvent, outgoingCall, openCallTab, incomingCall]);
+    // Do NOT list incomingCall in deps — setIncomingCall updates it and would retrigger this effect forever.
+  }, [callEvent, outgoingCall, openCallTab]);
 
   // ✅ Handle call-ended event (when caller cancels while receiver has incoming popup)
   useEffect(() => {
@@ -2154,12 +2166,9 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!callEvent) return;
 
-    // Check if this is a call-rejected event
-    if (
-      callEvent.type === undefined &&
-      callEvent.sdpOffer === undefined &&
-      callEvent.callerInfo === undefined
-    ) {
+    if (isIceCandidateEvent(callEvent)) return;
+
+    if (isCallRejectedEvent(callEvent)) {
       console.log("📞 [REJECTED] Call was rejected");
 
       // ✅ Use callback to avoid dependency on outgoingCall state

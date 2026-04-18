@@ -1,5 +1,38 @@
-import { renderHook, act, waitFor } from '@testing-library/react';
-import { useState, useEffect } from 'react';
+import { describe, it, expect } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
+import { useState, useEffect } from "react";
+import type { CallEvent } from "@/hooks/use-direct-messages";
+
+type TestIncomingCall = {
+  from: string;
+  type: "audio";
+  callerInfo: {
+    userId: string;
+    username: string;
+    displayName: string;
+  };
+  status: "incoming" | "cancelled";
+};
+
+type TestOutgoingCall = {
+  to: string;
+  toUser: { displayName: string; username: string };
+  type: "audio";
+  status: "calling" | "rejected";
+  roomName: string;
+};
+
+type CallEndedProps = { from: string } | null;
+
+type IncomingHookProps = {
+  callEnded: CallEndedProps;
+  incomingCall: TestIncomingCall;
+};
+
+type OutgoingHookProps = {
+  callEvent: CallEvent | null;
+  outgoingCall: TestOutgoingCall;
+};
 
 /**
  * Unit Tests for Call Feature - Infinite Loop Fixes
@@ -20,29 +53,34 @@ describe('Call Feature - Infinite Loop Prevention', () => {
   describe('When caller (A) cancels call', () => {
     it('should update receiver (B) incoming call to cancelled without infinite loop', async () => {
       // Mock the useEffect behavior
-      const { result, rerender } = renderHook(
+      const { result, rerender } = renderHook<
+        { incomingCall: TestIncomingCall | null; renderCount: number },
+        IncomingHookProps
+      >(
         ({ callEnded, incomingCall: initialIncomingCall }) => {
-          const [incomingCall, setIncomingCall] = useState(initialIncomingCall);
+          const [incomingCall, setIncomingCall] = useState<TestIncomingCall | null>(
+            initialIncomingCall,
+          );
           const [renderCount, setRenderCount] = useState(0);
 
           // Simulate the fixed useEffect for call-ended
           useEffect(() => {
             if (!callEnded) return;
 
-            console.log('[TEST] call-ended event received');
+            console.log("[TEST] call-ended event received");
 
             // ✅ Use callback to avoid dependency on incomingCall state
-            setIncomingCall(prev => {
+            setIncomingCall((prev) => {
               if (prev && prev.from === callEnded.from) {
-                console.log('[TEST] Updating to cancelled');
-                return { ...prev, status: 'cancelled' };
+                console.log("[TEST] Updating to cancelled");
+                return { ...prev, status: "cancelled" };
               }
               return prev;
             });
 
             const timer = setTimeout(() => {
-              setIncomingCall(prev => {
-                if (prev && prev.from === callEnded.from && prev.status === 'cancelled') {
+              setIncomingCall((prev) => {
+                if (prev && prev.from === callEnded.from && prev.status === "cancelled") {
                   return null;
                 }
                 return prev;
@@ -61,36 +99,36 @@ describe('Call Feature - Infinite Loop Prevention', () => {
         },
         {
           initialProps: {
-            callEnded: null,
+            callEnded: null as CallEndedProps,
             incomingCall: {
-              from: 'user-a-id',
-              type: 'audio' as const,
+              from: "user-a-id",
+              type: "audio" as const,
               callerInfo: {
-                userId: 'user-a-id',
-                username: 'userA',
-                displayName: 'User A',
+                userId: "user-a-id",
+                username: "userA",
+                displayName: "User A",
               },
-              status: 'incoming' as const,
+              status: "incoming" as const,
             },
           },
         }
       );
 
       // Initial state
-      expect(result.current.incomingCall?.status).toBe('incoming');
+      expect(result.current.incomingCall?.status).toBe("incoming");
       expect(result.current.renderCount).toBeLessThan(5); // Should not exceed reasonable renders
 
       // Simulate call-ended event
       await act(async () => {
         rerender({
-          callEnded: { from: 'user-a-id' },
-          incomingCall: result.current.incomingCall,
+          callEnded: { from: "user-a-id" },
+          incomingCall: result.current.incomingCall!,
         });
       });
 
       // Should update to cancelled
       await waitFor(() => {
-        expect(result.current.incomingCall?.status).toBe('cancelled');
+        expect(result.current.incomingCall?.status).toBe("cancelled");
       });
 
       // ✅ Verify no infinite loop (render count should stay low)
@@ -110,16 +148,21 @@ describe('Call Feature - Infinite Loop Prevention', () => {
     });
 
     it('should not update if callEnded is for different user', async () => {
-      const { result, rerender } = renderHook(
+      const { result, rerender } = renderHook<
+        { incomingCall: TestIncomingCall | null },
+        IncomingHookProps
+      >(
         ({ callEnded, incomingCall: initialIncomingCall }) => {
-          const [incomingCall, setIncomingCall] = useState(initialIncomingCall);
+          const [incomingCall, setIncomingCall] = useState<TestIncomingCall | null>(
+            initialIncomingCall,
+          );
 
           useEffect(() => {
             if (!callEnded) return;
 
-            setIncomingCall(prev => {
+            setIncomingCall((prev) => {
               if (prev && prev.from === callEnded.from) {
-                return { ...prev, status: 'cancelled' };
+                return { ...prev, status: "cancelled" };
               }
               return prev;
             });
@@ -129,16 +172,16 @@ describe('Call Feature - Infinite Loop Prevention', () => {
         },
         {
           initialProps: {
-            callEnded: null,
+            callEnded: null as CallEndedProps,
             incomingCall: {
-              from: 'user-a-id',
-              type: 'audio' as const,
+              from: "user-a-id",
+              type: "audio" as const,
               callerInfo: {
-                userId: 'user-a-id',
-                username: 'userA',
-                displayName: 'User A',
+                userId: "user-a-id",
+                username: "userA",
+                displayName: "User A",
               },
-              status: 'incoming' as const,
+              status: "incoming" as const,
             },
           },
         }
@@ -147,13 +190,13 @@ describe('Call Feature - Infinite Loop Prevention', () => {
       // Simulate call-ended for different user
       await act(async () => {
         rerender({
-          callEnded: { from: 'different-user-id' },
-          incomingCall: result.current.incomingCall,
+          callEnded: { from: "different-user-id" },
+          incomingCall: result.current.incomingCall!,
         });
       });
 
       // Should NOT update (still incoming)
-      expect(result.current.incomingCall?.status).toBe('incoming');
+      expect(result.current.incomingCall?.status).toBe("incoming");
     });
   });
 
@@ -163,9 +206,14 @@ describe('Call Feature - Infinite Loop Prevention', () => {
 
   describe('When receiver (B) rejects call', () => {
     it('should update caller (A) outgoing call to rejected without infinite loop', async () => {
-      const { result, rerender } = renderHook(
+      const { result, rerender } = renderHook<
+        { outgoingCall: TestOutgoingCall | null; renderCount: number },
+        OutgoingHookProps
+      >(
         ({ callEvent, outgoingCall: initialOutgoingCall }) => {
-          const [outgoingCall, setOutgoingCall] = useState(initialOutgoingCall);
+          const [outgoingCall, setOutgoingCall] = useState<TestOutgoingCall | null>(
+            initialOutgoingCall,
+          );
           const [renderCount, setRenderCount] = useState(0);
 
           // Simulate the fixed useEffect for call-rejected
@@ -173,21 +221,21 @@ describe('Call Feature - Infinite Loop Prevention', () => {
             if (!callEvent) return;
 
             // Check if this is a call-rejected event
-            if (callEvent.type === undefined && callEvent.sdpOffer === undefined && callEvent.callerInfo === undefined) {
-              console.log('[TEST] call-rejected event received');
+            if (callEvent.callSignal === "rejected") {
+              console.log("[TEST] call-rejected event received");
 
               // ✅ Use callback to avoid dependency on outgoingCall state
-              setOutgoingCall(prev => {
-                if (prev && prev.status !== 'rejected') {
-                  console.log('[TEST] Updating to rejected');
-                  return { ...prev, status: 'rejected' };
+              setOutgoingCall((prev) => {
+                if (prev && prev.status !== "rejected") {
+                  console.log("[TEST] Updating to rejected");
+                  return { ...prev, status: "rejected" };
                 }
                 return prev;
               });
 
               const timer = setTimeout(() => {
-                setOutgoingCall(prev => {
-                  if (prev && prev.status === 'rejected') {
+                setOutgoingCall((prev) => {
+                  if (prev && prev.status === "rejected") {
                     return null;
                   }
                   return prev;
@@ -207,39 +255,39 @@ describe('Call Feature - Infinite Loop Prevention', () => {
         },
         {
           initialProps: {
-            callEvent: null,
+            callEvent: null as CallEvent | null,
             outgoingCall: {
-              to: 'user-b-id',
+              to: "user-b-id",
               toUser: {
-                displayName: 'User B',
-                username: 'userB',
+                displayName: "User B",
+                username: "userB",
               },
-              type: 'audio' as const,
-              status: 'calling' as const,
-              roomName: 'dm-test-room',
+              type: "audio" as const,
+              status: "calling" as const,
+              roomName: "dm-test-room",
             },
           },
         }
       );
 
       // Initial state
-      expect(result.current.outgoingCall?.status).toBe('calling');
+      expect(result.current.outgoingCall?.status).toBe("calling");
       expect(result.current.renderCount).toBeLessThan(5);
 
       // Simulate call-rejected event
       await act(async () => {
         rerender({
-          callEvent: { from: 'user-b-id' }, // Minimal callEvent to indicate rejection
-          outgoingCall: result.current.outgoingCall,
+          callEvent: { from: "user-b-id", callSignal: "rejected" },
+          outgoingCall: result.current.outgoingCall!,
         });
       });
 
       // Should update to rejected
       await waitFor(() => {
-        expect(result.current.outgoingCall?.status).toBe('rejected');
+        expect(result.current.outgoingCall?.status).toBe("rejected");
       });
 
-      // ✅ Verify no infinite loop
+      // Verify no infinite loop
       expect(result.current.renderCount).toBeLessThan(10);
       console.log('[TEST] ✅ Render count:', result.current.renderCount, '(no infinite loop)');
 
@@ -255,20 +303,25 @@ describe('Call Feature - Infinite Loop Prevention', () => {
       expect(result.current.renderCount).toBeLessThan(15);
     });
 
-    it('should not update status to rejected again if already rejected', async () => {
-      const { result, rerender } = renderHook(
+    it("should not update status to rejected again if already rejected", async () => {
+      const { result, rerender } = renderHook<
+        { outgoingCall: TestOutgoingCall | null; updateCount: number },
+        OutgoingHookProps
+      >(
         ({ callEvent, outgoingCall: initialOutgoingCall }) => {
-          const [outgoingCall, setOutgoingCall] = useState(initialOutgoingCall);
+          const [outgoingCall, setOutgoingCall] = useState<TestOutgoingCall | null>(
+            initialOutgoingCall,
+          );
           const [updateCount, setUpdateCount] = useState(0);
 
           useEffect(() => {
             if (!callEvent) return;
 
-            if (callEvent.type === undefined && callEvent.sdpOffer === undefined && callEvent.callerInfo === undefined) {
-              setOutgoingCall(prev => {
-                if (prev && prev.status !== 'rejected') {
-                  setUpdateCount(c => c + 1); // Track updates
-                  return { ...prev, status: 'rejected' };
+            if (callEvent.callSignal === "rejected") {
+              setOutgoingCall((prev) => {
+                if (prev && prev.status !== "rejected") {
+                  setUpdateCount((c) => c + 1); // Track updates
+                  return { ...prev, status: "rejected" };
                 }
                 return prev;
               });
@@ -279,13 +332,13 @@ describe('Call Feature - Infinite Loop Prevention', () => {
         },
         {
           initialProps: {
-            callEvent: null,
+            callEvent: null as CallEvent | null,
             outgoingCall: {
-              to: 'user-b-id',
-              toUser: { displayName: 'User B', username: 'userB' },
-              type: 'audio' as const,
-              status: 'rejected' as const, // Already rejected
-              roomName: 'dm-test-room',
+              to: "user-b-id",
+              toUser: { displayName: "User B", username: "userB" },
+              type: "audio" as const,
+              status: "rejected" as const, // Already rejected
+              roomName: "dm-test-room",
             },
           },
         }
@@ -294,13 +347,13 @@ describe('Call Feature - Infinite Loop Prevention', () => {
       // Simulate call-rejected event again
       await act(async () => {
         rerender({
-          callEvent: { from: 'user-b-id' },
-          outgoingCall: result.current.outgoingCall,
+          callEvent: { from: "user-b-id", callSignal: "rejected" },
+          outgoingCall: result.current.outgoingCall!,
         });
       });
 
       // Should NOT update (already rejected)
-      expect(result.current.outgoingCall?.status).toBe('rejected');
+      expect(result.current.outgoingCall?.status).toBe("rejected");
       expect(result.current.updateCount).toBe(0); // No updates
     });
   });
@@ -313,9 +366,14 @@ describe('Call Feature - Infinite Loop Prevention', () => {
     it('should handle complete flow without infinite loops', async () => {
       let totalRenders = 0;
 
-      const { result, rerender } = renderHook(
+      const { result, rerender } = renderHook<
+        { outgoingCall: TestOutgoingCall | null; totalRenders: number },
+        OutgoingHookProps
+      >(
         ({ callEvent, outgoingCall: initialOutgoingCall }) => {
-          const [outgoingCall, setOutgoingCall] = useState(initialOutgoingCall);
+          const [outgoingCall, setOutgoingCall] = useState<TestOutgoingCall | null>(
+            initialOutgoingCall,
+          );
 
           useEffect(() => {
             totalRenders++;
@@ -324,17 +382,17 @@ describe('Call Feature - Infinite Loop Prevention', () => {
           useEffect(() => {
             if (!callEvent) return;
 
-            if (callEvent.type === undefined && callEvent.sdpOffer === undefined && callEvent.callerInfo === undefined) {
-              setOutgoingCall(prev => {
-                if (prev && prev.status !== 'rejected') {
-                  return { ...prev, status: 'rejected' };
+            if (callEvent.callSignal === "rejected") {
+              setOutgoingCall((prev) => {
+                if (prev && prev.status !== "rejected") {
+                  return { ...prev, status: "rejected" };
                 }
                 return prev;
               });
 
               const timer = setTimeout(() => {
-                setOutgoingCall(prev => {
-                  if (prev && prev.status === 'rejected') {
+                setOutgoingCall((prev) => {
+                  if (prev && prev.status === "rejected") {
                     return null;
                   }
                   return prev;
@@ -349,13 +407,13 @@ describe('Call Feature - Infinite Loop Prevention', () => {
         },
         {
           initialProps: {
-            callEvent: null,
+            callEvent: null as CallEvent | null,
             outgoingCall: {
-              to: 'user-b-id',
-              toUser: { displayName: 'User B', username: 'userB' },
-              type: 'audio' as const,
-              status: 'calling' as const,
-              roomName: 'dm-test-room',
+              to: "user-b-id",
+              toUser: { displayName: "User B", username: "userB" },
+              type: "audio" as const,
+              status: "calling" as const,
+              roomName: "dm-test-room",
             },
           },
         }
@@ -364,18 +422,18 @@ describe('Call Feature - Infinite Loop Prevention', () => {
       const initialRenders = totalRenders;
 
       // Step 1: Initiate call
-      expect(result.current.outgoingCall?.status).toBe('calling');
+      expect(result.current.outgoingCall?.status).toBe("calling");
 
       // Step 2: Receive rejection
       await act(async () => {
         rerender({
-          callEvent: { from: 'user-b-id' },
-          outgoingCall: result.current.outgoingCall,
+          callEvent: { from: "user-b-id", callSignal: "rejected" },
+          outgoingCall: result.current.outgoingCall!,
         });
       });
 
       await waitFor(() => {
-        expect(result.current.outgoingCall?.status).toBe('rejected');
+        expect(result.current.outgoingCall?.status).toBe("rejected");
       });
 
       // Step 3: Wait for auto-close

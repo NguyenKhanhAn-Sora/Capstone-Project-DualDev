@@ -408,8 +408,8 @@
       },
       "outgoingCall": {
         "calling": "Đang gọi...",
-        "rejected": "Người nhận không khả dụng",
-        "noAnswer": "Không có người nghe máy",
+        "rejected": "{name} không bắt máy",
+        "noAnswer": "{name} không bắt máy",
         "videoCall": "Cuộc gọi video",
         "voiceCall": "Cuộc gọi thoại",
         "cancelCall": "Hủy cuộc gọi",
