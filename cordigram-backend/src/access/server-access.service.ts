@@ -990,6 +990,16 @@ export class ServerAccessService {
       isBypass,
     });
 
+    const applyJoinAccepted =
+      accessMode === 'apply' && (doc as any)?.status === 'accepted';
+    const chatViewBlocked =
+      !gate.allowed &&
+      !(
+        applyJoinAccepted &&
+        gate.reason === 'verification'
+      );
+    const chatBlockReason = chatViewBlocked ? gate.reason ?? null : null;
+
     const ageYears = calcAgeFromBirthdate(birthdate);
 
     // Thành viên đã có trong server trước khi bật "apply": không áp dụng ngược.
@@ -1019,10 +1029,13 @@ export class ServerAccessService {
       verificationLevel,
       verificationChecks,
       verificationWait,
-      chatViewBlocked: !gate.allowed,
-      chatBlockReason: gate.allowed ? null : (gate.reason ?? null),
+      chatViewBlocked,
+      chatBlockReason,
       showAgeRestrictedChannelNotice:
-        isAgeRestricted && gate.allowed && !isBypass && (ageYears ?? 0) >= 18,
+        isAgeRestricted &&
+        !chatViewBlocked &&
+        !isBypass &&
+        (ageYears ?? 0) >= 18,
     };
   }
 

@@ -150,7 +150,9 @@ export function applyMessagesRootChromeFromStorage(
   migrateMessagesChromeStorageOnce(userId);
   const hex = resolveMessagesChromeApplyHex(userId, messagesShellTheme);
   if (hex === null) {
-    applyAccentColor(DEFAULT_MESSAGES_CHROME_HEX, root);
+    applyAccentColor(DEFAULT_MESSAGES_CHROME_HEX, root, {
+      messagesShellTheme,
+    });
     return;
   }
   applyAccentColor(hex, root, {

@@ -15,6 +15,7 @@
   --accent-hover: #4752c4;
   --accent-active: #3d46a5;
   --accent-soft: rgba(88, 101, 242, 0.18);
+  --color-on-accent: #ffffff;
   --color-primary: #4aa3e4;
   --color-primary-strong: #3470a2;
   --color-primary-accent: #22d3ee;
@@ -87,6 +88,7 @@
   --accent-hover: #4752c4;
   --accent-active: #3d46a5;
   --accent-soft: rgba(88, 101, 242, 0.18);
+  --color-on-accent: #ffffff;
   --color-button-x: #ffffff;
   --color-border-button-x: #434f65;
   --color-primary: #559ac2;

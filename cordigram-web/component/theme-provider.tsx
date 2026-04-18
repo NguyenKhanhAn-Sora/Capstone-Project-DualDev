@@ -62,6 +62,7 @@ const ACCENT_OVERRIDE_KEYS = [
   "--color-chat-text-secondary",
   "--color-chat-read",
   "--user-appearance-bg",
+  "--color-on-accent",
 ] as const;
 
 function clamp(value: number, min: number, max: number) {
@@ -122,6 +123,31 @@ export function transparent(color: string, alpha: number): string {
 }
 
 /**
+ * Darkens a hex color until its luminance is at most `maxLuminance`, so text/icons
+ * stay readable on very light chat backgrounds (e.g. role colors, display-name picks).
+ */
+export function ensureReadableForeground(
+  color: string,
+  options?: { maxLuminance?: number },
+): string {
+  const maxL = options?.maxLuminance ?? 0.55;
+  let c = normalizeHex(color);
+  let L = getLuminance(c);
+  let guard = 0;
+  while (L > maxL && guard < 28) {
+    c = darken(c, 9);
+    L = getLuminance(c);
+    guard += 1;
+  }
+  return c;
+}
+
+/** Accent used for buttons, links, and primary chrome — never pure white. */
+function clampAccentForUi(hex: string): string {
+  return ensureReadableForeground(hex, { maxLuminance: 0.4 });
+}
+
+/**
  * Messages root: `messagesShellTheme === "light"` overrides some text tokens so a dark accent
  * still keeps body copy readable on the light shell stylesheet.
  */
@@ -155,15 +181,21 @@ export function applyAccentColor(
   }
   const luminance = getLuminance(base);
   const isLightTone = luminance > 0.56;
-  const hover = darken(base, 10);
-  const active = darken(base, 18);
+  const veryLightSurface = isLightTone && luminance > 0.82;
+  const accentUi = clampAccentForUi(base);
+  const hover = darken(accentUi, 10);
+  const active = darken(accentUi, 18);
   const soft = transparent(base, 0.18);
   const bgSoft = transparent(base, isLightTone ? 0.2 : 0.12);
   const bgGlow = transparent(lighten(base, isLightTone ? 2 : 12), isLightTone ? 0.16 : 0.22);
 
   const bg = isLightTone ? lighten(base, 84) : darken(base, 80);
   const surface = isLightTone ? lighten(base, 91) : darken(base, 74);
-  const surfaceMuted = isLightTone ? lighten(base, 87) : darken(base, 70);
+  const surfaceMuted = veryLightSurface
+    ? darken(surface, 10)
+    : isLightTone
+      ? lighten(base, 87)
+      : darken(base, 70);
   const border = isLightTone ? darken(bg, 10) : lighten(bg, 12);
   let text = isLightTone ? darken(base, 78) : "#F8FAFC";
   let textMuted = isLightTone ? darken(base, 48) : lighten(base, 38);
@@ -175,15 +207,28 @@ export function applyAccentColor(
   }
   const panelBg = surface;
   const panelSidebar = isLightTone ? lighten(base, 86) : darken(base, 76);
-  const panelHover = isLightTone ? darken(surface, 6) : lighten(surface, 5);
-  const panelActive = isLightTone ? darken(surface, 10) : lighten(surface, 10);
+  const panelHover = veryLightSurface
+    ? darken(panelSidebar, 14)
+    : isLightTone
+      ? darken(surface, 6)
+      : lighten(surface, 5);
+  const panelActive = veryLightSurface
+    ? darken(surface, 14)
+    : isLightTone
+      ? darken(surface, 10)
+      : lighten(surface, 10);
   const panelDeep = isLightTone ? darken(surface, 4) : darken(bg, 8);
   const panelContext = isLightTone ? lighten(base, 94) : darken(bg, 10);
   const chatReceived = isLightTone ? darken(surface, 3) : lighten(surface, 2);
-  const chatReceivedHover = isLightTone ? darken(surface, 6) : lighten(surface, 6);
+  const chatReceivedHover = veryLightSurface
+    ? darken(surface, 12)
+    : isLightTone
+      ? darken(surface, 6)
+      : lighten(surface, 6);
   const chatInput = isLightTone ? darken(surface, 4) : darken(bg, 6);
+  const onAccent = getLuminance(accentUi) > 0.45 ? "#0f1629" : "#ffffff";
   const applyToStyle = (s: CSSStyleDeclaration) => {
-    s.setProperty("--accent-color", base);
+    s.setProperty("--accent-color", accentUi);
     s.setProperty("--accent-hover", hover);
     s.setProperty("--accent-active", active);
     s.setProperty("--accent-soft", soft);
@@ -221,7 +266,8 @@ export function applyAccentColor(
       "--color-chat-text-secondary",
       el && options?.messagesShellTheme === "light" ? "#5A6480" : textMuted,
     );
-    s.setProperty("--color-chat-read", base);
+    s.setProperty("--color-chat-read", accentUi);
+    s.setProperty("--color-on-accent", onAccent);
     s.setProperty(
       "--user-appearance-bg",
       `radial-gradient(circle at 20% 10%, ${bgGlow}, transparent 32%), linear-gradient(${bgSoft}, ${bgSoft}), ${bg}`,

@@ -43,13 +43,36 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--color-on-accent, #fff);
   transition: all 0.2s ease;
 }
 
 .createBtn:hover {
   background: var(--color-primary-strong);
   transform: scale(1.05);
+}
+
+/* Trang chủ Social (bảng tin) — rời Messages */
+.socialHomeBtn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.socialHomeBtn:hover {
+  transform: scale(1.05);
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .exploreBtn {
@@ -1071,17 +1094,17 @@
 }
 
 .conversationItem:hover {
-  background-color: var(--color-surface-muted);
+  background-color: var(--color-panel-hover);
 }
 
 .conversationItem.active {
   background-color: var(--color-primary);
-  color: #fff;
+  color: var(--color-on-accent, #fff);
 }
 
 .conversationItem.active .userName,
 .conversationItem.active .userStatus {
-  color: white;
+  color: var(--color-on-accent, #fff);
 }
 
 .avatar {
@@ -1094,7 +1117,7 @@
   justify-content: center;
   flex-shrink: 0;
   font-weight: 600;
-  color: white;
+  color: var(--color-on-accent, #fff);
   font-size: 16px;
   position: relative;
 }
@@ -1140,7 +1163,7 @@
   height: 20px;
   border-radius: 50%;
   background: var(--color-primary);
-  color: white;
+  color: var(--color-on-accent, #fff);
   font-size: 11px;
   font-weight: 600;
   display: flex;
@@ -1301,6 +1324,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--color-on-accent, #fff);
 }
 
 .messageAvatar img {

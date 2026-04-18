@@ -294,7 +294,7 @@ export class MessagesService {
       serverLean ||
       ((await this.serverModel
         .findById(serverId)
-        .select('ownerId members safetySettings isAgeRestricted')
+        .select('ownerId members safetySettings isAgeRestricted isPublic accessMode')
         .lean()
         .exec()) as Record<string, unknown> | null);
     if (!server) return { allowed: false, reason: 'verification' };
@@ -352,7 +352,7 @@ export class MessagesService {
 
     const isServerEmailVerified = Boolean((usDoc as any)?.serverEmailVerified);
 
-    return evaluateChannelChatGate({
+    const gate = evaluateChannelChatGate({
       isAgeRestricted: Boolean((server as any).isAgeRestricted),
       ageRestrictedAcknowledged: ageAckForGate,
       birthdate: (profileRow as any)?.birthdate ?? null,
@@ -362,6 +362,23 @@ export class MessagesService {
       memberJoinedAt,
       isBypass,
     });
+
+    const accessModeRaw = (server as any)?.accessMode as
+      | 'discoverable'
+      | 'invite_only'
+      | 'apply'
+      | undefined;
+    const accessMode = accessModeRaw
+      ? accessModeRaw
+      : (server as any)?.isPublic
+        ? 'discoverable'
+        : 'invite_only';
+    const applyAccepted =
+      accessMode === 'apply' && (usDoc as any)?.status === 'accepted';
+    if (!gate.allowed && gate.reason === 'verification' && applyAccepted) {
+      return { allowed: true };
+    }
+    return gate;
   }
 
   /** Cho WebSocket: chỉ join room khi được phép xem tin kênh. */
@@ -1159,7 +1176,7 @@ export class MessagesService {
 
       const serverForGate = await this.serverModel
         .findById(channel.serverId)
-        .select('ownerId members safetySettings isAgeRestricted')
+        .select('ownerId members safetySettings isAgeRestricted isPublic accessMode')
         .lean()
         .exec();
       const gate = await this.resolveChannelChatGate(

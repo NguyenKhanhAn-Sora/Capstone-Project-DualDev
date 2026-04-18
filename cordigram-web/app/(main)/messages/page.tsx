@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef, memo, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import styles from "./messages.module.css";
@@ -111,7 +111,7 @@ import ChannelUserProfileRoot, {
   type ChannelProfileAnchorContext,
 } from "@/components/ChannelUserProfile/ChannelUserProfileRoot";
 import MessagesUserSettingsModal from "@/components/MessagesUserSettings/MessagesUserSettingsModal";
-import { applyAccentColor } from "@/component/theme-provider";
+import { applyAccentColor, ensureReadableForeground } from "@/component/theme-provider";
 import {
   applyMessagesRootChromeFromStorage,
   migrateMessagesChromeStorageOnce,
@@ -142,12 +142,16 @@ function getDisplayNameTextStyle(
 ): React.CSSProperties | undefined {
   if (!source) return undefined;
   const defaultPrimary = messagesShellTheme === "light" ? "#0F1629" : "#F2F3F5";
-  const primary = /^#[0-9a-f]{6}$/i.test(String(source.displayNamePrimaryHex || ""))
+  let primary = /^#[0-9a-f]{6}$/i.test(String(source.displayNamePrimaryHex || ""))
     ? String(source.displayNamePrimaryHex)
     : defaultPrimary;
-  const accent = /^#[0-9a-f]{6}$/i.test(String(source.displayNameAccentHex || ""))
+  let accent = /^#[0-9a-f]{6}$/i.test(String(source.displayNameAccentHex || ""))
     ? String(source.displayNameAccentHex)
     : "#5865F2";
+  if (messagesShellTheme === "light") {
+    primary = ensureReadableForeground(primary, { maxLuminance: 0.58 });
+    accent = ensureReadableForeground(accent, { maxLuminance: 0.58 });
+  }
   const fontFamily =
     source.displayNameFontId === "mono"
       ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
@@ -517,6 +521,7 @@ function areMessagesEqual(
     onVisible?: (messageId: string, isVisible: boolean) => void;
     senderColor?: string;
     senderNameStyle?: React.CSSProperties;
+    messagesShellTheme?: MessagesShellTheme;
     onChannelUserProfileOpen?: (
       message: UIMessage,
       anchorRect: DOMRect,
@@ -528,12 +533,14 @@ function areMessagesEqual(
     onVisible?: (messageId: string, isVisible: boolean) => void;
     senderColor?: string;
     senderNameStyle?: React.CSSProperties;
+    messagesShellTheme?: MessagesShellTheme;
     onChannelUserProfileOpen?: (
       message: UIMessage,
       anchorRect: DOMRect,
     ) => void;
   },
 ) {
+  if (prevProps.messagesShellTheme !== nextProps.messagesShellTheme) return false;
   if (prevProps.senderColor !== nextProps.senderColor) return false;
   if (prevProps.senderNameStyle !== nextProps.senderNameStyle) return false;
   if (prevProps.onChannelUserProfileOpen !== nextProps.onChannelUserProfileOpen)
@@ -594,6 +601,7 @@ const MessageItem = memo(
     dmPartnerDisplayName,
     senderColor,
     senderNameStyle,
+    messagesShellTheme = "dark",
     onChannelUserProfileOpen,
   }: {
     message: UIMessage;
@@ -609,12 +617,19 @@ const MessageItem = memo(
     dmPartnerDisplayName?: string;
     senderColor?: string; // Màu hiển thị từ role cao nhất
     senderNameStyle?: React.CSSProperties;
+    messagesShellTheme?: MessagesShellTheme;
     onChannelUserProfileOpen?: (
       message: UIMessage,
       anchorRect: DOMRect,
     ) => void;
   }) => {
     const { t } = useLanguage();
+    const safeSenderColor = useMemo(() => {
+      const c = senderColor?.trim();
+      if (!c) return undefined;
+      if (messagesShellTheme !== "light") return senderColor;
+      return ensureReadableForeground(c, { maxLuminance: 0.58 });
+    }, [senderColor, messagesShellTheme]);
     const messageRef = useRef<HTMLDivElement>(null);
     const [isHovered, setIsHovered] = useState(false);
     const [showQuickReactions, setShowQuickReactions] = useState(false);
@@ -762,8 +777,8 @@ const MessageItem = memo(
               style={
                 senderNameStyle
                   ? senderNameStyle
-                  : senderColor
-                    ? { color: senderColor }
+                  : safeSenderColor
+                    ? { color: safeSenderColor }
                     : undefined
               }
             >
@@ -1137,6 +1152,7 @@ function mapReplyToMessage(raw: any): UIMessage["replyToMessage"] {
 
 export default function MessagesPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { t, language } = useLanguage();
 
   const isAdminView = searchParams.get("from") === "admin";
@@ -1781,7 +1797,10 @@ export default function MessagesPage() {
   // ✅ New message in channel from WebSocket (thành viên khác gửi → hiện ngay không cần reload)
   useEffect(() => {
     if (!newMessageChannel?.message || !selectedChannel) return;
-    if (myServerAccessStatus?.chatViewBlocked) {
+    const skipBlockForApplyAccepted =
+      myServerAccessStatus?.accessMode === "apply" &&
+      myServerAccessStatus.status === "accepted";
+    if (myServerAccessStatus?.chatViewBlocked && !skipBlockForApplyAccepted) {
       clearNewMessageChannel();
       return;
     }
@@ -1855,6 +1874,8 @@ export default function MessagesPage() {
     currentUserId,
     clearNewMessageChannel,
     myServerAccessStatus?.chatViewBlocked,
+    myServerAccessStatus?.accessMode,
+    myServerAccessStatus?.status,
     allChannels,
     notificationRoleNames,
     currentUserProfile?.username,
@@ -2746,8 +2767,11 @@ export default function MessagesPage() {
         const status = await serversApi.getMyServerAccessStatus(selectedServer);
         if (cancelled) return;
         setMyServerAccessStatus(status);
-        const needsRules = status.hasRules && !status.acceptedRules && !status.chatViewBlocked;
-        if (needsRules) {
+        const needsRules =
+          status.hasRules && !status.acceptedRules && !status.chatViewBlocked;
+        const applyAccepted =
+          status.accessMode === "apply" && status.status === "accepted";
+        if (needsRules && !applyAccepted) {
           try {
             const s = await serversApi.getServerAccessSettings(selectedServer);
             if (cancelled) return;
@@ -2781,7 +2805,12 @@ export default function MessagesPage() {
       try {
         const status = await serversApi.getMyServerAccessStatus(selectedServer);
         setMyServerAccessStatus(status);
-        if (status.hasRules && !status.acceptedRules && !status.chatViewBlocked) {
+        if (
+          status.hasRules &&
+          !status.acceptedRules &&
+          !status.chatViewBlocked &&
+          !(status.accessMode === "apply" && status.status === "accepted")
+        ) {
           const s = await serversApi.getServerAccessSettings(selectedServer);
           setVerificationAccessSettings(s);
           setVerificationRulesAgreed(false);
@@ -2805,7 +2834,11 @@ export default function MessagesPage() {
       try {
         const s = await serversApi.getMyServerAccessStatus(selectedServer);
         setMyServerAccessStatus(s);
-        const stillBlocked = s.chatViewBlocked || (s.hasRules && !s.acceptedRules);
+        const applyAccepted =
+          s.accessMode === "apply" && s.status === "accepted";
+        const stillBlocked = applyAccepted
+          ? false
+          : s.chatViewBlocked || (s.hasRules && !s.acceptedRules);
         if (!stillBlocked) {
           setVerificationRulesOpen(false);
           setShowAcceptRulesModal(false);
@@ -4032,9 +4065,18 @@ export default function MessagesPage() {
     setReplyingTo(message);
   };
 
+  /**
+   * Apply-to-join: sau khi chủ server duyệt (accepted), user đã là thành viên — không hiện
+   * màn xác minh/quy định dạng "trước khi chat" (chỉ dành cho người chưa được vào server / chờ duyệt).
+   */
+  const isApplyModeAcceptedMember =
+    myServerAccessStatus?.accessMode === "apply" &&
+    myServerAccessStatus.status === "accepted";
+
   const shouldBlockServerChatInput = Boolean(
     selectedServer &&
       !selectedDirectMessageFriend &&
+      !isApplyModeAcceptedMember &&
       (myServerAccessStatus?.chatViewBlocked === true ||
         (myServerAccessStatus?.hasRules === true &&
           !myServerAccessStatus?.acceptedRules)),
@@ -4046,6 +4088,12 @@ export default function MessagesPage() {
     setShowPlusMenu(false);
     setShowGiphyPicker(false);
   }, [shouldBlockServerChatInput]);
+
+  useEffect(() => {
+    if (!isApplyModeAcceptedMember) return;
+    setVerificationRulesOpen(false);
+    setShowAcceptRulesModal(false);
+  }, [isApplyModeAcceptedMember]);
 
   const handleSendMessage = async () => {
     if (shouldBlockServerChatInput) {
@@ -4253,9 +4301,11 @@ export default function MessagesPage() {
       }
       const status = await serversApi.getMyServerAccessStatus(selectedServer);
       setMyServerAccessStatus(status);
-      const stillBlocked =
-        status.chatViewBlocked ||
-        (status.hasRules && !status.acceptedRules);
+      const applyAccepted =
+        status.accessMode === "apply" && status.status === "accepted";
+      const stillBlocked = applyAccepted
+        ? false
+        : status.chatViewBlocked || (status.hasRules && !status.acceptedRules);
       if (!stillBlocked) {
         setVerificationRulesOpen(false);
         setVerificationAccessSettings(null);
@@ -4278,7 +4328,12 @@ export default function MessagesPage() {
       await serversApi.acknowledgeServerAgeRestriction(selectedServer);
       const status = await serversApi.getMyServerAccessStatus(selectedServer);
       setMyServerAccessStatus(status);
-      if (status.hasRules && !status.acceptedRules && !status.chatViewBlocked) {
+      if (
+        status.hasRules &&
+        !status.acceptedRules &&
+        !status.chatViewBlocked &&
+        !(status.accessMode === "apply" && status.status === "accepted")
+      ) {
         try {
           const s = await serversApi.getServerAccessSettings(selectedServer);
           setVerificationAccessSettings(s);
@@ -6557,6 +6612,19 @@ export default function MessagesPage() {
           }}
           style={{ cursor: "pointer" }}
         />
+
+        <button
+          type="button"
+          className={styles.socialHomeBtn}
+          title={t("chat.messagesPage.socialHomeTitle")}
+          aria-label={t("chat.messagesPage.socialHomeTitle")}
+          onClick={() => router.push("/")}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+        </button>
 
         {!isAdminView ? (
           <button
@@ -8899,6 +8967,7 @@ export default function MessagesPage() {
                             onDelete={(msgId) => setShowDeleteDialog(msgId)}
                             scrollContainerRef={messagesContainerRef}
                             dmPartnerDisplayName={selectedDirectMessageFriend.displayName || selectedDirectMessageFriend.username}
+                            messagesShellTheme={messagesShellTheme}
                           />
                         </div>
                       ))
@@ -9028,6 +9097,7 @@ export default function MessagesPage() {
                             scrollContainerRef={messagesContainerRef}
                             senderColor={memberRoleColors[message.senderId]}
                             senderNameStyle={resolveMessageSenderStyle(message)}
+                            messagesShellTheme={messagesShellTheme}
                             onChannelUserProfileOpen={handleOpenChannelUserProfile}
                           />
                         </div>
@@ -9677,7 +9747,11 @@ export default function MessagesPage() {
         />
       )}
 
-      {(verificationRulesOpen || showAcceptRulesModal) && selectedServer && !selectedDirectMessageFriend && (() => {
+      {(verificationRulesOpen || showAcceptRulesModal) &&
+        selectedServer &&
+        !selectedDirectMessageFriend &&
+        !isApplyModeAcceptedMember &&
+        (() => {
         const srv = currentServer;
         const hasRulesContent = (verificationAccessSettings?.rules?.length ?? 0) > 0;
         const rulesAccepted = myServerAccessStatus?.acceptedRules !== false;

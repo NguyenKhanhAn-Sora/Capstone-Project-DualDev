@@ -41,6 +41,8 @@ export default function ServerJoinApplicationsPanel({
   const [actionLoading, setActionLoading] = useState(false);
 
   const [menu, setMenu] = useState<{ userId: string; x: number; y: number } | null>(null);
+  /** Hàng đang gọi API duyệt/từ chối nhanh */
+  const [quickOperatingUserId, setQuickOperatingUserId] = useState<string | null>(null);
 
   const localeTag = localeTagForLanguage(language);
 
@@ -175,6 +177,38 @@ export default function ServerJoinApplicationsPanel({
     }
   };
 
+  const runQuickApprove = async (userId: string) => {
+    setQuickOperatingUserId(userId);
+    try {
+      await serversApi.approveServerAccessUser(serverId, userId);
+      if (selectedUserId === userId) {
+        setSelectedUserId(null);
+        setDetail(null);
+      }
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : t("chat.joinApplications.approveError"));
+    } finally {
+      setQuickOperatingUserId(null);
+    }
+  };
+
+  const runQuickReject = async (userId: string) => {
+    setQuickOperatingUserId(userId);
+    try {
+      await serversApi.rejectAccessUser(serverId, userId);
+      if (selectedUserId === userId) {
+        setSelectedUserId(null);
+        setDetail(null);
+      }
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : t("chat.joinApplications.rejectError"));
+    } finally {
+      setQuickOperatingUserId(null);
+    }
+  };
+
   const openKebab = (e: React.MouseEvent, userId: string) => {
     e.stopPropagation();
     setMenu({ userId, x: e.clientX, y: e.clientY });
@@ -219,7 +253,7 @@ export default function ServerJoinApplicationsPanel({
                 <tr>
                   <th className={styles.th}>{t("chat.joinApplications.colName")}</th>
                   <th className={styles.th}>{t("chat.joinApplications.colRegistered")}</th>
-                  <th className={styles.th} aria-hidden style={{ width: 48 }} />
+                  <th className={styles.th} aria-hidden style={{ width: 120 }} />
                 </tr>
               </thead>
               <tbody>
@@ -249,6 +283,36 @@ export default function ServerJoinApplicationsPanel({
                     <td className={styles.td}>
                       {row.userId !== ownerId && (
                         <div className={styles.rowActions}>
+                          {row.status === "pending" && (
+                            <div className={styles.quickRow}>
+                              <button
+                                type="button"
+                                className={`${styles.quickBtn} ${styles.quickApprove}`}
+                                title={t("chat.joinApplications.approveTitle")}
+                                aria-label={t("chat.joinApplications.quickApproveAria")}
+                                disabled={quickOperatingUserId != null || actionLoading}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void runQuickApprove(row.userId);
+                                }}
+                              >
+                                ✓
+                              </button>
+                              <button
+                                type="button"
+                                className={`${styles.quickBtn} ${styles.quickReject}`}
+                                title={t("chat.joinApplications.rejectTitle")}
+                                aria-label={t("chat.joinApplications.quickRejectAria")}
+                                disabled={quickOperatingUserId != null || actionLoading}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void runQuickReject(row.userId);
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
                           <button
                             type="button"
                             className={styles.kebab}
