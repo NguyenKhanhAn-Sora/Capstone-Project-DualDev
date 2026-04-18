@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_API_BASE:
       process.env.NEXT_PUBLIC_API_BASE ??
       process.env.BACKEND_URL ??
-      "http://localhost:9999",
+      "https://cordigram-api.onrender.com",
     NEXT_PUBLIC_SOCIAL_URL:
       process.env.NEXT_PUBLIC_SOCIAL_URL ??
       process.env.SOCIAL_URL ??

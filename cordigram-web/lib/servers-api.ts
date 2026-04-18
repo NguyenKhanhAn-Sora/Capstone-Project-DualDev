@@ -4,7 +4,7 @@ import {
   type CordigramUploadContext,
 } from "./cordigram-upload-context";
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "http://localhost:9999";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "https://cordigram-api.onrender.com";
 
 function getToken(): string {
   return (
