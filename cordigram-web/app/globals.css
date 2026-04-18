@@ -290,19 +290,6 @@
   --color-chat-read: #4a9eff;
 }
 
-:root,
-[data-theme="dark"],
-[data-appearance] {
-  --color-primary: var(--accent-color);
-  --color-primary-strong: var(--accent-hover);
-  --color-primary-accent: var(--accent-active);
-  --color-panel-accent: var(--accent-color);
-  --color-panel-accent-hover: var(--accent-hover);
-  --color-chat-accent: var(--accent-color);
-  --color-voice-sent: var(--accent-color);
-  --color-voice-sent-hover: var(--accent-hover);
-}
-
 @theme inline {
   --color-background: var(--color-bg);
   --color-foreground: var(--color-text);

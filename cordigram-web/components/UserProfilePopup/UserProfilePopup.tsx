@@ -152,7 +152,7 @@ export default function UserProfilePopup({
             {t("chat.profileEditor.statusPlaceholder")}
           </div>
 
-          <h2 className={styles.name} style={getDisplayNameTextStyle(detail)}>
+          <h2 className={styles.name} style={getDisplayNameTextStyle(detail ?? undefined)}>
             {displayName}
           </h2>
           <p className={styles.username}>{username}</p>

@@ -251,6 +251,7 @@ const TAB_FILTER: Record<TabKey, Array<NotificationItem["type"]>> = {
   comment: ["post_comment", "comment_reply"],
   mentions: ["post_mention"],
   follow: ["follow"],
+  system: ["system_notice"],
 };
 
 function formatRelativeTime(value: string): string {

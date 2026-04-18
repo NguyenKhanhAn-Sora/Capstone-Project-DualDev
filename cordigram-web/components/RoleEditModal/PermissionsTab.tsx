@@ -56,7 +56,7 @@ export default function PermissionsTab({
     const raw = { ...r.permissions } as Record<string, unknown>;
     delete raw.createPublicThreads;
     delete raw.createPrivateThreads;
-    const p = raw as RolePermissions;
+    const p = raw as unknown as RolePermissions;
     return {
       ...p,
       mentionEveryone: p.mentionEveryone ?? false,

@@ -44,6 +44,8 @@ const EMOJI_CATEGORIES = {
   ],
 };
 
+type EmojiCategoryKey = keyof typeof EMOJI_CATEGORIES;
+
 interface EmojiReactionPickerProps {
   onSelect: (emoji: string) => void;
   onClose: () => void;
@@ -56,7 +58,8 @@ export default function EmojiReactionPicker({
   position,
 }: EmojiReactionPickerProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] =
+    useState<EmojiCategoryKey | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -135,7 +138,7 @@ export default function EmojiReactionPicker({
 
         {!searchQuery && (
           <div className={styles.categories}>
-            {Object.keys(EMOJI_CATEGORIES).map((category) => (
+            {(Object.keys(EMOJI_CATEGORIES) as EmojiCategoryKey[]).map((category) => (
               <button
                 key={category}
                 className={`${styles.categoryButton} ${

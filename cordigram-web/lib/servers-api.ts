@@ -1849,7 +1849,15 @@ export interface EventPreviewResponse {
     description: string | null;
     channelId: { name: string; type: string } | null;
   };
-  server: { _id: string; name: string; isPublic: boolean; avatarUrl?: string | null };
+  server: {
+    _id: string;
+    name: string;
+    isPublic: boolean;
+    avatarUrl?: string | null;
+    bannerUrl?: string | null;
+    bannerImageUrl?: string | null;
+    bannerColor?: string | null;
+  };
   isMember: boolean;
 }
 

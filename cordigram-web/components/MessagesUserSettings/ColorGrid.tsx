@@ -34,7 +34,7 @@ export default function ColorGrid({
         const sel = selectedColor;
         const active =
           Boolean(showActiveState && sel) &&
-          sel.toUpperCase() === option.color.toUpperCase();
+          sel?.toUpperCase() === option.color.toUpperCase();
         return (
           <button
             key={option.id}

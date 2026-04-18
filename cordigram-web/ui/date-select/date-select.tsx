@@ -429,7 +429,7 @@ export function DateSelect({
                               }`}
                               role="option"
                               aria-selected={active}
-                              disabled={disabledYear}
+                              disabled={disabledYear ?? undefined}
                               onClick={() => {
                                 if (disabledYear) return;
                                 const clamped = Math.min(
