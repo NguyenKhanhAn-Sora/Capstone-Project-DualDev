@@ -23,7 +23,8 @@ async function bootstrap() {
       config.frontendUrl,
       'http://localhost:3000',
       'http://localhost:3001',
-      'https://www.cordigram.com'
+      'https://www.cordigram.com',
+      'https://admin.cordigram.com'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
