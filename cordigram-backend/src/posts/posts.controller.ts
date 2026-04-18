@@ -32,7 +32,8 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { UpdateVisibilityDto } from './dto/update-visibility.dto';
 import { UpdatePostNotificationMuteDto } from './dto/update-post-notification-mute.dto';
 import { PostsService } from './posts.service';
-import { BoostService } from '../boost/boost.service';
+import { BoostService, FREE_MAX_UPLOAD_BYTES } from '../boost/boost.service';
+import { isCordigramMessagesUpload } from '../common/cordigram-upload-context';
 
 @Controller('posts')
 @UseGuards(JwtAuthGuard)
@@ -223,7 +224,9 @@ export class PostsController {
       throw new BadRequestException('Missing file');
     }
     const status = await this.boostService.getBoostStatus(user.userId);
-    const maxBytes = status?.limits?.maxUploadBytes ?? 25 * 1024 * 1024;
+    const maxBytes = isCordigramMessagesUpload(req)
+      ? status.limits.maxUploadBytes
+      : FREE_MAX_UPLOAD_BYTES;
     if (typeof file.size === 'number' && file.size > maxBytes) {
       throw new BadRequestException(`File too large (max ${maxBytes} bytes)`);
     }
@@ -259,7 +262,9 @@ export class PostsController {
       throw new BadRequestException('Missing files');
     }
     const status = await this.boostService.getBoostStatus(user.userId);
-    const maxBytes = status?.limits?.maxUploadBytes ?? 25 * 1024 * 1024;
+    const maxBytes = isCordigramMessagesUpload(req)
+      ? status.limits.maxUploadBytes
+      : FREE_MAX_UPLOAD_BYTES;
     const tooLarge = files.find((f) => typeof f.size === 'number' && f.size > maxBytes);
     if (tooLarge) {
       throw new BadRequestException(`File too large (max ${maxBytes} bytes)`);

@@ -13,16 +13,28 @@ export type AccentOption = {
 
 type Props = {
   options: AccentOption[];
-  selectedColor: string;
+  /** null = không highlight ô nào (đang dùng nền có sẵn). */
+  selectedColor: string | null;
   disabled?: boolean;
+  /** Khi false: không vẽ viền ✓ (chế độ đang dùng nền có sẵn). */
+  showActiveState?: boolean;
   onSelect: (color: string) => void;
 };
 
-export default function ColorGrid({ options, selectedColor, disabled, onSelect }: Props) {
+export default function ColorGrid({
+  options,
+  selectedColor,
+  disabled,
+  showActiveState = true,
+  onSelect,
+}: Props) {
   return (
     <div className={`${modalStyles.appearanceBgSwatches} ${disabled ? styles.lockedGrid : ""}`}>
       {options.map((option) => {
-        const active = selectedColor.toUpperCase() === option.color.toUpperCase();
+        const sel = selectedColor;
+        const active =
+          Boolean(showActiveState && sel) &&
+          sel.toUpperCase() === option.color.toUpperCase();
         return (
           <button
             key={option.id}

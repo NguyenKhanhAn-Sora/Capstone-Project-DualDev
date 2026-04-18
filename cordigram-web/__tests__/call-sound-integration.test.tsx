@@ -208,7 +208,7 @@ describe('Call Sound Integration Tests', () => {
         expect(mockPlay).toHaveBeenCalled();
       });
 
-      // Audio src should be set to incoming-call.mp3
+      // Audio src should be set to universfield-ringtone-090-496416.mp3 (incoming)
       // (we verify through logs in actual implementation)
     });
 

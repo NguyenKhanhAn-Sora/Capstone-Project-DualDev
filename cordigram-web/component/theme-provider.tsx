@@ -121,7 +121,19 @@ export function transparent(color: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1)})`;
 }
 
-export function applyAccentColor(color: string, target?: HTMLElement | null) {
+/**
+ * Messages root: `messagesShellTheme === "light"` overrides some text tokens so a dark accent
+ * still keeps body copy readable on the light shell stylesheet.
+ */
+export type ApplyAccentColorOptions = {
+  messagesShellTheme?: "light" | "dark";
+};
+
+export function applyAccentColor(
+  color: string,
+  target?: HTMLElement | null,
+  options?: ApplyAccentColorOptions,
+) {
   if (typeof document === "undefined") return;
   const base = normalizeHex(color);
   const el = target ?? null;
@@ -148,12 +160,19 @@ export function applyAccentColor(color: string, target?: HTMLElement | null) {
   const soft = transparent(base, 0.18);
   const bgSoft = transparent(base, isLightTone ? 0.2 : 0.12);
   const bgGlow = transparent(lighten(base, isLightTone ? 2 : 12), isLightTone ? 0.16 : 0.22);
+
   const bg = isLightTone ? lighten(base, 84) : darken(base, 80);
   const surface = isLightTone ? lighten(base, 91) : darken(base, 74);
   const surfaceMuted = isLightTone ? lighten(base, 87) : darken(base, 70);
   const border = isLightTone ? darken(bg, 10) : lighten(bg, 12);
-  const text = isLightTone ? darken(base, 78) : "#F8FAFC";
-  const textMuted = isLightTone ? darken(base, 48) : lighten(base, 38);
+  let text = isLightTone ? darken(base, 78) : "#F8FAFC";
+  let textMuted = isLightTone ? darken(base, 48) : lighten(base, 38);
+  let panelTextFaint = textMuted;
+  if (el && options?.messagesShellTheme === "light") {
+    text = "#0F1629";
+    textMuted = "#5B6378";
+    panelTextFaint = "#738AAB";
+  }
   const panelBg = surface;
   const panelSidebar = isLightTone ? lighten(base, 86) : darken(base, 76);
   const panelHover = isLightTone ? darken(surface, 6) : lighten(surface, 5);
@@ -182,7 +201,7 @@ export function applyAccentColor(color: string, target?: HTMLElement | null) {
     s.setProperty("--color-panel-active", panelActive);
     s.setProperty("--color-panel-text", text);
     s.setProperty("--color-panel-text-muted", textMuted);
-    s.setProperty("--color-panel-text-faint", textMuted);
+    s.setProperty("--color-panel-text-faint", panelTextFaint);
     s.setProperty("--color-panel-border", border);
     s.setProperty("--color-panel-deep", panelDeep);
     s.setProperty("--color-panel-deep-border", border);
@@ -194,8 +213,14 @@ export function applyAccentColor(color: string, target?: HTMLElement | null) {
     s.setProperty("--color-chat-input", chatInput);
     s.setProperty("--color-chat-input-border", border);
     s.setProperty("--color-chat-hover", panelHover);
-    s.setProperty("--color-chat-text-strong", text);
-    s.setProperty("--color-chat-text-secondary", textMuted);
+    s.setProperty(
+      "--color-chat-text-strong",
+      el && options?.messagesShellTheme === "light" ? "#111827" : text,
+    );
+    s.setProperty(
+      "--color-chat-text-secondary",
+      el && options?.messagesShellTheme === "light" ? "#5A6480" : textMuted,
+    );
     s.setProperty("--color-chat-read", base);
     s.setProperty(
       "--user-appearance-bg",

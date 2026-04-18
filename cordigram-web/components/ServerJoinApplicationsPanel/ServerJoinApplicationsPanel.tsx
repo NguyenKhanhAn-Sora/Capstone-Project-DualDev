@@ -97,6 +97,21 @@ export default function ServerJoinApplicationsPanel({
   }, [loadList]);
 
   useEffect(() => {
+    const handler = (ev: Event) => {
+      const d = (ev as CustomEvent<{ serverId: string; userId: string; status: string }>).detail;
+      if (!d || d.serverId !== serverId) return;
+      void loadList();
+      onApplicationsChanged?.();
+      if (selectedUserId && d.userId === selectedUserId) {
+        setSelectedUserId(null);
+        setDetail(null);
+      }
+    };
+    window.addEventListener("cordigram-join-application-updated", handler as EventListener);
+    return () => window.removeEventListener("cordigram-join-application-updated", handler as EventListener);
+  }, [serverId, loadList, onApplicationsChanged, selectedUserId]);
+
+  useEffect(() => {
     if (!selectedUserId) {
       setDetail(null);
       return;

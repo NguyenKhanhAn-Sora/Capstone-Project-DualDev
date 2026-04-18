@@ -59,7 +59,7 @@ describe('useCallSound Hook', () => {
     it('should set correct src for incoming call', () => {
       const { result } = renderHook(() => useCallSound('incoming', false));
       
-      // Check that src would be set to incoming-call.wav
+      // Check that src would be set to universfield-ringtone-090-496416.mp3
       // (we can't directly check MockAudio instance, but we verify no errors)
       expect(mockPlay).not.toHaveBeenCalled();
     });

@@ -135,17 +135,19 @@ export default function UserProfilePopup({
 
   return (
     <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal aria-label={t("chat.popups.userProfile.aria")}>
-      <div className={styles.card} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.card}>
+        <div onClick={(e) => e.stopPropagation()}>
         <button type="button" className={styles.close} onClick={onClose} aria-label={t("chat.popups.closeAria")}>
           ×
         </button>
 
         <div className={styles.banner} style={bannerStyle} />
         <div className={styles.body}>
-          <div className={styles.avatar}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {detail?.avatarUrl ? <img src={detail.avatarUrl} alt="" /> : null}
-          </div>
+          <img
+            className={styles.avatar}
+            src={detail?.avatarUrl || ""}
+            alt=""
+          />
           <div className={styles.statusPill}>
             {t("chat.profileEditor.statusPlaceholder")}
           </div>
@@ -291,6 +293,7 @@ export default function UserProfilePopup({
               </button>
             </div>
           ) : null}
+        </div>
         </div>
       </div>
     </div>

@@ -70,16 +70,6 @@ const keys = [
     "Allows sending messages in threads and forum posts.",
   ],
   [
-    "createPublicThreads",
-    "Create public threads",
-    "Allows creating threads visible to everyone in the channel.",
-  ],
-  [
-    "createPrivateThreads",
-    "Create private threads",
-    "Allows creating invite-only threads.",
-  ],
-  [
     "embedLinks",
     "Embed links",
     "Shows rich embeds for links shared in chat.",

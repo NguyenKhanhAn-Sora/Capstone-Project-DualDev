@@ -1,3 +1,8 @@
+import {
+  withCordigramUploadContext,
+  type CordigramUploadContext,
+} from "./cordigram-upload-context";
+
 export interface ApiError<T = unknown> {
   status: number;
   message: string;
@@ -1702,13 +1707,18 @@ export async function fetchCurrentProfile(opts: {
 export async function uploadProfileAvatar(opts: {
   token: string;
   form: FormData;
+  /** Chỉ gửi từ Messages — áp giới hạn avatar theo gói Boost. */
+  cordigramUploadContext?: CordigramUploadContext;
 }): Promise<UpdateAvatarResponse> {
-  const { token, form } = opts;
+  const { token, form, cordigramUploadContext } = opts;
   const res = await fetch(`${apiBaseUrl}/profiles/avatar/upload`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: withCordigramUploadContext(
+      {
+        Authorization: `Bearer ${token}`,
+      },
+      cordigramUploadContext,
+    ),
     body: form,
   });
 
@@ -3277,21 +3287,25 @@ export type UploadMediaResponse = {
   duration?: number;
 };
 
-// Upload media (image/video) for messages
+// Upload media (image/video/audio) — gửi `cordigramUploadContext: "messages"` từ Messages để áp giới hạn Boost.
 export async function uploadMedia(opts: {
   token: string;
   file: File;
+  cordigramUploadContext?: CordigramUploadContext;
 }): Promise<UploadMediaResponse> {
-  const { token, file } = opts;
+  const { token, file, cordigramUploadContext } = opts;
 
   const formData = new FormData();
   formData.append("file", file);
 
   const response = await fetch(`${apiBaseUrl}/posts/upload`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: withCordigramUploadContext(
+      {
+        Authorization: `Bearer ${token}`,
+      },
+      cordigramUploadContext,
+    ),
     body: formData,
   });
 
@@ -3307,8 +3321,9 @@ export async function uploadMedia(opts: {
 export async function uploadMediaBatch(opts: {
   token: string;
   files: File[];
+  cordigramUploadContext?: CordigramUploadContext;
 }): Promise<Array<UploadMediaResponse>> {
-  const { token, files } = opts;
+  const { token, files, cordigramUploadContext } = opts;
 
   const formData = new FormData();
   files.forEach((file) => {
@@ -3317,9 +3332,12 @@ export async function uploadMediaBatch(opts: {
 
   const response = await fetch(`${apiBaseUrl}/posts/upload/batch`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: withCordigramUploadContext(
+      {
+        Authorization: `Bearer ${token}`,
+      },
+      cordigramUploadContext,
+    ),
     body: formData,
   });
 

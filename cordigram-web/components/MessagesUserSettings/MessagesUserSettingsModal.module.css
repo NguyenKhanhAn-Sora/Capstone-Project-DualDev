@@ -142,12 +142,12 @@
 .hint {
   margin: 0 0 16px;
   font-size: 13px;
-  color: var(--color-panel-text-muted);
+  color: var(--color-chat-text-secondary, var(--color-panel-text-muted));
   line-height: 1.45;
 }
 
 .cardDark .hint {
-  color: var(--color-panel-text-muted);
+  color: var(--color-chat-text-secondary, var(--color-panel-text-muted));
 }
 
 .panel {
@@ -245,6 +245,38 @@
 
 .cardDark .linkRow {
   color: var(--color-panel-accent);
+}
+
+.appearanceMutualHint {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--color-panel-deep);
+  border: 1px solid var(--color-panel-border);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-panel-text-muted);
+}
+
+.appearanceModeBadge {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-panel-accent);
+}
+
+.appearanceBlock {
+  margin-bottom: 16px;
+  padding: 14px 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--color-panel-border);
+  background: var(--color-panel-context);
+}
+
+.appearanceBlock .appearanceBgSection {
+  margin-top: 0;
 }
 
 .appearanceBgSection {

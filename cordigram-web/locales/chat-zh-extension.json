@@ -153,14 +153,6 @@
         "label": "在线程与帖子中发送消息",
         "description": "允许在线程和论坛帖子中发送消息。"
       },
-      "createPublicThreads": {
-        "label": "创建公开线程",
-        "description": "允许创建频道内所有人可见的线程。"
-      },
-      "createPrivateThreads": {
-        "label": "创建私密线程",
-        "description": "允许创建仅限邀请的线程。"
-      },
       "embedLinks": {
         "label": "嵌入链接",
         "description": "允许显示成员分享链接的富媒体嵌入。"

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./messages-shell-theme.css";
 
 export const metadata: Metadata = {
   title: "Messages - Cordigram",

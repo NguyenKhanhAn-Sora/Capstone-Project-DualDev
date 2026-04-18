@@ -2,6 +2,7 @@
 
 import React from "react";
 import styles from "./ModeratorViewToggle.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 interface ModeratorViewToggleProps {
   enabled: boolean;
@@ -14,12 +15,13 @@ export default function ModeratorViewToggle({
   canEnable,
   onChange,
 }: ModeratorViewToggleProps) {
+  const { t } = useLanguage();
   return (
     <div className={styles.container}>
       <label className={styles.label}>
-        <span className={styles.title}>Chế độ hiển thị Mod</span>
+        <span className={styles.title}>{t("chat.serverMembers.moderatorViewTitle")}</span>
         <span className={styles.subtitle}>
-          Khi bật, danh sách thành viên sẽ hiển thị thêm cột thông tin cho kiểm duyệt viên.
+          {t("chat.serverMembers.moderatorViewDesc")}
         </span>
       </label>
       <button
@@ -35,7 +37,7 @@ export default function ModeratorViewToggle({
       </button>
       {!canEnable && (
         <div className={styles.hint}>
-          Chỉ chủ máy chủ hoặc thành viên có quyền quản lý thành viên mới bật được chế độ này.
+          {t("chat.serverMembers.moderatorViewPermissionHint")}
         </div>
       )}
     </div>

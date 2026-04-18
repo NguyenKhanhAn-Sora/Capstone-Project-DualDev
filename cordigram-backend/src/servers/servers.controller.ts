@@ -27,6 +27,8 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { ForbiddenException } from '@nestjs/common';
 import { ServerBoostContextInterceptor } from './server-boost-context.interceptor';
 import { BoostService } from '../boost/boost.service';
+import { isCordigramMessagesUpload } from '../common/cordigram-upload-context';
+import type { Request as ExpressRequest } from 'express';
 
 type MulterFile = {
   buffer: Buffer;
@@ -36,6 +38,7 @@ type MulterFile = {
 };
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+const SERVER_AVATAR_MULTER_CEILING = 600 * 1024 * 1024;
 
 const imageFileFilter = (
   req: any,
@@ -118,6 +121,16 @@ export class ServersController {
   }
 
   /**
+   * Preview máy chủ cho embed invite (DM): luôn 200 + `{ server: null }` nếu không còn server.
+   */
+  @Get('embed-preview')
+  async getServerEmbedPreview(@Query('id') serverId: string | undefined) {
+    const id = String(serverId || "").trim();
+    if (!id) return { server: null };
+    return this.serversService.getServerEmbedPreview(id);
+  }
+
+  /**
    * Lấy danh sách thành viên (chỉ owner - API cũ)
    */
   @Get(':id/mentions')
@@ -160,6 +173,25 @@ export class ServersController {
     return this.serversService.getServerStickersManage(
       serverId,
       req.user.userId,
+    );
+  }
+
+  /**
+   * Chủ máy chủ gán mức mở rộng ô sticker (tối đa 2 máy chủ / chủ).
+   * PATCH /servers/sticker-boost/:id — literal trước :id để tránh xung đột với @Patch(':id').
+   */
+  @Patch('sticker-boost/:id')
+  async setServerStickerBoostTier(
+    @Param('id') serverId: string,
+    @Body() body: { tier?: 'basic' | 'boost' | null },
+    @Request() req: any,
+  ) {
+    const tier =
+      body?.tier === 'basic' || body?.tier === 'boost' ? body.tier : null;
+    return this.serversService.setServerStickerBoostTier(
+      serverId,
+      req.user.userId,
+      tier,
     );
   }
 
@@ -803,7 +835,10 @@ export class ServersController {
         { name: 'original', maxCount: 1 },
         { name: 'cropped', maxCount: 1 },
       ],
-      { limits: { fileSize: MAX_AVATAR_BYTES }, fileFilter: imageFileFilter },
+      {
+        limits: { fileSize: SERVER_AVATAR_MULTER_CEILING },
+        fileFilter: imageFileFilter,
+      },
     ),
   )
   async uploadMyServerAvatar(
@@ -817,6 +852,20 @@ export class ServersController {
     const croppedFile = files?.cropped?.[0];
     if (!originalFile) {
       throw new BadRequestException('Thiếu file original');
+    }
+
+    const boost = await this.boostService.getBoostStatus(userId);
+    const maxAvatarBytes = isCordigramMessagesUpload(req as ExpressRequest)
+      ? boost.active
+        ? boost.limits.maxUploadBytes
+        : MAX_AVATAR_BYTES
+      : MAX_AVATAR_BYTES;
+    for (const f of [originalFile, croppedFile].filter(Boolean) as MulterFile[]) {
+      if (typeof f.size === 'number' && f.size > maxAvatarBytes) {
+        throw new BadRequestException(
+          `File too large (max ${maxAvatarBytes} bytes)`,
+        );
+      }
     }
 
     const folder = [
@@ -843,8 +892,8 @@ export class ServersController {
         Array.isArray(boostedBy) && userId
           ? boostedBy.some((x) => String(x) === userId)
           : false;
-      const ent = await this.boostService.getBoostStatus(userId);
-      const unlocked = accountBoost || serverBoost || Boolean(ent?.active);
+      const unlocked =
+        accountBoost || serverBoost || Boolean(boost?.active);
       if (!unlocked) {
         throw new BadRequestException('Boost required for GIF avatar');
       }

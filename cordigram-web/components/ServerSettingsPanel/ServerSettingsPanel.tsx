@@ -8,12 +8,10 @@ import { useLanguage, type LanguageCode } from "@/component/language-provider";
 export type ServerSettingsSection =
   | "profile"
   | "interactions"
-  | "privileges"
   | "emoji"
   | "sticker"
   | "members"
   | "roles"
-  | "invites"
   | "access"
   | "safety"
   | "bans"
@@ -97,7 +95,6 @@ export default function ServerSettingsPanel({
       items: [
         { id: "profile" },
         { id: "interactions" },
-        { id: "privileges" },
       ],
     },
     {
@@ -108,7 +105,7 @@ export default function ServerSettingsPanel({
     {
       key: "group-people",
       titleKey: "chat.serverSettings.groups.people",
-      items: [{ id: "members" }, { id: "roles" }, { id: "invites" }, { id: "access" }],
+      items: [{ id: "members" }, { id: "roles" }, { id: "access" }],
     },
     {
       key: "group-moderation",

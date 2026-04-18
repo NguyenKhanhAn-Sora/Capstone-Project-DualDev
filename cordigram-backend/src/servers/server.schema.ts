@@ -440,6 +440,13 @@ export class Server extends Document {
   })
   communityDiscoveryStatus: CommunityDiscoveryStatus;
 
+  /**
+   * Mức mở rộng ô sticker do chủ máy chủ gán cho server này (theo gói Boost trên tài khoản chủ).
+   * Một chủ tối đa gán đồng thời cho 2 máy chủ.
+   */
+  @Prop({ type: String, default: null })
+  stickerBoostTier: 'basic' | 'boost' | null;
+
   /** Sticker tùy chỉnh do máy chủ quản lý (hiển thị trong picker; chỉ dùng được trong kênh cùng server). */
   @Prop({
     type: [

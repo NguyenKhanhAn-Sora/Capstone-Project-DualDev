@@ -11,7 +11,22 @@ import React, {
 import { createPortal } from "react-dom";
 import styles from "./MessagesUserSettingsModal.module.css";
 import { useLanguage } from "@/component/language-provider";
-import { applyAccentColor, useTheme } from "@/component/theme-provider";
+import {
+  getMessagesShellTheme,
+  setMessagesShellTheme as persistMessagesShellTheme,
+  type MessagesShellTheme,
+} from "@/lib/messages-shell-theme";
+import {
+  DEFAULT_MESSAGES_CHROME_HEX,
+  flushMessagesChromeToRoot,
+  migrateMessagesChromeStorageOnce,
+  normalizeMessagesChromeHex,
+  persistMessagesAppearanceSource,
+  persistMessagesChromeHex,
+  readMessagesAppearanceSource,
+  readMessagesChromeHex,
+  type MessagesAppearanceSource,
+} from "@/lib/messages-appearance-chrome";
 import {
   fetchUserSettings,
   updateUserSettings,
@@ -48,30 +63,9 @@ type Props = {
   onToast?: (message: string) => void;
 };
 
-const CHAT_ACCENT_KEY = "chat-accent-color";
-
-function chatAccentKey(userId: string) {
-  const u = String(userId || "").trim();
-  return u ? `chat:${u}:${CHAT_ACCENT_KEY}` : CHAT_ACCENT_KEY;
-}
-
-function normalizeHex(color: string): string {
-  const raw = String(color || "").trim();
-  if (/^#[0-9A-Fa-f]{6}$/.test(raw)) return raw.toUpperCase();
-  return "#5865F2";
-}
-
 function getMessagesRoot(): HTMLElement | null {
   if (typeof document === "undefined") return null;
   return document.getElementById("cordigram-messages-root");
-}
-
-function applyChatTheme(color: string) {
-  const root = getMessagesRoot();
-  if (root) applyAccentColor(color, root);
-  if (typeof document !== "undefined") {
-    applyAccentColor(color, document.body);
-  }
 }
 
 function dispatchChatSettingsRefresh() {
@@ -94,9 +88,6 @@ export default function MessagesUserSettingsModal({
   }, [onToast]);
 
   const { language, setLanguage, t } = useLanguage();
-  const {
-    theme,
-  } = useTheme();
   const [section, setSection] = useState<Section>("general");
   const [profileSub, setProfileSub] = useState<"main" | "server">("main");
 
@@ -113,16 +104,50 @@ export default function MessagesUserSettingsModal({
   >([]);
   const [listOpen, setListOpen] = useState<"none" | "blocked">("none");
   const [boostUnlocked, setBoostUnlocked] = useState(false);
+  const [messagesShellTheme, setMessagesShellTheme] = useState<MessagesShellTheme>("dark");
 
-  const isDark = theme === "dark";
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setMessagesShellTheme(getMessagesShellTheme());
+    const onShell = () => setMessagesShellTheme(getMessagesShellTheme());
+    window.addEventListener("cordigram-messages-shell-theme", onShell);
+    return () => window.removeEventListener("cordigram-messages-shell-theme", onShell);
+  }, []);
+
+  const commitMessagesShellTheme = useCallback((mode: MessagesShellTheme) => {
+    persistMessagesShellTheme(mode);
+    setMessagesShellTheme(mode);
+  }, []);
+
   const backgroundThemeOptions = useMemo(
-    () => [
-      { id: "default" as const, color: "#5865F2", label: "Mặc định" },
-      { id: "social-dark" as const, color: "#0C1220", label: "Tối (giống Social)" },
-      { id: "graphite" as const, color: "#3A3D49", label: "Graphite" },
-      { id: "charcoal" as const, color: "#24262E", label: "Charcoal" },
-      { id: "indigo" as const, color: "#111827", label: "Indigo" },
-    ],
+    () =>
+      [
+        {
+          id: "default" as const,
+          color: "#5865F2",
+          labelKey: "settings.appearanceBg.presetDefault" as const,
+        },
+        {
+          id: "social-dark" as const,
+          color: "#0C1220",
+          labelKey: "settings.appearanceBg.presetSocialDark" as const,
+        },
+        {
+          id: "graphite" as const,
+          color: "#3A3D49",
+          labelKey: "settings.appearanceBg.presetGraphite" as const,
+        },
+        {
+          id: "charcoal" as const,
+          color: "#24262E",
+          labelKey: "settings.appearanceBg.presetCharcoal" as const,
+        },
+        {
+          id: "indigo" as const,
+          color: "#111827",
+          labelKey: "settings.appearanceBg.presetIndigo" as const,
+        },
+      ] as const,
     [],
   );
   const accentOptions = useMemo(
@@ -144,29 +169,29 @@ export default function MessagesUserSettingsModal({
     ],
     [],
   );
-  const [chatAccentColor, setChatAccentColor] = useState<string>(() => {
-    if (typeof window === "undefined") return "#5865F2";
-    const raw = localStorage.getItem(chatAccentKey(currentUserId));
-    return normalizeHex(raw || "#5865F2");
-  });
+  const [chromeHex, setChromeHex] = useState(() =>
+    typeof window === "undefined"
+      ? DEFAULT_MESSAGES_CHROME_HEX
+      : readMessagesChromeHex(currentUserId),
+  );
+  const [appearanceSource, setAppearanceSource] = useState<MessagesAppearanceSource>(() =>
+    readMessagesAppearanceSource(currentUserId),
+  );
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(chatAccentKey(currentUserId), normalizeHex(chatAccentColor));
-    applyChatTheme(chatAccentColor);
-  }, [chatAccentColor, currentUserId]);
+    setAppearanceSource(readMessagesAppearanceSource(currentUserId));
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!open) return;
-    // Sync state from storage when opening (supports login/logout without reload).
-    if (typeof window !== "undefined") {
-      const storedAccent = localStorage.getItem(chatAccentKey(currentUserId));
-      if (storedAccent) setChatAccentColor(normalizeHex(storedAccent));
-    }
-    applyChatTheme(chatAccentColor);
+    if (typeof window === "undefined") return;
+    migrateMessagesChromeStorageOnce(currentUserId);
+    setChromeHex(readMessagesChromeHex(currentUserId));
+    setAppearanceSource(readMessagesAppearanceSource(currentUserId));
+    setMessagesShellTheme(getMessagesShellTheme());
   }, [open, currentUserId]);
 
-  const cardClass = `${styles.card} ${isDark ? styles.cardDark : ""}`;
+  const cardClass = `${styles.card} ${messagesShellTheme === "dark" ? styles.cardDark : ""}`;
 
   const loadCore = useCallback(async () => {
     try {
@@ -177,11 +202,23 @@ export default function MessagesUserSettingsModal({
       ]);
       setUserSettings(u);
       setNotif(n);
-      setBoostUnlocked(Boolean(b?.active) || Boolean(b?.unlocked) || Boolean(b?.accountBoost));
+      const unlocked =
+        Boolean(b?.active) || Boolean(b?.unlocked) || Boolean(b?.accountBoost);
+      setBoostUnlocked(unlocked);
+      if (!unlocked) {
+        setAppearanceSource((prev) => {
+          if (prev === "accent") {
+            persistMessagesAppearanceSource(currentUserId, "background");
+            flushMessagesChromeToRoot(currentUserId);
+            return "background";
+          }
+          return prev;
+        });
+      }
     } catch {
       onToastRef.current?.(t("settings.failedToLoad"));
     }
-  }, [token]);
+  }, [token, currentUserId]);
 
   useEffect(() => {
     if (!open) return;
@@ -265,6 +302,8 @@ export default function MessagesUserSettingsModal({
   );
 
   if (!open || typeof document === "undefined") return null;
+
+  const portalHost = getMessagesRoot() ?? document.body;
 
   return createPortal(
     <div
@@ -539,54 +578,90 @@ export default function MessagesUserSettingsModal({
 
             {section === "appearance" ? (
               <>
-                <div className={styles.appearanceBgSection}>
-                  <div className={styles.appearanceBgHeader}>
-                    <div>
-                      <div className={styles.appearanceBgTitle}>
-                        {t("settings.appearanceBg.title")}
-                      </div>
-                      <div className={styles.hint} style={{ margin: 0 }}>
-                        {t("settings.appearanceBg.hint")}
+                <p className={styles.appearanceMutualHint}>
+                  {t("settings.appearance.mutualHint")}
+                </p>
+                <p className={styles.appearanceModeBadge} aria-live="polite">
+                  {appearanceSource === "accent" && boostUnlocked
+                    ? t("settings.appearance.modeAccent")
+                    : t("settings.appearance.modeBackground")}
+                </p>
+
+                <div className={styles.appearanceBlock}>
+                  <div className={styles.appearanceBgSection}>
+                    <div className={styles.appearanceBgHeader}>
+                      <div>
+                        <div className={styles.appearanceBgTitle}>
+                          {t("settings.appearanceBg.title")}
+                        </div>
+                        <div className={styles.hint} style={{ margin: 0 }}>
+                          {t("settings.appearanceBg.hintShort")}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className={styles.appearanceBgLockedWrap}>
-                    <div className={styles.appearanceBgRow}>
-                      <div className={styles.appearanceBgSwatches}>
-                        {backgroundThemeOptions.map((option) => (
-                          <button
-                            key={option.id}
-                            type="button"
-                            className={`${styles.appearanceBgSwatch} ${
-                              normalizeHex(chatAccentColor) === option.color.toUpperCase()
-                                ? styles.appearanceBgSwatchActive
-                                : ""
-                            }`}
-                            title={option.label}
-                            aria-label={t("settings.appearanceBg.pickPreset")}
-                            style={{
-                              background: option.color,
-                            }}
-                            onClick={() => {
-                              setChatAccentColor(option.color);
-                            }}
-                          />
-                        ))}
+                    <div className={styles.appearanceBgLockedWrap}>
+                      <div className={styles.appearanceBgRow}>
+                        <div className={styles.appearanceBgSwatches}>
+                          {backgroundThemeOptions.map((option) => {
+                            const active =
+                              appearanceSource === "background" &&
+                              messagesShellTheme === "dark" &&
+                              normalizeMessagesChromeHex(chromeHex) ===
+                                option.color.toUpperCase();
+                            return (
+                              <button
+                                key={option.id}
+                                type="button"
+                                className={`${styles.appearanceBgSwatch} ${
+                                  active ? styles.appearanceBgSwatchActive : ""
+                                }`}
+                                title={t(option.labelKey)}
+                                aria-label={t("settings.appearanceBg.pickPreset")}
+                                style={{
+                                  background: option.color,
+                                }}
+                                onClick={() => {
+                                  persistMessagesAppearanceSource(
+                                    currentUserId,
+                                    "background",
+                                  );
+                                  setAppearanceSource("background");
+                                  commitMessagesShellTheme("dark");
+                                  const h = normalizeMessagesChromeHex(option.color);
+                                  persistMessagesChromeHex(currentUserId, h);
+                                  setChromeHex(h);
+                                  flushMessagesChromeToRoot(currentUserId);
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-                <ThemePanel
-                  unlocked={boostUnlocked}
-                  accentColor={chatAccentColor}
-                  options={accentOptions}
-                  onSelectColor={setChatAccentColor}
-                  onPreview={() => applyChatTheme("#5865F2")}
-                  onUnlock={() => {
-                    onToast?.("Mở tab Boost để đăng ký gói.");
-                  }}
-                />
+
+                <div className={styles.appearanceBlock}>
+                  <ThemePanel
+                    accentColor={chromeHex}
+                    options={accentOptions}
+                    locked={!boostUnlocked}
+                    showAccentSelection={
+                      boostUnlocked && appearanceSource === "accent"
+                    }
+                    onSelectColor={(color) => {
+                      if (!boostUnlocked) return;
+                      commitMessagesShellTheme("dark");
+                      persistMessagesAppearanceSource(currentUserId, "accent");
+                      setAppearanceSource("accent");
+                      const h = normalizeMessagesChromeHex(color);
+                      persistMessagesChromeHex(currentUserId, h);
+                      setChromeHex(h);
+                      flushMessagesChromeToRoot(currentUserId);
+                    }}
+                  />
+                </div>
               </>
             ) : null}
 
@@ -671,6 +746,6 @@ export default function MessagesUserSettingsModal({
         </div>
       </div>
     </div>,
-    document.body,
+    portalHost,
   );
 }

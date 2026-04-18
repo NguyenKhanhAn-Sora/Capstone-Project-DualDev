@@ -317,10 +317,6 @@ export class MessagesService {
       .lean()
       .exec();
 
-    const ageRestrictedAcknowledged = Boolean(
-      (usDoc as any)?.ageRestrictedAcknowledged,
-    );
-
     const [userRow, profileRow] = await Promise.all([
       this.userModel
         .findById(userId)
@@ -337,9 +333,18 @@ export class MessagesService {
     const memberRow = ((server as any).members || []).find(
       (m: any) => (m?.userId?._id ?? m?.userId)?.toString() === userId,
     );
-    const memberJoinedAt = memberRow?.joinedAt
+    const rawMemberJoinedAt = memberRow?.joinedAt
       ? new Date(memberRow.joinedAt)
       : null;
+
+    const legacyMemberNoUserServerRow =
+      !usDoc && rawMemberJoinedAt != null;
+    const ageAckForGate =
+      isBypass ||
+      Boolean((usDoc as any)?.ageRestrictedAcknowledged) ||
+      legacyMemberNoUserServerRow;
+
+    const memberJoinedAt = rawMemberJoinedAt;
 
     const verificationLevel = normalizeServerVerificationLevel(
       (server as any).safetySettings?.spamProtection?.verificationLevel,
@@ -349,7 +354,7 @@ export class MessagesService {
 
     return evaluateChannelChatGate({
       isAgeRestricted: Boolean((server as any).isAgeRestricted),
-      ageRestrictedAcknowledged,
+      ageRestrictedAcknowledged: ageAckForGate,
       birthdate: (profileRow as any)?.birthdate ?? null,
       verificationLevel,
       isVerified: isServerEmailVerified,

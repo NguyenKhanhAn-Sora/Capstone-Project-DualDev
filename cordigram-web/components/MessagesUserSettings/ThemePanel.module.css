@@ -1,5 +1,5 @@
 .panel {
-  margin-top: 18px;
+  margin-top: 0;
   border: 1px solid var(--color-panel-border);
   border-radius: 16px;
   background: var(--color-panel-context);
@@ -23,8 +23,9 @@
 
 .hint {
   margin-top: 4px;
-  color: var(--color-panel-text-muted);
+  color: var(--color-chat-text-secondary, var(--color-panel-text-muted));
   font-size: 14px;
+  line-height: 1.45;
 }
 
 .hintAccent {
@@ -87,4 +88,43 @@
 .customLabel {
   color: var(--color-panel-text-muted);
   font-size: 13px;
+}
+
+.customWrapDisabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.panelLocked {
+  position: relative;
+}
+
+.panelLockedInner {
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.52;
+  filter: grayscale(0.2);
+}
+
+.panelLockOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--color-panel-bg) 58%, transparent);
+  pointer-events: none;
+}
+
+.panelLockMessage {
+  margin: 0;
+  max-width: 300px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--color-panel-text);
 }

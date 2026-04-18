@@ -50,7 +50,19 @@ interface MessageSearchPanelProps {
   onQuickSwitchDm?: (userId: string) => void;
   onQuickSwitchChannel?: (serverId: string, channelId: string) => void;
   onQuickSwitchServer?: (serverId: string) => void;
+  /**
+   * DM: mở từ nút kính lúp trên header — chỉ tìm nội dung trong cuộc trò chuyện hiện tại,
+   * không quick switch @/#/!/* và không parse from:/has: (query literal).
+   */
+  dmConversationOnlySearch?: boolean;
 }
+
+export type ParseQuickSwitchPrefixOpts = {
+  /** false = @ # ! * không kích hoạt quick switch (coi như nội dung tìm). */
+  enableQuickSwitch?: boolean;
+  /** Chỉ khi enableQuickSwitch; mặc định true (server: false để bỏ *). */
+  includeStarQuickSwitch?: boolean;
+};
 
 type RecentChannel = { channelId: string; channelName: string; serverName: string };
 
@@ -80,24 +92,34 @@ function saveRecent(serverId: string, entry: RecentChannel) {
 }
 
 /** Discord-style: leading @ # ! * switches mode; rest is filter needle */
-export function parseQuickSwitchPrefix(raw: string): {
+export function parseQuickSwitchPrefix(
+  raw: string,
+  opts?: ParseQuickSwitchPrefixOpts,
+): {
   kind: "@" | "#" | "!" | "*" | null;
   needle: string;
 } {
+  if (opts?.enableQuickSwitch === false) {
+    return { kind: null, needle: "" };
+  }
+  const includeStar = opts?.includeStarQuickSwitch !== false;
   const t = raw.trimStart();
   if (!t.length) return { kind: null, needle: "" };
   const c = t[0];
   if (c === "@") return { kind: "@", needle: t.slice(1).trimStart() };
   if (c === "#") return { kind: "#", needle: t.slice(1).trimStart() };
   if (c === "!") return { kind: "!", needle: t.slice(1).trimStart() };
-  if (c === "*") return { kind: "*", needle: t.slice(1).trimStart() };
+  if (c === "*" && includeStar) return { kind: "*", needle: t.slice(1).trimStart() };
   return { kind: null, needle: "" };
 }
 
 function getFilterSuggestContext(
   q: string,
+  parseOpts: ParseQuickSwitchPrefixOpts,
+  suppressInlineFilterSuggest = false,
 ): { kind: "from" | "in"; needle: string } | null {
-  if (parseQuickSwitchPrefix(q).kind) return null;
+  if (parseQuickSwitchPrefix(q, parseOpts).kind) return null;
+  if (suppressInlineFilterSuggest) return null;
   const trimmed = q.trimEnd();
   const fromM = /(?:^|\s)from:([^ \t]*)$/i.exec(trimmed);
   if (fromM) return { kind: "from", needle: fromM[1] };
@@ -154,8 +176,30 @@ export default function MessageSearchPanel({
   onQuickSwitchDm,
   onQuickSwitchChannel,
   onQuickSwitchServer,
+  dmConversationOnlySearch = false,
 }: MessageSearchPanelProps) {
   const { t, language } = useLanguage();
+  const quickSwitchParseOpts = useMemo((): ParseQuickSwitchPrefixOpts => {
+    if (mode === "dm" && dmConversationOnlySearch) {
+      return { enableQuickSwitch: false };
+    }
+    if (mode === "server") {
+      return { enableQuickSwitch: true, includeStarQuickSwitch: false };
+    }
+    return { enableQuickSwitch: true, includeStarQuickSwitch: true };
+  }, [mode, dmConversationOnlySearch]);
+
+  const suppressInlineFilterSuggest = mode === "dm" && dmConversationOnlySearch;
+
+  const footerHint = useMemo(() => {
+    if (mode === "dm" && dmConversationOnlySearch) {
+      return { bodyKey: "proTipDmConversationOnly" as const, showKbds: false };
+    }
+    if (mode === "server") {
+      return { bodyKey: "proTipBodyServer" as const, showKbds: true, showStar: false };
+    }
+    return { bodyKey: "proTipBody" as const, showKbds: true, showStar: true };
+  }, [mode, dmConversationOnlySearch]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -163,9 +207,6 @@ export default function MessageSearchPanel({
   const [hasSearched, setHasSearched] = useState(false);
   const [lastParsed, setLastParsed] = useState<ParsedMessageSearch | null>(null);
   const [recent, setRecent] = useState<RecentChannel[]>([]);
-  const [filterBefore, setFilterBefore] = useState("");
-  const [filterAfter, setFilterAfter] = useState("");
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const LIMIT = 25;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -176,7 +217,10 @@ export default function MessageSearchPanel({
     [channels],
   );
 
-  const quickSwitch = useMemo(() => parseQuickSwitchPrefix(query), [query]);
+  const quickSwitch = useMemo(
+    () => parseQuickSwitchPrefix(query, quickSwitchParseOpts),
+    [query, quickSwitchParseOpts],
+  );
 
   const dmMatches = useMemo(() => {
     if (quickSwitch.kind !== "@") return [];
@@ -254,13 +298,13 @@ export default function MessageSearchPanel({
       setTotalCount(0);
       setHasSearched(false);
       setLastParsed(null);
-      setFilterBefore("");
-      setFilterAfter("");
-      setShowAdvanced(false);
     }
   }, [isOpen]);
 
-  const suggestCtx = useMemo(() => getFilterSuggestContext(query), [query]);
+  const suggestCtx = useMemo(
+    () => getFilterSuggestContext(query, quickSwitchParseOpts, suppressInlineFilterSuggest),
+    [query, quickSwitchParseOpts, suppressInlineFilterSuggest],
+  );
 
   const filteredMembers = useMemo(() => {
     if (!suggestCtx || suggestCtx.kind !== "from") return [];
@@ -297,17 +341,21 @@ export default function MessageSearchPanel({
 
   const doSearch = useCallback(
     async (q: string, currentOffset: number, append: boolean) => {
-      if (parseQuickSwitchPrefix(q).kind) return;
+      if (parseQuickSwitchPrefix(q, quickSwitchParseOpts).kind) return;
 
       const parsedLocal =
         mode === "dm"
-          ? parseMessageSearchQueryForDm(q)
+          ? dmConversationOnlySearch
+            ? { text: q.trim(), filters: {} as ParsedMessageSearch["filters"] }
+            : parseMessageSearchQueryForDm(q)
           : parseMessageSearchQuery(q);
       const hasSignal =
-        q.trim().length > 0 ||
-        Boolean(parsedLocal.filters.from) ||
-        Boolean(parsedLocal.filters.in) ||
-        Boolean(parsedLocal.filters.has);
+        mode === "dm" && dmConversationOnlySearch
+          ? q.trim().length > 0
+          : q.trim().length > 0 ||
+            Boolean(parsedLocal.filters.from) ||
+            Boolean(parsedLocal.filters.in) ||
+            Boolean(parsedLocal.filters.has);
 
       if (!hasSignal) return;
 
@@ -318,8 +366,6 @@ export default function MessageSearchPanel({
             q: q.trim() || undefined,
             serverId,
             channelId: channelId || undefined,
-            before: filterBefore || undefined,
-            after: filterAfter || undefined,
             limit: LIMIT,
             offset: currentOffset,
             fuzzy: false,
@@ -348,12 +394,10 @@ export default function MessageSearchPanel({
             token,
             q: q.trim() || undefined,
             userId: dmPartnerId || undefined,
-            before: filterBefore || undefined,
-            after: filterAfter || undefined,
             limit: LIMIT,
             offset: currentOffset,
             fuzzy: false,
-            parseQuery: true,
+            parseQuery: !dmConversationOnlySearch,
           });
           if (append) {
             setResults((prev) => [...prev, ...res.results]);
@@ -382,15 +426,15 @@ export default function MessageSearchPanel({
       serverId,
       channelId,
       dmPartnerId,
-      filterBefore,
-      filterAfter,
+      quickSwitchParseOpts,
+      dmConversationOnlySearch,
     ],
   );
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    if (parseQuickSwitchPrefix(query).kind) {
+    if (parseQuickSwitchPrefix(query, quickSwitchParseOpts).kind) {
       setResults([]);
       setTotalCount(0);
       setHasSearched(false);
@@ -401,13 +445,17 @@ export default function MessageSearchPanel({
 
     const parsedLocal =
       mode === "dm"
-        ? parseMessageSearchQueryForDm(query)
+        ? dmConversationOnlySearch
+          ? { text: query.trim(), filters: {} as ParsedMessageSearch["filters"] }
+          : parseMessageSearchQueryForDm(query)
         : parseMessageSearchQuery(query);
     const hasSignal =
-      query.trim().length > 0 ||
-      Boolean(parsedLocal.filters.from) ||
-      Boolean(parsedLocal.filters.in) ||
-      Boolean(parsedLocal.filters.has);
+      mode === "dm" && dmConversationOnlySearch
+        ? query.trim().length > 0
+        : query.trim().length > 0 ||
+          Boolean(parsedLocal.filters.from) ||
+          Boolean(parsedLocal.filters.in) ||
+          Boolean(parsedLocal.filters.has);
 
     if (!hasSignal) {
       setResults([]);
@@ -423,7 +471,7 @@ export default function MessageSearchPanel({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, doSearch, mode]);
+  }, [query, doSearch, mode, quickSwitchParseOpts, dmConversationOnlySearch]);
 
   const handleLoadMore = () => {
     doSearch(query, results.length, true);
@@ -454,12 +502,18 @@ export default function MessageSearchPanel({
 
   const highlightTerms = useMemo(() => {
     if (lastParsed) return highlightTermsFromParsed(lastParsed);
+    if (mode === "dm" && dmConversationOnlySearch) {
+      return highlightTermsFromParsed({
+        text: query.trim(),
+        filters: {},
+      });
+    }
     return highlightTermsFromParsed(
       mode === "dm"
         ? parseMessageSearchQueryForDm(query)
         : parseMessageSearchQuery(query),
     );
-  }, [lastParsed, query, mode]);
+  }, [lastParsed, query, mode, dmConversationOnlySearch]);
 
   const showQuickSwitch = Boolean(quickSwitch.kind);
   const showMessageToolbar = !showQuickSwitch;
@@ -555,37 +609,6 @@ export default function MessageSearchPanel({
                 ))}
               </div>
             )}
-
-          {showMessageToolbar && (
-            <div className={styles.toolbar}>
-              <button
-                type="button"
-                className={styles.advancedBtn}
-                onClick={() => setShowAdvanced(!showAdvanced)}
-              >
-                {t("chat.popups.messageSearch.advanced")}
-              </button>
-            </div>
-          )}
-
-          {showMessageToolbar && showAdvanced && (
-            <div className={styles.advancedRow}>
-              <input
-                type="date"
-                className={styles.dateInput}
-                value={filterAfter}
-                onChange={(e) => setFilterAfter(e.target.value)}
-                title={t("chat.popups.messageSearch.fromDate")}
-              />
-              <input
-                type="date"
-                className={styles.dateInput}
-                value={filterBefore}
-                onChange={(e) => setFilterBefore(e.target.value)}
-                title={t("chat.popups.messageSearch.toDate")}
-              />
-            </div>
-          )}
 
           {showMessageToolbar &&
             mode === "server" &&
@@ -897,13 +920,17 @@ export default function MessageSearchPanel({
             <span className={styles.footerTipLabel}>
               {t("chat.popups.messageSearch.proTipLabel")}
             </span>
-            <span className={styles.footerTipText}>{t("chat.popups.messageSearch.proTipBody")}</span>
-            <span className={styles.kbdGroup}>
-              <kbd className={styles.kbd}>@</kbd>
-              <kbd className={styles.kbd}>#</kbd>
-              <kbd className={styles.kbd}>!</kbd>
-              <kbd className={styles.kbd}>*</kbd>
+            <span className={styles.footerTipText}>
+              {t(`chat.popups.messageSearch.${footerHint.bodyKey}`)}
             </span>
+            {footerHint.showKbds ? (
+              <span className={styles.kbdGroup}>
+                <kbd className={styles.kbd}>@</kbd>
+                <kbd className={styles.kbd}>#</kbd>
+                <kbd className={styles.kbd}>!</kbd>
+                {footerHint.showStar ? <kbd className={styles.kbd}>*</kbd> : null}
+              </span>
+            ) : null}
           </div>
         </div>
       </div>

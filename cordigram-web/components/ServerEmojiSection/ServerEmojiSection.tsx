@@ -3,11 +3,12 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./ServerEmojiSection.module.css";
 import * as serversApi from "@/lib/servers-api";
+import { fetchBoostStatus } from "@/lib/api";
 import AddServerEmojiModal from "@/components/AddServerEmojiModal/AddServerEmojiModal";
 import { useLanguage } from "@/component/language-provider";
 
 const ACCEPT = "image/png,image/jpeg,image/jpg,image/gif,image/webp,image/x-png";
-const MAX_FILE_BYTES = 2 * 1024 * 1024;
+const DEFAULT_USER_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 function isAllowedFile(file: File): boolean {
   if (ACCEPT.split(",").some((t) => file.type === t.trim())) return true;
@@ -27,8 +28,27 @@ export default function ServerEmojiSection({ serverId, token, canManage, onEmoji
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [userMaxUploadBytes, setUserMaxUploadBytes] = useState(DEFAULT_USER_UPLOAD_BYTES);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!token || !canManage) return;
+    let c = false;
+    void fetchBoostStatus({ token, serverId })
+      .then((b) => {
+        if (c) return;
+        const n = Number(b?.limits?.maxUploadBytes);
+        if (Number.isFinite(n) && n > 0) setUserMaxUploadBytes(n);
+        else setUserMaxUploadBytes(DEFAULT_USER_UPLOAD_BYTES);
+      })
+      .catch(() => {
+        if (!c) setUserMaxUploadBytes(DEFAULT_USER_UPLOAD_BYTES);
+      });
+    return () => {
+      c = true;
+    };
+  }, [token, canManage, serverId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,7 +72,15 @@ export default function ServerEmojiSection({ serverId, token, canManage, onEmoji
   const handleFiles = (files: FileList | null) => {
     if (!files?.length || !canManage) return;
     const file = files[0];
-    if (file.size > MAX_FILE_BYTES) { setErr(t("chat.serverEmoji.fileTooLarge")); return; }
+    if (file.size > userMaxUploadBytes) {
+      setErr(
+        t("chat.serverEmoji.fileTooLarge").replace(
+          "{n}",
+          String(Math.round(userMaxUploadBytes / (1024 * 1024))),
+        ),
+      );
+      return;
+    }
     if (!isAllowedFile(file)) { setErr(t("chat.serverEmoji.fileInvalid")); return; }
     setErr(null);
     setPendingFile(file);
@@ -116,6 +144,7 @@ export default function ServerEmojiSection({ serverId, token, canManage, onEmoji
         isOpen={!!pendingFile}
         file={pendingFile}
         token={token}
+        maxGifUploadBytes={userMaxUploadBytes}
         defaultServerId={serverId}
         onClose={() => setPendingFile(null)}
         onSuccess={async () => { await load(); onEmojisChanged?.(); }}
@@ -137,7 +166,12 @@ export default function ServerEmojiSection({ serverId, token, canManage, onEmoji
         onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); }}
         onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); if (remaining <= 0) return; handleFiles(e.dataTransfer.files); }}
       >
-        <p className={styles.hint}>{t("chat.serverEmoji.dropHint")}</p>
+        <p className={styles.hint}>
+          {t("chat.serverEmoji.dropHint").replace(
+            "{n}",
+            String(Math.round(userMaxUploadBytes / (1024 * 1024))),
+          )}
+        </p>
       </div>
 
       {err ? <div className={styles.err}>{err}</div> : null}

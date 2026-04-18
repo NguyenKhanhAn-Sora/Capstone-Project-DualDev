@@ -1,4 +1,8 @@
 import { decodeJwt } from "./auth";
+import {
+  withCordigramUploadContext,
+  type CordigramUploadContext,
+} from "./cordigram-upload-context";
 
 export const API_BASE_URL = "http://localhost:9999";
 
@@ -426,6 +430,11 @@ export interface ServerStickerManageRow {
 export async function getServerStickersManage(serverId: string): Promise<{
   max: number;
   count: number;
+  boostActive: boolean;
+  boostTier: "basic" | "boost" | null;
+  stickerBoostTierOnServer?: "basic" | "boost" | null;
+  ownerStickerBoostSlotsUsed?: number;
+  ownerStickerBoostSlotsMax?: number;
   stickers: ServerStickerManageRow[];
 }> {
   const response = await fetch(
@@ -436,6 +445,35 @@ export async function getServerStickersManage(serverId: string): Promise<{
     const err = await response.json().catch(() => ({}));
     throw new Error(
       (err as { message?: string }).message || "Không tải được danh sách sticker",
+    );
+  }
+  return response.json();
+}
+
+/** Chủ máy chủ: gán / gỡ mức mở rộng ô sticker (tối đa 2 máy chủ). */
+export async function setServerStickerBoostTier(
+  serverId: string,
+  body: { tier: "basic" | "boost" | null },
+): Promise<{
+  stickerBoostTier: "basic" | "boost" | null;
+  maxStickerSlots: number;
+  assignedStickerBoostServerCount: number;
+  boostActive: boolean;
+  boostTier: "basic" | "boost" | null;
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/servers/sticker-boost/${serverId}`,
+    {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify(body),
+    },
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as { message?: string }).message ||
+        "Không cập nhật được gán Boost sticker",
     );
   }
   return response.json();
@@ -490,6 +528,44 @@ export async function getServer(serverId: string): Promise<Server> {
   }
 
   return response.json();
+}
+
+export type ServerEmbedPreviewPayload = {
+  name: string;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
+  bannerImageUrl?: string | null;
+  bannerColor?: string | null;
+  memberCount: number;
+  onlineCount: number;
+  createdAt: string;
+};
+
+const serverEmbedPreviewCache = new Map<
+  string,
+  { server: ServerEmbedPreviewPayload | null }
+>();
+
+/**
+ * Preview cho thẻ invite trong DM: HTTP 200 + `server: null` nếu máy chủ không còn (tránh 404 trong console).
+ */
+export async function getServerEmbedPreview(
+  serverId: string,
+): Promise<{ server: ServerEmbedPreviewPayload | null }> {
+  const id = String(serverId || "").trim();
+  if (!id) return { server: null };
+  const cached = serverEmbedPreviewCache.get(id);
+  if (cached) return cached;
+
+  const response = await fetch(
+    `${API_BASE_URL}/servers/embed-preview?id=${encodeURIComponent(id)}`,
+    { headers: getHeaders() },
+  );
+  const data = response.ok
+    ? ((await response.json()) as { server: ServerEmbedPreviewPayload | null })
+    : { server: null };
+  serverEmbedPreviewCache.set(id, data);
+  return data;
 }
 
 export async function getServerProfileStats(serverId: string): Promise<ServerProfileStats> {
@@ -655,6 +731,7 @@ export interface RolePermissions {
   manageServer: boolean;
   manageChannels: boolean;
   manageEvents: boolean;
+  manageExpressions: boolean;
 
   // Quyền Thành Viên
   createInvite: boolean;
@@ -668,8 +745,6 @@ export interface RolePermissions {
   mentionEveryone: boolean;
   sendMessages: boolean;
   sendMessagesInThreads: boolean;
-  createPublicThreads: boolean;
-  createPrivateThreads: boolean;
   embedLinks: boolean;
   attachFiles: boolean;
   addReactions: boolean;
@@ -1108,6 +1183,7 @@ export interface CurrentUserServerPermissions {
   canManageServer: boolean;
   canManageChannels: boolean;
   canManageEvents: boolean;
+  canManageExpressions: boolean;
   canCreateInvite: boolean;
   /** Được dùng đề cập (@) — không ảnh hưởng việc nhận tin khi người khác @ bạn. */
   mentionEveryone?: boolean;
@@ -1145,6 +1221,7 @@ export async function getCurrentUserPermissions(
         canManageServer: membersResponse.currentUserPermissions.isOwner,
         canManageChannels: membersResponse.currentUserPermissions.isOwner,
         canManageEvents: membersResponse.currentUserPermissions.isOwner,
+        canManageExpressions: membersResponse.currentUserPermissions.isOwner,
         canCreateInvite: true,
         mentionEveryone: membersResponse.currentUserPermissions.isOwner,
       };
@@ -1158,6 +1235,7 @@ export async function getCurrentUserPermissions(
         canManageServer: false,
         canManageChannels: false,
         canManageEvents: false,
+        canManageExpressions: false,
         canCreateInvite: true,
         mentionEveryone: false,
       };
@@ -1901,11 +1979,19 @@ export async function updateMyServerProfile(
 export async function uploadMyServerAvatar(opts: {
   serverId: string;
   form: FormData;
+  cordigramUploadContext?: CordigramUploadContext;
 }): Promise<{ avatarUrl: string }> {
-  const { serverId, form } = opts;
+  const { serverId, form, cordigramUploadContext } = opts;
   const res = await fetch(
     `${API_BASE_URL}/servers/${encodeURIComponent(serverId)}/me/avatar/upload`,
-    { method: "POST", headers: { Authorization: `Bearer ${getToken()}` }, body: form },
+    {
+      method: "POST",
+      headers: withCordigramUploadContext(
+        { Authorization: `Bearer ${getToken()}` },
+        cordigramUploadContext,
+      ),
+      body: form,
+    },
   );
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));

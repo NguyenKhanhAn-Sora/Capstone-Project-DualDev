@@ -5,8 +5,8 @@ describe("mapSectionToSafetyTab", () => {
     expect(mapSectionToSafetyTab("automod")).toBe("automod");
   });
 
-  it("maps privileges section to privileges tab", () => {
-    expect(mapSectionToSafetyTab("privileges")).toBe("privileges");
+  it("maps profile section to spam tab (default)", () => {
+    expect(mapSectionToSafetyTab("profile")).toBe("spam");
   });
 
   it("maps safety section to spam tab", () => {

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { getServer, getServerProfileStats } from "@/lib/servers-api";
+import React, { useEffect, useRef, useState } from "react";
+import { getServerEmbedPreview } from "@/lib/servers-api";
 import ServerBannerStrip from "@/components/ServerBannerStrip/ServerBannerStrip";
 
 interface ServerInviteCardProps {
@@ -9,7 +9,13 @@ interface ServerInviteCardProps {
   inviteUrl: string;
 }
 
+function isLikelyMongoObjectId(id: string): boolean {
+  return /^[a-f\d]{24}$/i.test(String(id || "").trim());
+}
+
 export default function ServerInviteCard({ serverId, inviteUrl }: ServerInviteCardProps) {
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  const [inView, setInView] = useState(false);
   const [server, setServer] = useState<{
     name: string;
     avatarUrl?: string;
@@ -22,42 +28,75 @@ export default function ServerInviteCard({ serverId, inviteUrl }: ServerInviteCa
   const [onlineCount, setOnlineCount] = useState<number>(0);
   const [error, setError] = useState(false);
 
+  /** Tránh gọi hàng chục GET /servers/:id khi cuộn lịch sử DM — chỉ fetch khi preview gần viewport. */
+  useEffect(() => {
+    const el = mountRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setInView(true);
+          io.disconnect();
+        }
+      },
+      { root: null, rootMargin: "200px 0px", threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
+    if (!inView) return;
+    if (!isLikelyMongoObjectId(serverId)) {
+      setServer(null);
+      setError(true);
+      return;
+    }
+    setError(false);
     (async () => {
       try {
-        const [srv, stats] = await Promise.all([
-          getServer(serverId),
-          getServerProfileStats(serverId).catch(() => null),
-        ]);
+        const { server: srv } = await getServerEmbedPreview(serverId);
         if (cancelled) return;
+        if (!srv) {
+          setError(true);
+          return;
+        }
         setServer({
           name: srv.name,
-          avatarUrl: srv.avatarUrl,
+          avatarUrl: srv.avatarUrl ?? undefined,
           bannerUrl: srv.bannerUrl,
           bannerImageUrl: srv.bannerImageUrl,
           bannerColor: srv.bannerColor,
-          memberCount: stats?.memberCount ?? srv.memberCount ?? srv.members?.length ?? 0,
+          memberCount: srv.memberCount,
           createdAt: srv.createdAt,
         });
-        setOnlineCount(stats?.onlineCount ?? 0);
+        setOnlineCount(srv.onlineCount ?? 0);
       } catch {
         if (!cancelled) setError(true);
       }
     })();
-    return () => { cancelled = true; };
-  }, [serverId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [inView, serverId]);
 
   if (error || !server) {
     if (error) return null;
     return (
-      <div style={{
-        background: "#2b2d31",
-        borderRadius: 8,
-        padding: 16,
-        maxWidth: 400,
-        marginTop: 4,
-      }}>
+      <div
+        ref={mountRef}
+        style={{
+          background: "#2b2d31",
+          borderRadius: 8,
+          padding: 16,
+          maxWidth: 400,
+          marginTop: 4,
+        }}
+      >
         <div style={{ width: 100, height: 12, borderRadius: 4, background: "#3f4147" }} />
       </div>
     );
@@ -68,14 +107,17 @@ export default function ServerInviteCard({ serverId, inviteUrl }: ServerInviteCa
   const initial = (server.name || "?").charAt(0).toUpperCase();
 
   return (
-    <div style={{
+    <div
+      ref={mountRef}
+      style={{
       background: "#2b2d31",
       borderRadius: 8,
       maxWidth: 400,
       marginTop: 4,
       border: "1px solid #3f4147",
       overflow: "hidden",
-    }}>
+    }}
+    >
       <ServerBannerStrip server={server} height={72} />
       <div style={{ padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>

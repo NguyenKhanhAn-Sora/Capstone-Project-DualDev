@@ -73,6 +73,12 @@ export interface BoostEntitlementUpdatedEvent {
   limits?: any;
 }
 
+export interface JoinApplicationUpdatedEvent {
+  serverId: string;
+  userId: string;
+  status: "accepted" | "rejected" | "withdrawn";
+}
+
 interface UseChannelMessagesOptions {
   token: string | null;
 }
@@ -163,6 +169,17 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
         // ignore
       }
       setTimeout(() => setBoostEntitlementUpdated(null), 500);
+    });
+
+    socket.on("join-application-updated", (data: JoinApplicationUpdatedEvent) => {
+      if (!data?.serverId || !data?.userId) return;
+      try {
+        window.dispatchEvent(
+          new CustomEvent("cordigram-join-application-updated", { detail: data }),
+        );
+      } catch {
+        // ignore
+      }
     });
 
     return () => {

@@ -26,7 +26,7 @@ export function useCallSound(
       // Set src immediately
       const audioSrc =
         soundType === "incoming"
-          ? "/sounds/incoming-call.mp3"
+          ? "/sounds/universfield-ringtone-090-496416.mp3"
           : "/sounds/outgoing-call.mp3";
 
       audioRef.current.src = audioSrc;

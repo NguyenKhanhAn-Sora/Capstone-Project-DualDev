@@ -16,7 +16,6 @@ import {
 
 /** Sticker tĩnh PNG/WebP sau nén (tương thích moderation / Cloudinary). */
 const STICKER_MAX_BYTES = 500 * 1024;
-const MAX_GIF_BYTES = 2 * 1024 * 1024;
 
 function isAnimatedSticker(file: File): boolean {
   if (file.type === "image/gif") return true;
@@ -44,6 +43,8 @@ type Props = {
   isOpen: boolean;
   file: File | null;
   token: string;
+  /** Giới hạn GIF sticker (theo gói Boost / mặc định 25MB). */
+  maxGifUploadBytes: number;
   defaultServerId: string;
   onClose: () => void;
   onSuccess: () => void | Promise<void>;
@@ -53,6 +54,7 @@ export default function AddServerStickerModal({
   isOpen,
   file,
   token,
+  maxGifUploadBytes,
   defaultServerId,
   onClose,
   onSuccess,
@@ -263,7 +265,8 @@ export default function AddServerStickerModal({
 
   const selected = targets.find((t) => t.serverId === selectedServerId);
 
-  const gifTooBig = gif && file && file.size > MAX_GIF_BYTES;
+  const maxGifMb = Math.max(1, Math.round(maxGifUploadBytes / (1024 * 1024)));
+  const gifTooBig = gif && file && file.size > maxGifUploadBytes;
 
   const nameOk = sanitizeStickerName(stickerName).length > 0;
   const canSubmit =
@@ -289,12 +292,16 @@ export default function AddServerStickerModal({
 
     try {
       if (gif) {
-        if (file.size > MAX_GIF_BYTES) {
-          setFormErr("GIF không được vượt quá 2 MB.");
+        if (file.size > maxGifUploadBytes) {
+          setFormErr(`GIF không được vượt quá ${maxGifMb} MB.`);
           setSubmitting(false);
           return;
         }
-        const up = await uploadMedia({ token, file });
+        const up = await uploadMedia({
+          token,
+          file,
+          cordigramUploadContext: "messages",
+        });
         const imageUrl = up.secureUrl || up.url;
         if (!imageUrl) throw new Error("Upload thất bại");
         await serversApi.addServerSticker(selected.serverId, {
@@ -323,7 +330,11 @@ export default function AddServerStickerModal({
         const mime = blob.type || "image/png";
         const ext = mime.includes("webp") ? "webp" : "png";
         const outFile = new File([blob], `sticker.${ext}`, { type: mime });
-        const up = await uploadMedia({ token, file: outFile });
+        const up = await uploadMedia({
+          token,
+          file: outFile,
+          cordigramUploadContext: "messages",
+        });
         const imageUrl = up.secureUrl || up.url;
         if (!imageUrl) throw new Error("Upload thất bại");
         await serversApi.addServerSticker(selected.serverId, {
@@ -404,7 +415,7 @@ export default function AddServerStickerModal({
 
             <p className={styles.hint}>
               {gif
-                ? "Sticker GIF được tải nguyên bản lên Cloudinary (tối đa 2 MB)."
+                ? `Sticker GIF được tải nguyên bản lên Cloudinary (tối đa ${maxGifMb} MB).`
                 : "Kéo hình ảnh để thay đổi vị trí"}
             </p>
 
@@ -575,7 +586,7 @@ export default function AddServerStickerModal({
             ) : null}
             {gifTooBig ? (
               <p className={styles.err}>
-                Sticker GIF quá lớn! Tối đa 2 MB.
+                {`Sticker GIF quá lớn! Tối đa ${maxGifMb} MB.`}
               </p>
             ) : null}
             {selected && selected.remaining <= 0 ? (

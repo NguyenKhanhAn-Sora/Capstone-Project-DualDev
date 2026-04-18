@@ -31,6 +31,7 @@ import { User } from '../users/user.schema';
 import { Server } from '../servers/server.schema';
 import { ChannelMessagesGateway } from '../messages/channel-messages.gateway';
 import { BoostService } from '../boost/boost.service';
+import { isCordigramMessagesUpload } from '../common/cordigram-upload-context';
 
 type MulterFile = {
   buffer: Buffer;
@@ -40,6 +41,8 @@ type MulterFile = {
 };
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+/** Multer trần — kiểm tra kích thước thật theo Boost + context trong handler. */
+const AVATAR_UPLOAD_MULTER_CEILING = 600 * 1024 * 1024;
 
 const avatarFileFilter = (
   req: any,
@@ -316,7 +319,7 @@ export class ProfilesController {
         { name: 'cropped', maxCount: 1 },
       ],
       {
-        limits: { fileSize: MAX_AVATAR_BYTES },
+        limits: { fileSize: AVATAR_UPLOAD_MULTER_CEILING },
         fileFilter: avatarFileFilter,
       },
     ),
@@ -340,6 +343,21 @@ export class ProfilesController {
       throw new BadRequestException('Thiếu file original');
     }
 
+    const reqAny = req as Request & { user?: AuthenticatedUser };
+    const boost = await this.boostService.getBoostStatus(user.userId);
+    const maxAvatarBytes = isCordigramMessagesUpload(reqAny)
+      ? boost.active
+        ? boost.limits.maxUploadBytes
+        : MAX_AVATAR_BYTES
+      : MAX_AVATAR_BYTES;
+    for (const f of [originalFile, croppedFile].filter(Boolean) as MulterFile[]) {
+      if (typeof f.size === 'number' && f.size > maxAvatarBytes) {
+        throw new BadRequestException(
+          `File too large (max ${maxAvatarBytes} bytes)`,
+        );
+      }
+    }
+
     const folder = [
       this.config.cloudinaryFolder,
       'users',
@@ -356,8 +374,7 @@ export class ProfilesController {
 
     if (isGif) {
       const accountBoost = Boolean((user as any)?.settings?.accountBoost);
-      const ent = await this.boostService.getBoostStatus(user.userId);
-      const unlocked = accountBoost || Boolean(ent?.active);
+      const unlocked = accountBoost || Boolean(boost?.active);
       if (!unlocked) {
         throw new BadRequestException('Boost required for GIF avatar');
       }

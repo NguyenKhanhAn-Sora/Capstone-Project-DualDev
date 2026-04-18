@@ -6,17 +6,19 @@ import styles from "./ThemePanel.module.css";
 type Props = {
   value: string;
   onChange: (color: string) => void;
+  disabled?: boolean;
 };
 
-export default function ColorPicker({ value, onChange }: Props) {
+export default function ColorPicker({ value, onChange, disabled }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className={styles.customWrap}>
+    <div className={`${styles.customWrap} ${disabled ? styles.customWrapDisabled : ""}`}>
       <button
         type="button"
         className={styles.customBtn}
-        onClick={() => inputRef.current?.click()}
+        disabled={disabled}
+        onClick={() => !disabled && inputRef.current?.click()}
         title="Custom Color"
         aria-label="Custom Color"
       >

@@ -546,7 +546,11 @@ export default function MessagesProfileEditor({
   const submitBannerCrop = async (cropped: File) => {
     try {
       const optimized = await optimizeBannerImageFile(cropped);
-      const up = await uploadMedia({ token, file: optimized });
+      const up = await uploadMedia({
+        token,
+        file: optimized,
+        cordigramUploadContext: "messages",
+      });
       const url = up.secureUrl || up.url;
       if (!url) throw new Error(t("chat.profileEditor.errorGetUrl"));
       if (tab === "server" && serverId) {
@@ -564,23 +568,28 @@ export default function MessagesProfileEditor({
 
   const submitAvatarForm = async (form: FormData) => {
     if (tab === "server" && serverId) {
-      const res = await serversApi.uploadMyServerAvatar({ serverId, form });
+      const res = await serversApi.uploadMyServerAvatar({
+        serverId,
+        form,
+        cordigramUploadContext: "messages",
+      });
       setServerAvatarUrl(res.avatarUrl || null);
       if (res.avatarUrl) pushRecentProfileAvatar(res.avatarUrl);
       refreshRecent();
       onToast?.(t("chat.profileEditor.updatedAvatar"));
       return;
     }
-    const res = await uploadProfileAvatar({ token, form });
+    const res = await uploadProfileAvatar({
+      token,
+      form,
+      cordigramUploadContext: "messages",
+    });
     setAvatarUrl(res.avatarUrl || DEFAULT_AVATAR);
     if (res.avatarUrl) pushRecentProfileAvatar(res.avatarUrl);
     refreshRecent();
     onToast?.(t("chat.profileEditor.updatedAvatar"));
     await loadProfile();
   };
-
-  const placeholderSoon = () =>
-    onToast?.(t("chat.profileEditor.comingSoon"));
 
   if (!active) return null;
 
@@ -717,39 +726,6 @@ export default function MessagesProfileEditor({
 
             <hr className={styles.divider} />
 
-            <label className={styles.sectionTitle}>{t("chat.profileEditor.avatarDecoLabel")}</label>
-            <button
-              type="button"
-              className={styles.btnPrimary}
-              onClick={placeholderSoon}
-            >
-              {t("chat.profileEditor.changeAvatarDeco")}
-            </button>
-
-            <hr className={styles.divider} />
-
-            <label className={styles.sectionTitle}>{t("chat.profileEditor.nameplateLabel")}</label>
-            <button
-              type="button"
-              className={styles.btnPrimary}
-              onClick={placeholderSoon}
-            >
-              {t("chat.profileEditor.changeNameplate")}
-            </button>
-
-            <hr className={styles.divider} />
-
-            <label className={styles.sectionTitle}>{t("chat.profileEditor.profileEffectLabel")}</label>
-            <button
-              type="button"
-              className={styles.btnPrimary}
-              onClick={placeholderSoon}
-            >
-              {t("chat.profileEditor.changeProfileEffect")}
-            </button>
-
-            <hr className={styles.divider} />
-
             <label className={styles.sectionTitle}>{t("chat.profileEditor.bannerColorLabel")}</label>
             <div className={styles.bannerRow}>
               <button
@@ -878,10 +854,11 @@ export default function MessagesProfileEditor({
             <div className={styles.previewCard}>
               <div className={styles.banner} style={bannerStyle} />
               <div className={styles.bodyCard}>
-                <div className={styles.avatar}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={effectiveAvatarUrl || DEFAULT_AVATAR} alt="" />
-                </div>
+                <img
+                  className={styles.avatar}
+                  src={effectiveAvatarUrl || DEFAULT_AVATAR}
+                  alt=""
+                />
                 <div className={styles.statusPill}>{t("chat.profileEditor.statusPlaceholder")}</div>
                 <h4 className={styles.displayName} style={displayNameTextStyle}>
                   {previewDisplayName}
@@ -894,10 +871,11 @@ export default function MessagesProfileEditor({
               </div>
             </div>
             <div className={styles.nameplate}>
-              <div className={styles.nameplateAv}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={effectiveAvatarUrl || DEFAULT_AVATAR} alt="" />
-              </div>
+              <img
+                className={styles.nameplateAv}
+                src={effectiveAvatarUrl || DEFAULT_AVATAR}
+                alt=""
+              />
               <span className={styles.nameplateName} style={displayNameTextStyle}>
                 {previewDisplayName}
               </span>

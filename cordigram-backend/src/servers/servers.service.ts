@@ -30,8 +30,12 @@ import { BoostService } from '../boost/boost.service';
 
 /** Tổng số emoji tùy chỉnh (tĩnh + GIF) tối đa mỗi máy chủ. */
 const MAX_CUSTOM_EMOJIS_PER_SERVER = 30;
-/** Sticker máy chủ — tầng nâng cấp (boost) sẽ mở rộng sau; hiện chỉ dùng tầng miễn phí. */
-const MAX_CUSTOM_STICKERS_PER_SERVER = 5;
+/** Sticker máy chủ: tầng miễn phí + bonus theo gói Boost của chủ máy chủ + gán tối đa 2 server. */
+const STICKER_FREE_SLOTS = 5;
+const STICKER_BONUS_LEVEL1 = 10;
+const STICKER_BONUS_LEVEL2 = 15;
+const STICKER_BONUS_LEVEL3 = 30;
+const OWNER_STICKER_BOOST_MAX_SERVERS = 2;
 
 @Injectable()
 export class ServersService {
@@ -59,6 +63,86 @@ export class ServersService {
     @Inject(forwardRef(() => BoostService))
     private readonly boostService: BoostService,
   ) {}
+
+  private stickerMaxFromBoost(boost: {
+    active: boolean;
+    tier: string | null;
+  }): number {
+    if (!boost?.active || !boost.tier) return STICKER_FREE_SLOTS;
+    if (boost.tier === 'basic') {
+      return STICKER_FREE_SLOTS + STICKER_BONUS_LEVEL1;
+    }
+    if (boost.tier === 'boost') {
+      return (
+        STICKER_FREE_SLOTS +
+        STICKER_BONUS_LEVEL1 +
+        STICKER_BONUS_LEVEL2 +
+        STICKER_BONUS_LEVEL3
+      );
+    }
+    return STICKER_FREE_SLOTS;
+  }
+
+  private async canManageServerExpressions(
+    serverId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const server = await this.serverModel
+      .findById(serverId)
+      .select('ownerId')
+      .lean()
+      .exec();
+    if (!server) return false;
+    if (String((server as any).ownerId) === userId) return true;
+    const [manageServer, manageExpressions] = await Promise.all([
+      this.rolesService.hasPermission(serverId, userId, 'manageServer'),
+      this.rolesService.hasPermission(serverId, userId, 'manageExpressions'),
+    ]);
+    return manageServer || manageExpressions;
+  }
+
+  /**
+   * Giới hạn sticker theo gán trên server + gói Boost đang hoạt động của chủ máy chủ.
+   */
+  private async getStickerSlotMetaForServer(server: {
+    ownerId: Types.ObjectId;
+    stickerBoostTier?: 'basic' | 'boost' | null;
+  }): Promise<{
+    max: number;
+    boostActive: boolean;
+    boostTier: 'basic' | 'boost' | null;
+  }> {
+    const assignedRaw = (server as any).stickerBoostTier;
+    const assigned: 'basic' | 'boost' | null =
+      assignedRaw === 'basic' || assignedRaw === 'boost' ? assignedRaw : null;
+    const ownerBoost = await this.boostService.getBoostStatus(
+      String(server.ownerId),
+    );
+    if (!assigned || !ownerBoost.active || !ownerBoost.tier) {
+      return {
+        max: STICKER_FREE_SLOTS,
+        boostActive: false,
+        boostTier: null,
+      };
+    }
+    let effective: 'basic' | 'boost' | null = assigned;
+    if (ownerBoost.tier === 'basic' && effective === 'boost') {
+      effective = 'basic';
+    }
+    if (ownerBoost.tier !== 'basic' && ownerBoost.tier !== 'boost') {
+      return {
+        max: STICKER_FREE_SLOTS,
+        boostActive: false,
+        boostTier: null,
+      };
+    }
+    const max = this.stickerMaxFromBoost({ active: true, tier: effective });
+    return {
+      max,
+      boostActive: true,
+      boostTier: effective,
+    };
+  }
 
   /** Internal helper: create notification for specific users (no permission checks). */
   async createUserNotification(params: {
@@ -773,6 +857,55 @@ export class ServersService {
       onlineCount,
       memberCount: Number((server as any).memberCount || memberIds.length || 0),
       createdAt: (server as any).createdAt,
+    };
+  }
+
+  /**
+   * Preview server cho thẻ invite trong DM: không ném 404 (client tránh GET /servers/:id fail hàng loạt).
+   */
+  async getServerEmbedPreview(serverId: string): Promise<{
+    server: {
+      name: string;
+      avatarUrl?: string | null;
+      bannerUrl?: string | null;
+      bannerImageUrl?: string | null;
+      bannerColor?: string | null;
+      memberCount: number;
+      onlineCount: number;
+      createdAt: Date;
+    } | null;
+  }> {
+    const id = String(serverId || "").trim();
+    if (!Types.ObjectId.isValid(id)) {
+      return { server: null };
+    }
+    const server = await this.serverModel
+      .findOne({
+        _id: new Types.ObjectId(id),
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      })
+      .select(
+        "name avatarUrl bannerUrl bannerImageUrl bannerColor members memberCount createdAt",
+      )
+      .lean()
+      .exec();
+
+    if (!server) {
+      return { server: null };
+    }
+
+    const stats = await this.getServerProfileStats(id);
+    return {
+      server: {
+        name: String((server as any).name || ""),
+        avatarUrl: (server as any).avatarUrl ?? null,
+        bannerUrl: (server as any).bannerUrl ?? null,
+        bannerImageUrl: (server as any).bannerImageUrl ?? null,
+        bannerColor: (server as any).bannerColor ?? null,
+        memberCount: stats.memberCount,
+        onlineCount: stats.onlineCount,
+        createdAt: stats.createdAt,
+      },
     };
   }
 
@@ -2388,6 +2521,7 @@ export class ServersService {
     canManageServer: boolean;
     canManageChannels: boolean;
     canManageEvents: boolean;
+    canManageExpressions: boolean;
     canCreateInvite: boolean;
     mentionEveryone: boolean;
   }> {
@@ -2422,6 +2556,7 @@ export class ServersService {
         canManageServer: true,
         canManageChannels: true,
         canManageEvents: true,
+        canManageExpressions: true,
         canCreateInvite: true,
         mentionEveryone: true,
       };
@@ -2442,6 +2577,7 @@ export class ServersService {
       canManageServer: permissions.manageServer,
       canManageChannels: permissions.manageChannels,
       canManageEvents: permissions.manageEvents,
+      canManageExpressions: Boolean(permissions.manageExpressions),
       canCreateInvite: permissions.createInvite,
       mentionEveryone: Boolean(permissions.mentionEveryone),
     };
@@ -3493,17 +3629,18 @@ export class ServersService {
         0,
     );
     const createdAt = new Date((server as any).createdAt || Date.now());
-    const ageMinutes = Math.floor(
-      (Date.now() - createdAt.getTime()) / (60 * 1000),
-    );
+    const ageMs = Date.now() - createdAt.getTime();
+    const ageMinutes = Math.floor(ageMs / (60 * 1000));
 
-    const minMembers = 3;
-    const minAgeMinutes = 5;
+    /** Đồng bộ với UI Truy cập / kích hoạt cộng đồng (Khám Phá). */
+    const minMembers = 1000;
+    const minDiscoveryAgeWeeks = 8;
+    const minDiscoveryAgeMs = minDiscoveryAgeWeeks * 7 * 24 * 60 * 60 * 1000;
     const minMembersToEvaluate = 2;
 
     const canEvaluate = memberCount >= minMembersToEvaluate;
     const hasEnoughMembers = memberCount >= minMembers;
-    const isOldEnough = ageMinutes >= minAgeMinutes;
+    const isOldEnough = ageMs >= minDiscoveryAgeMs;
 
     const communityEnabled = Boolean(
       (server as any).communitySettings?.enabled,
@@ -3536,7 +3673,7 @@ export class ServersService {
         label: isOldEnough ? 'Máy Chủ Đủ Tuổi' : 'Máy Chủ "Quá Trẻ"',
         description: isOldEnough
           ? 'Máy chủ đã đủ tuổi để lên Khám Phá.'
-          : `Máy chủ trong Khám Phá cần có tuổi thọ ít nhất là ${minAgeMinutes} phút. Vui lòng kiểm tra lại sau.`,
+          : `Máy chủ trong Khám Phá cần tồn tại ít nhất ${minDiscoveryAgeWeeks} tuần. Vui lòng kiểm tra lại sau.`,
         passed: isOldEnough,
       },
       {
@@ -3933,6 +4070,80 @@ export class ServersService {
     return { contextServerId: ctx || null, groups };
   }
 
+  async setServerStickerBoostTier(
+    serverId: string,
+    userId: string,
+    tier: 'basic' | 'boost' | null,
+  ): Promise<{
+    stickerBoostTier: 'basic' | 'boost' | null;
+    maxStickerSlots: number;
+    assignedStickerBoostServerCount: number;
+    boostActive: boolean;
+    boostTier: 'basic' | 'boost' | null;
+  }> {
+    const server = await this.serverModel.findById(serverId).exec();
+    if (!server) {
+      throw new NotFoundException(`Server with id ${serverId} not found`);
+    }
+    if ((server as any).ownerId?.toString() !== userId) {
+      throw new ForbiddenException(
+        'Chỉ chủ máy chủ mới có thể gán gói Boost mở rộng ô sticker cho máy chủ này.',
+      );
+    }
+
+    const ownerBoost = await this.boostService.getBoostStatus(userId);
+    const normalizedTier: 'basic' | 'boost' | null =
+      tier === 'basic' || tier === 'boost' ? tier : null;
+
+    if (normalizedTier === 'boost') {
+      if (!ownerBoost.active || ownerBoost.tier !== 'boost') {
+        throw new BadRequestException(
+          'Cần gói Boost đầy đủ đang hoạt động trên tài khoản của bạn để gán mức này.',
+        );
+      }
+    } else if (normalizedTier === 'basic') {
+      if (!ownerBoost.active || !ownerBoost.tier) {
+        throw new BadRequestException(
+          'Cần gói Boost (Basic hoặc Đầy đủ) đang hoạt động trên tài khoản của bạn.',
+        );
+      }
+    }
+
+    const current = (server as any).stickerBoostTier ?? null;
+    const hadAssignment = current === 'basic' || current === 'boost';
+    if (normalizedTier && !hadAssignment) {
+      const other = await this.serverModel.countDocuments({
+        ownerId: new Types.ObjectId(userId),
+        _id: { $ne: server._id },
+        stickerBoostTier: { $in: ['basic', 'boost'] },
+      });
+      if (other >= OWNER_STICKER_BOOST_MAX_SERVERS) {
+        throw new BadRequestException(
+          `Bạn chỉ có thể áp dụng mở rộng ô sticker cho tối đa ${OWNER_STICKER_BOOST_MAX_SERVERS} máy chủ. Hãy gỡ gán trên một máy chủ khác trước.`,
+        );
+      }
+    }
+
+    (server as any).stickerBoostTier = normalizedTier;
+    await server.save();
+
+    const meta = await this.getStickerSlotMetaForServer(server as any);
+    const assignedStickerBoostServerCount = await this.serverModel
+      .countDocuments({
+        ownerId: new Types.ObjectId(userId),
+        stickerBoostTier: { $in: ['basic', 'boost'] },
+      })
+      .exec();
+
+    return {
+      stickerBoostTier: normalizedTier,
+      maxStickerSlots: meta.max,
+      assignedStickerBoostServerCount,
+      boostActive: meta.boostActive,
+      boostTier: meta.boostTier,
+    };
+  }
+
   async addServerSticker(
     serverId: string,
     userId: string,
@@ -3945,10 +4156,7 @@ export class ServersService {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
 
-    const isOwner = (server as any).ownerId?.toString() === userId;
-    const canManage =
-      isOwner ||
-      (await this.rolesService.hasPermission(serverId, userId, 'manageServer'));
+    const canManage = await this.canManageServerExpressions(serverId, userId);
     if (!canManage) {
       throw new ForbiddenException(
         'Bạn không có quyền thêm sticker cho máy chủ này',
@@ -3962,9 +4170,12 @@ export class ServersService {
     const name = (dto.name || '').trim().slice(0, 80);
 
     const list = (server as any).customStickers || [];
-    if (list.length >= MAX_CUSTOM_STICKERS_PER_SERVER) {
+    const { max: stickerMax } = await this.getStickerSlotMetaForServer(
+      server as any,
+    );
+    if (list.length >= stickerMax) {
       throw new BadRequestException(
-        `Máy chủ đã đạt giới hạn ${MAX_CUSTOM_STICKERS_PER_SERVER} sticker tùy chỉnh. Nâng cấp máy chủ sẽ mở thêm ô (sắp có).`,
+        `Máy chủ đã đạt giới hạn ${stickerMax} sticker tùy chỉnh. Chủ máy chủ cần gán gói Boost Cordigram cho máy chủ này (tối đa ${OWNER_STICKER_BOOST_MAX_SERVERS} máy chủ) để mở thêm ô.`,
       );
     }
 
@@ -4134,10 +4345,7 @@ export class ServersService {
 
     for (const s of servers) {
       const sid = String(s._id);
-      const isOwner = String((s as any).ownerId) === userId;
-      const canManage =
-        isOwner ||
-        (await this.rolesService.hasPermission(sid, userId, 'manageServer'));
+      const canManage = await this.canManageServerExpressions(sid, userId);
       if (!canManage) continue;
 
       const list = ((s as any).customEmojis || []) as any[];
@@ -4157,7 +4365,7 @@ export class ServersService {
     return { targets };
   }
 
-  /** Máy chủ mà user có quyền quản lý sticker + slot còn lại (tối đa 5, chưa tính boost). */
+  /** Máy chủ mà user có quyền quản lý sticker + slot còn lại (max theo Boost chủ + gán server). */
   async getStickerUploadTargets(userId: string): Promise<{
     targets: Array<{
       serverId: string;
@@ -4171,7 +4379,7 @@ export class ServersService {
     const userObjectId = new Types.ObjectId(userId);
     const servers = await this.serverModel
       .find({ 'members.userId': userObjectId })
-      .select('_id name avatarUrl customStickers ownerId')
+      .select('_id name avatarUrl customStickers ownerId stickerBoostTier')
       .lean()
       .exec();
 
@@ -4186,21 +4394,21 @@ export class ServersService {
 
     for (const s of servers) {
       const sid = String(s._id);
-      const isOwner = String((s as any).ownerId) === userId;
-      const canManage =
-        isOwner ||
-        (await this.rolesService.hasPermission(sid, userId, 'manageServer'));
+      const canManage = await this.canManageServerExpressions(sid, userId);
       if (!canManage) continue;
 
       const list = ((s as any).customStickers || []) as any[];
       const count = list.length;
+      const { max: stickerMax } = await this.getStickerSlotMetaForServer(
+        s as any,
+      );
       targets.push({
         serverId: sid,
         name: (s as any).name || '',
         avatarUrl: (s as any).avatarUrl ?? null,
         count,
-        max: MAX_CUSTOM_STICKERS_PER_SERVER,
-        remaining: Math.max(0, MAX_CUSTOM_STICKERS_PER_SERVER - count),
+        max: stickerMax,
+        remaining: Math.max(0, stickerMax - count),
       });
     }
 
@@ -4232,10 +4440,7 @@ export class ServersService {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
 
-    const isOwner = (server as any).ownerId?.toString() === userId;
-    const canManage =
-      isOwner ||
-      (await this.rolesService.hasPermission(serverId, userId, 'manageServer'));
+    const canManage = await this.canManageServerExpressions(serverId, userId);
     if (!canManage) {
       throw new ForbiddenException(
         'Bạn không có quyền xem hoặc quản lý emoji máy chủ này',
@@ -4298,6 +4503,11 @@ export class ServersService {
   ): Promise<{
     max: number;
     count: number;
+    boostActive: boolean;
+    boostTier: 'basic' | 'boost' | null;
+    stickerBoostTierOnServer: 'basic' | 'boost' | null;
+    ownerStickerBoostSlotsUsed: number;
+    ownerStickerBoostSlotsMax: number;
     stickers: Array<{
       id: string;
       imageUrl: string;
@@ -4315,10 +4525,7 @@ export class ServersService {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
 
-    const isOwner = (server as any).ownerId?.toString() === userId;
-    const canManage =
-      isOwner ||
-      (await this.rolesService.hasPermission(serverId, userId, 'manageServer'));
+    const canManage = await this.canManageServerExpressions(serverId, userId);
     if (!canManage) {
       throw new ForbiddenException(
         'Bạn không có quyền xem hoặc quản lý sticker máy chủ này',
@@ -4368,9 +4575,26 @@ export class ServersService {
       };
     });
 
+    const ownerIdStr = String((server as any).ownerId);
+    const rawTier = (server as any).stickerBoostTier;
+    const stickerBoostTierOnServer: 'basic' | 'boost' | null =
+      rawTier === 'basic' || rawTier === 'boost' ? rawTier : null;
+    const ownerStickerBoostSlotsUsed = await this.serverModel
+      .countDocuments({
+        ownerId: new Types.ObjectId(ownerIdStr),
+        stickerBoostTier: { $in: ['basic', 'boost'] },
+      })
+      .exec();
+    const slotMeta = await this.getStickerSlotMetaForServer(server as any);
+
     return {
-      max: MAX_CUSTOM_STICKERS_PER_SERVER,
+      max: slotMeta.max,
       count: list.length,
+      boostActive: slotMeta.boostActive,
+      boostTier: slotMeta.boostTier,
+      stickerBoostTierOnServer,
+      ownerStickerBoostSlotsUsed,
+      ownerStickerBoostSlotsMax: OWNER_STICKER_BOOST_MAX_SERVERS,
       stickers,
     };
   }
@@ -4387,10 +4611,7 @@ export class ServersService {
       throw new NotFoundException(`Server with id ${serverId} not found`);
     }
 
-    const isOwner = (server as any).ownerId?.toString() === userId;
-    const canManage =
-      isOwner ||
-      (await this.rolesService.hasPermission(serverId, userId, 'manageServer'));
+    const canManage = await this.canManageServerExpressions(serverId, userId);
     if (!canManage) {
       throw new ForbiddenException(
         'Bạn không có quyền thêm emoji cho máy chủ này',

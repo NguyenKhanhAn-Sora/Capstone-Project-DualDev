@@ -62,16 +62,13 @@
   opacity: 0.65;
 }
 
-.btnBannerGhost {
-  padding: 10px 18px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  background: transparent;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: not-allowed;
-  opacity: 0.65;
+.btnBannerPrimaryActive {
+  opacity: 1;
+  cursor: pointer;
+}
+
+.btnBannerPrimaryActive:hover {
+  filter: brightness(1.05);
 }
 
 .timeline {
@@ -134,6 +131,17 @@
 
 .tierCardLocked {
   opacity: 0.72;
+}
+
+.tierCardOpen {
+  border-color: color-mix(in oklab, var(--color-panel-success) 45%, var(--color-panel-border));
+}
+
+.tierMetaUnlocked {
+  font-size: 18px;
+  color: var(--color-panel-success);
+  font-weight: 800;
+  flex-shrink: 0;
 }
 
 .tierHead {
@@ -257,6 +265,33 @@
   opacity: 0.55;
 }
 
+.unlockedBody {
+  text-align: center;
+  padding: 20px 12px;
+  color: var(--color-panel-text);
+  font-size: 13px;
+}
+
+.unlockedPh {
+  font-size: 40px;
+  opacity: 0.45;
+  margin-bottom: 8px;
+  color: var(--color-panel-success);
+}
+
+.btnIncluded {
+  margin-top: 12px;
+  padding: 8px 20px;
+  border-radius: 4px;
+  border: none;
+  background: color-mix(in oklab, var(--color-panel-success) 88%, #000);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: default;
+  opacity: 1;
+}
+
 .err {
   margin-top: 12px;
   font-size: 13px;
@@ -276,4 +311,77 @@
   font-size: 12px;
   color: var(--color-panel-text-muted);
   line-height: 1.4;
+}
+
+.ownerNote {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--color-panel-bg-elevated) 92%, var(--color-panel-text-muted));
+  color: var(--color-panel-text-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.assignCard {
+  margin-bottom: 24px;
+  padding: 18px 20px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, var(--color-panel-border) 85%, transparent);
+  background: var(--color-panel-bg-elevated);
+}
+
+.assignTitle {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-panel-text);
+}
+
+.assignDesc,
+.assignSlots,
+.assignCurrent {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-panel-text-muted);
+}
+
+.assignActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.assignBtn {
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assignBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.assignBtnSecondary {
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--color-panel-border);
+  background: transparent;
+  color: var(--color-panel-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assignBtnSecondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

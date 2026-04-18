@@ -276,11 +276,12 @@
   color: var(--color-text);
 }
 
-.settingsBtnImg {
-  display: block;
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
+.settingsBtnIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  line-height: 1;
   pointer-events: none;
 }
 
@@ -1066,6 +1067,7 @@
   cursor: pointer;
   transition: background-color 0.2s ease;
   position: relative;
+  color: var(--color-text);
 }
 
 .conversationItem:hover {
@@ -1074,6 +1076,7 @@
 
 .conversationItem.active {
   background-color: var(--color-primary);
+  color: #fff;
 }
 
 .conversationItem.active .userName,
@@ -1173,7 +1176,7 @@
   flex-shrink: 0;
 }
 
-.chatHeaderLeft {
+.channelHeaderStart {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1191,7 +1194,7 @@
   gap: 8px;
 }
 
-.chatIconBtn {
+.chatHeaderActions > button {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1205,7 +1208,7 @@
   transition: all 0.2s ease;
 }
 
-.chatIconBtn:hover {
+.chatHeaderActions > button:hover {
   background: var(--color-surface-muted);
   color: var(--color-text);
 }

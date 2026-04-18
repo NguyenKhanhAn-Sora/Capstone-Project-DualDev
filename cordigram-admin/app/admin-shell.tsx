@@ -9,7 +9,17 @@ import styles from "./admin-shell.module.css";
 type NavItem = {
   href: string;
   label: string;
-  icon: "dashboard" | "report" | "resolved" | "moderation" | "content" | "ads" | "audit" | "broadcast" | "verification" | "discovery";
+  icon:
+    | "dashboard"
+    | "report"
+    | "resolved"
+    | "moderation"
+    | "content"
+    | "ads"
+    | "audit"
+    | "broadcast"
+    | "verification"
+    | "discovery";
   matcher: (pathname: string) => boolean;
 };
 

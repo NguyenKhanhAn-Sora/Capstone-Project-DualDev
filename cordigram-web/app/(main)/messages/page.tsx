@@ -15,6 +15,7 @@ import {
 import { useChannelMessages } from "@/hooks/use-channel-messages";
 import * as serversApi from "@/lib/servers-api";
 import { translateCategoryName, translateChannelName } from "@/lib/system-names";
+import { playMessageNotificationSound } from "@/lib/message-notification-sound";
 import {
   sendDirectMessage,
   getDirectMessages,
@@ -110,6 +111,14 @@ import ChannelUserProfileRoot, {
 } from "@/components/ChannelUserProfile/ChannelUserProfileRoot";
 import MessagesUserSettingsModal from "@/components/MessagesUserSettings/MessagesUserSettingsModal";
 import { applyAccentColor } from "@/component/theme-provider";
+import {
+  applyMessagesRootChromeFromStorage,
+  migrateMessagesChromeStorageOnce,
+} from "@/lib/messages-appearance-chrome";
+import {
+  getMessagesShellTheme,
+  type MessagesShellTheme,
+} from "@/lib/messages-shell-theme";
 import { getDmSidebarPeersMode } from "@/lib/messages-dm-sidebar-prefs";
 import UserProfilePopup from "@/components/UserProfilePopup/UserProfilePopup";
 
@@ -121,16 +130,20 @@ const VoiceChannelCall = dynamic<VoiceChannelCallProps>(
 );
 const UNCATEGORIZED_CATEGORY_ID = "__uncategorized__";
 
-function getDisplayNameTextStyle(source?: {
-  displayNameFontId?: string | null;
-  displayNameEffectId?: string | null;
-  displayNamePrimaryHex?: string | null;
-  displayNameAccentHex?: string | null;
-}): React.CSSProperties | undefined {
+function getDisplayNameTextStyle(
+  source?: {
+    displayNameFontId?: string | null;
+    displayNameEffectId?: string | null;
+    displayNamePrimaryHex?: string | null;
+    displayNameAccentHex?: string | null;
+  },
+  messagesShellTheme: MessagesShellTheme = "dark",
+): React.CSSProperties | undefined {
   if (!source) return undefined;
+  const defaultPrimary = messagesShellTheme === "light" ? "#0F1629" : "#F2F3F5";
   const primary = /^#[0-9a-f]{6}$/i.test(String(source.displayNamePrimaryHex || ""))
     ? String(source.displayNamePrimaryHex)
-    : "#F2F3F5";
+    : defaultPrimary;
   const accent = /^#[0-9a-f]{6}$/i.test(String(source.displayNameAccentHex || ""))
     ? String(source.displayNameAccentHex)
     : "#5865F2";
@@ -804,13 +817,13 @@ const MessageItem = memo(
                 </div>
                 <div className={styles.replyContextText}>
                   {message.replyToMessage.messageType === "gif"
-                    ? "GIF"
+                    ? t("chat.composer.replyGif")
                     : message.replyToMessage.messageType === "sticker"
-                      ? "Sticker"
+                      ? t("chat.composer.replySticker")
                       : message.replyToMessage.messageType === "voice"
-                        ? "Tin nhắn thoại"
+                        ? t("chat.composer.replyVoice")
                         : message.replyToMessage.messageType === "welcome"
-                          ? (message.replyToMessage.text || "Lời chào mừng")
+                          ? (message.replyToMessage.text || t("chat.composer.replyWelcomeFallback"))
                         : message.replyToMessage.text}
                 </div>
               </div>
@@ -1133,6 +1146,19 @@ export default function MessagesPage() {
   // Skip login redirect entirely for admin view
   const canRender = useRequireAuth({ skip: isAdminView });
 
+  const [messagesShellTheme, setMessagesShellTheme] = useState<MessagesShellTheme>("dark");
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    setMessagesShellTheme(getMessagesShellTheme());
+  }, []);
+
+  useEffect(() => {
+    const fn = () => setMessagesShellTheme(getMessagesShellTheme());
+    window.addEventListener("cordigram-messages-shell-theme", fn);
+    return () => window.removeEventListener("cordigram-messages-shell-theme", fn);
+  }, []);
+
   const [servers, setServers] = useState<BackendServer[]>([]);
   const [selectedServer, setSelectedServer] = useState<string | null>(null);
   const serversRef = useRef(servers);
@@ -1161,6 +1187,10 @@ export default function MessagesPage() {
   const [serverInteractionSettings, setServerInteractionSettings] = useState<serversApi.ServerInteractionSettings | null>(null);
   // Map userId -> displayColor (màu role cao nhất) cho server hiện tại
   const [memberRoleColors, setMemberRoleColors] = useState<Record<string, string>>({});
+  /** Thành viên đủ username/displayName (getServerMembersWithRoles) cho gợi ý `from:` trong tìm tin nhắn server */
+  const [membersForMessageSearch, setMembersForMessageSearch] = useState<
+    Array<{ userId: string; displayName?: string; username?: string; avatarUrl?: string }>
+  >([]);
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [messageText, setMessageText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -1230,6 +1260,8 @@ export default function MessagesPage() {
   const [showShareEventPopup, setShowShareEventPopup] = useState(false);
   const [showMessagesInbox, setShowMessagesInbox] = useState(false);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
+  /** true = popup tìm tin từ header DM: chỉ nội dung, không @/#/!/*. */
+  const [messageSearchDmConversationOnly, setMessageSearchDmConversationOnly] = useState(false);
   /** Có lời mời hoặc nội dung mới trong Hộp thư (Dành cho Bạn) → hiển thị chấm đỏ trên nút hộp thư. */
   const [hasInboxNotification, setHasInboxNotification] = useState(false);
   const [createdEventDetail, setCreatedEventDetail] = useState<serversApi.ServerEvent | null>(null);
@@ -1439,9 +1471,15 @@ export default function MessagesPage() {
           displayNamePrimaryHex: message.senderDisplayNamePrimaryHex,
           displayNameAccentHex: message.senderDisplayNameAccentHex,
         };
-      return getDisplayNameTextStyle(source);
+      return getDisplayNameTextStyle(source, messagesShellTheme);
     },
-    [currentUserProfile, dmProfileDetail, selectedDirectMessageFriend, friends],
+    [
+      currentUserProfile,
+      dmProfileDetail,
+      selectedDirectMessageFriend,
+      friends,
+      messagesShellTheme,
+    ],
   );
   const [passkeyRequired, setPasskeyRequired] = useState(false);
   const [passkeyChecking, setPasskeyChecking] = useState(false);
@@ -1758,6 +1796,7 @@ export default function MessagesPage() {
     if (channelId !== selectedChannel) return;
     const senderId = typeof msg.senderId === "string" ? msg.senderId : msg.senderId?._id;
     if (senderId === currentUserId) return;
+    playMessageNotificationSound();
     const srvId = selectedServerRef.current;
     const senderNickname = srvId
       ? serversRef.current
@@ -2590,10 +2629,19 @@ export default function MessagesPage() {
               }
             });
             setMemberRoleColors(colorMap);
+            setMembersForMessageSearch(
+              response.members.map((m) => ({
+                userId: m.userId,
+                displayName: m.displayName,
+                username: m.username,
+                avatarUrl: m.avatarUrl,
+              })),
+            );
           })
           .catch((err) => {
             console.error("[MessagesPage] Failed to fetch member role colors:", err);
             setMemberRoleColors({});
+            setMembersForMessageSearch([]);
           });
         // Fetch permissions to determine if user can drag channels
         serversApi.getCurrentUserPermissions(selectedServer)
@@ -2612,6 +2660,7 @@ export default function MessagesPage() {
       } else {
         // Admin view: do not call member-only endpoints (will 403).
         setMemberRoleColors({});
+        setMembersForMessageSearch([]);
         setCanDragChannels(false);
         setCanUseMentions(false);
         setServerInteractionSettings(null);
@@ -2626,6 +2675,7 @@ export default function MessagesPage() {
       setActiveServerEvents([]);
       setServerEventsTotalCount(0);
       setMemberRoleColors({});
+      setMembersForMessageSearch([]);
       setCanDragChannels(false);
       setCanUseMentions(false);
       setServerInteractionSettings(null);
@@ -3047,12 +3097,20 @@ export default function MessagesPage() {
     if (newMessage) {
       console.log("📨 [RECEIVE] New incoming message received:", newMessage);
       const msg = newMessage.message as any;
-      const friendId = msg.senderId._id; // For incoming messages, friend is always the sender
+      const rawSender = msg.senderId;
+      const senderIdStr =
+        typeof rawSender === "string" ? rawSender : rawSender?._id ?? "";
+      if (senderIdStr && senderIdStr === currentUserId) {
+        return;
+      }
+      const friendId =
+        typeof rawSender === "string" ? rawSender : rawSender?._id; // For incoming messages, friend is usually the sender
+      if (!friendId) return;
       console.log("📨 [RECEIVE] Friend ID (sender):", friendId);
       console.log("📨 [RECEIVE] Current user ID:", currentUserId);
       console.log(
         "📨 [RECEIVE] Message from current user?",
-        msg.senderId._id === currentUserId,
+        friendId === currentUserId,
       );
       console.log(
         "📨 [RECEIVE] Currently viewing friend?",
@@ -3066,11 +3124,15 @@ export default function MessagesPage() {
       const uiMessage: UIMessage = {
         id: msg._id,
         text: msg.content,
-        senderId: msg.senderId._id,
-        senderEmail: msg.senderId.email,
-        senderDisplayName: msg.senderId.displayName || undefined,
-        senderName: msg.senderId.username || msg.senderId.email,
-        senderAvatar: msg.senderId.avatar,
+        senderId: friendId,
+        senderEmail: typeof rawSender === "object" ? rawSender.email ?? "" : "",
+        senderDisplayName:
+          typeof rawSender === "object" ? rawSender.displayName || undefined : undefined,
+        senderName:
+          typeof rawSender === "object"
+            ? rawSender.username || rawSender.email || ""
+            : "",
+        senderAvatar: typeof rawSender === "object" ? rawSender.avatar : undefined,
         timestamp: new Date(msg.createdAt),
         isFromCurrentUser: false, // Always false for incoming messages
         type: "direct",
@@ -3138,6 +3200,7 @@ export default function MessagesPage() {
         const isDuplicate = currentMessages.some((m) => m.id === msg._id);
         if (!isDuplicate) {
           console.log("✅ [RECEIVE] Adding new incoming message");
+          playMessageNotificationSound();
           const updated = [...currentMessages, uiMessage];
           newMap.set(friendId, updated);
           console.log("✅ [RECEIVE] Updated messages count:", updated.length);
@@ -4560,7 +4623,11 @@ export default function MessagesPage() {
           return;
         }
 
-        const uploadResponse = await uploadMedia({ token, file: audioFile });
+        const uploadResponse = await uploadMedia({
+          token,
+          file: audioFile,
+          cordigramUploadContext: "messages",
+        });
         if (!uploadResponse || (!uploadResponse.secureUrl && !uploadResponse.url)) {
           throw new Error("Failed to upload voice message");
         }
@@ -4640,7 +4707,11 @@ export default function MessagesPage() {
       });
 
       console.log("🎤 [VOICE-UPLOAD] Uploading to Cloudinary...");
-      const uploadResponse = await uploadMedia({ token, file: audioFile });
+      const uploadResponse = await uploadMedia({
+        token,
+        file: audioFile,
+        cordigramUploadContext: "messages",
+      });
       console.log("🎤 [VOICE-UPLOAD] Upload response:", uploadResponse);
 
       if (!uploadResponse || (!uploadResponse.secureUrl && !uploadResponse.url)) {
@@ -4986,6 +5057,13 @@ export default function MessagesPage() {
       let insertText: string;
       if (suggestion.type === "user") {
         insertText = `@${suggestion.description || suggestion.name}`;
+      } else if (suggestion.type === "special") {
+        insertText =
+          suggestion.id === "special_here"
+            ? "@here"
+            : suggestion.id === "special_everyone"
+              ? "@everyone"
+              : suggestion.name;
       } else {
         insertText = suggestion.name;
       }
@@ -5828,10 +5906,18 @@ export default function MessagesPage() {
         // ✅ FIX: Upload files in background
         let uploadResults;
         if (files.length === 1) {
-          const result = await uploadMedia({ token, file: files[0] });
+          const result = await uploadMedia({
+            token,
+            file: files[0],
+            cordigramUploadContext: "messages",
+          });
           uploadResults = [result];
         } else {
-          uploadResults = await uploadMediaBatch({ token, files });
+          uploadResults = await uploadMediaBatch({
+            token,
+            files,
+            cordigramUploadContext: "messages",
+          });
         }
 
         // ✅ FIX: Send each media and update UI
@@ -6166,6 +6252,31 @@ export default function MessagesPage() {
   }, [selectedServer]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (ev: Event) => {
+      const d = (ev as CustomEvent<{ serverId: string }>).detail;
+      if (!d?.serverId || d.serverId !== selectedServer || !canManageJoinApplications) return;
+      setJoinApplicationsRefreshTick((x) => x + 1);
+    };
+    window.addEventListener("cordigram-join-application-updated", handler as EventListener);
+    return () => window.removeEventListener("cordigram-join-application-updated", handler as EventListener);
+  }, [selectedServer, canManageJoinApplications]);
+
+  // Applicant: duyệt / từ chối / rút đơn — cập nhật trạng thái truy cập không cần reload trang.
+  useEffect(() => {
+    if (typeof window === "undefined" || !selectedServer || !currentUserId) return;
+    if (isAdminView && selectedServer === adminViewServerId) return;
+    const handler = (ev: Event) => {
+      const d = (ev as CustomEvent<{ serverId: string; userId: string; status: string }>).detail;
+      if (!d || d.serverId !== selectedServer || d.userId !== currentUserId) return;
+      if (d.status !== "accepted" && d.status !== "rejected" && d.status !== "withdrawn") return;
+      void serversApi.getMyServerAccessStatus(selectedServer).then(setMyServerAccessStatus).catch(() => undefined);
+    };
+    window.addEventListener("cordigram-join-application-updated", handler as EventListener);
+    return () => window.removeEventListener("cordigram-join-application-updated", handler as EventListener);
+  }, [selectedServer, currentUserId, isAdminView, adminViewServerId]);
+
+  useEffect(() => {
     if (!selectedServer || !canManageJoinApplications) {
       setJoinAppPendingCount(0);
       return;
@@ -6275,16 +6386,23 @@ export default function MessagesPage() {
     const root = document.getElementById("cordigram-messages-root");
     if (!root) return;
 
-    const accentKey = `chat:${currentUserId}:chat-accent-color`;
-    const accent = window.localStorage.getItem(accentKey) || "#5865F2";
+    const apply = () => {
+      migrateMessagesChromeStorageOnce(currentUserId);
+      applyMessagesRootChromeFromStorage(root, currentUserId, getMessagesShellTheme());
+    };
+    apply();
 
-    applyAccentColor(accent, root);
-    applyAccentColor(accent, document.body);
+    const onChrome = () => apply();
+    const onShell = () => apply();
+    window.addEventListener("cordigram-messages-chrome", onChrome);
+    window.addEventListener("cordigram-messages-shell-theme", onShell);
+    window.addEventListener("cordigram-chat-settings", onChrome);
 
     return () => {
-      // Important: many Messages modals render via portal to document.body.
-      // Reset on unmount so other routes (Social) keep their own theme.
-      applyAccentColor("#5865F2", document.body);
+      window.removeEventListener("cordigram-messages-chrome", onChrome);
+      window.removeEventListener("cordigram-messages-shell-theme", onShell);
+      window.removeEventListener("cordigram-chat-settings", onChrome);
+      applyAccentColor("#5865F2", root);
     };
   }, [canRender, currentUserId]);
 
@@ -6302,7 +6420,11 @@ export default function MessagesPage() {
   )?.nickname;
 
   return (
-    <div id="cordigram-messages-root" className={styles.container}>
+    <div
+      id="cordigram-messages-root"
+      className={styles.container}
+      data-messages-theme={messagesShellTheme}
+    >
       {passkeyRequired ? (
         <div className={styles.passkeyOverlay} role="dialog" aria-modal>
           <div className={styles.passkeyCard}>
@@ -6458,6 +6580,7 @@ export default function MessagesPage() {
                       canManageServer: isOwner,
                       canManageChannels: isOwner,
                       canManageEvents: isOwner,
+                      canManageExpressions: isOwner,
                       canCreateInvite: true,
                       mentionEveryone: isOwner,
                     };
@@ -6507,13 +6630,9 @@ export default function MessagesPage() {
             aria-label={t("chat.messagesPage.settingsTitle")}
             onClick={() => setShowMessagesUserSettings(true)}
           >
-            <img
-              src="/Windows_Settings_app_icon.png"
-              alt=""
-              width={28}
-              height={28}
-              className={styles.settingsBtnImg}
-            />
+            <span className={styles.settingsBtnIcon} aria-hidden>
+              ⚙
+            </span>
           </button>
         </div>
       </div>
@@ -6562,7 +6681,10 @@ export default function MessagesPage() {
                   <button
                     type="button"
                     className={styles.searchButton}
-                    onClick={() => setShowMessageSearch(true)}
+                    onClick={() => {
+                      setMessageSearchDmConversationOnly(false);
+                      setShowMessageSearch(true);
+                    }}
                     title={t("chat.messagesPage.searchButtonAria")}
                     aria-label={t("chat.messagesPage.searchButtonAria")}
                   >
@@ -6570,7 +6692,6 @@ export default function MessagesPage() {
                   </button>
                 </div>
 
-                {/* DM Sidebar: danh sách menu (Friends, Mission, ...) */}
                 <div className={styles.dmSidebarMenuList}>
                   <button
                     type="button"
@@ -6595,34 +6716,6 @@ export default function MessagesPage() {
                       <path d="M12 2l2.2 6.8H21l-5.5 4 2.1 7.2L12 16.9 6.4 20l2.1-7.2L3 8.8h6.8L12 2z" />
                     </svg>
                     <span>Nâng cấp Boost</span>
-                  </button>
-                  <button type="button" className={styles.dmSidebarMenuEntry}>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M9 11H7.82a2 2 0 0 0-1.82 1.18l-2 5A2 2 0 0 0 3 19h4m0 0a6 6 0 0 0 12 0m4-7h-1.17a2 2 0 0 1-1.82-1.18l-2-5A2 2 0 0 0 13 5h-4"></path>
-                    </svg>
-                    <span>Mission</span>
-                  </button>
-                  <button type="button" className={styles.dmSidebarMenuEntry}>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <circle cx="9" cy="21" r="1"></circle>
-                      <circle cx="20" cy="21" r="1"></circle>
-                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                    </svg>
-                    <span>Store</span>
                   </button>
                 </div>
 
@@ -6671,7 +6764,7 @@ export default function MessagesPage() {
                             <div className={styles.friendInfo}>
                               <p
                                 className={styles.friendName}
-                                style={getDisplayNameTextStyle(friend)}
+                                style={getDisplayNameTextStyle(friend, messagesShellTheme)}
                               >
                                 {friend.displayName || friend.username}
                               </p>
@@ -6741,7 +6834,7 @@ export default function MessagesPage() {
                     <div className={styles.userTextInfo}>
                       <div
                         className={styles.userDisplayName}
-                        style={getDisplayNameTextStyle(currentUserProfile)}
+                        style={getDisplayNameTextStyle(currentUserProfile, messagesShellTheme)}
                       >
                         {currentUserProfile?.displayName ||
                           currentUserProfile?.username ||
@@ -7474,7 +7567,7 @@ export default function MessagesPage() {
                     <div className={styles.userTextInfo}>
                       <div
                         className={styles.userDisplayName}
-                        style={getDisplayNameTextStyle(currentUserProfile)}
+                        style={getDisplayNameTextStyle(currentUserProfile, messagesShellTheme)}
                       >
                         {currentServerNickname ||
                           currentUserProfile?.displayName ||
@@ -8386,7 +8479,7 @@ export default function MessagesPage() {
                   <>
                     {viewingVoiceChannel && (
                   <div className={styles.chatHeader}>
-                    <div className={styles.chatHeaderLeft}>
+                    <div className={styles.channelHeaderStart}>
                       <span className={styles.voiceChannelIcon}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
@@ -8400,14 +8493,9 @@ export default function MessagesPage() {
                       </h2>
                     </div>
                     <div className={styles.chatHeaderActions}>
-                      <button className={styles.chatIconBtn} title="Chat">
+                      <button type="button" title={t("chat.composer.voiceHeaderChat")}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        </svg>
-                      </button>
-                      <button className={styles.chatIconBtn} title={t("chat.ageRestrict.moreOptions")}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                          <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
                         </svg>
                       </button>
                     </div>
@@ -8468,15 +8556,16 @@ export default function MessagesPage() {
                 )}
                 {/* Chat Header (DM or text channel) */}
                 <div className={styles.chatHeader}>
-                  <div className={styles.chatHeaderLeft}>
+                  <div className={styles.channelHeaderStart}>
                     <h2 className={styles.chatHeaderTitle}>
                       {selectedDirectMessageFriend
                         ? selectedDirectMessageFriend.displayName ||
                           selectedDirectMessageFriend.username
-                        : "#" +
-                          (allChannels.find((c) => c._id === selectedChannel)
-                            ?.name ||
-                            "channel")}
+                        : `#${translateChannelName(
+                            allChannels.find((c) => c._id === selectedChannel)?.name ??
+                              "channel",
+                            language,
+                          )}`}
                     </h2>
                   </div>
                   <div className={styles.chatHeaderActions}>
@@ -8484,8 +8573,8 @@ export default function MessagesPage() {
                     {selectedDirectMessageFriend && (
                       <>
                         <button
-                          className={styles.chatIconBtn}
-                          title="Voice Call"
+                          type="button"
+                          title={t("chat.composer.voiceCall")}
                           onClick={() => handleStartCall(false)}
                           disabled={isInCall}
                         >
@@ -8501,8 +8590,8 @@ export default function MessagesPage() {
                           </svg>
                         </button>
                         <button
-                          className={styles.chatIconBtn}
-                          title="Video Call"
+                          type="button"
+                          title={t("chat.composer.videoCall")}
                           onClick={() => handleStartCall(true)}
                           disabled={isInCall}
                         >
@@ -8528,26 +8617,17 @@ export default function MessagesPage() {
                       </>
                     )}
                     <button
-                      className={styles.chatIconBtn}
+                      type="button"
                       title={t("chat.popups.messageSearch.title")}
                       aria-label={t("chat.popups.messageSearch.title")}
-                      onClick={() => setShowMessageSearch(true)}
+                      onClick={() => {
+                        setMessageSearchDmConversationOnly(Boolean(selectedDirectMessageFriend));
+                        setShowMessageSearch(true);
+                      }}
                     >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <circle cx="11" cy="11" r="8" />
                         <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                      </svg>
-                    </button>
-                    <button className={styles.chatIconBtn} title={t("chat.ageRestrict.moreOptions")}>
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <circle cx="12" cy="5" r="2"></circle>
-                        <circle cx="12" cy="12" r="2"></circle>
-                        <circle cx="12" cy="19" r="2"></circle>
                       </svg>
                     </button>
                   </div>
@@ -8829,7 +8909,12 @@ export default function MessagesPage() {
                           }}>
                             {t("chat.welcome.channelBegin")}{" "}
                             <strong style={{ color: "var(--color-text)" }}>
-                              #{allChannels.find((c) => c._id === selectedChannel)?.name || "chung"}
+                              #
+                              {translateChannelName(
+                                allChannels.find((c) => c._id === selectedChannel)?.name ??
+                                  "chung",
+                                language,
+                              )}
                             </strong>
                             {t("chat.welcome.startTalking")}
                           </p>
@@ -9070,7 +9155,7 @@ export default function MessagesPage() {
                             <polyline points="17 8 12 3 7 8"></polyline>
                             <line x1="12" y1="3" x2="12" y2="15"></line>
                           </svg>
-                          <span>Upload file</span>
+                          <span>{t("chat.composer.plusUploadFile")}</span>
                         </button>
                         <button
                           className={styles.plusMenuItem}
@@ -9090,29 +9175,7 @@ export default function MessagesPage() {
                             <line x1="16" y1="17" x2="8" y2="17"></line>
                             <polyline points="10 9 9 9 8 9"></polyline>
                           </svg>
-                          <span>Tạo khảo sát</span>
-                        </button>
-                        <button
-                          className={styles.plusMenuItem}
-                          onClick={() => {
-                            console.log("Use apps");
-                            setShowPlusMenu(false);
-                          }}
-                        >
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                          </svg>
-                          <span>Use apps</span>
+                          <span>{t("chat.composer.plusCreatePoll")}</span>
                         </button>
                       </div>
                     )}
@@ -9184,7 +9247,7 @@ export default function MessagesPage() {
                           ref={messageInputRef}
                           type="text"
                           className={styles.messageInput}
-                          placeholder="Nhập tin nhắn..."
+                          placeholder={t("chat.composer.messagePlaceholder")}
                           disabled={shouldBlockServerChatInput}
                           value={messageText}
                           onChange={(e) => {
@@ -9286,8 +9349,10 @@ export default function MessagesPage() {
                       <div className={styles.mediaButtons}>
                         {/* Voice Recording Button */}
                         <button
+                          type="button"
                           className={styles.mediaButton}
-                          title="Gửi tin nhắn thoại"
+                          title={t("chat.composer.voiceMessage")}
+                          aria-label={t("chat.composer.voiceMessage")}
                           onClick={() => setIsRecordingVoice(true)}
                           disabled={isRecordingVoice || isUploadingVoice}
                         >
@@ -9308,8 +9373,10 @@ export default function MessagesPage() {
 
                         {/* GIF Button */}
                         <button
+                          type="button"
                           className={styles.mediaButton}
-                          title="Send GIF"
+                          title={t("chat.composer.sendGif")}
+                          aria-label={t("chat.composer.sendGif")}
                           onClick={() => {
                             setMediaPickerTab("gif");
                             setShowGiphyPicker(true);
@@ -9318,14 +9385,16 @@ export default function MessagesPage() {
                           <span
                             style={{ fontSize: "14px", fontWeight: "bold" }}
                           >
-                            GIF
+                            {t("chat.mediaPicker.tabGif")}
                           </span>
                         </button>
 
                         {/* Sticker Button */}
                         <button
+                          type="button"
                           className={styles.mediaButton}
-                          title="Gửi nhãn dán"
+                          title={t("chat.composer.sendSticker")}
+                          aria-label={t("chat.composer.sendSticker")}
                           onClick={() => {
                             setMediaPickerTab("sticker");
                             setShowGiphyPicker(true);
@@ -9371,8 +9440,10 @@ export default function MessagesPage() {
 
                         {/* Emoji Picker */}
                         <button
+                          type="button"
                           className={styles.mediaButton}
-                          title="Emoji & kaomoji"
+                          title={t("chat.composer.openEmojiPicker")}
+                          aria-label={t("chat.composer.openEmojiPicker")}
                           onClick={() => {
                             setMediaPickerTab("emoji");
                             setShowGiphyPicker(true);
@@ -9395,6 +9466,7 @@ export default function MessagesPage() {
                       </div>
 
                       <button
+                        type="button"
                         className={styles.sendButton}
                         onClick={
                           selectedDirectMessageFriend
@@ -9402,7 +9474,8 @@ export default function MessagesPage() {
                             : handleSendMessage
                         }
                         disabled={!messageText.trim() || (!selectedDirectMessageFriend && shouldBlockServerChatInput)}
-                        title="Gửi tin nhắn"
+                        title={t("chat.composer.sendMessage")}
+                        aria-label={t("chat.composer.sendMessage")}
                       >
                         <svg
                           width="18"
@@ -10043,61 +10116,58 @@ export default function MessagesPage() {
 
       <MessageSearchPanel
         isOpen={showMessageSearch}
-        onClose={() => setShowMessageSearch(false)}
+        onClose={() => {
+          setShowMessageSearch(false);
+          setMessageSearchDmConversationOnly(false);
+        }}
         mode={selectedServer ? "server" : "dm"}
+        dmConversationOnlySearch={messageSearchDmConversationOnly}
         serverId={selectedServer || undefined}
         serverName={currentServer?.name}
-        channelId={selectedChannel || undefined}
+        channelId={selectedServer ? undefined : selectedChannel || undefined}
         channels={allChannels}
-        members={
-          currentServer?.members
-            ? currentServer.members.map((m) => ({
-                userId:
-                  typeof m.userId === "string"
-                    ? m.userId
-                    : String(
-                        (m.userId as { _id?: string })?._id ?? m.userId ?? "",
-                      ),
-                displayName: m.nickname || undefined,
-                username: undefined,
-              }))
-            : []
-        }
+        members={selectedServer ? membersForMessageSearch : []}
         dmPeers={friends}
-        serversForQuickSwitch={servers.map((s) => ({
-          _id: s._id,
-          name: s.name || "",
-          textChannels:
-            s.textChannels?.length
-              ? s.textChannels
-              : (s.channels || []).filter(
-                  (c) => c.type === "text" && c.category !== "info",
-                ),
-          voiceChannels: s.voiceChannels?.length
-            ? s.voiceChannels
-            : (s.channels || []).filter((c) => c.type === "voice"),
-        }))}
+        serversForQuickSwitch={(selectedServer ? servers.filter((s) => s._id === selectedServer) : servers).map(
+          (s) => ({
+            _id: s._id,
+            name: s.name || "",
+            textChannels:
+              s.textChannels?.length
+                ? s.textChannels
+                : (s.channels || []).filter(
+                    (c) => c.type === "text" && c.category !== "info",
+                  ),
+            voiceChannels: s.voiceChannels?.length
+              ? s.voiceChannels
+              : (s.channels || []).filter((c) => c.type === "voice"),
+          }),
+        )}
         dmPartnerId={selectedDirectMessageFriend?._id}
         dmPartnerName={selectedDirectMessageFriend?.displayName || selectedDirectMessageFriend?.username}
         onResultClick={(messageId, channelId) => {
           setShowMessageSearch(false);
+          setMessageSearchDmConversationOnly(false);
           if (channelId && selectedServer) {
             trySelectChannel(channelId);
           }
         }}
         onQuickSwitchDm={(userId) => {
           setShowMessageSearch(false);
+          setMessageSearchDmConversationOnly(false);
           const friend = friends.find((f) => f._id === userId);
           if (friend) void handleSelectDirectMessageFriend(friend);
         }}
         onQuickSwitchChannel={async (sid, cid) => {
           setShowMessageSearch(false);
+          setMessageSearchDmConversationOnly(false);
           setSelectedDirectMessageFriend(null);
           setSelectedServer(sid);
           await loadChannels(sid, { preferredChannelId: cid });
         }}
         onQuickSwitchServer={async (sid) => {
           setShowMessageSearch(false);
+          setMessageSearchDmConversationOnly(false);
           setSelectedDirectMessageFriend(null);
           setSelectedServer(sid);
           await loadChannels(sid);
@@ -10218,6 +10288,8 @@ export default function MessagesPage() {
             canManageChannels: currentUserId !== "" &&
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
             canManageEvents: currentUserId !== "" &&
+              String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
+            canManageExpressions: currentUserId !== "" &&
               String((serverContextMenu.server as any).ownerId?._id ?? (serverContextMenu.server as any).ownerId) === currentUserId,
             canCreateInvite: true,
           }}
@@ -10631,7 +10703,7 @@ export default function MessagesPage() {
               />
             );
           }
-          if ((section === "safety" || section === "privileges") && serverSettingsTarget?.serverId) {
+          if (section === "safety" && serverSettingsTarget?.serverId) {
             const initialTab = mapSectionToSafetyTab(section);
             return (
               <ServerSafetySection
@@ -10693,7 +10765,8 @@ export default function MessagesPage() {
           if (section === "emoji" && serverSettingsTarget?.serverId && token) {
             const canManageEmoji =
               Boolean(serverSettingsPermissions?.isOwner) ||
-              Boolean(serverSettingsPermissions?.canManageServer);
+              Boolean(serverSettingsPermissions?.canManageServer) ||
+              Boolean(serverSettingsPermissions?.canManageExpressions);
             return (
               <ServerEmojiSection
                 serverId={serverSettingsTarget.serverId}
@@ -10710,12 +10783,26 @@ export default function MessagesPage() {
           if (section === "sticker" && serverSettingsTarget?.serverId && token) {
             const canManageSticker =
               Boolean(serverSettingsPermissions?.isOwner) ||
-              Boolean(serverSettingsPermissions?.canManageServer);
+              Boolean(serverSettingsPermissions?.canManageServer) ||
+              Boolean(serverSettingsPermissions?.canManageExpressions);
             return (
               <ServerStickerSection
                 serverId={serverSettingsTarget.serverId}
                 token={token}
                 canManage={canManageSticker}
+                isServerOwner={Boolean(serverSettingsPermissions?.isOwner)}
+                onOpenBoostSubscribe={() => {
+                  setShowServerSettingsPanel(false);
+                  setServerSettingsTarget(null);
+                  setServerSettingsPermissions(null);
+                  setShowExploreView(false);
+                  setShowJoinApplicationsView(false);
+                  setSelectedDirectMessageFriend(null);
+                  setShowBoostUpgradeView(true);
+                  setBoostModalOpen(false);
+                  setBoostModalStep("plan");
+                  setBoostMode("subscribe");
+                }}
               />
             );
           }

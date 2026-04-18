@@ -27,6 +27,7 @@ import {
   type ChatGateBlockReason,
   type ServerVerificationLevel,
 } from '../messages/channel-chat-gate.util';
+import { ChannelMessagesGateway } from '../messages/channel-messages.gateway';
 
 function defaultStatusForAccessMode(
   accessMode: ServerAccessMode,
@@ -77,7 +78,33 @@ export class ServerAccessService {
     @InjectModel(Rule.name) private ruleModel: Model<Rule>,
     @InjectModel(UserServer.name) private userServerModel: Model<UserServer>,
     @InjectModel(User.name) private userModel: Model<User>,
+    private readonly channelMessagesGateway: ChannelMessagesGateway,
   ) {}
+
+  private notifyJoinApplicationUpdated(
+    server: unknown,
+    serverId: string,
+    applicantUserId: string,
+    status: 'accepted' | 'rejected' | 'withdrawn',
+  ): void {
+    try {
+      const ids = new Set<string>();
+      const owner = stringMongoUserId((server as any)?.ownerId);
+      if (owner) ids.add(owner);
+      for (const m of (server as any)?.members || []) {
+        const uid = stringMongoUserId(m?.userId);
+        if (uid) ids.add(uid);
+      }
+      ids.add(String(applicantUserId));
+      this.channelMessagesGateway.emitJoinApplicationUpdated([...ids], {
+        serverId,
+        userId: String(applicantUserId),
+        status,
+      });
+    } catch {
+      // ignore socket failures
+    }
+  }
 
   private getEffectiveAccessMode(server: Server): ServerAccessMode {
     const fromField = (server as any).accessMode as
@@ -672,6 +699,8 @@ export class ServerAccessService {
       })
       .catch(() => {});
 
+    this.notifyJoinApplicationUpdated(server, serverId, targetUserId, 'rejected');
+
     return updated as any;
   }
 
@@ -726,6 +755,8 @@ export class ServerAccessService {
 
     await this.deleteUserServerRecord(serverId, userId);
 
+    this.notifyJoinApplicationUpdated(server, serverId, userId, 'withdrawn');
+
     return { ok: true };
   }
 
@@ -756,6 +787,7 @@ export class ServerAccessService {
     }
 
     const prevHasRules = Boolean((server as any).hasRules);
+    const prevAgeRestricted = Boolean((server as any).isAgeRestricted);
 
     if (patch.accessMode) (server as any).accessMode = patch.accessMode;
     if (patch.isAgeRestricted !== undefined)
@@ -768,34 +800,40 @@ export class ServerAccessService {
     (server as any).isPublic = effectiveMode === 'discoverable';
 
     const nextHasRules = Boolean((server as any).hasRules);
+    const nextAgeRestricted = Boolean((server as any).isAgeRestricted);
     const ownerOid = new Types.ObjectId(String((server as any).ownerId));
+    const serverOid = new Types.ObjectId(serverId);
+
     if (prevHasRules !== nextHasRules) {
       if (nextHasRules) {
-        // Chỉ bắt chấp nhận lại quy định với thành viên đã đi qua luồng đơn đăng ký / nộp đơn.
-        // Thành viên cũ (vào trước khi bật đơn) không bị áp dụng ngược — giữ acceptedRules như cũ.
+        // Thành viên đã trong máy chủ: không bắt chấp nhận lại khi chủ bật quy định sau này.
+        // Người gia nhập sau vẫn phải chấp nhận qua joinServer / UI.
         await this.userServerModel.updateMany(
-          {
-            serverId: new Types.ObjectId(serverId),
-            status: 'accepted',
-            userId: { $ne: ownerOid },
-            applicationSubmittedAt: { $exists: true, $ne: null },
-          },
-          { $set: { acceptedRules: false } },
+          { serverId: serverOid },
+          { $set: { acceptedRules: true } },
         );
       } else {
         await this.userServerModel.updateMany(
-          { serverId: new Types.ObjectId(serverId) },
+          { serverId: serverOid },
           { $set: { acceptedRules: true } },
         );
       }
+    }
+
+    // Bật giới hạn độ tuổi: thành viên hiện tại không phải bấm "Tiếp tục" lại; chỉ user mới vào sau mới ACK.
+    if (!prevAgeRestricted && nextAgeRestricted) {
+      await this.userServerModel.updateMany(
+        { serverId: serverOid },
+        { $set: { ageRestrictedAcknowledged: true } },
+      );
     }
 
     await server.save();
 
     return {
       accessMode: this.getEffectiveAccessMode(server),
-      isAgeRestricted: Boolean((server as any).isAgeRestricted),
-      hasRules: Boolean((server as any).hasRules),
+      isAgeRestricted: nextAgeRestricted,
+      hasRules: nextHasRules,
     };
   }
 
@@ -877,10 +915,6 @@ export class ServerAccessService {
       .lean()
       .exec();
 
-    const ageRestrictedAcknowledged = Boolean(
-      (doc as any)?.ageRestrictedAcknowledged,
-    );
-
     const [userRow, profileRow] = await Promise.all([
       this.userModel
         .findById(userId)
@@ -920,6 +954,10 @@ export class ServerAccessService {
     );
     const isBypass = isOwner || canManageServer;
 
+    /** Thành viên trong members nhưng chưa có UserServer (dữ liệu cũ) — không áp dụng ngược gate tuổi/quy định. */
+    const legacyMemberNoUserServerRow =
+      !doc && rawMemberJoinedAt != null;
+
     const birthdate = (profileRow as any)?.birthdate ?? null;
     const accountCreatedAt = new Date(
       (userRow as any)?.createdAt || Date.now(),
@@ -936,9 +974,14 @@ export class ServerAccessService {
       accountCreatedAt,
       memberJoinedAt,
     });
+    const ageAckForGate =
+      isBypass ||
+      Boolean((doc as any)?.ageRestrictedAcknowledged) ||
+      legacyMemberNoUserServerRow;
+
     const gate = evaluateChannelChatGate({
       isAgeRestricted,
-      ageRestrictedAcknowledged,
+      ageRestrictedAcknowledged: ageAckForGate,
       birthdate,
       verificationLevel,
       isVerified: isServerEmailVerified,
@@ -950,11 +993,11 @@ export class ServerAccessService {
     const ageYears = calcAgeFromBirthdate(birthdate);
 
     // Thành viên đã có trong server trước khi bật "apply": không áp dụng ngược.
-    // Nếu chưa có bản ghi UserServer (dữ liệu cũ), coi như đã được chấp thuận.
+    // Nếu chưa có bản ghi UserServer (dữ liệu cũ), coi như đã chấp nhận quy định / không bắt ACK tuổi lại.
     const base = !doc
       ? {
           status: 'accepted' as UserServerStatus,
-          acceptedRules: !hasRules,
+          acceptedRules: true,
         }
       : {
           status: doc.status ?? null,
@@ -971,7 +1014,7 @@ export class ServerAccessService {
       hasRules,
       accessMode,
       isAgeRestricted,
-      ageRestrictedAcknowledged: isBypass ? true : ageRestrictedAcknowledged,
+      ageRestrictedAcknowledged: isBypass ? true : ageAckForGate,
       ageYears,
       verificationLevel,
       verificationChecks,
@@ -1288,6 +1331,8 @@ export class ServerAccessService {
         content: '__SYS:joinAppApprovedContent',
       })
       .catch(() => {});
+
+    this.notifyJoinApplicationUpdated(server, serverId, targetUserId, 'accepted');
 
     return updated as any;
   }

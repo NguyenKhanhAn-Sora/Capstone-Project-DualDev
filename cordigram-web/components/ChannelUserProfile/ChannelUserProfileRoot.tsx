@@ -594,19 +594,17 @@ export default function ChannelUserProfileRoot({
               <img src={bannerUrl} alt="" className={styles.fullModalBannerImg} />
             </div>
             <div className={styles.fullModalAvatarWrap}>
-              <img
-                src={avatarUrl}
-                alt=""
-                className={styles.fullModalAvatarImg}
-              />
+              <img src={avatarUrl} alt="" className={styles.fullModalAvatarImg} />
               <span
                 className={`${styles.fullStatusDot} ${styles[`status_${connectionStatus}`]}`}
                 aria-hidden
               />
             </div>
-            <h2 className={styles.fullDisplayName} style={getDisplayNameTextStyle(profile)}>
-              {displayName}
-            </h2>
+            <div>
+              <h2 className={styles.fullDisplayName} style={getDisplayNameTextStyle(profile)}>
+                {displayName}
+              </h2>
+            </div>
             <p className={styles.fullUsername}>@{usernameLabel}</p>
             <div className={styles.fullActionRow}>
               {profile.isFollowing ? (

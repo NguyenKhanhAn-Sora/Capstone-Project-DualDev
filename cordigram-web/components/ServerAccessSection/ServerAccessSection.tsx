@@ -10,6 +10,71 @@ type RuleRow = { id: string; content: string };
 type JoinFormQuestionType = "short" | "paragraph" | "multiple_choice";
 type JoinFormQuestion = { id: string; title: string; type: JoinFormQuestionType; required: boolean; options?: string[] };
 
+/** Must match `servers.service` discovery thresholds. */
+const DISCOVERY_MIN_EVALUATE = 2;
+const DISCOVERY_MIN_MEMBERS = 1000;
+const DISCOVERY_MIN_AGE_WEEKS = 8;
+
+function localizedDiscoveryCheck(
+  check: serversApi.DiscoveryCheck,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): { label: string; description: string } {
+  switch (check.id) {
+    case "evaluate":
+      if (check.passed) {
+        return {
+          label: t("chat.serverAccess.discoveryCheckEvaluatePassTitle"),
+          description: t("chat.serverAccess.discoveryCheckEvaluatePassDesc"),
+        };
+      }
+      return {
+        label: t("chat.serverAccess.discoveryCheckEvaluateWaitTitle"),
+        description: t("chat.serverAccess.discoveryCheckEvaluateWaitDesc", {
+          minEvaluate: DISCOVERY_MIN_EVALUATE,
+        }),
+      };
+    case "members":
+      if (check.passed) {
+        return {
+          label: t("chat.serverAccess.discoveryCheckMembersPassTitle", { minMembers: DISCOVERY_MIN_MEMBERS }),
+          description: t("chat.serverAccess.discoveryCheckMembersDesc", { minMembers: DISCOVERY_MIN_MEMBERS }),
+        };
+      }
+      return {
+        label: t("chat.serverAccess.discoveryCheckMembersFailTitle", { minMembers: DISCOVERY_MIN_MEMBERS }),
+        description: t("chat.serverAccess.discoveryCheckMembersDesc", { minMembers: DISCOVERY_MIN_MEMBERS }),
+      };
+    case "age":
+      if (check.passed) {
+        return {
+          label: t("chat.serverAccess.discoveryCheckAgePassTitle"),
+          description: t("chat.serverAccess.discoveryCheckAgePassDesc", {
+            minAgeWeeks: DISCOVERY_MIN_AGE_WEEKS,
+          }),
+        };
+      }
+      return {
+        label: t("chat.serverAccess.discoveryCheckAgeFailTitle"),
+        description: t("chat.serverAccess.discoveryCheckAgeFailDesc", {
+          minAgeWeeks: DISCOVERY_MIN_AGE_WEEKS,
+        }),
+      };
+    case "content":
+      if (check.passed) {
+        return {
+          label: t("chat.serverAccess.discoveryCheckContentPassTitle"),
+          description: t("chat.serverAccess.discoveryCheckContentPassDesc"),
+        };
+      }
+      return {
+        label: t("chat.serverAccess.discoveryCheckContentFailTitle"),
+        description: t("chat.serverAccess.discoveryCheckContentFailDesc"),
+      };
+    default:
+      return { label: check.label, description: check.description };
+  }
+}
+
 type ServerAccessSettings = {
   accessMode: AccessMode;
   isAgeRestricted: boolean;
@@ -193,15 +258,16 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
               <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-panel-text)" }}>
                 {discoveryEligible
                   ? t("chat.serverAccess.discoveryMet")
-                  : <>{t("chat.serverAccess.discoveryNotMet").replace("không", "").trim().split(" não")[0]}<strong style={{ color: "var(--color-panel-danger)" }}>không</strong>{t("chat.serverAccess.discoveryNotMet").split("không")[1]}</>
-                }
+                  : t("chat.serverAccess.discoveryNotMet")}
               </div>
             </div>
           </div>
           {discoveryLoading && <div style={{ textAlign: "center", padding: 16, color: "var(--color-panel-text-muted)" }}>{t("chat.serverAccess.checkingDiscovery")}</div>}
           {!discoveryLoading && discoveryChecks.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-              {discoveryChecks.map((check) => (
+              {discoveryChecks.map((check) => {
+                const row = localizedDiscoveryCheck(check, t);
+                return (
                 <div key={check.id} style={{ display: "flex", gap: 14, alignItems: "flex-start", padding: "14px 0", borderTop: "1px solid var(--color-panel-border)" }}>
                   <div style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800,
                     background: check.passed ? "rgba(35,165,90,0.15)" : check.warning ? "rgba(254,231,92,0.15)" : "rgba(242,63,67,0.15)",
@@ -209,11 +275,12 @@ export default function ServerAccessSection({ serverId, canManageSettings }: { s
                     {check.passed ? "✓" : check.warning ? "!" : "✕"}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--color-panel-text)" }}>{check.label}</div>
-                    <div style={{ fontSize: 13, color: "var(--color-panel-text-muted)", marginTop: 2, lineHeight: 1.45 }}>{check.description}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--color-panel-text)" }}>{row.label}</div>
+                    <div style={{ fontSize: 13, color: "var(--color-panel-text-muted)", marginTop: 2, lineHeight: 1.45 }}>{row.description}</div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

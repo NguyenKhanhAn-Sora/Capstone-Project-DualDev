@@ -50,7 +50,6 @@ import {
   CommunityDiscoveryHistory,
   CommunityDiscoveryHistorySchema,
 } from './community-discovery-history.schema';
-
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),

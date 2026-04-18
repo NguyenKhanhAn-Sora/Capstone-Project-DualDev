@@ -15,7 +15,6 @@ import {
 } from "@/lib/getCroppedImageBlob";
 
 const STATIC_MAX_BYTES = 256 * 1024;
-const MAX_GIF_BYTES = 2 * 1024 * 1024;
 
 function nameFromFile(f: File): string {
   const base = f.name.replace(/\.[^.]+$/i, "");
@@ -43,6 +42,7 @@ type Props = {
   isOpen: boolean;
   file: File | null;
   token: string;
+  maxGifUploadBytes: number;
   defaultServerId: string;
   onClose: () => void;
   onSuccess: () => void | Promise<void>;
@@ -52,6 +52,7 @@ export default function AddServerEmojiModal({
   isOpen,
   file,
   token,
+  maxGifUploadBytes,
   defaultServerId,
   onClose,
   onSuccess,
@@ -257,7 +258,8 @@ export default function AddServerEmojiModal({
 
   const selected = targets.find((t) => t.serverId === selectedServerId);
 
-  const gifTooBig = gif && file && file.size > MAX_GIF_BYTES;
+  const maxGifMb = Math.max(1, Math.round(maxGifUploadBytes / (1024 * 1024)));
+  const gifTooBig = gif && file && file.size > maxGifUploadBytes;
 
   const nameOk = sanitizeEmojiName(emojiName).length > 0;
   const canSubmit =
@@ -283,12 +285,16 @@ export default function AddServerEmojiModal({
 
     try {
       if (gif) {
-        if (file.size > MAX_GIF_BYTES) {
-          setFormErr("GIF không được vượt quá 2 MB.");
+        if (file.size > maxGifUploadBytes) {
+          setFormErr(`GIF không được vượt quá ${maxGifMb} MB.`);
           setSubmitting(false);
           return;
         }
-        const up = await uploadMedia({ token, file });
+        const up = await uploadMedia({
+          token,
+          file,
+          cordigramUploadContext: "messages",
+        });
         const imageUrl = up.secureUrl || up.url;
         if (!imageUrl) throw new Error("Upload thất bại");
         await serversApi.addServerEmoji(selected.serverId, {
@@ -317,7 +323,11 @@ export default function AddServerEmojiModal({
         const mime = blob.type || "image/png";
         const ext = mime.includes("webp") ? "webp" : "png";
         const outFile = new File([blob], `emoji.${ext}`, { type: mime });
-        const up = await uploadMedia({ token, file: outFile });
+        const up = await uploadMedia({
+          token,
+          file: outFile,
+          cordigramUploadContext: "messages",
+        });
         const imageUrl = up.secureUrl || up.url;
         if (!imageUrl) throw new Error("Upload thất bại");
         await serversApi.addServerEmoji(selected.serverId, {
@@ -400,7 +410,7 @@ export default function AddServerEmojiModal({
 
             <p className={styles.hint}>
               {gif
-                ? "GIF sẽ được tải nguyên bản. Giới hạn 2 MB."
+                ? `GIF sẽ được tải nguyên bản. Giới hạn ${maxGifMb} MB.`
                 : "Kéo hình ảnh để thay đổi vị trí"}
             </p>
 
@@ -571,7 +581,7 @@ export default function AddServerEmojiModal({
             ) : null}
             {gifTooBig ? (
               <p className={styles.err}>
-                Emoji này quá lớn! GIF phải nhỏ hơn 2 MB.
+                {`Emoji này quá lớn! GIF phải nhỏ hơn ${maxGifMb} MB.`}
               </p>
             ) : null}
             {selected && selected.remaining <= 0 ? (
