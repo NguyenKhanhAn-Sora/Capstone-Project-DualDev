@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_SOCIAL_URL:
       process.env.NEXT_PUBLIC_SOCIAL_URL ??
       process.env.SOCIAL_URL ??
-      "http://localhost:3000",
+      "https://www.cordigram.com",
     NEXT_PUBLIC_APP_URL:
       process.env.NEXT_PUBLIC_APP_URL ??
       process.env.APP_URL ??

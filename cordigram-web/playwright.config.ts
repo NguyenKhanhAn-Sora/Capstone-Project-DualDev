@@ -5,7 +5,7 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 15_000 },
   use: {
-    baseURL: process.env.E2E_BASE_URL || "http://localhost:3000",
+    baseURL: process.env.E2E_BASE_URL || "https://www.cordigram.com",
     trace: "retain-on-failure",
   },
 });

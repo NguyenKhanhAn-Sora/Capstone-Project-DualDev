@@ -1,5 +1,5 @@
 const DEFAULT_BASE_URL = "https://cordigram-api.onrender.com";
-const DEFAULT_SOCIAL_BASE_URL = "http://localhost:3000";
+const DEFAULT_SOCIAL_BASE_URL = "https://www.cordigram.com";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? DEFAULT_BASE_URL;

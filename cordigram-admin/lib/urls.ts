@@ -1,4 +1,4 @@
-const DEFAULT_WEB_BASE = "http://localhost:3000";
+const DEFAULT_WEB_BASE = "https://www.cordigram.com";
 
 const webBaseUrl =
   process.env.NEXT_PUBLIC_SOCIAL_URL?.replace(/\/$/, "") ??

@@ -10,7 +10,7 @@ class AppConfig {
 
   static const _rawWebBaseUrl = String.fromEnvironment(
     'WEB_BASE_URL',
-    defaultValue: 'http://localhost:3000',
+    defaultValue: 'https://www.cordigram.com',
   );
 
   static final webBaseUrl = _rawWebBaseUrl.replaceAll(RegExp(r'[/\\]+$'), '');
