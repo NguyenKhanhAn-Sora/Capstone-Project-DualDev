@@ -2530,6 +2530,11 @@ export default function ReelPage({
   };
 
   const initialSyncRef = useRef<string | null>(null);
+  const pendingRequestedUrlSyncRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    pendingRequestedUrlSyncRef.current = requestedReelId ?? null;
+  }, [requestedReelId]);
 
   useEffect(() => {
     if (!items.length) return;
@@ -2548,6 +2553,19 @@ export default function ReelPage({
       setActiveIndex(idx);
       activeIndexRef.current = idx;
       initialSyncRef.current = currentRequested;
+
+      const targetId = items[idx]?.id;
+      if (targetId) {
+        requestAnimationFrame(() => {
+          const container = listRef.current;
+          const el = itemRefs.current[targetId];
+          if (container && el) {
+            container.scrollTo({ top: el.offsetTop, behavior: "auto" });
+            return;
+          }
+          el?.scrollIntoView({ block: "start" });
+        });
+      }
     }
   }, [requestedReelId, items]);
 
@@ -2693,6 +2711,15 @@ export default function ReelPage({
     if (!currentReelId) return;
     if (singleMode) return;
 
+    // Block URL rewrite until the requested reel has actually become active once.
+    const pendingRequestedId = pendingRequestedUrlSyncRef.current;
+    if (pendingRequestedId && currentReelId !== pendingRequestedId) {
+      return;
+    }
+    if (pendingRequestedId && currentReelId === pendingRequestedId) {
+      pendingRequestedUrlSyncRef.current = null;
+    }
+
     if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
     urlSyncTimerRef.current = setTimeout(() => {
       const query = new URLSearchParams();
@@ -2713,7 +2740,6 @@ export default function ReelPage({
         lastSyncedPathRef.current = target;
         return;
       }
-
       window.history.replaceState({}, "", target);
       lastSyncedPathRef.current = target;
     }, 200);
@@ -2721,7 +2747,13 @@ export default function ReelPage({
     return () => {
       if (urlSyncTimerRef.current) clearTimeout(urlSyncTimerRef.current);
     };
-  }, [currentReelId, profileMode, profileModeUserId, singleMode]);
+  }, [
+    currentReelId,
+    profileMode,
+    profileModeUserId,
+    requestedReelId,
+    singleMode,
+  ]);
 
   useEffect(() => {
     if (!token) return;

@@ -68,12 +68,11 @@ export default function ProfileReelsPage() {
           items={items}
           loading={showSkeleton}
           onSelect={(item) => {
-            const targetId = (item as any)?.repostOf || item.id;
             const kind = (item as any)?.repostKind || item.kind;
             const isReel = kind === "reel" || item.media?.[0]?.type === "video";
 
             if (!isReel) {
-              router.push(`/post/${targetId}`);
+              router.push(`/post/${item.id}`);
               return;
             }
 
@@ -82,7 +81,8 @@ export default function ProfileReelsPage() {
             if (ownerUserId) {
               query.set("profileId", ownerUserId);
             }
-            router.push(`/reels/${targetId}?${query.toString()}`);
+            const href = `/reels/${item.id}?${query.toString()}`;
+            router.push(href);
           }}
         />
       )}
