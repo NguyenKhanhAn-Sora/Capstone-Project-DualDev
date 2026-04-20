@@ -36,6 +36,7 @@ import { RolesModule } from './roles/roles.module';
 import { LivestreamModule } from './livestream/livestream.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { BoostModule } from './boost/boost.module';
+import { MessagingProfilesModule } from './messaging-profiles/messaging-profiles.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { BoostModule } from './boost/boost.module';
     LivestreamModule,
     AuditLogModule,
     BoostModule,
+    MessagingProfilesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

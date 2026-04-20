@@ -2366,6 +2366,86 @@ export type ProfileDetailResponse = {
   }>;
 };
 
+/** Hồ sơ hiển thị trong chat/DM — tách khỏi Profile social (`/profiles`). */
+export type MessagingProfileCardResponse = {
+  userId: string;
+  displayName: string;
+  /** Tên dòng phụ trong tin nhắn (không nhất thiết trùng username social). */
+  chatUsername: string;
+  avatarUrl: string;
+  avatarOriginalUrl: string;
+  coverUrl: string;
+  bio: string;
+  pronouns: string;
+  displayNameFontId: string | null;
+  displayNameEffectId: string | null;
+  displayNamePrimaryHex: string | null;
+  displayNameAccentHex: string | null;
+  cordigramMemberSince?: string;
+  mutualServerCount: number;
+  mutualServers: Array<{
+    serverId: string;
+    name: string;
+    avatarUrl: string | null;
+  }>;
+  mutualFollowCount: number;
+  mutualFollowUsers: Array<{
+    userId: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string;
+  }>;
+  isFollowing: boolean;
+  isCreatorVerified: boolean;
+};
+
+export type UpdateMessagingProfilePayload = {
+  displayName?: string;
+  chatUsername?: string;
+  bio?: string;
+  pronouns?: string;
+  coverUrl?: string;
+  displayNameFontId?: string | null;
+  displayNameEffectId?: string | null;
+  displayNamePrimaryHex?: string | null;
+  displayNameAccentHex?: string | null;
+};
+
+/** Gắn dữ liệu messaging vào shape `ProfileDetailResponse` cho UI dùng chung (popup, v.v.). */
+export function messagingProfileCardToDetail(
+  m: MessagingProfileCardResponse,
+): ProfileDetailResponse {
+  return {
+    id: m.userId,
+    userId: m.userId,
+    displayName: m.displayName,
+    username: m.chatUsername,
+    avatarUrl: m.avatarUrl,
+    avatarOriginalUrl: m.avatarOriginalUrl,
+    coverUrl: m.coverUrl,
+    displayNameFontId: m.displayNameFontId,
+    displayNameEffectId: m.displayNameEffectId,
+    displayNamePrimaryHex: m.displayNamePrimaryHex,
+    displayNameAccentHex: m.displayNameAccentHex,
+    bio: m.bio,
+    pronouns: m.pronouns,
+    stats: {
+      posts: 0,
+      reels: 0,
+      totalPosts: 0,
+      followers: 0,
+      following: 0,
+    },
+    cordigramMemberSince: m.cordigramMemberSince,
+    mutualServerCount: m.mutualServerCount,
+    mutualServers: m.mutualServers,
+    mutualFollowCount: m.mutualFollowCount,
+    mutualFollowUsers: m.mutualFollowUsers,
+    isFollowing: m.isFollowing,
+    isCreatorVerified: m.isCreatorVerified,
+  };
+}
+
 export type MentionMuteDuration =
   | "15m"
   | "1h"
@@ -2431,6 +2511,83 @@ export async function fetchProfileDetail(opts: {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+  });
+}
+
+export async function fetchMessagingProfileMe(opts: {
+  token: string;
+}): Promise<MessagingProfileCardResponse> {
+  const { token } = opts;
+  return apiFetch<MessagingProfileCardResponse>({
+    path: "/messaging-profiles/me",
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function fetchMessagingProfileByUserId(opts: {
+  token: string;
+  userId: string;
+}): Promise<MessagingProfileCardResponse> {
+  const { token, userId } = opts;
+  return apiFetch<MessagingProfileCardResponse>({
+    path: `/messaging-profiles/${encodeURIComponent(userId)}`,
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function updateMyMessagingProfile(opts: {
+  token: string;
+  payload: UpdateMessagingProfilePayload;
+}): Promise<MessagingProfileCardResponse> {
+  const { token, payload } = opts;
+  return apiFetch<MessagingProfileCardResponse>({
+    path: "/messaging-profiles/me",
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function uploadMessagingProfileAvatar(opts: {
+  token: string;
+  form: FormData;
+  cordigramUploadContext?: CordigramUploadContext;
+}): Promise<UpdateAvatarResponse> {
+  const { token, form, cordigramUploadContext } = opts;
+  const res = await fetch(`${apiBaseUrl}/messaging-profiles/avatar/upload`, {
+    method: "POST",
+    headers: withCordigramUploadContext(
+      { Authorization: `Bearer ${token}` },
+      cordigramUploadContext,
+    ),
+    body: form,
+  });
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    throw {
+      status: res.status,
+      message: payload.message || "Avatar upload failed",
+      data: payload,
+    } satisfies ApiError;
+  }
+  return (await res.json()) as UpdateAvatarResponse;
+}
+
+export async function resetMessagingProfileAvatar(opts: {
+  token: string;
+}): Promise<UpdateAvatarResponse> {
+  const { token } = opts;
+  return apiFetch<UpdateAvatarResponse>({
+    path: "/messaging-profiles/avatar",
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
   });
 }
 

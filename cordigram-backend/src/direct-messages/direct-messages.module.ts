@@ -10,10 +10,12 @@ import { Profile, ProfileSchema } from '../profiles/profile.schema';
 import { Follow, FollowSchema } from '../users/follow.schema';
 import { MessageReport, MessageReportSchema } from './message-report.schema';
 import { UsersModule } from '../users/users.module';
+import { MessagingProfilesModule } from '../messaging-profiles/messaging-profiles.module';
 
 @Module({
   imports: [
     forwardRef(() => UsersModule),
+    forwardRef(() => MessagingProfilesModule),
     MongooseModule.forFeature([
       { name: DirectMessage.name, schema: DirectMessageSchema },
       { name: User.name, schema: UserSchema },

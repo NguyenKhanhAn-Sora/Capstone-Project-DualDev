@@ -3,7 +3,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import styles from "./UserProfilePopup.module.css";
 import { useLanguage } from "@/component/language-provider";
-import { fetchProfileDetail, followUser, unfollowUser, type ProfileDetailResponse } from "@/lib/api";
+import {
+  fetchProfileDetail,
+  fetchMessagingProfileByUserId,
+  followUser,
+  unfollowUser,
+  messagingProfileCardToDetail,
+  type ProfileDetailResponse,
+} from "@/lib/api";
 import { parseUserCover } from "@/lib/user-profile-cover";
 
 function getDisplayNameTextStyle(source?: {
@@ -48,6 +55,8 @@ type Props = {
   userId: string;
   token: string | null;
   currentUserId: string;
+  /** `messaging`: thẻ hồ sơ trong ngữ cảnh chat (tách khỏi social). */
+  profileSource?: "social" | "messaging";
   onClose: () => void;
   onMessage?: (userId: string) => void;
 };
@@ -56,6 +65,7 @@ export default function UserProfilePopup({
   userId,
   token,
   currentUserId,
+  profileSource = "social",
   onClose,
   onMessage,
 }: Props) {
@@ -77,10 +87,15 @@ export default function UserProfilePopup({
       setLoading(false);
       return;
     }
-    fetchProfileDetail({ token, id: userId })
-      .then((d) => {
-        if (!cancelled) setDetail(d);
-      })
+    const p =
+      profileSource === "messaging"
+        ? fetchMessagingProfileByUserId({ token, userId }).then(
+            messagingProfileCardToDetail,
+          )
+        : fetchProfileDetail({ token, id: userId });
+    p.then((d) => {
+      if (!cancelled) setDetail(d);
+    })
       .catch(() => {
         if (!cancelled) setDetail(null);
       })
@@ -90,7 +105,7 @@ export default function UserProfilePopup({
     return () => {
       cancelled = true;
     };
-  }, [token, userId]);
+  }, [token, userId, profileSource]);
 
   const displayName = detail?.displayName || detail?.username || "—";
   const username = detail?.username || "";
