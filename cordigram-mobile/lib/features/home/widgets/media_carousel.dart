@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
@@ -5,7 +6,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:video_player/video_player.dart';
 import '../models/feed_post.dart';
+
+bool _isVideoMediaType(String type) {
+  final normalized = type.trim().toLowerCase();
+  return normalized == 'video' || normalized.startsWith('video/');
+}
+
+bool _isVideoMediaUrl(String url) {
+  final raw = url.trim().toLowerCase();
+  if (raw.isEmpty) return false;
+  final withoutQuery = raw.split('?').first;
+  return withoutQuery.endsWith('.mp4') ||
+      withoutQuery.endsWith('.mov') ||
+      withoutQuery.endsWith('.webm') ||
+      withoutQuery.endsWith('.mkv') ||
+      withoutQuery.endsWith('.avi') ||
+      withoutQuery.endsWith('.m3u8');
+}
+
+bool _isVideoFeedMedia(FeedMedia media) {
+  return _isVideoMediaType(media.type) || _isVideoMediaUrl(media.url);
+}
 
 /// Carousel for a list of images/videos within a post card.
 /// Shows one media item at a time with prev/next arrows and a counter badge.
@@ -15,10 +38,16 @@ class MediaCarousel extends StatefulWidget {
     super.key,
     required this.media,
     this.allowDownload = false,
+    this.playbackScopeKey,
+    this.enableAutoPlayOnVisible = false,
+    this.isParentVisible = false,
   });
 
   final List<FeedMedia> media;
   final bool allowDownload;
+  final String? playbackScopeKey;
+  final bool enableAutoPlayOnVisible;
+  final bool isParentVisible;
 
   @override
   State<MediaCarousel> createState() => _MediaCarouselState();
@@ -36,6 +65,13 @@ class _MediaCarouselState extends State<MediaCarousel> {
       _currentMedia.isBlurredByModeration;
   bool get _showModerationRevealOverlay =>
       _currentMedia.isBlurredByModeration && !_shouldRevealCurrent;
+
+  String _playbackKeyAt(int index) {
+    final scope = (widget.playbackScopeKey?.trim().isNotEmpty ?? false)
+        ? widget.playbackScopeKey!.trim()
+        : 'global';
+    return '$scope::$index::${widget.media[index].url}';
+  }
 
   @override
   void dispose() {
@@ -220,6 +256,13 @@ class _MediaCarouselState extends State<MediaCarousel> {
                     child: _MediaItem(
                       media: media[i],
                       revealed: _revealedMap[media[i].url] == true,
+                      playbackKey: _playbackKeyAt(i),
+                      autoPlay:
+                          widget.enableAutoPlayOnVisible &&
+                          widget.isParentVisible &&
+                          _currentIndex == i &&
+                          i == 0 &&
+                          _isVideoFeedMedia(media[i]),
                     ),
                   ),
                 ),
@@ -409,6 +452,11 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
   bool get _showModerationRevealOverlay =>
       _currentMedia.isBlurredByModeration && !_shouldRevealCurrent;
 
+  String _playbackKeyAt(int index) {
+    if (index < 0 || index >= widget.media.length) return 'viewer::invalid';
+    return 'viewer::${widget.media[index].url}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -525,23 +573,29 @@ class _ImageViewerOverlayState extends State<_ImageViewerOverlay> {
                   }),
                   itemBuilder: (_, i) {
                     final item = media[i];
+                    final mediaUrl = item.displayUrl(
+                      revealed: _revealedMap[item.url] == true,
+                    );
                     return GestureDetector(
                       // Stop tap from reaching the background GestureDetector
                       onTap: () {},
                       onLongPress: () => _showOverlayMediaActions(item),
                       child: SafeArea(
                         child: SizedBox.expand(
-                          child: _ZoomableImage(
-                            url: item.displayUrl(
-                              revealed: _revealedMap[item.url] == true,
-                            ),
-                            onZoomChanged: (zoomed) {
-                              // Only update if this is the current visible page
-                              if (i == _index && zoomed != _isZoomed) {
-                                setState(() => _isZoomed = zoomed);
-                              }
-                            },
-                          ),
+                          child: _isVideoFeedMedia(item)
+                              ? _OverlayVideoPlayer(
+                                  url: mediaUrl,
+                                  playbackKey: _playbackKeyAt(i),
+                                )
+                              : _ZoomableImage(
+                                  url: mediaUrl,
+                                  onZoomChanged: (zoomed) {
+                                    // Only update if this is the current visible page
+                                    if (i == _index && zoomed != _isZoomed) {
+                                      setState(() => _isZoomed = zoomed);
+                                    }
+                                  },
+                                ),
                         ),
                       ),
                     );
@@ -804,15 +858,31 @@ class _OverlayIconButton extends StatelessWidget {
 }
 
 class _MediaItem extends StatelessWidget {
-  const _MediaItem({required this.media, required this.revealed});
+  const _MediaItem({
+    required this.media,
+    required this.revealed,
+    required this.playbackKey,
+    required this.autoPlay,
+  });
   final FeedMedia media;
   final bool revealed;
+  final String playbackKey;
+  final bool autoPlay;
 
   @override
   Widget build(BuildContext context) {
+    final url = media.displayUrl(revealed: revealed);
+    if (_isVideoFeedMedia(media)) {
+      return _InlineVideoPreview(
+        url: url,
+        playbackKey: playbackKey,
+        autoPlay: autoPlay,
+      );
+    }
+
     // object-fit: contain — shows full image, letterboxed with dark background
     return Image.network(
-      media.displayUrl(revealed: revealed),
+      url,
       fit: BoxFit.contain,
       width: double.infinity,
       height: double.infinity,
@@ -839,6 +909,541 @@ class _MediaItem extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class _InlineVideoPreview extends StatefulWidget {
+  const _InlineVideoPreview({
+    required this.url,
+    required this.playbackKey,
+    required this.autoPlay,
+  });
+  final String url;
+  final String playbackKey;
+  final bool autoPlay;
+
+  @override
+  State<_InlineVideoPreview> createState() => _InlineVideoPreviewState();
+}
+
+class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
+  VideoPlayerController? _controller;
+  bool _initialized = false;
+  bool _playing = false;
+  bool _restoredWasPlaying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+      ..initialize().then((_) {
+        if (!mounted) return;
+        final ctrl = _controller;
+        if (ctrl == null) return;
+        final snapshot = _VideoPlaybackStore.read(widget.playbackKey);
+        if (snapshot != null) {
+          final maxMs = ctrl.value.duration.inMilliseconds;
+          final nextMs = snapshot.position.inMilliseconds.clamp(0, maxMs);
+          ctrl.seekTo(Duration(milliseconds: nextMs));
+          _restoredWasPlaying = snapshot.wasPlaying;
+        }
+
+        final shouldAutoPlay = widget.autoPlay || _restoredWasPlaying;
+        if (shouldAutoPlay) {
+          ctrl.play();
+        } else {
+          ctrl.pause();
+        }
+
+        setState(() {
+          _initialized = true;
+          _playing = ctrl.value.isPlaying;
+        });
+      });
+    _controller?.addListener(_onVideoTick);
+  }
+
+  @override
+  void didUpdateWidget(covariant _InlineVideoPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playbackKey != widget.playbackKey) {
+      _persistPlayback();
+    }
+    if (oldWidget.autoPlay == widget.autoPlay) return;
+
+    final ctrl = _controller;
+    if (!_initialized || ctrl == null) return;
+
+    if (widget.autoPlay) {
+      ctrl.play();
+    } else {
+      ctrl.pause();
+      _persistPlayback();
+    }
+  }
+
+  void _onVideoTick() {
+    if (!mounted) return;
+    final ctrl = _controller;
+    if (ctrl == null) return;
+    final nextPlaying = ctrl.value.isPlaying;
+    if (nextPlaying != _playing) {
+      setState(() => _playing = nextPlaying);
+      return;
+    }
+    setState(() {});
+  }
+
+  String _formatDuration(Duration d) {
+    final mm = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final ss = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$mm:$ss';
+  }
+
+  void _togglePlayPause() {
+    final ctrl = _controller;
+    if (!_initialized || ctrl == null) return;
+    if (ctrl.value.isPlaying) {
+      ctrl.pause();
+      _persistPlayback();
+    } else {
+      ctrl.play();
+    }
+  }
+
+  void _persistPlayback() {
+    final ctrl = _controller;
+    if (ctrl == null) return;
+    _VideoPlaybackStore.write(
+      widget.playbackKey,
+      position: ctrl.value.position,
+      wasPlaying: ctrl.value.isPlaying,
+    );
+  }
+
+  @override
+  void dispose() {
+    _persistPlayback();
+    _controller?.removeListener(_onVideoTick);
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_initialized && _controller != null) {
+      final position = _controller!.value.position;
+      final duration = _controller!.value.duration;
+      final progress = duration.inMilliseconds > 0
+          ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+          : 0.0;
+
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.contain,
+              child: SizedBox(
+                width: _controller!.value.size.width,
+                height: _controller!.value.size.height,
+                child: VideoPlayer(_controller!),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: false,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.transparent,
+                      Color(0x99000000),
+                    ],
+                    stops: [0.0, 0.55, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: _togglePlayPause,
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.55),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 34,
+              ),
+            ),
+          ),
+          Positioned(
+            left: 6,
+            right: 6,
+            bottom: 6,
+            child: GestureDetector(
+              onTap: () {},
+              child: Column(
+                children: [
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 3,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 6,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 12,
+                      ),
+                      activeTrackColor: const Color(0xFF4AA3E4),
+                      inactiveTrackColor: Colors.white.withValues(alpha: 0.35),
+                      thumbColor: const Color(0xFF4AA3E4),
+                    ),
+                    child: Slider(
+                      value: progress,
+                      onChanged: _initialized
+                          ? (v) {
+                              final ms = (v * duration.inMilliseconds).round();
+                              _controller?.seekTo(Duration(milliseconds: ms));
+                            }
+                          : null,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatDuration(position),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          _formatDuration(duration),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      color: const Color(0xFF1A2235),
+      child: const Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: Color(0xFF4AA3E4),
+        ),
+      ),
+    );
+  }
+}
+
+class _OverlayVideoPlayer extends StatefulWidget {
+  const _OverlayVideoPlayer({required this.url, required this.playbackKey});
+  final String url;
+  final String playbackKey;
+
+  @override
+  State<_OverlayVideoPlayer> createState() => _OverlayVideoPlayerState();
+}
+
+class _OverlayVideoPlayerState extends State<_OverlayVideoPlayer> {
+  VideoPlayerController? _controller;
+  bool _initialized = false;
+  bool _showControls = true;
+  Timer? _hideTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+      ..initialize().then((_) {
+        if (!mounted) return;
+        final ctrl = _controller;
+        if (ctrl == null) return;
+        final snapshot = _VideoPlaybackStore.read(widget.playbackKey);
+        if (snapshot != null) {
+          final maxMs = ctrl.value.duration.inMilliseconds;
+          final nextMs = snapshot.position.inMilliseconds.clamp(0, maxMs);
+          ctrl.seekTo(Duration(milliseconds: nextMs));
+        }
+        ctrl.play();
+        setState(() {
+          _initialized = true;
+        });
+        _scheduleHideControls();
+      });
+    _controller?.addListener(_onVideoTick);
+  }
+
+  void _onVideoTick() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  String _formatDuration(Duration d) {
+    final mm = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final ss = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$mm:$ss';
+  }
+
+  void _scheduleHideControls() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 3), () {
+      final ctrl = _controller;
+      if (!mounted || ctrl == null) return;
+      if (ctrl.value.isPlaying) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
+
+  void _onTapVideo() {
+    setState(() => _showControls = !_showControls);
+    final ctrl = _controller;
+    if (_showControls && ctrl != null && ctrl.value.isPlaying) {
+      _scheduleHideControls();
+    }
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    final ctrl = _controller;
+    if (ctrl != null) {
+      _VideoPlaybackStore.write(
+        widget.playbackKey,
+        position: ctrl.value.position,
+        wasPlaying: ctrl.value.isPlaying,
+      );
+    }
+    _controller?.removeListener(_onVideoTick);
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _togglePlayPause() {
+    final ctrl = _controller;
+    if (!_initialized || ctrl == null) return;
+    if (ctrl.value.isPlaying) {
+      ctrl.pause();
+      setState(() => _showControls = true);
+      _hideTimer?.cancel();
+    } else {
+      ctrl.play();
+      setState(() => _showControls = true);
+      _scheduleHideControls();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_initialized || _controller == null) {
+      return const Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: Color(0xFF4AA3E4),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: _onTapVideo,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.contain,
+              child: SizedBox(
+                width: _controller!.value.size.width,
+                height: _controller!.value.size.height,
+                child: VideoPlayer(_controller!),
+              ),
+            ),
+          ),
+          AnimatedOpacity(
+            opacity: _showControls ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 180),
+            child: IgnorePointer(
+              ignoring: !_showControls,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xBF000000),
+                      Colors.transparent,
+                      Colors.transparent,
+                      Color(0xBF000000),
+                    ],
+                    stops: [0.0, 0.25, 0.75, 1.0],
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    Center(
+                      child: GestureDetector(
+                        onTap: _togglePlayPause,
+                        child: Container(
+                          width: 62,
+                          height: 62,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.55),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _controller!.value.isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 38,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: MediaQuery.of(context).padding.bottom + 18,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 3,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 7,
+                                ),
+                                overlayShape: const RoundSliderOverlayShape(
+                                  overlayRadius: 14,
+                                ),
+                                activeTrackColor: const Color(0xFF4AA3E4),
+                                inactiveTrackColor: Colors.white.withValues(
+                                  alpha: 0.3,
+                                ),
+                                thumbColor: const Color(0xFF4AA3E4),
+                              ),
+                              child: Slider(
+                                value:
+                                    (_controller!
+                                                    .value
+                                                    .duration
+                                                    .inMilliseconds >
+                                                0
+                                            ? (_controller!
+                                                      .value
+                                                      .position
+                                                      .inMilliseconds /
+                                                  _controller!
+                                                      .value
+                                                      .duration
+                                                      .inMilliseconds)
+                                            : 0.0)
+                                        .clamp(0.0, 1.0),
+                                onChanged: _initialized
+                                    ? (v) {
+                                        final durationMs = _controller!
+                                            .value
+                                            .duration
+                                            .inMilliseconds;
+                                        final ms = (v * durationMs).round();
+                                        _controller?.seekTo(
+                                          Duration(milliseconds: ms),
+                                        );
+                                        setState(() => _showControls = true);
+                                        _scheduleHideControls();
+                                      }
+                                    : null,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    _formatDuration(
+                                      _controller!.value.position,
+                                    ),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatDuration(
+                                      _controller!.value.duration,
+                                    ),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlaybackSnapshot {
+  const _PlaybackSnapshot({required this.position, required this.wasPlaying});
+  final Duration position;
+  final bool wasPlaying;
+}
+
+class _VideoPlaybackStore {
+  static final Map<String, _PlaybackSnapshot> _byKey = {};
+
+  static _PlaybackSnapshot? read(String key) => _byKey[key];
+
+  static void write(
+    String key, {
+    required Duration position,
+    required bool wasPlaying,
+  }) {
+    _byKey[key] = _PlaybackSnapshot(position: position, wasPlaying: wasPlaying);
   }
 }
 

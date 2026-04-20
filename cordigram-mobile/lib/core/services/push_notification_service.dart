@@ -11,6 +11,7 @@ import 'auth_storage.dart';
 import '../../features/notifications/notification_screen.dart';
 import '../../features/post/post_detail_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/reels/reels_screen.dart';
 
 class PushNotificationService {
   PushNotificationService._();
@@ -170,6 +171,11 @@ class PushNotificationService {
     final postId =
         ((data['postId'] ?? data['targetPostId']) as String?)?.trim() ?? '';
     final commentId = (data['commentId'] as String?)?.trim() ?? '';
+    final postKind =
+        ((data['postKind'] ?? data['post_kind']) as String?)
+            ?.trim()
+            .toLowerCase() ??
+        'post';
 
     if (type == 'follow' && actorId.isNotEmpty) {
       navigator.push(
@@ -179,6 +185,19 @@ class PushNotificationService {
     }
 
     if (postId.isNotEmpty) {
+      if (postKind == 'reel') {
+        navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => ReelsScreen(
+              scope: 'all',
+              initialReelId: postId,
+              pinInitialReelToTop: true,
+            ),
+          ),
+        );
+        return;
+      }
+
       navigator.push(
         MaterialPageRoute<void>(
           builder: (_) => PostDetailScreen(

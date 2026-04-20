@@ -1198,6 +1198,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         .toUpperCase();
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: scheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1608,112 +1609,120 @@ class _ProfileMenuSheet extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle bar
-          Container(
-            width: 36,
-            height: 4,
-            margin: const EdgeInsets.only(top: 10, bottom: 16),
-            decoration: BoxDecoration(
-              color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(2),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 16),
+              decoration: BoxDecoration(
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          // Avatar + name header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: Row(
-              children: [
-                avatarUrl != null
-                    ? CircleAvatar(
-                        radius: 24,
-                        backgroundImage: NetworkImage(avatarUrl!),
-                        backgroundColor: scheme.surfaceContainerHighest,
-                      )
-                    : CircleAvatar(
-                        radius: 24,
-                        backgroundColor: scheme.primary,
-                        child: Text(
-                          avatarLetter,
-                          style: TextStyle(
-                            color: scheme.onPrimary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
+            // Avatar + name header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: Row(
+                children: [
+                  avatarUrl != null
+                      ? CircleAvatar(
+                          radius: 24,
+                          backgroundImage: NetworkImage(avatarUrl!),
+                          backgroundColor: scheme.surfaceContainerHighest,
+                        )
+                      : CircleAvatar(
+                          radius: 24,
+                          backgroundColor: scheme.primary,
+                          child: Text(
+                            avatarLetter,
+                            style: TextStyle(
+                              color: scheme.onPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ),
-                const SizedBox(width: 14),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (displayName != null)
-                      Text(
-                        displayName!,
-                        style: TextStyle(
-                          color: scheme.onSurface,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                  const SizedBox(width: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (displayName != null)
+                        Text(
+                          displayName!,
+                          style: TextStyle(
+                            color: scheme.onSurface,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                    if (username != null)
-                      Text(
-                        username!,
-                        style: TextStyle(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 13,
+                      if (username != null)
+                        Text(
+                          username!,
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 13,
+                          ),
                         ),
-                      ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          Divider(color: scheme.outline, height: 1),
-          _SheetItem(
-            icon: Icons.person_outline_rounded,
-            label: 'Profile',
-            onTap: onProfile,
-          ),
-          _SheetItem(
-            icon: Icons.settings_outlined,
-            label: 'Settings',
-            onTap: onSettings,
-          ),
-          _SheetItem(
-            icon: Icons.bookmark_border_rounded,
-            label: 'Saved',
-            onTap: onSaved,
-          ),
-          AnimatedBuilder(
-            animation: ThemeController.instance,
-            builder: (_, __) {
-              final isDark = ThemeController.instance.isDarkMode;
-              return _SheetItem(
-                icon: isDark
-                    ? Icons.light_mode_outlined
-                    : Icons.dark_mode_outlined,
-                label: isDark ? 'Switch to light mode' : 'Switch to dark mode',
-                onTap: onToggleTheme,
-              );
-            },
-          ),
-          _SheetItem(icon: Icons.campaign_outlined, label: 'Ads', onTap: onAds),
-          _SheetItem(
-            icon: Icons.flag_outlined,
-            label: 'Report a problem',
-            onTap: onReportProblem,
-          ),
-          _SheetItem(
-            icon: Icons.logout_rounded,
-            label: 'Log out',
-            labelColor: const Color(0xFFE53935),
-            iconColor: const Color(0xFFE53935),
-            onTap: onLogout,
-          ),
-          const SizedBox(height: 8),
-        ],
+            Divider(color: scheme.outline, height: 1),
+            _SheetItem(
+              icon: Icons.person_outline_rounded,
+              label: 'Profile',
+              onTap: onProfile,
+            ),
+            _SheetItem(
+              icon: Icons.settings_outlined,
+              label: 'Settings',
+              onTap: onSettings,
+            ),
+            _SheetItem(
+              icon: Icons.bookmark_border_rounded,
+              label: 'Saved',
+              onTap: onSaved,
+            ),
+            AnimatedBuilder(
+              animation: ThemeController.instance,
+              builder: (_, __) {
+                final isDark = ThemeController.instance.isDarkMode;
+                return _SheetItem(
+                  icon: isDark
+                      ? Icons.light_mode_outlined
+                      : Icons.dark_mode_outlined,
+                  label: isDark
+                      ? 'Switch to light mode'
+                      : 'Switch to dark mode',
+                  onTap: onToggleTheme,
+                );
+              },
+            ),
+            _SheetItem(
+              icon: Icons.campaign_outlined,
+              label: 'Ads',
+              onTap: onAds,
+            ),
+            _SheetItem(
+              icon: Icons.flag_outlined,
+              label: 'Report a problem',
+              onTap: onReportProblem,
+            ),
+            _SheetItem(
+              icon: Icons.logout_rounded,
+              label: 'Log out',
+              labelColor: const Color(0xFFE53935),
+              iconColor: const Color(0xFFE53935),
+              onTap: onLogout,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

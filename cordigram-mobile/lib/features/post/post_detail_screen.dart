@@ -48,6 +48,66 @@ class _CommentMediaData {
   final Map<String, dynamic>? metadata;
 }
 
+const Set<String> _commentVideoExtensions = {
+  'mp4',
+  'mov',
+  'm4v',
+  'webm',
+  'mkv',
+  'avi',
+  '3gp',
+  '3gpp',
+};
+
+const Map<String, String> _commentMimeByExtension = {
+  'jpg': 'image/jpeg',
+  'jpeg': 'image/jpeg',
+  'png': 'image/png',
+  'gif': 'image/gif',
+  'webp': 'image/webp',
+  'bmp': 'image/bmp',
+  'heic': 'image/heic',
+  'heif': 'image/heif',
+  'mp4': 'video/mp4',
+  'mov': 'video/quicktime',
+  'm4v': 'video/x-m4v',
+  'webm': 'video/webm',
+  'mkv': 'video/x-matroska',
+  'avi': 'video/x-msvideo',
+  '3gp': 'video/3gpp',
+  '3gpp': 'video/3gpp',
+};
+
+String _fileExtension(String path) {
+  final normalized = path.toLowerCase();
+  final dot = normalized.lastIndexOf('.');
+  if (dot < 0 || dot == normalized.length - 1) return '';
+  return normalized.substring(dot + 1);
+}
+
+String _detectCommentMediaType(XFile file) {
+  final mime = file.mimeType?.toLowerCase().trim();
+  if (mime != null) {
+    if (mime.startsWith('video/')) return 'video';
+    if (mime.startsWith('image/')) return 'image';
+  }
+  return _commentVideoExtensions.contains(_fileExtension(file.path))
+      ? 'video'
+      : 'image';
+}
+
+String _resolveCommentUploadContentType(XFile file, String mediaType) {
+  final mime = file.mimeType?.toLowerCase().trim();
+  if (mime != null &&
+      (mime.startsWith('image/') || mime.startsWith('video/'))) {
+    return mime;
+  }
+  final ext = _fileExtension(file.path);
+  final byExt = _commentMimeByExtension[ext];
+  if (byExt != null) return byExt;
+  return mediaType == 'video' ? 'video/mp4' : 'image/jpeg';
+}
+
 /// Mirrors web's `replyTarget` state — tracks which comment is being replied to.
 class _ReplyTarget {
   const _ReplyTarget({required this.id, this.username});
@@ -791,19 +851,23 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (media != null) {
       if (media.file != null) {
         // Upload file first, then include URL in the comment body
+        final uploadContentType = _resolveCommentUploadContentType(
+          media.file!,
+          media.type,
+        );
         final uploaded = await ApiService.postMultipart(
           '/posts/${widget.postId}/comments/upload',
           fieldName: 'file',
           filePath: media.file!.path,
-          contentType:
-              media.file!.mimeType ??
-              (media.type == 'video' ? 'video/mp4' : 'image/jpeg'),
+          contentType: uploadContentType,
           extraHeaders: _authHeader,
         );
-        mediaJson = {
-          'type': media.type,
-          'url': (uploaded['secureUrl'] ?? uploaded['url']) as String?,
-        };
+        final uploadedUrl =
+            ((uploaded['secureUrl'] ?? uploaded['url']) as String?)?.trim();
+        if (uploadedUrl == null || uploadedUrl.isEmpty) {
+          throw const ApiException('Upload failed: missing media URL');
+        }
+        mediaJson = {'type': media.type, 'url': uploadedUrl};
       } else {
         // GIF / sticker — pass Giphy URL directly, no upload
         mediaJson = {
@@ -2705,15 +2769,9 @@ class _CommentInputBarState extends State<_CommentInputBar> {
     final picker = ImagePicker();
     final picked = await picker.pickMedia();
     if (picked == null || !mounted) return;
-    final isVideo =
-        picked.mimeType?.startsWith('video/') == true ||
-        picked.path.toLowerCase().endsWith('.mp4') ||
-        picked.path.toLowerCase().endsWith('.mov');
+    final mediaType = _detectCommentMediaType(picked);
     setState(() {
-      _media = _CommentMediaData(
-        type: isVideo ? 'video' : 'image',
-        file: picked,
-      );
+      _media = _CommentMediaData(type: mediaType, file: picked);
     });
   }
 

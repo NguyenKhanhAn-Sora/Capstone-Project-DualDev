@@ -33,10 +33,16 @@ import '../report/report_post_sheet.dart';
 // ── Reels screen ──────────────────────────────────────────────────────────────
 
 class ReelsScreen extends StatefulWidget {
-  const ReelsScreen({super.key, this.scope = 'all', this.initialReelId});
+  const ReelsScreen({
+    super.key,
+    this.scope = 'all',
+    this.initialReelId,
+    this.pinInitialReelToTop = false,
+  });
 
   final String scope;
   final String? initialReelId;
+  final bool pinInitialReelToTop;
 
   @override
   State<ReelsScreen> createState() => _ReelsScreenState();
@@ -349,15 +355,26 @@ class _ReelsScreenState extends State<ReelsScreen> {
       return;
     }
 
+    int playIndex = targetIndex;
+    if (widget.pinInitialReelToTop && targetIndex > 0) {
+      final target = _reels.removeAt(targetIndex);
+      _reels.insert(0, target);
+      for (final c in _controllers.values) {
+        c.dispose();
+      }
+      _controllers.clear();
+      playIndex = 0;
+    }
+
     _initialTargetHandled = true;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      _currentPage = targetIndex;
+      _currentPage = playIndex;
       if (_pageController.hasClients) {
-        _pageController.jumpToPage(targetIndex);
+        _pageController.jumpToPage(playIndex);
       }
-      _onPageChanged(targetIndex);
+      _onPageChanged(playIndex);
     });
   }
 
@@ -1952,6 +1969,68 @@ class _RCommentMediaData {
   final Map<String, dynamic>? metadata;
 }
 
+const Set<String> _reelCommentVideoExtensions = {
+  'mp4',
+  'mov',
+  'm4v',
+  'webm',
+  'mkv',
+  'avi',
+  '3gp',
+  '3gpp',
+};
+
+const Map<String, String> _reelCommentMimeByExtension = {
+  'jpg': 'image/jpeg',
+  'jpeg': 'image/jpeg',
+  'png': 'image/png',
+  'gif': 'image/gif',
+  'webp': 'image/webp',
+  'bmp': 'image/bmp',
+  'heic': 'image/heic',
+  'heif': 'image/heif',
+  'mp4': 'video/mp4',
+  'mov': 'video/quicktime',
+  'm4v': 'video/x-m4v',
+  'webm': 'video/webm',
+  'mkv': 'video/x-matroska',
+  'avi': 'video/x-msvideo',
+  '3gp': 'video/3gpp',
+  '3gpp': 'video/3gpp',
+};
+
+String _reelCommentFileExtension(String path) {
+  final normalized = path.toLowerCase();
+  final dot = normalized.lastIndexOf('.');
+  if (dot < 0 || dot == normalized.length - 1) return '';
+  return normalized.substring(dot + 1);
+}
+
+String _detectReelCommentMediaType(XFile file) {
+  final mime = file.mimeType?.toLowerCase().trim();
+  if (mime != null) {
+    if (mime.startsWith('video/')) return 'video';
+    if (mime.startsWith('image/')) return 'image';
+  }
+  return _reelCommentVideoExtensions.contains(
+        _reelCommentFileExtension(file.path),
+      )
+      ? 'video'
+      : 'image';
+}
+
+String _resolveReelCommentUploadContentType(XFile file, String mediaType) {
+  final mime = file.mimeType?.toLowerCase().trim();
+  if (mime != null &&
+      (mime.startsWith('image/') || mime.startsWith('video/'))) {
+    return mime;
+  }
+  final ext = _reelCommentFileExtension(file.path);
+  final byExt = _reelCommentMimeByExtension[ext];
+  if (byExt != null) return byExt;
+  return mediaType == 'video' ? 'video/mp4' : 'image/jpeg';
+}
+
 class _RReplyTarget {
   const _RReplyTarget({required this.id, this.username});
   final String id;
@@ -2155,19 +2234,23 @@ class _ReelCommentSheetState extends State<_ReelCommentSheet> {
     Map<String, dynamic>? mediaJson;
     if (media != null) {
       if (media.file != null) {
+        final uploadContentType = _resolveReelCommentUploadContentType(
+          media.file!,
+          media.type,
+        );
         final uploaded = await ApiService.postMultipart(
           '/posts/${widget.postId}/comments/upload',
           fieldName: 'file',
           filePath: media.file!.path,
-          contentType:
-              media.file!.mimeType ??
-              (media.type == 'video' ? 'video/mp4' : 'image/jpeg'),
+          contentType: uploadContentType,
           extraHeaders: _authHeader,
         );
-        mediaJson = {
-          'type': media.type,
-          'url': (uploaded['secureUrl'] ?? uploaded['url']) as String?,
-        };
+        final uploadedUrl =
+            ((uploaded['secureUrl'] ?? uploaded['url']) as String?)?.trim();
+        if (uploadedUrl == null || uploadedUrl.isEmpty) {
+          throw const ApiException('Upload failed: missing media URL');
+        }
+        mediaJson = {'type': media.type, 'url': uploadedUrl};
       } else {
         mediaJson = {
           'type': media.type,
@@ -3294,15 +3377,9 @@ class _RCommentInputBarState extends State<_RCommentInputBar> {
     final picker = ImagePicker();
     final picked = await picker.pickMedia();
     if (picked == null || !mounted) return;
-    final isVideo =
-        picked.mimeType?.startsWith('video/') == true ||
-        picked.path.toLowerCase().endsWith('.mp4') ||
-        picked.path.toLowerCase().endsWith('.mov');
+    final mediaType = _detectReelCommentMediaType(picked);
     setState(() {
-      _media = _RCommentMediaData(
-        type: isVideo ? 'video' : 'image',
-        file: picked,
-      );
+      _media = _RCommentMediaData(type: mediaType, file: picked);
     });
   }
 

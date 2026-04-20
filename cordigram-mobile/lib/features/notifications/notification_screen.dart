@@ -6,6 +6,7 @@ import '../../core/config/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../post/post_detail_screen.dart';
 import '../profile/profile_screen.dart';
+import '../reels/reels_screen.dart';
 import 'models/app_notification_item.dart';
 import 'services/notification_realtime_service.dart';
 import 'services/notification_service.dart';
@@ -256,6 +257,21 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
 
     if (item.postId == null || item.postId!.isEmpty) return;
+
+    final postKind = item.postKind.trim().toLowerCase();
+    if (postKind == 'reel') {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ReelsScreen(
+            scope: 'all',
+            initialReelId: item.postId!,
+            pinInitialReelToTop: true,
+          ),
+        ),
+      );
+      return;
+    }
+
     final priorityCommentId = await _resolvePriorityCommentId(item);
     if (!mounted) return;
     await Navigator.of(context).push(

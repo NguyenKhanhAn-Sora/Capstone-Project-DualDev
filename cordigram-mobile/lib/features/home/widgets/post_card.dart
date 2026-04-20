@@ -223,6 +223,7 @@ class _PostCardState extends State<PostCard> {
   Timer? _dwellTimer;
   // Per-card last-view epoch ms (resets if card is destroyed & recreated)
   int _lastViewAt = 0;
+  bool _isVisibleForAutoplay = false;
 
   /// Captured once at widget creation — mirrors web’s initialFollowingRef.
   late bool _initiallyFollowing;
@@ -245,6 +246,11 @@ class _PostCardState extends State<PostCard> {
   }
 
   void _onVisibilityChanged(VisibilityInfo info) {
+    final nextVisible = info.visibleFraction >= 0.5;
+    if (nextVisible != _isVisibleForAutoplay) {
+      setState(() => _isVisibleForAutoplay = nextVisible);
+    }
+
     if (info.visibleFraction >= 0.5) {
       // Skip if already within per-card cooldown
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -536,6 +542,9 @@ class _PostCardState extends State<PostCard> {
                 MediaCarousel(
                   media: post.media,
                   allowDownload: post.allowDownload == true,
+                  playbackScopeKey: post.id,
+                  enableAutoPlayOnVisible: !widget.detailMode,
+                  isParentVisible: _isVisibleForAutoplay,
                 ),
               ],
               if (isAdPost &&
