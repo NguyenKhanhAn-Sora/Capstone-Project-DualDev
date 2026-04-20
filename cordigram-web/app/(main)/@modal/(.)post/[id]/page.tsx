@@ -1,4 +1,4 @@
-import PostView from "../../post/PostView";
+import PostView from "../../../post/PostView";
 
 export default async function PostModal({
   params,

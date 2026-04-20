@@ -13,6 +13,7 @@ export function useScrollRestoration(
   const restoredRef = useRef(false);
   const [target, setTarget] = useState<ScrollTarget | null>(null);
   const lastSavedRef = useRef<number | null>(null);
+  const restoringRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -65,7 +66,25 @@ export function useScrollRestoration(
     if (saved) {
       const top = Number(saved) || 0;
       lastSavedRef.current = top;
-      requestAnimationFrame(() => scrollTo(top));
+      restoringRef.current = true;
+
+      // Layout can continue growing after initial data hydration.
+      // Re-apply restoration briefly to avoid landing on a wrong card.
+      let attempts = 0;
+      const maxAttempts = 24;
+      const restoreTick = () => {
+        attempts += 1;
+        scrollTo(top);
+        const current = readScroll();
+        const settled = Math.abs(current - top) <= 2;
+        if (settled || attempts >= maxAttempts) {
+          restoringRef.current = false;
+          return;
+        }
+        requestAnimationFrame(restoreTick);
+      };
+
+      requestAnimationFrame(restoreTick);
     }
     restoredRef.current = true;
   }, [key, ready, target, saveEnabled]);
@@ -76,6 +95,7 @@ export function useScrollRestoration(
     let raf = 0;
     const save = () => {
       if (!saveEnabled) return;
+      if (restoringRef.current) return;
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;

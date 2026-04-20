@@ -2949,11 +2949,7 @@ function FeedCard({
     setMenuOpen(false);
     persistResume();
 
-    if (typeof window !== "undefined") {
-      window.location.href = `/post/${targetPostId}`;
-    } else {
-      router.push(`/post/${targetPostId}`);
-    }
+    router.push(`/post/${targetPostId}`, { scroll: false });
   }, [targetPostId, router, persistResume, onPersistFeedCache]);
 
   const openAdsDetail = useCallback(async () => {
@@ -2994,7 +2990,7 @@ function FeedCard({
       onPersistFeedCache?.();
     }
     persistResume();
-    router.push(`/post/${id}`);
+    router.push(`/post/${id}`, { scroll: false });
   }, [id, router, persistResume, onPersistFeedCache]);
 
   useEffect(() => {
