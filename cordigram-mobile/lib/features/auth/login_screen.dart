@@ -397,6 +397,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final secondaryTextColor = theme.colorScheme.onSurfaceVariant;
+    final actionLinkColor = theme.colorScheme.primary;
 
     return Scaffold(
       body: Container(
@@ -516,7 +518,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                       },
                                       visualDensity: VisualDensity.compact,
                                     ),
-                                    const Text('Remember me'),
+                                    Text(
+                                      'Remember me',
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: secondaryTextColor,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
                                     const Spacer(),
                                     TextButton(
                                       onPressed: () {
@@ -627,7 +636,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Text("Don't have an account? "),
+                                    Text(
+                                      "Don't have an account? ",
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: secondaryTextColor,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                    ),
                                     TextButton(
                                       onPressed: () {
                                         Navigator.of(context).push(
@@ -643,7 +659,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                         tapTargetSize:
                                             MaterialTapTargetSize.shrinkWrap,
                                       ),
-                                      child: const Text('Sign up'),
+                                      child: Text(
+                                        'Sign up',
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              color: actionLinkColor,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
                                     ),
                                   ],
                                 ),

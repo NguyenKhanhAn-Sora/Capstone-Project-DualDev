@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://cordigram-api.onrender.com";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "https://api.cordigram.com";
 
 export interface LiveKitTokenResponse {
   token: string;

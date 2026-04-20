@@ -3,7 +3,7 @@ class AppConfig {
 
   static const _rawBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://cordigram-api.onrender.com',
+    defaultValue: 'https://api.cordigram.com',
   );
 
   static final apiBaseUrl = _rawBaseUrl.replaceAll(RegExp(r'[/\\]+$'), '');

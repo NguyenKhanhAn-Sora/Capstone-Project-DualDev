@@ -83,7 +83,7 @@ const formatDate = (value: string | null | undefined) => {
   if (!value) return "--";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--";
-  return date.toLocaleDateString("vi-VN", {
+  return date.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -136,7 +136,7 @@ export default function CommunityDiscoveryPage() {
       return;
     }
 
-    // Tab 1: chỉ list các server đang chờ duyệt
+    // Tab 1: list only pending servers
     loadServers(token, "pending");
   }, [router]);
 
@@ -233,11 +233,11 @@ export default function CommunityDiscoveryPage() {
       setServers((prev) =>
         prev.map((s) => (s.id === srv.id ? { ...s, communityDiscoveryStatus: status } : s)),
       );
-      setToast({ type: "success", message: status === "approved" ? "Đã chấp thuận." : "Đã từ chối." });
-      // Tab 1 yêu cầu sau khi duyệt/từ chối thì biến mất khỏi tab 1 và chỉ còn ở lịch sử
+      setToast({ type: "success", message: status === "approved" ? "Approved." : "Rejected." });
+      // After review/reject, remove from review tab and keep in history.
       void loadServers(token, "pending");
     } catch (err) {
-      setToast({ type: "error", message: err instanceof Error ? err.message : "Không cập nhật được" });
+      setToast({ type: "error", message: err instanceof Error ? err.message : "Could not update." });
     } finally {
       setApprovalLoadingId((cur) => (cur === srv.id ? null : cur));
     }
@@ -259,11 +259,11 @@ export default function CommunityDiscoveryPage() {
       setServers((prev) =>
         prev.map((s) => (s.id === srv.id ? { ...s, communityDiscoveryStatus: "removed" } : s)),
       );
-      setToast({ type: "success", message: "Đã gỡ khỏi discovery." });
-      // Tab 2: sau khi gỡ, server quay về bình thường => biến mất khỏi danh sách gỡ
+      setToast({ type: "success", message: "Removed from Discovery." });
+      // After removal, server returns to normal and leaves this tab.
       void loadServers(token, "approved");
     } catch (e) {
-      setToast({ type: "error", message: e instanceof Error ? e.message : "Không gỡ được" });
+      setToast({ type: "error", message: e instanceof Error ? e.message : "Could not remove." });
     } finally {
       setApprovalLoadingId((cur) => (cur === srv.id ? null : cur));
     }
@@ -282,12 +282,12 @@ export default function CommunityDiscoveryPage() {
         const text = await res.text().catch(() => "");
         throw new Error(text || `HTTP ${res.status}`);
       }
-      setToast({ type: "success", message: "Đã khôi phục discovery." });
+      setToast({ type: "success", message: "Discovery restored." });
       // refresh both servers and history snapshot
       await loadServers(token, "all");
       await loadHistory({ serverId });
     } catch (e) {
-      setToast({ type: "error", message: e instanceof Error ? e.message : "Không khôi phục được" });
+      setToast({ type: "error", message: e instanceof Error ? e.message : "Could not restore." });
     } finally {
       setApprovalLoadingId((cur) => (cur === serverId ? null : cur));
     }
@@ -337,7 +337,7 @@ export default function CommunityDiscoveryPage() {
                 onClick={() => setToast(null)}
                 style={{ padding: "4px 10px" }}
               >
-                Đóng
+                Close
               </button>
             </div>
           </div>
@@ -347,8 +347,8 @@ export default function CommunityDiscoveryPage() {
             <p className={styles.eyebrow}>Admin</p>
             <h1 className={styles.title}>Community Discovery</h1>
             <p className={styles.subtitle}>
-              Quản lý và duyệt các máy chủ đã kích hoạt Community. Kiểm tra
-              thông tin chi tiết, tham gia xem với tư cách người quan sát.
+              Manage and review servers with Community enabled. Check details
+              and join as an observer in read-only mode.
             </p>
           </div>
         </div>
@@ -364,7 +364,7 @@ export default function CommunityDiscoveryPage() {
             }}
             style={tab === "review" ? { outline: "2px solid var(--color-primary)", outlineOffset: 2 } : undefined}
           >
-            Duyệt (chờ duyệt)
+            Review (Pending)
           </button>
           <button
             type="button"
@@ -376,7 +376,7 @@ export default function CommunityDiscoveryPage() {
             }}
             style={tab === "remove" ? { outline: "2px solid var(--color-primary)", outlineOffset: 2 } : undefined}
           >
-            Gỡ khỏi discovery
+            Remove from Discovery
           </button>
           <button
             type="button"
@@ -387,7 +387,7 @@ export default function CommunityDiscoveryPage() {
             }}
             style={tab === "history" ? { outline: "2px solid var(--color-primary)", outlineOffset: 2 } : undefined}
           >
-            Lịch sử
+            History
           </button>
         </div>
 
@@ -420,7 +420,7 @@ export default function CommunityDiscoveryPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm theo tên hoặc ID server..."
+                placeholder="Search by server name or ID..."
                 style={{
                   flex: "1 1 260px",
                   minWidth: 220,
@@ -443,12 +443,12 @@ export default function CommunityDiscoveryPage() {
                   color: "var(--color-text)",
                   fontSize: 13,
                 }}
-                title="Sắp xếp theo thời gian"
+                title="Sort by time"
               >
-                <option value="activated_desc">Kích hoạt: Mới nhất</option>
-                <option value="activated_asc">Kích hoạt: Cũ nhất</option>
-                <option value="created_desc">Tạo server: Mới nhất</option>
-                <option value="created_asc">Tạo server: Cũ nhất</option>
+                <option value="activated_desc">Activated: Newest</option>
+                <option value="activated_asc">Activated: Oldest</option>
+                <option value="created_desc">Created: Newest</option>
+                <option value="created_asc">Created: Oldest</option>
               </select>
               <button
                 type="button"
@@ -459,7 +459,7 @@ export default function CommunityDiscoveryPage() {
                   if (token) void loadServers(token, status);
                 }}
               >
-                Tìm
+                Search
               </button>
             </div>
           )}
@@ -468,10 +468,10 @@ export default function CommunityDiscoveryPage() {
           ) : servers.length === 0 ? (
             <div className={styles.emptyState}>
               {tab === "review"
-                ? "Không có máy chủ nào đang chờ duyệt."
+                ? "No servers are pending review."
                 : tab === "remove"
-                  ? "Không có máy chủ nào đã duyệt để gỡ."
-                  : "Không có dữ liệu."}
+                  ? "No approved servers available for removal."
+                  : "No data available."}
             </div>
           ) : (
             <div className={styles.tableWrap}>
@@ -520,7 +520,7 @@ export default function CommunityDiscoveryPage() {
                         <td>
                           <p className={styles.main}>{srv.memberCount}</p>
                         </td>
-                        <td>
+                        <td style={{display: "flex", alignItems: "center", gap: 10}}>
                           <p className={styles.main}>{srv.totalChannels}</p>
                           <button
                             type="button"
@@ -531,27 +531,24 @@ export default function CommunityDiscoveryPage() {
                               )
                             }
                           >
-                            {expandedId === srv.id ? "Ẩn" : "Chi tiết"}
+                            {expandedId === srv.id ? "Hide" : "Details"}
                           </button>
                         </td>
                         <td>
                           {srv.safety.hasSafetyFullyConfigured ? (
-                            <span className={styles.badgeOk}>Đầy đủ</span>
+                            <span className={styles.badgeOk}>Complete</span>
                           ) : (
-                            <span className={styles.badgeWarn}>Thiếu</span>
+                            <span className={styles.badgeWarn}>Incomplete</span>
                           )}
-                          <p className={styles.sub}>
-                            Filter: {srv.safety.contentFilterLevel}
-                          </p>
                           <p className={styles.sub}>
                             Verify: {srv.safety.verificationLevel}
                           </p>
                         </td>
                         <td>
                           {srv.safety.hasAutoMod ? (
-                            <span className={styles.badgeOk}>Bật</span>
+                            <span className={styles.badgeOk}>Enabled</span>
                           ) : (
-                            <span className={styles.badgeDanger}>Tắt</span>
+                            <span className={styles.badgeDanger}>Disabled</span>
                           )}
                           {srv.safety.bannedWordsCount > 0 && (
                             <p className={styles.sub}>
@@ -562,10 +559,10 @@ export default function CommunityDiscoveryPage() {
                         <td>
                           {srv.hasAbnormalActivity ? (
                             <span className={styles.badgeDanger}>
-                              Bất thường
+                              Abnormal
                             </span>
                           ) : (
-                            <span className={styles.badgeOk}>Bình thường</span>
+                            <span className={styles.badgeOk}>Normal</span>
                           )}
                         </td>
                         <td>
@@ -574,15 +571,16 @@ export default function CommunityDiscoveryPage() {
                           </p>
                         </td>
                         <td>
-                          <button
+
+                          {tab === "review" && (
+                            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                                        <button
                             type="button"
                             className={styles.joinBtn}
                             onClick={() => setJoinConfirm(srv)}
                           >
-                            Tham gia xem
+                            View
                           </button>
-                          {tab === "review" && (
-                            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
                               <button
                                 type="button"
                                 className={styles.expandBtn}
@@ -592,11 +590,11 @@ export default function CommunityDiscoveryPage() {
                                   void updateApproval(srv, "approved");
                                 }}
                                 disabled={srv.communityDiscoveryStatus === "approved"}
-                                title="Chấp thuận để hiển thị trong Khám phá"
+                                title="Approve to show in Discovery"
                               >
                                 {approvalLoadingId === srv.id && srv.communityDiscoveryStatus !== "approved"
-                                  ? "Đang xử lý..."
-                                  : "Chấp thuận"}
+                                  ? "Processing..."
+                                  : "Approve"}
                               </button>
                               <button
                                 type="button"
@@ -607,12 +605,12 @@ export default function CommunityDiscoveryPage() {
                                   void updateApproval(srv, "rejected");
                                 }}
                                 disabled={srv.communityDiscoveryStatus === "rejected"}
-                                title="Từ chối — không hiển thị trong Khám phá"
+                                title="Reject and keep hidden from Discovery"
                                 style={{ color: "#b42318", borderColor: "rgba(180,35,24,0.25)" }}
                               >
                                 {approvalLoadingId === srv.id && srv.communityDiscoveryStatus !== "rejected"
-                                  ? "Đang xử lý..."
-                                  : "Từ chối"}
+                                  ? "Processing..."
+                                  : "Reject"}
                               </button>
                             </div>
                           )}
@@ -630,12 +628,12 @@ export default function CommunityDiscoveryPage() {
                                 disabled={srv.communityDiscoveryStatus !== "approved"}
                                 title={
                                   srv.communityDiscoveryStatus !== "approved"
-                                    ? "Chỉ server đã chấp thuận mới được gỡ"
-                                    : "Gỡ khỏi discovery"
+                                    ? "Only approved servers can be removed"
+                                    : "Remove from Discovery"
                                 }
                                 style={{ color: "#b42318", borderColor: "rgba(180,35,24,0.25)" }}
                               >
-                                {approvalLoadingId === srv.id ? "Đang xử lý..." : "Gỡ"}
+                                {approvalLoadingId === srv.id ? "Processing..." : "Remove"}
                               </button>
                             </div>
                           )}
@@ -648,7 +646,7 @@ export default function CommunityDiscoveryPage() {
                               {srv.uncategorizedChannels.length > 0 && (
                                 <div className={styles.channelCategory}>
                                   <div className={styles.channelCategoryTitle}>
-                                    Không có danh mục
+                                    Uncategorized
                                   </div>
                                   <ul className={styles.channelList}>
                                     {srv.uncategorizedChannels.map((ch) => (
@@ -691,7 +689,7 @@ export default function CommunityDiscoveryPage() {
                               {srv.channelsByCategory.length === 0 &&
                                 srv.uncategorizedChannels.length === 0 && (
                                   <p className={styles.sub}>
-                                    Không có kênh nào.
+                                    No channels.
                                   </p>
                                 )}
                             </div>
@@ -712,7 +710,7 @@ export default function CommunityDiscoveryPage() {
               <input
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
-                placeholder="Tìm theo tên hoặc ID server..."
+                placeholder="Search by server name or ID..."
                 style={{
                   flex: "1 1 260px",
                   minWidth: 220,
@@ -739,13 +737,13 @@ export default function CommunityDiscoveryPage() {
                   color: "var(--color-text)",
                   fontSize: 13,
                 }}
-                title="Bộ lọc lịch sử"
+                title="History filter"
               >
-                <option value="all">Tất cả</option>
-                <option value="approve">Chấp thuận</option>
-                <option value="reject">Từ chối</option>
-                <option value="remove">Gỡ khỏi discovery</option>
-                <option value="restore">Khôi phục</option>
+                <option value="all">All</option>
+                <option value="approve">Approve</option>
+                <option value="reject">Reject</option>
+                <option value="remove">Remove from Discovery</option>
+                <option value="restore">Restore</option>
               </select>
               <select
                 value={historySort}
@@ -758,19 +756,19 @@ export default function CommunityDiscoveryPage() {
                   color: "var(--color-text)",
                   fontSize: 13,
                 }}
-                title="Sắp xếp theo thời gian"
+                title="Sort by time"
               >
-                <option value="action_desc">Hành động: Mới nhất</option>
-                <option value="action_asc">Hành động: Cũ nhất</option>
-                <option value="activated_desc">Kích hoạt: Mới nhất</option>
-                <option value="activated_asc">Kích hoạt: Cũ nhất</option>
+                <option value="action_desc">Action: Newest</option>
+                <option value="action_asc">Action: Oldest</option>
+                <option value="activated_desc">Activated: Newest</option>
+                <option value="activated_asc">Activated: Oldest</option>
               </select>
               <button
                 type="button"
                 className={styles.expandBtn}
                 onClick={() => void loadHistory()}
               >
-                Tìm
+                Search
               </button>
             </div>
 
@@ -779,16 +777,16 @@ export default function CommunityDiscoveryPage() {
             ) : historyError ? (
               <div className={styles.emptyState}>{historyError}</div>
             ) : historyItems.length === 0 ? (
-              <div className={styles.emptyState}>Chưa có lịch sử.</div>
+              <div className={styles.emptyState}>No history yet.</div>
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
                     <tr>
                       <th>Server</th>
-                      <th>Hành động</th>
-                      <th>Thời gian</th>
-                      <th>Chi tiết</th>
+                      <th>Action</th>
+                      <th>Time</th>
+                      <th>Details</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -811,10 +809,10 @@ export default function CommunityDiscoveryPage() {
                           {it.serverDeleted ? (
                             <div style={{ display: "grid", gap: 6 }}>
                               <span className={styles.badgeDanger}>
-                                Server đã xóa
+                                Server deleted
                               </span>
                               <span className={styles.sub}>
-                                Xóa bởi: {it.deletedBy?.email || it.deletedBy?.id || "--"}
+                                Deleted by: {it.deletedBy?.email || it.deletedBy?.id || "--"}
                               </span>
                               <button
                                 type="button"
@@ -837,11 +835,11 @@ export default function CommunityDiscoveryPage() {
                                       const text = await res.text().catch(() => "");
                                       throw new Error(text || `HTTP ${res.status}`);
                                     }
-                                    setToast({ type: "success", message: "Đã khôi phục server." });
+                                    setToast({ type: "success", message: "Server restored." });
                                     await loadHistory();
                                   } catch (e) {
                                     const err = e as { message?: string } | null;
-                                    setToast({ type: "error", message: err?.message || "Không khôi phục được" });
+                                    setToast({ type: "error", message: err?.message || "Could not restore." });
                                   } finally {
                                     setApprovalLoadingId((cur) =>
                                       cur === String(it.serverId) ? null : cur,
@@ -851,22 +849,22 @@ export default function CommunityDiscoveryPage() {
                                 disabled={approvalLoadingId === String(it.serverId) || it.canRestoreServer === false}
                                 title={
                                   it.canRestoreServer === false
-                                    ? "Server đã bị xóa vĩnh viễn (hard-delete) nên không thể khôi phục."
+                                    ? "Server was hard-deleted and cannot be restored."
                                     : undefined
                                 }
                               >
-                                {approvalLoadingId === String(it.serverId) ? "Đang xử lý..." : "Khôi phục server"}
+                                {approvalLoadingId === String(it.serverId) ? "Processing..." : "Restore server"}
                               </button>
                             </div>
                           ) : (
                             <span className={styles.badgeOk} style={{ background: "rgba(99,102,241,0.12)", color: "#3730a3" }}>
                               {it.action === "approve"
-                                ? "Chấp thuận"
+                                ? "Approve"
                                 : it.action === "reject"
-                                  ? "Từ chối"
+                                  ? "Reject"
                                   : it.action === "remove"
-                                    ? "Gỡ khỏi discovery"
-                                    : "Khôi phục"}
+                                    ? "Remove from Discovery"
+                                    : "Restore"}
                             </span>
                           )}
                         </td>
@@ -878,12 +876,12 @@ export default function CommunityDiscoveryPage() {
                             onClick={() => {
                               setHistoryDetail({
                                 serverId: String(it.serverId),
-                                serverName: it.serverSnapshot?.name || "Máy chủ",
+                                serverName: it.serverSnapshot?.name || "Server",
                               });
                               void loadHistory({ serverId: String(it.serverId) });
                             }}
                           >
-                            Xem chi tiết
+                            View details
                           </button>
                         </td>
                       </tr>
@@ -904,9 +902,9 @@ export default function CommunityDiscoveryPage() {
             }}
           >
             <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <h2 className={styles.modalTitle}>Lịch sử — {historyDetail.serverName}</h2>
+              <h2 className={styles.modalTitle}>History — {historyDetail.serverName}</h2>
               <p className={styles.modalDesc}>
-                Hiển thị các mốc: chấp thuận, từ chối, gỡ khỏi discovery và khôi phục.
+                Displays events: approve, reject, remove from Discovery, and restore.
               </p>
 
               <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
@@ -928,9 +926,9 @@ export default function CommunityDiscoveryPage() {
                 <table className={styles.table} style={{ minWidth: 0 }}>
                   <thead>
                     <tr>
-                      <th>Hành động</th>
-                      <th>Thời gian</th>
-                      <th>Ghi chú</th>
+                      <th>Action</th>
+                      <th>Time</th>
+                      <th>Note</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -938,12 +936,12 @@ export default function CommunityDiscoveryPage() {
                       <tr key={it._id}>
                         <td className={styles.main}>
                           {it.action === "approve"
-                            ? "Chấp thuận"
+                            ? "Approve"
                             : it.action === "reject"
-                              ? "Từ chối"
+                              ? "Reject"
                               : it.action === "remove"
-                                ? "Gỡ khỏi discovery"
-                                : "Khôi phục"}
+                                ? "Remove from Discovery"
+                                : "Restore"}
                         </td>
                         <td className={styles.sub}>{formatDate(it.createdAt)}</td>
                         <td className={styles.sub}>{it.note || "--"}</td>
@@ -962,7 +960,7 @@ export default function CommunityDiscoveryPage() {
                     onClick={() => void restoreDiscovery(historyDetail.serverId)}
                     disabled={approvalLoadingId === historyDetail.serverId}
                   >
-                    {approvalLoadingId === historyDetail.serverId ? "Đang xử lý..." : "Khôi phục discovery"}
+                    {approvalLoadingId === historyDetail.serverId ? "Processing..." : "Restore Discovery"}
                   </button>
                 </div>
               )}
@@ -976,7 +974,7 @@ export default function CommunityDiscoveryPage() {
                     void loadHistory();
                   }}
                 >
-                  Đóng
+                  Close
                 </button>
               </div>
             </div>
@@ -990,12 +988,12 @@ export default function CommunityDiscoveryPage() {
           onClick={() => setJoinConfirm(null)}
         >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>Xem máy chủ</h2>
+            <h2 className={styles.modalTitle}>View server</h2>
             <p className={styles.modalDesc}>
-              Bạn sẽ vào màn hình xem nội bộ &ldquo;{joinConfirm.name}&rdquo; (cùng
-              cổng admin, đã đăng nhập) ở chế độ <strong>chỉ đọc</strong>: danh
-              sách kênh và tin nhắn, không chat hay reaction. Không mở tab ứng
-              dụng web người dùng.
+              You will open the internal viewer for &ldquo;{joinConfirm.name}&rdquo;
+              (same admin portal, authenticated) in <strong>read-only</strong>
+              mode: channel list and messages only, no chat or reactions. This
+              does not open the user web app.
             </p>
             <div className={styles.modalActions}>
               <button
@@ -1003,14 +1001,14 @@ export default function CommunityDiscoveryPage() {
                 className={styles.modalCancel}
                 onClick={() => setJoinConfirm(null)}
               >
-                Hủy
+                Cancel
               </button>
               <button
                 type="button"
                 className={styles.modalConfirm}
                 onClick={handleJoinConfirm}
               >
-                Mở xem
+                Open view
               </button>
             </div>
           </div>

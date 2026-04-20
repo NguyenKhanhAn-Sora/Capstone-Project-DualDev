@@ -1316,39 +1316,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget _buildSliverAppBar(ProfileDetail p, bool isOwner) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final hasCover = p.coverUrl != null && p.coverUrl!.isNotEmpty;
     return SliverAppBar(
-      expandedHeight: hasCover ? 180 : 60,
+      expandedHeight: 60,
       pinned: true,
       backgroundColor: scheme.surface,
       surfaceTintColor: Colors.transparent,
-      flexibleSpace: hasCover
-          ? FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    p.coverUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        ColoredBox(color: scheme.surface),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          scheme.surface.withValues(alpha: 0.82),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : null,
+      flexibleSpace: null,
       leading: IconButton(
         icon: Icon(
           Icons.arrow_back_ios_new_rounded,
