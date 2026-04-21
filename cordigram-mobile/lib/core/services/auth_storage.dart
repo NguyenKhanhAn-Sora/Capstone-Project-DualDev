@@ -69,6 +69,24 @@ class AuthStorage {
   static String? get refreshToken => _refreshToken;
   static String? get deviceId => _deviceId;
 
+  /// Returns true when the current access token is expired.
+  ///
+  /// This is intentionally used on app startup so users are not forced out
+  /// mid-session the moment the token expires.
+  static bool hasExpiredAccessToken({
+    Duration clockSkew = const Duration(seconds: 30),
+  }) {
+    final token = _accessToken;
+    if (token == null || token.isEmpty) return false;
+
+    final exp = _extractJwtExp(token);
+    if (exp == null) return false;
+
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final expMs = exp * 1000;
+    return now >= (expMs - clockSkew.inMilliseconds);
+  }
+
   /// Load all persisted values at app startup. Also generates deviceId if missing.
   static Future<void> loadAll() async {
     final prefs = await SharedPreferences.getInstance();
@@ -199,6 +217,23 @@ class AuthStorage {
     final prefs = await SharedPreferences.getInstance();
     final encoded = jsonEncode(items.map((item) => item.toJson()).toList());
     await prefs.setString(_keyRecentAccounts, encoded);
+  }
+
+  static int? _extractJwtExp(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      final normalized = base64Url.normalize(parts[1]);
+      final payload = utf8.decode(base64Url.decode(normalized));
+      final map = jsonDecode(payload);
+      if (map is! Map) return null;
+      final exp = map['exp'];
+      if (exp is int) return exp;
+      if (exp is num) return exp.toInt();
+      return int.tryParse(exp?.toString() ?? '');
+    } catch (_) {
+      return null;
+    }
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────

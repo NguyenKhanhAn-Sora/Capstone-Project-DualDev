@@ -13,6 +13,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _requestNotificationPermission();
   await AuthStorage.loadAll();
+  if (AuthStorage.hasExpiredAccessToken()) {
+    await AuthStorage.clear();
+  }
   await PushNotificationService.initialize(navigatorKey: appNavigatorKey);
   runApp(const MyApp());
 }

@@ -58,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   static const double _kTopNavContentHeight = kToolbarHeight + 44;
   static const double _kNavToggleTriggerDistance = 42;
   static const double _kBackToTopTriggerDistance = 140;
+  bool _topNavTargetVisible = true;
   double _scrollTriggerAccumulated = 0;
   int _scrollTriggerDirection = 0;
   DateTime? _lastBackPressedAt;
@@ -168,12 +169,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _showTopNav() {
-    if (_topNavAnimController.value >= 0.999) return;
+    if (_topNavTargetVisible) return;
+    _topNavTargetVisible = true;
     _topNavAnimController.animateTo(1);
   }
 
   void _hideTopNav() {
-    if (_topNavAnimController.value <= 0.001) return;
+    if (!_topNavTargetVisible) return;
+    _topNavTargetVisible = false;
     _topNavAnimController.animateTo(0);
   }
 
@@ -1149,42 +1152,52 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _topNavVisibility,
-      builder: (context, _) {
-        final topInset = MediaQuery.paddingOf(context).top;
-        final fullTopNavHeight = topInset + _kTopNavContentHeight;
-        final visibleTopNavHeight = fullTopNavHeight * _topNavVisibility.value;
-        final navFullyHidden = visibleTopNavHeight <= 0.1;
+    final topInset = MediaQuery.paddingOf(context).top;
+    final fullTopNavHeight = topInset + _kTopNavContentHeight;
+    final feedBody = NotificationListener<ScrollNotification>(
+      onNotification: _onBodyScroll,
+      child: _buildBody(),
+    );
+    final topNav = SizedBox(height: fullTopNavHeight, child: _buildAppBar());
 
-        return WillPopScope(
-          onWillPop: _onWillPop,
-          child: Scaffold(
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            appBar: navFullyHidden
-                ? null
-                : PreferredSize(
-                    preferredSize: Size.fromHeight(visibleTopNavHeight),
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: AnimatedBuilder(
+          animation: _topNavVisibility,
+          builder: (context, _) {
+            final value = _topNavVisibility.value;
+            final hiddenDistance = (1 - value) * fullTopNavHeight;
+
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: fullTopNavHeight * value),
+                    child: feedBody,
+                  ),
+                ),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: fullTopNavHeight,
+                  child: IgnorePointer(
+                    ignoring: value < 0.05,
                     child: ClipRect(
-                      child: SizedBox(
-                        height: fullTopNavHeight,
-                        child: Transform.translate(
-                          offset: Offset(
-                            0,
-                            -(1 - _topNavVisibility.value) * fullTopNavHeight,
-                          ),
-                          child: _buildAppBar(),
-                        ),
+                      child: Transform.translate(
+                        offset: Offset(0, -hiddenDistance),
+                        child: topNav,
                       ),
                     ),
                   ),
-            body: NotificationListener<ScrollNotification>(
-              onNotification: _onBodyScroll,
-              child: _buildBody(),
-            ),
-          ),
-        );
-      },
+                ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 
