@@ -145,6 +145,27 @@
   object-fit: cover;
 }
 
+.feedPreviewComposite {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.feedPreviewCameraOverlay {
+  position: absolute;
+  width: 30%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.28);
+  box-shadow: 0 8px 20px rgba(2, 6, 23, 0.46);
+}
+
+.feedPreviewCameraBottomRight {
+  bottom: 10px;
+  right: 10px;
+}
+
 .feedPreviewEmpty {
   width: 100%;
   height: 100%;
@@ -508,7 +529,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: #dbeafe;
+  /* color: #dbeafe; */
   text-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
 }
 
@@ -885,7 +906,7 @@
 .ivsText,
 .ivsField {
   margin: 0;
-  color: #dbeafe;
+  /* color: #dbeafe; */
   font-size: 12px;
   line-height: 1.4;
   word-break: break-word;
@@ -894,6 +915,58 @@
   height: 100%;
   object-fit: cover;
   min-height: 180px;
+}
+
+.videoMirrored {
+  transform: scaleX(-1);
+  transform-origin: center;
+}
+
+.stageCameraOverlay {
+  position: absolute;
+  z-index: 2;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.34);
+  box-shadow: 0 10px 24px rgba(2, 6, 23, 0.48);
+  min-height: 0;
+  width: auto;
+  height: auto;
+}
+
+.stageCameraTopLeft {
+  top: 10px;
+  left: 10px;
+}
+
+.stageCameraTopRight {
+  top: 10px;
+  right: 10px;
+}
+
+.stageCameraBottomLeft {
+  bottom: 10px;
+  left: 10px;
+}
+
+.stageCameraBottomRight {
+  bottom: 10px;
+  right: 10px;
+}
+
+.stageCameraSmall {
+  width: 20%;
+  aspect-ratio: 16 / 9;
+}
+
+.stageCameraMedium {
+  width: 26%;
+  aspect-ratio: 16 / 9;
+}
+
+.stageCameraLarge {
+  width: 33%;
+  aspect-ratio: 16 / 9;
 }
 
 .stageFullscreenBtn {

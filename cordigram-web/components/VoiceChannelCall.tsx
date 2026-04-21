@@ -12,6 +12,10 @@ import { Track } from "livekit-client";
 import styles from "./VoiceChannelCall.module.css";
 
 const MAX_PARTICIPANTS = 15;
+const LIVEKIT_ROOM_OPTIONS = {
+  adaptiveStream: true,
+  dynacast: true,
+};
 
 export interface VoiceChannelCallProps {
   token: string;
@@ -38,6 +42,7 @@ export default function VoiceChannelCall({
         connect={true}
         video={true}
         audio={true}
+        options={LIVEKIT_ROOM_OPTIONS}
         onDisconnected={onDisconnect}
         className={styles.liveKitRoom}
       >
@@ -160,8 +165,8 @@ function VoiceChannelControls({
   micMuted?: boolean;
 }) {
   const { localParticipant } = useLocalParticipant();
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const isVideoOff = localParticipant ? !localParticipant.isCameraEnabled : false;
+  const isScreenSharing = localParticipant ? localParticipant.isScreenShareEnabled : false;
 
   useEffect(() => {
     if (!localParticipant) return;
@@ -174,17 +179,17 @@ function VoiceChannelControls({
 
   const toggleVideo = async () => {
     if (localParticipant) {
-      const enabled = localParticipant.isCameraEnabled;
-      await localParticipant.setCameraEnabled(!enabled);
-      setIsVideoOff(enabled);
+      await localParticipant.setCameraEnabled(!localParticipant.isCameraEnabled);
     }
   };
 
   const toggleScreenShare = async () => {
     if (localParticipant) {
-      const enabled = localParticipant.isScreenShareEnabled;
-      await localParticipant.setScreenShareEnabled(!enabled);
-      setIsScreenSharing(!enabled);
+      try {
+        await localParticipant.setScreenShareEnabled(!localParticipant.isScreenShareEnabled);
+      } catch {
+        // Keep UI stable when browser blocks or user cancels share picker.
+      }
     }
   };
 

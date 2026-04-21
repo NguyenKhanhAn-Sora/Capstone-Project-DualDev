@@ -12,6 +12,11 @@ import {
 import { Track, RoomEvent } from "livekit-client";
 import styles from "./CallRoom.module.css";
 
+const LIVEKIT_ROOM_OPTIONS = {
+  adaptiveStream: true,
+  dynacast: true,
+};
+
 /** In a 1:1 call, when the remote participant leaves, end this session too */
 function EndCallWhenRemoteDisconnects({
   onRemoteLeft,
@@ -58,8 +63,6 @@ export default function CallRoom({
   participantName,
   isAudioOnly = false,
 }: CallRoomProps) {
-  const [isConnected, setIsConnected] = useState(false);
-
   return (
     <div className={styles.callRoomContainer}>
       <LiveKitRoom
@@ -68,13 +71,8 @@ export default function CallRoom({
         connect={true}
         video={!isAudioOnly}
         audio={true}
-        onConnected={() => {
-          setIsConnected(true);
-        }}
-        onDisconnected={() => {
-          setIsConnected(false);
-          onDisconnect();
-        }}
+        options={LIVEKIT_ROOM_OPTIONS}
+        onDisconnected={onDisconnect}
         className={styles.liveKitRoom}
       >
         <EndCallWhenRemoteDisconnects onRemoteLeft={onDisconnect} />
@@ -228,33 +226,31 @@ function CustomVideoConference({ onDisconnect }: { onDisconnect: () => void }) {
 
 // Custom Controls Component for Video Call
 function CustomControls({ onDisconnect }: { onDisconnect: () => void }) {
-  const room = useRoomContext();
   const { localParticipant } = useLocalParticipant();
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
+
+  const isMuted = localParticipant ? !localParticipant.isMicrophoneEnabled : false;
+  const isVideoOff = localParticipant ? !localParticipant.isCameraEnabled : false;
+  const isScreenSharing = localParticipant ? localParticipant.isScreenShareEnabled : false;
 
   const toggleMicrophone = async () => {
     if (localParticipant) {
-      const enabled = localParticipant.isMicrophoneEnabled;
-      await localParticipant.setMicrophoneEnabled(!enabled);
-      setIsMuted(enabled);
+      await localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
     }
   };
 
   const toggleVideo = async () => {
     if (localParticipant) {
-      const enabled = localParticipant.isCameraEnabled;
-      await localParticipant.setCameraEnabled(!enabled);
-      setIsVideoOff(enabled);
+      await localParticipant.setCameraEnabled(!localParticipant.isCameraEnabled);
     }
   };
 
   const toggleScreenShare = async () => {
     if (localParticipant) {
-      const enabled = localParticipant.isScreenShareEnabled;
-      await localParticipant.setScreenShareEnabled(!enabled);
-      setIsScreenSharing(!enabled);
+      try {
+        await localParticipant.setScreenShareEnabled(!localParticipant.isScreenShareEnabled);
+      } catch {
+        // Keep UI stable when browser blocks or user cancels share picker.
+      }
     }
   };
 
@@ -385,13 +381,11 @@ function AudioOnlyView({
   );
 
   const { localParticipant } = useLocalParticipant();
-  const [isMuted, setIsMuted] = useState(false);
+  const isMuted = localParticipant ? !localParticipant.isMicrophoneEnabled : false;
 
   const toggleMicrophone = async () => {
     if (localParticipant) {
-      const enabled = localParticipant.isMicrophoneEnabled;
-      await localParticipant.setMicrophoneEnabled(!enabled);
-      setIsMuted(enabled);
+      await localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
     }
   };
 

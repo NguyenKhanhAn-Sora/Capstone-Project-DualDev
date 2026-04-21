@@ -8,7 +8,14 @@ import {
   type LivestreamLatencyMode,
 } from "@/lib/livestream-api";
 import {
+  type LivestreamCameraPosition,
+  type LivestreamCameraSize,
+  type LivestreamHostVideoMode,
+  clearPendingLivestreamMedia,
+  clearPendingCameraStream,
   clearPendingScreenShareStream,
+  setPendingCameraStream,
+  setPendingHostVideoConfig,
   setPendingScreenShareStream,
 } from "@/lib/livestream-screen-share-cache";
 import { searchProfiles, type ProfileSearchItem } from "@/lib/api";
@@ -92,16 +99,49 @@ async function optimizeScreenVideoTrack(
   }
 }
 
+function getCameraCaptureConstraints(mode: LivestreamLatencyMode) {
+  if (mode === "low") {
+    return {
+      width: { ideal: 960, max: 1280 },
+      height: { ideal: 540, max: 720 },
+      frameRate: { ideal: 24, max: 30 },
+      facingMode: "user",
+    } as MediaTrackConstraints;
+  }
+
+  if (mode === "balanced") {
+    return {
+      width: { ideal: 1280, max: 1920 },
+      height: { ideal: 720, max: 1080 },
+      frameRate: { ideal: 30, max: 30 },
+      facingMode: "user",
+    } as MediaTrackConstraints;
+  }
+
+  return {
+    width: { ideal: 1920, max: 1920 },
+    height: { ideal: 1080, max: 1080 },
+    frameRate: { ideal: 30, max: 60 },
+    facingMode: "user",
+  } as MediaTrackConstraints;
+}
+
 export default function LivestreamCreatePanel() {
   const router = useRouter();
   type PermissionState = "unknown" | "granted" | "denied" | "unsupported";
-  type PreviewAttempt = "screen" | null;
+  type PreviewAttempt = "screen" | "camera" | null;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [pinnedComment, setPinnedComment] = useState("");
   const [location, setLocation] = useState("");
   const [visibility, setVisibility] = useState<"public" | "followers" | "private">("public");
   const [latencyMode, setLatencyMode] = useState<LivestreamLatencyMode>("adaptive");
+  const [hostVideoMode, setHostVideoMode] = useState<LivestreamHostVideoMode>(
+    "screen-camera",
+  );
+  const [cameraPosition, setCameraPosition] =
+    useState<LivestreamCameraPosition>("bottom-right");
+  const [cameraSize, setCameraSize] = useState<LivestreamCameraSize>("medium");
   const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [mentionSuggestions, setMentionSuggestions] = useState<ProfileSearchItem[]>([]);
@@ -119,12 +159,15 @@ export default function LivestreamCreatePanel() {
   const [titleError, setTitleError] = useState("");
   const [micPermission, setMicPermission] = useState<PermissionState>("unknown");
   const [screenPermission, setScreenPermission] = useState<PermissionState>("unknown");
-  const [permissionBusy, setPermissionBusy] = useState<"microphone" | "screen" | null>(null);
+  const [cameraPermission, setCameraPermission] = useState<PermissionState>("unknown");
+  const [permissionBusy, setPermissionBusy] =
+    useState<"microphone" | "screen" | "camera" | null>(null);
   const [permissionError, setPermissionError] = useState("");
-  const [previewMode, setPreviewMode] = useState<"none" | "screen">("none");
   const [lastPreviewAttempt, setLastPreviewAttempt] = useState<PreviewAttempt>(null);
   const [microphoneDevices, setMicrophoneDevices] = useState<MediaDeviceInfo[]>([]);
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState("");
+  const [selectedCameraId, setSelectedCameraId] = useState("");
   const [devicesLoading, setDevicesLoading] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
   const [isMicTesting, setIsMicTesting] = useState(false);
@@ -133,9 +176,11 @@ export default function LivestreamCreatePanel() {
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
   const visibilityRef = useRef<HTMLDivElement | null>(null);
   const emojiRef = useRef<HTMLDivElement | null>(null);
-  const previewRef = useRef<HTMLVideoElement | null>(null);
-  const previewStreamRef = useRef<MediaStream | null>(null);
-  const keepScreenPreviewOnUnmountRef = useRef(false);
+  const screenPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const cameraPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const screenPreviewStreamRef = useRef<MediaStream | null>(null);
+  const cameraPreviewStreamRef = useRef<MediaStream | null>(null);
+  const keepPreviewStreamsOnUnmountRef = useRef(false);
   const micStreamRef = useRef<MediaStream | null>(null);
   const micAudioContextRef = useRef<AudioContext | null>(null);
   const micAnalyserRef = useRef<AnalyserNode | null>(null);
@@ -149,6 +194,29 @@ export default function LivestreamCreatePanel() {
       visibilityOptions[0],
     [visibility],
   );
+
+  const hasScreenPreview =
+    Boolean(screenPreviewStreamRef.current?.getVideoTracks()?.[0]) &&
+    screenPreviewStreamRef.current?.getVideoTracks()?.[0]?.readyState !== "ended";
+
+  const hasCameraPreview =
+    Boolean(cameraPreviewStreamRef.current?.getVideoTracks()?.[0]) &&
+    cameraPreviewStreamRef.current?.getVideoTracks()?.[0]?.readyState !== "ended";
+
+  const requiresScreen = hostVideoMode !== "camera-only";
+  const requiresCamera = hostVideoMode !== "screen-only";
+
+  const activeScreenPreview = hasScreenPreview && requiresScreen;
+  const activeCameraPreview = hasCameraPreview && requiresCamera;
+
+  const computedPreviewMode =
+    activeScreenPreview && activeCameraPreview
+      ? "screen-camera"
+      : activeScreenPreview
+        ? "screen"
+        : activeCameraPreview
+          ? "camera"
+          : "none";
 
   const titleWordCount = useMemo(() => {
     const trimmed = title.trim();
@@ -254,39 +322,69 @@ export default function LivestreamCreatePanel() {
       setDevicesLoading(true);
       const devices = await navigator.mediaDevices.enumerateDevices();
       const microphones = devices.filter((device) => device.kind === "audioinput");
+      const cameras = devices.filter((device) => device.kind === "videoinput");
       setMicrophoneDevices(microphones);
+      setCameraDevices(cameras);
 
       setSelectedMicrophoneId((prev) => {
         if (prev && microphones.some((device) => device.deviceId === prev)) return prev;
         return microphones[0]?.deviceId || "";
+      });
+
+      setSelectedCameraId((prev) => {
+        if (prev && cameras.some((device) => device.deviceId === prev)) return prev;
+        return cameras[0]?.deviceId || "";
       });
     } finally {
       setDevicesLoading(false);
     }
   };
 
-  const stopPreview = () => {
-    if (previewStreamRef.current) {
-      previewStreamRef.current.getTracks().forEach((track) => track.stop());
-      previewStreamRef.current = null;
+  const stopScreenPreview = () => {
+    if (screenPreviewStreamRef.current) {
+      screenPreviewStreamRef.current.getTracks().forEach((track) => track.stop());
+      screenPreviewStreamRef.current = null;
     }
     clearPendingScreenShareStream();
-    if (previewRef.current) {
-      previewRef.current.srcObject = null;
+    if (screenPreviewRef.current) {
+      screenPreviewRef.current.srcObject = null;
     }
-    setPreviewMode("none");
   };
 
-  const attachPreviewStream = (stream: MediaStream, mode: "screen") => {
-    if (previewStreamRef.current) {
-      previewStreamRef.current.getTracks().forEach((track) => track.stop());
+  const stopCameraPreview = () => {
+    if (cameraPreviewStreamRef.current) {
+      cameraPreviewStreamRef.current.getTracks().forEach((track) => track.stop());
+      cameraPreviewStreamRef.current = null;
     }
-    previewStreamRef.current = stream;
+    clearPendingCameraStream();
+    if (cameraPreviewRef.current) {
+      cameraPreviewRef.current.srcObject = null;
+    }
+  };
+
+  const attachScreenPreviewStream = (stream: MediaStream) => {
+    if (screenPreviewStreamRef.current) {
+      screenPreviewStreamRef.current.getTracks().forEach((track) => track.stop());
+    }
+    screenPreviewStreamRef.current = stream;
     setPendingScreenShareStream(stream);
-    setPreviewMode(mode);
-    if (previewRef.current) {
-      previewRef.current.srcObject = stream;
-      void previewRef.current.play().catch(() => {
+    if (screenPreviewRef.current) {
+      screenPreviewRef.current.srcObject = stream;
+      void screenPreviewRef.current.play().catch(() => {
+        // Browser may require additional user interaction before playback.
+      });
+    }
+  };
+
+  const attachCameraPreviewStream = (stream: MediaStream) => {
+    if (cameraPreviewStreamRef.current) {
+      cameraPreviewStreamRef.current.getTracks().forEach((track) => track.stop());
+    }
+    cameraPreviewStreamRef.current = stream;
+    setPendingCameraStream(stream);
+    if (cameraPreviewRef.current) {
+      cameraPreviewRef.current.srcObject = stream;
+      void cameraPreviewRef.current.play().catch(() => {
         // Browser may require additional user interaction before playback.
       });
     }
@@ -338,8 +436,10 @@ export default function LivestreamCreatePanel() {
     void loadMediaDevices();
 
     return () => {
-      if (!keepScreenPreviewOnUnmountRef.current) {
-        stopPreview();
+      if (!keepPreviewStreamsOnUnmountRef.current) {
+        stopScreenPreview();
+        stopCameraPreview();
+        clearPendingLivestreamMedia();
       }
       stopMicMeter();
       if (micOverlayTimerRef.current) {
@@ -350,16 +450,28 @@ export default function LivestreamCreatePanel() {
   }, []);
 
   useEffect(() => {
-    if (!previewRef.current) return;
-    if (!previewStreamRef.current) {
-      previewRef.current.srcObject = null;
+    if (!screenPreviewRef.current) return;
+    if (!screenPreviewStreamRef.current) {
+      screenPreviewRef.current.srcObject = null;
       return;
     }
-    previewRef.current.srcObject = previewStreamRef.current;
-    void previewRef.current.play().catch(() => {
+    screenPreviewRef.current.srcObject = screenPreviewStreamRef.current;
+    void screenPreviewRef.current.play().catch(() => {
       // Browser may require additional user interaction before playback.
     });
-  }, [previewMode]);
+  }, [latencyMode]);
+
+  useEffect(() => {
+    if (!cameraPreviewRef.current) return;
+    if (!cameraPreviewStreamRef.current) {
+      cameraPreviewRef.current.srcObject = null;
+      return;
+    }
+    cameraPreviewRef.current.srcObject = cameraPreviewStreamRef.current;
+    void cameraPreviewRef.current.play().catch(() => {
+      // Browser may require additional user interaction before playback.
+    });
+  }, [latencyMode]);
 
   const requestMicrophonePermission = async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -466,10 +578,10 @@ export default function LivestreamCreatePanel() {
       }
 
       setScreenPermission("granted");
-      attachPreviewStream(stream, "screen");
+      attachScreenPreviewStream(stream);
       if (videoTrack) {
         videoTrack.onended = () => {
-          stopPreview();
+          stopScreenPreview();
         };
       }
     } catch {
@@ -480,7 +592,50 @@ export default function LivestreamCreatePanel() {
     }
   };
 
+  const requestCameraPreview = async () => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setCameraPermission("unsupported");
+      setPermissionError("Camera API is not supported in this browser.");
+      return;
+    }
+
+    try {
+      setPermissionBusy("camera");
+      setLastPreviewAttempt("camera");
+      setPermissionError("");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: selectedCameraId
+          ? {
+              deviceId: { exact: selectedCameraId },
+              ...getCameraCaptureConstraints(latencyMode),
+            }
+          : getCameraCaptureConstraints(latencyMode),
+      });
+
+      const [videoTrack] = stream.getVideoTracks();
+      if (!videoTrack || videoTrack.readyState === "ended") {
+        throw new Error("No valid camera track selected");
+      }
+
+      setCameraPermission("granted");
+      attachCameraPreviewStream(stream);
+      videoTrack.onended = () => {
+        stopCameraPreview();
+      };
+    } catch {
+      setCameraPermission("denied");
+      setPermissionError("Camera was blocked or unavailable. Please try again.");
+    } finally {
+      setPermissionBusy(null);
+    }
+  };
+
   const retryPreview = async () => {
+    if (lastPreviewAttempt === "camera") {
+      await requestCameraPreview();
+      return;
+    }
     await requestScreenPreview();
   };
 
@@ -662,13 +817,13 @@ export default function LivestreamCreatePanel() {
       return;
     }
 
-    const hasScreenPreview =
-      previewMode === "screen" &&
-      Boolean(previewStreamRef.current?.getVideoTracks()?.[0]) &&
-      previewStreamRef.current?.getVideoTracks()?.[0]?.readyState !== "ended";
-
-    if (!hasScreenPreview) {
+    if (requiresScreen && !hasScreenPreview) {
       setError("Please choose a screen share source before creating livestream.");
+      return;
+    }
+
+    if (requiresCamera && !hasCameraPreview) {
+      setError("Please enable a camera source before creating livestream.");
       return;
     }
 
@@ -683,8 +838,14 @@ export default function LivestreamCreatePanel() {
         location: location.trim(),
         mentions: extractMentionsFromTitle(trimmedTitle),
       });
-      keepScreenPreviewOnUnmountRef.current = true;
-      setPendingScreenShareStream(previewStreamRef.current);
+      keepPreviewStreamsOnUnmountRef.current = true;
+      setPendingScreenShareStream(requiresScreen ? screenPreviewStreamRef.current : null);
+      setPendingCameraStream(requiresCamera ? cameraPreviewStreamRef.current : null);
+      setPendingHostVideoConfig({
+        mode: hostVideoMode,
+        cameraPosition,
+        cameraSize,
+      });
       router.push(`/livestream/${encodeURIComponent(data.stream.id)}?host=1`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create livestream.");
@@ -1009,9 +1170,8 @@ export default function LivestreamCreatePanel() {
           className={panelStyles.button}
           disabled={
             loading ||
-            previewMode !== "screen" ||
-            !previewStreamRef.current?.getVideoTracks()?.[0] ||
-            previewStreamRef.current?.getVideoTracks()?.[0]?.readyState === "ended"
+            (requiresScreen && !hasScreenPreview) ||
+            (requiresCamera && !hasCameraPreview)
           }
         >
           {loading ? "Creating..." : "Create livestream"}
@@ -1045,6 +1205,91 @@ export default function LivestreamCreatePanel() {
                 )}
               </select>
             </div>
+
+            <div className={panelStyles.deviceRow}>
+              <span>Camera source</span>
+              <select
+                className={panelStyles.deviceSelect}
+                value={selectedCameraId}
+                onChange={(event) => setSelectedCameraId(event.target.value)}
+                disabled={devicesLoading || !cameraDevices.length}
+              >
+                {cameraDevices.length ? (
+                  cameraDevices.map((device, index) => (
+                    <option key={device.deviceId || `camera-${index}`} value={device.deviceId}>
+                      {device.label || `Camera ${index + 1}`}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">No camera detected</option>
+                )}
+              </select>
+            </div>
+
+            <div className={panelStyles.modeGrid}>
+              <button
+                type="button"
+                className={`${panelStyles.modeOption} ${
+                  hostVideoMode === "screen-only" ? panelStyles.modeOptionActive : ""
+                }`}
+                onClick={() => setHostVideoMode("screen-only")}
+              >
+                Screen only
+              </button>
+              <button
+                type="button"
+                className={`${panelStyles.modeOption} ${
+                  hostVideoMode === "screen-camera" ? panelStyles.modeOptionActive : ""
+                }`}
+                onClick={() => setHostVideoMode("screen-camera")}
+              >
+                Screen + camera
+              </button>
+              <button
+                type="button"
+                className={`${panelStyles.modeOption} ${
+                  hostVideoMode === "camera-only" ? panelStyles.modeOptionActive : ""
+                }`}
+                onClick={() => setHostVideoMode("camera-only")}
+              >
+                Camera only
+              </button>
+            </div>
+
+            {hostVideoMode === "screen-camera" ? (
+              <>
+                <div className={panelStyles.deviceRow}>
+                  <span>Camera mini position</span>
+                  <select
+                    className={panelStyles.deviceSelect}
+                    value={cameraPosition}
+                    onChange={(event) =>
+                      setCameraPosition(event.target.value as LivestreamCameraPosition)
+                    }
+                  >
+                    <option value="top-left">Top left</option>
+                    <option value="top-right">Top right</option>
+                    <option value="bottom-left">Bottom left</option>
+                    <option value="bottom-right">Bottom right</option>
+                  </select>
+                </div>
+
+                <div className={panelStyles.deviceRow}>
+                  <span>Camera mini size</span>
+                  <select
+                    className={panelStyles.deviceSelect}
+                    value={cameraSize}
+                    onChange={(event) =>
+                      setCameraSize(event.target.value as LivestreamCameraSize)
+                    }
+                  >
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
+                  </select>
+                </div>
+              </>
+            ) : null}
 
             <div className={panelStyles.permissionRow}>
               <span>Microphone</span>
@@ -1124,6 +1369,29 @@ export default function LivestreamCreatePanel() {
             >
               {permissionBusy === "screen" ? "Starting preview..." : "Choose screen share"}
             </button>
+
+              <div className={panelStyles.permissionRow}>
+                <span>Camera</span>
+                <span
+                  className={`${panelStyles.permissionBadge} ${
+                    cameraPermission === "granted"
+                      ? panelStyles.permissionGranted
+                      : cameraPermission === "denied"
+                        ? panelStyles.permissionDenied
+                        : ""
+                  }`}
+                >
+                  {permissionLabel(cameraPermission)}
+                </span>
+              </div>
+              <button
+                type="button"
+                className={panelStyles.sideButton}
+                onClick={() => void requestCameraPreview()}
+                disabled={permissionBusy !== null}
+              >
+                {permissionBusy === "camera" ? "Starting camera..." : "Enable camera"}
+              </button>
           </div>
 
           {permissionError ? <p className={panelStyles.sideError}>{permissionError}</p> : null}
@@ -1135,7 +1403,7 @@ export default function LivestreamCreatePanel() {
           </div>
 
           <div className={panelStyles.previewStage}>
-            {previewMode === "none" ? (
+            {computedPreviewMode === "none" ? (
               <div className={panelStyles.previewEmpty}>
                 <p className={panelStyles.previewEmptyTitle}>No preview started</p>
                 {(permissionError || screenPermission === "denied") ? (
@@ -1150,18 +1418,54 @@ export default function LivestreamCreatePanel() {
                 ) : null}
               </div>
             ) : (
-              <video
-                ref={previewRef}
-                className={panelStyles.previewVideo}
-                autoPlay
-                muted
-                playsInline
-              />
+              <div className={panelStyles.previewComposite}>
+                {activeScreenPreview ? (
+                  <video
+                    ref={screenPreviewRef}
+                    className={panelStyles.previewVideo}
+                    autoPlay
+                    muted
+                    playsInline
+                  />
+                ) : null}
+
+                {activeCameraPreview ? (
+                  <video
+                    ref={cameraPreviewRef}
+                    className={`${
+                      hostVideoMode === "camera-only"
+                        ? panelStyles.previewVideo
+                        : panelStyles.previewCameraPip
+                    } ${panelStyles.previewCameraMirrored} ${
+                      hostVideoMode === "screen-camera"
+                        ? cameraPosition === "top-left"
+                          ? panelStyles.previewCameraTopLeft
+                          : cameraPosition === "top-right"
+                            ? panelStyles.previewCameraTopRight
+                            : cameraPosition === "bottom-left"
+                              ? panelStyles.previewCameraBottomLeft
+                              : panelStyles.previewCameraBottomRight
+                        : ""
+                    } ${
+                      hostVideoMode === "screen-camera"
+                        ? cameraSize === "small"
+                          ? panelStyles.previewCameraSmall
+                          : cameraSize === "large"
+                            ? panelStyles.previewCameraLarge
+                            : panelStyles.previewCameraMedium
+                        : ""
+                    }`}
+                    autoPlay
+                    muted
+                    playsInline
+                  />
+                ) : null}
+              </div>
             )}
           </div>
 
           <p className={panelStyles.sideNote}>
-            Current preview source: {previewMode === "none" ? "None" : "Screen share"}
+            Current preview source: {computedPreviewMode === "none" ? "None" : computedPreviewMode === "screen-camera" ? "Screen + Camera" : computedPreviewMode === "screen" ? "Screen share" : "Camera"}
           </p>
         </section>
       </aside>

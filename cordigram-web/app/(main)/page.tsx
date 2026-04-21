@@ -1,6 +1,6 @@
 "use client";
 
-import { JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import EmojiPicker from "emoji-picker-react";
 import { usePathname, useRouter } from "next/navigation";
@@ -545,6 +545,11 @@ export default function HomePage({
     () => (maxItems ? items.slice(0, maxItems) : items),
     [items, maxItems],
   );
+  const livestreamInsertIndex = useMemo(() => {
+    if (!visibleItems.length) return 0;
+    // Insert livestream section inside the ranked feed, not pinned at the top.
+    return Math.min(4, visibleItems.length);
+  }, [visibleItems.length]);
   const showFollowingEmptyState =
     scopeOverride === "following" &&
     initialized &&
@@ -1611,45 +1616,50 @@ export default function HomePage({
   return (
     <div className={embedded ? undefined : styles.page}>
       <div className={embedded ? styles.embedded : styles.centerColumn}>
-        <LivestreamHub viewerId={viewerId} />
         {headerSlot}
-        {visibleItems.map(({ item, flags }) => (
-          <FeedCard
-            key={item.id}
-            data={item}
-            liked={Boolean(flags.liked)}
-            saved={Boolean(flags.saved)}
-            flags={flags}
-            repostHeartsBoost={repostHeartsByOriginalId.get(item.id) ?? 0}
-            cardClassName={cardClassName}
-            onLike={onLike}
-            onSave={onSave}
-            onShare={(id, anchor) =>
-              onRepostIntent(
-                id,
-                item.authorUsername || item.author?.username || "this user",
-                item.kind,
-                Boolean(item.allowDownload),
-                anchor,
-              )
-            }
-            onHide={onHide}
-            onToggleComments={onToggleComments}
-            onToggleHideLikeCount={onToggleHideLikeCount}
-            onCopyLink={onCopyLink}
-            onReportIntent={onReportIntent}
-            onDeleteIntent={onDeleteIntent}
-            onView={onView}
-            onBlockUser={onBlockIntent}
-            viewerId={viewerId}
-            viewerIsCreatorVerified={Boolean(viewerProfile?.isCreatorVerified)}
-            viewerUsername={viewerProfile?.username}
-            onFollow={onFollow}
-            token={token}
-            onRemoteUpdate={onRemoteUpdate}
-            onPersistFeedCache={persistFeedCache}
-          />
+        {visibleItems.map(({ item, flags }, index) => (
+          <Fragment key={item.id}>
+            <FeedCard
+              data={item}
+              liked={Boolean(flags.liked)}
+              saved={Boolean(flags.saved)}
+              flags={flags}
+              repostHeartsBoost={repostHeartsByOriginalId.get(item.id) ?? 0}
+              cardClassName={cardClassName}
+              onLike={onLike}
+              onSave={onSave}
+              onShare={(id, anchor) =>
+                onRepostIntent(
+                  id,
+                  item.authorUsername || item.author?.username || "this user",
+                  item.kind,
+                  Boolean(item.allowDownload),
+                  anchor,
+                )
+              }
+              onHide={onHide}
+              onToggleComments={onToggleComments}
+              onToggleHideLikeCount={onToggleHideLikeCount}
+              onCopyLink={onCopyLink}
+              onReportIntent={onReportIntent}
+              onDeleteIntent={onDeleteIntent}
+              onView={onView}
+              onBlockUser={onBlockIntent}
+              viewerId={viewerId}
+              viewerIsCreatorVerified={Boolean(viewerProfile?.isCreatorVerified)}
+              viewerUsername={viewerProfile?.username}
+              onFollow={onFollow}
+              token={token}
+              onRemoteUpdate={onRemoteUpdate}
+              onPersistFeedCache={persistFeedCache}
+            />
+            {index + 1 === livestreamInsertIndex ? (
+              <LivestreamHub viewerId={viewerId} />
+            ) : null}
+          </Fragment>
         ))}
+
+        {!visibleItems.length ? <LivestreamHub viewerId={viewerId} /> : null}
 
         {showFollowingEmptyState ? (
           <div className={styles.empty}>{t("feed.followingEmpty")}</div>

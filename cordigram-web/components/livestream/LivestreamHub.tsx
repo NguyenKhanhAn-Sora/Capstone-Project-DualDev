@@ -25,6 +25,13 @@ import {
 import { fetchCurrentProfile, fetchProfileDetail, searchProfiles, type ProfileSearchItem } from "@/lib/api";
 import { getStoredAccessToken } from "@/lib/auth";
 import {
+  type LivestreamCameraPosition,
+  type LivestreamCameraSize,
+  type LivestreamHostVideoMode,
+  clearPendingLivestreamMedia,
+  clearPendingCameraStream,
+  getPendingCameraStream,
+  getPendingHostVideoConfig,
   clearPendingScreenShareStream,
   getPendingScreenShareStream,
 } from "@/lib/livestream-screen-share-cache";
@@ -277,40 +284,83 @@ function extractMentionHandles(value: string): string[] {
   return Array.from(new Set(found.map((token) => token.slice(1).toLowerCase())));
 }
 
+type HostCameraLayout = {
+  cameraPosition: LivestreamCameraPosition;
+  cameraSize: LivestreamCameraSize;
+};
+
+const DEFAULT_HOST_CAMERA_LAYOUT: HostCameraLayout = {
+  cameraPosition: "bottom-right",
+  cameraSize: "medium",
+};
+
+function getCameraPositionClass(position: LivestreamCameraPosition) {
+  if (position === "top-left") return hubStyles.stageCameraTopLeft;
+  if (position === "top-right") return hubStyles.stageCameraTopRight;
+  if (position === "bottom-left") return hubStyles.stageCameraBottomLeft;
+  return hubStyles.stageCameraBottomRight;
+}
+
+function getCameraSizeClass(size: LivestreamCameraSize) {
+  if (size === "small") return hubStyles.stageCameraSmall;
+  if (size === "large") return hubStyles.stageCameraLarge;
+  return hubStyles.stageCameraMedium;
+}
+
 function StreamStage({
   hostName,
   viewerCount,
   allowFullscreen,
+  cameraLayout,
+  hostVideoMode,
 }: {
   hostName: string;
   viewerCount: number;
   allowFullscreen: boolean;
+  cameraLayout?: HostCameraLayout;
+  hostVideoMode?: LivestreamHostVideoMode;
 }) {
   const tileRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const screenTracks = useTracks(
+  const tracks = useTracks(
     [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
     { onlySubscribed: false },
   );
-  const hostTrack = screenTracks.find((track) =>
+  const cameraTracks = useTracks(
+    [{ source: Track.Source.Camera, withPlaceholder: false }],
+    { onlySubscribed: false },
+  );
+
+  const hostScreenTrack = tracks.find((track) =>
     (track.participant.identity || "").includes("-host-"),
   );
-  const isLocalSelfSharePreview = Boolean(hostTrack?.participant?.isLocal);
+  const hostCameraTrack = cameraTracks.find((track) =>
+    (track.participant.identity || "").includes("-host-"),
+  );
+  const preferredMode = hostVideoMode || "screen-only";
+  const stageTrack =
+    preferredMode === "camera-only"
+      ? hostCameraTrack || hostScreenTrack
+      : hostScreenTrack || hostCameraTrack;
+  const isLocalSelfSharePreview = Boolean(stageTrack?.participant?.isLocal);
   const canUseFullscreen = allowFullscreen && !isLocalSelfSharePreview;
+  const layout = cameraLayout || DEFAULT_HOST_CAMERA_LAYOUT;
+  const hasScreen = Boolean(hostScreenTrack?.publication) && preferredMode !== "camera-only";
+  const hasCamera = Boolean(hostCameraTrack?.publication);
 
   useEffect(() => {
-    const publication: any = hostTrack?.publication;
+    const publication: any = stageTrack?.publication;
     if (!publication || typeof publication.setVideoQuality !== "function") {
       return;
     }
 
     try {
-      publication.setVideoQuality(VideoQuality.HIGH);
+      publication.setVideoQuality(isFullscreen ? VideoQuality.HIGH : VideoQuality.MEDIUM);
       publication.setSubscribed(true);
     } catch {
       // Ignore quality pinning errors on unsupported publication types.
     }
-  }, [hostTrack?.publication]);
+  }, [stageTrack?.publication, isFullscreen]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -342,9 +392,24 @@ function StreamStage({
 
   return (
     <div className={hubStyles.stageGrid}>
-      {hostTrack?.publication ? (
+      {stageTrack?.publication ? (
         <div className={hubStyles.tile} ref={tileRef}>
-          <VideoTrack trackRef={hostTrack} className={hubStyles.video} />
+          {hasScreen && hostScreenTrack ? (
+            <VideoTrack trackRef={hostScreenTrack} className={hubStyles.video} />
+          ) : hostCameraTrack ? (
+            <VideoTrack
+              trackRef={hostCameraTrack}
+              className={`${hubStyles.video} ${hubStyles.videoMirrored}`}
+            />
+          ) : null}
+
+          {hasScreen && hasCamera && hostCameraTrack ? (
+            <VideoTrack
+              trackRef={hostCameraTrack}
+              className={`${hubStyles.stageCameraOverlay} ${getCameraPositionClass(layout.cameraPosition)} ${getCameraSizeClass(layout.cameraSize)} ${hubStyles.videoMirrored}`}
+            />
+          ) : null}
+
           {canUseFullscreen ? (
             <button
               type="button"
@@ -392,7 +457,7 @@ function StreamStage({
           </p>
         </div>
       ) : (
-        <div className={hubStyles.emptyStage}>Host has not started screen sharing yet...</div>
+        <div className={hubStyles.emptyStage}>Host has not started video yet...</div>
       )}
     </div>
   );
@@ -552,20 +617,51 @@ function FeedCardStage() {
     [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
     { onlySubscribed: false },
   );
+  const cameraTracks = useTracks(
+    [{ source: Track.Source.Camera, withPlaceholder: false }],
+    { onlySubscribed: false },
+  );
   const hostTrack = screenTracks.find((track) =>
     (track.participant.identity || "").includes("-host-"),
   );
+  const hostCameraTrack = cameraTracks.find((track) =>
+    (track.participant.identity || "").includes("-host-"),
+  );
 
-  if (!hostTrack?.publication) {
-    return <div className={hubStyles.feedPreviewEmpty}>Waiting for live screen...</div>;
+  if (!hostTrack?.publication && !hostCameraTrack?.publication) {
+    return <div className={hubStyles.feedPreviewEmpty}>Waiting for live video...</div>;
   }
 
-  return <VideoTrack trackRef={hostTrack} className={hubStyles.feedPreviewVideo} />;
+  return (
+    <div className={hubStyles.feedPreviewComposite}>
+      {hostTrack?.publication ? (
+        <VideoTrack trackRef={hostTrack} className={hubStyles.feedPreviewVideo} />
+      ) : hostCameraTrack?.publication ? (
+        <VideoTrack
+          trackRef={hostCameraTrack}
+          className={`${hubStyles.feedPreviewVideo} ${hubStyles.videoMirrored}`}
+        />
+      ) : null}
+      {hostTrack?.publication && hostCameraTrack?.publication ? (
+        <VideoTrack
+          trackRef={hostCameraTrack}
+          className={`${hubStyles.feedPreviewCameraOverlay} ${hubStyles.feedPreviewCameraBottomRight} ${hubStyles.videoMirrored}`}
+        />
+      ) : null}
+    </div>
+  );
 }
 
 function FeedCardPreview({ streamId }: { streamId: string }) {
   const [joinToken, setJoinToken] = useState("");
   const [joinUrl, setJoinUrl] = useState("");
+  const feedPreviewRoomOptions = useMemo(
+    () => ({
+      adaptiveStream: true,
+      dynacast: true,
+    }),
+    [],
+  );
 
   useEffect(() => {
     let disposed = false;
@@ -603,6 +699,7 @@ function FeedCardPreview({ streamId }: { streamId: string }) {
       connect={true}
       audio={false}
       video={false}
+      options={feedPreviewRoomOptions}
       className={hubStyles.feedPreviewRoom}
     >
       <FeedCardStage />
@@ -1107,12 +1204,18 @@ function HostMediaControls({
   visible,
   connected,
   latencyMode,
+  onHostVideoConfigChange,
   onEndLive,
   ending,
 }: {
   visible: boolean;
   connected: boolean;
   latencyMode: LivestreamLatencyMode;
+  onHostVideoConfigChange: (config: {
+    mode: LivestreamHostVideoMode;
+    cameraPosition: LivestreamCameraPosition;
+    cameraSize: LivestreamCameraSize;
+  }) => void;
   onEndLive: () => void;
   ending: boolean;
 }) {
@@ -1120,7 +1223,7 @@ function HostMediaControls({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [autoTried, setAutoTried] = useState(false);
-  const pendingScreenShareAttemptedRef = useRef(false);
+  const pendingPublishAttemptedRef = useRef(false);
 
   if (!visible) return null;
 
@@ -1146,49 +1249,86 @@ function HostMediaControls({
   };
 
   const tryApplyPendingScreenShare = async (): Promise<boolean> => {
-    const pending = getPendingScreenShareStream();
-    const pendingVideoTrack = pending?.getVideoTracks()?.[0];
-    const pendingAudioTrack = pending?.getAudioTracks()?.[0];
+    const config = getPendingHostVideoConfig() || {
+      mode: "screen-only" as LivestreamHostVideoMode,
+      cameraPosition: DEFAULT_HOST_CAMERA_LAYOUT.cameraPosition,
+      cameraSize: DEFAULT_HOST_CAMERA_LAYOUT.cameraSize,
+    };
+    const pendingScreen = getPendingScreenShareStream();
+    const pendingCamera = getPendingCameraStream();
+    const pendingScreenVideoTrack = pendingScreen?.getVideoTracks()?.[0];
+    const pendingScreenAudioTrack = pendingScreen?.getAudioTracks()?.[0];
+    const pendingCameraTrack = pendingCamera?.getVideoTracks()?.[0];
 
-    if (!pending || !pendingVideoTrack || pendingVideoTrack.readyState === "ended") {
-      clearPendingScreenShareStream();
+    const needsScreen = config.mode !== "camera-only";
+    const needsCamera = config.mode !== "screen-only";
+
+    if (
+      (needsScreen && (!pendingScreenVideoTrack || pendingScreenVideoTrack.readyState === "ended")) ||
+      (needsCamera && (!pendingCameraTrack || pendingCameraTrack.readyState === "ended"))
+    ) {
+      clearPendingLivestreamMedia();
       return false;
     }
 
     try {
-      await optimizePublishedScreenTrack(pendingVideoTrack, latencyMode);
-      await (localParticipant as any).publishTrack(
-        pendingVideoTrack,
-        getScreenSharePublishOptions(latencyMode),
-      );
-      if (pendingAudioTrack && pendingAudioTrack.readyState !== "ended") {
-        await (localParticipant as any).publishTrack(pendingAudioTrack, {
+      await unpublishVideoTracks();
+
+      if (needsScreen && pendingScreenVideoTrack) {
+        await optimizePublishedScreenTrack(pendingScreenVideoTrack, latencyMode);
+        await (localParticipant as any).publishTrack(
+          pendingScreenVideoTrack,
+          getScreenSharePublishOptions(latencyMode),
+        );
+      }
+
+      if (needsScreen && pendingScreenAudioTrack && pendingScreenAudioTrack.readyState !== "ended") {
+        await (localParticipant as any).publishTrack(pendingScreenAudioTrack, {
           source: Track.Source.ScreenShareAudio,
         });
       }
-      clearPendingScreenShareStream();
+
+      if (needsCamera && pendingCameraTrack) {
+        await (localParticipant as any).publishTrack(pendingCameraTrack, {
+          source: Track.Source.Camera,
+        });
+      }
+
+      onHostVideoConfigChange(config);
+
+      clearPendingLivestreamMedia();
       return true;
     } catch {
       return false;
     }
   };
 
-  const unpublishScreenTracks = async () => {
+  const unpublishVideoTracks = async () => {
     const publications = Array.from(
       ((localParticipant as any)?.trackPublications?.values?.() || []) as Iterable<any>,
     );
 
     for (const pub of publications) {
       const source = pub?.source;
-      if (source !== Track.Source.ScreenShare && source !== Track.Source.ScreenShareAudio) {
+      if (
+        source !== Track.Source.ScreenShare &&
+        source !== Track.Source.ScreenShareAudio &&
+        source !== Track.Source.Camera
+      ) {
         continue;
       }
 
-      const mediaTrack = pub?.track?.mediaStreamTrack;
-      if (!mediaTrack) continue;
-
       try {
-        await (localParticipant as any).unpublishTrack(mediaTrack, false);
+        const localTrack = pub?.track;
+        if (localTrack) {
+          await (localParticipant as any).unpublishTrack(localTrack, false);
+          continue;
+        }
+
+        const mediaTrack = pub?.track?.mediaStreamTrack;
+        if (mediaTrack) {
+          await (localParticipant as any).unpublishTrack(mediaTrack, false);
+        }
       } catch {
         // Ignore unpublish race errors.
       }
@@ -1211,7 +1351,7 @@ function HostMediaControls({
     }
 
     await optimizePublishedScreenTrack(videoTrack, latencyMode);
-    await unpublishScreenTracks();
+    await unpublishVideoTracks();
     await (localParticipant as any).publishTrack(
       videoTrack,
       getScreenSharePublishOptions(latencyMode),
@@ -1224,11 +1364,48 @@ function HostMediaControls({
     }
 
     videoTrack.onended = () => {
-      void unpublishScreenTracks();
+      void unpublishVideoTracks();
     };
+
+    onHostVideoConfigChange({
+      mode: "screen-only",
+      cameraPosition: DEFAULT_HOST_CAMERA_LAYOUT.cameraPosition,
+      cameraSize: DEFAULT_HOST_CAMERA_LAYOUT.cameraSize,
+    });
   };
 
-  const enableScreenShare = async (forcePicker: boolean) => {
+  const captureAndPublishCameraFromPicker = async () => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      throw new Error("Camera is not supported in this browser");
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: true,
+    });
+    const videoTrack = stream.getVideoTracks()?.[0];
+
+    if (!videoTrack || videoTrack.readyState === "ended") {
+      throw new Error("No valid camera track selected");
+    }
+
+    await unpublishVideoTracks();
+    await (localParticipant as any).publishTrack(videoTrack, {
+      source: Track.Source.Camera,
+    });
+
+    videoTrack.onended = () => {
+      void unpublishVideoTracks();
+    };
+
+    onHostVideoConfigChange({
+      mode: "camera-only",
+      cameraPosition: DEFAULT_HOST_CAMERA_LAYOUT.cameraPosition,
+      cameraSize: DEFAULT_HOST_CAMERA_LAYOUT.cameraSize,
+    });
+  };
+
+  const enableScreenShare = async (forcePicker: boolean | null) => {
     try {
       if (!connected) {
         setError("Connecting to livestream room. Please retry in 1-2 seconds.");
@@ -1237,28 +1414,33 @@ function HostMediaControls({
       setBusy(true);
       setError("");
 
-      if (forcePicker) {
+      if (forcePicker === true) {
         // User explicitly requested changing source: close current share and force browser picker.
         clearPendingScreenShareStream();
-        pendingScreenShareAttemptedRef.current = true;
+        clearPendingCameraStream();
+        pendingPublishAttemptedRef.current = true;
         await captureAndPublishFromPicker();
         return;
       }
 
-      if (!forcePicker && !pendingScreenShareAttemptedRef.current) {
-        pendingScreenShareAttemptedRef.current = true;
+      if (forcePicker === false && pendingPublishAttemptedRef.current) {
+        return;
+      }
+
+      if (forcePicker === false && !pendingPublishAttemptedRef.current) {
+        pendingPublishAttemptedRef.current = true;
         const appliedPending = await tryApplyPendingScreenShare();
         if (appliedPending) {
           return;
         }
-
-        // Do not auto-open browser picker on first room entry if no pending stream exists.
-        setError("No pre-selected screen source found. Click Change screen share to choose one.");
+        setError("No pre-selected media source found. Choose screen share or camera to go live.");
         return;
       }
 
-      // Auto path only attempts pending stream handoff and never opens browser picker.
-      return;
+      if (forcePicker === null) {
+        await captureAndPublishCameraFromPicker();
+        return;
+      }
     } catch (err) {
       setError(mapMediaError(err));
     } finally {
@@ -1281,6 +1463,14 @@ function HostMediaControls({
         disabled={busy}
       >
         Change screen share
+      </button>
+      <button
+        type="button"
+        className={hubStyles.hostControlBtn}
+        onClick={() => void enableScreenShare(null)}
+        disabled={busy}
+      >
+        Change camera
       </button>
       <button
         type="button"
@@ -1740,6 +1930,8 @@ export default function LivestreamHub({
   const [endOverlayOpen, setEndOverlayOpen] = useState(false);
   const [endOverlayClosing, setEndOverlayClosing] = useState(false);
   const [roomConnected, setRoomConnected] = useState(false);
+  const [hostVideoMode, setHostVideoMode] = useState<LivestreamHostVideoMode>("screen-only");
+  const [hostCameraLayout, setHostCameraLayout] = useState<HostCameraLayout>(DEFAULT_HOST_CAMERA_LAYOUT);
   const [viewerRoomNonce, setViewerRoomNonce] = useState(0);
   const [hostProfiles, setHostProfiles] = useState<
     Record<string, { username: string; avatarUrl?: string }>
@@ -2111,6 +2303,13 @@ export default function LivestreamHub({
                   visible={isHostSession}
                   connected={roomConnected}
                   latencyMode={activeStreamMeta.latencyMode}
+                  onHostVideoConfigChange={(config) => {
+                    setHostVideoMode(config.mode);
+                    setHostCameraLayout({
+                      cameraPosition: config.cameraPosition,
+                      cameraSize: config.cameraSize,
+                    });
+                  }}
                   onEndLive={() => {
                     if (endingLive) return;
                     setEndOverlayOpen(true);
@@ -2129,6 +2328,8 @@ export default function LivestreamHub({
                       hostName={activeStreamMeta.hostName}
                       viewerCount={activeStreamMeta.viewerCount}
                       allowFullscreen={!isHostSession}
+                      cameraLayout={hostCameraLayout}
+                      hostVideoMode={hostVideoMode}
                     />
                   )}
                   <LiveComments
