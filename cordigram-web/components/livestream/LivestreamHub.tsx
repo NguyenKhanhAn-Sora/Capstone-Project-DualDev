@@ -395,17 +395,17 @@ function StreamStage({
       {stageTrack?.publication ? (
         <div className={hubStyles.tile} ref={tileRef}>
           {hasScreen && hostScreenTrack ? (
-            <VideoTrack trackRef={hostScreenTrack} className={hubStyles.video} />
+            <VideoTrack trackRef={hostScreenTrack as any} className={hubStyles.video} />
           ) : hostCameraTrack ? (
             <VideoTrack
-              trackRef={hostCameraTrack}
+              trackRef={hostCameraTrack as any}
               className={`${hubStyles.video} ${hubStyles.videoMirrored}`}
             />
           ) : null}
 
           {hasScreen && hasCamera && hostCameraTrack ? (
             <VideoTrack
-              trackRef={hostCameraTrack}
+              trackRef={hostCameraTrack as any}
               className={`${hubStyles.stageCameraOverlay} ${getCameraPositionClass(layout.cameraPosition)} ${getCameraSizeClass(layout.cameraSize)} ${hubStyles.videoMirrored}`}
             />
           ) : null}
@@ -635,16 +635,16 @@ function FeedCardStage() {
   return (
     <div className={hubStyles.feedPreviewComposite}>
       {hostTrack?.publication ? (
-        <VideoTrack trackRef={hostTrack} className={hubStyles.feedPreviewVideo} />
+        <VideoTrack trackRef={hostTrack as any} className={hubStyles.feedPreviewVideo} />
       ) : hostCameraTrack?.publication ? (
         <VideoTrack
-          trackRef={hostCameraTrack}
+          trackRef={hostCameraTrack as any}
           className={`${hubStyles.feedPreviewVideo} ${hubStyles.videoMirrored}`}
         />
       ) : null}
       {hostTrack?.publication && hostCameraTrack?.publication ? (
         <VideoTrack
-          trackRef={hostCameraTrack}
+          trackRef={hostCameraTrack as any}
           className={`${hubStyles.feedPreviewCameraOverlay} ${hubStyles.feedPreviewCameraBottomRight} ${hubStyles.videoMirrored}`}
         />
       ) : null}
