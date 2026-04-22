@@ -1,7 +1,5 @@
 import {
   BadRequestException,
-  HttpException,
-  HttpStatus,
   Injectable,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -34,7 +32,6 @@ export type ReportProblemResponse = {
 };
 
 const MAX_FILE_BYTES = 100 * 1024 * 1024; // 100 MB
-const COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 
 @Injectable()
 export class ReportProblemService {
@@ -61,26 +58,6 @@ export class ReportProblemService {
 
     if (files.some((file) => (file.size ?? 0) > MAX_FILE_BYTES)) {
       throw new BadRequestException('Each file must be <= 100MB');
-    }
-
-    const last = await this.reportModel
-      .findOne({ userId: new Types.ObjectId(reporterId) })
-      .sort({ createdAt: -1 })
-      .select('createdAt')
-      .lean();
-
-    if (last?.createdAt) {
-      const elapsed = Date.now() - last.createdAt.getTime();
-      const remaining = COOLDOWN_MS - elapsed;
-      if (remaining > 0) {
-        throw new HttpException(
-          {
-            message: 'Please wait before sending another report.',
-            retryAfterMs: remaining,
-          },
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
     }
 
     const attachments = await this.uploadAttachments(reporterId, files);

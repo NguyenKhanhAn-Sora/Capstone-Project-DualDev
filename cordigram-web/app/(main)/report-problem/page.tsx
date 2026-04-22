@@ -20,25 +20,13 @@ export default function ReportProblemPage() {
   const [success, setSuccess] = useState<ReportProblemAttachment[] | null>(
     null
   );
-  const [cooldownMs, setCooldownMs] = useState<number | null>(null);
-  const [tick, setTick] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (cooldownMs === null) return;
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(id);
-  }, [cooldownMs]);
 
   useEffect(() => {
     return () => {
       files.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
     };
   }, [files]);
-
-  const remainingMs =
-    cooldownMs !== null ? Math.max(0, cooldownMs - tick * 1000) : 0;
-  const remainingSec = Math.ceil(remainingMs / 1000);
 
   if (!canRender) return null;
 
@@ -88,7 +76,6 @@ export default function ReportProblemPage() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
-    setCooldownMs(null);
 
     const trimmed = description.trim();
     if (!trimmed) {
@@ -117,13 +104,6 @@ export default function ReportProblemPage() {
       clearSelectedFiles();
     } catch (err) {
       const apiErr = err as ApiError | undefined;
-      const retryAfter = (apiErr?.data as { retryAfterMs?: number } | undefined)
-        ?.retryAfterMs;
-      if (retryAfter && retryAfter > 0) {
-        setCooldownMs(retryAfter);
-        setError("Please wait before sending another report.");
-        return;
-      }
       setError(apiErr?.message || "Cannot send report now.");
     } finally {
       setSubmitting(false);
@@ -223,14 +203,6 @@ export default function ReportProblemPage() {
           ) : null}
 
           {error ? <p className={styles.error}>{error}</p> : null}
-          {cooldownMs !== null ? (
-            <div className={styles.successBox}>
-              <p className={styles.successTitle}>Cooldown</p>
-              <p className={styles.successText}>
-                You can send the next report in {remainingSec}s.
-              </p>
-            </div>
-          ) : null}
           {success ? (
             <div className={styles.successBox}>
               <p className={styles.successTitle}>Report sent</p>
@@ -257,7 +229,7 @@ export default function ReportProblemPage() {
             <button
               type="submit"
               className={styles.primary}
-              disabled={submitting || (cooldownMs !== null && remainingMs > 0)}
+              disabled={submitting}
             >
               {submitting ? "Sending..." : "Send report"}
             </button>
