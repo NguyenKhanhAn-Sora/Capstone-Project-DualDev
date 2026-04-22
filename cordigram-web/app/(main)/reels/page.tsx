@@ -286,6 +286,7 @@ const clamp = (value: number, min: number, max: number) =>
 
 const QUOTE_CHAR_LIMIT = 500;
 const REPOST_ANIMATION_MS = 200;
+const REELS_AUDIO_PREFS_KEY = "reels:audio:preferences:v1";
 
 type ReelVideoProps = {
   item: ReelItem;
@@ -293,6 +294,10 @@ type ReelVideoProps = {
   onViewed?: (msWatched?: number) => void;
   onFollow: (authorId: string, nextFollow: boolean) => void;
   viewerId?: string;
+  muted: boolean;
+  volume: number;
+  onMutedChange: (nextMuted: boolean) => void;
+  onVolumeChange: (nextVolume: number) => void;
   children?: React.ReactNode;
 };
 
@@ -425,6 +430,10 @@ function ReelVideo({
   onViewed,
   onFollow,
   viewerId,
+  muted,
+  volume,
+  onMutedChange,
+  onVolumeChange,
   children,
 }: ReelVideoProps) {
   const { language } = useLanguage();
@@ -432,8 +441,6 @@ function ReelVideo({
   const [isPlaying, setIsPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.72);
-  const [muted, setMuted] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [canExpand, setCanExpand] = useState(false);
   const captionRef = useRef<HTMLDivElement | null>(null);
@@ -571,7 +578,7 @@ function ReelVideo({
 
   const toggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setMuted((m) => !m);
+    onMutedChange(!muted);
   };
 
   const seekToClientX = useCallback((clientX: number) => {
@@ -653,9 +660,10 @@ function ReelVideo({
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
-    setVolume(Number(e.target.value));
-    if (muted && Number(e.target.value) > 0.01) {
-      setMuted(false);
+    const next = Number(e.target.value);
+    onVolumeChange(next);
+    if (muted && next > 0.01) {
+      onMutedChange(false);
     }
   };
 
@@ -1256,8 +1264,48 @@ export default function ReelPage({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [sharedMuted, setSharedMuted] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const raw = localStorage.getItem(REELS_AUDIO_PREFS_KEY);
+      if (!raw) return true;
+      const parsed = JSON.parse(raw) as { muted?: unknown };
+      return typeof parsed.muted === "boolean" ? parsed.muted : true;
+    } catch {
+      return true;
+    }
+  });
+  const [sharedVolume, setSharedVolume] = useState<number>(() => {
+    if (typeof window === "undefined") return 0.72;
+    try {
+      const raw = localStorage.getItem(REELS_AUDIO_PREFS_KEY);
+      if (!raw) return 0.72;
+      const parsed = JSON.parse(raw) as { volume?: unknown };
+      if (typeof parsed.volume !== "number" || !Number.isFinite(parsed.volume)) {
+        return 0.72;
+      }
+      return clamp(parsed.volume, 0, 1);
+    } catch {
+      return 0.72;
+    }
+  });
 
   const active = items[activeIndex];
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(
+        REELS_AUDIO_PREFS_KEY,
+        JSON.stringify({
+          muted: sharedMuted,
+          volume: clamp(sharedVolume, 0, 1),
+        }),
+      );
+    } catch {
+      // ignore localStorage write errors
+    }
+  }, [sharedMuted, sharedVolume]);
 
   const editingReel = useMemo(() => {
     if (!editTargetId) return null;
@@ -3300,6 +3348,10 @@ export default function ReelPage({
                               onViewed={(ms) => handleViewed(item.id, ms)}
                               onFollow={onFollow}
                               viewerId={viewerId}
+                              muted={sharedMuted}
+                              volume={sharedVolume}
+                              onMutedChange={setSharedMuted}
+                              onVolumeChange={setSharedVolume}
                             >
                               <div
                                 className={`${styles.moreMenuWrap} ${
