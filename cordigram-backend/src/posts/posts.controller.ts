@@ -252,8 +252,8 @@ export class PostsController {
   @UseInterceptors(
     FileInterceptor('file', {
       limits: {
-        // allow up to Boost tier, enforce per-user below
-        fileSize: 600 * 1024 * 1024,
+        // Post/reel uploads are capped at FREE_MAX_UPLOAD_BYTES.
+        fileSize: FREE_MAX_UPLOAD_BYTES,
       },
     }),
   )
@@ -291,7 +291,7 @@ export class PostsController {
   @UseInterceptors(
     FilesInterceptor('files', 10, {
       limits: {
-        fileSize: 600 * 1024 * 1024,
+        fileSize: FREE_MAX_UPLOAD_BYTES,
       },
     }),
   )

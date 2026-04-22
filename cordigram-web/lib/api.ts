@@ -9,6 +9,13 @@ export interface ApiError<T = unknown> {
   data?: T;
 }
 
+type ApiErrorPayload = {
+  message?: string | string[];
+  error?: string;
+  statusCode?: number;
+  [key: string]: unknown;
+};
+
 interface FetchOptions extends RequestInit {
   path: string;
 }
@@ -31,6 +38,81 @@ function normalizeApiBaseUrl(raw: string | undefined | null): string {
 }
 
 const apiBaseUrl = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE);
+
+function extractPayloadMessage(payload: ApiErrorPayload | null): string | null {
+  if (!payload) return null;
+  if (typeof payload.message === "string" && payload.message.trim()) {
+    return payload.message.trim();
+  }
+  if (Array.isArray(payload.message)) {
+    const combined = payload.message
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .join(". ");
+    if (combined) return combined;
+  }
+  if (typeof payload.error === "string" && payload.error.trim()) {
+    return payload.error.trim();
+  }
+  return null;
+}
+
+async function readErrorPayload(
+  res: Response,
+): Promise<{ payload: ApiErrorPayload | null; rawText: string }> {
+  const rawText = await res.text();
+  if (!rawText) {
+    return { payload: null, rawText: "" };
+  }
+  try {
+    return { payload: JSON.parse(rawText) as ApiErrorPayload, rawText };
+  } catch {
+    return { payload: null, rawText };
+  }
+}
+
+function buildFriendlyStatusMessage(status: number, fallback: string): string {
+  if (status === 413) {
+    return "File too large. Please upload a smaller file.";
+  }
+  if (status === 429) {
+    return "Too many requests. Please wait a moment and try again.";
+  }
+  if (status >= 500) {
+    return "Server is busy. Please try again in a moment.";
+  }
+  return fallback;
+}
+
+export function resolveApiErrorMessage(
+  err: unknown,
+  fallback = "Request failed",
+): string {
+  const rawMessage =
+    typeof err === "object" && err && "message" in err
+      ? String((err as { message?: unknown }).message ?? "")
+      : "";
+
+  const lower = rawMessage.toLowerCase();
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("network request failed")
+  ) {
+    return "Cannot reach server. Check your internet or server URL and try again.";
+  }
+
+  const status =
+    typeof err === "object" && err && "status" in err
+      ? Number((err as { status?: unknown }).status)
+      : NaN;
+  if (Number.isFinite(status) && status === 413) {
+    return "File too large. Please upload a smaller file.";
+  }
+
+  return rawMessage || fallback;
+}
 
 async function toJson<T>(res: Response): Promise<T> {
   const text = await res.text();
@@ -69,10 +151,19 @@ export async function apiFetch<T = unknown>(options: FetchOptions): Promise<T> {
     mergedHeaders["x-admin-preview-token"] = adminPreviewToken;
   }
 
-  const res = await fetch(url, {
-    ...rest,
-    headers: mergedHeaders,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...rest,
+      headers: mergedHeaders,
+    });
+  } catch (err) {
+    throw {
+      status: 0,
+      message: resolveApiErrorMessage(err, "Cannot reach server"),
+      data: null,
+    } satisfies ApiError;
+  }
 
   if (res.status === 401 && typeof window !== "undefined") {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
@@ -84,13 +175,11 @@ export async function apiFetch<T = unknown>(options: FetchOptions): Promise<T> {
   }
 
   if (!res.ok) {
-    const payload: { message?: string } & Record<string, unknown> =
-      await toJson<{ message?: string } & Record<string, unknown>>(res).catch(
-        () => ({}) as { message?: string },
-      );
+    const { payload, rawText } = await readErrorPayload(res);
+    const fallback = buildFriendlyStatusMessage(res.status, "Request failed");
     throw {
       status: res.status,
-      message: payload.message || "Request failed",
+      message: extractPayloadMessage(payload) || rawText.trim() || fallback,
       data: payload,
     } satisfies ApiError;
   }
@@ -2237,21 +2326,29 @@ export async function uploadPostMedia(opts: {
   const form = new FormData();
   form.append("file", file);
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: form,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: form,
+    });
+  } catch (err) {
+    throw {
+      status: 0,
+      message: resolveApiErrorMessage(err, "Upload failed"),
+      data: null,
+    } satisfies ApiError;
+  }
 
   if (!res.ok) {
-    const payload = (await res.json().catch(() => ({}))) as {
-      message?: string;
-    };
+    const { payload, rawText } = await readErrorPayload(res);
+    const fallback = buildFriendlyStatusMessage(res.status, "Upload failed");
     throw {
       status: res.status,
-      message: payload.message || "Upload failed",
+      message: extractPayloadMessage(payload) || rawText.trim() || fallback,
       data: payload,
     } satisfies ApiError;
   }
@@ -2269,21 +2366,29 @@ export async function uploadCommentMedia(opts: {
   const form = new FormData();
   form.append("file", file);
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: form,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: form,
+    });
+  } catch (err) {
+    throw {
+      status: 0,
+      message: resolveApiErrorMessage(err, "Upload failed"),
+      data: null,
+    } satisfies ApiError;
+  }
 
   if (!res.ok) {
-    const payload = (await res.json().catch(() => ({}))) as {
-      message?: string;
-    };
+    const { payload, rawText } = await readErrorPayload(res);
+    const fallback = buildFriendlyStatusMessage(res.status, "Upload failed");
     throw {
       status: res.status,
-      message: payload.message || "Upload failed",
+      message: extractPayloadMessage(payload) || rawText.trim() || fallback,
       data: payload,
     } satisfies ApiError;
   }

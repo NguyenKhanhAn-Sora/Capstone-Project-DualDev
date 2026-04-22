@@ -11,6 +11,7 @@ import {
   createPost,
   createReel,
   fetchCurrentProfile,
+  resolveApiErrorMessage,
   searchProfiles,
   uploadPostMedia,
   type CreatePostRequest,
@@ -132,6 +133,7 @@ const audienceOptions = [
 
 const REEL_MAX_DURATION_SECONDS = 90;
 const REEL_MAX_BYTES = 50 * 1024 * 1024; // 50MB hard cap
+const POST_MAX_BYTES = 100 * 1024 * 1024; // Must match backend FREE_MAX_UPLOAD_BYTES
 const MAX_MEDIA_ITEMS = 10;
 
 type Step = "select" | "details";
@@ -495,6 +497,12 @@ export default function CreatePostPage() {
       return;
     }
 
+    const tooLargePostFile = valid.find((file) => file.size > POST_MAX_BYTES);
+    if (tooLargePostFile) {
+      setError("Each post media file must be 100MB or smaller.");
+      return;
+    }
+
     const newItems: MediaItem[] = [];
     for (const file of valid) {
       const remaining = MAX_MEDIA_ITEMS - (mediaItems.length + newItems.length);
@@ -786,11 +794,9 @@ export default function CreatePostPage() {
         setSubmitSuccess("Post created successfully.");
       }
     } catch (err) {
-      const message =
-        typeof err === "object" && err && "message" in err
-          ? (err as { message?: string }).message || "Request failed"
-          : "Request failed";
-      setSubmitError(message);
+      setSubmitError(
+        resolveApiErrorMessage(err, "Could not publish. Please try again."),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -1325,7 +1331,7 @@ export default function CreatePostPage() {
                 </>
               ) : (
                 <>
-                  <li>Maximum size: 30 GB, video duration: 60 minutes.</li>
+                  <li>Maximum size per file: 100 MB.</li>
                   <li>
                     Recommended: “.mp4”. Other major formats are supported.
                   </li>
