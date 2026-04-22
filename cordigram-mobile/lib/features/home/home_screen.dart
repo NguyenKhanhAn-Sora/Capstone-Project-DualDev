@@ -15,6 +15,7 @@ import '../following/following_screen.dart';
 import '../hashtag/hashtag_screen.dart';
 import '../livestream/livestream_create_service.dart';
 import '../livestream/livestream_hub_screen.dart';
+import '../messages/message_home_screen.dart';
 import '../notifications/services/notification_realtime_service.dart';
 import '../notifications/notification_screen.dart';
 import '../post/create_tab_screen.dart';
@@ -540,23 +541,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _refreshHome() async {
-    await Future.wait([
-      _loadFeed(refresh: true),
-      _loadLiveStreams(),
-    ]);
+    await Future.wait([_loadFeed(refresh: true), _loadLiveStreams()]);
   }
 
   Future<void> _ensureLiveHostProfiles(List<LivestreamItem> streams) async {
-    final pendingHostIds = streams
-        .map((item) => item.hostUserId.trim())
-        .where((id) {
-          if (id.isEmpty) return false;
-          final snapshot = _liveHostProfiles[id];
-          return snapshot == null ||
-              snapshot.username == null ||
-              snapshot.avatarUrl == null;
-        })
-        .toSet();
+    final pendingHostIds = streams.map((item) => item.hostUserId.trim()).where((
+      id,
+    ) {
+      if (id.isEmpty) return false;
+      final snapshot = _liveHostProfiles[id];
+      return snapshot == null ||
+          snapshot.username == null ||
+          snapshot.avatarUrl == null;
+    }).toSet();
     if (pendingHostIds.isEmpty) return;
 
     await Future.wait(
@@ -570,15 +567,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           if (!mounted) return;
           setState(() {
             _liveHostProfiles[hostId] = _LiveHostSnapshot(
-              username: username.isNotEmpty
-                  ? username
-                  : null,
-              displayName: displayName.isNotEmpty
-                  ? displayName
-                  : null,
-              avatarUrl: avatarUrl.isNotEmpty
-                  ? avatarUrl
-                  : null,
+              username: username.isNotEmpty ? username : null,
+              displayName: displayName.isNotEmpty ? displayName : null,
+              avatarUrl: avatarUrl.isNotEmpty ? avatarUrl : null,
             );
           });
         } catch (_) {
@@ -1252,10 +1243,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final isHost = _viewerId != null && stream.hostUserId == _viewerId;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => LivestreamHubScreen(
-          initialStreamId: stream.id,
-          forceHost: isHost,
-        ),
+        builder: (_) =>
+            LivestreamHubScreen(initialStreamId: stream.id, forceHost: isHost),
       ),
     );
     if (!mounted) return;
@@ -1331,17 +1320,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               children: _liveStreams.map((stream) {
                 final hostSnapshot = _liveHostProfiles[stream.hostUserId];
                 final hostUsername =
-                  hostSnapshot?.username?.trim() ?? stream.hostUsername?.trim();
-                final hostAvatarUrl = hostSnapshot?.avatarUrl ?? stream.hostAvatarUrl;
-                final hostLabel = (hostUsername != null && hostUsername.isNotEmpty)
-                  ? '@$hostUsername'
-                  : '@unknown';
+                    hostSnapshot?.username?.trim() ??
+                    stream.hostUsername?.trim();
+                final hostAvatarUrl =
+                    hostSnapshot?.avatarUrl ?? stream.hostAvatarUrl;
+                final hostLabel =
+                    (hostUsername != null && hostUsername.isNotEmpty)
+                    ? '@$hostUsername'
+                    : '@unknown';
                 final avatarSeed = (hostUsername ?? stream.hostName).trim();
                 final initial = avatarSeed.isNotEmpty
-                  ? avatarSeed[0].toUpperCase()
+                    ? avatarSeed[0].toUpperCase()
                     : '?';
-                final viewerCount =
-                  (stream.viewerCount - 1).clamp(0, 9999999).toInt();
+                final viewerCount = (stream.viewerCount - 1)
+                    .clamp(0, 9999999)
+                    .toInt();
 
                 return Container(
                   key: ValueKey('live-${stream.id}'),
@@ -1349,7 +1342,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.1),
+                    ),
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -1780,9 +1775,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           iconSize: 27,
           count: _dmUnread,
           tooltip: 'Messages',
-          onTap: () => ScaffoldMessenger.of(
+          onTap: () => Navigator.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Messages coming soon'))),
+          ).push(MaterialPageRoute(builder: (_) => const MessageHomeScreen())),
         ),
         // Profile avatar
         GestureDetector(
@@ -1896,7 +1891,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     final hasLiveSection = _liveStreams.isNotEmpty || _loadingLiveStreams;
-    final liveInsertIndex = _states.isEmpty ? 0 : (_states.length < 4 ? _states.length : 4);
+    final liveInsertIndex = _states.isEmpty
+        ? 0
+        : (_states.length < 4 ? _states.length : 4);
     final sliverItemCount = _states.length + (hasLiveSection ? 1 : 0);
 
     return RefreshIndicator(
@@ -2000,11 +1997,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 // ── Nav badge icon button ─────────────────────────────────────────────────────
 
 class _LiveHostSnapshot {
-  const _LiveHostSnapshot({
-    this.username,
-    this.displayName,
-    this.avatarUrl,
-  });
+  const _LiveHostSnapshot({this.username, this.displayName, this.avatarUrl});
 
   final String? username;
   final String? displayName;
@@ -2110,10 +2103,7 @@ class _LivePreviewPlayerState extends State<_LivePreviewPlayer> {
 }
 
 class _LiveFeedPreview extends StatelessWidget {
-  const _LiveFeedPreview({
-    required this.streamId,
-    required this.playbackUrl,
-  });
+  const _LiveFeedPreview({required this.streamId, required this.playbackUrl});
 
   final String streamId;
   final String? playbackUrl;
@@ -2174,7 +2164,8 @@ class _LiveTrackPreviewState extends State<_LiveTrackPreview> {
       final join = await LivestreamCreateService.joinLivestreamToken(
         widget.streamId,
         asHost: false,
-        participantName: 'home-preview-${DateTime.now().microsecondsSinceEpoch}',
+        participantName:
+            'home-preview-${DateTime.now().microsecondsSinceEpoch}',
       );
 
       final room = Room();

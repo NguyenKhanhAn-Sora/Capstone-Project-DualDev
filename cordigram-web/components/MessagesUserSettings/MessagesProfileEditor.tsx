@@ -12,12 +12,11 @@ import dynamic from "next/dynamic";
 import styles from "./MessagesProfileEditor.module.css";
 import { useLanguage } from "@/component/language-provider";
 import {
-  fetchCurrentProfile,
-  fetchProfileDetail,
-  resetProfileAvatar,
-  updateMyProfile,
+  fetchMessagingProfileMe,
+  resetMessagingProfileAvatar,
+  updateMyMessagingProfile,
   uploadMedia,
-  uploadProfileAvatar,
+  uploadMessagingProfileAvatar,
 } from "@/lib/api";
 import * as serversApi from "@/lib/servers-api";
 import { optimizeBannerImageFile } from "@/lib/server-banner";
@@ -174,8 +173,10 @@ export default function MessagesProfileEditor({
       window.dispatchEvent(
         new CustomEvent("cordigram-user-profile-style-updated", {
           detail: {
+            profileContext: "messaging" as const,
             userId: currentUserId,
             displayName: displayName.trim() || username.trim() || undefined,
+            /** Trong messaging, đây là `chatUsername` (dòng phụ chat), không phải username social. */
             username: username.trim() || undefined,
             displayNameFontId: style.fontId,
             displayNameEffectId: style.effectId,
@@ -203,12 +204,9 @@ export default function MessagesProfileEditor({
     if (!currentUserId) return;
     setLoading(true);
     try {
-      const detail = await fetchProfileDetail({
-        token,
-        id: currentUserId,
-      });
+      const detail = await fetchMessagingProfileMe({ token });
       setDisplayName(detail.displayName ?? "");
-      setUsername(detail.username ?? "");
+      setUsername(detail.chatUsername ?? "");
       setPronouns((detail.pronouns ?? "").slice(0, PRONOUNS_MAX));
       setBio((detail.bio ?? "").slice(0, BIO_MAX));
       setAvatarUrl(detail.avatarUrl || DEFAULT_AVATAR);
@@ -217,20 +215,7 @@ export default function MessagesProfileEditor({
       setBannerSolidHex(parsed.bannerSolidHex);
       setDisplayNameStyle(mapProfileStyle(detail));
     } catch {
-      try {
-        const cur = await fetchCurrentProfile({ token });
-        setDisplayName(cur.displayName ?? "");
-        setUsername(cur.username ?? "");
-        setPronouns("");
-        setBio("");
-        setAvatarUrl(cur.avatarUrl || DEFAULT_AVATAR);
-        const parsed = parseUserCover("");
-        setBannerImageUrl(parsed.bannerImageUrl);
-        setBannerSolidHex(parsed.bannerSolidHex);
-        setDisplayNameStyle(mapProfileStyle(cur));
-      } catch {
-        onToastRef.current?.(t("chat.profileEditor.errorLoadProfile"));
-      }
+      onToastRef.current?.(t("chat.profileEditor.errorLoadProfile"));
     } finally {
       setLoading(false);
     }
@@ -367,11 +352,11 @@ export default function MessagesProfileEditor({
         bannerImageUrl,
         bannerSolidHex,
       });
-      await updateMyProfile({
+      await updateMyMessagingProfile({
         token,
         payload: {
           displayName: displayName.trim(),
-          username: username.trim().toLowerCase(),
+          chatUsername: username.trim().toLowerCase(),
           bio: bio.slice(0, BIO_MAX),
           pronouns: pronouns.trim().slice(0, PRONOUNS_MAX),
           coverUrl: coverUrl || undefined,
@@ -460,7 +445,7 @@ export default function MessagesProfileEditor({
 
     setDisplayNameStyle(next);
     try {
-      await updateMyProfile({
+      await updateMyMessagingProfile({
         token,
         payload: {
           displayNameFontId: next.fontId,
@@ -579,7 +564,7 @@ export default function MessagesProfileEditor({
       onToast?.(t("chat.profileEditor.updatedAvatar"));
       return;
     }
-    const res = await uploadProfileAvatar({
+    const res = await uploadMessagingProfileAvatar({
       token,
       form,
       cordigramUploadContext: "messages",
@@ -710,7 +695,7 @@ export default function MessagesProfileEditor({
                         await serversApi.resetMyServerAvatar(serverId);
                         setServerAvatarUrl(null);
                       } else {
-                        const res = await resetProfileAvatar({ token });
+                        const res = await resetMessagingProfileAvatar({ token });
                         setAvatarUrl(res.avatarUrl || DEFAULT_AVATAR);
                         await loadProfile();
                       }

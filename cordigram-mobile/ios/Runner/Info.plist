@@ -54,5 +54,9 @@
 	<string>Cordigram needs camera access for livestream camera mode.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Cordigram needs microphone access for livestream audio and mic test.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Cordigram needs microphone access to record voice messages in chat.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Cordigram needs photo library access to attach images and videos in chat.</string>
 </dict>
 </plist>

@@ -24,6 +24,7 @@ C:\Users\admin\AppData\Local\Android\Sdk\platform-tools\adb.exe reverse tcp:9999
 4. Run app with API base URL:
 
 flutter run --dart-define=API_BASE_URL=https://api.cordigram.com
+
 ## Phone Setup Required
 
 1. Enable Developer options.

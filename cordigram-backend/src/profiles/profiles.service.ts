@@ -917,4 +917,92 @@ export class ProfilesService {
       mutualFollowUsers,
     };
   }
+
+  /**
+   * Dữ liệu social (follow, mutual servers, member since) để hiển thị cạnh hồ sơ messaging —
+   * không dùng displayName/avatar từ Profile document.
+   */
+  async getMessagingSocialOverlay(params: {
+    viewerId: string;
+    ownerUserId: string;
+  }): Promise<{
+    mutualServerCount: number;
+    mutualServers: Array<{
+      serverId: string;
+      name: string;
+      avatarUrl: string | null;
+    }>;
+    mutualFollowCount: number;
+    mutualFollowUsers: Array<{
+      userId: string;
+      username: string;
+      displayName: string;
+      avatarUrl: string;
+    }>;
+    cordigramMemberSince?: string;
+    isFollowing: boolean;
+    isCreatorVerified: boolean;
+  }> {
+    const viewerId = this.asObjectId(params.viewerId);
+    const ownerId = this.asObjectId(params.ownerUserId);
+    if (!viewerId || !ownerId) {
+      throw new BadRequestException('Invalid user id');
+    }
+
+    const ownerUser = await this.userModel
+      .findById(ownerId)
+      .select('status isCreatorVerified createdAt settings')
+      .lean()
+      .exec();
+
+    if (!ownerUser || ownerUser.status === 'banned') {
+      throw new NotFoundException('Account is unavailable');
+    }
+
+    const isOwner = viewerId.equals(ownerId);
+    const ownerSettings = (ownerUser as { settings?: Record<string, unknown> })
+      ?.settings;
+    const showMemberSince =
+      (ownerSettings?.showCordigramMemberSince as boolean | undefined) !==
+      false;
+    const cordigramMemberSince =
+      showMemberSince &&
+      (ownerUser as { createdAt?: Date }).createdAt
+        ? new Date(
+            (ownerUser as { createdAt: Date }).createdAt,
+          ).toLocaleDateString('vi-VN', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
+        : undefined;
+
+    if (isOwner) {
+      return {
+        mutualServerCount: 0,
+        mutualServers: [],
+        mutualFollowCount: 0,
+        mutualFollowUsers: [],
+        cordigramMemberSince,
+        isFollowing: false,
+        isCreatorVerified: Boolean(ownerUser?.isCreatorVerified),
+      };
+    }
+
+    const [serverList, mutualFollow, viewerFollow] = await Promise.all([
+      this.listMutualServers(viewerId, ownerId),
+      this.getMutualFollowersPreview(viewerId, ownerId),
+      this.followModel.exists({ followerId: viewerId, followeeId: ownerId }),
+    ]);
+
+    return {
+      mutualServerCount: serverList.length,
+      mutualServers: serverList.length ? serverList : [],
+      mutualFollowCount: mutualFollow.count,
+      mutualFollowUsers: mutualFollow.users,
+      cordigramMemberSince,
+      isFollowing: Boolean(viewerFollow),
+      isCreatorVerified: Boolean(ownerUser?.isCreatorVerified),
+    };
+  }
 }

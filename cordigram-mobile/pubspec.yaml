@@ -53,6 +53,11 @@ dependencies:
   firebase_messaging: ^15.2.9
   flutter_local_notifications: ^17.2.2
   livekit_client: ^2.5.4
+  record: ^6.2.0
+  flutter_dotenv: ^6.0.1
+  emoji_picker_flutter: ^4.4.0
+  webview_flutter: ^4.9.0
+  webview_flutter_android: ^4.10.1
 
 dev_dependencies:
   flutter_test:
@@ -84,6 +89,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/cordigram-logo.png
+    # Optional local env values are loaded at runtime if present.
 
   # To add assets to your application, add an assets section, like this:
   # assets:

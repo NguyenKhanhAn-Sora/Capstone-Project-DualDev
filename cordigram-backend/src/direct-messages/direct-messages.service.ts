@@ -22,6 +22,7 @@ import {
   parseMessageSearchQueryForDm,
   type ParsedMessageSearch,
 } from '../messages/message-search-query.parser';
+import { MessagingProfilesService } from '../messaging-profiles/messaging-profiles.service';
 
 @Injectable()
 export class DirectMessagesService {
@@ -34,6 +35,7 @@ export class DirectMessagesService {
     @InjectModel(MessageReport.name)
     private messageReportModel: Model<MessageReport>,
     private readonly ignoredService: IgnoredService,
+    private readonly messagingProfilesService: MessagingProfilesService,
   ) {}
 
   async createDirectMessage(
@@ -110,7 +112,7 @@ export class DirectMessagesService {
         .lean()
         .exec();
 
-      // Enrich with profile data (userId as ObjectId for reliable Profile lookup)
+      // Enrich with messaging profile (tách khỏi hồ sơ social)
       const enrichedMessages = await Promise.all(
         messages.map(async (msg: any) => {
           const senderUserId =
@@ -122,33 +124,21 @@ export class DirectMessagesService {
               ? new Types.ObjectId(msg.receiverId._id.toString())
               : null;
 
-          const senderProfile = senderUserId
-            ? await this.profileModel
-                .findOne({ userId: senderUserId })
-                .select('username displayName avatarUrl')
-                .lean()
-                .exec()
-            : null;
-          const receiverProfile = receiverUserId
-            ? await this.profileModel
-                .findOne({ userId: receiverUserId })
-                .select('username displayName avatarUrl')
-                .lean()
-                .exec()
-            : null;
+          const [senderPart, receiverPart] = await Promise.all([
+            senderUserId
+              ? this.messagingProfilesService.buildDmParticipantPayload(
+                  senderUserId,
+                  msg.senderId?.email || '',
+                )
+              : Promise.resolve(null),
+            receiverUserId
+              ? this.messagingProfilesService.buildDmParticipantPayload(
+                  receiverUserId,
+                  msg.receiverId?.email || '',
+                )
+              : Promise.resolve(null),
+          ]);
 
-          const senderDisplay =
-            senderProfile?.displayName ||
-            senderProfile?.username ||
-            msg.senderId?.email ||
-            '';
-          const receiverDisplay =
-            receiverProfile?.displayName ||
-            receiverProfile?.username ||
-            msg.receiverId?.email ||
-            '';
-
-          // Enrich replyTo (if populated) with Profile.displayName
           let enrichedReplyTo: any = null;
           if (msg.replyTo && msg.replyTo.senderId?._id) {
             const rt: any = msg.replyTo;
@@ -159,27 +149,16 @@ export class DirectMessagesService {
               rt.receiverId._id.toString(),
             );
 
-            const rtSenderProfile = await this.profileModel
-              .findOne({ userId: rtSenderUserId })
-              .select('username displayName avatarUrl')
-              .lean()
-              .exec();
-            const rtReceiverProfile = await this.profileModel
-              .findOne({ userId: rtReceiverUserId })
-              .select('username displayName avatarUrl')
-              .lean()
-              .exec();
-
-            const rtSenderDisplay =
-              rtSenderProfile?.displayName ||
-              rtSenderProfile?.username ||
-              rt.senderId.email ||
-              '';
-            const rtReceiverDisplay =
-              rtReceiverProfile?.displayName ||
-              rtReceiverProfile?.username ||
-              rt.receiverId.email ||
-              '';
+            const [rtSenderPart, rtReceiverPart] = await Promise.all([
+              this.messagingProfilesService.buildDmParticipantPayload(
+                rtSenderUserId,
+                rt.senderId.email || '',
+              ),
+              this.messagingProfilesService.buildDmParticipantPayload(
+                rtReceiverUserId,
+                rt.receiverId.email || '',
+              ),
+            ]);
 
             enrichedReplyTo = {
               _id: rt._id,
@@ -189,39 +168,26 @@ export class DirectMessagesService {
               voiceUrl: rt.voiceUrl ?? null,
               voiceDuration: rt.voiceDuration ?? null,
               createdAt: rt.createdAt,
-              senderId: {
-                _id: rt.senderId._id,
-                email: rt.senderId.email,
-                username: rtSenderDisplay,
-                displayName: rtSenderProfile?.displayName ?? rtSenderDisplay,
-                avatar: rtSenderProfile?.avatarUrl,
-              },
-              receiverId: {
-                _id: rt.receiverId._id,
-                email: rt.receiverId.email,
-                username: rtReceiverDisplay,
-                displayName:
-                  rtReceiverProfile?.displayName ?? rtReceiverDisplay,
-                avatar: rtReceiverProfile?.avatarUrl,
-              },
+              senderId: rtSenderPart,
+              receiverId: rtReceiverPart,
             };
           }
 
           return {
             ...msg,
-            senderId: {
+            senderId: senderPart ?? {
               _id: msg.senderId._id,
               email: msg.senderId.email,
-              username: senderDisplay,
-              displayName: senderProfile?.displayName ?? senderDisplay,
-              avatar: senderProfile?.avatarUrl,
+              displayName: msg.senderId.email,
+              username: msg.senderId.email,
+              avatar: undefined,
             },
-            receiverId: {
+            receiverId: receiverPart ?? {
               _id: msg.receiverId._id,
               email: msg.receiverId.email,
-              username: receiverDisplay,
-              displayName: receiverProfile?.displayName ?? receiverDisplay,
-              avatar: receiverProfile?.avatarUrl,
+              displayName: msg.receiverId.email,
+              username: msg.receiverId.email,
+              avatar: undefined,
             },
             replyTo: enrichedReplyTo ?? msg.replyTo ?? null,
           };
@@ -254,63 +220,38 @@ export class DirectMessagesService {
       throw new NotFoundException(`Message with id ${messageId} not found`);
     }
 
-    // Enrich with profile data
     const senderUserId = new Types.ObjectId(message.senderId._id.toString());
     const receiverUserId = new Types.ObjectId(
       message.receiverId._id.toString(),
     );
 
-    const senderProfile = await this.profileModel
-      .findOne({ userId: senderUserId })
-      .select('username displayName avatarUrl')
-      .lean()
-      .exec();
+    const [senderPart, receiverPart] = await Promise.all([
+      this.messagingProfilesService.buildDmParticipantPayload(
+        senderUserId,
+        message.senderId.email || '',
+      ),
+      this.messagingProfilesService.buildDmParticipantPayload(
+        receiverUserId,
+        message.receiverId.email || '',
+      ),
+    ]);
 
-    const receiverProfile = await this.profileModel
-      .findOne({ userId: receiverUserId })
-      .select('username displayName avatarUrl')
-      .lean()
-      .exec();
-
-    const senderDisplay =
-      senderProfile?.displayName ||
-      senderProfile?.username ||
-      message.senderId.email ||
-      '';
-    const receiverDisplay =
-      receiverProfile?.displayName ||
-      receiverProfile?.username ||
-      message.receiverId.email ||
-      '';
-
-    // Enrich replyTo (if any) with Profile.displayName
     let enrichedReplyTo: any = null;
     if (message.replyTo && message.replyTo.senderId?._id) {
       const rt: any = message.replyTo;
       const rtSenderUserId = new Types.ObjectId(rt.senderId._id.toString());
       const rtReceiverUserId = new Types.ObjectId(rt.receiverId._id.toString());
 
-      const rtSenderProfile = await this.profileModel
-        .findOne({ userId: rtSenderUserId })
-        .select('username displayName avatarUrl')
-        .lean()
-        .exec();
-      const rtReceiverProfile = await this.profileModel
-        .findOne({ userId: rtReceiverUserId })
-        .select('username displayName avatarUrl')
-        .lean()
-        .exec();
-
-      const rtSenderDisplay =
-        rtSenderProfile?.displayName ||
-        rtSenderProfile?.username ||
-        rt.senderId.email ||
-        '';
-      const rtReceiverDisplay =
-        rtReceiverProfile?.displayName ||
-        rtReceiverProfile?.username ||
-        rt.receiverId.email ||
-        '';
+      const [rtSenderPart, rtReceiverPart] = await Promise.all([
+        this.messagingProfilesService.buildDmParticipantPayload(
+          rtSenderUserId,
+          rt.senderId.email || '',
+        ),
+        this.messagingProfilesService.buildDmParticipantPayload(
+          rtReceiverUserId,
+          rt.receiverId.email || '',
+        ),
+      ]);
 
       enrichedReplyTo = {
         _id: rt._id,
@@ -320,39 +261,15 @@ export class DirectMessagesService {
         voiceUrl: rt.voiceUrl ?? null,
         voiceDuration: rt.voiceDuration ?? null,
         createdAt: rt.createdAt,
-        senderId: {
-          _id: rt.senderId._id,
-          email: rt.senderId.email,
-          username: rtSenderDisplay,
-          displayName: rtSenderProfile?.displayName ?? rtSenderDisplay,
-          avatar: rtSenderProfile?.avatarUrl,
-        },
-        receiverId: {
-          _id: rt.receiverId._id,
-          email: rt.receiverId.email,
-          username: rtReceiverDisplay,
-          displayName: rtReceiverProfile?.displayName ?? rtReceiverDisplay,
-          avatar: rtReceiverProfile?.avatarUrl,
-        },
+        senderId: rtSenderPart,
+        receiverId: rtReceiverPart,
       };
     }
 
     return {
       ...message,
-      senderId: {
-        _id: message.senderId._id,
-        email: message.senderId.email,
-        username: senderDisplay,
-        displayName: senderProfile?.displayName ?? senderDisplay,
-        avatar: senderProfile?.avatarUrl,
-      },
-      receiverId: {
-        _id: message.receiverId._id,
-        email: message.receiverId.email,
-        username: receiverDisplay,
-        displayName: receiverProfile?.displayName ?? receiverDisplay,
-        avatar: receiverProfile?.avatarUrl,
-      },
+      senderId: senderPart,
+      receiverId: receiverPart,
       replyTo: enrichedReplyTo ?? message.replyTo ?? null,
     };
   }
@@ -541,7 +458,7 @@ export class DirectMessagesService {
       ])
       .exec();
 
-    return conversations.map((conv) => ({
+    const rows = conversations.map((conv) => ({
       userId: conv._id.conversation?.toString?.() ?? conv._id.conversation,
       username: conv.userInfo[0]?.username || 'Unknown',
       avatar: conv.userInfo[0]?.avatar,
@@ -550,6 +467,24 @@ export class DirectMessagesService {
       lastMessageTime: conv.lastMessageTime,
       unreadCount: conv.unreadCount,
     }));
+
+    return Promise.all(
+      rows.map(async (row) => {
+        if (!row.userId || !Types.ObjectId.isValid(String(row.userId))) {
+          return row;
+        }
+        const part =
+          await this.messagingProfilesService.buildDmParticipantPayload(
+            new Types.ObjectId(String(row.userId)),
+            row.email || '',
+          );
+        return {
+          ...row,
+          username: part.displayName,
+          avatar: part.avatar,
+        };
+      }),
+    );
   }
 
   /** Unread DM conversations for inbox, excluding ignored users. Returns displayName and last message. */
@@ -580,20 +515,15 @@ export class DirectMessagesService {
     }[] = [];
     for (const c of withUnread) {
       const otherUserId = new Types.ObjectId(c.userId);
-      const profile = await this.profileModel
-        .findOne({ userId: otherUserId })
-        .select('displayName username avatarUrl')
-        .lean()
-        .exec();
-      const displayName =
-        (profile as any)?.displayName ||
-        (profile as any)?.username ||
-        c.username ||
-        'Unknown';
+      const part =
+        await this.messagingProfilesService.buildDmParticipantPayload(
+          otherUserId,
+          c.email || '',
+        );
       result.push({
         userId: String(c.userId),
-        displayName,
-        username: c.username || 'Unknown',
+        displayName: part.displayName || 'Unknown',
+        username: part.username || part.displayName || 'Unknown',
         lastMessage: c.lastMessage ?? '',
         lastMessageAt:
           c.lastMessageTime?.toISOString?.() ?? new Date().toISOString(),
@@ -713,21 +643,25 @@ export class DirectMessagesService {
         onlineById.set(u._id.toString(), last > 0 && last >= devicePresenceAgo);
       }
 
-      return profiles.map((profile) => {
-        const uid = profile.userId.toString();
-        const isOnline = onlineById.get(uid) ?? false;
-        return {
-          _id: profile.userId,
-          userId: profile.userId,
-          username: profile.username,
-          displayName: profile.displayName,
-          avatar: profile.avatarUrl,
-          avatarUrl: profile.avatarUrl,
-          bio: profile.bio,
-          email: isOnline ? 'Đang hoạt động' : 'Offline',
-          isOnline,
-        };
-      });
+      return Promise.all(
+        profiles.map(async (profile) => {
+          const uid = profile.userId.toString();
+          const isOnline = onlineById.get(uid) ?? false;
+          const mp =
+            await this.messagingProfilesService.ensureMessagingProfile(uid);
+          return {
+            _id: profile.userId,
+            userId: profile.userId,
+            username: mp.chatUsername,
+            displayName: mp.displayName,
+            avatar: mp.avatarUrl,
+            avatarUrl: mp.avatarUrl,
+            bio: mp.bio || '',
+            email: isOnline ? 'Đang hoạt động' : 'Offline',
+            isOnline,
+          };
+        }),
+      );
     } catch (error) {
       console.error('Error getting available users:', error);
       return [];
@@ -813,7 +747,6 @@ export class DirectMessagesService {
         .lean()
         .exec();
 
-      // Enrich with profile data (same as getConversation)
       const enrichedMessages = await Promise.all(
         messages.map(async (msg: any) => {
           const sid =
@@ -824,46 +757,34 @@ export class DirectMessagesService {
             msg.receiverId?._id != null
               ? new Types.ObjectId(msg.receiverId._id.toString())
               : null;
-          const senderProfile = sid
-            ? await this.profileModel
-                .findOne({ userId: sid })
-                .select('username displayName avatarUrl')
-                .lean()
-                .exec()
-            : null;
-          const receiverProfile = rid
-            ? await this.profileModel
-                .findOne({ userId: rid })
-                .select('username displayName avatarUrl')
-                .lean()
-                .exec()
-            : null;
-          const senderDisplay =
-            senderProfile?.displayName ||
-            senderProfile?.username ||
-            msg.senderId?.email ||
-            '';
-          const receiverDisplay =
-            receiverProfile?.displayName ||
-            receiverProfile?.username ||
-            msg.receiverId?.email ||
-            '';
+          const [senderPart, receiverPart] = await Promise.all([
+            sid
+              ? this.messagingProfilesService.buildDmParticipantPayload(
+                  sid,
+                  msg.senderId?.email || '',
+                )
+              : Promise.resolve(null),
+            rid
+              ? this.messagingProfilesService.buildDmParticipantPayload(
+                  rid,
+                  msg.receiverId?.email || '',
+                )
+              : Promise.resolve(null),
+          ]);
           return {
             ...msg,
-            senderId: {
-              _id: msg.senderId._id,
-              email: msg.senderId.email,
-              username: senderDisplay,
-              displayName: senderProfile?.displayName ?? senderDisplay,
-              avatar: senderProfile?.avatarUrl,
-            },
-            receiverId: {
-              _id: msg.receiverId._id,
-              email: msg.receiverId.email,
-              username: receiverDisplay,
-              displayName: receiverProfile?.displayName ?? receiverDisplay,
-              avatar: receiverProfile?.avatarUrl,
-            },
+            senderId:
+              senderPart ??
+              ({
+                _id: msg.senderId._id,
+                email: msg.senderId.email,
+              } as any),
+            receiverId:
+              receiverPart ??
+              ({
+                _id: msg.receiverId._id,
+                email: msg.receiverId.email,
+              } as any),
           };
         }),
       );
@@ -1057,41 +978,47 @@ export class DirectMessagesService {
         const sId = msg.senderId?._id ?? msg.senderId;
         const rId = msg.receiverId?._id ?? msg.receiverId;
 
-        const [senderProfile, receiverProfile] = await Promise.all([
+        const [senderPart, receiverPart] = await Promise.all([
           sId
-            ? this.profileModel
-                .findOne({ userId: new Types.ObjectId(sId.toString()) })
-                .select('username displayName avatarUrl')
-                .lean()
-                .exec()
-            : null,
+            ? this.messagingProfilesService.buildDmParticipantPayload(
+                new Types.ObjectId(sId.toString()),
+                typeof msg.senderId === 'object'
+                  ? msg.senderId?.email || ''
+                  : '',
+              )
+            : Promise.resolve(null),
           rId
-            ? this.profileModel
-                .findOne({ userId: new Types.ObjectId(rId.toString()) })
-                .select('username displayName avatarUrl')
-                .lean()
-                .exec()
-            : null,
+            ? this.messagingProfilesService.buildDmParticipantPayload(
+                new Types.ObjectId(rId.toString()),
+                typeof msg.receiverId === 'object'
+                  ? msg.receiverId?.email || ''
+                  : '',
+              )
+            : Promise.resolve(null),
         ]);
 
         return {
           ...msg,
-          senderId: {
-            ...(typeof msg.senderId === 'object'
-              ? msg.senderId
-              : { _id: msg.senderId, email: '' }),
-            displayName: senderProfile?.displayName ?? undefined,
-            username: senderProfile?.username ?? undefined,
-            avatarUrl: senderProfile?.avatarUrl ?? undefined,
-          },
-          receiverId: {
-            ...(typeof msg.receiverId === 'object'
-              ? msg.receiverId
-              : { _id: msg.receiverId, email: '' }),
-            displayName: receiverProfile?.displayName ?? undefined,
-            username: receiverProfile?.username ?? undefined,
-            avatarUrl: receiverProfile?.avatarUrl ?? undefined,
-          },
+          senderId: senderPart
+            ? {
+                ...(typeof msg.senderId === 'object'
+                  ? msg.senderId
+                  : { _id: msg.senderId, email: '' }),
+                displayName: senderPart.displayName,
+                username: senderPart.username,
+                avatarUrl: senderPart.avatar,
+              }
+            : msg.senderId,
+          receiverId: receiverPart
+            ? {
+                ...(typeof msg.receiverId === 'object'
+                  ? msg.receiverId
+                  : { _id: msg.receiverId, email: '' }),
+                displayName: receiverPart.displayName,
+                username: receiverPart.username,
+                avatarUrl: receiverPart.avatar,
+              }
+            : msg.receiverId,
         };
       }),
     );

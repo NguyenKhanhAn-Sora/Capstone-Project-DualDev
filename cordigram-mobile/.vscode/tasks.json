@@ -1,20 +1,20 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "Flutter Run (mobile, quiet logs)",
-      "type": "shell",
-      "command": "flutter run 2>&1 | Where-Object { $_ -notmatch 'AudioRecordImpl|EglImage dataspace changed, need recreate|^D/Au$' }",
-      "options": {
-        "shell": {
-          "executable": "powershell",
-          "args": [
-            "-NoProfile",
-            "-Command"
-          ]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Flutter Run (mobile, quiet logs)",
+            "type": "shell",
+            "command": "flutter run 2>&1 | Where-Object { $_ -notmatch 'AudioRecordImpl|EglImage dataspace changed, need recreate|^D/Au$' }",
+            "options": {
+                "shell": {
+                    "executable": "powershell",
+                    "args": [
+                        "-NoProfile",
+                        "-Command"
+                    ]
+                }
+            },
+            "problemMatcher": []
         }
-      },
-      "problemMatcher": []
-    }
-  ]
+    ]
 }
