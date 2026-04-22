@@ -207,7 +207,7 @@ class ApiService {
     );
     final streamed = await _client
         .send(request)
-        .timeout(const Duration(seconds: 60));
+        .timeout(const Duration(seconds: 180));
     final response = await http.Response.fromStream(streamed);
     return _handleResponse(response);
   }

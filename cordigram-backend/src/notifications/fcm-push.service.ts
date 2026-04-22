@@ -12,6 +12,7 @@ import type { NotificationItem } from './notifications.service';
 export class FcmPushService {
   private readonly logger = new Logger(FcmPushService.name);
   private app: admin.app.App | null = null;
+  private static readonly androidNotificationIcon = 'ic_stat_cordigram';
 
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
@@ -142,6 +143,7 @@ export class FcmPushService {
         priority: 'high',
         notification: {
           channelId: 'cordigram_push_high',
+          icon: FcmPushService.androidNotificationIcon,
           priority: 'high',
           visibility: 'public',
         },

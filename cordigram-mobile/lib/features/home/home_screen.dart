@@ -11,6 +11,7 @@ import '../auth/login_screen.dart';
 import '../explore/explore_screen.dart';
 import '../following/following_screen.dart';
 import '../hashtag/hashtag_screen.dart';
+import '../messages/message_home_screen.dart';
 import '../notifications/services/notification_realtime_service.dart';
 import '../notifications/notification_screen.dart';
 import '../post/create_tab_screen.dart';
@@ -1331,9 +1332,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           iconSize: 27,
           count: _dmUnread,
           tooltip: 'Messages',
-          onTap: () => ScaffoldMessenger.of(
+          onTap: () => Navigator.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Messages coming soon'))),
+          ).push(MaterialPageRoute(builder: (_) => const MessageHomeScreen())),
         ),
         // Profile avatar
         GestureDetector(

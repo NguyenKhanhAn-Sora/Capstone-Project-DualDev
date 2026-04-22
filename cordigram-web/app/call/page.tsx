@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { getStoredAccessToken } from "@/lib/auth";
+import { getStoredAccessToken, setStoredAccessToken } from "@/lib/auth";
 import { getLiveKitToken } from "@/lib/livekit-api";
 import styles from "./call.module.css";
 
@@ -18,14 +18,45 @@ export default function CallPage() {
   const roomName = searchParams.get("roomName");
   const participantName = searchParams.get("participantName");
   const isAudioOnly = searchParams.get("audioOnly") === "true";
+  const embedded = searchParams.get("embedded") === "1";
+  const tokenFromQuery = searchParams.get("accessToken");
+  const lkTokenFromQuery = searchParams.get("lkToken");
+  const lkUrlFromQuery = searchParams.get("lkUrl");
+  const publicLivekitUrl = (process.env.NEXT_PUBLIC_LIVEKIT_URL || "").trim();
 
   const [callToken, setCallToken] = useState<string>("");
   const [callServerUrl, setCallServerUrl] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ended, setEnded] = useState(false);
 
   useEffect(() => {
     const initCall = async () => {
+      const lkToken = (lkTokenFromQuery || "").trim();
+      const lkUrl = (lkUrlFromQuery || "").trim();
+
+      // Mobile embedded mode should always prefer pre-issued LiveKit credentials
+      // to avoid any dependency on browser auth state.
+      if (embedded && lkToken) {
+        const resolvedUrl = lkUrl || publicLivekitUrl;
+        if (!resolvedUrl) {
+          setError("Missing LiveKit URL");
+          setLoading(false);
+          return;
+        }
+        setCallToken(lkToken);
+        setCallServerUrl(resolvedUrl);
+        setLoading(false);
+        return;
+      }
+
+      if (lkToken && lkUrl) {
+        setCallToken(lkToken);
+        setCallServerUrl(lkUrl);
+        setLoading(false);
+        return;
+      }
+
       if (!roomName || !participantName) {
         setError("Missing call parameters");
         setLoading(false);
@@ -33,7 +64,20 @@ export default function CallPage() {
       }
 
       try {
-        const token = getStoredAccessToken();
+        const queryTokenRaw = tokenFromQuery?.trim() ?? "";
+        const queryToken = queryTokenRaw.replace(/^Bearer\s+/i, "");
+        if (queryToken) {
+          setStoredAccessToken(queryToken);
+          try {
+            window.localStorage.setItem("token", queryToken);
+          } catch (_) {}
+        }
+        const token =
+          queryToken ||
+          getStoredAccessToken() ||
+          (typeof window !== "undefined"
+            ? window.localStorage.getItem("token")
+            : null);
         if (!token) {
           setError("Not authenticated");
           setLoading(false);
@@ -59,9 +103,21 @@ export default function CallPage() {
     };
 
     initCall();
-  }, [roomName, participantName]);
+  }, [
+    roomName,
+    participantName,
+    embedded,
+    tokenFromQuery,
+    lkTokenFromQuery,
+    lkUrlFromQuery,
+    publicLivekitUrl,
+  ]);
 
   const handleDisconnect = useCallback(() => {
+    if (embedded) {
+      setEnded(true);
+      return;
+    }
     // Close the tab/window
     window.close();
 
@@ -69,7 +125,7 @@ export default function CallPage() {
     setTimeout(() => {
       router.push("/messages");
     }, 100);
-  }, [router]);
+  }, [embedded, router]);
 
   if (loading) {
     return (
@@ -89,6 +145,14 @@ export default function CallPage() {
         <button onClick={() => window.close()} className={styles.closeButton}>
           Close Window
         </button>
+      </div>
+    );
+  }
+
+  if (ended) {
+    return (
+      <div className={styles.loadingContainer}>
+        <p className={styles.loadingText}>Call ended.</p>
       </div>
     );
   }

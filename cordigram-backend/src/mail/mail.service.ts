@@ -786,8 +786,8 @@ export class MailService {
     code: string,
     expiresMinutes: number,
   ): Promise<void> {
-    const subject = 'Confirm your Cordigram login';
-    const text = `Your login code: ${code}\nValid for ${expiresMinutes} minutes.`;
+    const subject = 'Confirm your Cordigram two-factor verification';
+    const text = `Your two-factor verification code: ${code}\nValid for ${expiresMinutes} minutes.`;
 
     const logoUrl =
       'https://res.cloudinary.com/doicocgeo/image/upload/v1765956408/logo_plpbhm.png';
@@ -806,7 +806,7 @@ export class MailService {
               </tr>
               <tr>
                 <td style="font-size:15px;line-height:1.6;padding-bottom:16px;color:#475569;">
-                  Enter this code to finish signing in to Cordigram. The code expires in ${expiresMinutes} minutes.
+                  Enter this code to complete two-factor verification for your Cordigram account. The code expires in ${expiresMinutes} minutes.
                 </td>
               </tr>
               <tr>
@@ -818,7 +818,7 @@ export class MailService {
               </tr>
               <tr>
                 <td style="font-size:14px;line-height:1.6;color:#475569;padding-bottom:6px;">
-                  If you did not request this login, you can safely ignore this email.
+                  If you did not request this two-factor verification, you can safely ignore this email.
                 </td>
               </tr>
               <tr>

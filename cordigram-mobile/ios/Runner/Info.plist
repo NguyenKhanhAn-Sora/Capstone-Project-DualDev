@@ -50,5 +50,9 @@
 		<string>comgooglemaps</string>
 		<string>https</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Cordigram needs microphone access to record voice messages in chat.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Cordigram needs photo library access to attach images and videos in chat.</string>
 </dict>
 </plist>

@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "https://cordigram-api.onrender.com";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ?? "https://api.cordigram.com";
 
 function getHeaders(): Record<string, string> {
   const token = localStorage.getItem("accessToken") || localStorage.getItem("token") || "";

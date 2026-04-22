@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'core/config/app_config.dart';
 import 'core/config/app_theme.dart';
 import 'core/services/auth_storage.dart';
 import 'core/services/push_notification_service.dart';
@@ -11,6 +13,31 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    // Same keys as cordigram-web; edit `assets/env/.env` or use --dart-define=*.
+    await dotenv.load(fileName: 'assets/env/.env', isOptional: true);
+  } catch (_) {
+    // Giphy can still use --dart-define=*.
+  }
+  if (dotenv.isInitialized) {
+    final giphy =
+        (dotenv.env['NEXT_PUBLIC_GIPHY_API_KEY'] ??
+                dotenv.env['GIPHY_API_KEY'] ??
+                '')
+            .trim();
+    AppConfig.setGiphyApiKeyFromRuntime(giphy);
+
+    final configuredWebBase =
+        (dotenv.env['WEB_BASE_URL'] ??
+                dotenv.env['NEXT_PUBLIC_WEB_BASE_URL'] ??
+                dotenv.env['SOCIAL_URL'] ??
+                '')
+            .trim();
+    if (configuredWebBase.isNotEmpty &&
+        !configuredWebBase.contains('localhost')) {
+      AppConfig.setWebBaseUrlFromRuntime(configuredWebBase);
+    }
+  }
   await _requestNotificationPermission();
   await AuthStorage.loadAll();
   await PushNotificationService.initialize(navigatorKey: appNavigatorKey);
