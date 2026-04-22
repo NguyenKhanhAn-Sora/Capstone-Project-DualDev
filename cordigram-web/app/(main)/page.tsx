@@ -20,7 +20,6 @@ import {
   unsavePost,
   repostPost,
   createPost,
-  createReel,
   setPostAllowComments,
   setPostHideLikeCount,
   updatePostNotificationMute,
@@ -1287,11 +1286,7 @@ export default function HomePage({
           mentions: mentions.length ? mentions : undefined,
         };
 
-        if (target.kind === "reel") {
-          await createReel({ token, payload: payload as any });
-        } else {
-          await createPost({ token, payload });
-        }
+        await createPost({ token, payload });
 
         incrementRepostStat(originalId);
         if (originalId !== targetId) {

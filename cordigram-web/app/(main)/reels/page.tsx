@@ -21,7 +21,6 @@ import {
   unsavePost,
   repostPost,
   createPost,
-  createReel,
   followUser,
   unfollowUser,
   viewPost,
@@ -2310,11 +2309,7 @@ export default function ReelPage({
           mentions: mentions.length ? mentions : undefined,
         } as const;
 
-        if (target.kind === "reel") {
-          await createReel({ token, payload: payload as any });
-        } else {
-          await createPost({ token, payload: payload as any });
-        }
+        await createPost({ token, payload: payload as any });
 
         incrementRepostStat(originalId);
         if (originalId !== targetId) {
