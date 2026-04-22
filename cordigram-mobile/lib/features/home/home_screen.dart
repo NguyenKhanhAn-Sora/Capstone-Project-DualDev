@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:livekit_client/livekit_client.dart';
+import 'package:video_player/video_player.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/theme_controller.dart';
@@ -11,6 +13,8 @@ import '../auth/login_screen.dart';
 import '../explore/explore_screen.dart';
 import '../following/following_screen.dart';
 import '../hashtag/hashtag_screen.dart';
+import '../livestream/livestream_create_service.dart';
+import '../livestream/livestream_hub_screen.dart';
 import '../notifications/services/notification_realtime_service.dart';
 import '../notifications/notification_screen.dart';
 import '../post/create_tab_screen.dart';
@@ -21,6 +25,7 @@ import '../post/utils/likes_list_sheet.dart';
 import '../post/utils/post_mute_overlay.dart';
 import '../post/utils/repost_flow_utils.dart';
 import '../profile/profile_screen.dart';
+import '../profile/services/profile_service.dart';
 import '../reels/reels_screen.dart';
 import '../search/search_screen.dart';
 import '../report/report_problem_screen.dart';
@@ -95,6 +100,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final Map<String, int> _viewCooldownMap = {};
   static const int _kViewCooldownMs = 300000;
   final Map<String, String> _campaignIdByPromotedPostId = {};
+  Timer? _livePollTimer;
+  static const Duration _livePollInterval = Duration(seconds: 8);
+  List<LivestreamItem> _liveStreams = const [];
+  bool _loadingLiveStreams = false;
+  final Map<String, _LiveHostSnapshot> _liveHostProfiles = {};
 
   @override
   void initState() {
@@ -112,10 +122,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
     _tabController.addListener(_onTabChanged);
     _loadFeed();
+    _loadLiveStreams();
     _fetchProfile();
     _fetchUnreadCounts();
     _scrollController.addListener(_onScroll);
     _startPolling();
+    _startLivePolling();
     _startNotificationRealtime();
   }
 
@@ -125,6 +137,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _tabController.dispose();
     _topNavAnimController.dispose();
     _pollTimer?.cancel();
+    _livePollTimer?.cancel();
     _notificationRtSub?.cancel();
     _notificationSeenSub?.cancel();
     _notificationStateSub?.cancel();
@@ -477,6 +490,102 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _syncStats();
       _fetchUnreadCounts();
     });
+  }
+
+  void _startLivePolling() {
+    _livePollTimer?.cancel();
+    _livePollTimer = Timer.periodic(_livePollInterval, (_) {
+      unawaited(_loadLiveStreams(silent: true));
+    });
+  }
+
+  Future<void> _loadLiveStreams({bool silent = false}) async {
+    if (_loadingLiveStreams) return;
+
+    if (!silent && mounted) {
+      setState(() => _loadingLiveStreams = true);
+    } else {
+      _loadingLiveStreams = true;
+    }
+
+    try {
+      final response = await LivestreamCreateService.listLiveLivestreams();
+      final items = response.items.where((item) => item.isLive).toList()
+        ..sort((a, b) {
+          final aTime = a.startedAt?.millisecondsSinceEpoch ?? 0;
+          final bTime = b.startedAt?.millisecondsSinceEpoch ?? 0;
+          return bTime.compareTo(aTime);
+        });
+
+      if (!mounted) return;
+      setState(() {
+        _liveStreams = items;
+      });
+      unawaited(_ensureLiveHostProfiles(items));
+    } catch (_) {
+      if (!mounted) return;
+      if (!silent) {
+        setState(() {
+          _liveStreams = const [];
+          _liveHostProfiles.clear();
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingLiveStreams = false);
+      } else {
+        _loadingLiveStreams = false;
+      }
+    }
+  }
+
+  Future<void> _refreshHome() async {
+    await Future.wait([
+      _loadFeed(refresh: true),
+      _loadLiveStreams(),
+    ]);
+  }
+
+  Future<void> _ensureLiveHostProfiles(List<LivestreamItem> streams) async {
+    final pendingHostIds = streams
+        .map((item) => item.hostUserId.trim())
+        .where((id) {
+          if (id.isEmpty) return false;
+          final snapshot = _liveHostProfiles[id];
+          return snapshot == null ||
+              snapshot.username == null ||
+              snapshot.avatarUrl == null;
+        })
+        .toSet();
+    if (pendingHostIds.isEmpty) return;
+
+    await Future.wait(
+      pendingHostIds.map((hostId) async {
+        try {
+          final profile = await ProfileService.fetchProfile(hostId);
+          final username = profile.username.trim();
+          final displayName = profile.displayName.trim();
+          final avatarUrl = profile.avatarUrl.trim();
+
+          if (!mounted) return;
+          setState(() {
+            _liveHostProfiles[hostId] = _LiveHostSnapshot(
+              username: username.isNotEmpty
+                  ? username
+                  : null,
+              displayName: displayName.isNotEmpty
+                  ? displayName
+                  : null,
+              avatarUrl: avatarUrl.isNotEmpty
+                  ? avatarUrl
+                  : null,
+            );
+          });
+        } catch (_) {
+          // Keep fallback data from livestream list when profile lookup fails.
+        }
+      }),
+    );
   }
 
   /// Fetches a fresh batch from the server and merges updated stats into the
@@ -1038,8 +1147,50 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ── Logout ────────────────────────────────────────────────────────────────
 
+  Future<void> _endOwnedLivestreamsBeforeLogout() async {
+    final token = AuthStorage.accessToken;
+    if (token == null) return;
+
+    try {
+      var currentUserId = _viewerId;
+      if (currentUserId == null || currentUserId.isEmpty) {
+        final me = await ApiService.get(
+          '/profiles/me',
+          extraHeaders: {'Authorization': 'Bearer $token'},
+        );
+        currentUserId =
+            (me['userId'] as String?) ?? (me['id'] as String?) ?? '';
+      }
+      if (currentUserId.isEmpty) return;
+
+      final liveList = await LivestreamCreateService.listLiveLivestreams();
+      final ownedLiveIds = liveList.items
+          .where((item) => item.isLive && item.hostUserId == currentUserId)
+          .map((item) => item.id)
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList(growable: false);
+
+      if (ownedLiveIds.isEmpty) return;
+
+      await Future.wait(
+        ownedLiveIds.map((streamId) async {
+          try {
+            await LivestreamCreateService.endLivestream(streamId);
+          } catch (_) {
+            // Best-effort cleanup before logout; continue with logout flow.
+          }
+        }),
+      );
+    } catch (_) {
+      // Best-effort cleanup before logout; continue with logout flow.
+    }
+  }
+
   Future<void> _logout() async {
     _pollTimer?.cancel();
+    _livePollTimer?.cancel();
+    await _endOwnedLivestreamsBeforeLogout();
     try {
       final refreshToken = AuthStorage.refreshToken;
       await ApiService.post(
@@ -1093,6 +1244,290 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           initialState: state,
           viewerId: _viewerId,
         ),
+      ),
+    );
+  }
+
+  Future<void> _openLivestreamFromHome(LivestreamItem stream) async {
+    final isHost = _viewerId != null && stream.hostUserId == _viewerId;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LivestreamHubScreen(
+          initialStreamId: stream.id,
+          forceHost: isHost,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    unawaited(_loadLiveStreams(silent: true));
+  }
+
+  String _formatCompactCount(int value) {
+    if (value >= 1000000) {
+      final r = value / 1000000;
+      return '${r.toStringAsFixed(r.truncateToDouble() == r ? 0 : 1)}M';
+    }
+    if (value >= 1000) {
+      final r = value / 1000;
+      return '${r.toStringAsFixed(r.truncateToDouble() == r ? 0 : 1)}K';
+    }
+    return '$value';
+  }
+
+  String _formatLiveStartedAgo(DateTime? startedAt) {
+    if (startedAt == null) return 'just now';
+
+    final diff = DateTime.now().difference(startedAt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inHours < 1) {
+      final m = diff.inMinutes;
+      return '$m minute${m == 1 ? '' : 's'} ago';
+    }
+    if (diff.inDays < 1) {
+      final h = diff.inHours;
+      return '$h hour${h == 1 ? '' : 's'} ago';
+    }
+    final d = diff.inDays;
+    return '$d day${d == 1 ? '' : 's'} ago';
+  }
+
+  Widget _buildLiveNowSection() {
+    if (_liveStreams.isEmpty && !_loadingLiveStreams) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 2, bottom: 10),
+            child: Text(
+              'Live now',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (_loadingLiveStreams && _liveStreams.isEmpty)
+            Container(
+              height: 110,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFF131929),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: const CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFF4AA3E4),
+              ),
+            )
+          else
+            Column(
+              children: _liveStreams.map((stream) {
+                final hostSnapshot = _liveHostProfiles[stream.hostUserId];
+                final hostUsername =
+                  hostSnapshot?.username?.trim() ?? stream.hostUsername?.trim();
+                final hostAvatarUrl = hostSnapshot?.avatarUrl ?? stream.hostAvatarUrl;
+                final hostLabel = (hostUsername != null && hostUsername.isNotEmpty)
+                  ? '@$hostUsername'
+                  : '@unknown';
+                final avatarSeed = (hostUsername ?? stream.hostName).trim();
+                final initial = avatarSeed.isNotEmpty
+                  ? avatarSeed[0].toUpperCase()
+                    : '?';
+                final viewerCount =
+                  (stream.viewerCount - 1).clamp(0, 9999999).toInt();
+
+                return Container(
+                  key: ValueKey('live-${stream.id}'),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF162238), Color(0xFF101A2E)],
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x33000000),
+                        blurRadius: 18,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          hostAvatarUrl != null
+                              ? CircleAvatar(
+                                  radius: 19,
+                                  backgroundImage: NetworkImage(hostAvatarUrl),
+                                )
+                              : Container(
+                                  width: 38,
+                                  height: 38,
+                                  alignment: Alignment.center,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Color(0xFF0EA5E9),
+                                        Color(0xFFF43F5E),
+                                      ],
+                                    ),
+                                  ),
+                                  child: Text(
+                                    initial,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  hostLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Went live ${_formatLiveStartedAgo(stream.startedAt)}',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.65),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => _openLivestreamFromHome(stream),
+                        child: AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFF102243), Color(0xFF0B132A)],
+                              ),
+                            ),
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: _LiveFeedPreview(
+                                    streamId: stream.id,
+                                    playbackUrl: stream.ivsPlaybackUrl,
+                                  ),
+                                ),
+                                Positioned.fill(
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Colors.transparent,
+                                          Colors.black.withValues(alpha: 0.65),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 10,
+                                  left: 10,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade600,
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: const Text(
+                                      'LIVE',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  left: 10,
+                                  right: 10,
+                                  bottom: 10,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          stream.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Icon(
+                                        Icons.visibility_outlined,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _formatCompactCount(viewerCount),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
       ),
     );
   }
@@ -1440,13 +1875,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     if (!_initialLoad && _states.isEmpty && !_loading) {
+      if (_liveStreams.isNotEmpty || _loadingLiveStreams) {
+        return RefreshIndicator(
+          color: const Color(0xFF4AA3E4),
+          backgroundColor: const Color(0xFF131929),
+          onRefresh: _refreshHome,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: PeopleYouMayKnow(onOpenProfile: _openUserProfile),
+              ),
+              SliverToBoxAdapter(child: _buildLiveNowSection()),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            ],
+          ),
+        );
+      }
       return _EmptyState(onRefresh: () => _loadFeed(refresh: true));
     }
+
+    final hasLiveSection = _liveStreams.isNotEmpty || _loadingLiveStreams;
+    final liveInsertIndex = _states.isEmpty ? 0 : (_states.length < 4 ? _states.length : 4);
+    final sliverItemCount = _states.length + (hasLiveSection ? 1 : 0);
 
     return RefreshIndicator(
       color: const Color(0xFF4AA3E4),
       backgroundColor: const Color(0xFF131929),
-      onRefresh: () => _loadFeed(refresh: true),
+      onRefresh: _refreshHome,
       child: CustomScrollView(
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
@@ -1458,7 +1914,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // Feed items
           SliverList(
             delegate: SliverChildBuilderDelegate((context, index) {
-              final itemState = _states[index];
+              if (hasLiveSection && index == liveInsertIndex) {
+                return _buildLiveNowSection();
+              }
+
+              final postIndex = hasLiveSection && index > liveInsertIndex
+                  ? index - 1
+                  : index;
+              final itemState = _states[postIndex];
               return PostCard(
                 state: itemState,
                 viewerId: _viewerId,
@@ -1479,7 +1942,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 onComment: () => _openPostDetail(itemState),
                 onMenuAction: _onPostMenuAction,
               );
-            }, childCount: _states.length),
+            }, childCount: sliverItemCount),
           ),
           // Loading indicator at end
           if (_loading && !_initialLoad)
@@ -1535,6 +1998,310 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 }
 
 // ── Nav badge icon button ─────────────────────────────────────────────────────
+
+class _LiveHostSnapshot {
+  const _LiveHostSnapshot({
+    this.username,
+    this.displayName,
+    this.avatarUrl,
+  });
+
+  final String? username;
+  final String? displayName;
+  final String? avatarUrl;
+}
+
+class _LivePreviewPlayer extends StatefulWidget {
+  const _LivePreviewPlayer({required this.playbackUrl});
+
+  final String? playbackUrl;
+
+  @override
+  State<_LivePreviewPlayer> createState() => _LivePreviewPlayerState();
+}
+
+class _LivePreviewPlayerState extends State<_LivePreviewPlayer> {
+  VideoPlayerController? _controller;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _setup();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LivePreviewPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playbackUrl != widget.playbackUrl) {
+      _setup();
+    }
+  }
+
+  Future<void> _setup() async {
+    final old = _controller;
+    _controller = null;
+    _ready = false;
+    if (mounted) setState(() {});
+    await old?.dispose();
+
+    final url = widget.playbackUrl?.trim();
+    if (url == null || url.isEmpty) return;
+
+    final uri = Uri.tryParse(url);
+    if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+      return;
+    }
+
+    try {
+      final controller = VideoPlayerController.networkUrl(uri);
+      await controller.initialize();
+      await controller.setVolume(0);
+      await controller.setLooping(true);
+      await controller.play();
+
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+
+      setState(() {
+        _controller = controller;
+        _ready = true;
+      });
+    } catch (_) {
+      // Keep fallback background when preview stream is unavailable.
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (!_ready || controller == null || !controller.value.isInitialized) {
+      return const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF102243), Color(0xFF0B132A)],
+          ),
+        ),
+      );
+    }
+
+    return ColoredBox(
+      color: Colors.black,
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: SizedBox(
+          width: controller.value.size.width,
+          height: controller.value.size.height,
+          child: VideoPlayer(controller),
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveFeedPreview extends StatelessWidget {
+  const _LiveFeedPreview({
+    required this.streamId,
+    required this.playbackUrl,
+  });
+
+  final String streamId;
+  final String? playbackUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = playbackUrl?.trim();
+    if (url != null && url.isNotEmpty) {
+      return _LivePreviewPlayer(playbackUrl: url);
+    }
+    return _LiveTrackPreview(streamId: streamId);
+  }
+}
+
+class _LiveTrackPreview extends StatefulWidget {
+  const _LiveTrackPreview({required this.streamId});
+
+  final String streamId;
+
+  @override
+  State<_LiveTrackPreview> createState() => _LiveTrackPreviewState();
+}
+
+class _LiveTrackPreviewState extends State<_LiveTrackPreview> {
+  Room? _room;
+  EventsListener<RoomEvent>? _listener;
+  VideoTrack? _track;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_connect());
+  }
+
+  @override
+  void didUpdateWidget(covariant _LiveTrackPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.streamId != widget.streamId) {
+      unawaited(_disposeRoom());
+      unawaited(_connect());
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_disposeRoom());
+    super.dispose();
+  }
+
+  Future<void> _connect() async {
+    setState(() {
+      _loading = true;
+      _track = null;
+    });
+
+    try {
+      final join = await LivestreamCreateService.joinLivestreamToken(
+        widget.streamId,
+        asHost: false,
+        participantName: 'home-preview-${DateTime.now().microsecondsSinceEpoch}',
+      );
+
+      final room = Room();
+      final listener = room.createListener();
+      listener
+        ..on<ParticipantEvent>((_) => _pickTrack())
+        ..on<RoomDisconnectedEvent>((_) {
+          if (!mounted) return;
+          setState(() {
+            _track = null;
+          });
+        });
+      room.addListener(_pickTrack);
+
+      await room.connect(join.url, join.token);
+
+      if (!mounted) {
+        await listener.dispose();
+        await room.dispose();
+        return;
+      }
+
+      setState(() {
+        _room = room;
+        _listener = listener;
+        _loading = false;
+      });
+      _pickTrack();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _disposeRoom() async {
+    final room = _room;
+    final listener = _listener;
+    _room = null;
+    _listener = null;
+    _track = null;
+
+    if (room != null) {
+      room.removeListener(_pickTrack);
+    }
+
+    if (listener != null) {
+      await listener.dispose();
+    }
+
+    if (room != null) {
+      try {
+        await room.disconnect();
+      } catch (_) {}
+      await room.dispose();
+    }
+  }
+
+  void _pickTrack() {
+    final room = _room;
+    if (room == null) return;
+
+    VideoTrack? selected;
+    RemoteParticipant? host;
+    for (final participant in room.remoteParticipants.values) {
+      if (participant.identity.contains('-host-')) {
+        host = participant;
+        break;
+      }
+    }
+
+    if (host != null) {
+      for (final pub in host.videoTrackPublications) {
+        if (!pub.isScreenShare) continue;
+        final track = pub.track;
+        if (track is VideoTrack) {
+          selected = track;
+          break;
+        }
+      }
+      if (selected == null) {
+        for (final pub in host.videoTrackPublications) {
+          final track = pub.track;
+          if (track is VideoTrack) {
+            selected = track;
+            break;
+          }
+        }
+      }
+    }
+
+    if (selected == null) {
+      for (final participant in room.remoteParticipants.values) {
+        for (final pub in participant.videoTrackPublications) {
+          final track = pub.track;
+          if (track is VideoTrack) {
+            selected = track;
+            break;
+          }
+        }
+        if (selected != null) break;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() => _track = selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_track != null) {
+      return VideoTrackRenderer(_track!, fit: VideoViewFit.contain);
+    }
+    if (_loading) {
+      return const Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Color(0xFF4AA3E4),
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+}
 
 class _NavBadgeButton extends StatelessWidget {
   const _NavBadgeButton({

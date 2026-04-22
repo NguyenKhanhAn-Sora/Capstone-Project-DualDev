@@ -142,7 +142,16 @@
 .feedPreviewVideo {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #020617;
+}
+
+.feedPreviewVideo :global(video),
+.feedPreviewComposite :global(video) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain !important;
+  background: #020617;
 }
 
 .feedPreviewComposite {
@@ -872,21 +881,30 @@
 
 .tile {
   position: relative;
+  width: min(100%, 980px);
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
   border-radius: 12px;
   overflow: hidden;
-  min-height: 180px;
+  min-height: 220px;
   background: #0f172a;
-.ivsVideo {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  min-height: 180px;
-  background: #020617;
-}
   border: 1px solid var(--color-border);
 }
 
 .video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #020617;
+}
+
+.ivsVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #020617;
+}
+
 .ivsCard {
   border: 1px solid rgba(56, 189, 248, 0.35);
   background: rgba(14, 116, 144, 0.16);
@@ -906,15 +924,9 @@
 .ivsText,
 .ivsField {
   margin: 0;
-  /* color: #dbeafe; */
   font-size: 12px;
   line-height: 1.4;
   word-break: break-word;
-}
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  min-height: 180px;
 }
 
 .videoMirrored {
@@ -1095,6 +1107,7 @@
   gap: 6px;
   flex-grow: 1;
   min-height: 0;
+  scroll-behavior: smooth;
 }
 
 .commentListEmpty {
@@ -1110,8 +1123,36 @@
 
 .commentItem {
   margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   font-size: 13px;
   line-height: 1.4;
+}
+
+.commentAvatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  flex: 0 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #e2e8f0;
+  background: linear-gradient(145deg, #0ea5e9, #f43f5e);
+  overflow: hidden;
+}
+
+.commentAvatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.commentBody {
+  min-width: 0;
 }
 
 .commentAuthorWrap {
@@ -1140,6 +1181,7 @@
 
 .commentText {
   display: inline;
+  color: var(--color-text);
 }
 
 .commentComposer {

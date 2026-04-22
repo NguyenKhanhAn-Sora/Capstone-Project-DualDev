@@ -50,5 +50,9 @@
 		<string>comgooglemaps</string>
 		<string>https</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Cordigram needs camera access for livestream camera mode.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Cordigram needs microphone access for livestream audio and mic test.</string>
 </dict>
 </plist>

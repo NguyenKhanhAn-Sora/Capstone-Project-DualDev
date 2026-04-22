@@ -23,6 +23,9 @@ const MAX_VIEWERS_PER_ROOM = 30;
 export class LivestreamService {
   private readonly logger = new Logger(LivestreamService.name);
 
+  private readonly DEFAULT_AVATAR_URL =
+    'https://res.cloudinary.com/doicocgeo/image/upload/v1765850274/user-avatar-default_gfx5bs.jpg';
+
   constructor(
     @InjectModel(Livestream.name)
     private readonly livestreamModel: Model<Livestream>,
@@ -37,6 +40,7 @@ export class LivestreamService {
   private toResponse(
     stream: Livestream,
     viewerCount = 0,
+    hostIdentity?: { username?: string; avatarUrl?: string },
   ): {
     id: string;
     title: string;
@@ -47,6 +51,8 @@ export class LivestreamService {
     visibility: 'public' | 'followers' | 'private';
     latencyMode: 'adaptive' | 'balanced' | 'low';
     hostName: string;
+    hostUsername?: string;
+    hostAvatarUrl?: string;
     hostUserId: string;
     roomName: string;
     provider: 'livekit' | 'ivs';
@@ -67,6 +73,8 @@ export class LivestreamService {
       visibility: stream.visibility,
       latencyMode: stream.latencyMode ?? 'adaptive',
       hostName: stream.hostName,
+      hostUsername: hostIdentity?.username ?? '',
+      hostAvatarUrl: hostIdentity?.avatarUrl ?? this.DEFAULT_AVATAR_URL,
       hostUserId: stream.hostUserId.toString(),
       roomName: stream.roomName,
       provider: stream.provider ?? 'livekit',
@@ -77,6 +85,38 @@ export class LivestreamService {
       maxViewers: stream.maxViewers,
       viewerCount,
     };
+  }
+
+  private async getHostIdentityMap(
+    streams: Livestream[],
+  ): Promise<Map<string, { username?: string; avatarUrl?: string }>> {
+    const hostIds = Array.from(
+      new Set(
+        streams
+          .map((stream) => stream.hostUserId?.toString?.() ?? '')
+          .filter((id) => Boolean(id) && Types.ObjectId.isValid(id)),
+      ),
+    );
+
+    if (!hostIds.length) {
+      return new Map<string, { username?: string; avatarUrl?: string }>();
+    }
+
+    const profiles = await this.profileModel
+      .find({ userId: { $in: hostIds.map((id) => new Types.ObjectId(id)) } })
+      .select('userId username avatarUrl')
+      .lean();
+
+    const out = new Map<string, { username?: string; avatarUrl?: string }>();
+    for (const profile of profiles) {
+      const userId = profile.userId?.toString?.();
+      if (!userId) continue;
+      out.set(userId, {
+        username: profile.username ?? '',
+        avatarUrl: profile.avatarUrl || this.DEFAULT_AVATAR_URL,
+      });
+    }
+    return out;
   }
 
   private async countLiveRooms(): Promise<number> {
@@ -178,13 +218,21 @@ export class LivestreamService {
       roomParticipantMap.set(room.name, room.numParticipants ?? 0);
     });
 
+    const hostIdentityMap = await this.getHostIdentityMap(streams);
+
     return {
       maxConcurrentLivestreams: MAX_CONCURRENT_LIVESTREAMS,
       maxViewersPerRoom: MAX_VIEWERS_PER_ROOM,
       activeCount: streams.length,
-      items: streams.map((stream) =>
-        this.toResponse(stream, roomParticipantMap.get(stream.roomName) ?? 0),
-      ),
+      items: streams.map((stream) => {
+        const hostId = stream.hostUserId?.toString?.() ?? '';
+        const hostIdentity = hostIdentityMap.get(hostId);
+        return this.toResponse(
+          stream,
+          roomParticipantMap.get(stream.roomName) ?? 0,
+          hostIdentity,
+        );
+      }),
     };
   }
 
@@ -276,7 +324,10 @@ export class LivestreamService {
     });
 
     return {
-      stream: this.toResponse(stream, 1),
+      stream: this.toResponse(stream, 1, {
+        username: hostProfile?.username ?? '',
+        avatarUrl: this.DEFAULT_AVATAR_URL,
+      }),
       limits: {
         maxConcurrentLivestreams: MAX_CONCURRENT_LIVESTREAMS,
         maxViewersPerRoom: MAX_VIEWERS_PER_ROOM,
@@ -328,10 +379,18 @@ export class LivestreamService {
       `joinToken issued stream=${streamId} role=${role} user=${user.userId} identity=${identity} canPublish=true canSubscribe=true canPublishData=true participants=${participants}`,
     );
 
+    const hostProfile = await this.profileModel
+      .findOne({ userId: stream.hostUserId })
+      .select('username avatarUrl')
+      .lean();
+
     return {
       token,
       url: this.livekitService.getPublicUrl(),
-      stream: this.toResponse(stream, participants),
+      stream: this.toResponse(stream, participants, {
+        username: hostProfile?.username ?? '',
+        avatarUrl: hostProfile?.avatarUrl || this.DEFAULT_AVATAR_URL,
+      }),
       role,
     };
   }
@@ -342,7 +401,16 @@ export class LivestreamService {
       stream.status === 'live'
         ? await this.livekitService.getParticipantCount(stream.roomName)
         : 0;
-    return { stream: this.toResponse(stream, participants) };
+    const hostProfile = await this.profileModel
+      .findOne({ userId: stream.hostUserId })
+      .select('username avatarUrl')
+      .lean();
+    return {
+      stream: this.toResponse(stream, participants, {
+        username: hostProfile?.username ?? '',
+        avatarUrl: hostProfile?.avatarUrl || this.DEFAULT_AVATAR_URL,
+      }),
+    };
   }
 
   async getIvsIngest(streamId: string, userId: string) {
@@ -405,7 +473,16 @@ export class LivestreamService {
     await stream.save();
 
     const participants = await this.livekitService.getParticipantCount(stream.roomName);
-    return { stream: this.toResponse(stream, participants) };
+    const hostProfile = await this.profileModel
+      .findOne({ userId: stream.hostUserId })
+      .select('username avatarUrl')
+      .lean();
+    return {
+      stream: this.toResponse(stream, participants, {
+        username: hostProfile?.username ?? '',
+        avatarUrl: hostProfile?.avatarUrl || this.DEFAULT_AVATAR_URL,
+      }),
+    };
   }
 
   async end(streamId: string, userId: string) {

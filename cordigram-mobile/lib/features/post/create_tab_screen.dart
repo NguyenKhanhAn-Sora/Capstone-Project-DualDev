@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'create_post_screen.dart';
 import 'create_reel_screen.dart';
+import '../livestream/create_livestream_screen.dart';
 
 /// Wrapper screen shown in the Create tab.
 /// Provides a Post / Reel mode toggle at the top,
@@ -14,23 +15,53 @@ class CreateTabScreen extends StatefulWidget {
 
 class _CreateTabScreenState extends State<CreateTabScreen>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabCtrl;
+  static const int _kTabCount = 3;
+  late TabController _tabCtrl;
+
+  void _handleTabChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _initController({int initialIndex = 0}) {
+    _tabCtrl = TabController(
+      length: _kTabCount,
+      vsync: this,
+      initialIndex: initialIndex.clamp(0, _kTabCount - 1),
+    );
+    _tabCtrl.addListener(_handleTabChanged);
+  }
+
+  void _ensureControllerLength() {
+    if (_tabCtrl.length == _kTabCount) return;
+    final nextIndex = _tabCtrl.index.clamp(0, _kTabCount - 1);
+    _tabCtrl.removeListener(_handleTabChanged);
+    _tabCtrl.dispose();
+    _initController(initialIndex: nextIndex);
+  }
+
+  void _safeAnimateTo(int index) {
+    _ensureControllerLength();
+    if (index < 0 || index >= _tabCtrl.length) return;
+    _tabCtrl.animateTo(index);
+  }
 
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
-    _tabCtrl.addListener(() => setState(() {}));
+    _initController();
   }
 
   @override
   void dispose() {
+    _tabCtrl.removeListener(_handleTabChanged);
     _tabCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    _ensureControllerLength();
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -45,6 +76,11 @@ class _CreateTabScreenState extends State<CreateTabScreen>
                 children: [
                   CreatePostScreen(showHeader: false, onPostCreated: () {}),
                   CreateReelScreen(showHeader: false, onReelCreated: () {}),
+                  CreateLivestreamScreen(
+                    showHeader: false,
+                    isActive: _tabCtrl.index == 2,
+                    onLivestreamCreated: (_) {},
+                  ),
                 ],
               ),
             ),
@@ -77,7 +113,11 @@ class _CreateTabScreenState extends State<CreateTabScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _tabCtrl.index == 0 ? 'Create post' : 'Create reel',
+                      _tabCtrl.index == 0
+                          ? 'Create post'
+                          : _tabCtrl.index == 1
+                          ? 'Create reel'
+                          : 'Create livestream',
                       style: TextStyle(
                         color: scheme.onSurface,
                         fontSize: 18,
@@ -88,7 +128,9 @@ class _CreateTabScreenState extends State<CreateTabScreen>
                     Text(
                       _tabCtrl.index == 0
                           ? 'Share genuine moments'
-                          : 'Share a short reel',
+                          : _tabCtrl.index == 1
+                          ? 'Share a short reel'
+                          : 'Set up your livestream session',
                       style: TextStyle(
                         color: scheme.onSurfaceVariant,
                         fontSize: 13,
@@ -114,13 +156,19 @@ class _CreateTabScreenState extends State<CreateTabScreen>
                   label: 'Post',
                   icon: Icons.photo_library_outlined,
                   active: _tabCtrl.index == 0,
-                  onTap: () => _tabCtrl.animateTo(0),
+                  onTap: () => _safeAnimateTo(0),
                 ),
                 _PillTab(
                   label: 'Reel',
                   icon: Icons.smart_display_outlined,
                   active: _tabCtrl.index == 1,
-                  onTap: () => _tabCtrl.animateTo(1),
+                  onTap: () => _safeAnimateTo(1),
+                ),
+                _PillTab(
+                  label: 'Live',
+                  icon: Icons.wifi_tethering_rounded,
+                  active: _tabCtrl.index == 2,
+                  onTap: () => _safeAnimateTo(2),
                 ),
               ],
             ),

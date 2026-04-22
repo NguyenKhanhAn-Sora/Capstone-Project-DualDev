@@ -1235,7 +1235,7 @@ class _CreateReelScreenState extends State<CreateReelScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionLabel(text: 'Audience'),
+        const _SectionLabel(text: 'Visibility'),
         const SizedBox(height: 8),
         ..._Audience.values.map(
           (a) => GestureDetector(

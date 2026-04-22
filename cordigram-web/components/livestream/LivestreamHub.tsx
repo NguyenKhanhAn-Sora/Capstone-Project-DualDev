@@ -42,6 +42,7 @@ type LiveComment = {
   authorHandle: string;
   isHost: boolean;
   text: string;
+  avatarUrl?: string;
 };
 
 type LivestreamMetaPatch = {
@@ -79,6 +80,7 @@ type HistoryWireComment = {
   authorHandle: string;
   isHost: boolean;
   text: string;
+  avatarUrl?: string;
 };
 
 type ShareVideoConstraints = {
@@ -723,6 +725,7 @@ function LiveComments({
   const [comments, setComments] = useState<LiveComment[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [myAvatarUrl, setMyAvatarUrl] = useState("");
   const [showCommentEmojiPicker, setShowCommentEmojiPicker] = useState(false);
   const commentEmojiRef = useRef<HTMLDivElement | null>(null);
   const commentInputRef = useRef<HTMLInputElement | null>(null);
@@ -751,11 +754,13 @@ function LiveComments({
       text,
       author,
       isHost,
+      avatarUrl,
     }: {
       commentId: string;
       text: string;
       author: string;
       isHost: boolean;
+      avatarUrl?: string;
     }) => {
       const payload = new TextEncoder().encode(
         JSON.stringify({
@@ -764,6 +769,7 @@ function LiveComments({
           text,
           author,
           isHost,
+          avatarUrl,
         }),
       );
 
@@ -836,6 +842,31 @@ function LiveComments({
     };
   }, [localParticipant.identity, localParticipant.name]);
 
+  useEffect(() => {
+    const token = getStoredAccessToken();
+    if (!token) {
+      setMyAvatarUrl("");
+      return;
+    }
+
+    let disposed = false;
+    const loadMe = async () => {
+      try {
+        const me = await fetchCurrentProfile({ token });
+        if (disposed) return;
+        setMyAvatarUrl((me.avatarUrl || "").trim());
+      } catch {
+        if (disposed) return;
+        setMyAvatarUrl("");
+      }
+    };
+
+    void loadMe();
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
   const sendCommentHistoryToParticipant = useCallback(
     async (participant?: any) => {
       if (!participant) return;
@@ -846,6 +877,7 @@ function LiveComments({
           authorHandle: item.authorHandle,
           isHost: item.isHost,
           text: item.text,
+          avatarUrl: item.avatarUrl,
         }))
         .filter((item) => item.id && item.text?.trim());
 
@@ -903,6 +935,7 @@ function LiveComments({
           type?: "comment" | "meta_update" | "comment_history" | "comment_history_request";
           text?: string;
           author?: string;
+          avatarUrl?: string;
           patch?: LivestreamMetaPatch;
           commentId?: string;
           isHost?: boolean;
@@ -918,6 +951,7 @@ function LiveComments({
               authorHandle: toHandle(item.authorHandle),
               isHost: Boolean(item.isHost),
               text: item.text.trim(),
+              avatarUrl: (item.avatarUrl || "").trim(),
             });
           });
           return;
@@ -944,6 +978,7 @@ function LiveComments({
               ? parsed.isHost
               : Boolean(participant?.identity?.includes("-host-")),
           text: parsed.text.trim(),
+          avatarUrl: (parsed.avatarUrl || "").trim(),
         });
       } catch {
         // Ignore non-comment data packets.
@@ -1020,6 +1055,7 @@ function LiveComments({
       authorHandle: author,
       isHost,
       text: content,
+      avatarUrl: myAvatarUrl,
     });
 
     try {
@@ -1034,6 +1070,7 @@ function LiveComments({
         text: content,
         author,
         isHost,
+        avatarUrl: myAvatarUrl,
       });
     } catch (err) {
       // Publish failed — keep the local comment visible (optimistic update).
@@ -1089,24 +1126,33 @@ function LiveComments({
       <div className={`${hubStyles.commentList} ${!comments.length ? hubStyles.commentListEmpty : ""}`}>
         {!comments.length ? <p className={hubStyles.commentEmpty}>No comments yet.</p> : null}
         {comments.map((item) => (
-          <p key={item.id} className={hubStyles.commentItem}>
-            <span className={hubStyles.commentAuthorWrap}>
-              <strong className={hubStyles.commentAuthor}>{item.authorHandle}</strong>
-              {item.isHost ? (
-                <span className={hubStyles.commentHostBadge} title="Host" aria-label="Host">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M4 7.5 8.5 12l3.5-5 3.5 5L20 7.5 18.5 17h-13L4 7.5Z"
-                      stroke="currentColor"
-                      strokeWidth="1.7"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </span>
-              ) : null}
+          <div key={item.id} className={hubStyles.commentItem}>
+            <span className={hubStyles.commentAvatar} aria-hidden>
+              {item.avatarUrl ? (
+                <img src={item.avatarUrl} alt="" className={hubStyles.commentAvatarImage} />
+              ) : (
+                getAvatarInitial(item.authorHandle)
+              )}
             </span>
-            <span className={hubStyles.commentText}>{item.text}</span>
-          </p>
+            <div className={hubStyles.commentBody}>
+              <span className={hubStyles.commentAuthorWrap}>
+                <strong className={hubStyles.commentAuthor}>{item.authorHandle}</strong>
+                {item.isHost ? (
+                  <span className={hubStyles.commentHostBadge} title="Host" aria-label="Host">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path
+                        d="M4 7.5 8.5 12l3.5-5 3.5 5L20 7.5 18.5 17h-13L4 7.5Z"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                ) : null}
+              </span>
+              <span className={hubStyles.commentText}>{item.text}</span>
+            </div>
+          </div>
         ))}
       </div>
 
