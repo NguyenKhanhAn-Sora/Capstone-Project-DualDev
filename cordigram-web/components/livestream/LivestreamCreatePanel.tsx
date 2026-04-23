@@ -169,6 +169,8 @@ export default function LivestreamCreatePanel() {
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState("");
   const [selectedCameraId, setSelectedCameraId] = useState("");
   const [devicesLoading, setDevicesLoading] = useState(false);
+  const [screenPreviewStream, setScreenPreviewStream] = useState<MediaStream | null>(null);
+  const [cameraPreviewStream, setCameraPreviewStream] = useState<MediaStream | null>(null);
   const [micLevel, setMicLevel] = useState(0);
   const [isMicTesting, setIsMicTesting] = useState(false);
   const [micOverlayOpen, setMicOverlayOpen] = useState(false);
@@ -196,12 +198,12 @@ export default function LivestreamCreatePanel() {
   );
 
   const hasScreenPreview =
-    Boolean(screenPreviewStreamRef.current?.getVideoTracks()?.[0]) &&
-    screenPreviewStreamRef.current?.getVideoTracks()?.[0]?.readyState !== "ended";
+    Boolean(screenPreviewStream?.getVideoTracks()?.[0]) &&
+    screenPreviewStream?.getVideoTracks()?.[0]?.readyState !== "ended";
 
   const hasCameraPreview =
-    Boolean(cameraPreviewStreamRef.current?.getVideoTracks()?.[0]) &&
-    cameraPreviewStreamRef.current?.getVideoTracks()?.[0]?.readyState !== "ended";
+    Boolean(cameraPreviewStream?.getVideoTracks()?.[0]) &&
+    cameraPreviewStream?.getVideoTracks()?.[0]?.readyState !== "ended";
 
   const requiresScreen = hostVideoMode !== "camera-only";
   const requiresCamera = hostVideoMode !== "screen-only";
@@ -345,6 +347,7 @@ export default function LivestreamCreatePanel() {
       screenPreviewStreamRef.current.getTracks().forEach((track) => track.stop());
       screenPreviewStreamRef.current = null;
     }
+    setScreenPreviewStream(null);
     clearPendingScreenShareStream();
     if (screenPreviewRef.current) {
       screenPreviewRef.current.srcObject = null;
@@ -356,6 +359,7 @@ export default function LivestreamCreatePanel() {
       cameraPreviewStreamRef.current.getTracks().forEach((track) => track.stop());
       cameraPreviewStreamRef.current = null;
     }
+    setCameraPreviewStream(null);
     clearPendingCameraStream();
     if (cameraPreviewRef.current) {
       cameraPreviewRef.current.srcObject = null;
@@ -367,6 +371,7 @@ export default function LivestreamCreatePanel() {
       screenPreviewStreamRef.current.getTracks().forEach((track) => track.stop());
     }
     screenPreviewStreamRef.current = stream;
+    setScreenPreviewStream(stream);
     setPendingScreenShareStream(stream);
     if (screenPreviewRef.current) {
       screenPreviewRef.current.srcObject = stream;
@@ -381,6 +386,7 @@ export default function LivestreamCreatePanel() {
       cameraPreviewStreamRef.current.getTracks().forEach((track) => track.stop());
     }
     cameraPreviewStreamRef.current = stream;
+    setCameraPreviewStream(stream);
     setPendingCameraStream(stream);
     if (cameraPreviewRef.current) {
       cameraPreviewRef.current.srcObject = stream;
@@ -451,27 +457,27 @@ export default function LivestreamCreatePanel() {
 
   useEffect(() => {
     if (!screenPreviewRef.current) return;
-    if (!screenPreviewStreamRef.current) {
+    if (!screenPreviewStream) {
       screenPreviewRef.current.srcObject = null;
       return;
     }
-    screenPreviewRef.current.srcObject = screenPreviewStreamRef.current;
+    screenPreviewRef.current.srcObject = screenPreviewStream;
     void screenPreviewRef.current.play().catch(() => {
       // Browser may require additional user interaction before playback.
     });
-  }, [latencyMode]);
+  }, [latencyMode, screenPreviewStream]);
 
   useEffect(() => {
     if (!cameraPreviewRef.current) return;
-    if (!cameraPreviewStreamRef.current) {
+    if (!cameraPreviewStream) {
       cameraPreviewRef.current.srcObject = null;
       return;
     }
-    cameraPreviewRef.current.srcObject = cameraPreviewStreamRef.current;
+    cameraPreviewRef.current.srcObject = cameraPreviewStream;
     void cameraPreviewRef.current.play().catch(() => {
       // Browser may require additional user interaction before playback.
     });
-  }, [latencyMode]);
+  }, [latencyMode, cameraPreviewStream]);
 
   const requestMicrophonePermission = async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -839,8 +845,8 @@ export default function LivestreamCreatePanel() {
         mentions: extractMentionsFromTitle(trimmedTitle),
       });
       keepPreviewStreamsOnUnmountRef.current = true;
-      setPendingScreenShareStream(requiresScreen ? screenPreviewStreamRef.current : null);
-      setPendingCameraStream(requiresCamera ? cameraPreviewStreamRef.current : null);
+      setPendingScreenShareStream(requiresScreen ? screenPreviewStream : null);
+      setPendingCameraStream(requiresCamera ? cameraPreviewStream : null);
       setPendingHostVideoConfig({
         mode: hostVideoMode,
         cameraPosition,
@@ -1347,51 +1353,59 @@ export default function LivestreamCreatePanel() {
               </div>
             ) : null}
 
-            <div className={panelStyles.permissionRow}>
-              <span>Screen share</span>
-              <span
-                className={`${panelStyles.permissionBadge} ${
-                  screenPermission === "granted"
-                    ? panelStyles.permissionGranted
-                    : screenPermission === "denied"
-                      ? panelStyles.permissionDenied
-                      : ""
-                }`}
-              >
-                {permissionLabel(screenPermission)}
-              </span>
-            </div>
-            <button
-              type="button"
-              className={panelStyles.sideButton}
-              onClick={() => void requestScreenPreview()}
-              disabled={permissionBusy !== null}
-            >
-              {permissionBusy === "screen" ? "Starting preview..." : "Choose screen share"}
-            </button>
-
-              <div className={panelStyles.permissionRow}>
-                <span>Camera</span>
-                <span
-                  className={`${panelStyles.permissionBadge} ${
-                    cameraPermission === "granted"
-                      ? panelStyles.permissionGranted
-                      : cameraPermission === "denied"
-                        ? panelStyles.permissionDenied
-                        : ""
-                  }`}
+            {requiresScreen ? (
+              <>
+                <div className={panelStyles.permissionRow}>
+                  <span>Screen share</span>
+                  <span
+                    className={`${panelStyles.permissionBadge} ${
+                      screenPermission === "granted"
+                        ? panelStyles.permissionGranted
+                        : screenPermission === "denied"
+                          ? panelStyles.permissionDenied
+                          : ""
+                    }`}
+                  >
+                    {permissionLabel(screenPermission)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className={panelStyles.sideButton}
+                  onClick={() => void requestScreenPreview()}
+                  disabled={permissionBusy !== null}
                 >
-                  {permissionLabel(cameraPermission)}
-                </span>
-              </div>
-              <button
-                type="button"
-                className={panelStyles.sideButton}
-                onClick={() => void requestCameraPreview()}
-                disabled={permissionBusy !== null}
-              >
-                {permissionBusy === "camera" ? "Starting camera..." : "Enable camera"}
-              </button>
+                  {permissionBusy === "screen" ? "Starting preview..." : "Choose screen share"}
+                </button>
+              </>
+            ) : null}
+
+            {requiresCamera ? (
+              <>
+                <div className={panelStyles.permissionRow}>
+                  <span>Camera</span>
+                  <span
+                    className={`${panelStyles.permissionBadge} ${
+                      cameraPermission === "granted"
+                        ? panelStyles.permissionGranted
+                        : cameraPermission === "denied"
+                          ? panelStyles.permissionDenied
+                          : ""
+                    }`}
+                  >
+                    {permissionLabel(cameraPermission)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className={panelStyles.sideButton}
+                  onClick={() => void requestCameraPreview()}
+                  disabled={permissionBusy !== null}
+                >
+                  {permissionBusy === "camera" ? "Starting camera..." : "Enable camera"}
+                </button>
+              </>
+            ) : null}
           </div>
 
           {permissionError ? <p className={panelStyles.sideError}>{permissionError}</p> : null}
