@@ -8,7 +8,9 @@ import {
   useRoomContext,
   useLocalParticipant,
   VideoTrack,
+  isTrackReference,
 } from "@livekit/components-react";
+import type { TrackReference } from "@livekit/components-react";
 import { Track, RoomEvent, RemoteAudioTrack } from "livekit-client";
 import styles from "./CallRoom.module.css";
 
@@ -190,11 +192,20 @@ function UnifiedCallView({
   // Decide what the main viewport renders. Prefer the remote participant's
   // video when available; otherwise fall back to the avatar grid — same
   // behaviour as the native call screen.
-  const remoteCameraTrack = cameraTracks.find(
-    (t) => !t.participant.isLocal && t.publication,
+  //
+  // We go through `isTrackReference` so TypeScript narrows from
+  // `TrackReferenceOrPlaceholder` down to `TrackReference`. Without this
+  // narrowing, `<VideoTrack trackRef={...} />` fails type-check because
+  // placeholders have `publication: undefined`. That build break is what
+  // caused the Vercel deploy to fail.
+  const realCameraTracks = cameraTracks.filter(
+    (t): t is TrackReference => isTrackReference(t),
   );
-  const localCameraTrack = cameraTracks.find(
-    (t) => t.participant.isLocal && t.publication,
+  const remoteCameraTrack = realCameraTracks.find(
+    (t) => !t.participant.isLocal,
+  );
+  const localCameraTrack = realCameraTracks.find(
+    (t) => t.participant.isLocal,
   );
 
   const showVideoLayout = anyVideoPublished;
