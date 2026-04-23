@@ -8,6 +8,8 @@ import 'core/services/push_notification_service.dart';
 import 'core/services/theme_controller.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
+import 'features/messages/call/dm_call_manager.dart';
+import 'features/messages/call/global_call_overlay.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -44,6 +46,9 @@ void main() async {
     await AuthStorage.clear();
   }
   await PushNotificationService.initialize(navigatorKey: appNavigatorKey);
+  // Attach the global call manager so incoming DM calls ring anywhere in
+  // the app — not only while the user is inside the matching chat screen.
+  await DmCallManager.instance.attach(appNavigatorKey);
   runApp(const MyApp());
 }
 
@@ -78,6 +83,10 @@ class _MyAppState extends State<MyApp> {
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: ThemeController.instance.themeMode,
+        // Wrap every route with the global call overlay so ring-ins show up
+        // on top of home, feed, profile, settings — everywhere.
+        builder: (ctx, child) =>
+            GlobalCallOverlay(child: child ?? const SizedBox.shrink()),
         home: AuthStorage.accessToken != null
             ? const HomeScreen()
             : const LoginScreen(),

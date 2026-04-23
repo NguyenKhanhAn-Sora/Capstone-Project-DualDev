@@ -8,6 +8,7 @@ import '../../core/services/api_service.dart';
 import '../../core/services/auth_storage.dart';
 import '../../core/services/push_notification_service.dart';
 import '../home/home_screen.dart';
+import '../messages/call/dm_call_manager.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
@@ -236,6 +237,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
       await PushNotificationService.syncCurrentToken();
+      await DmCallManager.instance.onAuthChanged();
       if (!mounted) return;
       Navigator.of(
         context,
@@ -286,6 +288,7 @@ class _LoginScreenState extends State<LoginScreen> {
           await _upsertRecentAfterLogin(email: email, accessToken: accessToken);
         }
         await PushNotificationService.syncCurrentToken();
+        await DmCallManager.instance.onAuthChanged();
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -376,6 +379,7 @@ class _LoginScreenState extends State<LoginScreen> {
         accessToken: accessToken,
       );
       await PushNotificationService.syncCurrentToken();
+      await DmCallManager.instance.onAuthChanged();
 
       if (!mounted) return;
       Navigator.of(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getStoredAccessToken, setStoredAccessToken } from "@/lib/auth";
@@ -22,7 +22,10 @@ export default function CallPage() {
   const tokenFromQuery = searchParams.get("accessToken");
   const lkTokenFromQuery = searchParams.get("lkToken");
   const lkUrlFromQuery = searchParams.get("lkUrl");
+  const peerId = searchParams.get("peerId") || "";
   const publicLivekitUrl = (process.env.NEXT_PUBLIC_LIVEKIT_URL || "").trim();
+
+  const channelRef = useRef<BroadcastChannel | null>(null);
 
   const [callToken, setCallToken] = useState<string>("");
   const [callServerUrl, setCallServerUrl] = useState<string>("");
@@ -113,19 +116,59 @@ export default function CallPage() {
     publicLivekitUrl,
   ]);
 
+  // Open a BroadcastChannel so we can talk to the main messages tab:
+  //   - outgoing: tell it to emit `call-end` when the user hangs up
+  //   - incoming: listen for `peer-ended` so we tear down LiveKit as soon
+  //     as the peer (mobile / other web user) stops their call, instead of
+  //     waiting for the LiveKit ParticipantDisconnected fallback.
+  useEffect(() => {
+    if (embedded || typeof window === "undefined" || !("BroadcastChannel" in window)) {
+      return;
+    }
+    const channel = new BroadcastChannel("cordigram-call");
+    channelRef.current = channel;
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string; peerId?: string } | null;
+      if (!data) return;
+      if (
+        data.type === "peer-ended" &&
+        (!peerId || !data.peerId || data.peerId === peerId)
+      ) {
+        setEnded(true);
+        setTimeout(() => {
+          try {
+            window.close();
+          } catch (_) {}
+        }, 50);
+      }
+    };
+    channel.addEventListener("message", onMessage);
+    return () => {
+      channel.removeEventListener("message", onMessage);
+      channel.close();
+      channelRef.current = null;
+    };
+  }, [embedded, peerId]);
+
   const handleDisconnect = useCallback(() => {
     if (embedded) {
       setEnded(true);
       return;
     }
-    // Close the tab/window
+    // Signal the opener tab so it can emit `call-end` via its socket — this
+    // is what makes the peer (especially the mobile app) tear down their
+    // side immediately instead of waiting for LiveKit's fallback timeout.
+    if (peerId && channelRef.current) {
+      try {
+        channelRef.current.postMessage({ type: "self-ended", peerId });
+      } catch (_) {}
+    }
     window.close();
 
-    // If window.close() doesn't work (some browsers block it), redirect
     setTimeout(() => {
       router.push("/messages");
     }, 100);
-  }, [embedded, router]);
+  }, [embedded, router, peerId]);
 
   if (loading) {
     return (

@@ -1,0 +1,789 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:livekit_client/livekit_client.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import 'calls_api_service.dart';
+import 'dm_call_manager.dart';
+
+/// Native Flutter call screen backed by the `livekit_client` SDK.
+///
+/// Keeps the user inside the Flutter app — no WebView, no browser session.
+/// Interoperates with the web app (`cordigram-web`) because both clients
+/// talk to the same LiveKit server against a deterministic DM room id.
+class NativeCallScreen extends StatefulWidget {
+  const NativeCallScreen({
+    super.key,
+    required this.session,
+    required this.title,
+    required this.onHangup,
+    this.peerAvatarUrl,
+  });
+
+  final CallSession session;
+  final String title;
+  final String? peerAvatarUrl;
+
+  /// Called exactly once when the user leaves the call (hangup, remote left,
+  /// or fatal error). The parent should notify the peer over the signaling
+  /// socket (`call-end`) inside this callback.
+  final Future<void> Function() onHangup;
+
+  @override
+  State<NativeCallScreen> createState() => _NativeCallScreenState();
+}
+
+class _NativeCallScreenState extends State<NativeCallScreen> {
+  // Grace window after `room.connect()` during which we ignore
+  // `ParticipantDisconnected` events. This is specifically to survive the
+  // brief disconnect ↔ reconnect cycle that web peers go through in React 18
+  // StrictMode / slow networks when joining a LiveKit room.
+  static const Duration _initialGrace = Duration(seconds: 5);
+  // Once at least one remote has joined, any transient disconnect must
+  // persist for this long before we actually treat the call as ended.
+  static const Duration _remoteLeaveGrace = Duration(seconds: 3);
+
+  Room? _room;
+  EventsListener<RoomEvent>? _roomListener;
+  bool _connecting = true;
+  String? _fatalError;
+  bool _micEnabled = true;
+  bool _camEnabled = false;
+  bool _isVideoCall = false;
+  bool _frontCamera = true;
+  bool _speakerOn = true;
+  bool _hangupCalled = false;
+  DateTime? _connectedAt;
+  Timer? _remoteLeavePending;
+
+  List<Participant> _participants = const [];
+  VoidCallback? _mgrListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _isVideoCall = widget.session.isVideo;
+    _camEnabled = widget.session.isVideo;
+    _speakerOn = widget.session.isVideo;
+    _mgrListener = _onManagerChanged;
+    DmCallManager.instance.addListener(_mgrListener!);
+    _connect();
+  }
+
+  /// Listen for externally-driven call termination (peer socket `call-ended`
+  /// / manager-level hangup). When the manager clears its active call, we
+  /// must tear down the LiveKit room and pop this screen — otherwise the UI
+  /// would linger after the other side ended the call.
+  void _onManagerChanged() {
+    if (!mounted || _hangupCalled) return;
+    if (DmCallManager.instance.active == null) {
+      _teardownAndPop();
+    }
+  }
+
+  Future<void> _connect() async {
+    try {
+      final room = Room(
+        roomOptions: RoomOptions(
+          adaptiveStream: true,
+          dynacast: true,
+          defaultVideoPublishOptions: const VideoPublishOptions(
+            simulcast: true,
+          ),
+          defaultAudioCaptureOptions: const AudioCaptureOptions(
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          ),
+        ),
+      );
+
+      final listener = room.createListener()
+        ..on<RoomDisconnectedEvent>((_) => _handleRemoteLeft())
+        ..on<ParticipantConnectedEvent>((_) {
+          _remoteLeavePending?.cancel();
+          _remoteLeavePending = null;
+          _refreshParticipants();
+        })
+        ..on<ParticipantDisconnectedEvent>((event) {
+          _refreshParticipants();
+          if (room.remoteParticipants.isEmpty) {
+            _scheduleRemoteLeaveIfPersistent(room);
+          }
+        })
+        ..on<TrackSubscribedEvent>((_) => _refreshParticipants())
+        ..on<TrackUnsubscribedEvent>((_) => _refreshParticipants())
+        ..on<LocalTrackPublishedEvent>((_) => _refreshParticipants())
+        ..on<LocalTrackUnpublishedEvent>((_) => _refreshParticipants());
+
+      await room.connect(
+        widget.session.serverUrl,
+        widget.session.callToken,
+        connectOptions: const ConnectOptions(autoSubscribe: true),
+      );
+
+      await room.localParticipant?.setMicrophoneEnabled(true);
+      if (widget.session.isVideo) {
+        await room.localParticipant?.setCameraEnabled(true);
+      }
+
+      try {
+        await Hardware.instance.setSpeakerphoneOn(_speakerOn);
+      } catch (_) {}
+
+      if (!mounted) {
+        await room.disconnect();
+        await listener.dispose();
+        return;
+      }
+
+      setState(() {
+        _room = room;
+        _roomListener = listener;
+        _connecting = false;
+        _connectedAt = DateTime.now();
+      });
+      _refreshParticipants();
+    } catch (err) {
+      if (!mounted) return;
+      setState(() {
+        _connecting = false;
+        _fatalError = 'Không thể kết nối cuộc gọi: $err';
+      });
+    }
+  }
+
+  void _refreshParticipants() {
+    if (!mounted) return;
+    final room = _room;
+    if (room == null) return;
+    setState(() {
+      _participants = <Participant>[
+        if (room.localParticipant != null) room.localParticipant!,
+        ...room.remoteParticipants.values,
+      ];
+    });
+  }
+
+  Future<void> _toggleMic() async {
+    final lp = _room?.localParticipant;
+    if (lp == null) return;
+    final next = !_micEnabled;
+    await lp.setMicrophoneEnabled(next);
+    if (mounted) setState(() => _micEnabled = next);
+  }
+
+  /// Voice call: flip to a video call by enabling the camera.
+  /// Video call: toggle local camera on/off.
+  Future<void> _toggleCamera() async {
+    final lp = _room?.localParticipant;
+    if (lp == null) return;
+
+    if (!_isVideoCall) {
+      final cam = await Permission.camera.request();
+      if (!cam.isGranted) {
+        _showSnack('Cần cấp quyền camera để bật video');
+        return;
+      }
+      try {
+        await lp.setCameraEnabled(true);
+        if (mounted) {
+          setState(() {
+            _isVideoCall = true;
+            _camEnabled = true;
+          });
+        }
+      } catch (err) {
+        _showSnack('Không bật được camera: $err');
+      }
+      return;
+    }
+
+    final next = !_camEnabled;
+    try {
+      await lp.setCameraEnabled(next);
+      if (mounted) setState(() => _camEnabled = next);
+    } catch (_) {}
+  }
+
+  Future<void> _flipCamera() async {
+    final lp = _room?.localParticipant;
+    if (lp == null || !_camEnabled) return;
+    final track = lp.videoTrackPublications
+        .map((p) => p.track)
+        .whereType<LocalVideoTrack>()
+        .firstOrNull;
+    if (track == null) return;
+    try {
+      // livekit_client 2.x: `setCameraPosition` is the public, cross-platform
+      // way to flip between the front/back lens. Passing raw 'user' / 'environment'
+      // strings to `switchCamera` (which expects a deviceId) is a no-op and was
+      // the reason the flip button silently did nothing before.
+      final next = _frontCamera ? CameraPosition.back : CameraPosition.front;
+      await track.setCameraPosition(next);
+      if (mounted) setState(() => _frontCamera = !_frontCamera);
+    } catch (err) {
+      _showSnack('Không đổi được camera: $err');
+    }
+  }
+
+  Future<void> _toggleSpeaker() async {
+    final next = !_speakerOn;
+    try {
+      await Hardware.instance.setSpeakerphoneOn(next);
+      if (mounted) setState(() => _speakerOn = next);
+    } catch (_) {}
+  }
+
+  void _scheduleRemoteLeaveIfPersistent(Room room) {
+    final connectedAt = _connectedAt;
+    if (connectedAt != null &&
+        DateTime.now().difference(connectedAt) < _initialGrace) {
+      return;
+    }
+    _remoteLeavePending?.cancel();
+    _remoteLeavePending = Timer(_remoteLeaveGrace, () {
+      if (!mounted || _hangupCalled) return;
+      if (room.remoteParticipants.isEmpty) {
+        _handleRemoteLeft();
+      }
+    });
+  }
+
+  void _handleRemoteLeft() {
+    if (!mounted || _hangupCalled) return;
+    _hangup();
+  }
+
+  /// Full hangup: user-initiated. Tears down LiveKit, notifies the peer via
+  /// the manager (which emits `call-end` over the socket), then pops.
+  Future<void> _hangup() async {
+    if (_hangupCalled) return;
+    // Mark via setState so the enclosing PopScope re-renders with
+    // `canPop: true` BEFORE we call Navigator.pop. Otherwise
+    // PopScope(canPop: false) silently vetoes the pop and the call screen
+    // stays visible after pressing the end-call button.
+    if (mounted) {
+      setState(() {
+        _hangupCalled = true;
+      });
+    } else {
+      _hangupCalled = true;
+    }
+    _remoteLeavePending?.cancel();
+    _remoteLeavePending = null;
+    try {
+      await _roomListener?.dispose();
+    } catch (_) {}
+    try {
+      await _room?.disconnect();
+    } catch (_) {}
+    try {
+      await widget.onHangup();
+    } catch (_) {}
+    _popSelf();
+  }
+
+  /// Externally-triggered teardown (peer ended the call via socket). We do
+  /// NOT call `widget.onHangup` here — the manager already knows the call is
+  /// over; we just close the LiveKit room + screen.
+  Future<void> _teardownAndPop() async {
+    if (_hangupCalled) return;
+    if (mounted) {
+      setState(() {
+        _hangupCalled = true;
+      });
+    } else {
+      _hangupCalled = true;
+    }
+    _remoteLeavePending?.cancel();
+    _remoteLeavePending = null;
+    try {
+      await _roomListener?.dispose();
+    } catch (_) {}
+    try {
+      await _room?.disconnect();
+    } catch (_) {}
+    _popSelf();
+  }
+
+  /// Close the call screen. Uses `pop` (not `maybePop`) so we force-dismiss
+  /// even if some other layer has transiently vetoed pops.
+  void _popSelf() {
+    if (!mounted) return;
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      nav.pop();
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  @override
+  void dispose() {
+    if (_mgrListener != null) {
+      DmCallManager.instance.removeListener(_mgrListener!);
+    }
+    _remoteLeavePending?.cancel();
+    _remoteLeavePending = null;
+    if (!_hangupCalled) {
+      _hangupCalled = true;
+      unawaited(_roomListener?.dispose());
+      unawaited(_room?.disconnect());
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      // Once hangup has been initiated the route MUST allow popping —
+      // otherwise Navigator.pop is vetoed and the screen stays stuck on
+      // the "in call" UI after the user taps the end button. While the
+      // call is live we still block accidental back-swipes / system back
+      // and route them through _hangup instead.
+      canPop: _hangupCalled,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await _hangup();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Positioned.fill(child: _buildBody()),
+              Positioned(
+                top: 8,
+                left: 8,
+                right: 8,
+                child: _CallHeader(title: widget.title, onClose: _hangup),
+              ),
+              if (_isVideoCall && _camEnabled && _room != null)
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: _FlipCameraFab(onTap: _flipCamera),
+                ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 16,
+                child: _CallControls(
+                  isVideo: _isVideoCall,
+                  micEnabled: _micEnabled,
+                  camEnabled: _camEnabled,
+                  speakerOn: _speakerOn,
+                  onToggleMic: _toggleMic,
+                  onToggleCamera: _toggleCamera,
+                  onToggleSpeaker: _toggleSpeaker,
+                  onHangup: _hangup,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_connecting) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 12),
+            Text(
+              'Đang kết nối cuộc gọi...',
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_fatalError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.redAccent,
+                size: 48,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _fatalError!,
+                style: const TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _hangup,
+                child: const Text('Đóng'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!_isVideoCall) {
+      return _AudioCallBody(
+        title: widget.title,
+        avatarUrl: widget.peerAvatarUrl,
+        participants: _participants,
+      );
+    }
+
+    return _VideoCallBody(
+      participants: _participants,
+      peerName: widget.title,
+    );
+  }
+}
+
+class _CallHeader extends StatelessWidget {
+  const _CallHeader({required this.title, required this.onClose});
+
+  final String title;
+  final Future<void> Function() onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          onPressed: () => onClose(),
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+          tooltip: 'Kết thúc cuộc gọi',
+        ),
+        Expanded(
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(width: 48),
+      ],
+    );
+  }
+}
+
+class _VideoCallBody extends StatelessWidget {
+  const _VideoCallBody({required this.participants, required this.peerName});
+
+  final List<Participant> participants;
+  final String peerName;
+
+  @override
+  Widget build(BuildContext context) {
+    Participant? local;
+    final remotes = <Participant>[];
+    for (final p in participants) {
+      if (p is LocalParticipant) {
+        local = p;
+      } else {
+        remotes.add(p);
+      }
+    }
+
+    final mainParticipant = remotes.isNotEmpty ? remotes.first : local;
+    final pipParticipant = remotes.isNotEmpty ? local : null;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: _ParticipantTile(
+            participant: mainParticipant,
+            fallbackName: remotes.isEmpty ? 'Bạn' : peerName,
+          ),
+        ),
+        if (pipParticipant != null)
+          Positioned(
+            top: 72,
+            right: 16,
+            width: 110,
+            height: 160,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: _ParticipantTile(
+                participant: pipParticipant,
+                fallbackName: 'Bạn',
+                compact: true,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _AudioCallBody extends StatelessWidget {
+  const _AudioCallBody({
+    required this.title,
+    required this.participants,
+    this.avatarUrl,
+  });
+
+  final String title;
+  final String? avatarUrl;
+  final List<Participant> participants;
+
+  @override
+  Widget build(BuildContext context) {
+    final connected = participants.any((p) => p is! LocalParticipant);
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            radius: 56,
+            backgroundColor: const Color(0xFF1B2A4A),
+            backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
+                ? NetworkImage(avatarUrl!)
+                : null,
+            child: (avatarUrl == null || avatarUrl!.isEmpty)
+                ? Text(
+                    title.isNotEmpty ? title.substring(0, 1).toUpperCase() : '?',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(height: 18),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            connected ? 'Đang trong cuộc gọi' : 'Đang kết nối...',
+            style: const TextStyle(color: Color(0xFFB6C2DC)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ParticipantTile extends StatelessWidget {
+  const _ParticipantTile({
+    required this.participant,
+    required this.fallbackName,
+    this.compact = false,
+  });
+
+  final Participant? participant;
+  final String fallbackName;
+  final bool compact;
+
+  VideoTrack? _pickVideoTrack() {
+    final p = participant;
+    if (p == null) return null;
+    for (final pub in p.videoTrackPublications) {
+      final track = pub.track;
+      if (track is VideoTrack && !pub.muted) return track;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final track = _pickVideoTrack();
+    if (track != null) {
+      return Container(
+        color: Colors.black,
+        child: VideoTrackRenderer(track, fit: VideoViewFit.cover),
+      );
+    }
+    final name = participant?.name ?? participant?.identity ?? fallbackName;
+    return Container(
+      color: const Color(0xFF0F1B37),
+      alignment: Alignment.center,
+      child: CircleAvatar(
+        radius: compact ? 24 : 44,
+        backgroundColor: const Color(0xFF1B2A4A),
+        child: Text(
+          name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: compact ? 20 : 34,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Exactly four controls, matching the web redesign:
+///   - mic mute       (audio in)
+///   - speaker mute   (audio out)
+///   - camera         (voice call → upgrade to video; video call → video on/off)
+///   - end call
+class _CallControls extends StatelessWidget {
+  const _CallControls({
+    required this.isVideo,
+    required this.micEnabled,
+    required this.camEnabled,
+    required this.speakerOn,
+    required this.onToggleMic,
+    required this.onToggleCamera,
+    required this.onToggleSpeaker,
+    required this.onHangup,
+  });
+
+  final bool isVideo;
+  final bool micEnabled;
+  final bool camEnabled;
+  final bool speakerOn;
+  final Future<void> Function() onToggleMic;
+  final Future<void> Function() onToggleCamera;
+  final Future<void> Function() onToggleSpeaker;
+  final Future<void> Function() onHangup;
+
+  @override
+  Widget build(BuildContext context) {
+    final cameraIcon = !isVideo
+        ? Icons.videocam_outlined
+        : (camEnabled ? Icons.videocam_rounded : Icons.videocam_off_rounded);
+    final cameraTooltip = !isVideo
+        ? 'Bật video'
+        : (camEnabled ? 'Tắt camera' : 'Bật camera');
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(32),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _ControlButton(
+            icon: micEnabled ? Icons.mic_rounded : Icons.mic_off_rounded,
+            active: micEnabled,
+            onTap: onToggleMic,
+            tooltip: micEnabled ? 'Tắt micro' : 'Bật micro',
+          ),
+          _ControlButton(
+            icon: speakerOn
+                ? Icons.volume_up_rounded
+                : Icons.volume_off_rounded,
+            active: speakerOn,
+            onTap: onToggleSpeaker,
+            tooltip: speakerOn ? 'Tắt âm thanh' : 'Bật âm thanh',
+          ),
+          _ControlButton(
+            icon: cameraIcon,
+            active: isVideo && camEnabled,
+            onTap: onToggleCamera,
+            tooltip: cameraTooltip,
+          ),
+          _ControlButton(
+            icon: Icons.call_end_rounded,
+            active: true,
+            color: const Color(0xFFED4245),
+            onTap: onHangup,
+            tooltip: 'Kết thúc',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FlipCameraFab extends StatelessWidget {
+  const _FlipCameraFab({required this.onTap});
+
+  final Future<void> Function() onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.45),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => onTap(),
+        child: const Padding(
+          padding: EdgeInsets.all(10),
+          child: Icon(
+            Icons.flip_camera_ios_rounded,
+            color: Colors.white,
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ControlButton extends StatelessWidget {
+  const _ControlButton({
+    required this.icon,
+    required this.active,
+    required this.onTap,
+    this.color,
+    this.tooltip,
+  });
+
+  final IconData icon;
+  final bool active;
+  final Future<void> Function() onTap;
+  final Color? color;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = color ??
+        (active ? const Color(0x33FFFFFF) : const Color(0x22FFFFFF));
+    return Tooltip(
+      message: tooltip ?? '',
+      child: Material(
+        color: bg,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () => onTap(),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Icon(icon, color: Colors.white, size: 26),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull {
+    final it = iterator;
+    if (it.moveNext()) return it.current;
+    return null;
+  }
+}
