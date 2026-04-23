@@ -1269,6 +1269,10 @@ function HostMediaControls({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [autoTried, setAutoTried] = useState(false);
+  const [selectedShareMode, setSelectedShareMode] = useState<LivestreamHostVideoMode>(
+    "screen-camera",
+  );
+  const [showModeOptions, setShowModeOptions] = useState(false);
   const pendingPublishAttemptedRef = useRef(false);
 
   if (!visible) return null;
@@ -1296,7 +1300,7 @@ function HostMediaControls({
 
   const tryApplyPendingScreenShare = async (): Promise<boolean> => {
     const config = getPendingHostVideoConfig() || {
-      mode: "screen-only" as LivestreamHostVideoMode,
+      mode: "screen-camera" as LivestreamHostVideoMode,
       cameraPosition: DEFAULT_HOST_CAMERA_LAYOUT.cameraPosition,
       cameraSize: DEFAULT_HOST_CAMERA_LAYOUT.cameraSize,
     };
@@ -1340,6 +1344,7 @@ function HostMediaControls({
         });
       }
 
+      setSelectedShareMode(config.mode);
       onHostVideoConfigChange(config);
 
       clearPendingLivestreamMedia();
@@ -1350,17 +1355,21 @@ function HostMediaControls({
   };
 
   const unpublishVideoTracks = async () => {
+    await unpublishTracksBySources([
+      Track.Source.ScreenShare,
+      Track.Source.ScreenShareAudio,
+      Track.Source.Camera,
+    ]);
+  };
+
+  const unpublishTracksBySources = async (sources: Track.Source[]) => {
     const publications = Array.from(
       ((localParticipant as any)?.trackPublications?.values?.() || []) as Iterable<any>,
     );
 
     for (const pub of publications) {
       const source = pub?.source;
-      if (
-        source !== Track.Source.ScreenShare &&
-        source !== Track.Source.ScreenShareAudio &&
-        source !== Track.Source.Camera
-      ) {
+      if (!sources.includes(source)) {
         continue;
       }
 
@@ -1381,7 +1390,7 @@ function HostMediaControls({
     }
   };
 
-  const captureAndPublishFromPicker = async () => {
+  const publishScreenShare = async (mode: LivestreamHostVideoMode) => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
       throw new Error("Screen sharing is not supported in this browser");
     }
@@ -1397,7 +1406,13 @@ function HostMediaControls({
     }
 
     await optimizePublishedScreenTrack(videoTrack, latencyMode);
-    await unpublishVideoTracks();
+
+    if (mode === "screen-only") {
+      await unpublishVideoTracks();
+    } else {
+      await unpublishTracksBySources([Track.Source.ScreenShare, Track.Source.ScreenShareAudio]);
+    }
+
     await (localParticipant as any).publishTrack(
       videoTrack,
       getScreenSharePublishOptions(latencyMode),
@@ -1410,17 +1425,18 @@ function HostMediaControls({
     }
 
     videoTrack.onended = () => {
-      void unpublishVideoTracks();
+      void unpublishTracksBySources([Track.Source.ScreenShare, Track.Source.ScreenShareAudio]);
     };
 
+    setSelectedShareMode(mode);
     onHostVideoConfigChange({
-      mode: "screen-only",
+      mode,
       cameraPosition: DEFAULT_HOST_CAMERA_LAYOUT.cameraPosition,
       cameraSize: DEFAULT_HOST_CAMERA_LAYOUT.cameraSize,
     });
   };
 
-  const captureAndPublishCameraFromPicker = async () => {
+  const publishCamera = async (mode: LivestreamHostVideoMode) => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       throw new Error("Camera is not supported in this browser");
     }
@@ -1435,23 +1451,40 @@ function HostMediaControls({
       throw new Error("No valid camera track selected");
     }
 
-    await unpublishVideoTracks();
+    if (mode === "camera-only") {
+      await unpublishVideoTracks();
+    } else {
+      await unpublishTracksBySources([Track.Source.Camera]);
+    }
+
     await (localParticipant as any).publishTrack(videoTrack, {
       source: Track.Source.Camera,
     });
 
     videoTrack.onended = () => {
-      void unpublishVideoTracks();
+      void unpublishTracksBySources([Track.Source.Camera]);
     };
 
+    setSelectedShareMode(mode);
     onHostVideoConfigChange({
-      mode: "camera-only",
+      mode,
       cameraPosition: DEFAULT_HOST_CAMERA_LAYOUT.cameraPosition,
       cameraSize: DEFAULT_HOST_CAMERA_LAYOUT.cameraSize,
     });
   };
 
-  const enableScreenShare = async (forcePicker: boolean | null) => {
+  const applyShareMode = (mode: LivestreamHostVideoMode) => {
+    setSelectedShareMode(mode);
+    setShowModeOptions(false);
+    setError("");
+    onHostVideoConfigChange({
+      mode,
+      cameraPosition: DEFAULT_HOST_CAMERA_LAYOUT.cameraPosition,
+      cameraSize: DEFAULT_HOST_CAMERA_LAYOUT.cameraSize,
+    });
+  };
+
+  const tryAutoApplyPendingMedia = async () => {
     try {
       if (!connected) {
         setError("Connecting to livestream room. Please retry in 1-2 seconds.");
@@ -1460,33 +1493,57 @@ function HostMediaControls({
       setBusy(true);
       setError("");
 
-      if (forcePicker === true) {
-        // User explicitly requested changing source: close current share and force browser picker.
-        clearPendingScreenShareStream();
-        clearPendingCameraStream();
-        pendingPublishAttemptedRef.current = true;
-        await captureAndPublishFromPicker();
+      if (pendingPublishAttemptedRef.current) {
         return;
       }
 
-      if (forcePicker === false && pendingPublishAttemptedRef.current) {
+      pendingPublishAttemptedRef.current = true;
+      const appliedPending = await tryApplyPendingScreenShare();
+      if (appliedPending) {
         return;
       }
 
-      if (forcePicker === false && !pendingPublishAttemptedRef.current) {
-        pendingPublishAttemptedRef.current = true;
-        const appliedPending = await tryApplyPendingScreenShare();
-        if (appliedPending) {
-          return;
-        }
-        setError("No pre-selected media source found. Choose screen share or camera to go live.");
+      setError("No pre-selected media source found. Choose screen share or camera to go live.");
+    } catch (err) {
+      setError(mapMediaError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleChooseScreenShare = async () => {
+    try {
+      if (!connected) {
+        setError("Connecting to livestream room. Please retry in 1-2 seconds.");
         return;
       }
 
-      if (forcePicker === null) {
-        await captureAndPublishCameraFromPicker();
+      setBusy(true);
+      setError("");
+      clearPendingScreenShareStream();
+
+      const modeForAction = selectedShareMode === "screen-camera" ? "screen-camera" : "screen-only";
+      await publishScreenShare(modeForAction);
+    } catch (err) {
+      setError(mapMediaError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleEnableCamera = async () => {
+    try {
+      if (!connected) {
+        setError("Connecting to livestream room. Please retry in 1-2 seconds.");
         return;
       }
+
+      setBusy(true);
+      setError("");
+      clearPendingCameraStream();
+
+      const modeForAction = selectedShareMode === "camera-only" ? "camera-only" : "screen-camera";
+      await publishCamera(modeForAction);
     } catch (err) {
       setError(mapMediaError(err));
     } finally {
@@ -1497,36 +1554,95 @@ function HostMediaControls({
   useEffect(() => {
     if (!visible || !connected || autoTried) return;
     setAutoTried(true);
-    void enableScreenShare(false);
+    void tryAutoApplyPendingMedia();
   }, [autoTried, connected, visible]);
 
   return (
-    <div className={hubStyles.hostControls}>
-      <button
-        type="button"
-        className={hubStyles.hostControlBtn}
-        onClick={() => void enableScreenShare(true)}
-        disabled={busy}
-      >
-        Change screen share
-      </button>
-      <button
-        type="button"
-        className={hubStyles.hostControlBtn}
-        onClick={() => void enableScreenShare(null)}
-        disabled={busy}
-      >
-        Change camera
-      </button>
-      <button
-        type="button"
-        className={hubStyles.hostControlEnd}
-        onClick={onEndLive}
-        disabled={ending}
-      >
-        {ending ? "Ending..." : "End live"}
-      </button>
-    </div>
+    <>
+      <div className={hubStyles.hostControls}>
+        <div className={hubStyles.hostControlsLeft}>
+          <div className={hubStyles.hostModeSelector}>
+            <button
+              type="button"
+              className={hubStyles.hostControlBtn}
+              onClick={() => setShowModeOptions((prev) => !prev)}
+              disabled={busy}
+              aria-expanded={showModeOptions}
+            >
+              Change share mode
+            </button>
+
+            {showModeOptions ? (
+              <div className={hubStyles.hostModeOptions}>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostControlGhost} ${
+                    selectedShareMode === "screen-only" ? hubStyles.hostModeOptionActive : ""
+                  }`}
+                  onClick={() => applyShareMode("screen-only")}
+                  disabled={busy}
+                >
+                  Screen only
+                </button>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostControlGhost} ${
+                    selectedShareMode === "screen-camera" ? hubStyles.hostModeOptionActive : ""
+                  }`}
+                  onClick={() => applyShareMode("screen-camera")}
+                  disabled={busy}
+                >
+                  Screen + camera
+                </button>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostControlGhost} ${
+                    selectedShareMode === "camera-only" ? hubStyles.hostModeOptionActive : ""
+                  }`}
+                  onClick={() => applyShareMode("camera-only")}
+                  disabled={busy}
+                >
+                  Camera only
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {selectedShareMode !== "camera-only" ? (
+            <button
+              type="button"
+              className={hubStyles.hostControlBtn}
+              onClick={() => void handleChooseScreenShare()}
+              disabled={busy}
+            >
+              Choose screen share
+            </button>
+          ) : null}
+
+          {selectedShareMode !== "screen-only" ? (
+            <button
+              type="button"
+              className={hubStyles.hostControlBtn}
+              onClick={() => void handleEnableCamera()}
+              disabled={busy}
+            >
+              Enable camera
+            </button>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          className={hubStyles.hostControlEnd}
+          onClick={onEndLive}
+          disabled={ending}
+        >
+          {ending ? "Ending..." : "End live"}
+        </button>
+      </div>
+
+      {error ? <p className={hubStyles.hostControlError}>{error}</p> : null}
+    </>
   );
 }
 
