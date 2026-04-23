@@ -480,6 +480,37 @@
   justify-content: space-between;
 }
 
+.hostControlsLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hostModeSelector {
+  position: relative;
+}
+
+.hostModeOptions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  gap: 6px;
+  min-width: 180px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.34);
+  z-index: 20;
+}
+
+.hostModeOptionActive {
+  border: 1px solid rgba(34, 211, 238, 0.62);
+  background: rgba(14, 116, 144, 0.5);
+}
+
 .hostControlBtn,
 .hostControlGhost {
   border: none;
