@@ -1996,11 +1996,23 @@ export default function MessagesPage() {
       // Notify caller that call was answered (this will open tab on caller's side)
       answerCall(incomingCall.from, { roomName });
 
-      // Open call in new tab for receiver (this user)
+      // Open call in new tab for receiver (this user). We forward the current
+      // access token + peerId so the tab:
+      //   - never falls through `getStoredAccessToken()` into a stale/missing
+      //     token (fixes the 403 users hit when accepting calls, especially
+      //     calls initiated from mobile).
+      //   - knows who to signal via BroadcastChannel when the user hits
+      //     "end call", so the other side gets a proper `call-end` instead
+      //     of having to wait for LiveKit's disconnect event.
       const participantName =
         currentUserProfile.username || currentUserProfile.displayName || "Người dùng";
       const isAudioOnly = incomingCall.type === "audio";
-      const callUrl = `/call?roomName=${encodeURIComponent(roomName)}&participantName=${encodeURIComponent(participantName)}&audioOnly=${isAudioOnly}`;
+      const callUrl =
+        `/call?roomName=${encodeURIComponent(roomName)}` +
+        `&participantName=${encodeURIComponent(participantName)}` +
+        `&audioOnly=${isAudioOnly}` +
+        `&peerId=${encodeURIComponent(incomingCall.from)}` +
+        `&accessToken=${encodeURIComponent(token)}`;
 
       window.open(callUrl, "_blank", "noopener,noreferrer");
 
@@ -2034,7 +2046,10 @@ export default function MessagesPage() {
     setOutgoingCall(null);
   }, [outgoingCall, endCall]);
 
-  // ✅ Open call tab when receiver accepts (for caller)
+  // ✅ Open call tab when receiver accepts (for caller).
+  // Mirrors the accept-path URL: include access token + peerId so the tab
+  // can authenticate on its own and signal end-of-call back to this tab
+  // over BroadcastChannel when the user hangs up.
   const openCallTab = useCallback(async () => {
     if (!outgoingCall || !currentUserProfile) return;
 
@@ -2042,7 +2057,13 @@ export default function MessagesPage() {
       const participantName =
         currentUserProfile.username || currentUserProfile.displayName || "Người dùng";
       const isAudioOnly = outgoingCall.type === "audio";
-      const callUrl = `/call?roomName=${encodeURIComponent(outgoingCall.roomName!)}&participantName=${encodeURIComponent(participantName)}&audioOnly=${isAudioOnly}`;
+      const qpToken = token ? `&accessToken=${encodeURIComponent(token)}` : "";
+      const callUrl =
+        `/call?roomName=${encodeURIComponent(outgoingCall.roomName!)}` +
+        `&participantName=${encodeURIComponent(participantName)}` +
+        `&audioOnly=${isAudioOnly}` +
+        `&peerId=${encodeURIComponent(outgoingCall.to)}` +
+        qpToken;
 
       window.open(callUrl, "_blank", "noopener,noreferrer");
 
@@ -2051,7 +2072,7 @@ export default function MessagesPage() {
     } catch (error) {
       console.error("❌ [CALLER] Failed to open call window:", error);
     }
-  }, [outgoingCall, currentUserProfile]);
+  }, [outgoingCall, currentUserProfile, token]);
 
   // ✅ Handle incoming call & call events
   useEffect(() => {
@@ -2121,6 +2142,18 @@ export default function MessagesPage() {
       return prev;
     });
 
+    // Also relay the close signal to any active call tab — LiveKit's
+    // ParticipantDisconnected fires eventually, but broadcasting "end" here
+    // tears the tab down immediately so the UX matches what the user sees
+    // on the peer side (mobile / web).
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      try {
+        const channel = new BroadcastChannel("cordigram-call");
+        channel.postMessage({ type: "peer-ended", peerId: callEnded.from });
+        channel.close();
+      } catch (_) {}
+    }
+
     // Auto-close after 3 seconds if call was cancelled
     const timer = setTimeout(() => {
       setIncomingCall((prev) => {
@@ -2137,6 +2170,39 @@ export default function MessagesPage() {
 
     return () => clearTimeout(timer);
   }, [callEnded]); // ✅ Only depend on callEnded, not incomingCall
+
+  // ✅ Listen for the call tab telling us the user ended the call.
+  //
+  // Why a BroadcastChannel and not postMessage?
+  //   window.open(..., "noopener,noreferrer") deliberately severs
+  //   `window.opener`, so the tab can't reach us directly. BroadcastChannel
+  //   is the only cross-tab messaging primitive that still works with that
+  //   hardened `rel="noopener"` posture AND is already supported by all
+  //   browsers we target.
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) {
+      return;
+    }
+    const channel = new BroadcastChannel("cordigram-call");
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as
+        | { type: string; peerId?: string }
+        | null;
+      if (!data || typeof data !== "object") return;
+      if (data.type === "self-ended" && data.peerId) {
+        // Our call tab just hung up. Emit the matching socket signal so the
+        // peer (web or mobile) stops their own LiveKit session + UI.
+        endCall(data.peerId);
+        setIncomingCall(null);
+        setOutgoingCall(null);
+      }
+    };
+    channel.addEventListener("message", onMessage);
+    return () => {
+      channel.removeEventListener("message", onMessage);
+      channel.close();
+    };
+  }, [endCall]);
 
   // ✅ Listen for call-rejected event
   useEffect(() => {

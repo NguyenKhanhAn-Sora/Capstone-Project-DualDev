@@ -2,15 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../core/config/app_config.dart';
-import '../../../core/services/auth_storage.dart';
 import 'models/dm_message.dart';
 import 'models/message_thread.dart';
 import 'models/presence_state.dart';
 import 'models/voice_control_state.dart';
 import 'services/direct_messages_realtime_service.dart';
 import 'services/direct_messages_service.dart';
-import 'services/dm_livekit_service.dart';
 import 'services/inbox_service.dart';
 import 'services/message_notification_sound.dart';
 import 'services/messages_media_service.dart';
@@ -289,27 +286,6 @@ class MessagesController extends ChangeNotifier {
       MessageNotificationSound.play();
     }
     return sent;
-  }
-
-  /// Same flow as web `handleStartCall` + opening `/call` (LiveKit in browser).
-  Future<Uri> startDmCall(String peerUserId, {required bool video}) async {
-    final roomName = await DmLiveKitService.getDmRoomName(peerUserId);
-    DirectMessagesRealtimeService.initiateCall(
-      receiverId: peerUserId,
-      isVideo: video,
-    );
-    final participantName = await _callParticipantLabel();
-    return Uri.parse(
-      '${AppConfig.webBaseUrl}/call?roomName=${Uri.encodeComponent(roomName)}'
-      '&participantName=${Uri.encodeComponent(participantName)}'
-      '&audioOnly=${!video}',
-    );
-  }
-
-  static Future<String> _callParticipantLabel() async {
-    final recent = await AuthStorage.loadRecentAccounts();
-    if (recent.isNotEmpty) return recent.first.label;
-    return 'Người dùng';
   }
 
   Future<void> addReaction({required String messageId, required String emoji}) {

@@ -42,7 +42,7 @@ dependencies:
   shared_preferences: ^2.3.0
   flutter_web_auth_2: ^5.0.0
   visibility_detector: ^0.4.0
-  device_info_plus: ^11.3.0
+  device_info_plus: ^12.4.0
   url_launcher: ^6.3.1
   video_player: ^2.9.2
   path_provider: ^2.1.5
@@ -54,8 +54,10 @@ dependencies:
   record: ^6.2.0
   flutter_dotenv: ^6.0.1
   emoji_picker_flutter: ^4.4.0
-  webview_flutter: ^4.9.0
-  webview_flutter_android: ^4.10.1
+  # Native LiveKit client used by the in-app call screen (shared protocol
+  # with the `@livekit/components-react` SDK on cordigram-web, so web ↔ mobile
+  # and mobile ↔ mobile calls just work).
+  livekit_client: ^2.7.0
 
 dev_dependencies:
   flutter_test:

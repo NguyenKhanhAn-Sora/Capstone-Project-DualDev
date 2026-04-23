@@ -7,21 +7,21 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../../../core/config/app_config.dart';
+import 'call/dm_call_manager.dart';
 import 'messages_controller.dart';
 import 'services/direct_messages_realtime_service.dart';
 import 'services/direct_messages_service.dart';
 import 'models/dm_message.dart';
 import 'models/message_thread.dart';
-import 'services/dm_livekit_service.dart';
 import 'services/giphy_search_service.dart';
 import 'services/messages_media_service.dart';
 import 'services/polls_api_service.dart';
 import 'services/server_media_service.dart';
-import '../../../core/services/auth_storage.dart';
+// Note: all call/video logic now lives in `DmCallManager` + `GlobalCallOverlay`
+// so DM calls ring globally (not only when this screen is foregrounded) and
+// the native call UI is reused across the app.
 
 class MessageChatScreen extends StatefulWidget {
   const MessageChatScreen({
@@ -53,19 +53,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   bool _typingOn = false;
   final Map<String, String> _serverEmojiMap = {};
   String _lang = 'vi';
-  StreamSubscription<DmCallEvent>? _callSub;
-  StreamSubscription<String>? _callEndSub;
-  bool _showOutgoingCall = false;
-  bool _outgoingVideo = false;
-  String _outgoingStatus = 'calling';
-  bool _showIncomingCall = false;
-  String _incomingCallerName = '';
-  String? _incomingCallerAvatar;
-  bool _incomingVideo = false;
-  Uri? _activeCallUri;
-  String _activeCallTitle = 'Voice call';
-  bool _callScreenOpen = false;
-
   @override
   void initState() {
     super.initState();
@@ -73,15 +60,12 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     _inputController.addListener(_onInputChanged);
     _loadConversation();
     _loadLanguage();
-    _bindCallRealtime();
     widget.controller.markConversationRead(widget.thread.id);
   }
 
   @override
   void dispose() {
     _typingTimer?.cancel();
-    _callSub?.cancel();
-    _callEndSub?.cancel();
     _flushTyping(false);
     _inputController.removeListener(_onInputChanged);
     widget.controller.removeListener(_onControllerChanged);
@@ -216,155 +200,18 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   }
 
   Future<void> _onStartCall({required bool video}) async {
-    try {
-      await _ensureCallPermissions(video: video);
-      setState(() {
-        _showOutgoingCall = true;
-        _outgoingVideo = video;
-        _outgoingStatus = 'calling';
-      });
-      DirectMessagesRealtimeService.initiateCall(
-        receiverId: widget.thread.id,
-        isVideo: video,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      setState(() {
-        _showOutgoingCall = false;
-      });
-    }
-  }
-
-  void _bindCallRealtime() {
-    _callSub = DirectMessagesRealtimeService.callEvents.listen((event) async {
-      if (!mounted) return;
-      if (event.signal == 'incoming' && event.fromUserId == widget.thread.id) {
-        setState(() {
-          _showIncomingCall = true;
-          _incomingVideo = event.type == 'video';
-          _incomingCallerName =
-              (event.callerInfo?['displayName'] ??
-                      event.callerInfo?['username'] ??
-                      widget.thread.name)
-                  .toString();
-          _incomingCallerAvatar = event.callerInfo?['avatar']?.toString();
-        });
-      } else if (event.signal == 'answer' &&
-          event.fromUserId == widget.thread.id) {
-        final roomName = event.payload?['sdpOffer']?['roomName']?.toString();
-        if (roomName != null &&
-            roomName.isNotEmpty &&
-            _activeCallUri == null) {
-          await _openInAppCall(
-            roomName: roomName,
-            video: _outgoingVideo || event.type == 'video',
-          );
-        }
-      } else if (event.signal == 'rejected' &&
-          _showOutgoingCall &&
-          event.fromUserId == widget.thread.id) {
-        setState(() {
-          _outgoingStatus = 'rejected';
-        });
-      }
-    });
-
-    _callEndSub = DirectMessagesRealtimeService.callEnded.listen((from) {
-      if (!mounted || from != widget.thread.id) return;
-      setState(() {
-        _showIncomingCall = false;
-        _showOutgoingCall = false;
-        _activeCallUri = null;
-        _callScreenOpen = false;
-      });
-    });
-  }
-
-  Future<void> _acceptIncomingCall() async {
-    await _ensureCallPermissions(video: _incomingVideo);
-    final roomName = await DmLiveKitService.getDmRoomName(widget.thread.id);
-    DirectMessagesRealtimeService.answerCall(widget.thread.id, {
-      'roomName': roomName,
-    });
-    await _openInAppCall(roomName: roomName, video: _incomingVideo);
-  }
-
-  void _rejectIncomingCall() {
-    DirectMessagesRealtimeService.rejectCall(widget.thread.id);
-    setState(() => _showIncomingCall = false);
-  }
-
-  Future<void> _openInAppCall({
-    required String roomName,
-    required bool video,
-  }) async {
-    if ((AuthStorage.accessToken ?? '').isEmpty) {
-      await AuthStorage.loadAll();
-    }
-    final participantName = widget.controller.myUsername?.isNotEmpty == true
+    final myName = widget.controller.myUsername?.isNotEmpty == true
         ? widget.controller.myUsername!
         : (widget.controller.myDisplayName?.isNotEmpty == true
               ? widget.controller.myDisplayName!
               : 'Người dùng');
-    final liveKit = await DmLiveKitService.getLiveKitToken(
-      roomName: roomName,
-      participantName: participantName,
+    await DmCallManager.instance.startCall(
+      peerUserId: widget.thread.id,
+      peerName: widget.thread.name,
+      peerAvatarUrl: widget.thread.avatarUrl,
+      video: video,
+      myName: myName,
     );
-    final liveKitToken = liveKit['token'] ?? '';
-    final liveKitUrl = liveKit['url'] ?? '';
-    final uri = Uri.parse(
-      '${AppConfig.webBaseUrl}/call?roomName=${Uri.encodeComponent(roomName)}'
-      '&participantName=${Uri.encodeComponent(participantName)}'
-      '&audioOnly=${!video}'
-      '&embedded=1'
-      '&lkToken=${Uri.encodeComponent(liveKitToken)}'
-      '&lkUrl=${Uri.encodeComponent(liveKitUrl)}',
-    );
-    if (!mounted) return;
-    setState(() {
-      _showIncomingCall = false;
-      _showOutgoingCall = false;
-      _activeCallUri = uri;
-      _activeCallTitle = video ? 'Video call' : 'Voice call';
-    });
-    _openDedicatedCallScreen();
-  }
-
-  Future<void> _openDedicatedCallScreen() async {
-    if (_activeCallUri == null || _callScreenOpen || !mounted) return;
-    setState(() => _callScreenOpen = true);
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _DedicatedCallScreen(
-          callUri: _activeCallUri!,
-          title: _activeCallTitle,
-          onHangup: () async {
-            DirectMessagesRealtimeService.endCall(widget.thread.id);
-            await Future<void>.delayed(const Duration(milliseconds: 120));
-            if (!mounted) return;
-            setState(() {
-              _activeCallUri = null;
-            });
-          },
-        ),
-      ),
-    );
-    if (!mounted) return;
-    setState(() => _callScreenOpen = false);
-  }
-
-  Future<void> _ensureCallPermissions({required bool video}) async {
-    final mic = await Permission.microphone.request();
-    if (!mic.isGranted) {
-      throw Exception('Microphone permission is required for calls');
-    }
-    if (video) {
-      final camera = await Permission.camera.request();
-      if (!camera.isGranted) {
-        throw Exception('Camera permission is required for video calls');
-      }
-    }
   }
 
   Future<void> _pickAndUploadMedia() async {
@@ -1625,35 +1472,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
         children: [
           Column(
             children: [
-              if (_activeCallUri != null && !_callScreenOpen)
-                Container(
-                  color: const Color(0xFF101F43),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.call, color: Colors.white, size: 16),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'Cuộc gọi đang diễn ra',
-                          style: TextStyle(color: Colors.white, fontSize: 12),
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: _openDedicatedCallScreen,
-                        icon: const Icon(
-                          Icons.arrow_forward_rounded,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        label: const Text(
-                          'Quay lại call',
-                          style: TextStyle(color: Colors.white, fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               const Divider(height: 1, color: Color(0xFF233358)),
               Expanded(
                 child: _loading
@@ -1697,39 +1515,6 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
               ),
             ],
           ),
-          if (_showOutgoingCall)
-            Positioned.fill(
-              child: _CallOverlayCard(
-                title: widget.thread.name,
-                avatarUrl: widget.thread.avatarUrl,
-                subtitle: _outgoingVideo ? 'Video call' : 'Voice call',
-                statusText: _outgoingStatus == 'calling'
-                    ? 'Calling...'
-                    : (_outgoingStatus == 'rejected'
-                          ? 'Call rejected'
-                          : 'No answer'),
-                acceptLabel: null,
-                rejectLabel: 'Cancel',
-                onAccept: null,
-                onReject: () {
-                  DirectMessagesRealtimeService.endCall(widget.thread.id);
-                  setState(() => _showOutgoingCall = false);
-                },
-              ),
-            ),
-          if (_showIncomingCall)
-            Positioned.fill(
-              child: _CallOverlayCard(
-                title: _incomingCallerName,
-                avatarUrl: _incomingCallerAvatar,
-                subtitle: _incomingVideo ? 'Video call' : 'Voice call',
-                statusText: 'Incoming call',
-                acceptLabel: 'Accept',
-                rejectLabel: 'Decline',
-                onAccept: _acceptIncomingCall,
-                onReject: _rejectIncomingCall,
-              ),
-            ),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -1880,225 +1665,6 @@ class _VoiceRecordPanel extends StatefulWidget {
 
   @override
   State<_VoiceRecordPanel> createState() => _VoiceRecordPanelState();
-}
-
-class _DedicatedCallScreen extends StatefulWidget {
-  const _DedicatedCallScreen({
-    required this.callUri,
-    required this.title,
-    required this.onHangup,
-  });
-
-  final Uri callUri;
-  final String title;
-  final Future<void> Function() onHangup;
-
-  @override
-  State<_DedicatedCallScreen> createState() => _DedicatedCallScreenState();
-}
-
-class _DedicatedCallScreenState extends State<_DedicatedCallScreen> {
-  late final WebViewController _controller;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onNavigationRequest: (request) {
-            final uri = Uri.tryParse(request.url);
-            final host = uri?.host.toLowerCase() ?? '';
-            if (request.url == 'about:blank' ||
-                host == 'cordigram.com' ||
-                host == 'www.cordigram.com') {
-              return NavigationDecision.navigate;
-            }
-            return NavigationDecision.prevent;
-          },
-          onPageFinished: (_) async {
-            if (!mounted) return;
-            setState(() => _loading = false);
-          },
-        ),
-      )
-      ..loadRequest(widget.callUri);
-
-    final platformController = _controller.platform;
-    if (platformController is AndroidWebViewController) {
-      platformController.setMediaPlaybackRequiresUserGesture(false);
-      platformController.setOnPlatformPermissionRequest((request) {
-        request.grant();
-      });
-    }
-  }
-
-  Future<void> _hangup() async {
-    try {
-      await _controller.loadRequest(Uri.parse('about:blank'));
-    } catch (_) {}
-    await widget.onHangup();
-    if (mounted) Navigator.of(context).pop();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned.fill(child: WebViewWidget(controller: _controller)),
-            Positioned(
-              top: 8,
-              left: 8,
-              right: 8,
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                    tooltip: 'Quay lại chat',
-                  ),
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _hangup,
-                    icon: const Icon(Icons.call_end_rounded, color: Colors.red),
-                    tooltip: 'Kết thúc',
-                  ),
-                ],
-              ),
-            ),
-            if (_loading)
-              const Center(
-                child: CircularProgressIndicator(color: Colors.white),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CallOverlayCard extends StatelessWidget {
-  const _CallOverlayCard({
-    required this.title,
-    required this.subtitle,
-    required this.statusText,
-    required this.rejectLabel,
-    required this.onReject,
-    this.avatarUrl,
-    this.acceptLabel,
-    this.onAccept,
-  });
-
-  final String title;
-  final String subtitle;
-  final String statusText;
-  final String rejectLabel;
-  final VoidCallback onReject;
-  final String? avatarUrl;
-  final String? acceptLabel;
-  final VoidCallback? onAccept;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xB3000000),
-      child: Center(
-        child: Container(
-          width: 320,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F1B37),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFF2C3A5A)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircleAvatar(
-                radius: 34,
-                backgroundColor: const Color(0xFFDDDDDD),
-                backgroundImage: (avatarUrl ?? '').isNotEmpty
-                    ? NetworkImage(avatarUrl!)
-                    : null,
-                child: (avatarUrl ?? '').isNotEmpty
-                    ? null
-                    : Text(
-                        title.isNotEmpty
-                            ? title.substring(0, 1).toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          color: Color(0xFF1B2A4A),
-                          fontWeight: FontWeight.w700,
-                          fontSize: 24,
-                        ),
-                      ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                subtitle,
-                style: const TextStyle(color: Color(0xFFB6C2DC), fontSize: 13),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                statusText,
-                style: const TextStyle(color: Color(0xFF43B581), fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFED4245),
-                      ),
-                      onPressed: onReject,
-                      child: Text(rejectLabel),
-                    ),
-                  ),
-                  if (onAccept != null && acceptLabel != null) ...[
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF43B581),
-                        ),
-                        onPressed: onAccept,
-                        child: Text(acceptLabel!),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _VoiceRecordPanelState extends State<_VoiceRecordPanel> {
