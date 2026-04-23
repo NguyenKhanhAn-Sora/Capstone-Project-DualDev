@@ -11,6 +11,7 @@ import '../auth/login_screen.dart';
 import '../explore/explore_screen.dart';
 import '../following/following_screen.dart';
 import '../hashtag/hashtag_screen.dart';
+import '../messages/call/dm_call_manager.dart';
 import '../messages/message_home_screen.dart';
 import '../notifications/services/notification_realtime_service.dart';
 import '../notifications/notification_screen.dart';
@@ -1048,6 +1049,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
     } catch (_) {}
     await AuthStorage.clear();
+    // Tear down in-flight call state (active / ringing / outgoing) and
+    // reset the call socket so the NEXT account that logs in on this
+    // device doesn't inherit stale rings or auto-answer events from the
+    // previous session.
+    try {
+      await DmCallManager.instance.onAuthChanged();
+    } catch (_) {}
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),

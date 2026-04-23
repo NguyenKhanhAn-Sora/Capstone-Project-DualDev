@@ -2120,8 +2120,19 @@ export default function MessagesPage() {
       return;
     }
 
-    // Call answered - open tab for caller
-    if (isCallAnswerEvent(callEvent) && outgoingCall && callEvent.sdpOffer) {
+    // Call answered - open tab for caller.
+    //
+    // The `from === outgoingCall.to` guard is load-bearing: without it, a
+    // stale `answer` callEvent from a previous session (e.g. user logged
+    // out and back in, or called a different person earlier) would
+    // re-fire here the moment the user sets up a NEW outgoingCall and
+    // auto-open a call tab, skipping the accept/reject step entirely.
+    if (
+      isCallAnswerEvent(callEvent) &&
+      outgoingCall &&
+      callEvent.sdpOffer &&
+      String(callEvent.from) === String(outgoingCall.to)
+    ) {
       openCallTab();
       return;
     }

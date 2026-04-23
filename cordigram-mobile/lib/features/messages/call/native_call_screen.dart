@@ -260,7 +260,17 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   /// the manager (which emits `call-end` over the socket), then pops.
   Future<void> _hangup() async {
     if (_hangupCalled) return;
-    _hangupCalled = true;
+    // Mark via setState so the enclosing PopScope re-renders with
+    // `canPop: true` BEFORE we call Navigator.pop. Otherwise
+    // PopScope(canPop: false) silently vetoes the pop and the call screen
+    // stays visible after pressing the end-call button.
+    if (mounted) {
+      setState(() {
+        _hangupCalled = true;
+      });
+    } else {
+      _hangupCalled = true;
+    }
     _remoteLeavePending?.cancel();
     _remoteLeavePending = null;
     try {
@@ -272,8 +282,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     try {
       await widget.onHangup();
     } catch (_) {}
-    if (!mounted) return;
-    Navigator.of(context).maybePop();
+    _popSelf();
   }
 
   /// Externally-triggered teardown (peer ended the call via socket). We do
@@ -281,7 +290,13 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   /// over; we just close the LiveKit room + screen.
   Future<void> _teardownAndPop() async {
     if (_hangupCalled) return;
-    _hangupCalled = true;
+    if (mounted) {
+      setState(() {
+        _hangupCalled = true;
+      });
+    } else {
+      _hangupCalled = true;
+    }
     _remoteLeavePending?.cancel();
     _remoteLeavePending = null;
     try {
@@ -290,8 +305,17 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     try {
       await _room?.disconnect();
     } catch (_) {}
+    _popSelf();
+  }
+
+  /// Close the call screen. Uses `pop` (not `maybePop`) so we force-dismiss
+  /// even if some other layer has transiently vetoed pops.
+  void _popSelf() {
     if (!mounted) return;
-    Navigator.of(context).maybePop();
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      nav.pop();
+    }
   }
 
   void _showSnack(String message) {
@@ -319,7 +343,12 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      // Once hangup has been initiated the route MUST allow popping —
+      // otherwise Navigator.pop is vetoed and the screen stays stuck on
+      // the "in call" UI after the user taps the end button. While the
+      // call is live we still block accidental back-swipes / system back
+      // and route them through _hangup instead.
+      canPop: _hangupCalled,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         await _hangup();
