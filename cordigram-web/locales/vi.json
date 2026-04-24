@@ -222,6 +222,19 @@
         "desc": "Tin nhắn này sẽ bị gỡ khỏi thiết bị của bạn, nhưng vẫn hiển thị với các thành viên khác trong đoạn chat."
       }
     },
+    "actions": {
+      "deleteForMe": "Xóa ở phía tôi",
+      "deleteForEveryone": "Xóa với mọi người"
+    },
+    "messageRecalled": {
+      "self": "Bạn đã thu hồi một tin nhắn",
+      "other": "Tin nhắn đã bị thu hồi"
+    },
+    "toast": {
+      "deletedForMe": "Bạn đã xóa một tin nhắn",
+      "recalled": "Đã thu hồi tin nhắn với mọi người",
+      "deleteFailed": "Không thể xóa tin nhắn"
+    },
     "reportMessage": {
       "title": "Báo cáo tin nhắn",
       "reasonLabel": "Lý do báo cáo *",

@@ -222,6 +222,19 @@
         "desc": "这条消息会从你的设备中移除，但仍会对其他成员显示。"
       }
     },
+    "actions": {
+      "deleteForMe": "仅对我删除",
+      "deleteForEveryone": "对所有人撤回"
+    },
+    "messageRecalled": {
+      "self": "你撤回了一条消息",
+      "other": "此消息已被撤回"
+    },
+    "toast": {
+      "deletedForMe": "已为你删除这条消息",
+      "recalled": "已撤回这条消息",
+      "deleteFailed": "删除消息失败"
+    },
     "reportMessage": {
       "title": "举报消息",
       "reasonLabel": "举报原因 *",

@@ -178,12 +178,92 @@ export class DirectMessagesController {
   async deleteDirectMessage(
     @Param('messageId') messageId: string,
     @CurrentUser() user: any,
+    @Body() body?: { deleteType?: 'for-everyone' | 'for-me' },
+    @Query('deleteType') deleteTypeQuery?: 'for-everyone' | 'for-me',
   ) {
-    await this.directMessagesService.deleteDirectMessage(
+    // Accept deleteType from body (preferred) or query string so older clients
+    // that put the flag in the URL still work.
+    const requested = body?.deleteType || deleteTypeQuery;
+    const deleteType: 'for-everyone' | 'for-me' =
+      requested === 'for-everyone' ? 'for-everyone' : 'for-me';
+
+    const result = await this.directMessagesService.deleteDirectMessage(
       messageId,
       user.userId,
+      deleteType,
     );
-    return { deleted: true };
+
+    // Realtime: broadcast unsend so every connected client (sender +
+    // receiver) can update their bubble without a refresh. "for-me" stays
+    // local to the current device — we only need a broadcast for the
+    // "everyone" case.
+    try {
+      if (result.deleteType === 'for-everyone') {
+        this.directMessagesGateway.emitMessageDeleted({
+          messageId: result.messageId,
+          senderId: result.senderId,
+          receiverId: result.receiverId,
+          deleteType: 'for-everyone',
+          deletedAt: result.deletedAt.toISOString(),
+        });
+      }
+    } catch (_e) {
+      // Don't fail the REST request if the socket emit fails.
+    }
+
+    return {
+      deleted: true,
+      deleteType: result.deleteType,
+      deletedAt: result.deletedAt,
+      messageId: result.messageId,
+    };
+  }
+
+  @Delete(':messageId/for-me')
+  async deleteDirectMessageForMe(
+    @Param('messageId') messageId: string,
+    @CurrentUser() user: any,
+  ) {
+    const result = await this.directMessagesService.deleteDirectMessage(
+      messageId,
+      user.userId,
+      'for-me',
+    );
+    return {
+      deleted: true,
+      deleteType: result.deleteType,
+      deletedAt: result.deletedAt,
+      messageId: result.messageId,
+    };
+  }
+
+  @Delete(':messageId/for-everyone')
+  async deleteDirectMessageForEveryone(
+    @Param('messageId') messageId: string,
+    @CurrentUser() user: any,
+  ) {
+    const result = await this.directMessagesService.deleteDirectMessage(
+      messageId,
+      user.userId,
+      'for-everyone',
+    );
+    try {
+      this.directMessagesGateway.emitMessageDeleted({
+        messageId: result.messageId,
+        senderId: result.senderId,
+        receiverId: result.receiverId,
+        deleteType: 'for-everyone',
+        deletedAt: result.deletedAt.toISOString(),
+      });
+    } catch (_e) {
+      // ignore
+    }
+    return {
+      deleted: true,
+      deleteType: result.deleteType,
+      deletedAt: result.deletedAt,
+      messageId: result.messageId,
+    };
   }
 
   @Post(':messageId/reaction/:emoji')

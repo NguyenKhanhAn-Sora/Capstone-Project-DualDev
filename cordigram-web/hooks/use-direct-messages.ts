@@ -110,7 +110,13 @@ export const useDirectMessages = ({
   const [presenceByUserId, setPresenceByUserId] = useState<Record<string, PresenceStatus>>({});
   const [callEvent, setCallEvent] = useState<CallEvent | null>(null);
   const [callEnded, setCallEnded] = useState<{ from: string } | null>(null);
-  const [messageDeleted, setMessageDeleted] = useState<{ messageId: string } | null>(null);
+  const [messageDeleted, setMessageDeleted] = useState<{
+    messageId: string;
+    deleteType?: "for-everyone" | "for-me";
+    deletedAt?: string;
+    senderId?: string;
+    receiverId?: string;
+  } | null>(null);
   const [userProfileStyleUpdated, setUserProfileStyleUpdated] =
     useState<UserProfileStyleUpdatedEvent | null>(null);
   const [boostEntitlementUpdated, setBoostEntitlementUpdated] =
@@ -319,10 +325,23 @@ export const useDirectMessages = ({
       setTimeout(() => setCallEnded(null), 1000);
     });
 
-    socket.on("message-deleted", (data: { messageId: string }) => {
-      setMessageDeleted(data);
-      setTimeout(() => setMessageDeleted(null), 1000);
-    });
+    socket.on(
+      "message-deleted",
+      (data: {
+        messageId: string;
+        deleteType?: "for-everyone" | "for-me";
+        deletedAt?: string;
+        senderId?: string;
+        receiverId?: string;
+      }) => {
+        if (!data?.messageId) return;
+        // Always provide a fresh object reference so downstream effects
+        // re-fire even when the same id is deleted twice in a row (e.g.
+        // REST + socket emit for the same message).
+        setMessageDeleted({ ...data });
+        setTimeout(() => setMessageDeleted(null), 1500);
+      },
+    );
 
     socket.on("user-profile-style-updated", (data: UserProfileStyleUpdatedEvent) => {
       if (!data?.userId) return;

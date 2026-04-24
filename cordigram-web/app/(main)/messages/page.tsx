@@ -238,6 +238,13 @@ interface UIMessage {
   senderDisplayNameEffectId?: string | null;
   senderDisplayNamePrimaryHex?: string | null;
   senderDisplayNameAccentHex?: string | null;
+  /**
+   * True when the sender has "unsent" the message ("delete for everyone").
+   * The bubble should stay in the list but render a greyed-out italic
+   * placeholder instead of the original content.
+   */
+  isDeletedForEveryone?: boolean;
+  deletedAt?: string;
 }
 
 // GiphyMessage component for rendering GIF/Sticker
@@ -578,6 +585,13 @@ function areMessagesEqual(
   if (prevProps.message.replyToMessage !== nextProps.message.replyToMessage)
     return false;
 
+  // Re-render when the message gets unsent / re-displayed as "recalled"
+  if (
+    prevProps.message.isDeletedForEveryone !==
+    nextProps.message.isDeletedForEveryone
+  )
+    return false;
+
   // Emoji map / jumbo sizing đi qua renderMessageContent — phải re-render khi callback đổi
   if (prevProps.renderMessageContent !== nextProps.renderMessageContent)
     return false;
@@ -598,6 +612,8 @@ const MessageItem = memo(
     onPin,
     onReport,
     onDelete,
+    onDeleteForMe,
+    onDeleteForEveryone,
     scrollContainerRef,
     dmPartnerDisplayName,
     senderColor,
@@ -614,6 +630,10 @@ const MessageItem = memo(
     onPin?: (messageId: string) => void;
     onReport?: (messageId: string) => void;
     onDelete?: (messageId: string) => void;
+    /** "Delete for me" — immediate action, no confirmation dialog. */
+    onDeleteForMe?: (messageId: string) => void;
+    /** "Unsend / delete for everyone" — sender only. */
+    onDeleteForEveryone?: (messageId: string) => void;
     scrollContainerRef?: React.RefObject<HTMLElement | null>;
     dmPartnerDisplayName?: string;
     senderColor?: string; // Màu hiển thị từ role cao nhất
@@ -854,14 +874,16 @@ const MessageItem = memo(
           </div>
 
           {/* Message Reactions (ẩn khi đang hiện ở thanh sticky phía trên) */}
-          {message.reactions && message.reactions.length > 0 && (
-            <MessageReactions
-              reactions={message.reactions}
-              currentUserId={currentUserId || ""}
-              onReactionClick={(emoji) => onReaction?.(message.id, emoji)}
-              onAddClick={() => setShowEmojiPicker(true)}
-            />
-          )}
+          {!message.isDeletedForEveryone &&
+            message.reactions &&
+            message.reactions.length > 0 && (
+              <MessageReactions
+                reactions={message.reactions}
+                currentUserId={currentUserId || ""}
+                onReactionClick={(emoji) => onReaction?.(message.id, emoji)}
+                onAddClick={() => setShowEmojiPicker(true)}
+              />
+            )}
 
           {/* ✅ Read receipt indicator - only show for sent messages */}
           {alignAsSent && message.type === "direct" && (
@@ -921,7 +943,7 @@ const MessageItem = memo(
         </div>
 
         {/* Quick Reaction Bar on Hover — portal với position:fixed + z-index cao để đè lên chatHeader khi cần */}
-        {isHovered && (scrollContainerRef && fixedReactionPosition ? (
+        {isHovered && !message.isDeletedForEveryone && (scrollContainerRef && fixedReactionPosition ? (
           createPortal(
             <div
               style={{
@@ -955,7 +977,7 @@ const MessageItem = memo(
         ))}
 
         {/* Emoji Reaction Picker — portal để đè lên chatHeader */}
-        {showEmojiPicker && (scrollContainerRef && fixedReactionPosition ? (
+        {showEmojiPicker && !message.isDeletedForEveryone && (scrollContainerRef && fixedReactionPosition ? (
           createPortal(
             <div
               style={{
@@ -995,12 +1017,30 @@ const MessageItem = memo(
         ))}
 
         {/* Message Actions Menu */}
-        {showActionsMenu && (
+        {showActionsMenu && !message.isDeletedForEveryone && (
           <MessageActionsMenu
             onRemove={
-              message.isFromCurrentUser
+              // Legacy "Gỡ" action — still used by channel/server messages
+              // (their delete flow hasn't been migrated to split delete).
+              onDelete && message.isFromCurrentUser
                 ? () => {
                     onDelete?.(message.id);
+                  }
+                : undefined
+            }
+            onDeleteForMe={
+              // Direct action — no confirmation dialog, executes immediately.
+              onDeleteForMe
+                ? () => {
+                    onDeleteForMe(message.id);
+                  }
+                : undefined
+            }
+            onDeleteForEveryone={
+              // Only shown for the sender; the menu also enforces this.
+              onDeleteForEveryone && message.isFromCurrentUser
+                ? () => {
+                    onDeleteForEveryone(message.id);
                   }
                 : undefined
             }
@@ -3300,6 +3340,8 @@ export default function MessagesPage() {
         reactions: normalizeReactions(msg.reactions),
         replyTo: msg.replyTo?._id || undefined,
         replyToMessage: mapReplyToMessage(msg.replyTo),
+        isDeletedForEveryone: msg.isDeleted === true,
+        deletedAt: msg.deletedAt || undefined,
       };
 
 
@@ -3366,27 +3408,46 @@ export default function MessagesPage() {
   ]);
 
   // ✅ Handle message-deleted event
+  //
+  // Distinguish between the two delete modes so the UI matches the spec:
+  //  - for-everyone → keep the bubble, mark as "recalled" (italic, grey).
+  //  - for-me (or missing type, legacy) → remove the bubble locally.
   useEffect(() => {
-    if (messageDeleted) {
-      
-      // Remove message from all conversations
-      setConversations((prev) => {
-        const newMap = new Map(prev);
-        
-        // Iterate through all conversations
-        for (const [friendId, messages] of newMap.entries()) {
-          const updatedMessages = messages.filter(
-            (msg) => msg.id !== messageDeleted.messageId
-          );
-          
-          if (updatedMessages.length !== messages.length) {
-            newMap.set(friendId, updatedMessages);
+    if (!messageDeleted) return;
+
+    const { messageId, deleteType, deletedAt } = messageDeleted;
+    const asRecalled = deleteType === "for-everyone";
+
+    setConversations((prev) => {
+      const newMap = new Map(prev);
+      for (const [friendId, messages] of newMap.entries()) {
+        const idx = messages.findIndex((m) => m.id === messageId);
+        if (idx === -1) continue;
+
+        if (asRecalled) {
+          if (messages[idx].isDeletedForEveryone) continue; // idempotent
+          const next = messages.slice();
+          next[idx] = {
+            ...next[idx],
+            isDeletedForEveryone: true,
+            deletedAt: deletedAt || new Date().toISOString(),
+            text: "",
+            giphyId: undefined,
+            customStickerUrl: undefined,
+            voiceUrl: undefined,
+            voiceDuration: undefined,
+            reactions: [],
+          };
+          newMap.set(friendId, next);
+        } else {
+          const next = messages.filter((m) => m.id !== messageId);
+          if (next.length !== messages.length) {
+            newMap.set(friendId, next);
           }
         }
-        
-        return newMap;
-      });
-    }
+      }
+      return newMap;
+    });
   }, [messageDeleted]);
 
   // Load messages when any text chat channel is selected (includes category "info"; textChannels state excludes info only for sidebar grouping)
@@ -3770,6 +3831,8 @@ export default function MessagesPage() {
         reactions: normalizeReactions(msg.reactions),
         replyTo: msg.replyTo?._id || undefined,
         replyToMessage: mapReplyToMessage(msg.replyTo),
+        isDeletedForEveryone: msg.isDeleted === true,
+        deletedAt: msg.deletedAt || undefined,
       }));
 
       setConversations((prev) => {
@@ -4032,43 +4095,74 @@ export default function MessagesPage() {
   };
 
   // Handler for deleting messages
+  //
+  // Two distinct behaviours per spec:
+  //  - "for-me":       removes the bubble locally (and only locally). The
+  //                    backend adds the current user to `deletedFor[]` so
+  //                    when we reload the history this user still can't
+  //                    see it.
+  //  - "for-everyone": keeps the bubble in place on every client but
+  //                    replaces its content with a greyed italic placeholder.
+  //                    Backend sets `isDeleted=true` + `deletedAt` and emits
+  //                    a socket `message-deleted` event so the receiver's
+  //                    UI updates instantly without reloading.
   const handleDeleteMessage = async (
     messageId: string,
-    deleteType: "for-everyone" | "for-me"
+    deleteType: "for-everyone" | "for-me",
   ) => {
     try {
-      const result = await deleteDirectMessage(messageId, deleteType, { token });
+      await deleteDirectMessage(messageId, deleteType, { token });
 
-      // Update local state
-      if (selectedDirectMessageFriend) {
-        const friendId = selectedDirectMessageFriend._id;
-        const currentMessages = conversations.get(friendId) || [];
-        const updatedMessages = currentMessages.filter(
-          (msg) => msg.id !== messageId
-        );
-        setConversations(new Map(conversations.set(friendId, updatedMessages)));
+      // Emit socket so the other side updates instantly (backend also
+      // broadcasts from the REST handler — double-fire is idempotent).
+      if (deleteType === "for-everyone" && emitDeleteMessage) {
+        const friendId = selectedDirectMessageFriend?._id;
+        emitDeleteMessage(messageId, deleteType, friendId);
+      }
 
-        // Emit socket event to notify receiver (for real-time update)
-        if (emitDeleteMessage) {
-          emitDeleteMessage(messageId, deleteType, friendId);
+      // Local optimistic update.
+      setConversations((prev) => {
+        const newMap = new Map(prev);
+        for (const [friendId, messages] of newMap.entries()) {
+          const idx = messages.findIndex((m) => m.id === messageId);
+          if (idx === -1) continue;
+
+          if (deleteType === "for-me") {
+            // Hide the bubble entirely on this device.
+            const next = messages.filter((m) => m.id !== messageId);
+            newMap.set(friendId, next);
+          } else {
+            // Keep the bubble; replace with a "recalled" placeholder.
+            const next = messages.slice();
+            next[idx] = {
+              ...next[idx],
+              isDeletedForEveryone: true,
+              deletedAt: new Date().toISOString(),
+              text: "",
+              giphyId: undefined,
+              customStickerUrl: undefined,
+              voiceUrl: undefined,
+              voiceDuration: undefined,
+              reactions: [],
+            };
+            newMap.set(friendId, next);
+          }
         }
-      }
+        return newMap;
+      });
 
-      // Show success toast
-      if (deleteType === "for-everyone") {
-        setToastMessage("Đã thu hồi tin nhắn với mọi người");
-      } else {
-        setToastMessage("Bạn đã xóa một tin nhắn");
-      }
-
-      // Hide toast after 3 seconds
+      setToastMessage(
+        deleteType === "for-everyone"
+          ? t("chat.toast.recalled") || "Đã thu hồi tin nhắn với mọi người"
+          : t("chat.toast.deletedForMe") || "Bạn đã xóa một tin nhắn",
+      );
       setTimeout(() => setToastMessage(null), 3000);
 
-      // Close dialog
+      // Close the legacy dialog if it's still open from the old flow.
       setShowDeleteDialog(null);
     } catch (error) {
       console.error("Failed to delete message:", error);
-      alert("Không thể gỡ tin nhắn");
+      alert(t("chat.toast.deleteFailed") || "Không thể xóa tin nhắn");
     }
   };
 
@@ -5503,6 +5597,27 @@ export default function MessagesPage() {
         voiceUrl,
         voiceDuration,
       } = message;
+
+      // "Delete for everyone" / unsend — preserve the bubble footprint so the
+      // surrounding layout (avatars, reactions, read receipts) doesn't jump,
+      // but replace the payload with a greyed-out italic placeholder.
+      if (message.isDeletedForEveryone) {
+        const label = message.isFromCurrentUser
+          ? t("chat.messageRecalled.self") || "Bạn đã thu hồi một tin nhắn"
+          : t("chat.messageRecalled.other") || "Tin nhắn đã bị thu hồi";
+        return (
+          <span
+            style={{
+              fontStyle: "italic",
+              color: "var(--color-text-muted)",
+              opacity: 0.85,
+              userSelect: "none",
+            }}
+          >
+            {label}
+          </span>
+        );
+      }
 
       if (messageType === "system") {
         return (
@@ -8934,7 +9049,15 @@ export default function MessagesPage() {
                             onReply={handleReplyToMessage}
                             onPin={handlePinMessage}
                             onReport={(msgId) => setShowReportDialog(msgId)}
-                            onDelete={(msgId) => setShowDeleteDialog(msgId)}
+                            // DM bubbles use the split delete flow — each
+                            // menu item fires the action immediately without
+                            // an extra confirmation dialog.
+                            onDeleteForMe={(msgId) =>
+                              handleDeleteMessage(msgId, "for-me")
+                            }
+                            onDeleteForEveryone={(msgId) =>
+                              handleDeleteMessage(msgId, "for-everyone")
+                            }
                             scrollContainerRef={messagesContainerRef}
                             dmPartnerDisplayName={selectedDirectMessageFriend.displayName || selectedDirectMessageFriend.username}
                             messagesShellTheme={messagesShellTheme}
