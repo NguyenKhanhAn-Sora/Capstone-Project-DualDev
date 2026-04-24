@@ -222,6 +222,19 @@
         "desc": "This message will be removed from your device, but it will still be visible to other members in the chat."
       }
     },
+    "actions": {
+      "deleteForMe": "Delete for me",
+      "deleteForEveryone": "Delete for everyone"
+    },
+    "messageRecalled": {
+      "self": "You unsent a message",
+      "other": "This message was unsent"
+    },
+    "toast": {
+      "deletedForMe": "Message deleted for you",
+      "recalled": "Message unsent for everyone",
+      "deleteFailed": "Failed to delete message"
+    },
     "reportMessage": {
       "title": "Report message",
       "reasonLabel": "Report reason *",

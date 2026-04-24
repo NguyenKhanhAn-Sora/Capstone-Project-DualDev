@@ -222,6 +222,19 @@
         "desc": "このメッセージはあなたの端末から削除されますが、他のメンバーには表示されたままです。"
       }
     },
+    "actions": {
+      "deleteForMe": "自分側から削除",
+      "deleteForEveryone": "全員から削除"
+    },
+    "messageRecalled": {
+      "self": "メッセージの送信を取り消しました",
+      "other": "メッセージは取り消されました"
+    },
+    "toast": {
+      "deletedForMe": "メッセージを削除しました",
+      "recalled": "全員のメッセージを取り消しました",
+      "deleteFailed": "メッセージを削除できませんでした"
+    },
     "reportMessage": {
       "title": "メッセージを報告",
       "reasonLabel": "報告理由 *",
