@@ -227,12 +227,12 @@
       "deleteForEveryone": "对所有人撤回"
     },
     "messageRecalled": {
-      "self": "你撤回了一条消息",
-      "other": "此消息已被撤回"
+      "self": "你删除了一条消息",
+      "other": "{name} 删除了一条消息"
     },
     "toast": {
       "deletedForMe": "已为你删除这条消息",
-      "recalled": "已撤回这条消息",
+      "recalled": "已为所有人删除消息",
       "deleteFailed": "删除消息失败"
     },
     "reportMessage": {

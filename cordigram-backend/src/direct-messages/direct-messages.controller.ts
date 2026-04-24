@@ -8,6 +8,7 @@ import {
   Patch,
   Query,
   UseGuards,
+  HttpCode,
 } from '@nestjs/common';
 import { DirectMessagesService } from './direct-messages.service';
 import { DirectMessagesGateway } from './direct-messages.gateway';
@@ -50,6 +51,29 @@ export class DirectMessagesController {
       fuzzy: fuzzy === 'true' || fuzzy === '1',
       parseQuery: parseQuery === 'false' || parseQuery === '0' ? false : true,
     });
+  }
+
+  /**
+   * POST variants for delete — some proxies / hosts mishandle DELETE or strip
+   * bodies; the web client uses these as the primary transport.
+   * Registered before `@Post(':receiverId')` so paths are not captured as a receiver id.
+   */
+  @Post(':messageId/delete-for-everyone')
+  @HttpCode(200)
+  async deleteDirectMessageForEveryonePost(
+    @Param('messageId') messageId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.performDeleteForEveryone(messageId, user);
+  }
+
+  @Post(':messageId/delete-for-me')
+  @HttpCode(200)
+  async deleteDirectMessageForMePost(
+    @Param('messageId') messageId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.performDeleteForMe(messageId, user);
   }
 
   @Post(':receiverId')
@@ -174,6 +198,24 @@ export class DirectMessagesController {
     );
   }
 
+  // Register these *before* `@Delete(':messageId')` so paths like
+  // `/direct-messages/…/for-everyone` are never mis-handled in edge setups.
+  @Delete(':messageId/for-everyone')
+  async deleteDirectMessageForEveryone(
+    @Param('messageId') messageId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.performDeleteForEveryone(messageId, user);
+  }
+
+  @Delete(':messageId/for-me')
+  async deleteDirectMessageForMe(
+    @Param('messageId') messageId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.performDeleteForMe(messageId, user);
+  }
+
   @Delete(':messageId')
   async deleteDirectMessage(
     @Param('messageId') messageId: string,
@@ -204,60 +246,13 @@ export class DirectMessagesController {
           senderId: result.senderId,
           receiverId: result.receiverId,
           deleteType: 'for-everyone',
-          deletedAt: result.deletedAt.toISOString(),
+          deletedAt: this.deletedAtToIsoString(result.deletedAt),
         });
       }
     } catch (_e) {
       // Don't fail the REST request if the socket emit fails.
     }
 
-    return {
-      deleted: true,
-      deleteType: result.deleteType,
-      deletedAt: result.deletedAt,
-      messageId: result.messageId,
-    };
-  }
-
-  @Delete(':messageId/for-me')
-  async deleteDirectMessageForMe(
-    @Param('messageId') messageId: string,
-    @CurrentUser() user: any,
-  ) {
-    const result = await this.directMessagesService.deleteDirectMessage(
-      messageId,
-      user.userId,
-      'for-me',
-    );
-    return {
-      deleted: true,
-      deleteType: result.deleteType,
-      deletedAt: result.deletedAt,
-      messageId: result.messageId,
-    };
-  }
-
-  @Delete(':messageId/for-everyone')
-  async deleteDirectMessageForEveryone(
-    @Param('messageId') messageId: string,
-    @CurrentUser() user: any,
-  ) {
-    const result = await this.directMessagesService.deleteDirectMessage(
-      messageId,
-      user.userId,
-      'for-everyone',
-    );
-    try {
-      this.directMessagesGateway.emitMessageDeleted({
-        messageId: result.messageId,
-        senderId: result.senderId,
-        receiverId: result.receiverId,
-        deleteType: 'for-everyone',
-        deletedAt: result.deletedAt.toISOString(),
-      });
-    } catch (_e) {
-      // ignore
-    }
     return {
       deleted: true,
       deleteType: result.deleteType,
@@ -308,5 +303,54 @@ export class DirectMessagesController {
   @Get('available-users/list')
   async getAvailableUsers(@CurrentUser() user: any) {
     return this.directMessagesService.getAvailableUsers(user.userId);
+  }
+
+  private deletedAtToIsoString(deletedAt: Date | string | null | undefined): string {
+    if (deletedAt instanceof Date) {
+      return deletedAt.toISOString();
+    }
+    if (typeof deletedAt === 'string' && deletedAt.length > 0) {
+      return new Date(deletedAt).toISOString();
+    }
+    return new Date().toISOString();
+  }
+
+  private async performDeleteForEveryone(messageId: string, user: any) {
+    const result = await this.directMessagesService.deleteDirectMessage(
+      messageId,
+      user.userId,
+      'for-everyone',
+    );
+    try {
+      this.directMessagesGateway.emitMessageDeleted({
+        messageId: result.messageId,
+        senderId: result.senderId,
+        receiverId: result.receiverId,
+        deleteType: 'for-everyone',
+        deletedAt: this.deletedAtToIsoString(result.deletedAt),
+      });
+    } catch (_e) {
+      // ignore
+    }
+    return {
+      deleted: true,
+      deleteType: result.deleteType,
+      deletedAt: result.deletedAt,
+      messageId: result.messageId,
+    };
+  }
+
+  private async performDeleteForMe(messageId: string, user: any) {
+    const result = await this.directMessagesService.deleteDirectMessage(
+      messageId,
+      user.userId,
+      'for-me',
+    );
+    return {
+      deleted: true,
+      deleteType: result.deleteType,
+      deletedAt: result.deletedAt,
+      messageId: result.messageId,
+    };
   }
 }

@@ -215,6 +215,9 @@ export class DirectMessagesGateway
     deleteType: 'for-everyone' | 'for-me';
     deletedAt: string;
   }) {
+    if (!this.server) {
+      return;
+    }
     const body = {
       messageId: payload.messageId,
       deleteType: payload.deleteType,

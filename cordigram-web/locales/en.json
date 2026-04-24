@@ -227,12 +227,12 @@
       "deleteForEveryone": "Delete for everyone"
     },
     "messageRecalled": {
-      "self": "You unsent a message",
-      "other": "This message was unsent"
+      "self": "You deleted a message",
+      "other": "{name} deleted a message"
     },
     "toast": {
       "deletedForMe": "Message deleted for you",
-      "recalled": "Message unsent for everyone",
+      "recalled": "Message deleted for everyone",
       "deleteFailed": "Failed to delete message"
     },
     "reportMessage": {
