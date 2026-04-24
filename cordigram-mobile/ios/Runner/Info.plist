@@ -55,8 +55,17 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Cordigram needs microphone access for livestream audio and mic test.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Cordigram needs microphone access to record voice messages in chat.</string>
+	<string>Cordigram needs microphone access for voice calls and voice messages.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Cordigram needs camera access for video calls.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Cordigram needs photo library access to attach images and videos in chat.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Cordigram uses the local network to route real-time call media.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>voip</string>
+	</array>
 </dict>
 </plist>

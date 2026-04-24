@@ -25,6 +25,7 @@ import { MessagesModule } from './messages/messages.module';
 import { DirectMessagesModule } from './direct-messages/direct-messages.module';
 import { PollsModule } from './polls/polls.module';
 import { LivekitModule } from './livekit/livekit.module';
+import { CallModule } from './call/call.module';
 import { ActivityModule } from './activity/activity.module';
 import { AdminModule } from './admin/admin.module';
 import { EventsModule } from './events/events.module';
@@ -64,6 +65,7 @@ import { MessagingProfilesModule } from './messaging-profiles/messaging-profiles
     DirectMessagesModule,
     PollsModule,
     LivekitModule,
+    CallModule,
     ActivityModule,
     AdminModule,
     EventsModule,

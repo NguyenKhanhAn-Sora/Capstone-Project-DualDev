@@ -117,7 +117,21 @@ export const useDirectMessages = ({
     useState<BoostEntitlementUpdatedEvent | null>(null);
 
   useEffect(() => {
-    if (!userId || !token) return;
+    if (!userId || !token) {
+      // Clear any residual call / presence state so a user logging out
+      // (or the session going anonymous) cannot inherit ringing popups,
+      // "call-answered" auto-join events, or stale online lists from the
+      // previous identity. Without this the very first call after
+      // re-login would re-fire old socket events from React state.
+      setCallEvent(null);
+      setCallEnded(null);
+      setUserTyping(null);
+      setMessagesRead(null);
+      setReactionUpdate(null);
+      setOnlineUsers(new Set());
+      setPresenceByUserId({});
+      return;
+    }
 
     const socket = io(
       `${process.env.NEXT_PUBLIC_API_BASE || "https://api.cordigram.com"}/direct-messages`,
@@ -232,7 +246,28 @@ export const useDirectMessages = ({
       }
     });
 
-    // Call-related events
+    // Call-related events.
+    //
+    // IMPORTANT: every one-shot call signal ("incoming" / "answer" /
+    // "rejected") auto-clears after a short delay. Without this, the
+    // `callEvent` state would stay pinned to the last signal forever and
+    // any downstream `useEffect` that lists `callEvent` in its deps would
+    // re-fire the handler every time a sibling dep (e.g. `outgoingCall`)
+    // changed. That is exactly what caused:
+    //   - Bug 3: user A starts a new call → the effect re-runs with a
+    //     stale "incoming" callEvent from user C and the wrong incoming
+    //     popup flashes on screen.
+    //   - Bug 4: after logout / relogin, the user presses "video call"
+    //     and the stale "answer" callEvent resurrects openCallTab(),
+    //     skipping the accept/reject step.
+    // We only clear if the in-flight event is still the same reference,
+    // so a newer socket event replacing it won't get wiped prematurely.
+    const scheduleClearCallEvent = (evt: CallEvent, delayMs = 1200) => {
+      setTimeout(() => {
+        setCallEvent((prev) => (prev === evt ? null : prev));
+      }, delayMs);
+    };
+
     socket.on(
       "call-incoming",
       (data: {
@@ -245,28 +280,38 @@ export const useDirectMessages = ({
           avatar?: string;
         };
       }) => {
-        if (data.callerInfo) {
-        } else {
+        if (!data.callerInfo) {
           console.error("❌ [SOCKET] callerInfo is UNDEFINED or NULL!");
         }
-        setCallEvent({ ...data, callSignal: "incoming" });
+        const evt: CallEvent = { ...data, callSignal: "incoming" };
+        setCallEvent(evt);
+        scheduleClearCallEvent(evt);
       },
     );
 
     socket.on("call-answer", (data: { from: string; sdpOffer: any }) => {
-      setCallEvent({ ...data, callSignal: "answer" });
+      const evt: CallEvent = { ...data, callSignal: "answer" };
+      setCallEvent(evt);
+      scheduleClearCallEvent(evt);
     });
 
     socket.on("call-rejected", (data: { from: string }) => {
-      setCallEvent({ from: data.from, callSignal: "rejected" });
+      const evt: CallEvent = { from: data.from, callSignal: "rejected" };
+      setCallEvent(evt);
+      scheduleClearCallEvent(evt);
     });
 
     socket.on("ice-candidate", (data: { from: string; candidate: any }) => {
-      setCallEvent({
+      const evt: CallEvent = {
         from: data.from,
         candidate: data.candidate,
         callSignal: "ice",
-      });
+      };
+      setCallEvent(evt);
+      // ICE candidates are high-frequency; clear even faster so they
+      // can't linger and piggyback into the "answer"/"incoming"
+      // branches of the downstream useEffect.
+      scheduleClearCallEvent(evt, 500);
     });
 
     socket.on("call-ended", (data: { from: string }) => {
