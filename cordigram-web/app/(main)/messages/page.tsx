@@ -4153,7 +4153,7 @@ export default function MessagesPage() {
 
       setToastMessage(
         deleteType === "for-everyone"
-          ? t("chat.toast.recalled") || "Đã thu hồi tin nhắn với mọi người"
+          ? t("chat.toast.recalled") || "Đã xóa tin nhắn với mọi người"
           : t("chat.toast.deletedForMe") || "Bạn đã xóa một tin nhắn",
       );
       setTimeout(() => setToastMessage(null), 3000);
@@ -5601,10 +5601,22 @@ export default function MessagesPage() {
       // "Delete for everyone" / unsend — preserve the bubble footprint so the
       // surrounding layout (avatars, reactions, read receipts) doesn't jump,
       // but replace the payload with a greyed-out italic placeholder.
+      //
+      // The placeholder is personalised so the deletor sees "You deleted a
+      // message" while the other side sees "{senderName} deleted a message"
+      // (matches the spec: identify who removed the message in chat).
       if (message.isDeletedForEveryone) {
+        const senderName =
+          message.senderDisplayName ||
+          message.senderName ||
+          message.senderEmail ||
+          t("chat.welcome.unknownUser") ||
+          "Người dùng";
         const label = message.isFromCurrentUser
-          ? t("chat.messageRecalled.self") || "Bạn đã thu hồi một tin nhắn"
-          : t("chat.messageRecalled.other") || "Tin nhắn đã bị thu hồi";
+          ? t("chat.messageRecalled.self") || "Bạn đã xóa tin nhắn"
+          : (
+              t("chat.messageRecalled.other") || "{name} đã xóa tin nhắn"
+            ).replace("{name}", senderName);
         return (
           <span
             style={{
