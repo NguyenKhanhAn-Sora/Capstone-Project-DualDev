@@ -50,6 +50,9 @@ async function toJson<T>(res: Response): Promise<T> {
 export async function apiFetch<T = unknown>(options: FetchOptions): Promise<T> {
   const { path, headers, ...rest } = options;
   const url = `${apiBaseUrl}${path.startsWith("/") ? "" : "/"}${path}`;
+  const method = String(rest.method ?? "GET").toUpperCase();
+  /** Sending `Content-Type: application/json` with no body breaks some stacks (strict parsers / proxies) and can surface as 500 on DELETE. */
+  const hasBody = rest.body !== undefined && rest.body !== null;
   const deviceId =
     typeof window !== "undefined"
       ? window.localStorage.getItem("cordigramDeviceId")
@@ -59,9 +62,16 @@ export async function apiFetch<T = unknown>(options: FetchOptions): Promise<T> {
       ? new URLSearchParams(window.location.search).get("admin_preview")
       : null;
   const mergedHeaders: Record<string, string> = {
-    "Content-Type": "application/json",
     ...(headers || {}),
   } as Record<string, string>;
+  const callerSetContentType =
+    Boolean(mergedHeaders["Content-Type"] || mergedHeaders["content-type"]);
+  const skipDefaultJsonContentType =
+    !hasBody &&
+    (method === "DELETE" || method === "GET" || method === "HEAD");
+  if (!callerSetContentType && !skipDefaultJsonContentType) {
+    mergedHeaders["Content-Type"] = "application/json";
+  }
   if (deviceId && !mergedHeaders["x-device-id"]) {
     mergedHeaders["x-device-id"] = deviceId;
   }
@@ -3640,16 +3650,35 @@ export async function deleteDirectMessage(
     localStorage.getItem("accessToken") ||
     localStorage.getItem("token");
 
-  return apiFetch<any>({
-    path: `/direct-messages/${messageId}`,
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      deleteType,
-    }),
-  });
+  const id = encodeURIComponent(messageId);
+  const authHeaders = { Authorization: `Bearer ${token}` };
+
+  // Primary: POST — many hosts/proxies mishandle DELETE; POST + JSON body is reliable.
+  const postPath =
+    deleteType === "for-everyone"
+      ? `/direct-messages/${id}/delete-for-everyone`
+      : `/direct-messages/${id}/delete-for-me`;
+
+  try {
+    return await apiFetch<any>({
+      path: postPath,
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({}),
+    });
+  } catch (e: unknown) {
+    const status = (e as { status?: number })?.status;
+    // Older backends: only DELETE …/for-everyone exists
+    if (status === 404) {
+      const suffix = deleteType === "for-everyone" ? "for-everyone" : "for-me";
+      return apiFetch<any>({
+        path: `/direct-messages/${id}/${suffix}`,
+        method: "DELETE",
+        headers: authHeaders,
+      });
+    }
+    throw e;
+  }
 }
 
 export async function addMessageReaction(

@@ -311,15 +311,22 @@ export class DirectMessagesService {
     receiverId: string;
     isDeletedForEveryone: boolean;
   }> {
+    if (!Types.ObjectId.isValid(messageId)) {
+      throw new BadRequestException(`Invalid message id: ${messageId}`);
+    }
+
     const message = await this.directMessageModel.findById(messageId);
 
     if (!message) {
       throw new NotFoundException(`Message with id ${messageId} not found`);
     }
 
+    if (!Types.ObjectId.isValid(userId) || String(userId).length !== 24) {
+      throw new BadRequestException('Invalid user id');
+    }
     const userObjectId = new Types.ObjectId(userId);
-    const senderIdStr = message.senderId.toString();
-    const receiverIdStr = message.receiverId.toString();
+    const senderIdStr = this.participantUserIdString(message.senderId);
+    const receiverIdStr = this.participantUserIdString(message.receiverId);
 
     // Check if user is involved in this conversation
     const isInvolved = senderIdStr === userId || receiverIdStr === userId;
@@ -352,16 +359,43 @@ export class DirectMessagesService {
       }
 
       const deletedAt = new Date();
-      message.isDeleted = true;
-      message.deletedAt = deletedAt;
-      // Wipe payload so the recalled message cannot leak old content to any
-      // client that still holds a stale copy.
-      message.content = '';
-      message.attachments = [];
-      message.giphyId = null;
-      message.voiceUrl = null;
-      message.voiceDuration = null;
-      await message.save();
+      // Use the underlying MongoDB collection, not `Model#updateOne`, so
+      // Mongoose document validation / `required: content` never runs. That
+      // validation is what used to 500 the API when we cleared payload fields.
+      // Zero-width content keeps text-index / empty-string edge cases happy;
+      // the app renders placeholder text from `isDeleted`, not this string.
+      const contentPlaceholder = '\u200b';
+      const filter = { _id: message._id };
+      const fullRecall = {
+        isDeleted: true,
+        deletedAt,
+        content: contentPlaceholder,
+        attachments: [] as string[],
+        giphyId: null as string | null,
+        voiceUrl: null as string | null,
+        voiceDuration: null as number | null,
+        reactions: [] as Array<{ userId: Types.ObjectId; emoji: string }>,
+      };
+      try {
+        const r = await this.directMessageModel.collection.updateOne(filter, {
+          $set: fullRecall,
+        });
+        if (!r.acknowledged || r.matchedCount === 0) {
+          throw new Error('Mongo update missed the document');
+        }
+      } catch (_first) {
+        // Narrow update: avoids rare driver / validator issues on mixed fields.
+        const r2 = await this.directMessageModel.collection.updateOne(filter, {
+          $set: {
+            isDeleted: true,
+            deletedAt,
+            content: contentPlaceholder,
+          },
+        });
+        if (!r2.acknowledged || r2.matchedCount === 0) {
+          throw new NotFoundException(`Message with id ${messageId} not found`);
+        }
+      }
 
       return {
         deleteType: 'for-everyone',
@@ -373,11 +407,12 @@ export class DirectMessagesService {
       };
     }
 
-    // for-me: add current user to deletedFor (idempotent push)
-    if (!message.deletedFor.some((id) => id.toString() === userId)) {
-      message.deletedFor.push(userObjectId);
-      await message.save();
-    }
+    // for-me: add current user to deletedFor (idempotent push via $addToSet).
+    // Same as above: use native collection to avoid any Mongoose validation.
+    await this.directMessageModel.collection.updateOne(
+      { _id: message._id },
+      { $addToSet: { deletedFor: userObjectId } },
+    );
 
     return {
       deleteType: 'for-me',
@@ -830,6 +865,28 @@ export class DirectMessagesService {
       console.error('Error getting pinned messages:', error);
       return [];
     }
+  }
+
+  /** Normalize senderId / receiverId whether stored as ObjectId, string, or populated lean doc. */
+  private participantUserIdString(ref: unknown): string {
+    if (ref == null) {
+      throw new BadRequestException('Message is missing sender or receiver');
+    }
+    if (typeof ref === 'string') {
+      return ref;
+    }
+    if (ref instanceof Types.ObjectId) {
+      return ref.toHexString();
+    }
+    const asDoc = ref as { _id?: unknown };
+    if (asDoc._id != null) {
+      return this.participantUserIdString(asDoc._id);
+    }
+    const maybeToString = (ref as { toString?: () => string }).toString?.();
+    if (typeof maybeToString === 'string' && Types.ObjectId.isValid(maybeToString)) {
+      return new Types.ObjectId(maybeToString).toHexString();
+    }
+    throw new BadRequestException('Invalid sender or receiver on message');
   }
 
   private escapeRegexFragment(s: string): string {

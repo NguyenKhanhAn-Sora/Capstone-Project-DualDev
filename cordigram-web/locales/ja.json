@@ -227,12 +227,12 @@
       "deleteForEveryone": "全員から削除"
     },
     "messageRecalled": {
-      "self": "メッセージの送信を取り消しました",
-      "other": "メッセージは取り消されました"
+      "self": "あなたがメッセージを削除しました",
+      "other": "{name} さんがメッセージを削除しました"
     },
     "toast": {
       "deletedForMe": "メッセージを削除しました",
-      "recalled": "全員のメッセージを取り消しました",
+      "recalled": "全員のメッセージを削除しました",
       "deleteFailed": "メッセージを削除できませんでした"
     },
     "reportMessage": {

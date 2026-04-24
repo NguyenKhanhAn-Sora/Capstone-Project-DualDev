@@ -227,12 +227,12 @@
       "deleteForEveryone": "Xóa với mọi người"
     },
     "messageRecalled": {
-      "self": "Bạn đã thu hồi một tin nhắn",
-      "other": "Tin nhắn đã bị thu hồi"
+      "self": "Bạn đã xóa tin nhắn",
+      "other": "{name} đã xóa tin nhắn"
     },
     "toast": {
       "deletedForMe": "Bạn đã xóa một tin nhắn",
-      "recalled": "Đã thu hồi tin nhắn với mọi người",
+      "recalled": "Đã xóa tin nhắn với mọi người",
       "deleteFailed": "Không thể xóa tin nhắn"
     },
     "reportMessage": {
