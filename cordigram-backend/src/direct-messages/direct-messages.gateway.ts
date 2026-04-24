@@ -208,6 +208,33 @@ export class DirectMessagesGateway
     }
   }
 
+  emitMessageDeleted(payload: {
+    messageId: string;
+    senderId: string;
+    receiverId: string;
+    deleteType: 'for-everyone' | 'for-me';
+    deletedAt: string;
+  }) {
+    const body = {
+      messageId: payload.messageId,
+      deleteType: payload.deleteType,
+      deletedAt: payload.deletedAt,
+      senderId: payload.senderId,
+      receiverId: payload.receiverId,
+      // Back-compat alias per spec: { type: "message_unsent", messageId }
+      type: 'message_unsent',
+    };
+
+    // Send to both participants so every open client updates instantly.
+    for (const uid of [payload.senderId, payload.receiverId]) {
+      const sockets = this.connectedUsers.get(uid);
+      if (!sockets || sockets.size === 0) continue;
+      for (const sid of sockets) {
+        this.server.to(sid).emit('message-deleted', body);
+      }
+    }
+  }
+
   emitNewDirectMessageFromRest(payload: {
     senderId: string;
     receiverId: string;
@@ -485,6 +512,44 @@ export class DirectMessagesGateway
       }
     } catch (error) {
       console.error('Error marking conversation as read:', error);
+    }
+  }
+
+  @SubscribeMessage('delete-message')
+  async handleDeleteMessage(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody()
+    data: {
+      messageId: string;
+      deleteType?: 'for-everyone' | 'for-me';
+      receiverId?: string;
+    },
+  ) {
+    try {
+      const userId = socket.data.userId;
+      if (!userId || !data?.messageId) return;
+      const requested = data.deleteType;
+      const deleteType: 'for-everyone' | 'for-me' =
+        requested === 'for-everyone' ? 'for-everyone' : 'for-me';
+
+      // Service is idempotent, so double-invoking (REST + socket) is safe.
+      const result = await this.directMessagesService.deleteDirectMessage(
+        data.messageId,
+        userId,
+        deleteType,
+      );
+
+      if (result.deleteType === 'for-everyone') {
+        this.emitMessageDeleted({
+          messageId: result.messageId,
+          senderId: result.senderId,
+          receiverId: result.receiverId,
+          deleteType: 'for-everyone',
+          deletedAt: result.deletedAt.toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error('Error handling delete-message socket event:', error);
     }
   }
 

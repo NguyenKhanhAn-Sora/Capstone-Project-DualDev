@@ -303,7 +303,14 @@ export class DirectMessagesService {
     messageId: string,
     userId: string,
     deleteType: 'for-everyone' | 'for-me' = 'for-me',
-  ): Promise<{ deleteType: string; deletedAt: Date }> {
+  ): Promise<{
+    deleteType: 'for-everyone' | 'for-me';
+    deletedAt: Date;
+    messageId: string;
+    senderId: string;
+    receiverId: string;
+    isDeletedForEveryone: boolean;
+  }> {
     const message = await this.directMessageModel.findById(messageId);
 
     if (!message) {
@@ -311,11 +318,11 @@ export class DirectMessagesService {
     }
 
     const userObjectId = new Types.ObjectId(userId);
+    const senderIdStr = message.senderId.toString();
+    const receiverIdStr = message.receiverId.toString();
 
     // Check if user is involved in this conversation
-    const isInvolved =
-      message.senderId.toString() === userId ||
-      message.receiverId.toString() === userId;
+    const isInvolved = senderIdStr === userId || receiverIdStr === userId;
 
     if (!isInvolved) {
       throw new ForbiddenException(
@@ -324,33 +331,62 @@ export class DirectMessagesService {
     }
 
     if (deleteType === 'for-everyone') {
-      // Only sender can delete for everyone
-      if (message.senderId.toString() !== userId) {
+      // Only the sender can delete a message for everyone.
+      if (senderIdStr !== userId) {
         throw new ForbiddenException(
           'Only the sender can delete message for everyone',
         );
       }
 
-      // Hard delete - mark as deleted for everyone
+      // Idempotent: if already deleted for everyone, return the existing state
+      // instead of throwing, so the client + sockets can safely retry.
+      if (message.isDeleted) {
+        return {
+          deleteType: 'for-everyone',
+          deletedAt: message.deletedAt ?? new Date(),
+          messageId: message._id.toString(),
+          senderId: senderIdStr,
+          receiverId: receiverIdStr,
+          isDeletedForEveryone: true,
+        };
+      }
+
+      const deletedAt = new Date();
       message.isDeleted = true;
+      message.deletedAt = deletedAt;
+      // Wipe payload so the recalled message cannot leak old content to any
+      // client that still holds a stale copy.
+      message.content = '';
+      message.attachments = [];
+      message.giphyId = null;
+      message.voiceUrl = null;
+      message.voiceDuration = null;
       await message.save();
 
       return {
         deleteType: 'for-everyone',
-        deletedAt: new Date(),
-      };
-    } else {
-      // Soft delete - only hide for this user
-      if (!message.deletedFor.some((id) => id.toString() === userId)) {
-        message.deletedFor.push(userObjectId);
-        await message.save();
-      }
-
-      return {
-        deleteType: 'for-me',
-        deletedAt: new Date(),
+        deletedAt,
+        messageId: message._id.toString(),
+        senderId: senderIdStr,
+        receiverId: receiverIdStr,
+        isDeletedForEveryone: true,
       };
     }
+
+    // for-me: add current user to deletedFor (idempotent push)
+    if (!message.deletedFor.some((id) => id.toString() === userId)) {
+      message.deletedFor.push(userObjectId);
+      await message.save();
+    }
+
+    return {
+      deleteType: 'for-me',
+      deletedAt: new Date(),
+      messageId: message._id.toString(),
+      senderId: senderIdStr,
+      receiverId: receiverIdStr,
+      isDeletedForEveryone: false,
+    };
   }
 
   async markAsRead(messageIds: string[], userId: string): Promise<void> {

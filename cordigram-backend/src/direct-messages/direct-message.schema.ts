@@ -74,6 +74,9 @@ export class DirectMessage extends Document {
   @Prop({ type: Boolean, default: false })
   isDeleted: boolean;
 
+  @Prop({ type: Date, default: null })
+  deletedAt: Date | null;
+
   @Prop({ type: [Types.ObjectId], default: [] })
   deletedFor: Types.ObjectId[];
 
