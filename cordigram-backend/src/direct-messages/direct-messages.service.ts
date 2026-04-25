@@ -885,7 +885,10 @@ export class DirectMessagesService {
       return this.participantUserIdString(asDoc._id);
     }
     const maybeToString = (ref as { toString?: () => string }).toString?.();
-    if (typeof maybeToString === 'string' && Types.ObjectId.isValid(maybeToString)) {
+    if (
+      typeof maybeToString === 'string' &&
+      Types.ObjectId.isValid(maybeToString)
+    ) {
       return new Types.ObjectId(maybeToString).toHexString();
     }
     throw new BadRequestException('Invalid sender or receiver on message');
@@ -893,6 +896,25 @@ export class DirectMessagesService {
 
   private escapeRegexFragment(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private buildLooseContentSearch(text: string): Record<string, unknown> {
+    const terms = text
+      .split(/\s+/)
+      .map((w) => w.trim())
+      .filter((w) => w.length > 0);
+    if (terms.length <= 1) {
+      const escaped = this.escapeRegexFragment(text.trim());
+      return { content: { $regex: escaped, $options: 'i' } };
+    }
+    return {
+      $and: terms.map((term) => ({
+        content: {
+          $regex: this.escapeRegexFragment(term),
+          $options: 'i',
+        },
+      })),
+    };
   }
 
   private async resolveSenderForDm(
@@ -936,7 +958,11 @@ export class DirectMessagesService {
       fuzzy?: boolean;
       parseQuery?: boolean;
     },
-  ): Promise<{ results: any[]; totalCount: number; parsed?: ParsedMessageSearch }> {
+  ): Promise<{
+    results: any[];
+    totalCount: number;
+    parsed?: ParsedMessageSearch;
+  }> {
     const {
       q,
       otherUserId,
@@ -1042,8 +1068,7 @@ export class DirectMessagesService {
         });
         contentExtra = { $text: { $search: text } };
       } catch {
-        const escaped = this.escapeRegexFragment(text);
-        contentExtra = { content: { $regex: escaped, $options: 'i' } };
+        contentExtra = this.buildLooseContentSearch(text);
       }
     }
 
@@ -1052,7 +1077,9 @@ export class DirectMessagesService {
     if (fuzzy && totalCount === 0 && text && !('$text' in contentExtra)) {
       const words = text.split(/\s+/).filter((w) => w.length > 0);
       if (words.length > 1) {
-        const pattern = words.map((w) => this.escapeRegexFragment(w)).join('.*');
+        const pattern = words
+          .map((w) => this.escapeRegexFragment(w))
+          .join('.*');
         contentExtra = { content: { $regex: pattern, $options: 'i' } };
         const retry = await runQuery(contentExtra);
         totalCount = retry.totalCount;
@@ -1060,9 +1087,8 @@ export class DirectMessagesService {
       }
     }
 
-    if (fuzzy && totalCount === 0 && text && '$text' in contentExtra) {
-      const escaped = this.escapeRegexFragment(text);
-      contentExtra = { content: { $regex: escaped, $options: 'i' } };
+    if (totalCount === 0 && text && '$text' in contentExtra) {
+      contentExtra = this.buildLooseContentSearch(text);
       const retry = await runQuery(contentExtra);
       totalCount = retry.totalCount;
       messages = retry.messages;

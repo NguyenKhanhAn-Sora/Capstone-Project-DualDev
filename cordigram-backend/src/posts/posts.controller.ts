@@ -46,7 +46,6 @@ export class PostsController {
     private readonly postsService: PostsService,
     private readonly config: ConfigService,
     private readonly boostService: BoostService,
-
   ) {}
 
   private resolveAdminPreviewViewerId(
@@ -310,7 +309,9 @@ export class PostsController {
     const maxBytes = isCordigramMessagesUpload(req)
       ? status.limits.maxUploadBytes
       : FREE_MAX_UPLOAD_BYTES;
-    const tooLarge = files.find((f) => typeof f.size === 'number' && f.size > maxBytes);
+    const tooLarge = files.find(
+      (f) => typeof f.size === 'number' && f.size > maxBytes,
+    );
     if (tooLarge) {
       throw new BadRequestException(`File too large (max ${maxBytes} bytes)`);
     }

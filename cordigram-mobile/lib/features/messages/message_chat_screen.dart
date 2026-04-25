@@ -1330,34 +1330,34 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                   _showCustomReactionPicker(message);
                 },
               ),
-              if (isMine)
-                ListTile(
-                  leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                  title: const Text(
-                    'Xóa tin nhắn',
-                    style: TextStyle(color: Colors.redAccent),
-                  ),
-                  onTap: () async {
-                    Navigator.of(ctx).pop();
-                    final deleteType = await showModalBottomSheet<String>(
-                      context: context,
-                      backgroundColor: const Color(0xFF0B1424),
-                      builder: (dCtx) {
-                        return SafeArea(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ListTile(
-                                leading: const Icon(
-                                  Icons.delete_outline,
-                                  color: Colors.white,
-                                ),
-                                title: const Text(
-                                  'Xóa ở phía tôi',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                                onTap: () => Navigator.of(dCtx).pop('for-me'),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                title: const Text(
+                  'Xóa tin nhắn',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+                onTap: () async {
+                  Navigator.of(ctx).pop();
+                  final deleteType = await showModalBottomSheet<String>(
+                    context: context,
+                    backgroundColor: const Color(0xFF0B1424),
+                    builder: (dCtx) {
+                      return SafeArea(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ListTile(
+                              leading: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.white,
                               ),
+                              title: const Text(
+                                'Xóa ở phía tôi',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              onTap: () => Navigator.of(dCtx).pop('for-me'),
+                            ),
+                            if (isMine)
                               ListTile(
                                 leading: const Icon(
                                   Icons.delete_forever_outlined,
@@ -1370,23 +1370,23 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                                 onTap: () =>
                                     Navigator.of(dCtx).pop('for-everyone'),
                               ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                    if (deleteType == null) return;
-                    await widget.controller.deleteDmMessage(
-                      peerUserId: widget.thread.id,
-                      messageId: message.id,
-                      deleteType: deleteType,
-                    );
-                    if (!mounted) return;
-                    setState(() {
-                      _messages = widget.controller.liveMessages(widget.thread.id);
-                    });
-                  },
-                ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                  if (deleteType == null) return;
+                  await widget.controller.deleteDmMessage(
+                    peerUserId: widget.thread.id,
+                    messageId: message.id,
+                    deleteType: deleteType,
+                  );
+                  if (!mounted) return;
+                  setState(() {
+                    _messages = widget.controller.liveMessages(widget.thread.id);
+                  });
+                },
+              ),
               const SizedBox(height: 10),
             ],
           ),

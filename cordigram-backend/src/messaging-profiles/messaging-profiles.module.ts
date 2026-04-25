@@ -1,6 +1,9 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { MessagingProfile, MessagingProfileSchema } from './messaging-profile.schema';
+import {
+  MessagingProfile,
+  MessagingProfileSchema,
+} from './messaging-profile.schema';
 import { MessagingProfilesService } from './messaging-profiles.service';
 import { MessagingProfilesController } from './messaging-profiles.controller';
 import { Profile, ProfileSchema } from '../profiles/profile.schema';

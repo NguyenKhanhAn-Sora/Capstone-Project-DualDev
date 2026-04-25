@@ -7,6 +7,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../message_home_screen.dart';
 import 'calls_api_service.dart';
 import 'dm_call_manager.dart';
 
@@ -60,7 +61,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   bool _frontCamera = true;
   bool _speakerOn = true;
   bool _hangupCalled = false;
-  bool _allowPopForMinimize = false;
+  bool _isMinimizeNavigating = false;
   DateTime? _connectedAt;
   Timer? _remoteLeavePending;
 
@@ -112,6 +113,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
           _remoteLeavePending?.cancel();
           _remoteLeavePending = null;
           _refreshParticipants();
+          unawaited(_applySpeakerState(_speakerOn));
         })
         ..on<ParticipantDisconnectedEvent>((event) {
           _refreshParticipants();
@@ -120,6 +122,9 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
           }
         })
         ..on<TrackSubscribedEvent>((_) => _refreshParticipants())
+        ..on<TrackSubscribedEvent>((_) {
+          unawaited(_applySpeakerState(_speakerOn));
+        })
         ..on<TrackUnsubscribedEvent>((_) => _refreshParticipants())
         ..on<TrackMutedEvent>((_) => _refreshParticipants())
         ..on<TrackUnmutedEvent>((_) => _refreshParticipants())
@@ -140,6 +145,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       try {
         await Hardware.instance.setSpeakerphoneOn(_speakerOn);
       } catch (_) {}
+      await _applySpeakerState(_speakerOn);
 
       if (!mounted) {
         await room.disconnect();
@@ -247,8 +253,25 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     final next = !_speakerOn;
     try {
       await Hardware.instance.setSpeakerphoneOn(next);
+      await _applySpeakerState(next);
       if (mounted) setState(() => _speakerOn = next);
     } catch (_) {}
+  }
+
+  Future<void> _applySpeakerState(bool on) async {
+    final room = _room;
+    if (room == null) return;
+    for (final remote in room.remoteParticipants.values) {
+      for (final pub in remote.audioTrackPublications) {
+        try {
+          if (on) {
+            await pub.enable();
+          } else {
+            await pub.disable();
+          }
+        } catch (_) {}
+      }
+    }
   }
 
   Future<bool> _ensureAndroidScreenShareForegroundService() async {
@@ -403,6 +426,14 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   void _popSelf() {
     if (!mounted) return;
     final nav = Navigator.of(context);
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      // When this call screen is minimized, another route (messages) sits on top.
+      // `Navigator.pop()` would close that top route instead of this one.
+      // Remove this specific call route directly to avoid leaving a ghost call UI.
+      nav.removeRoute(route);
+      return;
+    }
     if (nav.canPop()) {
       nav.pop();
     }
@@ -438,10 +469,9 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       // the "in call" UI after the user taps the end button. While the
       // call is live we still block accidental back-swipes / system back
       // and route them through _hangup instead.
-      canPop: _hangupCalled || _allowPopForMinimize,
+      canPop: _hangupCalled,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        if (_allowPopForMinimize) return;
         await _hangup();
       },
       child: Scaffold(
@@ -490,13 +520,19 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   }
 
   Future<void> _minimizeCall() async {
-    if (_hangupCalled || !mounted) return;
+    if (_hangupCalled || !mounted || _isMinimizeNavigating) return;
     final mgr = DmCallManager.instance;
     if (mgr.active == null) return;
     if (mgr.isCallMinimized) return;
     mgr.minimizeActiveCall();
-    setState(() => _allowPopForMinimize = true);
-    Navigator.of(context).pop();
+    _isMinimizeNavigating = true;
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const MessageHomeScreen()),
+      );
+    } finally {
+      _isMinimizeNavigating = false;
+    }
   }
 
   Widget _buildBody() {

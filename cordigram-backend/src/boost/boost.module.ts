@@ -1,6 +1,9 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { BoostEntitlement, BoostEntitlementSchema } from './boost-entitlement.schema';
+import {
+  BoostEntitlement,
+  BoostEntitlementSchema,
+} from './boost-entitlement.schema';
 import { BoostService } from './boost.service';
 import { DirectMessagesModule } from '../direct-messages/direct-messages.module';
 import { MessagesModule } from '../messages/messages.module';
@@ -17,4 +20,3 @@ import { MessagesModule } from '../messages/messages.module';
   exports: [BoostService],
 })
 export class BoostModule {}
-

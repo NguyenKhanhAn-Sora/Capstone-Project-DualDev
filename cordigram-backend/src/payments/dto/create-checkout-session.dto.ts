@@ -33,7 +33,9 @@ export class CreateCheckoutSessionDto {
   @IsString()
   targetCampaignId?: string;
 
-  @ValidateIf((o) => !['boost_subscribe', 'boost_gift'].includes(String(o.actionType)))
+  @ValidateIf(
+    (o) => !['boost_subscribe', 'boost_gift'].includes(String(o.actionType)),
+  )
   @IsInt()
   @Min(1000)
   amount!: number;
@@ -66,12 +68,16 @@ export class CreateCheckoutSessionDto {
   @IsString()
   adFormat?: string;
 
-  @ValidateIf((o) => !['boost_subscribe', 'boost_gift'].includes(String(o.actionType)))
+  @ValidateIf(
+    (o) => !['boost_subscribe', 'boost_gift'].includes(String(o.actionType)),
+  )
   @IsString()
   @IsNotEmpty()
   boostPackageId!: string;
 
-  @ValidateIf((o) => !['boost_subscribe', 'boost_gift'].includes(String(o.actionType)))
+  @ValidateIf(
+    (o) => !['boost_subscribe', 'boost_gift'].includes(String(o.actionType)),
+  )
   @IsString()
   @IsNotEmpty()
   durationPackageId!: string;

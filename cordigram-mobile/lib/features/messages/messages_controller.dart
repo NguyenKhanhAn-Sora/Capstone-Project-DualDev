@@ -317,7 +317,29 @@ class MessagesController extends ChangeNotifier {
     await DirectMessagesService.deleteMessage(messageId, deleteType: deleteType);
     final list = _messagesByUser[peerUserId];
     if (list == null || list.isEmpty) return;
-    list.removeWhere((m) => m.id == messageId);
+    if (deleteType == 'for-everyone') {
+      final idx = list.indexWhere((m) => m.id == messageId);
+      if (idx != -1) {
+        final old = list[idx];
+        list[idx] = DmMessage(
+          id: old.id,
+          senderId: old.senderId,
+          receiverId: old.receiverId,
+          content: 'Tin nhắn đã được thu hồi',
+          createdAt: old.createdAt,
+          type: 'text',
+          read: old.read,
+          voiceUrl: null,
+          voiceDurationSec: null,
+          giphyId: null,
+          replyTo: old.replyTo,
+          attachments: const <String>[],
+          reactions: const <MessageReaction>[],
+        );
+      }
+    } else {
+      list.removeWhere((m) => m.id == messageId);
+    }
     _messagesByUser[peerUserId] = list;
     notifyListeners();
   }

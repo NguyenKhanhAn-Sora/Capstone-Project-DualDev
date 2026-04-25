@@ -875,7 +875,7 @@ export class ServersService {
       createdAt: Date;
     } | null;
   }> {
-    const id = String(serverId || "").trim();
+    const id = String(serverId || '').trim();
     if (!Types.ObjectId.isValid(id)) {
       return { server: null };
     }
@@ -885,7 +885,7 @@ export class ServersService {
         $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
       })
       .select(
-        "name avatarUrl bannerUrl bannerImageUrl bannerColor members memberCount createdAt",
+        'name avatarUrl bannerUrl bannerImageUrl bannerColor members memberCount createdAt',
       )
       .lean()
       .exec();
@@ -897,7 +897,7 @@ export class ServersService {
     const stats = await this.getServerProfileStats(id);
     return {
       server: {
-        name: String((server as any).name || ""),
+        name: String((server as any).name || ''),
         avatarUrl: (server as any).avatarUrl ?? null,
         bannerUrl: (server as any).bannerUrl ?? null,
         bannerImageUrl: (server as any).bannerImageUrl ?? null,
@@ -1522,19 +1522,23 @@ export class ServersService {
       (m?.userId?._id ?? m?.userId).toString(),
     );
     memberIds.forEach((uid: string) => {
-      this.channelMessagesGateway.emitToUser(uid, 'server-member-profile-updated', {
-        serverId,
-        userId,
-        coverUrl: nextCover,
-        avatarUrl: undefined,
-        profileThemePrimaryHex: (update as any).serverProfileThemePrimaryHex,
-        profileThemeAccentHex: (update as any).serverProfileThemeAccentHex,
-        displayNameFontId: (update as any).serverDisplayNameFontId,
-        displayNameEffectId: (update as any).serverDisplayNameEffectId,
-        displayNamePrimaryHex: (update as any).serverDisplayNamePrimaryHex,
-        displayNameAccentHex: (update as any).serverDisplayNameAccentHex,
-        updatedAt: new Date().toISOString(),
-      });
+      this.channelMessagesGateway.emitToUser(
+        uid,
+        'server-member-profile-updated',
+        {
+          serverId,
+          userId,
+          coverUrl: nextCover,
+          avatarUrl: undefined,
+          profileThemePrimaryHex: (update as any).serverProfileThemePrimaryHex,
+          profileThemeAccentHex: (update as any).serverProfileThemeAccentHex,
+          displayNameFontId: (update as any).serverDisplayNameFontId,
+          displayNameEffectId: (update as any).serverDisplayNameEffectId,
+          displayNamePrimaryHex: (update as any).serverDisplayNamePrimaryHex,
+          displayNameAccentHex: (update as any).serverDisplayNameAccentHex,
+          updatedAt: new Date().toISOString(),
+        },
+      );
     });
   }
 
@@ -1569,13 +1573,17 @@ export class ServersService {
       (m?.userId?._id ?? m?.userId).toString(),
     );
     memberIds.forEach((uid: string) => {
-      this.channelMessagesGateway.emitToUser(uid, 'server-member-profile-updated', {
-        serverId,
-        userId,
-        avatarUrl: next,
-        coverUrl: undefined,
-        updatedAt: new Date().toISOString(),
-      });
+      this.channelMessagesGateway.emitToUser(
+        uid,
+        'server-member-profile-updated',
+        {
+          serverId,
+          userId,
+          avatarUrl: next,
+          coverUrl: undefined,
+          updatedAt: new Date().toISOString(),
+        },
+      );
     });
 
     return { avatarUrl: next };
@@ -1609,13 +1617,17 @@ export class ServersService {
       (m?.userId?._id ?? m?.userId).toString(),
     );
     memberIds.forEach((uid: string) => {
-      this.channelMessagesGateway.emitToUser(uid, 'server-member-profile-updated', {
-        serverId,
-        userId,
-        avatarUrl: null,
-        coverUrl: undefined,
-        updatedAt: new Date().toISOString(),
-      });
+      this.channelMessagesGateway.emitToUser(
+        uid,
+        'server-member-profile-updated',
+        {
+          serverId,
+          userId,
+          avatarUrl: null,
+          coverUrl: undefined,
+          updatedAt: new Date().toISOString(),
+        },
+      );
     });
 
     return { avatarUrl: null };
@@ -4016,9 +4028,7 @@ export class ServersService {
     for (const s of servers) {
       const stickersRaw = (s as any).customStickers || [];
       if (!Array.isArray(stickersRaw) || stickersRaw.length === 0) continue;
-      const locked = ctx
-        ? String(s._id) !== ctx && !hasBoost
-        : !hasBoost;
+      const locked = ctx ? String(s._id) !== ctx && !hasBoost : !hasBoost;
       const stickerOut = stickersRaw.map((st: any) => {
         const prof = profileByUserId.get(String(st.addedByUserId));
         return {
@@ -4262,9 +4272,7 @@ export class ServersService {
     for (const s of servers) {
       const emojisRaw = (s as any).customEmojis || [];
       if (!Array.isArray(emojisRaw) || emojisRaw.length === 0) continue;
-      const locked = ctx
-        ? String(s._id) !== ctx && !hasBoost
-        : !hasBoost;
+      const locked = ctx ? String(s._id) !== ctx && !hasBoost : !hasBoost;
       const emojiOut = emojisRaw.map((em: any) => {
         const prof = profileByUserId.get(String(em.addedByUserId));
         return {

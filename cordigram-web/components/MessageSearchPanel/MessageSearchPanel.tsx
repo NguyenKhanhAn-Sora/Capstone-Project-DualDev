@@ -368,7 +368,7 @@ export default function MessageSearchPanel({
             channelId: channelId || undefined,
             limit: LIMIT,
             offset: currentOffset,
-            fuzzy: false,
+            fuzzy: true,
             parseQuery: true,
           });
           if (append) {
@@ -396,7 +396,7 @@ export default function MessageSearchPanel({
             userId: dmPartnerId || undefined,
             limit: LIMIT,
             offset: currentOffset,
-            fuzzy: false,
+            fuzzy: true,
             parseQuery: !dmConversationOnlySearch,
           });
           if (append) {

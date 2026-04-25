@@ -62,7 +62,6 @@ export class ServersController {
     private readonly boostService: BoostService,
   ) {}
 
-
   /**
    * Explore servers list (approved only)
    */
@@ -125,7 +124,7 @@ export class ServersController {
    */
   @Get('embed-preview')
   async getServerEmbedPreview(@Query('id') serverId: string | undefined) {
-    const id = String(serverId || "").trim();
+    const id = String(serverId || '').trim();
     if (!id) return { server: null };
     return this.serversService.getServerEmbedPreview(id);
   }
@@ -801,7 +800,10 @@ export class ServersController {
     },
     @Request() req: any,
   ) {
-    const next = (body?.coverUrl ?? null) === null ? null : String(body?.coverUrl ?? '').trim();
+    const next =
+      (body?.coverUrl ?? null) === null
+        ? null
+        : String(body?.coverUrl ?? '').trim();
     const isImageUrl = Boolean(next && /^https?:\/\//i.test(next));
     if (isImageUrl) {
       const accountBoost = Boolean(req?.user?.settings?.accountBoost);
@@ -809,7 +811,9 @@ export class ServersController {
       const boostedBy = Array.isArray((server as any)?.boostedByUserIds)
         ? (server as any).boostedByUserIds
         : [];
-      const serverBoost = boostedBy.some((x: any) => String(x) === String(req.user.userId));
+      const serverBoost = boostedBy.some(
+        (x: any) => String(x) === String(req.user.userId),
+      );
       const unlocked = accountBoost || serverBoost;
       if (!unlocked) {
         throw new ForbiddenException('Boost required for banner image');
@@ -860,7 +864,9 @@ export class ServersController {
         ? boost.limits.maxUploadBytes
         : MAX_AVATAR_BYTES
       : MAX_AVATAR_BYTES;
-    for (const f of [originalFile, croppedFile].filter(Boolean) as MulterFile[]) {
+    for (const f of [originalFile, croppedFile].filter(
+      Boolean,
+    ) as MulterFile[]) {
       if (typeof f.size === 'number' && f.size > maxAvatarBytes) {
         throw new BadRequestException(
           `File too large (max ${maxAvatarBytes} bytes)`,
@@ -885,15 +891,12 @@ export class ServersController {
 
     if (isGif) {
       const accountBoost = Boolean(req?.user?.settings?.accountBoost);
-      const boostedBy = (req as any)?.serverBoostedByUserIds as
-        | string[]
-        | undefined;
+      const boostedBy = req?.serverBoostedByUserIds as string[] | undefined;
       const serverBoost =
         Array.isArray(boostedBy) && userId
           ? boostedBy.some((x) => String(x) === userId)
           : false;
-      const unlocked =
-        accountBoost || serverBoost || Boolean(boost?.active);
+      const unlocked = accountBoost || serverBoost || Boolean(boost?.active);
       if (!unlocked) {
         throw new BadRequestException('Boost required for GIF avatar');
       }
@@ -933,7 +936,10 @@ export class ServersController {
   }
 
   @Delete(':id/me/avatar')
-  async resetMyServerAvatar(@Param('id') serverId: string, @Request() req: any) {
+  async resetMyServerAvatar(
+    @Param('id') serverId: string,
+    @Request() req: any,
+  ) {
     return this.serversService.resetMyServerAvatar(serverId, req.user.userId);
   }
 

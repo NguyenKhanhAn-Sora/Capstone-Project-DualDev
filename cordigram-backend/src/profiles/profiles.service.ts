@@ -431,10 +431,12 @@ export class ProfilesService {
     }
 
     if (data.profileThemePrimaryHex !== undefined) {
-      profile.profileThemePrimaryHex = data.profileThemePrimaryHex?.trim() || null;
+      profile.profileThemePrimaryHex =
+        data.profileThemePrimaryHex?.trim() || null;
     }
     if (data.profileThemeAccentHex !== undefined) {
-      profile.profileThemeAccentHex = data.profileThemeAccentHex?.trim() || null;
+      profile.profileThemeAccentHex =
+        data.profileThemeAccentHex?.trim() || null;
     }
     if (data.displayNameFontId !== undefined) {
       profile.displayNameFontId = data.displayNameFontId?.trim() || null;
@@ -443,7 +445,8 @@ export class ProfilesService {
       profile.displayNameEffectId = data.displayNameEffectId?.trim() || null;
     }
     if (data.displayNamePrimaryHex !== undefined) {
-      profile.displayNamePrimaryHex = data.displayNamePrimaryHex?.trim() || null;
+      profile.displayNamePrimaryHex =
+        data.displayNamePrimaryHex?.trim() || null;
     }
     if (data.displayNameAccentHex !== undefined) {
       profile.displayNameAccentHex = data.displayNameAccentHex?.trim() || null;
@@ -966,8 +969,7 @@ export class ProfilesService {
       (ownerSettings?.showCordigramMemberSince as boolean | undefined) !==
       false;
     const cordigramMemberSince =
-      showMemberSince &&
-      (ownerUser as { createdAt?: Date }).createdAt
+      showMemberSince && (ownerUser as { createdAt?: Date }).createdAt
         ? new Date(
             (ownerUser as { createdAt: Date }).createdAt,
           ).toLocaleDateString('vi-VN', {

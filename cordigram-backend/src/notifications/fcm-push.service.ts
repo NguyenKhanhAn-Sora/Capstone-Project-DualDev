@@ -188,8 +188,8 @@ export class FcmPushService {
     const actorName = item.actor.username.trim().length
       ? `@${item.actor.username.trim()}`
       : item.actor.displayName.trim().length
-      ? item.actor.displayName.trim()
-      : 'Someone';
+        ? item.actor.displayName.trim()
+        : 'Someone';
 
     switch (item.type) {
       case 'follow':

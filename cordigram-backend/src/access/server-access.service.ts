@@ -699,7 +699,12 @@ export class ServerAccessService {
       })
       .catch(() => {});
 
-    this.notifyJoinApplicationUpdated(server, serverId, targetUserId, 'rejected');
+    this.notifyJoinApplicationUpdated(
+      server,
+      serverId,
+      targetUserId,
+      'rejected',
+    );
 
     return updated as any;
   }
@@ -955,8 +960,7 @@ export class ServerAccessService {
     const isBypass = isOwner || canManageServer;
 
     /** Thành viên trong members nhưng chưa có UserServer (dữ liệu cũ) — không áp dụng ngược gate tuổi/quy định. */
-    const legacyMemberNoUserServerRow =
-      !doc && rawMemberJoinedAt != null;
+    const legacyMemberNoUserServerRow = !doc && rawMemberJoinedAt != null;
 
     const birthdate = (profileRow as any)?.birthdate ?? null;
     const accountCreatedAt = new Date(
@@ -993,12 +997,8 @@ export class ServerAccessService {
     const applyJoinAccepted =
       accessMode === 'apply' && (doc as any)?.status === 'accepted';
     const chatViewBlocked =
-      !gate.allowed &&
-      !(
-        applyJoinAccepted &&
-        gate.reason === 'verification'
-      );
-    const chatBlockReason = chatViewBlocked ? gate.reason ?? null : null;
+      !gate.allowed && !(applyJoinAccepted && gate.reason === 'verification');
+    const chatBlockReason = chatViewBlocked ? (gate.reason ?? null) : null;
 
     const ageYears = calcAgeFromBirthdate(birthdate);
 
@@ -1345,7 +1345,12 @@ export class ServerAccessService {
       })
       .catch(() => {});
 
-    this.notifyJoinApplicationUpdated(server, serverId, targetUserId, 'accepted');
+    this.notifyJoinApplicationUpdated(
+      server,
+      serverId,
+      targetUserId,
+      'accepted',
+    );
 
     return updated as any;
   }

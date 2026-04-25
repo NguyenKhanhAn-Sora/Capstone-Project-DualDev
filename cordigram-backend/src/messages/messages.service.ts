@@ -295,7 +295,9 @@ export class MessagesService {
       serverLean ||
       ((await this.serverModel
         .findById(serverId)
-        .select('ownerId members safetySettings isAgeRestricted isPublic accessMode')
+        .select(
+          'ownerId members safetySettings isAgeRestricted isPublic accessMode',
+        )
         .lean()
         .exec()) as Record<string, unknown> | null);
     if (!server) return { allowed: false, reason: 'verification' };
@@ -338,8 +340,7 @@ export class MessagesService {
       ? new Date(memberRow.joinedAt)
       : null;
 
-    const legacyMemberNoUserServerRow =
-      !usDoc && rawMemberJoinedAt != null;
+    const legacyMemberNoUserServerRow = !usDoc && rawMemberJoinedAt != null;
     const ageAckForGate =
       isBypass ||
       Boolean((usDoc as any)?.ageRestrictedAcknowledged) ||
@@ -683,7 +684,7 @@ export class MessagesService {
       const sourceServerId =
         sourceServerIdRaw && Types.ObjectId.isValid(sourceServerIdRaw)
           ? sourceServerIdRaw
-          : channel.serverId?.toString?.() ?? String(channel.serverId);
+          : (channel.serverId?.toString?.() ?? String(channel.serverId));
 
       const isCrossServerSticker =
         String(sourceServerId) !==
@@ -1027,9 +1028,7 @@ export class MessagesService {
 
     const allSenderIds: string[] = [
       ...new Set(
-        messages.map((m: any) =>
-          String((m.senderId as any)?._id ?? m.senderId),
-        ),
+        messages.map((m: any) => String(m.senderId?._id ?? m.senderId)),
       ),
     ];
     const mutedSenders = await this.mentionMuteService.listMutedSendersForOwner(
@@ -1184,7 +1183,9 @@ export class MessagesService {
 
       const serverForGate = await this.serverModel
         .findById(channel.serverId)
-        .select('ownerId members safetySettings isAgeRestricted isPublic accessMode')
+        .select(
+          'ownerId members safetySettings isAgeRestricted isPublic accessMode',
+        )
         .lean()
         .exec();
       const gate = await this.resolveChannelChatGate(
@@ -1375,7 +1376,9 @@ export class MessagesService {
   }> {
     const canView = await this.userCanJoinChannelRoom(channelId, userId);
     if (!canView) {
-      throw new ForbiddenException('Bạn không được phép thao tác trên kênh này');
+      throw new ForbiddenException(
+        'Bạn không được phép thao tác trên kênh này',
+      );
     }
 
     if (!Types.ObjectId.isValid(messageId)) {
@@ -1586,6 +1589,25 @@ export class MessagesService {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
+  private buildLooseContentSearch(text: string): Record<string, unknown> {
+    const terms = text
+      .split(/\s+/)
+      .map((w) => w.trim())
+      .filter((w) => w.length > 0);
+    if (terms.length <= 1) {
+      const escaped = this.escapeRegexFragment(text.trim());
+      return { content: { $regex: escaped, $options: 'i' } };
+    }
+    return {
+      $and: terms.map((term) => ({
+        content: {
+          $regex: this.escapeRegexFragment(term),
+          $options: 'i',
+        },
+      })),
+    };
+  }
+
   private async resolveChannelForSearch(
     serverId: string,
     raw: string,
@@ -1713,7 +1735,8 @@ export class MessagesService {
         .lean()
         .exec();
       const channelIds = channels.map((c) => c._id);
-      if (channelIds.length === 0) return { results: [], totalCount: 0, parsed };
+      if (channelIds.length === 0)
+        return { results: [], totalCount: 0, parsed };
       match.channelId = { $in: channelIds };
     }
 
@@ -1744,8 +1767,7 @@ export class MessagesService {
     }
 
     const hasImageFilter = parsed.filters.has === 'image';
-    const hasFileFilter =
-      Boolean(hasFile) || parsed.filters.has === 'file';
+    const hasFileFilter = Boolean(hasFile) || parsed.filters.has === 'file';
 
     if (hasImageFilter) {
       match.$and = match.$and || [];
@@ -1798,22 +1820,18 @@ export class MessagesService {
         });
         contentExtra = { $text: { $search: text } };
       } catch {
-        const escaped = this.escapeRegexFragment(text);
-        contentExtra = { content: { $regex: escaped, $options: 'i' } };
+        contentExtra = this.buildLooseContentSearch(text);
       }
     }
 
     let { totalCount, messages } = await runQuery(contentExtra);
 
-    if (
-      fuzzy &&
-      totalCount === 0 &&
-      text &&
-      !('$text' in contentExtra)
-    ) {
+    if (fuzzy && totalCount === 0 && text && !('$text' in contentExtra)) {
       const words = text.split(/\s+/).filter((w) => w.length > 0);
       if (words.length > 1) {
-        const pattern = words.map((w) => this.escapeRegexFragment(w)).join('.*');
+        const pattern = words
+          .map((w) => this.escapeRegexFragment(w))
+          .join('.*');
         contentExtra = { content: { $regex: pattern, $options: 'i' } };
         const retry = await runQuery(contentExtra);
         totalCount = retry.totalCount;
@@ -1821,9 +1839,8 @@ export class MessagesService {
       }
     }
 
-    if (fuzzy && totalCount === 0 && text && '$text' in contentExtra) {
-      const escaped = this.escapeRegexFragment(text);
-      contentExtra = { content: { $regex: escaped, $options: 'i' } };
+    if (totalCount === 0 && text && '$text' in contentExtra) {
+      contentExtra = this.buildLooseContentSearch(text);
       const retry = await runQuery(contentExtra);
       totalCount = retry.totalCount;
       messages = retry.messages;

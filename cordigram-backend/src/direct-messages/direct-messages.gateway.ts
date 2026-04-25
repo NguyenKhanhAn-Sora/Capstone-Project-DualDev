@@ -120,13 +120,12 @@ export class DirectMessagesGateway
     opts?: { bumpActivity?: boolean },
   ) {
     const now = Date.now();
-    const prev =
-      this.presence.get(userId) ?? {
-        status: 'offline' as const,
-        lastActiveAt: now,
-        idleTimer: undefined as NodeJS.Timeout | undefined,
-        sharePresence: true,
-      };
+    const prev = this.presence.get(userId) ?? {
+      status: 'offline' as const,
+      lastActiveAt: now,
+      idleTimer: undefined as NodeJS.Timeout | undefined,
+      sharePresence: true,
+    };
 
     const sharePresence = prev.sharePresence;
     const lastActiveAt = opts?.bumpActivity ? now : prev.lastActiveAt;
@@ -299,7 +298,6 @@ export class DirectMessagesGateway
 
       // Mark as online (or keep offline for others if sharePresence=false)
       this.setPresence(userId, 'online', { bumpActivity: true });
-
     } catch (error) {
       console.error('Connection error:', error);
       socket.disconnect();
@@ -322,7 +320,6 @@ export class DirectMessagesGateway
         this.setPresence(userId, 'offline');
         this.dmPresenceSubs.delete(userId);
       }
-
     }
   }
 
@@ -388,7 +385,6 @@ export class DirectMessagesGateway
           message._id.toString(),
         );
 
-
       // Send to receiver
       const receiverSocket = this.connectedUsers.get(data.receiverId);
       if (receiverSocket && receiverSocket.size) {
@@ -441,10 +437,8 @@ export class DirectMessagesGateway
           .lean()
           .exec();
 
-
         const username =
           senderProfile?.username || senderProfile?.displayName || 'Unknown';
-
 
         for (const sid of receiverSocket) {
           this.server.to(sid).emit('user-typing', {
@@ -605,11 +599,9 @@ export class DirectMessagesGateway
       const { Types } = require('mongoose');
       const senderObjectId = new Types.ObjectId(senderId);
 
-
       const senderProfile = await this.profileModel.findOne({
         userId: senderObjectId,
       });
-
 
       const callerInfo = {
         userId: senderId,
@@ -620,7 +612,6 @@ export class DirectMessagesGateway
         avatar: senderProfile?.avatarUrl || null,
       };
 
-
       if (receiverSocket && receiverSocket.size) {
         const payload = {
           from: senderId,
@@ -628,11 +619,9 @@ export class DirectMessagesGateway
           callerInfo,
         };
 
-
         for (const sid of receiverSocket) {
           this.server.to(sid).emit('call-incoming', payload);
         }
-
       } else {
       }
     } catch (error) {
@@ -700,7 +689,6 @@ export class DirectMessagesGateway
   ) {
     const userId = socket.data.userId;
     const peerSocket = this.connectedUsers.get(data.peerId);
-
 
     if (peerSocket && peerSocket.size) {
       for (const sid of peerSocket) {

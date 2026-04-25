@@ -24,8 +24,11 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function readFilterValue(s: string, start: number): { value: string; end: number } {
-  let i = start;
+function readFilterValue(
+  s: string,
+  start: number,
+): { value: string; end: number } {
+  const i = start;
   if (s[i] === '"') {
     const endQuote = s.indexOf('"', i + 1);
     if (endQuote === -1) {
@@ -51,15 +54,19 @@ function skipSpaces(s: string, i: number): number {
 
 function mapHasValue(raw: string): MessageSearchHasType {
   const v = raw.trim().toLowerCase();
-  if (
-    ['file', 'files', 'attachment', 'attachments'].includes(v)
-  ) {
+  if (['file', 'files', 'attachment', 'attachments'].includes(v)) {
     return 'file';
   }
   if (
-    ['image', 'images', 'img', 'photo', 'photos', 'picture', 'pictures'].includes(
-      v,
-    )
+    [
+      'image',
+      'images',
+      'img',
+      'photo',
+      'photos',
+      'picture',
+      'pictures',
+    ].includes(v)
   ) {
     return 'image';
   }

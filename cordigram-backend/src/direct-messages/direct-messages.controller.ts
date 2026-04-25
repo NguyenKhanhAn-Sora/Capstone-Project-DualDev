@@ -305,7 +305,9 @@ export class DirectMessagesController {
     return this.directMessagesService.getAvailableUsers(user.userId);
   }
 
-  private deletedAtToIsoString(deletedAt: Date | string | null | undefined): string {
+  private deletedAtToIsoString(
+    deletedAt: Date | string | null | undefined,
+  ): string {
     if (deletedAt instanceof Date) {
       return deletedAt.toISOString();
     }

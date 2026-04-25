@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { MessagingProfile, DEFAULT_MESSAGING_AVATAR_URL } from './messaging-profile.schema';
+import {
+  MessagingProfile,
+  DEFAULT_MESSAGING_AVATAR_URL,
+} from './messaging-profile.schema';
 import { Profile } from '../profiles/profile.schema';
 import { User } from '../users/user.schema';
 import { ProfilesService } from '../profiles/profiles.service';
@@ -26,7 +29,11 @@ export type MessagingProfileCardDto = {
   displayNameAccentHex: string | null;
   cordigramMemberSince?: string;
   mutualServerCount: number;
-  mutualServers: Array<{ serverId: string; name: string; avatarUrl: string | null }>;
+  mutualServers: Array<{
+    serverId: string;
+    name: string;
+    avatarUrl: string | null;
+  }>;
   mutualFollowCount: number;
   mutualFollowUsers: Array<{
     userId: string;
@@ -113,10 +120,7 @@ export class MessagingProfilesService {
       .exec();
     if (existing) return existing;
 
-    const profile = await this.profileModel
-      .findOne({ userId })
-      .lean()
-      .exec();
+    const profile = await this.profileModel.findOne({ userId }).lean().exec();
     if (!profile) {
       throw new NotFoundException('Profile not found');
     }
@@ -128,7 +132,8 @@ export class MessagingProfilesService {
       bio: profile.bio || '',
       pronouns: (profile as { pronouns?: string }).pronouns?.trim() || '',
       avatarUrl: profile.avatarUrl || DEFAULT_MESSAGING_AVATAR_URL,
-      avatarOriginalUrl: profile.avatarOriginalUrl || DEFAULT_MESSAGING_AVATAR_URL,
+      avatarOriginalUrl:
+        profile.avatarOriginalUrl || DEFAULT_MESSAGING_AVATAR_URL,
       avatarPublicId: profile.avatarPublicId || '',
       avatarOriginalPublicId: profile.avatarOriginalPublicId || '',
       coverUrl: profile.coverUrl || '',
@@ -303,5 +308,4 @@ export class MessagingProfilesService {
       displayNameAccentHex: mp.displayNameAccentHex ?? null,
     };
   }
-
 }

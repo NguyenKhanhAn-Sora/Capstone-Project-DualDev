@@ -803,7 +803,10 @@ export class AdminController {
       throw new ForbiddenException('Admin access required');
     }
     const adminId = req.user?.userId ?? '';
-    return (this.adminService as any).restoreDeletedServer({ serverId, adminId });
+    return (this.adminService as any).restoreDeletedServer({
+      serverId,
+      adminId,
+    });
   }
 
   @Get('community-discovery/:serverId/view')

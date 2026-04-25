@@ -16,7 +16,8 @@ export class IvsService {
     this.client = new IvsClient({
       region: this.configService.ivsRegion,
       credentials:
-        this.configService.ivsAccessKeyId && this.configService.ivsSecretAccessKey
+        this.configService.ivsAccessKeyId &&
+        this.configService.ivsSecretAccessKey
           ? {
               accessKeyId: this.configService.ivsAccessKeyId,
               secretAccessKey: this.configService.ivsSecretAccessKey,

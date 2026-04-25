@@ -8,5 +8,9 @@ export function isCordigramMessagesUpload(
 ): boolean {
   const raw = req.headers[CORDIGRAM_UPLOAD_CONTEXT_HEADER];
   const v = Array.isArray(raw) ? raw[0] : raw;
-  return String(v || '').trim().toLowerCase() === 'messages';
+  return (
+    String(v || '')
+      .trim()
+      .toLowerCase() === 'messages'
+  );
 }
