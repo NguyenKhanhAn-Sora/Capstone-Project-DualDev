@@ -7,6 +7,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { Buffer } from 'node:buffer';
 import { Model, Types } from 'mongoose';
 import { Message } from './message.schema';
 import { Channel } from '../channels/channel.schema';
@@ -1024,8 +1025,12 @@ export class MessagesService {
       servers.map((s: any) => [String(s._id), s.name]),
     );
 
-    const allSenderIds = [
-      ...new Set(messages.map((m: any) => m.senderId.toString())),
+    const allSenderIds: string[] = [
+      ...new Set(
+        messages.map((m: any) =>
+          String((m.senderId as any)?._id ?? m.senderId),
+        ),
+      ),
     ];
     const mutedSenders = await this.mentionMuteService.listMutedSendersForOwner(
       userId,
