@@ -114,12 +114,12 @@
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
-  color: var(--color-panel-text-muted);
+  color: var(--color-button-x, var(--color-panel-text));
   padding: 4px 8px;
 }
 
 .cardDark .closeX {
-  color: var(--color-panel-text-muted);
+  color: var(--color-button-x, var(--color-panel-text-muted));
 }
 
 .body {

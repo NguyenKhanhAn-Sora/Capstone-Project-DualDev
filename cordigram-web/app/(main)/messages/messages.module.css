@@ -2752,7 +2752,7 @@
 .closeButton {
   background: transparent;
   border: none;
-  color: var(--color-panel-text-muted);
+  color: var(--color-button-x, var(--color-panel-text));
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -2920,7 +2920,7 @@
 
 .pollCheckboxRow label {
   font-size: 14px;
-  color: var(--color-panel-text-muted);
+  color: var(--color-panel-text);
   cursor: pointer;
 }
 

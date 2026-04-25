@@ -94,8 +94,8 @@
 .btnMuted {
   padding: 8px 14px;
   border-radius: 6px;
-  border: none;
-  background: var(--color-panel-neutral);
+  border: 1px solid var(--color-panel-border);
+  background: var(--color-panel-deep, var(--color-surface-muted));
   color: var(--color-panel-text);
   font-weight: 700;
   font-size: 13px;

@@ -83,12 +83,14 @@ export class DirectMessagesService {
       const ignoredObjectIds = Array.from(ignoredSet).map(
         (id) => new Types.ObjectId(id),
       );
+      // Keep rows where the current user hid the message "for me" out via
+      // `deletedFor`, but still return messages that were unsent for everyone
+      // (`isDeleted: true`) so both sides can render the grey placeholder bubble.
       const baseMatch: any = {
         $or: [
           { senderId: user1, receiverId: user2 },
           { senderId: user2, receiverId: user1 },
         ],
-        isDeleted: false,
         deletedFor: { $ne: user1 },
       };
       if (ignoredObjectIds.length > 0) {

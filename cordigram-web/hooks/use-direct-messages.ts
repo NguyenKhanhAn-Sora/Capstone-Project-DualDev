@@ -338,7 +338,16 @@ export const useDirectMessages = ({
         // Always provide a fresh object reference so downstream effects
         // re-fire even when the same id is deleted twice in a row (e.g.
         // REST + socket emit for the same message).
-        setMessageDeleted({ ...data });
+        setMessageDeleted({
+          ...data,
+          messageId: String(data.messageId),
+          deleteType:
+            data.deleteType === "for-everyone" || data.deleteType === "for-me"
+              ? data.deleteType
+              : (data as { type?: string }).type === "message_unsent"
+                ? "for-everyone"
+                : data.deleteType,
+        });
         setTimeout(() => setMessageDeleted(null), 1500);
       },
     );
