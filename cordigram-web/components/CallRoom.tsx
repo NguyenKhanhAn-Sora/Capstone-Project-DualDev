@@ -207,14 +207,14 @@ function UnifiedCallView({
     }
 
     try {
-      // Hint browser picker to include both individual tabs and full windows.
+      // Do not force displaySurface: "browser" — it skews the picker and does
+      // not stop full-desktop recursion. Prefer excluding the current tab when
+      // the user shares a browser surface (Chrome et al.).
       await localParticipant.setScreenShareEnabled(true, {
         audio: true,
+        preferCurrentTab: false,
         video: {
-          displaySurface: "browser",
           cursor: "always",
-          // Avoid selecting the current call tab itself when possible
-          // (prevents recursive "hall of mirrors" effect).
           selfBrowserSurface: "exclude",
           surfaceSwitching: "include",
           monitorTypeSurfaces: "include",
@@ -232,6 +232,18 @@ function UnifiedCallView({
     if (!localParticipant) return;
     setIsScreenSharing(localParticipant.isScreenShareEnabled);
   }, [localParticipant, localParticipant?.isScreenShareEnabled]);
+
+  // Keep control bar in sync with LiveKit (e.g. connect options, policy) so
+  // mic/camera icons are not inverted vs actual capture at call start.
+  useEffect(() => {
+    if (!localParticipant) return;
+    setIsMicOn(localParticipant.isMicrophoneEnabled);
+    setIsCameraOn(localParticipant.isCameraEnabled);
+  }, [
+    localParticipant,
+    localParticipant?.isMicrophoneEnabled,
+    localParticipant?.isCameraEnabled,
+  ]);
 
   // Decide what the main viewport renders. Prefer the remote participant's
   // video when available; otherwise fall back to the avatar grid — same
@@ -265,12 +277,19 @@ function UnifiedCallView({
   const anyScreenSharePublished = realScreenTracks.length > 0;
   const showVideoLayout = anyVideoPublished || anyScreenSharePublished;
 
-  /** Main stage: remote screen first, then remote camera, else avatar. */
+  /** Main stage rules for 1:1:
+   *  - Viewer side (B): remote screen first.
+   *  - Sharer side (A): when sharing local screen and remote has camera, keep
+   *    remote camera on main and local share as PiP.
+   *  - Fallback to remote camera, else avatar.
+   */
   const mainScreenOrCamera:
     | { kind: "screen"; ref: TrackReference }
     | { kind: "camera"; ref: TrackReference }
     | { kind: "avatar" } = remoteScreenTrack
     ? { kind: "screen", ref: remoteScreenTrack }
+    : localScreenTrack && remoteCameraTrack
+      ? { kind: "camera", ref: remoteCameraTrack }
     : remoteCameraTrack
       ? { kind: "camera", ref: remoteCameraTrack }
       : { kind: "avatar" };
@@ -278,34 +297,22 @@ function UnifiedCallView({
   const mainIsRemoteScreen =
     mainScreenOrCamera.kind === "screen" &&
     !mainScreenOrCamera.ref.participant.isLocal;
-  const mainIsLocalScreen =
-    mainScreenOrCamera.kind === "screen" &&
-    mainScreenOrCamera.ref.participant.isLocal;
-
-  const showCameraPip =
-    (mainIsRemoteScreen && localCameraTrack && isCameraOn) ||
-    (mainIsLocalScreen && remoteCameraTrack) ||
-    (mainScreenOrCamera.kind === "camera" &&
-      localCameraTrack &&
-      isCameraOn);
-
-  const showRemoteAvatarPip = mainIsLocalScreen && !remoteCameraTrack;
-  const showLocalScreenPip =
-    Boolean(localScreenTrack) &&
-    !mainIsLocalScreen &&
-    !mainIsRemoteScreen &&
-    !showCameraPip;
-
+  // PiP rules:
+  // - On B while A is sharing + camera: PiP must be A camera (remoteCameraTrack).
+  // - On A while sharing: PiP should show "you are sharing" placeholder.
+  // - Otherwise keep local camera self-preview when available.
+  const showLocalScreenPip = Boolean(localScreenTrack);
+  const showRemoteAvatarPip =
+    showLocalScreenPip && !remoteCameraTrack && mainScreenOrCamera.kind === "avatar";
   const pipTrackRef: TrackReference | null =
-    mainIsRemoteScreen && localCameraTrack && isCameraOn
-      ? localCameraTrack
-      : mainIsLocalScreen && remoteCameraTrack
-        ? remoteCameraTrack
-        : mainScreenOrCamera.kind === "camera" &&
-            localCameraTrack &&
-            isCameraOn
-          ? localCameraTrack
-          : null;
+    mainIsRemoteScreen && remoteCameraTrack
+      ? remoteCameraTrack
+      : !showLocalScreenPip &&
+          mainScreenOrCamera.kind === "camera" &&
+          localCameraTrack &&
+          isCameraOn
+        ? localCameraTrack
+        : null;
 
   return (
     <div className={styles.unifiedCallContainer}>
@@ -329,7 +336,7 @@ function UnifiedCallView({
                 <div className={styles.unifiedAvatarLabel}>{participantName}</div>
               </div>
             )}
-            {showCameraPip && pipTrackRef ? (
+            {pipTrackRef ? (
               <div className={styles.unifiedPip}>
                 <VideoTrack
                   trackRef={pipTrackRef}
@@ -337,11 +344,8 @@ function UnifiedCallView({
                 />
               </div>
             ) : showLocalScreenPip && localScreenTrack ? (
-              <div className={styles.unifiedPip}>
-                <VideoTrack
-                  trackRef={localScreenTrack}
-                  className={styles.unifiedPipVideo}
-                />
+              <div className={`${styles.unifiedPip} ${styles.localScreenSharePip}`}>
+                <LocalScreenSharePreview />
               </div>
             ) : showRemoteAvatarPip ? (
               <div className={`${styles.unifiedPip} ${styles.unifiedPipAvatarOnly}`}>
@@ -539,6 +543,21 @@ function ScreenShareIcon() {
     </svg>
   );
 }
+
+/** PiP while publishing screen share: do not attach the local screen track
+ *  (it feeds back into the capture and creates the "hall of mirrors" for the
+ *  remote viewer when sharing a full desktop). */
+function LocalScreenSharePreview() {
+  return (
+    <div className={styles.localScreenSharePreviewInner}>
+      <span className={styles.localScreenShareIconWrap} aria-hidden>
+        <ScreenShareIcon />
+      </span>
+      <span className={styles.localScreenShareLabel}>Đang chia sẻ màn hình</span>
+    </div>
+  );
+}
+
 function EndCallIcon() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">

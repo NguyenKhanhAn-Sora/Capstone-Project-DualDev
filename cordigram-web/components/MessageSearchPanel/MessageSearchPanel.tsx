@@ -42,7 +42,11 @@ interface MessageSearchPanelProps {
   members?: Array<{ userId: string; displayName?: string; username?: string; avatarUrl?: string }>;
   dmPartnerId?: string;
   dmPartnerName?: string;
-  onResultClick?: (messageId: string, channelId?: string) => void;
+  onResultClick?: (payload: {
+    messageId: string;
+    channelId?: string;
+    dmUserId?: string;
+  }) => void;
   /** Friends / DM peers for @ quick switch */
   dmPeers?: DmPeer[];
   /** All servers with channel lists (cross-server # ! *) */
@@ -857,10 +861,32 @@ export default function MessageSearchPanel({
                           });
                           setRecent(loadRecent(serverId));
                         }
-                        onResultClick?.(
-                          msg._id,
-                          typeof cid === "string" ? cid : undefined,
-                        );
+                        const currentUserId =
+                          typeof window !== "undefined"
+                            ? localStorage.getItem("userId") ||
+                              localStorage.getItem("currentUserId") ||
+                              ""
+                            : "";
+                        const senderId =
+                          typeof msg.senderId === "object"
+                            ? String(msg.senderId?._id || "")
+                            : String(msg.senderId || "");
+                        const receiverId =
+                          typeof msg.receiverId === "object"
+                            ? String(msg.receiverId?._id || "")
+                            : String(msg.receiverId || "");
+                        const dmUserId =
+                          dmPartnerId ||
+                          (senderId && senderId !== currentUserId
+                            ? senderId
+                            : receiverId && receiverId !== currentUserId
+                              ? receiverId
+                              : undefined);
+                        onResultClick?.({
+                          messageId: msg._id,
+                          channelId: typeof cid === "string" ? cid : undefined,
+                          dmUserId: mode === "dm" ? dmUserId : undefined,
+                        });
                       }}
                     >
                       <div className={styles.resultHeader}>
