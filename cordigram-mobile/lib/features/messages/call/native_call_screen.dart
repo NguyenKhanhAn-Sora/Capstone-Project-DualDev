@@ -665,23 +665,18 @@ class _VideoCallBody extends StatelessWidget {
 
     final remote = remotes.isNotEmpty ? remotes.first : null;
     final remoteHasScreen = _ParticipantTile.hasScreenShare(remote);
-    final localHasScreen = _ParticipantTile.hasScreenShare(local);
-    final remoteHasCamera = _ParticipantTile.hasCamera(remote);
+    final localHasCamera = _ParticipantTile.hasCamera(local);
 
+    // 1:1 call layout rule:
+    // - Main always prioritizes remote participant (screen > camera > avatar).
+    // - Local camera stays in PiP whenever it is enabled.
     final mainParticipant = remoteHasScreen
         ? remote
-        : localHasScreen
-            ? local
-            : remoteHasCamera
-                ? remote
-                : (remote ?? local);
-    final mainPrefersScreen =
-        remoteHasScreen || (localHasScreen && !remoteHasScreen);
+        : (remote ?? local);
+    final mainPrefersScreen = remoteHasScreen;
 
-    final pipParticipant = mainParticipant == remote ? local : remote;
-    final showPip = pipParticipant != null &&
-        (_ParticipantTile.hasCamera(pipParticipant) ||
-            (mainParticipant == local && remote != null));
+    final pipParticipant = (remote != null && localHasCamera) ? local : null;
+    final showPip = pipParticipant != null;
 
     return Stack(
       children: [
