@@ -61,12 +61,13 @@ export default function VoiceRecorder({
         const intent = stopIntentRef.current;
         stopIntentRef.current = null;
 
-        if (intent === "cancel") {
+        // Chỉ gửi khi user bấm Gửi — mọi trường hợp khác (hủy, null, lỗi) đều không gọi upload.
+        if (intent !== "send") {
+          audioChunksRef.current = [];
           onCancel();
           return;
         }
 
-        // "send" (or legacy null — treat as send only if we have chunks)
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const duration = Math.floor(recordingTime / 1000);
         onRecordComplete(audioBlob, duration);
@@ -126,7 +127,9 @@ export default function VoiceRecorder({
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     stopIntentRef.current = "cancel";
     const mr = mediaRecorderRef.current;
     if (mr && mr.state !== "inactive") {
@@ -135,7 +138,6 @@ export default function VoiceRecorder({
       stopIntentRef.current = null;
       onCancel();
     }
-    // When recorder stops normally, `onCancel` runs from `onstop` (not `onRecordComplete`).
   };
 
   const handleSend = () => {
@@ -155,6 +157,7 @@ export default function VoiceRecorder({
       <div className={styles.recorderContent}>
         {/* Cancel Button */}
         <button
+          type="button"
           className={styles.cancelButton}
           onClick={handleCancel}
           title="Cancel"
@@ -196,6 +199,7 @@ export default function VoiceRecorder({
 
         {/* Pause/Resume Button */}
         <button
+          type="button"
           className={styles.pauseButton}
           onClick={handlePauseResume}
           title={isPaused ? "Resume" : "Pause"}
@@ -214,6 +218,7 @@ export default function VoiceRecorder({
 
         {/* Send Button */}
         <button
+          type="button"
           className={styles.sendButton}
           onClick={handleSend}
           disabled={recordingTime < 1000}
