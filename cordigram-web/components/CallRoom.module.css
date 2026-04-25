@@ -733,3 +733,37 @@
 .unifiedCtrlBtnDanger:hover {
   background: #ff5458;
 }
+
+/* Local screen-share PiP: static preview only (no live <VideoTrack>). */
+.localScreenSharePip {
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-sizing: border-box;
+}
+
+.localScreenSharePreviewInner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  color: #e2e8f0;
+  text-align: center;
+}
+
+.localScreenShareIconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.95;
+}
+
+.localScreenShareLabel {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  max-width: 100%;
+}
