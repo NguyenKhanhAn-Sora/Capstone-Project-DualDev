@@ -125,6 +125,11 @@ function UnifiedCallView({
     { onlySubscribed: false },
   );
 
+  const screenShareTracks = useTracks(
+    [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
+    { onlySubscribed: false },
+  );
+
   const cameraTracks = allTracks.filter(
     (t) => t.source === Track.Source.Camera,
   );
@@ -245,17 +250,71 @@ function UnifiedCallView({
     (t) => t.participant.isLocal,
   );
 
-  const showVideoLayout = anyVideoPublished;
+  const realScreenTracks = screenShareTracks.filter(
+    (t): t is TrackReference => isTrackReference(t),
+  );
+  const remoteScreenTrack = realScreenTracks.find(
+    (t) => !t.participant.isLocal,
+  );
+  const localScreenTrack = realScreenTracks.find(
+    (t) => t.participant.isLocal,
+  );
+
+  const anyScreenSharePublished = realScreenTracks.length > 0;
+  const showVideoLayout = anyVideoPublished || anyScreenSharePublished;
+
+  /** Main stage: remote screen first, then local screen (preview while sharing), then remote camera, else avatar. */
+  const mainScreenOrCamera:
+    | { kind: "screen"; ref: TrackReference }
+    | { kind: "camera"; ref: TrackReference }
+    | { kind: "avatar" } = remoteScreenTrack
+    ? { kind: "screen", ref: remoteScreenTrack }
+    : localScreenTrack
+      ? { kind: "screen", ref: localScreenTrack }
+      : remoteCameraTrack
+        ? { kind: "camera", ref: remoteCameraTrack }
+        : { kind: "avatar" };
+
+  const mainIsRemoteScreen =
+    mainScreenOrCamera.kind === "screen" &&
+    !mainScreenOrCamera.ref.participant.isLocal;
+  const mainIsLocalScreen =
+    mainScreenOrCamera.kind === "screen" &&
+    mainScreenOrCamera.ref.participant.isLocal;
+
+  const showCameraPip =
+    (mainIsRemoteScreen && localCameraTrack && isCameraOn) ||
+    (mainIsLocalScreen && remoteCameraTrack) ||
+    (mainScreenOrCamera.kind === "camera" &&
+      localCameraTrack &&
+      isCameraOn);
+
+  const showRemoteAvatarPip = mainIsLocalScreen && !remoteCameraTrack;
+
+  const pipTrackRef: TrackReference | null =
+    mainIsRemoteScreen && localCameraTrack && isCameraOn
+      ? localCameraTrack
+      : mainIsLocalScreen && remoteCameraTrack
+        ? remoteCameraTrack
+        : mainScreenOrCamera.kind === "camera" &&
+            localCameraTrack &&
+            isCameraOn
+          ? localCameraTrack
+          : null;
 
   return (
     <div className={styles.unifiedCallContainer}>
       <div className={styles.unifiedStage}>
         {showVideoLayout ? (
           <div className={styles.unifiedVideoStage}>
-            {remoteCameraTrack ? (
+            {mainScreenOrCamera.kind !== "avatar" ? (
               <VideoTrack
-                trackRef={remoteCameraTrack}
-                className={styles.unifiedRemoteVideo}
+                trackRef={mainScreenOrCamera.ref}
+                className={
+                  mainScreenOrCamera.kind === "screen"
+                    ? styles.unifiedMainScreenShare
+                    : styles.unifiedRemoteVideo
+                }
               />
             ) : (
               <div className={styles.unifiedAvatarMain}>
@@ -265,14 +324,20 @@ function UnifiedCallView({
                 <div className={styles.unifiedAvatarLabel}>{participantName}</div>
               </div>
             )}
-            {localCameraTrack && isCameraOn && (
+            {showCameraPip && pipTrackRef ? (
               <div className={styles.unifiedPip}>
                 <VideoTrack
-                  trackRef={localCameraTrack}
+                  trackRef={pipTrackRef}
                   className={styles.unifiedPipVideo}
                 />
               </div>
-            )}
+            ) : showRemoteAvatarPip ? (
+              <div className={`${styles.unifiedPip} ${styles.unifiedPipAvatarOnly}`}>
+                <div className={styles.unifiedPipAvatarLetter}>
+                  {participantName.charAt(0).toUpperCase() || "?"}
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : (
           <AvatarGrid tracks={allTracks} />
