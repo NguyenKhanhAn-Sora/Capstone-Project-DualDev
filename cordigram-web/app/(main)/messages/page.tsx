@@ -138,6 +138,34 @@ const VoiceChannelCall = dynamic<VoiceChannelCallProps>(
 );
 const UNCATEGORIZED_CATEGORY_ID = "__uncategorized__";
 
+/** Giá trị mặc định trùng MessagesProfileEditor — không coi là “tùy chỉnh”, dùng màu chữ token UI. */
+const MESSAGING_DEFAULT_SOLID_PRIMARY = "#f2f3f5";
+const MESSAGING_DEFAULT_ACCENT = "#5865f2";
+
+function hasMessagingDisplayNameOverride(
+  source?: {
+    displayNameFontId?: string | null;
+    displayNameEffectId?: string | null;
+    displayNamePrimaryHex?: string | null;
+    displayNameAccentHex?: string | null;
+  } | null,
+): boolean {
+  if (!source) return false;
+  const font = String(source.displayNameFontId || "default").trim();
+  if (font === "mono" || font === "rounded") return true;
+  const effect = String(source.displayNameEffectId || "solid").trim();
+  if (effect === "gradient" || effect === "neon") return true;
+  const pRaw = String(source.displayNamePrimaryHex || "").trim();
+  const aRaw = String(source.displayNameAccentHex || "").trim();
+  const pOk = /^#[0-9a-f]{6}$/i.test(pRaw);
+  const aOk = /^#[0-9a-f]{6}$/i.test(aRaw);
+  const pNorm = pOk ? pRaw.toLowerCase() : "";
+  const aNorm = aOk ? aRaw.toLowerCase() : "";
+  if (pNorm && pNorm !== MESSAGING_DEFAULT_SOLID_PRIMARY) return true;
+  if (aNorm && aNorm !== MESSAGING_DEFAULT_ACCENT.toLowerCase()) return true;
+  return false;
+}
+
 function getDisplayNameTextStyle(
   source?: {
     displayNameFontId?: string | null;
@@ -147,7 +175,7 @@ function getDisplayNameTextStyle(
   },
   messagesShellTheme: MessagesShellTheme = "dark",
 ): React.CSSProperties | undefined {
-  if (!source) return undefined;
+  if (!source || !hasMessagingDisplayNameOverride(source)) return undefined;
   const defaultPrimary = messagesShellTheme === "light" ? "#0F1629" : "#F2F3F5";
   let primary = /^#[0-9a-f]{6}$/i.test(String(source.displayNamePrimaryHex || ""))
     ? String(source.displayNamePrimaryHex)
@@ -560,6 +588,27 @@ function areMessagesEqual(
   if (prevProps.onChannelUserProfileOpen !== nextProps.onChannelUserProfileOpen)
     return false;
   if (prevProps.message.id !== nextProps.message.id) return false;
+
+  if (
+    prevProps.message.senderDisplayNameFontId !==
+    nextProps.message.senderDisplayNameFontId
+  )
+    return false;
+  if (
+    prevProps.message.senderDisplayNameEffectId !==
+    nextProps.message.senderDisplayNameEffectId
+  )
+    return false;
+  if (
+    prevProps.message.senderDisplayNamePrimaryHex !==
+    nextProps.message.senderDisplayNamePrimaryHex
+  )
+    return false;
+  if (
+    prevProps.message.senderDisplayNameAccentHex !==
+    nextProps.message.senderDisplayNameAccentHex
+  )
+    return false;
 
   // Re-render if read status changed (THIS IS KEY!)
   if (prevProps.message.isRead !== nextProps.message.isRead) {
@@ -1504,6 +1553,20 @@ export default function MessagesPage() {
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const [currentMessagingProfile, setCurrentMessagingProfile] =
     useState<MessagingProfileCardResponse | null>(null);
+  /** Kiểu tên Boost lưu ở hồ sơ messaging; ghép vào nguồn style thanh sidebar để khớp token nền sáng/tối. */
+  const selfSidebarDisplayStyleSource = useMemo(() => {
+    const base = currentUserProfile;
+    if (!base) return null;
+    const mp = currentMessagingProfile;
+    if (!mp) return base;
+    return {
+      ...base,
+      displayNameFontId: mp.displayNameFontId ?? base.displayNameFontId,
+      displayNameEffectId: mp.displayNameEffectId ?? base.displayNameEffectId,
+      displayNamePrimaryHex: mp.displayNamePrimaryHex ?? base.displayNamePrimaryHex,
+      displayNameAccentHex: mp.displayNameAccentHex ?? base.displayNameAccentHex,
+    };
+  }, [currentUserProfile, currentMessagingProfile]);
   const resolveMessageSenderStyle = useCallback(
     (message: UIMessage): React.CSSProperties | undefined => {
       const directFriend =
@@ -1521,17 +1584,31 @@ export default function MessagesPage() {
         message.isFromCurrentUser && selectedDirectMessageFriend
           ? currentMessagingProfile
           : null;
-      const source =
+      const baseProfile =
         selfDmSource ||
         (message.isFromCurrentUser ? currentUserProfile : null) ||
         directProfile ||
         directFriend ||
-        sidebarFriend || {
-          displayNameFontId: message.senderDisplayNameFontId,
-          displayNameEffectId: message.senderDisplayNameEffectId,
-          displayNamePrimaryHex: message.senderDisplayNamePrimaryHex,
-          displayNameAccentHex: message.senderDisplayNameAccentHex,
-        };
+        sidebarFriend ||
+        null;
+      const fromMessage = {
+        displayNameFontId: message.senderDisplayNameFontId,
+        displayNameEffectId: message.senderDisplayNameEffectId,
+        displayNamePrimaryHex: message.senderDisplayNamePrimaryHex,
+        displayNameAccentHex: message.senderDisplayNameAccentHex,
+      };
+      const source = baseProfile
+        ? {
+            displayNameFontId:
+              fromMessage.displayNameFontId ?? (baseProfile as any).displayNameFontId,
+            displayNameEffectId:
+              fromMessage.displayNameEffectId ?? (baseProfile as any).displayNameEffectId,
+            displayNamePrimaryHex:
+              fromMessage.displayNamePrimaryHex ?? (baseProfile as any).displayNamePrimaryHex,
+            displayNameAccentHex:
+              fromMessage.displayNameAccentHex ?? (baseProfile as any).displayNameAccentHex,
+          }
+        : fromMessage;
       return getDisplayNameTextStyle(source, messagesShellTheme);
     },
     [
@@ -1913,6 +1990,7 @@ export default function MessagesPage() {
           ?.members?.find((m) => String(m.userId) === String(senderId))?.nickname ?? null
       : null;
     const trimmedNick = typeof senderNickname === "string" ? senderNickname.trim() : "";
+    const snd = typeof msg.senderId === "object" && msg.senderId ? (msg.senderId as any) : null;
     const uiMessage: UIMessage = {
       id: msg._id,
       text: msg.content,
@@ -1921,6 +1999,10 @@ export default function MessagesPage() {
       senderName: typeof msg.senderId === "object" ? (msg.senderId?.username || msg.senderId?.email) ?? "" : "",
       senderDisplayName: trimmedNick || (typeof msg.senderId === "object" ? msg.senderId?.displayName : undefined),
       senderAvatar: typeof msg.senderId === "object" ? (msg.senderId?.avatarUrl ?? msg.senderId?.avatar) : undefined,
+      senderDisplayNameFontId: snd?.displayNameFontId ?? undefined,
+      senderDisplayNameEffectId: snd?.displayNameEffectId ?? undefined,
+      senderDisplayNamePrimaryHex: snd?.displayNamePrimaryHex ?? undefined,
+      senderDisplayNameAccentHex: snd?.displayNameAccentHex ?? undefined,
       timestamp: new Date(msg.createdAt),
       isFromCurrentUser: false,
       type: "server",
@@ -2609,8 +2691,15 @@ export default function MessagesPage() {
       if (!uid) return;
 
       const isMessaging = d.profileContext === "messaging";
+      const hasIdentityPatch =
+        "avatarUrl" in d || "displayName" in d || "username" in d;
+      const hasStylePatch =
+        "displayNameFontId" in d ||
+        "displayNameEffectId" in d ||
+        "displayNamePrimaryHex" in d ||
+        "displayNameAccentHex" in d;
 
-      if ("avatarUrl" in d || "displayName" in d || "username" in d) {
+      if (hasIdentityPatch || hasStylePatch) {
         setFriends((prev) =>
           prev.map((f) =>
             String(f._id) !== uid
@@ -2618,10 +2707,10 @@ export default function MessagesPage() {
               : ({
                   ...f,
                   avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? f.avatarUrl) : f.avatarUrl,
-                  displayName: d.displayName ?? f.displayName,
+                  displayName: "displayName" in d ? (d.displayName ?? f.displayName) : f.displayName,
                   ...(isMessaging
                     ? {}
-                    : { username: d.username ?? f.username }),
+                    : { username: "username" in d ? (d.username ?? f.username) : f.username }),
                   displayNameFontId:
                     "displayNameFontId" in d ? (d.displayNameFontId ?? f.displayNameFontId) : f.displayNameFontId,
                   displayNameEffectId:
@@ -2673,6 +2762,26 @@ export default function MessagesPage() {
         } as any;
       });
 
+      if (isMessaging && String(uid) === String(currentUserId)) {
+        setCurrentMessagingProfile((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            displayName: "displayName" in d ? (d.displayName ?? prev.displayName) : prev.displayName,
+            chatUsername: "username" in d ? (d.username ?? prev.chatUsername) : prev.chatUsername,
+            avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? prev.avatarUrl) : prev.avatarUrl,
+            displayNameFontId:
+              "displayNameFontId" in d ? (d.displayNameFontId ?? prev.displayNameFontId) : prev.displayNameFontId,
+            displayNameEffectId:
+              "displayNameEffectId" in d ? (d.displayNameEffectId ?? prev.displayNameEffectId) : prev.displayNameEffectId,
+            displayNamePrimaryHex:
+              "displayNamePrimaryHex" in d ? (d.displayNamePrimaryHex ?? prev.displayNamePrimaryHex) : prev.displayNamePrimaryHex,
+            displayNameAccentHex:
+              "displayNameAccentHex" in d ? (d.displayNameAccentHex ?? prev.displayNameAccentHex) : prev.displayNameAccentHex,
+          };
+        });
+      }
+
       if (!isMessaging) {
         setCurrentUserProfile((prev: any) => {
           if (!prev || String(prev.userId ?? prev.id ?? "") !== uid) return prev;
@@ -2691,12 +2800,29 @@ export default function MessagesPage() {
               "displayNameAccentHex" in d ? (d.displayNameAccentHex ?? prev.displayNameAccentHex) : prev.displayNameAccentHex,
           };
         });
+      } else if (String(uid) === String(currentUserId)) {
+        setCurrentUserProfile((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            avatarUrl: "avatarUrl" in d ? (d.avatarUrl ?? prev.avatarUrl) : prev.avatarUrl,
+            displayName: "displayName" in d ? (d.displayName ?? prev.displayName) : prev.displayName,
+            displayNameFontId:
+              "displayNameFontId" in d ? (d.displayNameFontId ?? prev.displayNameFontId) : prev.displayNameFontId,
+            displayNameEffectId:
+              "displayNameEffectId" in d ? (d.displayNameEffectId ?? prev.displayNameEffectId) : prev.displayNameEffectId,
+            displayNamePrimaryHex:
+              "displayNamePrimaryHex" in d ? (d.displayNamePrimaryHex ?? prev.displayNamePrimaryHex) : prev.displayNamePrimaryHex,
+            displayNameAccentHex:
+              "displayNameAccentHex" in d ? (d.displayNameAccentHex ?? prev.displayNameAccentHex) : prev.displayNameAccentHex,
+          };
+        });
       }
     };
 
     window.addEventListener("cordigram-user-profile-style-updated", onStyle as any);
     return () => window.removeEventListener("cordigram-user-profile-style-updated", onStyle as any);
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!dmUserIdFromUrl || !token) return;
@@ -3251,13 +3377,17 @@ export default function MessagesPage() {
       const friendId = msg.receiverId._id; // For sent messages, friend is always the receiver
 
       const uiMessage: UIMessage = {
-        id: msg._id,
+        id: String(msg._id),
         text: msg.content,
         senderId: msg.senderId._id,
         senderEmail: msg.senderId.email,
         senderDisplayName: msg.senderId.displayName || undefined,
         senderName: msg.senderId.username || msg.senderId.email,
         senderAvatar: msg.senderId.avatar,
+        senderDisplayNameFontId: (msg.senderId as any).displayNameFontId ?? undefined,
+        senderDisplayNameEffectId: (msg.senderId as any).displayNameEffectId ?? undefined,
+        senderDisplayNamePrimaryHex: (msg.senderId as any).displayNamePrimaryHex ?? undefined,
+        senderDisplayNameAccentHex: (msg.senderId as any).displayNameAccentHex ?? undefined,
         timestamp: new Date(msg.createdAt),
         isFromCurrentUser: true, // Always true for sent messages
         type: "direct",
@@ -3315,7 +3445,7 @@ export default function MessagesPage() {
       if (!friendId) return;
 
       const uiMessage: UIMessage = {
-        id: msg._id,
+        id: String(msg._id),
         text: msg.content,
         senderId: friendId,
         senderEmail: typeof rawSender === "object" ? rawSender.email ?? "" : "",
@@ -3326,6 +3456,14 @@ export default function MessagesPage() {
             ? rawSender.username || rawSender.email || ""
             : "",
         senderAvatar: typeof rawSender === "object" ? rawSender.avatar : undefined,
+        senderDisplayNameFontId:
+          typeof rawSender === "object" ? (rawSender as any).displayNameFontId ?? undefined : undefined,
+        senderDisplayNameEffectId:
+          typeof rawSender === "object" ? (rawSender as any).displayNameEffectId ?? undefined : undefined,
+        senderDisplayNamePrimaryHex:
+          typeof rawSender === "object" ? (rawSender as any).displayNamePrimaryHex ?? undefined : undefined,
+        senderDisplayNameAccentHex:
+          typeof rawSender === "object" ? (rawSender as any).displayNameAccentHex ?? undefined : undefined,
         timestamp: new Date(msg.createdAt),
         isFromCurrentUser: false, // Always false for incoming messages
         type: "direct",
@@ -3364,7 +3502,9 @@ export default function MessagesPage() {
         }
 
         // Check for duplicates
-        const isDuplicate = currentMessages.some((m) => m.id === msg._id);
+        const isDuplicate = currentMessages.some(
+          (m) => String(m.id) === String(msg._id),
+        );
         if (!isDuplicate) {
           playMessageNotificationSound();
           const updated = [...currentMessages, uiMessage];
@@ -3416,12 +3556,16 @@ export default function MessagesPage() {
     if (!messageDeleted) return;
 
     const { messageId, deleteType, deletedAt } = messageDeleted;
-    const asRecalled = deleteType === "for-everyone";
+    // Backend also sends `type: "message_unsent"` for recall; treat as for-everyone if deleteType omitted.
+    const asRecalled =
+      deleteType === "for-everyone" ||
+      (messageDeleted as { type?: string }).type === "message_unsent";
+    const mid = messageId != null ? String(messageId) : "";
 
     setConversations((prev) => {
       const newMap = new Map(prev);
       for (const [friendId, messages] of newMap.entries()) {
-        const idx = messages.findIndex((m) => m.id === messageId);
+        const idx = messages.findIndex((m) => String(m.id) === mid);
         if (idx === -1) continue;
 
         if (asRecalled) {
@@ -3723,6 +3867,22 @@ export default function MessagesPage() {
           typeof msg.senderId === "string"
             ? undefined
             : nickByUserId.get(String((msg.senderId as any)._id)) || (msg.senderId as any).displayName || undefined,
+        senderDisplayNameFontId:
+          typeof msg.senderId === "string"
+            ? undefined
+            : (msg.senderId as any).displayNameFontId ?? undefined,
+        senderDisplayNameEffectId:
+          typeof msg.senderId === "string"
+            ? undefined
+            : (msg.senderId as any).displayNameEffectId ?? undefined,
+        senderDisplayNamePrimaryHex:
+          typeof msg.senderId === "string"
+            ? undefined
+            : (msg.senderId as any).displayNamePrimaryHex ?? undefined,
+        senderDisplayNameAccentHex:
+          typeof msg.senderId === "string"
+            ? undefined
+            : (msg.senderId as any).displayNameAccentHex ?? undefined,
         serverNickname:
           typeof msg.senderId === "string"
             ? undefined
@@ -3806,7 +3966,7 @@ export default function MessagesPage() {
       });
 
       const uiMessages: UIMessage[] = backendMessages.map((msg: any) => ({
-        id: msg._id,
+        id: String(msg._id),
         text: msg.content,
         senderId: msg.senderId._id,
         senderEmail: msg.senderId.email,
@@ -4123,13 +4283,14 @@ export default function MessagesPage() {
       // Local optimistic update.
       setConversations((prev) => {
         const newMap = new Map(prev);
+        const midLocal = String(messageId);
         for (const [friendId, messages] of newMap.entries()) {
-          const idx = messages.findIndex((m) => m.id === messageId);
+          const idx = messages.findIndex((m) => String(m.id) === midLocal);
           if (idx === -1) continue;
 
           if (deleteType === "for-me") {
             // Hide the bubble entirely on this device.
-            const next = messages.filter((m) => m.id !== messageId);
+            const next = messages.filter((m) => String(m.id) !== midLocal);
             newMap.set(friendId, next);
           } else {
             // Keep the bubble; replace with a "recalled" placeholder.
@@ -7067,7 +7228,10 @@ export default function MessagesPage() {
                     <div className={styles.userTextInfo}>
                       <div
                         className={styles.userDisplayName}
-                        style={getDisplayNameTextStyle(currentUserProfile, messagesShellTheme)}
+                        style={getDisplayNameTextStyle(
+                          selfSidebarDisplayStyleSource ?? undefined,
+                          messagesShellTheme,
+                        )}
                       >
                         {currentUserProfile?.displayName ||
                           currentUserProfile?.username ||
@@ -7773,7 +7937,10 @@ export default function MessagesPage() {
                     <div className={styles.userTextInfo}>
                       <div
                         className={styles.userDisplayName}
-                        style={getDisplayNameTextStyle(currentUserProfile, messagesShellTheme)}
+                        style={getDisplayNameTextStyle(
+                          selfSidebarDisplayStyleSource ?? undefined,
+                          messagesShellTheme,
+                        )}
                       >
                         {currentServerNickname ||
                           currentUserProfile?.displayName ||
@@ -11296,8 +11463,13 @@ export default function MessagesPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className={styles.pollModalHeader}>
-              <h2>Tạo khảo sát</h2>
-              <button className={styles.closeButton} onClick={handleCancelPoll}>
+              <h2>{t("chat.createPoll.title")}</h2>
+              <button
+                type="button"
+                className={styles.closeButton}
+                aria-label={t("chat.createPoll.closeAria")}
+                onClick={handleCancelPoll}
+              >
                 <svg
                   width="20"
                   height="20"
@@ -11315,12 +11487,12 @@ export default function MessagesPage() {
             <div className={styles.pollModalBody}>
               {/* Question */}
               <div className={styles.pollField}>
-                <label className={styles.pollLabel}>Câu hỏi</label>
+                <label className={styles.pollLabel}>{t("chat.createPoll.questionLabel")}</label>
                 <div className={styles.pollInputWrapper}>
                   <input
                     type="text"
                     className={styles.pollInput}
-                    placeholder="Bạn muốn hỏi gì?"
+                    placeholder={t("chat.createPoll.questionPlaceholder")}
                     value={pollQuestion}
                     onChange={(e) => setPollQuestion(e.target.value)}
                     maxLength={300}
@@ -11333,10 +11505,10 @@ export default function MessagesPage() {
 
               {/* Options */}
               <div className={styles.pollField}>
-                <label className={styles.pollLabel}>Các phương án trả lời</label>
+                <label className={styles.pollLabel}>{t("chat.createPoll.optionsLabel")}</label>
                 {pollOptions.map((option, index) => (
                   <div key={index} className={styles.pollOptionRow}>
-                    <button className={styles.emojiButton}>
+                    <button type="button" className={styles.emojiButton}>
                       <svg
                         width="20"
                         height="20"
@@ -11354,7 +11526,7 @@ export default function MessagesPage() {
                     <input
                       type="text"
                       className={styles.pollOptionInput}
-                      placeholder="Nhập câu trả lời"
+                      placeholder={t("chat.createPoll.optionPlaceholder")}
                       value={option}
                       onChange={(e) =>
                         handlePollOptionChange(index, e.target.value)
@@ -11362,6 +11534,7 @@ export default function MessagesPage() {
                     />
                     {pollOptions.length > 2 && (
                       <button
+                        type="button"
                         className={styles.deleteOptionButton}
                         onClick={() => handleRemovePollOption(index)}
                       >
@@ -11381,27 +11554,28 @@ export default function MessagesPage() {
                   </div>
                 ))}
                 <button
+                  type="button"
                   className={styles.addOptionButton}
                   onClick={handleAddPollOption}
                 >
-                  + Thêm phương án
+                  + {t("chat.createPoll.addOption")}
                 </button>
               </div>
 
               {/* Duration */}
               <div className={styles.pollField}>
-                <label className={styles.pollLabel}>Thời gian</label>
+                <label className={styles.pollLabel}>{t("chat.createPoll.durationLabel")}</label>
                 <select
                   className={styles.pollSelect}
                   value={pollDuration}
                   onChange={(e) => setPollDuration(Number(e.target.value))}
                 >
-                  <option value={1}>1 giờ</option>
-                  <option value={4}>4 giờ</option>
-                  <option value={8}>8 giờ</option>
-                  <option value={24}>24 giờ</option>
-                  <option value={72}>3 ngày</option>
-                  <option value={168}>7 ngày</option>
+                  <option value={1}>{t("chat.createPoll.duration1h")}</option>
+                  <option value={4}>{t("chat.createPoll.duration4h")}</option>
+                  <option value={8}>{t("chat.createPoll.duration8h")}</option>
+                  <option value={24}>{t("chat.createPoll.duration24h")}</option>
+                  <option value={72}>{t("chat.createPoll.duration3d")}</option>
+                  <option value={168}>{t("chat.createPoll.duration7d")}</option>
                 </select>
               </div>
 
@@ -11413,22 +11587,24 @@ export default function MessagesPage() {
                   checked={pollAllowMultiple}
                   onChange={(e) => setPollAllowMultiple(e.target.checked)}
                 />
-                <label htmlFor="allowMultiple">Cho phép chọn nhiều phương án</label>
+                <label htmlFor="allowMultiple">{t("chat.createPoll.allowMultiple")}</label>
               </div>
             </div>
 
             <div className={styles.pollModalFooter}>
               <button
+                type="button"
                 className={styles.cancelButton}
                 onClick={handleCancelPoll}
               >
-                Hủy
+                {t("chat.createPoll.cancel")}
               </button>
               <button
+                type="button"
                 className={styles.submitButton}
                 onClick={handleSubmitPoll}
               >
-                Đăng
+                {t("chat.createPoll.submit")}
               </button>
             </div>
           </div>

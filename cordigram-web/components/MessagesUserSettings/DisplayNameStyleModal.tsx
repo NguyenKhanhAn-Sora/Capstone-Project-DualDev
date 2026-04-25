@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./DisplayNameStyleModal.module.css";
+import { useLanguage } from "@/component/language-provider";
 
 export type DisplayNameFontId = "default" | "rounded" | "mono";
 export type DisplayNameEffectId = "solid" | "gradient" | "neon";
@@ -18,9 +19,13 @@ type Props = {
   open: boolean;
   locked: boolean;
   value: DisplayNameStyleValue;
+  /** Giá trị đã lưu / trước khi mở modal — dùng khi Hủy để hoàn tác preview realtime. */
+  revertValue: DisplayNameStyleValue;
   onClose: () => void;
   onChange: (next: DisplayNameStyleValue) => void;
   onToast?: (message: string) => void;
+  /** Gọi khi draft đổi (debounce) để cập nhật DM/sidebar không cần lưu API. */
+  onDraftPreview?: (next: DisplayNameStyleValue) => void;
 };
 
 const DEFAULT_VALUE: DisplayNameStyleValue = {
@@ -60,16 +65,37 @@ export default function DisplayNameStyleModal({
   open,
   locked,
   value,
+  revertValue,
   onClose,
   onChange,
   onToast,
+  onDraftPreview,
 }: Props) {
+  const { t } = useLanguage();
   const [draft, setDraft] = useState<DisplayNameStyleValue>(value || DEFAULT_VALUE);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setDraft(value || DEFAULT_VALUE);
   }, [open, value]);
+
+  useEffect(() => {
+    if (!open || !onDraftPreview) return;
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = setTimeout(() => {
+      previewTimerRef.current = null;
+      onDraftPreview(draft);
+    }, 90);
+    return () => {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    };
+  }, [draft, open, onDraftPreview]);
+
+  const handleCancel = () => {
+    onDraftPreview?.(revertValue);
+    onClose();
+  };
 
   const fontPreviewClass = useMemo(() => {
     if (draft.fontId === "mono") return styles.fontMono;
@@ -84,70 +110,79 @@ export default function DisplayNameStyleModal({
       className={styles.backdrop}
       role="presentation"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) handleCancel();
       }}
     >
       <div className={styles.card} onMouseDown={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <div>
-            <div className={styles.title}>Kiểu Tên Hiển Thị</div>
+            <div className={styles.title}>{t("chat.displayNameStyleModal.title")}</div>
             {locked ? (
               <div className={styles.subTitle}>
-                Bị khóa — bạn có thể dùng thử trong preview, nhưng không lưu thật.
+                {t("chat.displayNameStyleModal.subtitleLocked")}
               </div>
             ) : null}
           </div>
-          <button type="button" className={styles.closeX} aria-label="Đóng" onClick={onClose}>
+          <button
+            type="button"
+            className={styles.closeX}
+            aria-label={t("chat.displayNameStyleModal.closeAria")}
+            onClick={handleCancel}
+          >
             ×
           </button>
         </div>
 
         <div className={styles.body}>
           <div className={styles.left}>
-            <div className={styles.sectionLabel}>Font</div>
+            <div className={styles.sectionLabel}>{t("chat.displayNameStyleModal.sectionFont")}</div>
             <div className={styles.pills}>
-              {([
-                { id: "default", label: "Mặc định" },
-                { id: "rounded", label: "Bo tròn" },
-                { id: "mono", label: "Mono" },
-              ] as const).map((it) => (
+              {(
+                [
+                  { id: "default" as const, labelKey: "chat.displayNameStyleModal.fontDefault" },
+                  { id: "rounded" as const, labelKey: "chat.displayNameStyleModal.fontRounded" },
+                  { id: "mono" as const, labelKey: "chat.displayNameStyleModal.fontMono" },
+                ] as const
+              ).map((it) => (
                 <button
                   key={it.id}
                   type="button"
                   className={`${styles.pill} ${draft.fontId === it.id ? styles.pillActive : ""}`}
                   onClick={() => setDraft((p) => ({ ...p, fontId: it.id }))}
                 >
-                  {it.label}
+                  {t(it.labelKey)}
                 </button>
               ))}
             </div>
 
             <div className={styles.sectionLabel} style={{ marginTop: 14 }}>
-              Hiệu ứng
+              {t("chat.displayNameStyleModal.sectionEffect")}
             </div>
             <div className={styles.pills}>
-              {([
-                { id: "solid", label: "Đơn sắc" },
-                { id: "gradient", label: "Chuyển màu" },
-                { id: "neon", label: "Neon" },
-              ] as const).map((it) => (
+              {(
+                [
+                  { id: "solid" as const, labelKey: "chat.displayNameStyleModal.effectSolid" },
+                  { id: "gradient" as const, labelKey: "chat.displayNameStyleModal.effectGradient" },
+                  { id: "neon" as const, labelKey: "chat.displayNameStyleModal.effectNeon" },
+                ] as const
+              ).map((it) => (
                 <button
                   key={it.id}
                   type="button"
                   className={`${styles.pill} ${draft.effectId === it.id ? styles.pillActive : ""}`}
                   onClick={() => setDraft((p) => ({ ...p, effectId: it.id }))}
                 >
-                  {it.label}
+                  {t(it.labelKey)}
                 </button>
               ))}
             </div>
 
             <div className={styles.sectionLabel} style={{ marginTop: 14 }}>
-              Màu
+              {t("chat.displayNameStyleModal.sectionColor")}
             </div>
             <div className={styles.colorGrid}>
               <label className={styles.colorRow}>
-                <span className={styles.colorLabel}>Primary</span>
+                <span className={styles.colorLabel}>{t("chat.displayNameStyleModal.colorPrimary")}</span>
                 <input
                   type="color"
                   className={styles.colorInput}
@@ -162,7 +197,7 @@ export default function DisplayNameStyleModal({
                 />
               </label>
               <label className={styles.colorRow}>
-                <span className={styles.colorLabel}>Accent</span>
+                <span className={styles.colorLabel}>{t("chat.displayNameStyleModal.colorAccent")}</span>
                 <input
                   type="color"
                   className={styles.colorInput}
@@ -180,32 +215,32 @@ export default function DisplayNameStyleModal({
           </div>
 
           <div className={styles.right}>
-            <div className={styles.previewTitle}>Preview</div>
+            <div className={styles.previewTitle}>{t("chat.displayNameStyleModal.previewTitle")}</div>
             <div className={styles.previewCard}>
               <div className={`${styles.previewName} ${fontPreviewClass}`} style={namePreviewStyle(draft)}>
                 Cordigram
               </div>
-              <div className={styles.previewSub}>@cordigram • they/them</div>
+              <div className={styles.previewSub}>{t("chat.displayNameStyleModal.previewSub")}</div>
             </div>
           </div>
         </div>
 
         <div className={styles.footer}>
-          <button type="button" className={styles.btnMuted} onClick={onClose}>
-            Hủy
+          <button type="button" className={styles.btnMuted} onClick={handleCancel}>
+            {t("chat.displayNameStyleModal.cancel")}
           </button>
           <button
             type="button"
             className={styles.btnPrimary}
             onClick={() => {
               if (locked) {
-                onToast?.("Cần Boost để lưu kiểu tên hiển thị.");
+                onToast?.(t("chat.displayNameStyleModal.toastNeedBoost"));
               }
               onChange(draft);
               onClose();
             }}
           >
-            {locked ? "Dùng thử" : "Dùng"}
+            {locked ? t("chat.displayNameStyleModal.applyTry") : t("chat.displayNameStyleModal.apply")}
           </button>
         </div>
       </div>
@@ -213,4 +248,3 @@ export default function DisplayNameStyleModal({
     document.body,
   );
 }
-
