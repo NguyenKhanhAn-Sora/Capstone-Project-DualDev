@@ -213,7 +213,9 @@ function UnifiedCallView({
         video: {
           displaySurface: "browser",
           cursor: "always",
-          selfBrowserSurface: "include",
+          // Avoid selecting the current call tab itself when possible
+          // (prevents recursive "hall of mirrors" effect).
+          selfBrowserSurface: "exclude",
           surfaceSwitching: "include",
           monitorTypeSurfaces: "include",
         },
@@ -242,7 +244,7 @@ function UnifiedCallView({
   // caused the Vercel deploy to fail.
   const realCameraTracks = cameraTracks.filter(
     (t): t is TrackReference => isTrackReference(t),
-  );
+  ).filter((t) => !t.publication.isMuted);
   const remoteCameraTrack = realCameraTracks.find(
     (t) => !t.participant.isLocal,
   );
@@ -252,7 +254,7 @@ function UnifiedCallView({
 
   const realScreenTracks = screenShareTracks.filter(
     (t): t is TrackReference => isTrackReference(t),
-  );
+  ).filter((t) => !t.publication.isMuted);
   const remoteScreenTrack = realScreenTracks.find(
     (t) => !t.participant.isLocal,
   );
@@ -263,17 +265,15 @@ function UnifiedCallView({
   const anyScreenSharePublished = realScreenTracks.length > 0;
   const showVideoLayout = anyVideoPublished || anyScreenSharePublished;
 
-  /** Main stage: remote screen first, then local screen (preview while sharing), then remote camera, else avatar. */
+  /** Main stage: remote screen first, then remote camera, else avatar. */
   const mainScreenOrCamera:
     | { kind: "screen"; ref: TrackReference }
     | { kind: "camera"; ref: TrackReference }
     | { kind: "avatar" } = remoteScreenTrack
     ? { kind: "screen", ref: remoteScreenTrack }
-    : localScreenTrack
-      ? { kind: "screen", ref: localScreenTrack }
-      : remoteCameraTrack
-        ? { kind: "camera", ref: remoteCameraTrack }
-        : { kind: "avatar" };
+    : remoteCameraTrack
+      ? { kind: "camera", ref: remoteCameraTrack }
+      : { kind: "avatar" };
 
   const mainIsRemoteScreen =
     mainScreenOrCamera.kind === "screen" &&
@@ -290,6 +290,11 @@ function UnifiedCallView({
       isCameraOn);
 
   const showRemoteAvatarPip = mainIsLocalScreen && !remoteCameraTrack;
+  const showLocalScreenPip =
+    Boolean(localScreenTrack) &&
+    !mainIsLocalScreen &&
+    !mainIsRemoteScreen &&
+    !showCameraPip;
 
   const pipTrackRef: TrackReference | null =
     mainIsRemoteScreen && localCameraTrack && isCameraOn
@@ -328,6 +333,13 @@ function UnifiedCallView({
               <div className={styles.unifiedPip}>
                 <VideoTrack
                   trackRef={pipTrackRef}
+                  className={styles.unifiedPipVideo}
+                />
+              </div>
+            ) : showLocalScreenPip && localScreenTrack ? (
+              <div className={styles.unifiedPip}>
+                <VideoTrack
+                  trackRef={localScreenTrack}
                   className={styles.unifiedPipVideo}
                 />
               </div>

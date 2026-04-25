@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -49,6 +50,7 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   final TextEditingController _inputController = TextEditingController();
   bool _loading = true;
   List<DmMessage> _messages = const [];
+  DmMessage? _replyingTo;
   Timer? _typingTimer;
   bool _typingOn = false;
   final Map<String, String> _serverEmojiMap = {};
@@ -191,12 +193,15 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
   Future<void> _sendTextMessage() async {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
+    final replyId = _replyingTo?.id;
     _inputController.clear();
     _flushTyping(false);
     await widget.controller.sendTextMessage(
       userId: widget.thread.id,
       content: text,
+      replyTo: replyId,
     );
+    if (mounted) setState(() => _replyingTo = null);
   }
 
   Future<void> _onStartCall({required bool video}) async {
@@ -248,8 +253,10 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
           peerUserId: widget.thread.id,
           filePath: path,
           mimeType: mime,
+          replyTo: _replyingTo?.id,
         );
       }
+      if (mounted) setState(() => _replyingTo = null);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -860,7 +867,11 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                                 giphyId: g.id,
                                 mediaType: stickers ? 'sticker' : 'gif',
                                 title: g.title,
+                                replyTo: _replyingTo?.id,
                               );
+                              if (mounted && _replyingTo != null) {
+                                setState(() => _replyingTo = null);
+                              }
                             },
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
@@ -967,7 +978,11 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                                 await widget.controller.sendTextMessage(
                                   userId: widget.thread.id,
                                   content: '🎨 [Sticker]: ${sticker.imageUrl}',
+                                  replyTo: _replyingTo?.id,
                                 );
+                                if (mounted && _replyingTo != null) {
+                                  setState(() => _replyingTo = null);
+                                }
                               },
                         child: Opacity(
                           opacity: group.locked ? 0.45 : 1,
@@ -1056,8 +1071,12 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       builder: (ctx) => _VoiceRecordPanel(
         peerUserId: widget.thread.id,
         controller: widget.controller,
+        replyToMessageId: _replyingTo?.id,
       ),
     );
+    if (mounted && _replyingTo != null) {
+      setState(() => _replyingTo = null);
+    }
   }
 
   Future<void> _showHamburgerMenu() async {
@@ -1246,6 +1265,168 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
     );
   }
 
+  Future<void> _showMessageActions({
+    required DmMessage message,
+    required bool isMine,
+  }) async {
+    const reactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0B1424),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              const Text(
+                'Hành động tin nhắn',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                children: reactions.map((emoji) {
+                  return ActionChip(
+                    label: Text(
+                      emoji,
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                    onPressed: () async {
+                      Navigator.of(ctx).pop();
+                      await widget.controller.addReaction(
+                        messageId: message.id,
+                        emoji: emoji,
+                      );
+                    },
+                    backgroundColor: const Color(0xFF1F2D4D),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.reply_rounded, color: Colors.white),
+                title: const Text(
+                  'Trả lời tin nhắn',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  setState(() => _replyingTo = message);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.add_reaction_outlined, color: Colors.white),
+                title: const Text(
+                  'Chọn emoji khác',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _showCustomReactionPicker(message);
+                },
+              ),
+              if (isMine)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                  title: const Text(
+                    'Xóa tin nhắn',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                  onTap: () async {
+                    Navigator.of(ctx).pop();
+                    final deleteType = await showModalBottomSheet<String>(
+                      context: context,
+                      backgroundColor: const Color(0xFF0B1424),
+                      builder: (dCtx) {
+                        return SafeArea(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                leading: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.white,
+                                ),
+                                title: const Text(
+                                  'Xóa ở phía tôi',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                onTap: () => Navigator.of(dCtx).pop('for-me'),
+                              ),
+                              ListTile(
+                                leading: const Icon(
+                                  Icons.delete_forever_outlined,
+                                  color: Colors.redAccent,
+                                ),
+                                title: const Text(
+                                  'Thu hồi cho mọi người',
+                                  style: TextStyle(color: Colors.redAccent),
+                                ),
+                                onTap: () =>
+                                    Navigator.of(dCtx).pop('for-everyone'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                    if (deleteType == null) return;
+                    await widget.controller.deleteDmMessage(
+                      peerUserId: widget.thread.id,
+                      messageId: message.id,
+                      deleteType: deleteType,
+                    );
+                    if (!mounted) return;
+                    setState(() {
+                      _messages = widget.controller.liveMessages(widget.thread.id);
+                    });
+                  },
+                ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showCustomReactionPicker(DmMessage message) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0B1424),
+      builder: (ctx) {
+        return SizedBox(
+          height: 360,
+          child: EmojiPicker(
+            onEmojiSelected: (_, emoji) async {
+              Navigator.of(ctx).pop();
+              await widget.controller.addReaction(
+                messageId: message.id,
+                emoji: emoji.emoji,
+              );
+            },
+            config: const Config(
+              emojiViewConfig: EmojiViewConfig(
+                backgroundColor: Color(0xFF0B1424),
+              ),
+              categoryViewConfig: CategoryViewConfig(
+                backgroundColor: Color(0xFF121e36),
+                iconColor: Color(0xFF8A98B8),
+                iconColorSelected: Colors.white,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   String _normalizedText(DmMessage message) {
     switch (message.type) {
       case 'gif':
@@ -1259,6 +1440,12 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       default:
         return message.content;
     }
+  }
+
+  String _replyPreviewText(DmReplyMessage reply) {
+    if ((reply.type ?? '') == 'voice') return '🔊 Tin nhắn thoại';
+    if ((reply.content).trim().isEmpty) return 'Tin nhắn';
+    return reply.content.trim();
   }
 
   String? _extractInviteUrl(String text) {
@@ -1382,6 +1569,13 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       );
     }
 
+    if (message.type == 'voice' && (message.voiceUrl ?? '').isNotEmpty) {
+      return _VoiceMessageBubble(
+        url: message.voiceUrl!,
+        durationSec: message.voiceDurationSec,
+      );
+    }
+
     return _buildEmojiAwareText(text);
   }
 
@@ -1492,22 +1686,108 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
                         alignment: isMine
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 8,
-                          ),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.sizeOf(context).width * 0.72,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isMine
-                                ? const Color(0xFF2B3C66)
-                                : const Color(0xFF1D2E52),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: _buildMessageContent(message),
+                        child: Column(
+                          crossAxisAlignment: isMine
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
+                          children: [
+                            GestureDetector(
+                              onLongPress: () => _showMessageActions(
+                                message: message,
+                                isMine: isMine,
+                              ),
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                constraints: BoxConstraints(
+                                  maxWidth: MediaQuery.sizeOf(context).width * 0.72,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isMine
+                                      ? const Color(0xFF2B3C66)
+                                      : const Color(0xFF1D2E52),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (message.replyTo != null)
+                                      Container(
+                                        margin: const EdgeInsets.only(bottom: 6),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0x33232f4a),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: const Color(0xFF44577F),
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              message.replyTo!.senderName ??
+                                                  message.replyTo!.senderId,
+                                              style: const TextStyle(
+                                                color: Color(0xFFB6C2DC),
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _replyPreviewText(message.replyTo!),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    _buildMessageContent(message),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (message.reactions.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Wrap(
+                                  spacing: 6,
+                                  children: message.reactions
+                                      .where((r) => r.emoji.isNotEmpty)
+                                      .map(
+                                        (r) => Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF1F2D4D),
+                                            borderRadius: BorderRadius.circular(999),
+                                          ),
+                                          child: Text(
+                                            '${r.emoji} ${r.count}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                              ),
+                          ],
                         ),
                       );
                     },
@@ -1519,7 +1799,55 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
       ),
       bottomNavigationBar: SafeArea(
         top: false,
-        child: Padding(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_replyingTo != null)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF17284A),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF3A4F77)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Đang trả lời',
+                            style: TextStyle(
+                              color: Color(0xFFB6C2DC),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _replyingTo!.content.isNotEmpty
+                                ? _replyingTo!.content
+                                : (_replyingTo!.type == 'voice'
+                                      ? '🔊 Tin nhắn thoại'
+                                      : 'Tin nhắn'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => setState(() => _replyingTo = null),
+                      icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+            Padding(
           padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1652,16 +1980,23 @@ class _MessageChatScreenState extends State<MessageChatScreen> {
             ],
           ),
         ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _VoiceRecordPanel extends StatefulWidget {
-  const _VoiceRecordPanel({required this.peerUserId, required this.controller});
+  const _VoiceRecordPanel({
+    required this.peerUserId,
+    required this.controller,
+    this.replyToMessageId,
+  });
 
   final String peerUserId;
   final MessagesController controller;
+  final String? replyToMessageId;
 
   @override
   State<_VoiceRecordPanel> createState() => _VoiceRecordPanelState();
@@ -1722,6 +2057,7 @@ class _VoiceRecordPanelState extends State<_VoiceRecordPanel> {
           filePath: path,
           mimeType: 'audio/mp4',
           durationSeconds: sec,
+          replyTo: widget.replyToMessageId,
         );
       }
       if (mounted) Navigator.of(context).pop();
@@ -1775,6 +2111,117 @@ class _VoiceRecordPanelState extends State<_VoiceRecordPanel> {
                 ),
               ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VoiceMessageBubble extends StatefulWidget {
+  const _VoiceMessageBubble({required this.url, this.durationSec});
+
+  final String url;
+  final int? durationSec;
+
+  @override
+  State<_VoiceMessageBubble> createState() => _VoiceMessageBubbleState();
+}
+
+class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
+  late final AudioPlayer _player = AudioPlayer();
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+  bool _playing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _player.onPositionChanged.listen((p) {
+      if (mounted) setState(() => _position = p);
+    });
+    _player.onDurationChanged.listen((d) {
+      if (mounted) setState(() => _duration = d);
+    });
+    _player.onPlayerStateChanged.listen((s) {
+      if (mounted) setState(() => _playing = s == PlayerState.playing);
+    });
+    _player.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _position = Duration.zero);
+    });
+  }
+
+  @override
+  void dispose() {
+    unawaited(_player.dispose());
+    super.dispose();
+  }
+
+  String _formatDuration() {
+    final fallback = widget.durationSec ?? 0;
+    final raw = _duration.inSeconds > 0 ? _duration.inSeconds : fallback;
+    final min = raw ~/ 60;
+    final sec = raw % 60;
+    return '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _togglePlay() async {
+    if (_playing) {
+      await _player.pause();
+      return;
+    }
+    await _player.play(UrlSource(widget.url));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = _duration.inMilliseconds > 0
+        ? _duration
+        : Duration(seconds: widget.durationSec ?? 0);
+    final progress = total.inMilliseconds <= 0
+        ? 0.0
+        : (_position.inMilliseconds / total.inMilliseconds)
+              .clamp(0.0, 1.0)
+              .toDouble();
+    return Container(
+      width: 230,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF26385F),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF5D6B87)),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: _togglePlay,
+            icon: Icon(
+              _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: Colors.white,
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Tin nhắn thoại',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                LinearProgressIndicator(
+                  value: progress,
+                  backgroundColor: const Color(0xFF1F2D4D),
+                  valueColor: const AlwaysStoppedAnimation(Color(0xFF6C5CE7)),
+                  minHeight: 4,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _formatDuration(),
+            style: const TextStyle(color: Color(0xFFB6C2DC), fontSize: 12),
+          ),
         ],
       ),
     );

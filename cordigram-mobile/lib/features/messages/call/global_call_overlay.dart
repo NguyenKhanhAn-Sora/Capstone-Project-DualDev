@@ -22,9 +22,17 @@ class GlobalCallOverlay extends StatelessWidget {
           animation: DmCallManager.instance,
           builder: (_, __) {
             final mgr = DmCallManager.instance;
-            // When the native call screen is open we suppress the overlays
-            // (the user is already inside a call view).
-            if (mgr.active != null) return const SizedBox.shrink();
+            // When call is active and minimized, show draggable mini-call.
+            if (mgr.active != null) {
+              if (!mgr.isCallMinimized) return const SizedBox.shrink();
+              return _MinimizedCallBubble(
+                offset: mgr.miniCallOffset,
+                title: mgr.active!.peerName,
+                onOffsetChanged: mgr.updateMiniCallOffset,
+                onRestore: mgr.restoreMinimizedCall,
+                onHangup: () => mgr.hangupActive(),
+              );
+            }
 
             final incoming = mgr.incoming;
             if (incoming != null) {
@@ -73,6 +81,87 @@ class GlobalCallOverlay extends StatelessWidget {
           },
         ),
       ],
+    );
+  }
+}
+
+class _MinimizedCallBubble extends StatelessWidget {
+  const _MinimizedCallBubble({
+    required this.offset,
+    required this.title,
+    required this.onOffsetChanged,
+    required this.onRestore,
+    required this.onHangup,
+  });
+
+  final Offset offset;
+  final String title;
+  final ValueChanged<Offset> onOffsetChanged;
+  final VoidCallback onRestore;
+  final VoidCallback onHangup;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: offset.dx,
+      top: offset.dy,
+      child: GestureDetector(
+        onPanUpdate: (details) {
+          final media = MediaQuery.sizeOf(context);
+          final nextX = (offset.dx + details.delta.dx).clamp(8.0, media.width - 220);
+          final nextY = (offset.dy + details.delta.dy).clamp(8.0, media.height - 80);
+          onOffsetChanged(Offset(nextX, nextY));
+        },
+        child: Material(
+          color: const Color(0xDD0F1B37),
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: 210,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF2C3A5A)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: onRestore,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.call_rounded, color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            title.isNotEmpty ? title : 'Cuộc gọi',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: onHangup,
+                  child: const Padding(
+                    padding: EdgeInsets.all(5),
+                    child: Icon(Icons.call_end_rounded, color: Color(0xFFED4245), size: 18),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

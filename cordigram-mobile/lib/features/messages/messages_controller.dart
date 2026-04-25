@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'models/dm_message.dart';
+import 'models/message_reaction.dart';
 import 'models/message_thread.dart';
 import 'models/presence_state.dart';
 import 'models/voice_control_state.dart';
@@ -22,6 +23,8 @@ class MessagesController extends ChangeNotifier {
   StreamSubscription<DmMessage>? _newMessageSub;
   StreamSubscription<DmUnreadCountEvent>? _unreadSub;
   StreamSubscription<PresenceState>? _presenceSub;
+  StreamSubscription<Map<String, dynamic>>? _reactionSub;
+  StreamSubscription<Map<String, dynamic>>? _deletedSub;
   Timer? _inboxPollTimer;
 
   bool _loadingThreads = false;
@@ -62,6 +65,10 @@ class MessagesController extends ChangeNotifier {
       notifyListeners();
     });
     _presenceSub = DirectMessagesRealtimeService.presences.listen(_onPresence);
+    _reactionSub = DirectMessagesRealtimeService.reactions.listen(_onReactionEvent);
+    _deletedSub = DirectMessagesRealtimeService.messageDeleted.listen(
+      _onDeletedEvent,
+    );
     _startInboxPolling();
     await refreshInboxCount();
     await refreshMyIdentity();
@@ -86,6 +93,8 @@ class MessagesController extends ChangeNotifier {
     await _newMessageSub?.cancel();
     await _unreadSub?.cancel();
     await _presenceSub?.cancel();
+    await _reactionSub?.cancel();
+    await _deletedSub?.cancel();
     _inboxPollTimer?.cancel();
     await DirectMessagesRealtimeService.disconnect();
   }
@@ -182,10 +191,12 @@ class MessagesController extends ChangeNotifier {
   Future<DmMessage?> sendTextMessage({
     required String userId,
     required String content,
+    String? replyTo,
   }) async {
     final sent = await DirectMessagesService.sendMessage(
       userId,
       content: content,
+      replyTo: replyTo,
     );
     if (sent != null) {
       prependMessageToCache(userId, sent);
@@ -199,6 +210,7 @@ class MessagesController extends ChangeNotifier {
     required String giphyId,
     required String mediaType,
     String title = '',
+    String? replyTo,
   }) async {
     final type = mediaType == 'sticker' ? 'sticker' : 'gif';
     final content = title.trim().isEmpty
@@ -209,6 +221,7 @@ class MessagesController extends ChangeNotifier {
       content: content,
       type: type,
       giphyId: giphyId,
+      replyTo: replyTo,
     );
     if (sent != null) {
       prependMessageToCache(peerUserId, sent);
@@ -222,6 +235,7 @@ class MessagesController extends ChangeNotifier {
     required String filePath,
     required String mimeType,
     required int durationSeconds,
+    String? replyTo,
   }) async {
     final upload = await MessagesMediaService.uploadFile(
       filePath: filePath,
@@ -237,6 +251,7 @@ class MessagesController extends ChangeNotifier {
       type: 'voice',
       voiceUrl: voiceUrl,
       voiceDuration: durationSeconds,
+      replyTo: replyTo,
     );
     if (sent != null) {
       prependMessageToCache(peerUserId, sent);
@@ -249,6 +264,7 @@ class MessagesController extends ChangeNotifier {
     required String peerUserId,
     required String filePath,
     required String mimeType,
+    String? replyTo,
   }) async {
     final upload = await MessagesMediaService.uploadFile(
       filePath: filePath,
@@ -264,6 +280,7 @@ class MessagesController extends ChangeNotifier {
       peerUserId,
       content: content,
       attachments: [url],
+      replyTo: replyTo,
     );
     if (sent != null) {
       prependMessageToCache(peerUserId, sent);
@@ -290,6 +307,83 @@ class MessagesController extends ChangeNotifier {
 
   Future<void> addReaction({required String messageId, required String emoji}) {
     return DirectMessagesService.addReaction(messageId, emoji);
+  }
+
+  Future<void> deleteDmMessage({
+    required String peerUserId,
+    required String messageId,
+    String deleteType = 'for-me',
+  }) async {
+    await DirectMessagesService.deleteMessage(messageId, deleteType: deleteType);
+    final list = _messagesByUser[peerUserId];
+    if (list == null || list.isEmpty) return;
+    list.removeWhere((m) => m.id == messageId);
+    _messagesByUser[peerUserId] = list;
+    notifyListeners();
+  }
+
+  void _onReactionEvent(Map<String, dynamic> payload) {
+    final messageId = payload['messageId']?.toString() ?? '';
+    if (messageId.isEmpty) return;
+    final reactionsRaw = payload['reactions'];
+    if (reactionsRaw is! List) return;
+    final reactions = reactionsRaw
+        .whereType<Map>()
+        .map((e) => MessageReaction.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+    var changed = false;
+    for (final entry in _messagesByUser.entries) {
+      final list = entry.value;
+      final idx = list.indexWhere((m) => m.id == messageId);
+      if (idx == -1) continue;
+      final old = list[idx];
+      list[idx] = DmMessage(
+        id: old.id,
+        senderId: old.senderId,
+        receiverId: old.receiverId,
+        content: old.content,
+        createdAt: old.createdAt,
+        type: old.type,
+        read: old.read,
+        voiceUrl: old.voiceUrl,
+        voiceDurationSec: old.voiceDurationSec,
+        giphyId: old.giphyId,
+        replyTo: old.replyTo,
+        attachments: old.attachments,
+        reactions: reactions,
+      );
+      changed = true;
+    }
+    if (changed) notifyListeners();
+  }
+
+  void _onDeletedEvent(Map<String, dynamic> payload) {
+    final messageId = payload['messageId']?.toString() ?? '';
+    if (messageId.isEmpty) return;
+    var changed = false;
+    for (final entry in _messagesByUser.entries) {
+      final list = entry.value;
+      final idx = list.indexWhere((m) => m.id == messageId);
+      if (idx == -1) continue;
+      final old = list[idx];
+      list[idx] = DmMessage(
+        id: old.id,
+        senderId: old.senderId,
+        receiverId: old.receiverId,
+        content: 'Tin nhắn đã được thu hồi',
+        createdAt: old.createdAt,
+        type: 'text',
+        read: old.read,
+        voiceUrl: null,
+        voiceDurationSec: null,
+        giphyId: null,
+        replyTo: old.replyTo,
+        attachments: const <String>[],
+        reactions: const <MessageReaction>[],
+      );
+      changed = true;
+    }
+    if (changed) notifyListeners();
   }
 
   bool isConversationMuted(String userId) => _conversationMuted[userId] == true;

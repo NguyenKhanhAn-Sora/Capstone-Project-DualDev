@@ -32,6 +32,7 @@ class DmCallManager extends ChangeNotifier {
   static const Duration _outgoingTimeout = Duration(seconds: 40);
   static const Duration _incomingTimeout = Duration(seconds: 45);
   static const Duration _rejectedLinger = Duration(seconds: 2);
+  static const String activeCallRouteName = '/dm-active-call';
 
   StreamSubscription<DmCallEvent>? _callSub;
   StreamSubscription<String>? _endedSub;
@@ -43,6 +44,8 @@ class DmCallManager extends ChangeNotifier {
   Timer? _outgoingTimer;
   Timer? _incomingTimer;
   Timer? _rejectedTimer;
+  bool _isCallMinimized = false;
+  Offset _miniCallOffset = const Offset(16, 140);
 
   /// Cached display/username of the currently authenticated user. Fetched
   /// lazily (and after login via [onAuthChanged]) so we can pass a real
@@ -57,6 +60,8 @@ class DmCallManager extends ChangeNotifier {
   OutgoingCallState? get outgoing => _outgoing;
   ActiveCallState? get active => _active;
   bool get hasActiveCall => _active != null;
+  bool get isCallMinimized => _isCallMinimized;
+  Offset get miniCallOffset => _miniCallOffset;
 
   /// Call once at app startup (after [AuthStorage.loadAll]) with the root
   /// navigator key. Safe to call multiple times — later calls are no-ops.
@@ -82,6 +87,7 @@ class DmCallManager extends ChangeNotifier {
     _incoming = null;
     _outgoing = null;
     _active = null;
+    _isCallMinimized = false;
     _myName = null;
     notifyListeners();
     final token = AuthStorage.accessToken;
@@ -247,7 +253,38 @@ class DmCallManager extends ChangeNotifier {
     if (act == null) return;
     DirectMessagesRealtimeService.endCall(act.peerUserId);
     _active = null;
+    _isCallMinimized = false;
     notifyListeners();
+  }
+
+  void minimizeActiveCall() {
+    if (_active == null || _isCallMinimized) return;
+    _isCallMinimized = true;
+    notifyListeners();
+  }
+
+  void updateMiniCallOffset(Offset offset) {
+    _miniCallOffset = offset;
+    notifyListeners();
+  }
+
+  void restoreMinimizedCall() {
+    if (_active == null) return;
+    _isCallMinimized = false;
+    notifyListeners();
+    final navigator = _navigatorKey?.currentState;
+    if (navigator == null) return;
+    var found = false;
+    navigator.popUntil((route) {
+      if (route.settings.name == activeCallRouteName) {
+        found = true;
+        return true;
+      }
+      return route.isFirst;
+    });
+    if (!found) {
+      _pushCallScreen();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -362,6 +399,7 @@ class DmCallManager extends ChangeNotifier {
     }
     if (_active?.peerUserId == fromUserId) {
       _active = null;
+      _isCallMinimized = false;
       changed = true;
     }
     if (changed) notifyListeners();
@@ -385,6 +423,7 @@ class DmCallManager extends ChangeNotifier {
       peerAvatarUrl: peerAvatarUrl,
       video: video,
     );
+    _isCallMinimized = false;
     notifyListeners();
     _pushCallScreen();
   }
@@ -402,6 +441,7 @@ class DmCallManager extends ChangeNotifier {
     if (act == null) return;
     navigator.push<void>(
       MaterialPageRoute(
+        settings: const RouteSettings(name: activeCallRouteName),
         fullscreenDialog: true,
         builder: (_) => NativeCallScreen(
           session: act.session,

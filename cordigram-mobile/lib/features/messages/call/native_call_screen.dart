@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_background/flutter_background.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -50,10 +53,14 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
   String? _fatalError;
   bool _micEnabled = true;
   bool _camEnabled = false;
+  bool _screenShareEnabled = false;
+  bool _screenShareBusy = false;
+  bool _shownShareScopeHint = false;
   bool _isVideoCall = false;
   bool _frontCamera = true;
   bool _speakerOn = true;
   bool _hangupCalled = false;
+  bool _allowPopForMinimize = false;
   DateTime? _connectedAt;
   Timer? _remoteLeavePending;
 
@@ -114,6 +121,8 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
         })
         ..on<TrackSubscribedEvent>((_) => _refreshParticipants())
         ..on<TrackUnsubscribedEvent>((_) => _refreshParticipants())
+        ..on<TrackMutedEvent>((_) => _refreshParticipants())
+        ..on<TrackUnmutedEvent>((_) => _refreshParticipants())
         ..on<LocalTrackPublishedEvent>((_) => _refreshParticipants())
         ..on<LocalTrackUnpublishedEvent>((_) => _refreshParticipants());
 
@@ -158,11 +167,17 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     if (!mounted) return;
     final room = _room;
     if (room == null) return;
+    final lp = room.localParticipant;
+    final localSharing = lp != null &&
+        lp.videoTrackPublications.any(
+          (pub) => pub.source == TrackSource.screenShareVideo && !pub.muted,
+        );
     setState(() {
       _participants = <Participant>[
         if (room.localParticipant != null) room.localParticipant!,
         ...room.remoteParticipants.values,
       ];
+      _screenShareEnabled = localSharing;
     });
   }
 
@@ -234,6 +249,81 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       await Hardware.instance.setSpeakerphoneOn(next);
       if (mounted) setState(() => _speakerOn = next);
     } catch (_) {}
+  }
+
+  Future<bool> _ensureAndroidScreenShareForegroundService() async {
+    if (!Platform.isAndroid) return true;
+    try {
+      final androidConfig = FlutterBackgroundAndroidConfig(
+        notificationTitle: 'Cordigram đang chia sẻ màn hình',
+        notificationText: 'Nhấn để quay lại cuộc gọi',
+        notificationImportance: AndroidNotificationImportance.normal,
+        notificationIcon: const AndroidResource(
+          name: 'ic_launcher',
+          defType: 'mipmap',
+        ),
+      );
+      final initialized = await FlutterBackground.initialize(
+        androidConfig: androidConfig,
+      );
+      if (!initialized) return false;
+      return await FlutterBackground.enableBackgroundExecution();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _toggleScreenShare() async {
+    final lp = _room?.localParticipant;
+    if (lp == null || _screenShareBusy) return;
+    final next = !_screenShareEnabled;
+    if (mounted) {
+      setState(() => _screenShareBusy = true);
+    } else {
+      _screenShareBusy = true;
+    }
+    try {
+      // On Android, explicit capture permission preflight avoids native crashes
+      // when user accepts the picker but projection session is not initialized.
+      if (next && Platform.isAndroid) {
+        if (!_shownShareScopeHint) {
+          _shownShareScopeHint = true;
+          _showSnack(
+            'Trên mobile chỉ hỗ trợ chia sẻ màn hình/app, không hỗ trợ chia sẻ theo từng tab như web.',
+          );
+        }
+        final fgReady = await _ensureAndroidScreenShareForegroundService();
+        if (!fgReady) {
+          _showSnack('Không thể khởi tạo foreground service cho chia sẻ màn hình');
+          return;
+        }
+        final allowed = await webrtc.Helper.requestCapturePermission();
+        if (allowed != true) {
+          _showSnack('Bạn chưa cấp quyền chia sẻ màn hình');
+          return;
+        }
+      }
+
+      final dynamic dynLp = lp;
+      await dynLp.setScreenShareEnabled(
+        next,
+        captureScreenAudio: false,
+      );
+      if (!next && Platform.isAndroid) {
+        try {
+          await FlutterBackground.disableBackgroundExecution();
+        } catch (_) {}
+      }
+      if (mounted) setState(() => _screenShareEnabled = next);
+    } catch (err) {
+      _showSnack('Không chia sẻ màn hình được: $err');
+    } finally {
+      if (mounted) {
+        setState(() => _screenShareBusy = false);
+      } else {
+        _screenShareBusy = false;
+      }
+    }
   }
 
   void _scheduleRemoteLeaveIfPersistent(Room room) {
@@ -348,9 +438,10 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       // the "in call" UI after the user taps the end button. While the
       // call is live we still block accidental back-swipes / system back
       // and route them through _hangup instead.
-      canPop: _hangupCalled,
+      canPop: _hangupCalled || _allowPopForMinimize,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
+        if (_allowPopForMinimize) return;
         await _hangup();
       },
       child: Scaffold(
@@ -363,7 +454,10 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
                 top: 8,
                 left: 8,
                 right: 8,
-                child: _CallHeader(title: widget.title, onClose: _hangup),
+                child: _CallHeader(
+                  title: widget.title,
+                  onMinimize: _minimizeCall,
+                ),
               ),
               if (_isVideoCall && _camEnabled && _room != null)
                 Positioned(
@@ -379,9 +473,11 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
                   isVideo: _isVideoCall,
                   micEnabled: _micEnabled,
                   camEnabled: _camEnabled,
+                  screenShareEnabled: _screenShareEnabled,
                   speakerOn: _speakerOn,
                   onToggleMic: _toggleMic,
                   onToggleCamera: _toggleCamera,
+                  onToggleScreenShare: _toggleScreenShare,
                   onToggleSpeaker: _toggleSpeaker,
                   onHangup: _hangup,
                 ),
@@ -391,6 +487,16 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _minimizeCall() async {
+    if (_hangupCalled || !mounted) return;
+    final mgr = DmCallManager.instance;
+    if (mgr.active == null) return;
+    if (mgr.isCallMinimized) return;
+    mgr.minimizeActiveCall();
+    setState(() => _allowPopForMinimize = true);
+    Navigator.of(context).pop();
   }
 
   Widget _buildBody() {
@@ -449,24 +555,25 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     return _VideoCallBody(
       participants: _participants,
       peerName: widget.title,
+      localScreenSharing: _screenShareEnabled,
     );
   }
 }
 
 class _CallHeader extends StatelessWidget {
-  const _CallHeader({required this.title, required this.onClose});
+  const _CallHeader({required this.title, required this.onMinimize});
 
   final String title;
-  final Future<void> Function() onClose;
+  final Future<void> Function() onMinimize;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         IconButton(
-          onPressed: () => onClose(),
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          tooltip: 'Kết thúc cuộc gọi',
+          onPressed: () => onMinimize(),
+          icon: const Icon(Icons.open_in_full_rounded, color: Colors.white),
+          tooltip: 'Thu nhỏ cuộc gọi',
         ),
         Expanded(
           child: Text(
@@ -486,13 +593,25 @@ class _CallHeader extends StatelessWidget {
 }
 
 class _VideoCallBody extends StatelessWidget {
-  const _VideoCallBody({required this.participants, required this.peerName});
+  const _VideoCallBody({
+    required this.participants,
+    required this.peerName,
+    required this.localScreenSharing,
+  });
 
   final List<Participant> participants;
   final String peerName;
+  final bool localScreenSharing;
 
   @override
   Widget build(BuildContext context) {
+    if (localScreenSharing) {
+      // Guard view while sharing from mobile:
+      // avoid rendering the live call scene inside the same captured screen,
+      // which creates the recursive "hall of mirrors" effect on remote clients.
+      return const _LocalShareGuardView();
+    }
+
     Participant? local;
     final remotes = <Participant>[];
     for (final p in participants) {
@@ -503,8 +622,25 @@ class _VideoCallBody extends StatelessWidget {
       }
     }
 
-    final mainParticipant = remotes.isNotEmpty ? remotes.first : local;
-    final pipParticipant = remotes.isNotEmpty ? local : null;
+    final remote = remotes.isNotEmpty ? remotes.first : null;
+    final remoteHasScreen = _ParticipantTile.hasScreenShare(remote);
+    final localHasScreen = _ParticipantTile.hasScreenShare(local);
+    final remoteHasCamera = _ParticipantTile.hasCamera(remote);
+
+    final mainParticipant = remoteHasScreen
+        ? remote
+        : localHasScreen
+            ? local
+            : remoteHasCamera
+                ? remote
+                : (remote ?? local);
+    final mainPrefersScreen =
+        remoteHasScreen || (localHasScreen && !remoteHasScreen);
+
+    final pipParticipant = mainParticipant == remote ? local : remote;
+    final showPip = pipParticipant != null &&
+        (_ParticipantTile.hasCamera(pipParticipant) ||
+            (mainParticipant == local && remote != null));
 
     return Stack(
       children: [
@@ -512,9 +648,10 @@ class _VideoCallBody extends StatelessWidget {
           child: _ParticipantTile(
             participant: mainParticipant,
             fallbackName: remotes.isEmpty ? 'Bạn' : peerName,
+            preferScreenShare: mainPrefersScreen,
           ),
         ),
-        if (pipParticipant != null)
+        if (showPip)
           Positioned(
             top: 72,
             right: 16,
@@ -524,12 +661,56 @@ class _VideoCallBody extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               child: _ParticipantTile(
                 participant: pipParticipant,
-                fallbackName: 'Bạn',
+                fallbackName: pipParticipant == local ? 'Bạn' : peerName,
                 compact: true,
               ),
             ),
           ),
       ],
+    );
+  }
+}
+
+class _LocalShareGuardView extends StatelessWidget {
+  const _LocalShareGuardView();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black,
+      alignment: Alignment.center,
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.screen_share_rounded,
+              color: Colors.white,
+              size: 54,
+            ),
+            SizedBox(height: 14),
+            Text(
+              'Đang chia sẻ màn hình',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Mở ứng dụng/nội dung bạn muốn chia sẻ. Màn hình cuộc gọi được ẩn tạm để tránh hiệu ứng lặp vô hạn.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFFB6C2DC),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -594,29 +775,59 @@ class _ParticipantTile extends StatelessWidget {
     required this.participant,
     required this.fallbackName,
     this.compact = false,
+    this.preferScreenShare = false,
   });
 
   final Participant? participant;
   final String fallbackName;
   final bool compact;
+  final bool preferScreenShare;
+
+  static bool hasScreenShare(Participant? participant) {
+    if (participant == null) return false;
+    return participant.videoTrackPublications.any(
+      (pub) => pub.source == TrackSource.screenShareVideo && !pub.muted,
+    );
+  }
+
+  static bool hasCamera(Participant? participant) {
+    if (participant == null) return false;
+    return participant.videoTrackPublications.any(
+      (pub) => pub.source == TrackSource.camera && !pub.muted,
+    );
+  }
 
   VideoTrack? _pickVideoTrack() {
     final p = participant;
     if (p == null) return null;
+    VideoTrack? camera;
+    VideoTrack? screen;
     for (final pub in p.videoTrackPublications) {
       final track = pub.track;
-      if (track is VideoTrack && !pub.muted) return track;
+      if (track is! VideoTrack || pub.muted) continue;
+      if (pub.source == TrackSource.screenShareVideo) {
+        screen = track;
+      } else if (pub.source == TrackSource.camera) {
+        camera = track;
+      }
     }
-    return null;
+    return preferScreenShare ? (screen ?? camera) : (camera ?? screen);
   }
 
   @override
   Widget build(BuildContext context) {
     final track = _pickVideoTrack();
     if (track != null) {
+      final isScreen = participant?.videoTrackPublications.any(
+            (pub) => pub.track == track && pub.source == TrackSource.screenShareVideo,
+          ) ==
+          true;
       return Container(
         color: Colors.black,
-        child: VideoTrackRenderer(track, fit: VideoViewFit.cover),
+        child: VideoTrackRenderer(
+          track,
+          fit: isScreen ? VideoViewFit.contain : VideoViewFit.cover,
+        ),
       );
     }
     final name = participant?.name ?? participant?.identity ?? fallbackName;
@@ -639,9 +850,10 @@ class _ParticipantTile extends StatelessWidget {
   }
 }
 
-/// Exactly four controls, matching the web redesign:
+/// Exactly five controls, matching the web redesign:
 ///   - mic mute       (audio in)
 ///   - speaker mute   (audio out)
+///   - screen share
 ///   - camera         (voice call → upgrade to video; video call → video on/off)
 ///   - end call
 class _CallControls extends StatelessWidget {
@@ -649,9 +861,11 @@ class _CallControls extends StatelessWidget {
     required this.isVideo,
     required this.micEnabled,
     required this.camEnabled,
+    required this.screenShareEnabled,
     required this.speakerOn,
     required this.onToggleMic,
     required this.onToggleCamera,
+    required this.onToggleScreenShare,
     required this.onToggleSpeaker,
     required this.onHangup,
   });
@@ -659,9 +873,11 @@ class _CallControls extends StatelessWidget {
   final bool isVideo;
   final bool micEnabled;
   final bool camEnabled;
+  final bool screenShareEnabled;
   final bool speakerOn;
   final Future<void> Function() onToggleMic;
   final Future<void> Function() onToggleCamera;
+  final Future<void> Function() onToggleScreenShare;
   final Future<void> Function() onToggleSpeaker;
   final Future<void> Function() onHangup;
 
@@ -697,6 +913,14 @@ class _CallControls extends StatelessWidget {
             active: speakerOn,
             onTap: onToggleSpeaker,
             tooltip: speakerOn ? 'Tắt âm thanh' : 'Bật âm thanh',
+          ),
+          _ControlButton(
+            icon: Icons.screen_share_rounded,
+            active: screenShareEnabled,
+            onTap: onToggleScreenShare,
+            tooltip: screenShareEnabled
+                ? 'Dừng chia sẻ màn hình'
+                : 'Chia sẻ màn hình',
           ),
           _ControlButton(
             icon: cameraIcon,

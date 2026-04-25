@@ -59,6 +59,9 @@ dependencies:
   # with the `@livekit/components-react` SDK on cordigram-web, so web ↔ mobile
   # and mobile ↔ mobile calls just work).
   livekit_client: ^2.7.0
+  flutter_webrtc: ^1.4.0
+  flutter_background: ^1.3.0+1
+  audioplayers: ^6.6.0
 
 dev_dependencies:
   flutter_test:
