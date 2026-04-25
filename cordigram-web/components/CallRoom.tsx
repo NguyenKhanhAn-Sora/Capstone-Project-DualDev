@@ -90,16 +90,13 @@ export default function CallRoom({
 // -----------------------------------------------------------------------------
 // Single call UI for both audio and video modes. Deliberately mirrors the
 // mobile `NativeCallScreen` layout: full-bleed remote video (or avatar grid
-// when no camera is publishing) + a bottom pill with exactly four controls:
+// when no camera is publishing) + bottom controls overlaid on the stage:
 //
-//   1. Mic toggle       (audio in)
-//   2. Speaker toggle   (audio out — mutes all remote audio)
-//   3. Camera toggle    (voice call → upgrades to video; video call → on/off)
-//   4. End call
-//
-// Screen-share and the old per-participant tile grid were intentionally
-// removed — they diverged from the mobile experience and weren't part of the
-// redesigned spec.
+//   1. Mic toggle
+//   2. Speaker toggle (mutes all remote audio via volume)
+//   3. Screen share
+//   4. Camera toggle
+//   5. End call
 // =============================================================================
 function UnifiedCallView({
   participantName,
@@ -116,6 +113,7 @@ function UnifiedCallView({
   const [isMicOn, setIsMicOn] = useState(true);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(!startedAsAudioOnly);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   // Subscribe to ALL tracks (camera + mic, with placeholders) so both the
   // video grid and the audio-only avatar grid can render off a single source.
@@ -189,6 +187,45 @@ function UnifiedCallView({
     }
   }, [localParticipant]);
 
+  const toggleScreenShare = useCallback(async () => {
+    if (!localParticipant) return;
+    const isCurrentlySharing = localParticipant.isScreenShareEnabled;
+
+    if (isCurrentlySharing) {
+      try {
+        await localParticipant.setScreenShareEnabled(false);
+        setIsScreenSharing(false);
+      } catch (err) {
+        console.error("[CALL] Failed to stop screen share:", err);
+      }
+      return;
+    }
+
+    try {
+      // Hint browser picker to include both individual tabs and full windows.
+      await localParticipant.setScreenShareEnabled(true, {
+        audio: true,
+        video: {
+          displaySurface: "browser",
+          cursor: "always",
+          selfBrowserSurface: "include",
+          surfaceSwitching: "include",
+          monitorTypeSurfaces: "include",
+        },
+      } as any);
+      setIsScreenSharing(true);
+    } catch (err) {
+      // User cancelling the picker is expected; keep UI state stable.
+      console.error("[CALL] Failed to start screen share:", err);
+      setIsScreenSharing(false);
+    }
+  }, [localParticipant]);
+
+  useEffect(() => {
+    if (!localParticipant) return;
+    setIsScreenSharing(localParticipant.isScreenShareEnabled);
+  }, [localParticipant, localParticipant?.isScreenShareEnabled]);
+
   // Decide what the main viewport renders. Prefer the remote participant's
   // video when available; otherwise fall back to the avatar grid — same
   // behaviour as the native call screen.
@@ -256,6 +293,13 @@ function UnifiedCallView({
           onClick={toggleSpeaker}
         >
           {isSpeakerOn ? <SpeakerOnIcon /> : <SpeakerOffIcon />}
+        </ControlButton>
+        <ControlButton
+          label={isScreenSharing ? "Dừng chia sẻ màn hình" : "Chia sẻ màn hình"}
+          active={isScreenSharing}
+          onClick={toggleScreenShare}
+        >
+          <ScreenShareIcon />
         </ControlButton>
         <ControlButton
           label={isCameraOn ? "Tắt camera" : "Bật camera"}
@@ -406,6 +450,15 @@ function CameraOffIcon() {
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10" />
       <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
+function ScreenShareIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
     </svg>
   );
 }

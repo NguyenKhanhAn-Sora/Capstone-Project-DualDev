@@ -533,9 +533,8 @@
 }
 
 /* =========================================================================
-   Unified Call View — mirrors the mobile NativeCallScreen layout (single
-   full-bleed stage + 4-button pill). Scoped with 'unified*' so it coexists
-   with the legacy classes still used by other screens.
+   Unified Call View — full-bleed stage with controls overlaid at the bottom
+   (not a separate footer band that shrinks the video). Scoped with 'unified*'.
    ========================================================================= */
 
 .unifiedCallContainer {
@@ -549,6 +548,7 @@
 
 .unifiedStage {
   flex: 1;
+  min-height: 0;
   position: relative;
   overflow: hidden;
 }
@@ -611,6 +611,8 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 24px;
   padding: 48px;
+  /* Leave room for overlaid control bar so avatars are not hidden behind it */
+  padding-bottom: calc(48px + 110px + env(safe-area-inset-bottom, 0px));
   align-content: center;
   justify-content: center;
   align-items: center;
@@ -646,11 +648,29 @@
 }
 
 .unifiedControlsBar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
   display: flex;
   justify-content: center;
-  gap: 18px;
-  padding: 24px 24px calc(24px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.25) 70%, transparent);
+  flex-wrap: wrap;
+  gap: 14px;
+  row-gap: 12px;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  /* Legible tap targets without an opaque strip that crops the video */
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.72) 0%,
+    rgba(0, 0, 0, 0.35) 45%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  pointer-events: none;
+}
+
+.unifiedControlsBar > * {
+  pointer-events: auto;
 }
 
 .unifiedCtrlBtn {
