@@ -167,6 +167,10 @@ export interface Message {
     displayName?: string;
     username?: string;
     avatarUrl?: string;
+    displayNameFontId?: string | null;
+    displayNameEffectId?: string | null;
+    displayNamePrimaryHex?: string | null;
+    displayNameAccentHex?: string | null;
   };
   content: string;
   attachments: string[];

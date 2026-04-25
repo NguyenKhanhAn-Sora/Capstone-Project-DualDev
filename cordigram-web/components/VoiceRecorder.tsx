@@ -21,13 +21,16 @@ export default function VoiceRecorder({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const pausedTimeRef = useRef<number>(0);
+  /** Why `stop()` was called — `onstop` always fires; without this, cancel (X) still uploads/sends. */
+  const stopIntentRef = useRef<"send" | "cancel" | null>(null);
 
   // Start recording on mount
   useEffect(() => {
     startRecording();
     return () => {
-      stopRecording();
+      stopIntentRef.current = "cancel";
       if (timerRef.current) clearInterval(timerRef.current);
+      stopRecording();
     };
   }, []);
 
@@ -53,12 +56,20 @@ export default function VoiceRecorder({
       };
 
       mediaRecorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+
+        const intent = stopIntentRef.current;
+        stopIntentRef.current = null;
+
+        if (intent === "cancel") {
+          onCancel();
+          return;
+        }
+
+        // "send" (or legacy null — treat as send only if we have chunks)
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const duration = Math.floor(recordingTime / 1000);
         onRecordComplete(audioBlob, duration);
-
-        // Stop all tracks
-        stream.getTracks().forEach((track) => track.stop());
       };
 
       mediaRecorder.start();
@@ -116,11 +127,19 @@ export default function VoiceRecorder({
   };
 
   const handleCancel = () => {
-    stopRecording();
-    onCancel();
+    stopIntentRef.current = "cancel";
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state !== "inactive") {
+      stopRecording();
+    } else {
+      stopIntentRef.current = null;
+      onCancel();
+    }
+    // When recorder stops normally, `onCancel` runs from `onstop` (not `onRecordComplete`).
   };
 
   const handleSend = () => {
+    stopIntentRef.current = "send";
     stopRecording();
   };
 
