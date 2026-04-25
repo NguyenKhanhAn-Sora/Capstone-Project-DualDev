@@ -274,6 +274,13 @@ interface UIMessage {
   deletedAt?: string;
 }
 
+type PendingMessageJump = {
+  messageId: string;
+  mode: "server" | "dm";
+  channelId?: string;
+  dmUserId?: string;
+};
+
 // GiphyMessage component for rendering GIF/Sticker
 const GiphyMessage = memo(
   ({
@@ -1464,6 +1471,10 @@ export default function MessagesPage() {
   const [conversations, setConversations] = useState<Map<string, UIMessage[]>>(
     new Map(),
   );
+  const [pendingMessageJump, setPendingMessageJump] =
+    useState<PendingMessageJump | null>(null);
+  const [highlightedJumpMessageId, setHighlightedJumpMessageId] = useState<string | null>(null);
+  const jumpHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Unread count per DM conversation (userId -> count). Updated from getConversationList; cleared when user opens chat. */
   const [dmUnreadCounts, setDmUnreadCounts] = useState<Record<string, number>>({});
   const [loadingDirectMessages, setLoadingDirectMessages] = useState(false);
@@ -1759,6 +1770,29 @@ export default function MessagesPage() {
   useEffect(() => {
     selectedChannelRef.current = selectedChannel;
   }, [selectedChannel]);
+  const escapeMessageSelectorValue = useCallback((value: string) => {
+    if (typeof window !== "undefined" && typeof window.CSS?.escape === "function") {
+      return window.CSS.escape(value);
+    }
+    return value.replace(/["\\]/g, "\\$&");
+  }, []);
+  const scrollToMessageBubble = useCallback(
+    (messageId: string) => {
+      const container = messagesContainerRef.current;
+      if (!container) return false;
+      const selector = `[data-message-id="${escapeMessageSelectorValue(messageId)}"]`;
+      const el = container.querySelector(selector) as HTMLElement | null;
+      if (!el) return false;
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      setHighlightedJumpMessageId(messageId);
+      if (jumpHighlightTimerRef.current) clearTimeout(jumpHighlightTimerRef.current);
+      jumpHighlightTimerRef.current = setTimeout(() => {
+        setHighlightedJumpMessageId((prev) => (prev === messageId ? null : prev));
+      }, 2200);
+      return true;
+    },
+    [escapeMessageSelectorValue],
+  );
 
   // DM sidebar: hồ sơ messaging của người đang chat + mutual servers / member since.
   useEffect(() => {
@@ -4097,6 +4131,76 @@ export default function MessagesPage() {
     }
     await loadDirectMessages(friend._id);
   };
+
+  useEffect(() => {
+    return () => {
+      if (jumpHighlightTimerRef.current) clearTimeout(jumpHighlightTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!pendingMessageJump) return;
+
+    if (pendingMessageJump.mode === "server") {
+      if (!pendingMessageJump.channelId) return;
+      if (selectedChannel !== pendingMessageJump.channelId) return;
+      let cancelled = false;
+      let attempts = 0;
+      const maxAttempts = 8;
+
+      const attempt = () => {
+        if (cancelled) return;
+        if (scrollToMessageBubble(pendingMessageJump.messageId)) {
+          setPendingMessageJump(null);
+          return;
+        }
+        attempts += 1;
+        if (attempts < maxAttempts) {
+          window.setTimeout(attempt, 140);
+        }
+      };
+
+      requestAnimationFrame(() => requestAnimationFrame(attempt));
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (pendingMessageJump.mode === "dm") {
+      const activeDmId = selectedDirectMessageFriend?._id;
+      if (!activeDmId || (pendingMessageJump.dmUserId && activeDmId !== pendingMessageJump.dmUserId)) {
+        return;
+      }
+
+      let cancelled = false;
+      let attempts = 0;
+      const maxAttempts = 8;
+
+      const attempt = () => {
+        if (cancelled) return;
+        if (scrollToMessageBubble(pendingMessageJump.messageId)) {
+          setPendingMessageJump(null);
+          return;
+        }
+        attempts += 1;
+        if (attempts < maxAttempts) {
+          window.setTimeout(attempt, 140);
+        }
+      };
+
+      requestAnimationFrame(() => requestAnimationFrame(attempt));
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [
+    pendingMessageJump,
+    selectedChannel,
+    selectedDirectMessageFriend?._id,
+    messages,
+    conversations,
+    scrollToMessageBubble,
+  ]);
 
   const handleOpenChannelUserProfile = useCallback(
     (message: UIMessage, anchorRect: DOMRect) => {
@@ -9281,6 +9385,15 @@ export default function MessagesPage() {
                           key={message.id}
                           data-message-id={message.id}
                           data-has-reactions={message.reactions?.length ? "true" : undefined}
+                          style={
+                            highlightedJumpMessageId === message.id
+                              ? {
+                                  background: "color-mix(in srgb, var(--color-panel-accent) 22%, transparent)",
+                                  borderRadius: 10,
+                                  transition: "background 220ms ease",
+                                }
+                              : undefined
+                          }
                         >
                           <MessageItem
                             message={message}
@@ -9381,7 +9494,19 @@ export default function MessagesPage() {
                               .slice()
                               .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
                               .map((m) => (
-                                <div key={m.id} data-message-id={m.id}>
+                                <div
+                                  key={m.id}
+                                  data-message-id={m.id}
+                                  style={
+                                    highlightedJumpMessageId === m.id
+                                      ? {
+                                          background: "color-mix(in srgb, var(--color-panel-accent) 22%, transparent)",
+                                          borderRadius: 10,
+                                          transition: "background 220ms ease",
+                                        }
+                                      : undefined
+                                  }
+                                >
                                   {renderMessageContent(m)}
                                 </div>
                               ))}
@@ -9408,7 +9533,19 @@ export default function MessagesPage() {
                       .map((message) => {
                       if (message.messageType === "system") {
                         return (
-                          <div key={message.id} data-message-id={message.id}>
+                          <div
+                            key={message.id}
+                            data-message-id={message.id}
+                            style={
+                              highlightedJumpMessageId === message.id
+                                ? {
+                                    background: "color-mix(in srgb, var(--color-panel-accent) 22%, transparent)",
+                                    borderRadius: 10,
+                                    transition: "background 220ms ease",
+                                  }
+                                : undefined
+                            }
+                          >
                             {renderMessageContent(message)}
                           </div>
                         );
@@ -9418,6 +9555,15 @@ export default function MessagesPage() {
                           key={message.id}
                           data-message-id={message.id}
                           data-has-reactions={message.reactions?.length ? "true" : undefined}
+                          style={
+                            highlightedJumpMessageId === message.id
+                              ? {
+                                  background: "color-mix(in srgb, var(--color-panel-accent) 22%, transparent)",
+                                  borderRadius: 10,
+                                  transition: "background 220ms ease",
+                                }
+                              : undefined
+                          }
                         >
                           <MessageItem
                             message={message}
@@ -10607,12 +10753,32 @@ export default function MessagesPage() {
         )}
         dmPartnerId={selectedDirectMessageFriend?._id}
         dmPartnerName={selectedDirectMessageFriend?.displayName || selectedDirectMessageFriend?.username}
-        onResultClick={(messageId, channelId) => {
+        onResultClick={({ messageId, channelId, dmUserId }) => {
           setShowMessageSearch(false);
           setMessageSearchDmConversationOnly(false);
-          if (channelId && selectedServer) {
-            trySelectChannel(channelId);
+          if (selectedServer) {
+            if (channelId) {
+              trySelectChannel(channelId);
+            }
+            setPendingMessageJump({
+              messageId,
+              mode: "server",
+              channelId: channelId || selectedChannel || undefined,
+            });
+            return;
           }
+
+          if (dmUserId && selectedDirectMessageFriend?._id !== dmUserId) {
+            const friend = friends.find((f) => f._id === dmUserId);
+            if (friend) {
+              void handleSelectDirectMessageFriend(friend);
+            }
+          }
+          setPendingMessageJump({
+            messageId,
+            mode: "dm",
+            dmUserId: dmUserId || selectedDirectMessageFriend?._id || undefined,
+          });
         }}
         onQuickSwitchDm={(userId) => {
           setShowMessageSearch(false);

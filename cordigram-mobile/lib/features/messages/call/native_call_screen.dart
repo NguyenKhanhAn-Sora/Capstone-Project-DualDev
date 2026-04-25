@@ -73,7 +73,9 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     super.initState();
     _isVideoCall = widget.session.isVideo;
     _camEnabled = widget.session.isVideo;
-    _speakerOn = widget.session.isVideo;
+    // Speaker control must match actual audio: start "on" for both voice and
+    // video so the icon is not shown muted until the user taps mute.
+    _speakerOn = true;
     _mgrListener = _onManagerChanged;
     DmCallManager.instance.addListener(_mgrListener!);
     _connect();
@@ -315,14 +317,17 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
             'Trên mobile chỉ hỗ trợ chia sẻ màn hình/app, không hỗ trợ chia sẻ theo từng tab như web.',
           );
         }
-        final fgReady = await _ensureAndroidScreenShareForegroundService();
-        if (!fgReady) {
-          _showSnack('Không thể khởi tạo foreground service cho chia sẻ màn hình');
-          return;
-        }
+        // API 34+: MediaProjection intent must run before the mediaProjection
+        // foreground service starts, then LiveKit may begin capture (see
+        // livekit/client-sdk-flutter#542).
         final allowed = await webrtc.Helper.requestCapturePermission();
         if (allowed != true) {
           _showSnack('Bạn chưa cấp quyền chia sẻ màn hình');
+          return;
+        }
+        final fgReady = await _ensureAndroidScreenShareForegroundService();
+        if (!fgReady) {
+          _showSnack('Không thể khởi tạo foreground service cho chia sẻ màn hình');
           return;
         }
       }
@@ -714,37 +719,44 @@ class _LocalShareGuardView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: Colors.black,
-      alignment: Alignment.center,
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.screen_share_rounded,
-              color: Colors.white,
-              size: 54,
-            ),
-            SizedBox(height: 14),
-            Text(
-              'Đang chia sẻ màn hình',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
+      child: SafeArea(
+        minimum: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Center(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.screen_share_rounded,
+                    color: Colors.white,
+                    size: MediaQuery.sizeOf(context).shortestSide < 360 ? 44 : 54,
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Đang chia sẻ màn hình',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: MediaQuery.sizeOf(context).shortestSide < 360 ? 17 : 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Mở ứng dụng hoặc nội dung bạn muốn gửi. Khung cuộc gọi được ẩn để tránh hình lặp vô hạn khi đối phương xem.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: const Color(0xFFB6C2DC),
+                      fontSize: MediaQuery.sizeOf(context).shortestSide < 360 ? 13 : 14,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
               ),
             ),
-            SizedBox(height: 8),
-            Text(
-              'Mở ứng dụng/nội dung bạn muốn chia sẻ. Màn hình cuộc gọi được ẩn tạm để tránh hiệu ứng lặp vô hạn.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFFB6C2DC),
-                fontSize: 14,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
