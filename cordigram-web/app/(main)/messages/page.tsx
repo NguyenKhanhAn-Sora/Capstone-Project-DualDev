@@ -6857,17 +6857,17 @@ export default function MessagesPage() {
       <div className={styles.leftSidebar}>
         <img
           src="/logo.png"
-          alt="Cordigram"
+          alt={t("chat.messagesPage.socialHomeTitle")}
           className={styles.logoImage}
-          onClick={() => {
-            setJoinedVoiceChannelId(null);
-            setVoiceChannelCallToken(null);
-            setVoiceChannelCallServerUrl("");
-            setSelectedServer(null);
-            setSelectedChannel(null);
-            setShowExploreView(false);
-              setShowBoostUpgradeView(false);
-            setShowJoinApplicationsView(false);
+          role="button"
+          tabIndex={0}
+          title={t("chat.messagesPage.socialHomeTitle")}
+          onClick={() => router.push("/")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              router.push("/");
+            }
           }}
           style={{ cursor: "pointer" }}
         />
@@ -6875,9 +6875,18 @@ export default function MessagesPage() {
         <button
           type="button"
           className={styles.socialHomeBtn}
-          title={t("chat.messagesPage.socialHomeTitle")}
-          aria-label={t("chat.messagesPage.socialHomeTitle")}
-          onClick={() => router.push("/")}
+          title={t("chat.messagesPage.messagesHomeTitle")}
+          aria-label={t("chat.messagesPage.messagesHomeTitle")}
+          onClick={() => {
+            setJoinedVoiceChannelId(null);
+            setVoiceChannelCallToken(null);
+            setVoiceChannelCallServerUrl("");
+            setSelectedServer(null);
+            setSelectedChannel(null);
+            setShowExploreView(false);
+            setShowBoostUpgradeView(false);
+            setShowJoinApplicationsView(false);
+          }}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />

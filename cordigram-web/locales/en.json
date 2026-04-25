@@ -1100,6 +1100,7 @@
       "soundOn": "Unmute",
       "soundOff": "Mute",
       "createServerTitle": "Create server",
+      "messagesHomeTitle": "Messages home",
       "socialHomeTitle": "Go to Social",
       "exploreTitle": "Explore",
       "exploreClose": "Close Explore",
