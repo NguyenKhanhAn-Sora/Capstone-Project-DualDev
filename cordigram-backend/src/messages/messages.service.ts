@@ -991,7 +991,11 @@ export class MessagesService {
   > {
     const userObjectId = new Types.ObjectId(userId);
     const messages = await this.messageModel
-      .find({ mentions: userObjectId, isDeleted: false })
+      .find({
+        mentions: userObjectId,
+        isDeleted: false,
+        deletedFor: { $nin: [userObjectId] },
+      })
       .populate('channelId', 'name type serverId')
       .sort({ createdAt: -1 })
       .limit(limit)
@@ -1142,7 +1146,6 @@ export class MessagesService {
   }> {
     const match: any = {
       channelId: new Types.ObjectId(channelId),
-      isDeleted: false,
     };
 
     // Access Control: nếu có viewerId thì chỉ cho xem khi viewer thuộc server.
@@ -1205,6 +1208,9 @@ export class MessagesService {
           { mentions: viewerOid },
         ];
       }
+
+      const viewerOid = new Types.ObjectId(viewerId);
+      match.deletedFor = { $nin: [viewerOid] };
     }
     const messages = await this.messageModel
       .find(match)
@@ -1329,6 +1335,10 @@ export class MessagesService {
       throw new NotFoundException(`Message with id ${messageId} not found`);
     }
 
+    if (message.isDeleted) {
+      throw new ForbiddenException('Cannot edit a deleted message');
+    }
+
     // Check if user is sender
     if (message.senderId.toString() !== userId) {
       throw new ForbiddenException('You can only edit your own messages');
@@ -1341,27 +1351,131 @@ export class MessagesService {
     return message.save();
   }
 
-  async deleteMessage(messageId: string, userId: string): Promise<void> {
-    const message = await this.messageModel.findById(messageId);
+  /**
+   * Xóa tin kênh máy chủ — giống DM:
+   * - `for-me`: ẩn với user hiện tại (`deletedFor`), người khác vẫn thấy.
+   * - `for-everyone`: chỉ người gửi; thu hồi nội dung, giữ bubble (`isDeleted` + xóa payload).
+   */
+  async deleteChannelMessage(
+    channelId: string,
+    messageId: string,
+    userId: string,
+    deleteType: 'for-everyone' | 'for-me',
+  ): Promise<{
+    deleteType: 'for-everyone' | 'for-me';
+    deletedAt: Date | null;
+    messageId: string;
+    channelId: string;
+    isDeletedForEveryone: boolean;
+  }> {
+    const canView = await this.userCanJoinChannelRoom(channelId, userId);
+    if (!canView) {
+      throw new ForbiddenException('Bạn không được phép thao tác trên kênh này');
+    }
 
+    if (!Types.ObjectId.isValid(messageId)) {
+      throw new BadRequestException(`Invalid message id: ${messageId}`);
+    }
+
+    const message = await this.messageModel.findById(messageId).exec();
     if (!message) {
       throw new NotFoundException(`Message with id ${messageId} not found`);
     }
 
-    // Check if user is sender
-    if (message.senderId.toString() !== userId) {
-      throw new ForbiddenException('You can only delete your own messages');
+    if (message.channelId.toString() !== channelId) {
+      throw new BadRequestException('Message does not belong to this channel');
     }
 
-    message.isDeleted = true;
-    await message.save();
+    const userObjectId = new Types.ObjectId(userId);
+    const senderIdStr = message.senderId.toString();
 
-    // Update channel message count
-    const channel = await this.channelModel.findById(message.channelId);
-    if (channel && channel.messageCount > 0) {
-      channel.messageCount -= 1;
-      await channel.save();
+    if (deleteType === 'for-everyone') {
+      if (senderIdStr !== userId) {
+        throw new ForbiddenException(
+          'Only the sender can delete message for everyone',
+        );
+      }
+
+      if (message.isDeleted) {
+        return {
+          deleteType: 'for-everyone',
+          deletedAt: message.deletedAt ?? new Date(),
+          messageId: message._id.toString(),
+          channelId,
+          isDeletedForEveryone: true,
+        };
+      }
+
+      const deletedAt = new Date();
+      const contentPlaceholder = '\u200b';
+      const filter = { _id: message._id };
+      const fullRecall = {
+        isDeleted: true,
+        deletedAt,
+        content: contentPlaceholder,
+        attachments: [] as string[],
+        giphyId: null as string | null,
+        customStickerUrl: null as string | null,
+        serverStickerId: null as Types.ObjectId | null,
+        voiceUrl: null as string | null,
+        voiceDuration: null as number | null,
+        reactions: [] as Array<{ userId: Types.ObjectId; emoji: string }>,
+      };
+      try {
+        const r = await this.messageModel.collection.updateOne(filter, {
+          $set: fullRecall,
+        });
+        if (!r.acknowledged || r.matchedCount === 0) {
+          throw new NotFoundException(`Message with id ${messageId} not found`);
+        }
+      } catch (_first) {
+        const r2 = await this.messageModel.collection.updateOne(filter, {
+          $set: {
+            isDeleted: true,
+            deletedAt,
+            content: contentPlaceholder,
+          },
+        });
+        if (!r2.acknowledged || r2.matchedCount === 0) {
+          throw new NotFoundException(`Message with id ${messageId} not found`);
+        }
+      }
+
+      return {
+        deleteType: 'for-everyone',
+        deletedAt,
+        messageId: message._id.toString(),
+        channelId,
+        isDeletedForEveryone: true,
+      };
     }
+
+    await this.messageModel.collection.updateOne(
+      { _id: message._id },
+      { $addToSet: { deletedFor: userObjectId } },
+    );
+
+    return {
+      deleteType: 'for-me',
+      deletedAt: null,
+      messageId: message._id.toString(),
+      channelId,
+      isDeletedForEveryone: false,
+    };
+  }
+
+  /** @deprecated Prefer deleteChannelMessage + deleteType; kept for DELETE clients. */
+  async deleteMessage(messageId: string, userId: string): Promise<void> {
+    const message = await this.messageModel.findById(messageId).lean().exec();
+    if (!message) {
+      throw new NotFoundException(`Message with id ${messageId} not found`);
+    }
+    await this.deleteChannelMessage(
+      message.channelId.toString(),
+      messageId,
+      userId,
+      'for-everyone',
+    );
   }
 
   async addReaction(
@@ -1373,6 +1487,10 @@ export class MessagesService {
 
     if (!message) {
       throw new NotFoundException(`Message with id ${messageId} not found`);
+    }
+
+    if (message.isDeleted) {
+      throw new ForbiddenException('Cannot react on a deleted message');
     }
 
     const userObjectId = new Types.ObjectId(userId);
@@ -1413,6 +1531,7 @@ export class MessagesService {
       .find({
         channelId: channelObjectId,
         isDeleted: false,
+        deletedFor: { $nin: [userObjectId] },
         mentions: userObjectId,
         createdAt: { $lte: now },
       })
@@ -1452,6 +1571,7 @@ export class MessagesService {
     return this.messageModel.countDocuments({
       channelId: channelObjectId,
       isDeleted: false,
+      deletedFor: { $nin: [userObjectId] },
       createdAt: { $gt: lastReadAt },
       senderId: { $ne: userObjectId },
     });

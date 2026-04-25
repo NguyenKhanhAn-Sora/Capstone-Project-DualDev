@@ -73,7 +73,6 @@ import MessageReactions from "@/components/MessageReactions";
 import MessageActionsMenu from "@/components/MessageActionsMenu";
 import ReportMessageDialog from "@/components/ReportMessageDialog";
 import ReplyMessagePreview from "@/components/ReplyMessagePreview";
-import DeleteMessageDialog from "@/components/DeleteMessageDialog";
 import CreateServerModal from "@/components/CreateServerModal/CreateServerModal";
 import CreateChannelModal, {
   type ChannelTypeForCreate,
@@ -640,6 +639,7 @@ function areMessagesEqual(
     nextProps.message.isDeletedForEveryone
   )
     return false;
+  if (prevProps.message.deletedAt !== nextProps.message.deletedAt) return false;
 
   // Emoji map / jumbo sizing đi qua renderMessageContent — phải re-render khi callback đổi
   if (prevProps.renderMessageContent !== nextProps.renderMessageContent)
@@ -1670,7 +1670,6 @@ export default function MessagesPage() {
   } | null>(null);
   const [showReportDialog, setShowReportDialog] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<UIMessage | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [channelProfileContext, setChannelProfileContext] =
     useState<ChannelProfileAnchorContext | null>(null);
@@ -1804,6 +1803,7 @@ export default function MessagesPage() {
     clearNewMessageChannel,
     clearChannelNotification,
     clearServerDeleted,
+    channelMessageDeleted,
   } = useChannelMessages({ token });
 
   const inboxRefetchTimerRef = useRef<number | null>(null);
@@ -1945,6 +1945,38 @@ export default function MessagesPage() {
     });
   }, [reactionUpdateChannel, selectedChannel]);
 
+  // ✅ Channel: xóa cho tôi / thu hồi (socket — đồng bộ mọi client trong room kênh)
+  useEffect(() => {
+    if (!channelMessageDeleted) return;
+    const { channelId, messageId, deleteType, deletedAt } = channelMessageDeleted;
+    if (channelId !== selectedChannelRef.current) return;
+    const asRecalled = deleteType === "for-everyone";
+    const mid = messageId != null ? String(messageId) : "";
+    if (!mid) return;
+
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => String(m.id) === mid);
+      if (idx === -1) return prev;
+      if (asRecalled) {
+        if (prev[idx].isDeletedForEveryone) return prev;
+        const next = prev.slice();
+        next[idx] = {
+          ...next[idx],
+          isDeletedForEveryone: true,
+          deletedAt: deletedAt || new Date().toISOString(),
+          text: "",
+          giphyId: undefined,
+          customStickerUrl: undefined,
+          voiceUrl: undefined,
+          voiceDuration: undefined,
+          reactions: [],
+        };
+        return next;
+      }
+      return prev.filter((m) => String(m.id) !== mid);
+    });
+  }, [channelMessageDeleted]);
+
   // ✅ New message in channel from WebSocket (thành viên khác gửi → hiện ngay không cần reload)
   useEffect(() => {
     if (!newMessageChannel?.message || !selectedChannel) return;
@@ -2020,6 +2052,8 @@ export default function MessagesPage() {
       reactions: normalizeReactions(msg.reactions),
       replyTo: msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo._id : typeof msg.replyTo === "string" ? msg.replyTo : undefined,
       replyToMessage: mapReplyToMessage(msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo : null),
+      isDeletedForEveryone: msg.isDeleted === true,
+      deletedAt: msg.deletedAt || undefined,
     };
     setMessages((prev) => appendServerMessage(prev, uiMessage));
     shouldAutoScrollRef.current = true;
@@ -3918,6 +3952,8 @@ export default function MessagesPage() {
         replyToMessage: mapReplyToMessage(
           msg.replyTo && typeof msg.replyTo === "object" ? msg.replyTo : null,
         ),
+        isDeletedForEveryone: (msg as serversApi.Message).isDeleted === true,
+        deletedAt: (msg as serversApi.Message).deletedAt || undefined,
       }));
 
       setMessages(sortServerMessagesAscending(uiMessages));
@@ -4270,47 +4306,76 @@ export default function MessagesPage() {
     messageId: string,
     deleteType: "for-everyone" | "for-me",
   ) => {
-    try {
-      await deleteDirectMessage(messageId, deleteType, { token });
-
-      // Emit socket so the other side updates instantly (backend also
-      // broadcasts from the REST handler — double-fire is idempotent).
-      if (deleteType === "for-everyone" && emitDeleteMessage) {
-        const friendId = selectedDirectMessageFriend?._id;
-        emitDeleteMessage(messageId, deleteType, friendId);
-      }
-
-      // Local optimistic update.
-      setConversations((prev) => {
-        const newMap = new Map(prev);
-        const midLocal = String(messageId);
-        for (const [friendId, messages] of newMap.entries()) {
-          const idx = messages.findIndex((m) => String(m.id) === midLocal);
-          if (idx === -1) continue;
-
-          if (deleteType === "for-me") {
-            // Hide the bubble entirely on this device.
-            const next = messages.filter((m) => String(m.id) !== midLocal);
-            newMap.set(friendId, next);
-          } else {
-            // Keep the bubble; replace with a "recalled" placeholder.
-            const next = messages.slice();
-            next[idx] = {
-              ...next[idx],
-              isDeletedForEveryone: true,
-              deletedAt: new Date().toISOString(),
-              text: "",
-              giphyId: undefined,
-              customStickerUrl: undefined,
-              voiceUrl: undefined,
-              voiceDuration: undefined,
-              reactions: [],
-            };
-            newMap.set(friendId, next);
-          }
+    const midLocal = String(messageId);
+    const applyChannelLocal = () => {
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => String(m.id) === midLocal);
+        if (idx === -1) return prev;
+        if (deleteType === "for-me") {
+          return prev.filter((m) => String(m.id) !== midLocal);
         }
-        return newMap;
+        if (prev[idx].isDeletedForEveryone) return prev;
+        const next = prev.slice();
+        next[idx] = {
+          ...next[idx],
+          isDeletedForEveryone: true,
+          deletedAt: new Date().toISOString(),
+          text: "",
+          giphyId: undefined,
+          customStickerUrl: undefined,
+          voiceUrl: undefined,
+          voiceDuration: undefined,
+          reactions: [],
+        };
+        return next;
       });
+    };
+
+    try {
+      if (selectedDirectMessageFriend) {
+        await deleteDirectMessage(messageId, deleteType, { token });
+
+        if (deleteType === "for-everyone" && emitDeleteMessage) {
+          const friendId = selectedDirectMessageFriend._id;
+          emitDeleteMessage(messageId, deleteType, friendId);
+        }
+
+        setConversations((prev) => {
+          const newMap = new Map(prev);
+          for (const [friendId, messages] of newMap.entries()) {
+            const idx = messages.findIndex((m) => String(m.id) === midLocal);
+            if (idx === -1) continue;
+
+            if (deleteType === "for-me") {
+              const next = messages.filter((m) => String(m.id) !== midLocal);
+              newMap.set(friendId, next);
+            } else {
+              const next = messages.slice();
+              next[idx] = {
+                ...next[idx],
+                isDeletedForEveryone: true,
+                deletedAt: new Date().toISOString(),
+                text: "",
+                giphyId: undefined,
+                customStickerUrl: undefined,
+                voiceUrl: undefined,
+                voiceDuration: undefined,
+                reactions: [],
+              };
+              newMap.set(friendId, next);
+            }
+          }
+          return newMap;
+        });
+      } else {
+        const chId = selectedChannelRef.current;
+        if (!chId) {
+          alert(t("chat.toast.deleteFailed") || "Không thể xóa tin nhắn");
+          return;
+        }
+        await serversApi.deleteChannelMessage(chId, messageId, deleteType);
+        applyChannelLocal();
+      }
 
       setToastMessage(
         deleteType === "for-everyone"
@@ -4318,9 +4383,6 @@ export default function MessagesPage() {
           : t("chat.toast.deletedForMe") || "Bạn đã xóa một tin nhắn",
       );
       setTimeout(() => setToastMessage(null), 3000);
-
-      // Close the legacy dialog if it's still open from the old flow.
-      setShowDeleteDialog(null);
     } catch (error) {
       console.error("Failed to delete message:", error);
       alert(t("chat.toast.deleteFailed") || "Không thể xóa tin nhắn");
@@ -7323,7 +7385,7 @@ export default function MessagesPage() {
                 </div>
               </>
             ) : (
-              // Server Selected - Header (tên máy chủ + mời) + Sự kiện + Nâng cấp + Kênh Chat & Kênh đàm thoại
+              // Server Selected - Header (tên máy chủ + mời) + Sự kiện + Kênh Chat & Kênh đàm thoại
               <>
                 <div className={styles.conversationsScrollArea}>
                 {/* Server header: tên máy chủ + mời tham gia */}
@@ -7423,14 +7485,6 @@ export default function MessagesPage() {
                   {serverEventsTotalCount > 0 && (
                     <span className={styles.eventCountBadge}>{serverEventsTotalCount} {t("chat.sidebar.events")}</span>
                   )}
-                </button>
-                {/* Nâng Cấp Máy Chủ */}
-                <button type="button" className={styles.serverMenuItem}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                    <path d="M2 17l10 5 10-5" />
-                  </svg>
-                  <span>{t("chat.sidebar.boostServer")}</span>
                 </button>
                 {canManageJoinApplications && selectedServer && (
                   <button
@@ -9374,7 +9428,12 @@ export default function MessagesPage() {
                             onReply={handleReplyToMessage}
                             onPin={handlePinMessage}
                             onReport={(msgId) => setShowReportDialog(msgId)}
-                            onDelete={(msgId) => setShowDeleteDialog(msgId)}
+                            onDeleteForMe={(msgId) =>
+                              void handleDeleteMessage(msgId, "for-me")
+                            }
+                            onDeleteForEveryone={(msgId) =>
+                              void handleDeleteMessage(msgId, "for-everyone")
+                            }
                             scrollContainerRef={messagesContainerRef}
                             senderColor={memberRoleColors[message.senderId]}
                             senderNameStyle={resolveMessageSenderStyle(message)}
@@ -11732,16 +11791,6 @@ export default function MessagesPage() {
             handleReportMessage(showReportDialog, reason, description)
           }
           onClose={() => setShowReportDialog(null)}
-        />
-      )}
-
-      {/* Delete Message Dialog */}
-      {showDeleteDialog && (
-        <DeleteMessageDialog
-          onConfirm={(deleteType) =>
-            handleDeleteMessage(showDeleteDialog, deleteType)
-          }
-          onClose={() => setShowDeleteDialog(null)}
         />
       )}
 

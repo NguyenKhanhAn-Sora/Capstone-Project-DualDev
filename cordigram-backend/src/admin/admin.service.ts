@@ -8473,7 +8473,7 @@ export class AdminService implements OnModuleInit {
       throw new NotFoundException('Channel not found in this server');
 
     const messages = await this.messageModel
-      .find({ channelId: new Types.ObjectId(channelId), isDeleted: false })
+      .find({ channelId: new Types.ObjectId(channelId) })
       .populate('senderId', 'email')
       .populate({
         path: 'replyTo',

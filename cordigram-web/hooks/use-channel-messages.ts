@@ -79,6 +79,13 @@ export interface JoinApplicationUpdatedEvent {
   status: "accepted" | "rejected" | "withdrawn";
 }
 
+export interface ChannelMessageDeletedEvent {
+  channelId: string;
+  messageId: string;
+  deleteType: "for-everyone" | "for-me";
+  deletedAt?: string;
+}
+
 interface UseChannelMessagesOptions {
   token: string | null;
 }
@@ -96,6 +103,8 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
     useState<UserProfileStyleUpdatedEvent | null>(null);
   const [boostEntitlementUpdated, setBoostEntitlementUpdated] =
     useState<BoostEntitlementUpdatedEvent | null>(null);
+  const [channelMessageDeleted, setChannelMessageDeleted] =
+    useState<ChannelMessageDeletedEvent | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -182,6 +191,17 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
       }
     });
 
+    socket.on("message-deleted", (data: ChannelMessageDeletedEvent) => {
+      if (!data?.messageId || !data?.channelId || !data?.deleteType) return;
+      setChannelMessageDeleted({
+        channelId: data.channelId,
+        messageId: data.messageId,
+        deleteType: data.deleteType,
+        deletedAt: data.deletedAt,
+      });
+      window.setTimeout(() => setChannelMessageDeleted(null), 500);
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
@@ -218,5 +238,6 @@ export function useChannelMessages({ token }: UseChannelMessagesOptions) {
     clearNewMessageChannel,
     clearChannelNotification,
     clearServerDeleted,
+    channelMessageDeleted,
   };
 }

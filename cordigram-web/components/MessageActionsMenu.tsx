@@ -5,11 +5,7 @@ import styles from "./MessageActionsMenu.module.css";
 import { useLanguage } from "@/component/language-provider";
 
 interface MessageActionsMenuProps {
-  /**
-   * Legacy generic "remove" action (kept for channel messages that still
-   * go through the DeleteMessageDialog flow). DM bubbles should use the
-   * split `onDeleteForMe` / `onDeleteForEveryone` handlers instead.
-   */
+  /** Legacy "Gỡ" — chỉ hiện khi truyền `onRemove` (vd. luồng cũ). DM và kênh máy chủ dùng `onDeleteForMe` / `onDeleteForEveryone`. */
   onRemove?: () => void;
   onForward?: () => void;
   onPin?: () => void;
