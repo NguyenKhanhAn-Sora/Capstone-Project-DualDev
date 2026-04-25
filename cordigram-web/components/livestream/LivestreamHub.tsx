@@ -2266,7 +2266,11 @@ export default function LivestreamHub({
   >({});
   const [viewerHostProfile, setViewerHostProfile] = useState<{ username: string; avatarUrl?: string } | null>(null);
   const [viewerTitleMentionMap, setViewerTitleMentionMap] = useState<Record<string, string>>({});
+  const [livestreamEnded, setLivestreamEnded] = useState(false);
+  const [showEndedModal, setShowEndedModal] = useState(false);
   const lastTransportResetAtRef = useRef(0);
+  const hostEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const wasViewerConnectedRef = useRef(false);
   const isHostSession = forceHost || role === "host";
 
   const loadHostProfileByUserId = useCallback(
@@ -2298,6 +2302,61 @@ export default function LivestreamHub({
     },
     [],
   );
+
+  // Auto-end livestream when host leaves or closes the page
+  useEffect(() => {
+    if (!isHostSession || !activeStreamMeta?.id) return;
+
+    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
+      // Prevent the default message, but this is just a fallback
+      // The actual ending happens in the cleanup
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    const cleanup = async () => {
+      // Clear timeout if exists
+      if (hostEndTimeoutRef.current) {
+        clearTimeout(hostEndTimeoutRef.current);
+        hostEndTimeoutRef.current = null;
+      }
+
+      // End livestream with a small delay to ensure proper cleanup
+      if (activeStreamMeta?.id) {
+        try {
+          await endLivestream(activeStreamMeta.id);
+        } catch {
+          // Silently fail - host is leaving anyway
+        }
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      // Call cleanup immediately when component unmounts or activeStreamMeta changes
+      void cleanup();
+    };
+  }, [isHostSession, activeStreamMeta?.id]);
+
+  // Track viewer connection and show modal only when viewer was connected and then disconnected
+  useEffect(() => {
+    if (!isViewerPage || isHostSession) return;
+
+    // Update whether viewer has ever been connected
+    if (roomConnected) {
+      wasViewerConnectedRef.current = true;
+    }
+
+    // Show ended modal only if:
+    // 1. Viewer is NOT currently connected
+    // 2. Viewer WAS previously connected (not the initial state)
+    if (!roomConnected && wasViewerConnectedRef.current) {
+      setLivestreamEnded(true);
+      setShowEndedModal(true);
+    }
+  }, [isViewerPage, isHostSession, roomConnected]);
 
   const loadStreams = useCallback(async () => {
     try {
@@ -2621,6 +2680,11 @@ export default function LivestreamHub({
                 }}
                 onDisconnected={() => {
                   setRoomConnected(false);
+                  // Show ended modal to viewers if they were connected
+                  if (!isHostSession) {
+                    setLivestreamEnded(true);
+                    setShowEndedModal(true);
+                  }
                 }}
                 onMediaDeviceFailure={() => {
                   setMediaError("Browser blocked screen share or microphone. Please allow device permissions.");
@@ -2867,6 +2931,36 @@ export default function LivestreamHub({
                 disabled={endingLive}
               >
                 {endingLive ? "Ending..." : "End live"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showEndedModal && livestreamEnded ? (
+        <div
+          className={hubStyles.endOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="livestream-ended-title"
+        >
+          <div className={hubStyles.endOverlayCard} onClick={(event) => event.stopPropagation()}>
+            <h3 id="livestream-ended-title" className={hubStyles.endOverlayTitle}>
+              Livestream Ended
+            </h3>
+            <p className={hubStyles.endOverlayText}>
+              This livestream has ended. Thank you for watching!
+            </p>
+            <div className={hubStyles.endOverlayActions}>
+              <button
+                type="button"
+                className={hubStyles.endOverlayConfirm}
+                onClick={() => {
+                  router.push("/");
+                }}
+                style={{ width: "100%" }}
+              >
+                Back to Home
               </button>
             </div>
           </div>
