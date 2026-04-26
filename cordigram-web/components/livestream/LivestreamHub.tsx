@@ -1269,7 +1269,18 @@ function HostMediaControls({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [autoTried, setAutoTried] = useState(false);
+  const [selectedShareMode, setSelectedShareMode] = useState<LivestreamHostVideoMode>(
+    "screen-camera",
+  );
+  const [cameraPosition, setCameraPosition] = useState<LivestreamCameraPosition>(
+    DEFAULT_HOST_CAMERA_LAYOUT.cameraPosition,
+  );
+  const [cameraSize, setCameraSize] = useState<LivestreamCameraSize>(
+    DEFAULT_HOST_CAMERA_LAYOUT.cameraSize,
+  );
+  const [showModeOptions, setShowModeOptions] = useState(false);
   const pendingPublishAttemptedRef = useRef(false);
+  const modeSelectorRef = useRef<HTMLDivElement | null>(null);
 
   if (!visible) return null;
 
@@ -1296,7 +1307,7 @@ function HostMediaControls({
 
   const tryApplyPendingScreenShare = async (): Promise<boolean> => {
     const config = getPendingHostVideoConfig() || {
-      mode: "screen-only" as LivestreamHostVideoMode,
+      mode: "screen-camera" as LivestreamHostVideoMode,
       cameraPosition: DEFAULT_HOST_CAMERA_LAYOUT.cameraPosition,
       cameraSize: DEFAULT_HOST_CAMERA_LAYOUT.cameraSize,
     };
@@ -1340,6 +1351,9 @@ function HostMediaControls({
         });
       }
 
+      setSelectedShareMode(config.mode);
+      setCameraPosition(config.cameraPosition);
+      setCameraSize(config.cameraSize);
       onHostVideoConfigChange(config);
 
       clearPendingLivestreamMedia();
@@ -1350,17 +1364,21 @@ function HostMediaControls({
   };
 
   const unpublishVideoTracks = async () => {
+    await unpublishTracksBySources([
+      Track.Source.ScreenShare,
+      Track.Source.ScreenShareAudio,
+      Track.Source.Camera,
+    ]);
+  };
+
+  const unpublishTracksBySources = async (sources: Track.Source[]) => {
     const publications = Array.from(
       ((localParticipant as any)?.trackPublications?.values?.() || []) as Iterable<any>,
     );
 
     for (const pub of publications) {
       const source = pub?.source;
-      if (
-        source !== Track.Source.ScreenShare &&
-        source !== Track.Source.ScreenShareAudio &&
-        source !== Track.Source.Camera
-      ) {
+      if (!sources.includes(source)) {
         continue;
       }
 
@@ -1381,7 +1399,7 @@ function HostMediaControls({
     }
   };
 
-  const captureAndPublishFromPicker = async () => {
+  const publishScreenShare = async (mode: LivestreamHostVideoMode) => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
       throw new Error("Screen sharing is not supported in this browser");
     }
@@ -1397,7 +1415,13 @@ function HostMediaControls({
     }
 
     await optimizePublishedScreenTrack(videoTrack, latencyMode);
-    await unpublishVideoTracks();
+
+    if (mode === "screen-only") {
+      await unpublishVideoTracks();
+    } else {
+      await unpublishTracksBySources([Track.Source.ScreenShare, Track.Source.ScreenShareAudio]);
+    }
+
     await (localParticipant as any).publishTrack(
       videoTrack,
       getScreenSharePublishOptions(latencyMode),
@@ -1410,17 +1434,18 @@ function HostMediaControls({
     }
 
     videoTrack.onended = () => {
-      void unpublishVideoTracks();
+      void unpublishTracksBySources([Track.Source.ScreenShare, Track.Source.ScreenShareAudio]);
     };
 
+    setSelectedShareMode(mode);
     onHostVideoConfigChange({
-      mode: "screen-only",
-      cameraPosition: DEFAULT_HOST_CAMERA_LAYOUT.cameraPosition,
-      cameraSize: DEFAULT_HOST_CAMERA_LAYOUT.cameraSize,
+      mode,
+      cameraPosition,
+      cameraSize,
     });
   };
 
-  const captureAndPublishCameraFromPicker = async () => {
+  const publishCamera = async (mode: LivestreamHostVideoMode) => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       throw new Error("Camera is not supported in this browser");
     }
@@ -1435,23 +1460,58 @@ function HostMediaControls({
       throw new Error("No valid camera track selected");
     }
 
-    await unpublishVideoTracks();
+    if (mode === "camera-only") {
+      await unpublishVideoTracks();
+    } else {
+      await unpublishTracksBySources([Track.Source.Camera]);
+    }
+
     await (localParticipant as any).publishTrack(videoTrack, {
       source: Track.Source.Camera,
     });
 
     videoTrack.onended = () => {
-      void unpublishVideoTracks();
+      void unpublishTracksBySources([Track.Source.Camera]);
     };
 
+    setSelectedShareMode(mode);
     onHostVideoConfigChange({
-      mode: "camera-only",
-      cameraPosition: DEFAULT_HOST_CAMERA_LAYOUT.cameraPosition,
-      cameraSize: DEFAULT_HOST_CAMERA_LAYOUT.cameraSize,
+      mode,
+      cameraPosition,
+      cameraSize,
     });
   };
 
-  const enableScreenShare = async (forcePicker: boolean | null) => {
+  const applyShareMode = (mode: LivestreamHostVideoMode) => {
+    setSelectedShareMode(mode);
+    setShowModeOptions(false);
+    setError("");
+    onHostVideoConfigChange({
+      mode,
+      cameraPosition,
+      cameraSize,
+    });
+  };
+
+  const applyCameraPosition = (position: LivestreamCameraPosition) => {
+    setCameraPosition(position);
+    onHostVideoConfigChange({
+      mode: selectedShareMode,
+      cameraPosition: position,
+      cameraSize,
+    });
+  };
+
+  const applyCameraSize = (size: LivestreamCameraSize) => {
+    setCameraSize(size);
+    onHostVideoConfigChange({
+      mode: selectedShareMode,
+      cameraPosition,
+      cameraSize: size,
+    });
+  };
+
+  const tryAutoApplyPendingMedia = async () => {
     try {
       if (!connected) {
         setError("Connecting to livestream room. Please retry in 1-2 seconds.");
@@ -1460,33 +1520,57 @@ function HostMediaControls({
       setBusy(true);
       setError("");
 
-      if (forcePicker === true) {
-        // User explicitly requested changing source: close current share and force browser picker.
-        clearPendingScreenShareStream();
-        clearPendingCameraStream();
-        pendingPublishAttemptedRef.current = true;
-        await captureAndPublishFromPicker();
+      if (pendingPublishAttemptedRef.current) {
         return;
       }
 
-      if (forcePicker === false && pendingPublishAttemptedRef.current) {
+      pendingPublishAttemptedRef.current = true;
+      const appliedPending = await tryApplyPendingScreenShare();
+      if (appliedPending) {
         return;
       }
 
-      if (forcePicker === false && !pendingPublishAttemptedRef.current) {
-        pendingPublishAttemptedRef.current = true;
-        const appliedPending = await tryApplyPendingScreenShare();
-        if (appliedPending) {
-          return;
-        }
-        setError("No pre-selected media source found. Choose screen share or camera to go live.");
+      setError("No pre-selected media source found. Choose screen share or camera to go live.");
+    } catch (err) {
+      setError(mapMediaError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleChooseScreenShare = async () => {
+    try {
+      if (!connected) {
+        setError("Connecting to livestream room. Please retry in 1-2 seconds.");
         return;
       }
 
-      if (forcePicker === null) {
-        await captureAndPublishCameraFromPicker();
+      setBusy(true);
+      setError("");
+      clearPendingScreenShareStream();
+
+      const modeForAction = selectedShareMode === "screen-camera" ? "screen-camera" : "screen-only";
+      await publishScreenShare(modeForAction);
+    } catch (err) {
+      setError(mapMediaError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleEnableCamera = async () => {
+    try {
+      if (!connected) {
+        setError("Connecting to livestream room. Please retry in 1-2 seconds.");
         return;
       }
+
+      setBusy(true);
+      setError("");
+      clearPendingCameraStream();
+
+      const modeForAction = selectedShareMode === "camera-only" ? "camera-only" : "screen-camera";
+      await publishCamera(modeForAction);
     } catch (err) {
       setError(mapMediaError(err));
     } finally {
@@ -1497,36 +1581,121 @@ function HostMediaControls({
   useEffect(() => {
     if (!visible || !connected || autoTried) return;
     setAutoTried(true);
-    void enableScreenShare(false);
+    void tryAutoApplyPendingMedia();
   }, [autoTried, connected, visible]);
 
+  useEffect(() => {
+    if (!showModeOptions) return;
+
+    const handlePointerDownOutside = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (modeSelectorRef.current?.contains(target)) return;
+      setShowModeOptions(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDownOutside);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDownOutside);
+    };
+  }, [showModeOptions]);
+
+  const selectedShareModeLabel =
+    selectedShareMode === "screen-only"
+      ? "Screen only"
+      : selectedShareMode === "camera-only"
+        ? "Camera only"
+        : "Screen + camera";
+
   return (
-    <div className={hubStyles.hostControls}>
-      <button
-        type="button"
-        className={hubStyles.hostControlBtn}
-        onClick={() => void enableScreenShare(true)}
-        disabled={busy}
-      >
-        Change screen share
-      </button>
-      <button
-        type="button"
-        className={hubStyles.hostControlBtn}
-        onClick={() => void enableScreenShare(null)}
-        disabled={busy}
-      >
-        Change camera
-      </button>
-      <button
-        type="button"
-        className={hubStyles.hostControlEnd}
-        onClick={onEndLive}
-        disabled={ending}
-      >
-        {ending ? "Ending..." : "End live"}
-      </button>
-    </div>
+    <>
+      <div className={hubStyles.hostControls}>
+        <div className={hubStyles.hostControlsLeft}>
+          <div className={hubStyles.hostModeSelector} ref={modeSelectorRef}>
+            <button
+              type="button"
+              className={hubStyles.hostControlBtn}
+              onClick={() => setShowModeOptions((prev) => !prev)}
+              disabled={busy}
+              aria-expanded={showModeOptions}
+              aria-label={`Current share mode: ${selectedShareModeLabel}`}
+            >
+              {selectedShareModeLabel}
+            </button>
+
+            {showModeOptions ? (
+              <div className={hubStyles.hostModeOptions}>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostControlGhost} ${
+                    selectedShareMode === "screen-only" ? hubStyles.hostModeOptionActive : ""
+                  }`}
+                  onClick={() => applyShareMode("screen-only")}
+                  disabled={busy}
+                >
+                  Screen only
+                </button>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostControlGhost} ${
+                    selectedShareMode === "screen-camera" ? hubStyles.hostModeOptionActive : ""
+                  }`}
+                  onClick={() => applyShareMode("screen-camera")}
+                  disabled={busy}
+                >
+                  Screen + camera
+                </button>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostControlGhost} ${
+                    selectedShareMode === "camera-only" ? hubStyles.hostModeOptionActive : ""
+                  }`}
+                  onClick={() => applyShareMode("camera-only")}
+                  disabled={busy}
+                >
+                  Camera only
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {selectedShareMode !== "camera-only" ? (
+            <button
+              type="button"
+              className={hubStyles.hostControlBtn}
+              onClick={() => void handleChooseScreenShare()}
+              disabled={busy}
+            >
+              Choose screen share
+            </button>
+          ) : null}
+
+          {selectedShareMode !== "screen-only" ? (
+            <button
+              type="button"
+              className={hubStyles.hostControlBtn}
+              onClick={() => void handleEnableCamera()}
+              disabled={busy}
+            >
+              Enable camera
+            </button>
+          ) : null}
+        </div>
+
+        <div className={hubStyles.hostControlsRight}>
+          <button
+            type="button"
+            className={hubStyles.hostControlEnd}
+            onClick={onEndLive}
+            disabled={ending}
+          >
+            {ending ? "Ending..." : "End live"}
+          </button>
+        </div>
+      </div>
+
+      {error ? <p className={hubStyles.hostControlError}>{error}</p> : null}
+    </>
   );
 }
 
@@ -1534,11 +1703,21 @@ function HostStreamAdminPanel({
   visible,
   streamId,
   meta,
+  hostVideoMode,
+  hostCameraLayout,
+  onHostVideoConfigChange,
   onMetaPatch,
 }: {
   visible: boolean;
   streamId: string;
   meta: LivestreamItem;
+  hostVideoMode: LivestreamHostVideoMode;
+  hostCameraLayout: HostCameraLayout;
+  onHostVideoConfigChange: (config: {
+    mode: LivestreamHostVideoMode;
+    cameraPosition: LivestreamCameraPosition;
+    cameraSize: LivestreamCameraSize;
+  }) => void;
   onMetaPatch: (patch: LivestreamMetaPatch) => void;
 }) {
   const { localParticipant } = useLocalParticipant();
@@ -1759,194 +1938,297 @@ function HostStreamAdminPanel({
     }, 0);
   };
 
+  const applyCameraPosition = (position: LivestreamCameraPosition) => {
+    onHostVideoConfigChange({
+      mode: hostVideoMode,
+      cameraPosition: position,
+      cameraSize: hostCameraLayout.cameraSize,
+    });
+  };
+
+  const applyCameraSize = (size: LivestreamCameraSize) => {
+    onHostVideoConfigChange({
+      mode: hostVideoMode,
+      cameraPosition: hostCameraLayout.cameraPosition,
+      cameraSize: size,
+    });
+  };
+
   return (
     <aside className={hubStyles.hostAdminPanel}>
       <div className={hubStyles.hostAdminHeader}>
         <h3 className={hubStyles.hostAdminTitle}>Host controls</h3>
       </div>
 
-      <label className={hubStyles.hostField}>
-        <span>Title</span>
-        <div className={hubStyles.hostTitleShell}>
-          <textarea
-            ref={titleRef}
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            onKeyDown={(event) => {
-              if (!mentionOpen) return;
-              if (event.key === "ArrowDown") {
-                event.preventDefault();
-                if (!mentionSuggestions.length) return;
-                setMentionHighlight((prev) =>
-                  prev + 1 < mentionSuggestions.length ? prev + 1 : 0,
-                );
-                return;
-              }
-              if (event.key === "ArrowUp") {
-                event.preventDefault();
-                if (!mentionSuggestions.length) return;
-                setMentionHighlight((prev) =>
-                  prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1,
-                );
-                return;
-              }
-              if (event.key === "Enter" && mentionHighlight >= 0) {
-                event.preventDefault();
-                const selected = mentionSuggestions[mentionHighlight];
-                if (selected) selectMention(selected);
-              }
-              if (event.key === "Escape") {
-                setMentionOpen(false);
-              }
-            }}
-            maxLength={300}
-            className={hubStyles.hostTextarea}
-            placeholder="Enter livestream title and tag with @username"
-          />
-          <div className={hubStyles.hostEmojiWrapInField} ref={emojiRef}>
-            <button
-              type="button"
-              className={hubStyles.hostEmojiButton}
-              onClick={() => setShowEmojiPicker((prev) => !prev)}
-              aria-label="Open emoji picker"
-            >
-              <svg
-                aria-hidden
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
-                <circle cx="9" cy="10" r="1.1" fill="currentColor" />
-                <circle cx="15" cy="10" r="1.1" fill="currentColor" />
-                <path
-                  d="M8.5 14.2C9.4 15.4 10.6 16 12 16c1.4 0 2.6-.6 3.5-1.8"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-
-            {showEmojiPicker ? (
-              <div className={hubStyles.hostEmojiPickerPanel}>
-                <EmojiPicker
-                  width={300}
-                  height={360}
-                  previewConfig={{ showPreview: false }}
-                  onEmojiClick={(emojiData) => insertEmoji(emojiData.emoji)}
-                />
-              </div>
-            ) : null}
-          </div>
-
-          {mentionOpen ? (
-            <div className={hubStyles.hostMentionSuggestions}>
-              {mentionSuggestions.map((opt, idx) => (
+      <div className={hubStyles.hostAdminLayout}>
+        <div className={hubStyles.hostAdminContent}>
+          <label className={hubStyles.hostField}>
+            <span>Title</span>
+            <div className={hubStyles.hostTitleShell}>
+              <textarea
+                ref={titleRef}
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (!mentionOpen) return;
+                  if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    if (!mentionSuggestions.length) return;
+                    setMentionHighlight((prev) =>
+                      prev + 1 < mentionSuggestions.length ? prev + 1 : 0,
+                    );
+                    return;
+                  }
+                  if (event.key === "ArrowUp") {
+                    event.preventDefault();
+                    if (!mentionSuggestions.length) return;
+                    setMentionHighlight((prev) =>
+                      prev - 1 >= 0 ? prev - 1 : mentionSuggestions.length - 1,
+                    );
+                    return;
+                  }
+                  if (event.key === "Enter" && mentionHighlight >= 0) {
+                    event.preventDefault();
+                    const selected = mentionSuggestions[mentionHighlight];
+                    if (selected) selectMention(selected);
+                  }
+                  if (event.key === "Escape") {
+                    setMentionOpen(false);
+                  }
+                }}
+                maxLength={300}
+                className={hubStyles.hostTextarea}
+                placeholder="Enter livestream title and tag with @username"
+              />
+              <div className={hubStyles.hostEmojiWrapInField} ref={emojiRef}>
                 <button
                   type="button"
-                  key={opt.id}
-                  className={`${hubStyles.hostMentionOption} ${
-                    idx === mentionHighlight ? hubStyles.hostMentionOptionActive : ""
-                  }`}
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    selectMention(opt);
-                  }}
-                  onMouseEnter={() => setMentionHighlight(idx)}
+                  className={hubStyles.hostEmojiButton}
+                  onClick={() => setShowEmojiPicker((prev) => !prev)}
+                  aria-label="Open emoji picker"
                 >
-                  <img src={opt.avatarUrl} alt="" className={hubStyles.hostMentionAvatar} />
-                  <div className={hubStyles.hostMentionMeta}>
-                    <span className={hubStyles.hostMentionName}>{opt.displayName}</span>
-                    <span className={hubStyles.hostMentionUsername}>@{opt.username}</span>
-                  </div>
+                  <svg
+                    aria-hidden
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+                    <circle cx="9" cy="10" r="1.1" fill="currentColor" />
+                    <circle cx="15" cy="10" r="1.1" fill="currentColor" />
+                    <path
+                      d="M8.5 14.2C9.4 15.4 10.6 16 12 16c1.4 0 2.6-.6 3.5-1.8"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </button>
-              ))}
+
+                {showEmojiPicker ? (
+                  <div className={hubStyles.hostEmojiPickerPanel}>
+                    <EmojiPicker
+                      width={300}
+                      height={360}
+                      previewConfig={{ showPreview: false }}
+                      onEmojiClick={(emojiData) => insertEmoji(emojiData.emoji)}
+                    />
+                  </div>
+                ) : null}
+              </div>
+
+              {mentionOpen ? (
+                <div className={hubStyles.hostMentionSuggestions}>
+                  {mentionSuggestions.map((opt, idx) => (
+                    <button
+                      type="button"
+                      key={opt.id}
+                      className={`${hubStyles.hostMentionOption} ${
+                        idx === mentionHighlight ? hubStyles.hostMentionOptionActive : ""
+                      }`}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        selectMention(opt);
+                      }}
+                      onMouseEnter={() => setMentionHighlight(idx)}
+                    >
+                      <img src={opt.avatarUrl} alt="" className={hubStyles.hostMentionAvatar} />
+                      <div className={hubStyles.hostMentionMeta}>
+                        <span className={hubStyles.hostMentionName}>{opt.displayName}</span>
+                        <span className={hubStyles.hostMentionUsername}>@{opt.username}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </label>
+
+          <label className={hubStyles.hostField}>
+            <span>Description</span>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              maxLength={500}
+              className={hubStyles.hostTextarea}
+              placeholder="Write a short description"
+            />
+          </label>
+
+          <label className={hubStyles.hostField}>
+            <span>Pinned comment</span>
+            <input
+              value={pinnedComment}
+              onChange={(event) => setPinnedComment(event.target.value)}
+              maxLength={200}
+              className={hubStyles.hostInput}
+              placeholder="Type a pinned comment"
+            />
+          </label>
+
+          <label className={hubStyles.hostField}>
+            <span>Location</span>
+            <input
+              value={location}
+              onChange={(event) => setLocation(event.target.value)}
+              maxLength={150}
+              className={hubStyles.hostInput}
+              placeholder="Add a location"
+            />
+          </label>
+
+          <label className={hubStyles.hostField}>
+            <span>Latency mode</span>
+            <div className={hubStyles.hostLatencyGroup}>
+              {hostLatencyOptions.map((option) => {
+                const active = latencyMode === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`${hubStyles.hostLatencyCard} ${
+                      active ? hubStyles.hostLatencyCardActive : ""
+                    }`}
+                    onClick={() => setLatencyMode(option.value)}
+                  >
+                    <span className={hubStyles.hostLatencyTitle}>{option.label}</span>
+                    <span className={hubStyles.hostLatencyNote}>{option.note}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </label>
+
+          <button
+            type="button"
+            className={hubStyles.hostSaveBtn}
+            onClick={() => void handleSave()}
+            disabled={saving || !hasChanges}
+          >
+            {saving ? "Saving..." : "Save changes"}
+          </button>
+
+          {meta.provider === 'ivs' ? (
+            <div className={hubStyles.ivsCard}>
+              <p className={hubStyles.ivsTitle}>AWS IVS ingest (HQ mode)</p>
+              <p className={hubStyles.ivsText}>
+                Use OBS/ffmpeg with RTMPS ingest to stream in high quality.
+              </p>
+              <p className={hubStyles.ivsField}><strong>Ingest endpoint:</strong> {ivsInfo?.ingestEndpoint || "Loading..."}</p>
+              <p className={hubStyles.ivsField}><strong>Stream key:</strong> {ivsInfo?.streamKey || "Loading..."}</p>
+              <p className={hubStyles.ivsField}><strong>Playback URL:</strong> {ivsInfo?.playbackUrl || meta.ivsPlaybackUrl || "N/A"}</p>
             </div>
           ) : null}
+
+          {error ? <p className={hubStyles.hostAdminError}>{error}</p> : null}
+          {success ? <p className={hubStyles.hostAdminSuccess}>{success}</p> : null}
         </div>
-      </label>
 
-      <label className={hubStyles.hostField}>
-        <span>Description</span>
-        <textarea
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          maxLength={500}
-          className={hubStyles.hostTextarea}
-          placeholder="Write a short description"
-        />
-      </label>
+        <aside className={hubStyles.hostAdminCameraPanel}>
+          <p className={hubStyles.hostAdminCameraTitle}>Camera overlay</p>
 
-      <label className={hubStyles.hostField}>
-        <span>Pinned comment</span>
-        <input
-          value={pinnedComment}
-          onChange={(event) => setPinnedComment(event.target.value)}
-          maxLength={200}
-          className={hubStyles.hostInput}
-          placeholder="Type a pinned comment"
-        />
-      </label>
+          {hostVideoMode === "screen-camera" ? (
+            <div className={hubStyles.hostCameraConfig}>
+              <div className={hubStyles.hostOptionGroup}>
+                <span className={hubStyles.hostControlLabel}>Position</span>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostOptionBtn} ${
+                    hostCameraLayout.cameraPosition === "top-left" ? hubStyles.hostOptionBtnActive : ""
+                  }`}
+                  onClick={() => applyCameraPosition("top-left")}
+                >
+                  Top left
+                </button>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostOptionBtn} ${
+                    hostCameraLayout.cameraPosition === "top-right" ? hubStyles.hostOptionBtnActive : ""
+                  }`}
+                  onClick={() => applyCameraPosition("top-right")}
+                >
+                  Top right
+                </button>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostOptionBtn} ${
+                    hostCameraLayout.cameraPosition === "bottom-left" ? hubStyles.hostOptionBtnActive : ""
+                  }`}
+                  onClick={() => applyCameraPosition("bottom-left")}
+                >
+                  Bottom left
+                </button>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostOptionBtn} ${
+                    hostCameraLayout.cameraPosition === "bottom-right" ? hubStyles.hostOptionBtnActive : ""
+                  }`}
+                  onClick={() => applyCameraPosition("bottom-right")}
+                >
+                  Bottom right
+                </button>
+              </div>
 
-      <label className={hubStyles.hostField}>
-        <span>Location</span>
-        <input
-          value={location}
-          onChange={(event) => setLocation(event.target.value)}
-          maxLength={150}
-          className={hubStyles.hostInput}
-          placeholder="Add a location"
-        />
-      </label>
-
-      <label className={hubStyles.hostField}>
-        <span>Latency mode</span>
-        <div className={hubStyles.hostLatencyGroup}>
-          {hostLatencyOptions.map((option) => {
-            const active = latencyMode === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                className={`${hubStyles.hostLatencyCard} ${
-                  active ? hubStyles.hostLatencyCardActive : ""
-                }`}
-                onClick={() => setLatencyMode(option.value)}
-              >
-                <span className={hubStyles.hostLatencyTitle}>{option.label}</span>
-                <span className={hubStyles.hostLatencyNote}>{option.note}</span>
-              </button>
-            );
-          })}
-        </div>
-      </label>
-
-      <button
-        type="button"
-        className={hubStyles.hostSaveBtn}
-        onClick={() => void handleSave()}
-        disabled={saving || !hasChanges}
-      >
-        {saving ? "Saving..." : "Save changes"}
-      </button>
-
-      {meta.provider === 'ivs' ? (
-        <div className={hubStyles.ivsCard}>
-          <p className={hubStyles.ivsTitle}>AWS IVS ingest (HQ mode)</p>
-          <p className={hubStyles.ivsText}>
-            Use OBS/ffmpeg with RTMPS ingest to stream in high quality.
-          </p>
-          <p className={hubStyles.ivsField}><strong>Ingest endpoint:</strong> {ivsInfo?.ingestEndpoint || "Loading..."}</p>
-          <p className={hubStyles.ivsField}><strong>Stream key:</strong> {ivsInfo?.streamKey || "Loading..."}</p>
-          <p className={hubStyles.ivsField}><strong>Playback URL:</strong> {ivsInfo?.playbackUrl || meta.ivsPlaybackUrl || "N/A"}</p>
-        </div>
-      ) : null}
-
-      {error ? <p className={hubStyles.hostAdminError}>{error}</p> : null}
-      {success ? <p className={hubStyles.hostAdminSuccess}>{success}</p> : null}
+              <div className={hubStyles.hostOptionGroup}>
+                <span className={hubStyles.hostControlLabel}>Size</span>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostOptionBtn} ${
+                    hostCameraLayout.cameraSize === "small" ? hubStyles.hostOptionBtnActive : ""
+                  }`}
+                  onClick={() => applyCameraSize("small")}
+                >
+                  Small
+                </button>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostOptionBtn} ${
+                    hostCameraLayout.cameraSize === "medium" ? hubStyles.hostOptionBtnActive : ""
+                  }`}
+                  onClick={() => applyCameraSize("medium")}
+                >
+                  Medium
+                </button>
+                <button
+                  type="button"
+                  className={`${hubStyles.hostOptionBtn} ${
+                    hostCameraLayout.cameraSize === "large" ? hubStyles.hostOptionBtnActive : ""
+                  }`}
+                  onClick={() => applyCameraSize("large")}
+                >
+                  Large
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className={hubStyles.hostAdminCameraEmpty}>
+              Enable Screen + camera mode in Change share mode to customize overlay.
+            </p>
+          )}
+        </aside>
+      </div>
     </aside>
   );
 }
@@ -1984,7 +2266,11 @@ export default function LivestreamHub({
   >({});
   const [viewerHostProfile, setViewerHostProfile] = useState<{ username: string; avatarUrl?: string } | null>(null);
   const [viewerTitleMentionMap, setViewerTitleMentionMap] = useState<Record<string, string>>({});
+  const [livestreamEnded, setLivestreamEnded] = useState(false);
+  const [showEndedModal, setShowEndedModal] = useState(false);
   const lastTransportResetAtRef = useRef(0);
+  const hostEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const wasViewerConnectedRef = useRef(false);
   const isHostSession = forceHost || role === "host";
 
   const loadHostProfileByUserId = useCallback(
@@ -2016,6 +2302,61 @@ export default function LivestreamHub({
     },
     [],
   );
+
+  // Auto-end livestream when host leaves or closes the page
+  useEffect(() => {
+    if (!isHostSession || !activeStreamMeta?.id) return;
+
+    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
+      // Prevent the default message, but this is just a fallback
+      // The actual ending happens in the cleanup
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    const cleanup = async () => {
+      // Clear timeout if exists
+      if (hostEndTimeoutRef.current) {
+        clearTimeout(hostEndTimeoutRef.current);
+        hostEndTimeoutRef.current = null;
+      }
+
+      // End livestream with a small delay to ensure proper cleanup
+      if (activeStreamMeta?.id) {
+        try {
+          await endLivestream(activeStreamMeta.id);
+        } catch {
+          // Silently fail - host is leaving anyway
+        }
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      // Call cleanup immediately when component unmounts or activeStreamMeta changes
+      void cleanup();
+    };
+  }, [isHostSession, activeStreamMeta?.id]);
+
+  // Track viewer connection and show modal only when viewer was connected and then disconnected
+  useEffect(() => {
+    if (!isViewerPage || isHostSession) return;
+
+    // Update whether viewer has ever been connected
+    if (roomConnected) {
+      wasViewerConnectedRef.current = true;
+    }
+
+    // Show ended modal only if:
+    // 1. Viewer is NOT currently connected
+    // 2. Viewer WAS previously connected (not the initial state)
+    if (!roomConnected && wasViewerConnectedRef.current) {
+      setLivestreamEnded(true);
+      setShowEndedModal(true);
+    }
+  }, [isViewerPage, isHostSession, roomConnected]);
 
   const loadStreams = useCallback(async () => {
     try {
@@ -2339,6 +2680,11 @@ export default function LivestreamHub({
                 }}
                 onDisconnected={() => {
                   setRoomConnected(false);
+                  // Show ended modal to viewers if they were connected
+                  if (!isHostSession) {
+                    setLivestreamEnded(true);
+                    setShowEndedModal(true);
+                  }
                 }}
                 onMediaDeviceFailure={() => {
                   setMediaError("Browser blocked screen share or microphone. Please allow device permissions.");
@@ -2401,6 +2747,15 @@ export default function LivestreamHub({
                   visible={isHostSession}
                   streamId={activeStreamMeta.id}
                   meta={activeStreamMeta}
+                  hostVideoMode={hostVideoMode}
+                  hostCameraLayout={hostCameraLayout}
+                  onHostVideoConfigChange={(config) => {
+                    setHostVideoMode(config.mode);
+                    setHostCameraLayout({
+                      cameraPosition: config.cameraPosition,
+                      cameraSize: config.cameraSize,
+                    });
+                  }}
                   onMetaPatch={(patch) => {
                     setActiveStreamMeta((prev) => {
                       if (!prev) return prev;
@@ -2576,6 +2931,36 @@ export default function LivestreamHub({
                 disabled={endingLive}
               >
                 {endingLive ? "Ending..." : "End live"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showEndedModal && livestreamEnded ? (
+        <div
+          className={hubStyles.endOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="livestream-ended-title"
+        >
+          <div className={hubStyles.endOverlayCard} onClick={(event) => event.stopPropagation()}>
+            <h3 id="livestream-ended-title" className={hubStyles.endOverlayTitle}>
+              Livestream Ended
+            </h3>
+            <p className={hubStyles.endOverlayText}>
+              This livestream has ended. Thank you for watching!
+            </p>
+            <div className={hubStyles.endOverlayActions}>
+              <button
+                type="button"
+                className={hubStyles.endOverlayConfirm}
+                onClick={() => {
+                  router.push("/");
+                }}
+                style={{ width: "100%" }}
+              >
+                Back to Home
               </button>
             </div>
           </div>
