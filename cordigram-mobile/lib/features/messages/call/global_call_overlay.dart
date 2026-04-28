@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'dm_call_manager.dart';
+import '../services/voice_channel_session_controller.dart';
 
 /// Wraps the whole app (via `MaterialApp.builder`) so that incoming /
 /// outgoing call popups are visible no matter which screen the user is on.
@@ -46,7 +47,7 @@ class GlobalCallOverlay extends StatelessWidget {
                     avatarUrl: incoming.callerAvatarUrl,
                     acceptLabel: 'Chấp nhận',
                     rejectLabel: 'Từ chối',
-                    onAccept: () => mgr.acceptIncoming(),
+                    onAccept: () => _acceptIncoming(context, mgr),
                     onReject: mgr.rejectIncoming,
                   ),
                 ),
@@ -82,6 +83,49 @@ class GlobalCallOverlay extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _acceptIncoming(BuildContext context, DmCallManager mgr) async {
+    final voiceSession = VoiceChannelSessionController.instance;
+    if (!voiceSession.active) {
+      await mgr.acceptIncoming();
+      return;
+    }
+
+    final leaveVoiceFirst = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF0E2247),
+          title: const Text(
+            'Đang ở kênh thoại server',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          ),
+          content: Text(
+            'Bạn đang trong kênh ${voiceSession.channelName ?? 'thoại'}. '
+            'Bạn cần rời kênh thoại trước khi nhận cuộc gọi DM.',
+            style: const TextStyle(color: Color(0xFFAFC0E2)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Từ chối'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Rời kênh và nhận'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (leaveVoiceFirst == true) {
+      await voiceSession.leave();
+      await mgr.acceptIncoming();
+      return;
+    }
+    mgr.rejectIncoming();
   }
 }
 

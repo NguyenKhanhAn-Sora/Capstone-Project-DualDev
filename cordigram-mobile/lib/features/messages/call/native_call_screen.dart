@@ -162,6 +162,12 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
         _connectedAt = DateTime.now();
       });
       _refreshParticipants();
+      DmCallManager.instance.bindActiveAudioControls(
+        micEnabled: _micEnabled,
+        soundEnabled: _speakerOn,
+        onSetMicEnabled: _setMicEnabled,
+        onSetSoundEnabled: _setSpeakerEnabled,
+      );
     } catch (err) {
       if (!mounted) return;
       setState(() {
@@ -193,8 +199,19 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
     final lp = _room?.localParticipant;
     if (lp == null) return;
     final next = !_micEnabled;
-    await lp.setMicrophoneEnabled(next);
-    if (mounted) setState(() => _micEnabled = next);
+    await _setMicEnabled(next);
+  }
+
+  Future<void> _setMicEnabled(bool enabled) async {
+    final lp = _room?.localParticipant;
+    if (lp == null) return;
+    await lp.setMicrophoneEnabled(enabled);
+    if (mounted) {
+      setState(() => _micEnabled = enabled);
+    } else {
+      _micEnabled = enabled;
+    }
+    DmCallManager.instance.updateActiveAudioState(micEnabled: enabled);
   }
 
   /// Voice call: flip to a video call by enabling the camera.
@@ -253,10 +270,19 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
 
   Future<void> _toggleSpeaker() async {
     final next = !_speakerOn;
+    await _setSpeakerEnabled(next);
+  }
+
+  Future<void> _setSpeakerEnabled(bool enabled) async {
     try {
-      await Hardware.instance.setSpeakerphoneOn(next);
-      await _applySpeakerState(next);
-      if (mounted) setState(() => _speakerOn = next);
+      await Hardware.instance.setSpeakerphoneOn(enabled);
+      await _applySpeakerState(enabled);
+      if (mounted) {
+        setState(() => _speakerOn = enabled);
+      } else {
+        _speakerOn = enabled;
+      }
+      DmCallManager.instance.updateActiveAudioState(soundEnabled: enabled);
     } catch (_) {}
   }
 
@@ -463,6 +489,7 @@ class _NativeCallScreenState extends State<NativeCallScreen> {
       unawaited(_roomListener?.dispose());
       unawaited(_room?.disconnect());
     }
+    DmCallManager.instance.unbindActiveAudioControls();
     super.dispose();
   }
 
